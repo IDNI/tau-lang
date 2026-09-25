@@ -253,6 +253,82 @@ TEST_SUITE("Tau API - string - execution") {
 #endif // TAU_PACK_HAS_BA_SBF
 
 
+	// A tautological literal still carries its lookback (README "Lookback
+	// initialization"): o2 is free at steps 0 and 1.
+	TEST_CASE("each clause keeps the warm-up it is written with") {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		CHECK( tau_api::sat(spec).value() );
+		CHECK( tau_api::realizable(spec).value() );
+		CHECK( !tau_api::unsat(spec).value() );
+
+		auto maybe_i = tau_api::get_interpreter(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value()) {
+				CHECK( output_at.name == "o2" );
+				collected.push_back(value);
+			}
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
+	// Every entry point that decides or runs a specification reads the
+	// same warm-ups, whatever polarity it decides.
+	TEST_CASE("the warm-ups as written reach every entry point") {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		const std::string neg = std::string("!(") + spec + ")";
+		CHECK( !tau_api::valid(neg).value() );
+		CHECK( !tau_api::valid_spec(neg).value() );
+		CHECK( !tau_api::valid(spec).value() );
+		CHECK( tau_api::valid("(always o2[t] = 1) -> "
+			"(always o2[t] = 1 && o1[t-2] = o1[t-2])").value() );
+		CHECK( !tau_api::valid("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"-> (always o2[t] = 1)").value() );
+		CHECK( !tau_api::unrealizable(spec).value() );
+		auto core = tau_api::unsat_core(std::string(spec) + ".", false);
+		REQUIRE( core.has_value() );
+		CHECK( core.value().empty() );
+		tau_api::reset_definitions();
+
+		// get_spec_as_written keeps the spec as written for the tref
+		// procedures
+		auto parsed = tau_api::get_spec_as_written(std::string(spec) + ".");
+		REQUIRE( parsed.has_value() );
+		CHECK( tau_api::sat(parsed.value()).value() );
+		CHECK( tau_api::realizable(parsed.value()).value() );
+		auto negated = tau_api::get_spec_as_written(neg + ".");
+		REQUIRE( negated.has_value() );
+		CHECK( !tau_api::valid(negated.value()).value() );
+		tau_api::reset_definitions();
+
+		// get_interpreter(tref) runs it with the warm-up
+		auto late = tau_api::get_spec_as_written(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( late.has_value() );
+		auto maybe_i = tau_api::get_interpreter(late.value());
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value())
+				collected.push_back(value);
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
 	TEST_CASE("using get_inputs_for_step") {
 
 		// Make the interpreter for a given specification as a string

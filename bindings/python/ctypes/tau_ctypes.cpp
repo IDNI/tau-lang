@@ -157,6 +157,22 @@ std::string build_json_array(const std::vector<std::string>& items) {
 	return ss.str();
 }
 
+// The formula's recurrence relation, its main formula keeping the warm-up
+// of each clause as written (pin_written_warm_ups), as get_interpreter
+// reads it; nullopt when it does not parse.
+std::optional<rr<node_t>> nso_rr_as_written(const char* formula) {
+	std::optional<rr<node_t>> nso;
+	{
+		use_hooks_guard<node_t> hooks_off(false);
+		nso = get_nso_rr<node_t>(tau::get(formula).value_or(nullptr));
+	}
+	if (!nso || !nso->main || !nso->main->get()) return nso;
+	auto pinned = tau_api::pin_main(nso->main->get());
+	if (!pinned.has_value()) return {};
+	nso->main = tau::geth(tau::reget(pinned.value()));
+	return nso;
+}
+
 } // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -174,7 +190,7 @@ extern "C" int tau_lang_decide(const char* formula) {
 	g_last_error.clear();
 
 	try {
-		auto nso = get_nso_rr<node_t>(tau::get(formula));
+		auto nso = nso_rr_as_written(formula);
 		if (!nso.has_value()) {
 			g_last_error = "parse error";
 			auto hint = classify_parse_error<node_t>(formula);
@@ -224,7 +240,7 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 
 	try {
 		// 1. Parse and check realizability
-		auto nso = get_nso_rr<node_t>(tau::get(formula));
+		auto nso = nso_rr_as_written(formula);
 		if (!nso.has_value()) {
 			g_last_error = "parse error";
 			auto hint = classify_parse_error<node_t>(formula);

@@ -1504,8 +1504,16 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	tref new_clause = rewriter::replace<node>(clause, changes);
 	DBG(LOG_TRACE << "    new clause: " << LOG_FM(new_clause);)
 
+	// Each part is enforced from its own lookback (README "Lookback
+	// initialization").
+	auto lookback = [](tref part) {
+		return get_max_shift<node>(tau::get(part)
+			.select_top(is_child<node, tau::io_var>));
+	};
 	// Eliminate parts in a group that are implied by another part in the same group.
 	// repr(parts[i]) returns the formula to use for implication checking.
+	// A part reading further back than the one implying it is kept: it
+	// starts later, where the other may no longer hold.
 	auto eliminate_implied = [&](trefs& parts, auto&& repr) {
 		for (size_t i = 0; i < parts.size(); ++i) {
 			// Skip parts already replaced by T: is_nso_impl(x, T) is
@@ -1519,9 +1527,12 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 			if (tau::get(parts[i]).equals_T()) continue;
 			for (size_t j = i + 1; j < parts.size(); ++j) {
 				if (tau::get(parts[j]).equals_T()) continue;
-				if (impl(repr(parts[i]), repr(parts[j])))
+				const int_t li = lookback(parts[i]);
+				const int_t lj = lookback(parts[j]);
+				if (lj <= li && impl(repr(parts[i]), repr(parts[j])))
 					parts[j] = tau::_T();
-				else if (impl(repr(parts[j]), repr(parts[i])))
+				else if (li <= lj
+					&& impl(repr(parts[j]), repr(parts[i])))
 					parts[i] = tau::_T();
 			}
 		}
@@ -1534,10 +1545,6 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	// nothing during its warm-up, where the sometimes part may already
 	// hold (README "Lookback initialization"), so such a pair decides
 	// nothing here.
-	auto lookback = [](tref part) {
-		return get_max_shift<node>(tau::get(part)
-			.select_top(is_child<node, tau::io_var>));
-	};
 	for (tref aw : aw_parts) for (tref st : st_parts) {
 		if (lookback(aw) > lookback(st)) continue;
 		tref f = tau::build_wff_and(

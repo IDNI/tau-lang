@@ -539,7 +539,7 @@ NB_MODULE(tau, m) {
 	// solver_error for UNKNOWN).
 	auto decide = [](const std::string& spec_str, auto&& procedure) {
 		idni::tau_lang::result<bool> r;
-		if (auto fm = r.merge_take(tau_api::get_spec(spec_str)))
+		if (auto fm = r.merge_take(tau_api::get_spec_as_written(spec_str)))
 			if (auto v = r.merge_take(procedure(*fm))) r = *v;
 		return to_py_result(std::move(r));
 	};

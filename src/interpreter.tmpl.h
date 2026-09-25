@@ -3865,6 +3865,8 @@ bool interpreter<node>::is_excluded_output(tref var) {
 	// The LTL step-counter encoding's own o__ltl_ctr bits are internal
 	// bookkeeping the same way (see apply_step_counter_encoding).
 	if (io_name.size() > 10 && io_name.substr(0, 10) == "o__ltl_ctr") return true;
+	// The warm-up of a clause (pin_written_warm_ups).
+	if (io_name == "o__warmup") return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }
@@ -3940,16 +3942,12 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 	// clauses of one part come from a single always body that
 	// create_spec_partition split per conjunct, so they already share
 	// one time frame: `always (A(t) && B(t))` means A and B from the same
-	// start point. Folding them through always_conjunction instead (as
-	// 76a69031 did) shifts the clause with the smaller lookback into the
-	// past, `always (A(t-1) && B(t))`, which asserts A one step BEFORE the
-	// run starts and, with an initial condition on the state, constrains
+	// start point. Shifting the clause with the smaller lookback into the
+	// past, `always (A(t-1) && B(t))`, would assert A one step BEFORE the
+	// run starts and, with an initial condition on the state, constrain
 	// an input the run never reads: a guarded latch such as
 	// `(o1[0] = 0) && (i1[t] = 1 ? o1[t] = 1 : o1[t] = o1[t-1])` was
-	// reported unsat (GitHub #100). always_conjunction is only right for
-	// two SEPARATELY written always statements, each with its own start;
-	// that case is merged by the normalizer before the spec reaches the
-	// interpreter and never arrives here as clauses of one always.
+	// reported unsat (GitHub #100).
 	tref aw_body = nullptr;
 	for (tref b : aw_clauses)
 		aw_body = aw_body ? tau::build_wff_and(aw_body, b) : b;

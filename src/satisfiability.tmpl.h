@@ -2076,6 +2076,216 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	return r;
 }
 
+/** @internal @copydoc pin_written_warm_ups @endinternal */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument,
+			messages::invalid_arguments);
+	}
+	// New nodes are built raw: a construction hook could fold a literal
+	// of a clause that is still to be read.
+	auto raw = [](auto&& build) {
+		use_hooks_guard<node> hooks_off(false);
+		return build();
+	};
+	auto peel = [](tref n) {
+		while (tau::get(n).child_is(tau::wff_parenthesis))
+			n = tau::get(n)[0].first();
+		return n;
+	};
+	auto is_temporal = [](tref n) {
+		return tau::get(n).find_top(is_temporal_quantifier<node>)
+			!= nullptr;
+	};
+	auto shifted_vars = [](tref n) {
+		return tau::get(n).select_top(is_child<node, tau::io_var>);
+	};
+	auto has_ref = [](tref n) {
+		return tau::get(n).find_top(is<node, tau::ref>) != nullptr;
+	};
+	bool failed = false;
+	// Deepest lookback left once the non-temporal parts of @p n are
+	// normalized, each on its own.
+	auto kept_lookback = [&](tref n) -> int_t {
+		int_t kept = 0;
+		trefs parts = tau::get(n).select_top([&](tref x) {
+			return tau::get(x).is(tau::wff) && !is_temporal(x); });
+		for (tref part : parts) {
+			auto nf = r.merge_take(normalize_non_temp<node>(part));
+			if (!nf) { failed = true; return 0; }
+			if (*nf) kept = std::max(kept, get_max_shift<node>(
+				shifted_vars(*nf)));
+		}
+		return kept;
+	};
+	// The deepest io variable of @p n and its shift.
+	auto written = [&](tref n) -> std::pair<tref, int_t> {
+		tref deepest = nullptr;
+		int_t k = 0;
+		for (tref v : shifted_vars(n))
+			if (int_t s = get_io_var_shift<node>(v); s > k)
+				k = s, deepest = v;
+		return { deepest, k };
+	};
+	// `o__warmup[t-k] = 0` at the offset of @p deepest, a fresh output
+	// that holds at every step.
+	auto marker = [&](tref deepest) {
+		const auto& io = tau::get(deepest).is(tau::io_var)
+			? tau::get(deepest) : tau::get(deepest)[0];
+		return raw([&] { return tau::build_bf_eq_0(build_out_var<node>(
+			tau::build_var_name("o__warmup"), io.child(1),
+			get_ba_type_id<node>(pack_bool_carrier_type<node>()))); });
+	};
+	// A body read positively gets the marker conjoined. One read under a
+	// negation gets its negation disjoined, so the marker is conjoined
+	// again once the negation is pushed through the temporal operator.
+	auto pin_body = [&](tref body, tref deepest, bool positive) {
+		tref m = marker(deepest);
+		return raw([&] { return positive ? tau::build_wff_and(body, m)
+			: tau::build_wff_or(body, tau::build_wff_neg(m)); });
+	};
+	// Rebuilds @p n with the children @p ch, or returns it unchanged.
+	auto rebuild = [&](tref n, const trefs& ch) {
+		const auto& t = tau::get(n);
+		const auto& op = t[0];
+		bool same = ch.size() == op.children_size();
+		for (size_t i = 0; same && i < ch.size(); ++i)
+			same = ch[i] == op.child(i);
+		if (same) return n;
+		return raw([&] {
+			return tau::get(tau::wff, tau::get(op.value, ch)); });
+	};
+	auto with_body = [&](tref statement, size_t i, tref body) {
+		trefs ch = tau::get(statement)[0].get_children();
+		ch[i] = body;
+		return rebuild(statement, ch);
+	};
+	// A clause read positively whose written lookback normalization
+	// would shrink; the body at child @p i gets the marker.
+	auto pin_statement = [&](tref s, size_t i, bool positive) {
+		if (has_ref(s)) return s;
+		auto [deepest, k] = written(s);
+		if (k == 0 || kept_lookback(s) >= k) return s;
+		return with_body(s, i, pin_body(tau::get(s)[0].child(i),
+			deepest, positive));
+	};
+	std::function<tref(tref, bool)> walk;
+	// A written conjunction of statements: its always statements whose
+	// bodies have no temporal operator form one always part (README
+	// "Lookback initialization"), enforced from their deepest lookback.
+	auto group = [&](tref n, bool positive) -> tref {
+		trefs leaves;
+		std::function<void(tref)> collect = [&](tref x) {
+			if (const auto& t = tau::get(peel(x)); t.child_is(tau::wff_and)) {
+				collect(t[0].first());
+				collect(t[0].second());
+			} else leaves.push_back(x);
+		};
+		collect(n);
+		subtree_map<node, tref> repl;
+		trefs aw;
+		for (tref leaf : leaves) {
+			tref s = peel(leaf);
+			const auto& t = tau::get(s);
+			if (!t.has_child()) continue;
+			const auto nt = t[0].value.nt;
+			const bool temporal_body = t[0].children_size() == 1
+				&& is_temporal(t[0].first());
+			tref res = leaf;
+			if (nt == tau::wff_always && !temporal_body) {
+				aw.push_back(s);
+				continue;
+			} else if (nt == tau::wff_sometimes && !temporal_body)
+				res = pin_statement(s, 0, positive);
+			else if (nt == tau::wff_always || nt == tau::wff_sometimes)
+				res = positive ? pin_statement(s, 0, true) : s;
+			else if (nt == tau::wff_until || nt == tau::wff_release
+				|| nt == tau::wff_weak_until)
+				res = positive ? pin_statement(s, 1, true) : s;
+			else res = walk(s, positive);
+			if (res != s) repl[leaf] = res;
+		}
+		if (!aw.empty()) {
+			trefs bodies;
+			bool refs = false;
+			for (tref s : aw) {
+				bodies.push_back(tau::get(s)[0].first());
+				refs = refs || has_ref(s);
+			}
+			tref merged = raw([&] { return tau::build_wff_and(bodies); });
+			auto [deepest, k] = written(merged);
+			if (!refs && k > 0) {
+				if (positive) {
+					if (kept_lookback(merged) < k)
+						repl[aw[0]] = with_body(aw[0], 0,
+							pin_body(bodies[0], deepest, true));
+				// Under a negation each always statement becomes
+				// a clause of its own, which keeps the always
+				// part's warm-up.
+				} else for (size_t i = 0; i < aw.size(); ++i)
+					if (kept_lookback(bodies[i]) < k)
+						repl[aw[i]] = with_body(aw[i], 0,
+							pin_body(bodies[i], deepest, false));
+			}
+		}
+		if (repl.empty()) return n;
+		std::function<tref(tref)> apply = [&](tref x) -> tref {
+			if (auto it = repl.find(x); it != repl.end()) return it->second;
+			const auto& t = tau::get(x);
+			if (t.child_is(tau::wff_and) || t.child_is(tau::wff_parenthesis)) {
+				trefs ch;
+				for (tref c : t[0].get_children()) ch.push_back(apply(c));
+				return rebuild(x, ch);
+			}
+			return x;
+		};
+		return apply(n);
+	};
+	// Tracks the polarity each statement is read with. Operators that read
+	// an operand in both polarities (<->, ^, ?:) are left as written.
+	walk = [&](tref n, bool positive) -> tref {
+		const auto& t = tau::get(n);
+		if (failed || !t.is(tau::wff) || !t.has_child()) return n;
+		const auto& op = t[0];
+		switch (op.value.nt) {
+		case tau::wff_parenthesis:
+			return rebuild(n, { walk(op.first(), positive) });
+		case tau::wff_neg:
+			return rebuild(n, { walk(op.first(), !positive) });
+		case tau::wff_imply:
+			return rebuild(n, { walk(op.first(), !positive),
+				walk(op.second(), positive) });
+		case tau::wff_rimply:
+			return rebuild(n, { walk(op.first(), positive),
+				walk(op.second(), !positive) });
+		case tau::wff_or:
+			return rebuild(n, { walk(op.first(), positive),
+				walk(op.second(), positive) });
+		case tau::wff_and:
+		case tau::wff_always:
+		case tau::wff_sometimes:
+		case tau::wff_until:
+		case tau::wff_release:
+		case tau::wff_weak_until:
+			return group(n, positive);
+		default: return n;
+		}
+	};
+	// A formula without temporal operator is one clause, read as its
+	// implicit always.
+	tref res = is_temporal(fm) ? walk(fm, true) : pin_statement(
+		raw([&] { return tau::build_wff_always(fm); }), 0, true);
+	if (failed) return r;
+	if (!is_temporal(fm)) {
+		tref body = tau::get(res)[0].first();
+		res = body == fm ? fm : body;
+	}
+	return r.with_value(res);
+}
+
 // This is the cross-revision satisfiability result cache. Any U/R/W/S/T
 // content routes a query through the full LTL(ABA) pipeline -- one ltlsynt
 // subprocess per call -- and the pointwise revision asks the same (formula,
@@ -2299,10 +2509,24 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		return r.with_error(code::unsupported_operation,
 			"implication between formulas with CTL* operators cannot "
 			"be decided");
-	TAU_TRY(tref f1n, normalize<node>(f1));
-	TAU_TRY(tref f2n, normalize<node>(f2));
-	TAU_TRY(tref imp_check, normalize_with_temp_simp<node>(
-		tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
+	// The decided formula is f1 && !f2; its clauses keep the warm-ups
+	// f1 and f2 are written with.
+	tref decided;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		decided = tau::build_wff_and(f1, tau::build_wff_neg(f2));
+	}
+	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+	tref imp_check;
+	if (pinned != decided) {
+		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
+			tau::reget(pinned)));
+	} else {
+		TAU_TRY(tref f1n, normalize<node>(f1));
+		TAU_TRY(tref f2n, normalize<node>(f2));
+		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
+			tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
+	}
 	// transform_to_execution decides the safety fragment only; anything
 	// sat routes to the LTL pipeline would be misread as unsatisfiable
 	if (sat_has_ltl_operators<node>(imp_check))
@@ -2341,14 +2565,33 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	if (!f1 || !f2) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	// Negate equivalence for unsat check
-	TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
-		"Normalization of the first formula failed");
-	TAU_TRY_OR(tref f2n, normalize<node>(f2), code::internal_error,
-		"Normalization of the second formula failed");
-	TAU_TRY_OR(tref equiv_check, normalize_with_temp_simp<node>(
-			tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
-		code::internal_error, "Normalization of the equivalence check failed");
+	// The decided formula is (f1 && !f2) || (!f1 && f2), each side read
+	// with the warm-ups it is written with.
+	tref decided;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		decided = tau::build_wff_or(
+			tau::build_wff_and(f1, tau::build_wff_neg(f2)),
+			tau::build_wff_and(tau::build_wff_neg(f1), f2));
+	}
+	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+	tref equiv_check;
+	if (pinned != decided) {
+		TAU_TRY_OR(equiv_check, normalize_with_temp_simp<node>(
+				tau::reget(pinned)),
+			code::internal_error,
+			"Normalization of the equivalence check failed");
+	} else {
+		// Negate equivalence for unsat check
+		TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
+			"Normalization of the first formula failed");
+		TAU_TRY_OR(tref f2n, normalize<node>(f2), code::internal_error,
+			"Normalization of the second formula failed");
+		TAU_TRY_OR(equiv_check, normalize_with_temp_simp<node>(
+				tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
+			code::internal_error,
+			"Normalization of the equivalence check failed");
+	}
 	if (has_ctl_star_operators<node>(equiv_check)
 		|| sat_has_ltl_operators<node>(equiv_check))
 		return r.with_error(code::unsupported_operation,

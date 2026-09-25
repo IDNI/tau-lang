@@ -663,3 +663,13 @@ add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes_bv
 add_repl_test(run_cmd-initial_value_constant_stream_with_sometimes
 	"o1:tau := out console. o2:tau := out console. run 4 steps (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)."
 	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F")
+
+# ── Warm-up of a literal normalization drops ──────────────────────────────────
+# o1[t-2] = o1[t-2] gives the always part a two-step warm-up, so o2 takes the
+# bottom value at steps 0 and 1; the spec with a sometimes is executable.
+add_repl_test(run_cmd-warm_up_tautology
+	"o2:tau := out console. run 3 steps always (o2[t] = 1 && o1[t-2] = o1[t-2])."
+	"o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[2\\] := T")
+add_repl_test(run_cmd-warm_up_tautology_sometimes
+	"o2:tau := out console. run 3 steps (always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes (o2[t-1] = 0))."
+	"o2\\[0\\] := .*o2\\[1\\] := .*o2\\[2\\] := T")

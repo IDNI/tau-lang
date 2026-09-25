@@ -77,6 +77,20 @@ static tref make_ctn(node_t::type kind, bool num_first, size_t n) {
 		: tau::get(kind, { cv, nm }));
 }
 
+// A spec as written: no construction hook has folded any of its literals.
+static tref spec_as_written(const char* spec) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return create_spec(spec);
+}
+
+// The lookback of the warm-up stream pin_written_warm_ups adds, -1 without it.
+static int_t warm_up_pin(tref fm) {
+	for (tref v : io_vars_of(fm))
+		if (get_var_name<node_t>(v) == "o__warmup")
+			return get_io_var_shift<node_t>(v);
+	return -1;
+}
+
 static bool str_has(const std::string& hay, const char* needle) {
 	return hay.find(needle) != std::string::npos;
 }
@@ -163,6 +177,80 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( !sat("(always o2[t] = 0 && o1[t-1] = 1) && "
 			"(sometimes (o2[t] = 1 && o1[t-1] = 1)).") );
 		CHECK( !sat("(always o2[t] = 0) && (sometimes o2[t] = 1).") );
+	}
+
+	// A clause is enforced from the deepest lookback it is written with,
+	// also when normalization drops the literal that reads it.
+	TEST_CASE("pin_written_warm_ups: a clause keeps the lookback it is written with") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref taut = pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0).");
+		CHECK( warm_up_pin(taut) == 2 );
+		auto sat = is_tau_formula_sat<node_t>(taut);
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+		// a semantic tautology, and a literal another always statement
+		// absorbs
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && "
+			"(o1[t-2] = 0 || o1[t-2] != 0)) && (sometimes o2[t-1] = 0).")) == 2 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+			"(sometimes o2[t-1] = 0).")) == 2 );
+		// a sometimes clause, and a formula without temporal operator
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o3[t-1] = 0) && "
+			"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).")) == 1 );
+		CHECK( warm_up_pin(pinned("o2[t] = 1 && i1[t-1] = i1[t-1].")) == 1 );
+		// a lookback that normalization keeps needs no pin
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = 0) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+	}
+
+	// Under a negation the always body gets the negated marker disjoined,
+	// so the marker is conjoined once the negation is pushed; each always
+	// statement keeps the lookback of the always part.
+	TEST_CASE("pin_written_warm_ups: clauses read under a negation") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref neg = pinned("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)).");
+		CHECK( warm_up_pin(neg) == 2 );
+		CHECK( tau::get(neg).find_top(is_child<node_t, tau::wff_or>) );
+		// the merged always part reads two steps back, o2[t] = 1 alone
+		// none: its negation is asked from step 2 on
+		CHECK( warm_up_pin(pinned("!((always o2[t] = 1) && "
+			"(always o1[t] = o1[t-2])).")) == 2 );
+		// read under <-> the clause is left as written
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"<-> (always o2[t] = 1).")) == -1 );
+	}
+
+	// is_tau_impl and are_tau_equivalent decide f1 && !f2 (and its mirror)
+	// as written: the tautology still delays the always part.
+	TEST_CASE("is_tau_impl / are_tau_equivalent: warm-ups as written") {
+		tref plain = spec_as_written("always o2[t] = 1.");
+		tref late = spec_as_written("always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		auto impl = [](tref a, tref b) {
+			auto r = is_tau_impl<node_t>(a, b);
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( impl(plain, late) );
+		CHECK( !impl(late, plain) );
+		auto eq = are_tau_equivalent<node_t>(plain, late);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
+		auto self = are_tau_equivalent<node_t>(late, late);
+		REQUIRE( self.has_value() );
+		CHECK( self.value() );
 	}
 
 	// The negated side of an implication turns an `always` over inputs

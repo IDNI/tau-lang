@@ -486,9 +486,20 @@ result<tref> api<node>::get_stream_def(const std::string& stream_def) {
 
 template <NodeType node>
 result<tref> api<node>::get_spec(const std::string& src) {
+	return get_spec(src, false);
+}
+
+template <NodeType node>
+result<tref> api<node>::get_spec_as_written(const std::string& src) {
+	return get_spec(src, true);
+}
+
+template <NodeType node>
+result<tref> api<node>::get_spec(const std::string& src, bool as_written) {
 	return with_budget<node>([&] {
 		result<tref> r;
 		tau_spec<node> spec;
+		if (as_written) spec.keep_as_written();
 		if (!spec.parse(src)) {
 			for (const auto& error : spec.errors())
 				r.error(code::parse_error, error);
@@ -1105,7 +1116,7 @@ template <NodeType node>
 result<bool> api<node>::realizable(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
+		TAU_TRY(auto simplified, simplify_keeping_warm_ups(fm));
 		// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 		// normalization so the downstream pipeline sees a single wff_always.
 		fm = flatten_always_conjuncts<node>(simplified);
@@ -1188,7 +1199,7 @@ template <NodeType node>
 result<bool> api<node>::sat(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
+		TAU_TRY(auto simplified, simplify_keeping_warm_ups(fm));
 		// A spec root (what get_spec yields; realizable and valid take it
 		// too) is unwrapped, its definitions applied, to its main formula.
 		if (simplified && tau::get(simplified).is(tau::spec)) {
@@ -1288,8 +1299,17 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 		result<trefs> r;
 		if (!fm) return r.with_assert_check_error(
 			code::invalid_argument, messages::invalid_arguments);
-		TAU_TRY(fm, simplify(fm));
-		if (fm && tau::get(fm).is(tau::spec)) {
+		// Each checked subset keeps the warm-ups its conjuncts are
+		// written with (sat and realizable read them). Definitions are
+		// matched on the folded spec, so a main formula that calls one
+		// is read folded.
+		TAU_TRY(tref written, simplify_as_written(fm));
+		using tt = typename tau::traverser;
+		if (!written || !tau::get(written).is(tau::spec)) fm = written;
+		else if (tref main = tt(written) | tau::main | tau::wff | tt::ref;
+			main && !contains(main, tau::ref)) fm = main;
+		else {
+			TAU_TRY(fm, simplify(fm));
 			TAU_TRY(fm, apply_all_defs(fm));
 		}
 		if (!fm || !is_formula(fm)) return r.with_assert_check_error(
@@ -1346,8 +1366,11 @@ template <NodeType node>
 result<bool> api<node>::valid(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
-		fm = flatten_always_conjuncts<node>(simplified);
+		TAU_TRY(auto simplified, simplify_as_written(fm));
+		{
+			use_hooks_guard<node> hooks_off(false);
+			fm = flatten_always_conjuncts<node>(simplified);
+		}
 		if (!fm) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
@@ -1360,7 +1383,9 @@ template <NodeType node>
 result<bool> api<node>::valid_spec(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(fm, simplify(fm));
+		// Validity decides the negation: its clauses keep the warm-ups
+		// they are written with, read under that negation.
+		TAU_TRY(fm, simplify_keeping_warm_ups(fm, true));
 		// valid() and valid_spec() are both public: the shape check sits
 		// here so neither can hand a term to formula negation or to a
 		// backend that expects a Boolean (issue #132: `valid x:bv[1]`
@@ -1539,6 +1564,8 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// place -- corrupting later, unrelated calls -- on every one of the
 		// early-return failure paths below.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		TAU_TRY(spec, pin_main(spec));
+		spec = tau::reget(spec);
 		TAU_TRY(auto nso_rr, get_nso_rr(spec));
 		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
 			code::internal_error, "Failed to apply definitions");
@@ -1582,6 +1609,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		// See the tref overload above: remaps are assigned into the global
 		// io_context only once every validation step has succeeded.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		spec.keep_warm_ups();
 		auto maybe_nso_rr = spec.get_nso_rr();
 		if (!maybe_nso_rr) {
 			for (const auto& error : spec.errors())
@@ -1715,6 +1743,59 @@ result<tref> api<node>::simplify(tref expr, bool use_defaults) {
 			DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(e);)
 			r = e;
 		}
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::simplify_as_written(tref expr) {
+	return with_budget<node>([&] {
+		// Inference only: no construction hook folds a literal and the
+		// lookback it is written with (pin_written_warm_ups).
+		use_hooks_guard<node> hooks_off(false);
+		return infer(expr);
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::pin_main(tref expr, bool negate) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		if (!expr) {
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		using tt = typename tau::traverser;
+		const bool spec = tau::get(expr).is(tau::spec);
+		tref main = spec ? (tt(expr) | tau::main | tau::wff | tt::ref)
+			: expr;
+		if (!main) return r.with_assert_check_value(expr);
+		tref decided = main;
+		if (negate) {
+			use_hooks_guard<node> hooks_off(false);
+			decided = tau::build_wff_neg(main);
+		}
+		TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+		if (pinned == decided) return r.with_assert_check_value(expr);
+		use_hooks_guard<node> hooks_off(false);
+		// Negated back: the main formula again, with the markers its
+		// negation needs.
+		if (negate) pinned = tau::build_wff_neg(pinned);
+		if (!spec) return r.with_assert_check_value(pinned);
+		return r.with_assert_check_value(
+			rewriter::replace<node>(expr, main, pinned));
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::simplify_keeping_warm_ups(tref expr, bool negate) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		TAU_TRY(tref inferred, simplify_as_written(expr));
+		TAU_TRY(tref pinned, pin_main(inferred, negate));
+		tref e = canonize_quantifier_ids<node>(tau::reget(pinned));
+		if (!e) r.error(code::internal_error, "Simplification failed");
+		else r = e;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});

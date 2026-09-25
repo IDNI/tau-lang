@@ -364,11 +364,12 @@ private:
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
 
-	/// @brief Apply any pending transformations to @p arg and return the result.
-	tref get_applied(tref arg) const;
+	/// @brief Apply any pending transformations to @p arg and return the
+	/// result; @p as_written as in tau_spec::keep_as_written.
+	tref get_applied(tref arg, bool as_written = false) const;
 	/// @brief Extract type id and formula from @p n or from history.
 	std::optional<std::pair<size_t, tref>> get_type_and_arg(
-		const tt& n) const;
+		const tt& n, bool as_written = false) const;
 	/// @brief Extract a formula of type @p nt from @p n or from history.
 	tref get_(typename node::type nt, tref n, bool suppress_error = false)
 									const;
@@ -378,6 +379,10 @@ private:
 	tref get_wff(tref n) const;
 	/// @brief Extract any formula from @p arg or from history.
 	tref get_any(tref arg) const;
+	/// @brief get_any() for the commands that decide or run a
+	/// specification: every literal as written, so that each clause keeps
+	/// its warm-up (pin_written_warm_ups).
+	tref get_spec_as_written(tref arg) const;
 	/// @brief Infer @p n's BA types so it can be matched against an
 	/// already inferred expression. Returns @p n if inference fails.
 	tref infer_for_match(tref n) const;
