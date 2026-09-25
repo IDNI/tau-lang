@@ -216,6 +216,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// pass, which folds the resulting input-only assumptions into its own
 	// wrap so both sets combine behind a single implication.
 	std::string shift_chain_input_assumptions;
+	if (ltl_input_twins)
+		add_input_twins<node>(sol.atoms, sol.input_props);
 	add_shift_chain_constraints<node>(sol.atoms, sol.skeleton,
 		shift_chain_input_assumptions, &sol.shift_chain_constraints);
 
@@ -459,6 +461,24 @@ static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
 	return r.with_value(*refined);
 }
 
+// Whether every input atom reads a single step. The environment of the
+// abstraction sets an input prop at the step that reads it; props of
+// different steps are tied only by the shift chains, and one reading a past
+// step is tied to the step it reads only through its present-time twin
+// (add_input_twins). With single-step atoms and their twins, each step's
+// input props are one valuation the data of that step can take.
+template <NodeType node>
+static bool input_atoms_read_one_step(
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	for (auto& [atom, _] : atoms)
+		if (is_pure_input_atom<node>(atom)
+			&& (atom_is_positional<node>(atom)
+				|| !atom_uniform_shift<node>(atom)))
+					return false;
+	return true;
+}
+
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
 
 template <NodeType node>
@@ -585,9 +605,52 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return wins;
 	};
 
+	// The default abstraction without a winning strategy proves nothing:
+	// its consistency constraints quantify the inputs universally and so
+	// can forbid the system a combination the environment's data makes
+	// true. The observed abstraction, whose constraints forbid only
+	// combinations no data satisfies, over-approximates the system when
+	// every input atom reads a single step: a winning strategy on the
+	// data, played on data chosen to match the input props, gives the
+	// props a play that abstraction allows. Its UNREALIZABLE, refined by
+	// clauses that also block only what no data realizes, is a proof.
+	auto unrealizable_on_sound_abstraction = [&](const char* how,
+		const ltl_aba_solution<node>& s) -> result<bool>
+	{
+		if (!input_atoms_read_one_step<node>(s.atoms)) {
+			if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << how
+				<< ", but an input atom reads several steps)";
+			return r.with_error(code::solver_error, std::string(
+				"UNKNOWN: the abstraction has no winning strategy, but "
+				"an input atom reading several steps lets its "
+				"environment choose what the data has fixed; "
+				"realizability could not be decided"));
+		}
+		std::optional<std::optional<ltl_aba_solution<node>>> sound;
+		{
+			const bool outer = ltl_observed_abstraction;
+			const bool outer_twins = ltl_input_twins;
+			ltl_observed_abstraction = ltl_input_twins = true;
+			sound = r.merge_take(solve_ltl_aba<node>(fm));
+			ltl_observed_abstraction = outer;
+			ltl_input_twins = outer_twins;
+		}
+		if (!sound) return backend_failed();
+		if (!*sound) return unrealizable(how);
+		auto refined = r.merge_take(
+			refine_or_observe<node>(fm, **sound, output));
+		if (!refined) return std::move(r);
+		if (*refined) return r.with_value(true);
+		return unrealizable(how);
+	};
+
 	if (!maybe) {
 		if (auto v = on_data(partial, true, nullptr)) return r.with_value(*v);
-		return unrealizable("propositional");
+		// only the default path has a game skeleton; the others decide
+		// their own abstraction
+		if (partial.game_skeleton.empty())
+			return unrealizable("propositional");
+		return unrealizable_on_sound_abstraction("propositional", partial);
 	}
 	if (auto v = on_data(*maybe, false, nullptr)) return r.with_value(*v);
 
@@ -601,7 +664,8 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return r.with_value(*v);
 	auto verdict = r.merge_take(std::move(refined));
 	if (!verdict) return r;
-	if (!*verdict) return unrealizable("ABA-refined");
+	if (!*verdict)
+		return unrealizable_on_sound_abstraction("ABA-refined", abstraction);
 	return r.with_value(true);
 }
 
@@ -999,7 +1063,9 @@ tref ltl_to_safety_formula(tref fm) {
 // ── ltl_explain ───────────────────────────────────────────────────────────────
 
 template <NodeType node>
-result<bool> ltl_explain(tref fm, std::ostream& out) {
+result<bool> ltl_explain(tref fm, std::ostream& out,
+	const std::function<result<bool>()>& decide)
+{
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	result<bool> r;
@@ -1031,6 +1097,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	// The verdict below comes from the same procedure `realizable` runs,
 	// which decides the normalized formula and reduces after it: do both in
 	// that order here, or the two commands answer from different atoms.
+	// The always statements form one always part with one warm-up, as in
+	// every other decision procedure.
+	fm = flatten_always_conjuncts<node>(fm);
 	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
 		fm = nf.value();
 	if (has_ctl_star_operators<node>(fm)) {
@@ -1052,7 +1121,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 		// Fall through to the existing safety pipeline. An error here
 		// (e.g. transform_to_execution's multiple-sometimes refusal) is
 		// undecided, not a decided UNREALIZABLE.
-		auto sat_r = is_tau_formula_sat<node>(fm, 0, false);
+		auto sat_r = decide ? decide()
+			: is_tau_formula_sat<node>(fm, 0, false);
 		if (!sat_r.has_value()) {
 			r.merge(std::move(sat_r));
 			return r.with_error(code::solver_error,
@@ -1087,18 +1157,19 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	if (maybe) sol = std::move(*maybe);
 
 	// The trace below is the first ltlsynt round and its per-edge oracle
-	// checks; the verdict comes from is_ltl_aba_realizable, the procedure
-	// `realizable` runs (window oracle, refinement rounds), so the two
-	// commands cannot disagree.
+	// checks; the verdict comes from `decide` when given, otherwise from
+	// is_ltl_aba_realizable, the procedure `realizable` runs (window
+	// oracle, refinement rounds).
 	auto verdict = [&]() -> result<bool> {
-		auto real = is_ltl_aba_realizable<node>(fm, 0, false);
+		auto real = decide ? decide()
+			: is_ltl_aba_realizable<node>(fm, 0, false);
 		if (!real.has_value()) {
 			r.merge(std::move(real));
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; realizability could not be decided");
 		}
-		if (!real.value() && !exact_reduction) {
+		if (!decide && !real.value() && !exact_reduction) {
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the CTL* reduction is unrealizable, but an E "
 				"witness over a past operator ranges over every input "

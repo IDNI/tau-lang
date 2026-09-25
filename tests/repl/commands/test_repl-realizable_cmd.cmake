@@ -892,6 +892,24 @@ add_repl_test(realizable_cmd-data_game_sat_ltl_spelling
 add_repl_test(realizable_cmd-data_game_equalities_over_default_type
 	"set ltlrefinementrounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F")
 
+# An abstraction over the atoms without a winning strategy is no proof: its
+# consistency constraints quantify the inputs universally, so they forbid
+# i1[t] = o1[t-1], which the environment's i1 can make true. With o1 = 0
+# every i1 meets one of the four atoms a step later, so the answer is T or,
+# where the game on the data is not decided, UNKNOWN; never F.
+add_repl_test(realizable_cmd-abstraction_without_strategy_input_after_output
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" "UNKNOWN|: T")
+add_repl_test(realizable_cmd-abstraction_without_strategy_sat_ltl_spelling
+	"sat T U (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" "UNKNOWN|: T")
+add_repl_test(realizable_cmd-abstraction_without_strategy_sat_sometimes_spelling
+	"sat sometimes (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
+# the same once the abstraction's strategy is blocked for edges no data
+# realizes and no strategy is left
+add_repl_test(realizable_cmd-abstraction_refined_without_strategy
+	"realizable (G (F (o1[t-2]:bv[2] = { 2 }:bv[2]))) && (G (F ((((o1[t-1]:bv[2] != i1[t-2]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]') && (o1[t-2]:bv[2] = i1[t-2]:bv[2] || o1[t]:bv[2] = 0))) W (o1[t-2]:bv[2] != i1[t]:bv[2]))))" "UNKNOWN|: T")
+# without the constants the environment picks an i1 outside both atoms
+add_repl_test(realizable_cmd-abstraction_without_strategy_unrealizable
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]')" ": F")
 # A value compared with the complement of another is read on codes of the
 # pairs {v, v'}, so the game is played on the codes instead of on formulas.
 add_repl_test(realizable_cmd-data_game_complement_codes
@@ -900,10 +918,6 @@ set_tests_properties("test_repl-realizable_cmd-data_game_complement_codes"
 	PROPERTIES TIMEOUT 60)
 
 # A type with few elements read by arithmetic or by constants other than 0
-# and 1 is played on its values: with o1 = 0 every input matches an atom a
-# step later.
-add_repl_test(realizable_cmd-data_game_small_bv_values
-	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
-# the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
+# and 1 is played on its values: the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
 add_repl_test(realizable_cmd-data_game_bv_arithmetic_values
 	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T")

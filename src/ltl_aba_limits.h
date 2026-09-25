@@ -273,6 +273,13 @@ inline thread_local bool ltl_verdict_incomplete = false;
  */
 inline thread_local bool ltl_observed_abstraction = false;
 
+/**
+ * @brief Set, with ltl_observed_abstraction, while the abstraction that
+ * settles an UNREALIZABLE verdict is built: an input atom reading a past
+ * step then gets a present-time twin (add_input_twins).
+ */
+inline thread_local bool ltl_input_twins = false;
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__LTL_ABA_LIMITS_H__

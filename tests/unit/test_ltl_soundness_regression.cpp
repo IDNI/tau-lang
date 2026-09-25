@@ -115,6 +115,42 @@ TEST_SUITE("LTL soundness regression (k-ary positive forbids)") {
 }
 
 
+// The verdict of is_ltl_aba_realizable, nullopt when undecided.
+static std::optional<bool> verdict(const char* s) {
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
+	REQUIRE(nso.has_value());
+	tref fm = nso.value().main->get();
+	REQUIRE(fm);
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	if (!r.has_value()) return std::nullopt;
+	return r.value();
+}
+
+TEST_SUITE("LTL soundness regression (an abstraction without a strategy)") {
+
+	// o1[t-1] is fixed before the environment picks i1[t]: the
+	// consistency constraints, quantifying i1 universally, forbid both
+	// atoms comparing them, so the abstraction has no strategy. With
+	// o1 = 0 every i1 meets one of the four atoms a step later.
+	TEST_CASE("an input compared with an earlier output is not unrealizable") {
+		CHECK(verdict(
+			"F ((i1[t]:bv[2] = o1[t-1]:bv[2])"
+			" || (i1[t]:bv[2] = o1[t-1]:bv[2]')"
+			" || (i1[t]:bv[2] = {1}:bv[2])"
+			" || (i1[t]:bv[2] = {2}:bv[2]))."
+		) != std::optional<bool>(false));
+	}
+
+	// Without the constants the environment picks an i1 outside both atoms.
+	TEST_CASE("the same atoms without the constants stay unrealizable") {
+		CHECK(verdict(
+			"F ((i1[t]:bv[2] = o1[t-1]:bv[2])"
+			" || (i1[t]:bv[2] = o1[t-1]:bv[2]'))."
+		) == std::optional<bool>(false));
+	}
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

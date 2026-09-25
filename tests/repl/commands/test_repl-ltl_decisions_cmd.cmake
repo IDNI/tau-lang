@@ -26,6 +26,37 @@ add_repl_test(ltl_decisions-input_valid_single_atom
 # ltl takes its verdict from the realizability procedure
 add_repl_test_fail(ltl_decisions-ltl_agrees_with_realizable
 	"ltl G ((o1[1] = 1) && (o1[t] = o1[t-1]) && F (o1[t]=0))" "\nUNREALIZABLE")
+# ltl merges the always statements into one always part, whose warm-up is
+# the deepest lookback among them, as realizable, sat and run do: o1 is
+# free at step 0, so the eventuality holds there
+add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up
+	"ltl (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
+	"\nREALIZABLE")
+add_repl_test(ltl_decisions-realizable_merged_always_warm_up
+	"realizable (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
+	": T")
+add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up_input
+	"ltl (G (o2[t-1] = 1)) && (G (i1[t-2] = o1[t])) && (T U (o2[t-1] = 0))"
+	"\nREALIZABLE")
+add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up_bv
+	"ltl (G (o2[t-1]:bv[1] = 1)) && (G (o1[t]:bv[1] = o3[t-2]:bv[1])) && (G (o1[t]:bv[1] = 1)) && (T U (o1[t]:bv[1] = 0))"
+	"\nREALIZABLE")
+# the explanation shows the one always part: a single G over both bodies
+add_repl_test_fail(ltl_decisions-ltl_merged_always_one_clause
+	"ltl (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
+	"X\\(G\\(\\((\\(__step_ge1 -> p[0-9]\\) & p[0-9]|p[0-9] & \\(__step_ge1 -> p[0-9]\\))\\)\\)\\)")
+# ltl keeps the warm-up a clause is written with, also where its literal
+# with that lookback is a tautology
+add_repl_test_fail(ltl_decisions-ltl_written_warm_up_tautology
+	"ltl (G (o2[t] = 1 && o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))"
+	"\nREALIZABLE")
+add_repl_test_fail(ltl_decisions-ltl_written_warm_up_tautology_own_always
+	"ltl (G (o2[t] = 1)) && (G (o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))"
+	"\nREALIZABLE")
+# a lookback-free always statement beside a sometimes with a lookback
+# still starts at step 0
+add_repl_test_fail(ltl_decisions-ltl_always_beside_sometimes_lookback
+	"ltl (G (o1[t] = 1)) && (T U (o1[t-2] = 0))" "\nUNREALIZABLE")
 
 # validity of full LTL: F when the negation is satisfiable, never T for both
 add_repl_test(ltl_decisions-valid_until_F

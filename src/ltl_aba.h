@@ -428,10 +428,14 @@ bool has_semantic_negation(tref fm);
  * @param fm Formula to explain: a wff, or a spec whose main part is one;
  *        anything else is an invalid_argument error, not a verdict.
  * @param out Stream receiving the trace.
+ * @param decide When given, the verdict printed and returned: the caller's
+ *        realizability check of the spec @p fm was prepared from, so the
+ *        trace never answers differently from it.
  * @return `true` iff @p fm is realizable, or an error when undecided.
  */
 template <NodeType node>
-result<bool> ltl_explain(tref fm, std::ostream& out);
+result<bool> ltl_explain(tref fm, std::ostream& out,
+	const std::function<result<bool>()>& decide = {});
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
