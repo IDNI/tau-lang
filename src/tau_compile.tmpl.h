@@ -331,7 +331,12 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 			  << s.ba_type << ");\n";
 	}
 	for (auto& s : d.output_streams) {
-		if (s.bind == stream_desc::binding::file)
+		// The warm-up of a clause (pin_written_warm_ups) is solved like
+		// any output but never printed, so it gets no console label.
+		if (s.name == "o__warmup")
+			f << "\tctx.add_output(\"" << s.name << "\", "
+			  << s.ba_type << ", make_shared<vector_output_stream>());\n";
+		else if (s.bind == stream_desc::binding::file)
 			f << "\tctx.add_output_file(\"" << s.name << "\", "
 			  << s.ba_type << ", \""
 			  << idni::escapes::encode(s.filename, idni::escapes::c_like)
@@ -401,9 +406,12 @@ result<codegen_result> compile_spec(
 	// (trailing '.', stream/rec-relation definitions) -- through the same
 	// nso_rr/normalizer pipeline get_interpreter uses.
 	using tau_api = api<Node>;
-	TAU_TRY(tref spec_tree, tau_api::get_spec(spec_src));
+	TAU_TRY(tref spec_tree, tau_api::get_spec_as_written(spec_src));
 	if (!spec_tree) return r.with_error(code::parse_error,
 		"compile: failed to parse spec");
+	// Each clause keeps the warm-up it is written with.
+	TAU_TRY(spec_tree, tau_api::pin_main(spec_tree));
+	spec_tree = tree<Node>::reget(spec_tree);
 	auto nso_rr = get_nso_rr<Node>(spec_tree);
 	if (!nso_rr) return r.with_error(code::parse_error,
 		"compile: failed to build the recurrence relation from spec");

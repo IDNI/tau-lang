@@ -24,3 +24,8 @@ add_test(NAME "test_repl-compile_verb-cxx_override_is_used"
 	COMMAND bash -c "d=$(mktemp -d /tmp/tau_cxx_override.XXXXXX); cp ${CMAKE_SOURCE_DIR}/tests/codegen_specs/declare_open_codegen.tau $d/spec.tau; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile --cxx /nonexistent/c++ $d/spec.tau -o $d/out; rc=$?; test $rc -ne 0 && grep -q 'nonexistent/c++' $d/spec.tau.build/configure.log && echo CXX_OVERRIDE_REACHED_CONFIGURE; rm -rf $d")
 set_tests_properties("test_repl-compile_verb-cxx_override_is_used" PROPERTIES
 	PASS_REGULAR_EXPRESSION "CXX_OVERRIDE_REACHED_CONFIGURE")
+
+# A tautological literal still gives its clause a two-step warm-up, so the
+# spec is realizable and compiles (o2 may be 0 at steps 0 and 1).
+add_compile_test(compile_verb-warm_up_tautology
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/warm_up_tautology.tau")

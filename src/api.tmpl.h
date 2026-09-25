@@ -486,9 +486,20 @@ result<tref> api<node>::get_stream_def(const std::string& stream_def) {
 
 template <NodeType node>
 result<tref> api<node>::get_spec(const std::string& src) {
+	return get_spec(src, false);
+}
+
+template <NodeType node>
+result<tref> api<node>::get_spec_as_written(const std::string& src) {
+	return get_spec(src, true);
+}
+
+template <NodeType node>
+result<tref> api<node>::get_spec(const std::string& src, bool as_written) {
 	return with_budget<node>([&] {
 		result<tref> r;
 		tau_spec<node> spec;
+		if (as_written) spec.keep_as_written();
 		if (!spec.parse(src)) {
 			for (const auto& error : spec.errors())
 				r.error(code::parse_error, error);
@@ -1288,8 +1299,17 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 		result<trefs> r;
 		if (!fm) return r.with_assert_check_error(
 			code::invalid_argument, messages::invalid_arguments);
-		TAU_TRY(fm, simplify(fm));
-		if (fm && tau::get(fm).is(tau::spec)) {
+		// Each checked subset keeps the warm-ups its conjuncts are
+		// written with (sat and realizable read them). Definitions are
+		// matched on the folded spec, so a main formula that calls one
+		// is read folded.
+		TAU_TRY(tref written, simplify_as_written(fm));
+		using tt = typename tau::traverser;
+		if (!written || !tau::get(written).is(tau::spec)) fm = written;
+		else if (tref main = tt(written) | tau::main | tau::wff | tt::ref;
+			main && !contains(main, tau::ref)) fm = main;
+		else {
+			TAU_TRY(fm, simplify(fm));
 			TAU_TRY(fm, apply_all_defs(fm));
 		}
 		if (!fm || !is_formula(fm)) return r.with_assert_check_error(
@@ -1544,6 +1564,8 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// place -- corrupting later, unrelated calls -- on every one of the
 		// early-return failure paths below.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		TAU_TRY(spec, pin_main(spec));
+		spec = tau::reget(spec);
 		TAU_TRY(auto nso_rr, get_nso_rr(spec));
 		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
 			code::internal_error, "Failed to apply definitions");

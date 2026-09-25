@@ -345,7 +345,7 @@ result<std::vector<std::string>> api<node>::unsat_core(
 	const std::string& spec, bool realizability)
 {
 	return with_budget<node>([&] {
-		return get_spec(spec).and_then([&](tref e) {
+		return get_spec_as_written(spec).and_then([&](tref e) {
 			return unsat_core(e, realizability);
 		}).transform([](const trefs& core) {
 			std::vector<std::string> out;

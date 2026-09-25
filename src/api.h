@@ -455,6 +455,12 @@ struct api {
 	/// stream declarations, and a main formula terminated by '.').
 	/// @return Parsed spec tree, or a structured error on failure.
 	static result<tref> get_spec(const std::string& spec);
+	/// get_spec() without the construction hooks: types inferred, every
+	/// literal kept as written, for the procedures that decide or run it
+	/// (sat, realizable, valid, get_interpreter, unsat_core), which keep
+	/// the warm-up of each clause (pin_written_warm_ups) and fold it
+	/// themselves.
+	static result<tref> get_spec_as_written(const std::string& spec);
 	/// @copydoc get_spec
 	static result<htref> geth_spec(const std::string& spec);
 
@@ -1025,6 +1031,7 @@ private:
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	static result<tref> get_spec(const std::string& spec, bool as_written);
 	/// get_formula_or_term() without the construction hooks, for the
 	/// decision procedures, which keep the warm-ups as written.
 	static result<tref> parse_as_written(const std::string& expr);
