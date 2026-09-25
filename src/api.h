@@ -1008,18 +1008,25 @@ struct api {
 	static result<tref> simplify(tref expr, bool use_defaults = true);
 	/// @copydoc simplify(const std::string&,bool)
 	static result<htref> simplify(htref expr, bool use_defaults = true);
+	/// simplify() without the construction hooks: types inferred, every
+	/// literal kept as written.
+	static result<tref> simplify_as_written(tref expr);
+	/// The main formula of @p expr (a formula or a spec root) with the
+	/// warm-up of each clause kept at its lookback as written
+	/// (pin_written_warm_ups). With @p negate the clauses are read under
+	/// a negation, for a procedure that decides the negation of @p expr.
+	static result<tref> pin_main(tref expr, bool negate = false);
+	/// simplify_as_written(), pin_main() and the construction hooks.
+	static result<tref> simplify_keeping_warm_ups(tref expr,
+		bool negate = false);
 
 private:
 	/// Extract a normalized rr<node> from an expression tree.
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
-	/// simplify() that first keeps the warm-up of each clause of @p expr
-	/// (a formula or a spec root) at its lookback as written, see
-	/// pin_written_warm_ups.
-	static result<tref> simplify_keeping_warm_ups(tref expr);
-	/// get_formula_or_term() without the construction hooks, for sat()
-	/// and realizable(), which keep the warm-ups as written.
+	/// get_formula_or_term() without the construction hooks, for the
+	/// decision procedures, which keep the warm-ups as written.
 	static result<tref> parse_as_written(const std::string& expr);
 };
 

@@ -837,13 +837,12 @@ add_repl_test(realizable_cmd-delay_chain_initial_conditions_pinned_source_unreal
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_unrealizable
 	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1 && i1[t] = 0)" ": F")
 
-# The strategy is played against the data before a REALIZABLE verdict: the
-# environment picks each input after the history is fixed. o2[t] is o1[t-1],
-# fixed a step before i1[t], so o2 cannot be made to meet i1; no strategy
-# over the atoms shows that as a path without data, so the verdict is open.
-add_repl_test_fail(realizable_cmd-data_check_history_fixed_before_input
+# The environment picks each input after the history is fixed. o2[t] is
+# o1[t-1], fixed a step before i1[t], so o2 cannot be made to meet i1. The
+# two always statements form one always part, so the atoms already show it.
+add_repl_test(realizable_cmd-data_check_history_fixed_before_input
 	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))"
-	"loses against the data")
+	": F")
 add_repl_test_fail(realizable_cmd-data_check_past_atom_against_input
 	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))"
 	"loses against the data")

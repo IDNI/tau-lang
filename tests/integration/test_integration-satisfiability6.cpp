@@ -211,6 +211,48 @@ TEST_SUITE("satisfiability public API") {
 			"(sometimes o2[t-1] = 0).")) == -1 );
 	}
 
+	// Under a negation the always body gets the negated marker disjoined,
+	// so the marker is conjoined once the negation is pushed; each always
+	// statement keeps the lookback of the always part.
+	TEST_CASE("pin_written_warm_ups: clauses read under a negation") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref neg = pinned("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)).");
+		CHECK( warm_up_pin(neg) == 2 );
+		CHECK( tau::get(neg).find_top(is_child<node_t, tau::wff_or>) );
+		// the merged always part reads two steps back, o2[t] = 1 alone
+		// none: its negation is asked from step 2 on
+		CHECK( warm_up_pin(pinned("!((always o2[t] = 1) && "
+			"(always o1[t] = o1[t-2])).")) == 2 );
+		// read under <-> the clause is left as written
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"<-> (always o2[t] = 1).")) == -1 );
+	}
+
+	// is_tau_impl and are_tau_equivalent decide f1 && !f2 (and its mirror)
+	// as written: the tautology still delays the always part.
+	TEST_CASE("is_tau_impl / are_tau_equivalent: warm-ups as written") {
+		tref plain = spec_as_written("always o2[t] = 1.");
+		tref late = spec_as_written("always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		auto impl = [](tref a, tref b) {
+			auto r = is_tau_impl<node_t>(a, b);
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( impl(plain, late) );
+		CHECK( !impl(late, plain) );
+		auto eq = are_tau_equivalent<node_t>(plain, late);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
+		auto self = are_tau_equivalent<node_t>(late, late);
+		REQUIRE( self.has_value() );
+		CHECK( self.value() );
+	}
+
 	// The negated side of an implication turns an `always` over inputs
 	// into a `sometimes`, which the check reads through a guard: read
 	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would

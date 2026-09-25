@@ -213,17 +213,20 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
-	if (auto check = get_type_and_arg(arg, true); check)
+	// Definitions are matched on the folded specification: one whose
+	// calls stay unapplied as written is read folded instead.
+	if (auto check = get_type_and_arg(arg, true); check
+		&& !tau::get(check.value().second).find_top(is<node, tau::ref>))
 		return check.value().second;
-	return nullptr;
+	return get_any(arg);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::get_applied(tref arg, bool keep_warm_ups) const {
+tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
-	if (keep_warm_ups) spec.keep_warm_ups();
+	if (as_written) spec.keep_as_written();
 	spec.add(arg);
 	auto& defs = definitions<node>::instance();
 	// type_defs is spliced first only for parallel structure with rr_defs/
@@ -310,8 +313,9 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool keep_warm_ups) const {
 		DBG(TAU_LOG_TRACE << "main is nullptr";)
 		return nullptr;
 	}
-	// add defs to global definitions:
-	for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
+	// add defs to global definitions; the definitions read as written
+	// are the same ones, left unfolded:
+	if (!as_written) for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
 		defs.add(r.first, r.second);
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
 	}
@@ -326,7 +330,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
 	repl_evaluator<BAs...>::get_type_and_arg(const tt& n,
-		bool keep_warm_ups) const
+		bool as_written) const
 {
 	auto nt = n | tt::nt;
 	tref r = nullptr;
@@ -342,7 +346,7 @@ std::optional<std::pair<size_t, tref>>
 			} else return {};
 		default: r = n | tt::ref;
 	}
-	r = get_applied(r, keep_warm_ups);
+	r = get_applied(r, as_written);
 	if (!r) return {};
 	return { { tau::get(r).get_type(), r } };
 }
@@ -1180,7 +1184,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::valid(value);

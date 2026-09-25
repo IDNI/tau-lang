@@ -1346,8 +1346,11 @@ template <NodeType node>
 result<bool> api<node>::valid(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
-		fm = flatten_always_conjuncts<node>(simplified);
+		TAU_TRY(auto simplified, simplify_as_written(fm));
+		{
+			use_hooks_guard<node> hooks_off(false);
+			fm = flatten_always_conjuncts<node>(simplified);
+		}
 		if (!fm) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
@@ -1360,7 +1363,9 @@ template <NodeType node>
 result<bool> api<node>::valid_spec(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(fm, simplify(fm));
+		// Validity decides the negation: its clauses keep the warm-ups
+		// they are written with, read under that negation.
+		TAU_TRY(fm, simplify_keeping_warm_ups(fm, true));
 		// valid() and valid_spec() are both public: the shape check sits
 		// here so neither can hand a term to formula negation or to a
 		// backend that expects a Boolean (issue #132: `valid x:bv[1]`
@@ -1722,27 +1727,51 @@ result<tref> api<node>::simplify(tref expr, bool use_defaults) {
 }
 
 template <NodeType node>
-result<tref> api<node>::simplify_keeping_warm_ups(tref expr) {
+result<tref> api<node>::simplify_as_written(tref expr) {
+	return with_budget<node>([&] {
+		// Inference only: no construction hook folds a literal and the
+		// lookback it is written with (pin_written_warm_ups).
+		use_hooks_guard<node> hooks_off(false);
+		return infer(expr);
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::pin_main(tref expr, bool negate) {
 	return with_budget<node>([&] {
 		result<tref> r;
 		if (!expr) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		// The warm-ups are read before reget: no construction hook may fold
-		// a tautological atom and the lookback it is written with.
-		std::optional<use_hooks_guard<node>> hooks_off(std::in_place, false);
-		TAU_TRY(tref inferred, infer(expr));
-		hooks_off.reset();
 		using tt = typename tau::traverser;
-		tref main = tau::get(inferred).is(tau::spec)
-			? (tt(inferred) | tau::main | tau::wff | tt::ref)
-			: inferred;
-		if (main) {
-			TAU_TRY(tref pinned, pin_written_warm_ups<node>(main));
-			if (pinned != main) inferred = main == inferred ? pinned
-				: rewriter::replace<node>(inferred, main, pinned);
+		const bool spec = tau::get(expr).is(tau::spec);
+		tref main = spec ? (tt(expr) | tau::main | tau::wff | tt::ref)
+			: expr;
+		if (!main) return r.with_assert_check_value(expr);
+		tref decided = main;
+		if (negate) {
+			use_hooks_guard<node> hooks_off(false);
+			decided = tau::build_wff_neg(main);
 		}
-		tref e = canonize_quantifier_ids<node>(tau::reget(inferred));
+		TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+		if (pinned == decided) return r.with_assert_check_value(expr);
+		use_hooks_guard<node> hooks_off(false);
+		// Negated back: the main formula again, with the markers its
+		// negation needs.
+		if (negate) pinned = tau::build_wff_neg(pinned);
+		if (!spec) return r.with_assert_check_value(pinned);
+		return r.with_assert_check_value(
+			rewriter::replace<node>(expr, main, pinned));
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::simplify_keeping_warm_ups(tref expr, bool negate) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		TAU_TRY(tref inferred, simplify_as_written(expr));
+		TAU_TRY(tref pinned, pin_main(inferred, negate));
+		tref e = canonize_quantifier_ids<node>(tau::reget(pinned));
 		if (!e) r.error(code::internal_error, "Simplification failed");
 		else r = e;
 		DBG(assert(r.is_well_formed());)

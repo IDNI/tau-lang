@@ -161,28 +161,37 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * @brief Keep the warm-up of each clause of @p fm at its lookback as written.
  *
  * A clause asks nothing before the deepest lookback it reads (README
- * "Lookback initialization"): the always part (every always statement whose
- * body has no temporal operator, merged), each other top-level conjunct
- * headed by `always`, `sometimes`, `U`, `R` or `W`, or the whole formula
- * when it has no temporal operator. Normalization can drop the literal that
- * carries that lookback, a tautology such as `o1[t-2] = o1[t-2]` or one
- * absorbed by another always statement. Such a clause gets `o__warmup[t-k] = 0`
- * conjoined, a fresh output of the Boolean carrier type at `k` the written
- * lookback; execution never prints this internal stream.
- * Clauses that call a definition are left as they are.
+ * "Lookback initialization"). The clauses of a written conjunction are its
+ * always part (every always statement whose body has no temporal operator,
+ * merged), each other conjunct headed by `always`, `sometimes`, `U`, `R` or
+ * `W`, or the whole formula when it has no temporal operator. Normalization
+ * can drop the literal that carries that lookback, a tautology such as
+ * `o1[t-2] = o1[t-2]` or one absorbed by another always statement. Such a
+ * clause gets the literal `o__warmup[t-k] = 0` on a fresh output of the
+ * Boolean carrier type, `k` the written lookback; execution never prints
+ * this stream. A clause read positively gets it conjoined to its body. A
+ * clause read under a negation gets its negation disjoined, so that the
+ * marker is conjoined once the negation is pushed through the temporal
+ * operator; there each always statement of the always part keeps the always
+ * part's lookback. Clauses under `<->`, `^` or `?:`, full-LTL clauses under
+ * a negation and clauses that call a definition are left as they are.
  *
- * Run it on the formula as written, before the construction hooks fold it
- * (`tau::reget`, `api::simplify`).
+ * Run it on the formula that is decided, as written: after any negation the
+ * decision applies and before the construction hooks fold it (`tau::reget`,
+ * `api::simplify`). A formula pinned for one polarity must not be negated
+ * afterwards.
  * @tparam node Tree node type.
  * @param fm Formula, typed but not yet rebuilt through the hooks.
- * @return @p fm with the clauses pinned, or the error of a normalization
- * that failed.
+ * @return @p fm with the clauses pinned, built without the hooks, or the
+ * error of a normalization that failed.
  *
  * @par Example
  * @code{.cpp}
  * // (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)
  * // becomes (always o2[t] = 1 && o1[t-2] = o1[t-2] && o__warmup[t-2] = 0)
  * //         && (sometimes o2[t-1] = 0)
+ * // and under a negation the always body becomes
+ * // (o2[t] = 1 && o1[t-2] = o1[t-2]) || o__warmup[t-2] != 0
  * @endcode
  */
 template <NodeType node>
