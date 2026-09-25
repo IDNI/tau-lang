@@ -313,11 +313,49 @@ inline bool ba_component_factoring_enabled() {
 	return env ? *env : ba_component_factoring;
 }
 
+template <typename node>
+static int factored_tau_valid(tref fm);
+
+/**
+ * @brief The dual of a `sometimes` formula: `G(!D)` for `F(D)`, in NNF.
+ *
+ * A complemented `:tau` constant `{K}'` whose body is an always-conjunction
+ * normalizes to a `sometimes` over the DNF of `!K`. Neither factored path
+ * can split that shape (the units are always-clauses); `F(D) == !G(!D)`
+ * maps both questions back to the always/CNF units of `K`, which the
+ * per-unit caches already hold: `sat(F(D)) == !valid(G(!D))` and
+ * `valid(F(D)) == !sat(G(!D))`. Both identities are the engine's own
+ * definitions of the two predicates (`valid(X)` is decided as `!sat(!X)`),
+ * so the dual adds no assumption beyond the per-unit factoring.
+ *
+ * Returns nullptr when @p fm is not a `sometimes` formula, or when its body
+ * holds a temporal operator of its own: the dual of a nested temporal body
+ * is not an always-conjunction the unit split could take apart, and pushing
+ * the negation through the full-LTL operators is the LTL pipeline's job.
+ * The callers pass the normalized main, where the complement of an
+ * always-conjunction is one `sometimes` over a DNF; a disjunction of
+ * several `sometimes`, as `to_nnf` alone produces, is not taken apart here
+ * and goes to the units path.
+ */
+template <typename node>
+static tref sometimes_dual(tref fm) {
+	using tau = tree<node>;
+	const tau& t = tau::get(fm);
+	if (!t.has_child() || !t.child_is(tau::wff_sometimes)) return nullptr;
+	const tref body = tau::trim2(fm);
+	if (tau::get(body).find_top(is_temporal_quantifier<node>)) return nullptr;
+	return to_nnf<node>(tau::build_wff_always(tau::build_wff_neg(body)));
+}
+
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
 static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
+	// sat(F(D)) == !valid(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_valid<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	for (tref u : units)
@@ -390,6 +428,10 @@ static int factored_tau_sat(tref fm) {
 template <typename node>
 static int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
+	// valid(F(D)) == !sat(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_sat<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
@@ -409,9 +451,40 @@ static int factored_tau_valid(tref fm) {
 	return all ? 1 : 0;
 }
 
+
+// The solver's bad splitter of a Tau constant is a fresh uninterpreted
+// constant `<:splitN> != 0` (tau_splitter_one calls tau_bad_splitter on
+// `T`, so the element is that bare formula), and the properness checks of
+// the step solver probe the element with is_zero and is_one -- the second
+// being the zero test of its complement -- before they commit a witness.
+// Both answers follow from the shape alone: an uninterpreted constant
+// `!= 0` is satisfiable (c := 1) and not valid (c := 0), and so is `= 0`.
+// Answering them here keeps the solver's checks and saves a full temporal
+// decision per probe -- two per minted constant, and the step solver mints
+// a fresh one on every step.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool is_uconst_zero_test(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (!fm.nso_rr.rec_relations.empty() || !fm.nso_rr.main) return false;
+	const tau& w = tau::get(fm.nso_rr.main->get());
+	if (!(w.child_is(tau::bf_neq) || w.child_is(tau::bf_eq))) return false;
+	tref l = w[0].first(), r = w[0].second();
+	if (!l || !r || !tau::get(r).equals_0()) return false;
+	// l must be exactly bf(variable(uconst_name)), the shape
+	// build_bf_uconst makes: one uninterpreted constant and nothing else,
+	// checked positively so that no operator, stream or constant around it
+	// passes.
+	const tau& tl = tau::get(l);
+	return tl.is(tau::bf) && tl.child_is(tau::variable)
+		&& tl[0].child_is(tau::uconst_name);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -428,6 +501,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
