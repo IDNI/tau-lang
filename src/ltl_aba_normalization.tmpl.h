@@ -2398,11 +2398,16 @@ struct data_quantifier {
 		auto it = two_element.find(tid);
 		if (it != two_element.end()) return it->second;
 		tref x = tau::get(tau::bf, v);
-		bool two = !aba_existential_feasible<node>(tau::build_wff_and(
+		// Only a decided "no third value" makes a type two-element: an
+		// undecided check, or an algebra that assumes its elements
+		// non-empty without checking, keeps its quantifiers.
+		auto third = is_non_temp_nso_satisfiable<node>(tau::build_wff_and(
 			tau::build_wff_neg(tau::build_bf_eq(x,
 				build_bf_f_type<node>(tid))),
 			tau::build_wff_neg(tau::build_bf_eq(x,
 				build_bf_t_type<node>(tid)))));
+		bool two = third.has_value() && !third.value()
+			&& !pack_type_output_always_satisfiable<node>(tid);
 		two_element.emplace(tid, two);
 		return two;
 	}
