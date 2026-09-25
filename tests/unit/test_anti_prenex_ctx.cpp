@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 0 unit tests for src/anti_prenex/foundations/ctx.h (package E).
+// Unit tests for src/anti_prenex/foundations/ctx.h.
 // Spec: anti_prenex.md §1 (ctx table, "Cache scope"), §5 (PUSH_EX_BLOCK's
 // setup), §6/§7 (the wrapper's consumers).
 //

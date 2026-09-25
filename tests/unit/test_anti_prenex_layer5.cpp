@@ -24,11 +24,11 @@
 // re-wrapped undecided (invariant 3). Each case's comment names the route its
 // input takes.
 //
-// The inputs come, and nothing else does, from the suite of the old module,
-// tests/unit/test_antiprenexing.cpp, at the line each case names; every
-// expectation here is worked out from the spec. Where an input is also a
-// layer-4 case (tests/unit/test_anti_prenex_layer4.cpp) that case pins what
-// the block DRIVER does with it and this one pins the ladder's route.
+// The inputs come, and nothing else does, from the suite of the module in
+// `src/antiprenexing/`, tests/unit/test_antiprenexing.cpp, at the line each
+// case names; every expectation here is worked out from the spec. Where an
+// input is also a case of tests/unit/test_anti_prenex_layer4.cpp, that case
+// pins what the block DRIVER does with it and this one the ladder's route.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.

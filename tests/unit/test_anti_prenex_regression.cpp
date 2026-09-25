@@ -1,16 +1,16 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // The REGRESSION CORPUS of the anti-prenexing module: inputs taken from the
-// suites of `src/antiprenexing/` that encode behaviour `anti_prenex.md` still
-// wants. Spec: §3 (the pipeline), §4, invariant 4.
+// suites of `src/antiprenexing/` that encode behaviour `anti_prenex.md` wants.
+// Spec: §3 (the pipeline), §4, invariant 4.
 //
 // Every case runs ONLY `anti_prenexing::anti_prenex` (anti_prenex.h) and
 // names, in one line, the suite and case its input comes from; the spec is
 // the reference, that suite only the source of the input. Cases that pin
 // another module's own entry points, knobs or intermediate steps are not
 // carried over — the spec's push steps are tested where they are defined —
-// and an expectation that was an output STRING is replaced by the semantic
-// claim it stands for: which variables are gone, which binder survives.
+// and an output STRING the source expects is replaced by the semantic claim
+// it stands for: which variables are gone, which binder survives.
 //
 // TWO TIERS PER CASE.
 //  ACTIVE, checked on every build: the output is EQUIVALENT to the input (by
@@ -274,7 +274,7 @@ TEST_CASE("R11: no block variable escapes its scope") {
 
 // --- PureBaBvEliminability: the two halves of the bitvector rule ------------------
 
-TEST_CASE("R12: a pure-BA scope over bitvector variables") {
+TEST_CASE("R12: a pure-BA scope over bitvector variables is eliminated") {
 	// PureBaBvEliminability / "pure-BA bv scope is eliminated in Tau":
 	// `∃x.(x ∪ y = 0)` is `y = 0` in ANY BA, so the bitvector type is no
 	// reason to keep the binder. The pin of `x ∪ y = 0` on `x` is WEAK, its

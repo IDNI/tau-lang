@@ -11,8 +11,8 @@
 // push the block into it. What is claimed of every result: EQUIVALENT to
 // `∃P.ψ` (`are_nso_equivalent` on the finished formula, the solver
 // (`bv_equivalent`) on bitvector content, or structurally where a reference
-// puts both out of reach), no free variable ESCAPED, and INVARIANT 4. Per case: the block is RESOLVED, or what came back is exactly
-// the RE-WRAP.
+// puts both out of reach), no free variable ESCAPED, and INVARIANT 4. Per
+// case: the block is RESOLVED, or what came back is exactly the RE-WRAP.
 //
 // TYPES: §7's table has no row for an untyped block and `method`
 // Debug-asserts on one, so every fixture carries typed variables — a parsed

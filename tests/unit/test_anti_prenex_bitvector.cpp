@@ -20,7 +20,8 @@
 // claims are structural, and the keep-mode answer is checked through its
 // plain re-run, the chains resolved by RESOLVE_FUNCTIONAL_PLAIN.
 //
-// The observables are the answers, `binder_count`, and `same` on the shapes.
+// The observables are the answers, `binder_count`, `same` on the shapes, the
+// delta of `taint_count`, and in Release `solver_memo` through `lookup`.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -441,7 +442,7 @@ TEST_CASE("V8: a chain on the pure side skips the joint ask") {
 	CHECK(bv_equivalent(plain, f.quantified));
 }
 
-TEST_CASE("V9: a chain the split's closure puts on the solver side") {
+TEST_CASE("V9: a solver side holding a chain re-wraps whole") {
 	// `∃x (x + a = 0 ∧ ∀_y (x·y) = 0)`: the pure chain equation shares `x`
 	// with the arithmetic atom, so both re-wrap as one unit over `x`.
 	const size_t bv2 = bv_type_id<node_t>(2);

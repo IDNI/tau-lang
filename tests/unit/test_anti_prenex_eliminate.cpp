@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 3 unit tests for src/anti_prenex/eliminate/atomless.h and
-// eliminate_block.h: §7's type table, ELIMINATE_BLOCK with its memo and its
-// two pre-steps, and the atomless method end to end. Spec: anti_prenex.md §7
-// (the table, the method contract, ELIMINATE_ATOMLESS_CLAUSE, DISCHARGE), §3
+// Unit tests for src/anti_prenex/eliminate/atomless.h and eliminate_block.h:
+// §7's type table, ELIMINATE_BLOCK with its memo, its two pre-steps and its
+// dispatch, and the atomless method end to end. Spec: anti_prenex.md §7 (the
+// table, the method contract, ELIMINATE_ATOMLESS_CLAUSE, DISCHARGE), §3
 // (TRY_WITNESS), §1 (the term representation, the leaf hazard, cache scope).
 //
 // TYPES: only the ATOMLESS types (`tau`, `sbf`) and the bitvector family are

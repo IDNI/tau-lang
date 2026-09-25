@@ -101,10 +101,9 @@ tref eliminate_block(tref clause, const block& X, ctx<node>& c);
  *    `∃X(indep ∧ dep) = indep ∧ ∃X.dep`, and `X` is narrowed to what the
  *    dependent conjuncts still hold. After it §7's method contract holds:
  *    every remaining conjunct mentions some `x ∈ X`.
- * 3. THE DISPATCH, on `METHOD(ctx.type)`: the atomless method, or the
- *    bitvector router — the finite method for pure content, the solver for
- *    the rest, a freeze for what neither reads. The table's `⊥` row re-wraps
- *    the dependent part (invariant 3).
+ * 3. THE DISPATCH, on `METHOD(ctx.type)`: the atomless method or the
+ *    bitvector router. The table's `⊥` row re-wraps the dependent part
+ *    (invariant 3).
  *
  * Both pre-steps are pure identities and are run here, once, rather than in
  * every method.

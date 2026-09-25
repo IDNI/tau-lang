@@ -115,7 +115,7 @@ tref query_or_rewrap(const trefs& conjuncts, const block& X,
 /**
  * @brief §7 `FINITE_TIER2(clause, X, ctx)`: one query per variable-disjoint
  * part holding a non-positive conjunct, smallest first, then one joint
- * closing over the re-wraps that share a free variable.
+ * closing over the re-wraps once two of them share a free variable.
  *
  * `∃X` distributes over the parts, and a part of positives alone is its
  * own `pos`, which the caller emits, so it is left out. The per-part
@@ -124,9 +124,9 @@ tref query_or_rewrap(const trefs& conjuncts, const block& X,
  * assignments, and the one joint closing catches that. A part decided `F`
  * decides the clause, and the later parts are never queried (invariant 7).
  *
- * A conjunct the squeeze left free of the block — `x + b = x + c` gives
- * `b + c = 0` — is a part of its own over no variable, and its query is the
- * conjunct itself.
+ * A negative the squeeze left free of the block — `¬(x + b = x + c)` gives
+ * `¬(b + c = 0)` — is a part of its own over no variable, and its query is
+ * the conjunct itself.
  */
 template <NodeType node>
 tref finite_tier2(const trefs& conjuncts, const block& X, ctx<node>& c);

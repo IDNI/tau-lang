@@ -232,7 +232,7 @@ TEST_CASE("F1: what the sweep cannot read freezes its component") {
 
 // --- tiers 0 and 1 ----------------------------------------------------------------
 
-TEST_CASE("F2: tier 0, positives alone") {
+TEST_CASE("F2: positives alone are tier 0: pos is the answer") {
 	// `∀_x (x ∪ a) = a`, so `pos` is the one atom `a = 0`.
 	fixture f = make("ex x (x:bv[2] | a:bv[2] = { 0 }:bv[2]).");
 	const tref got = ap::eliminate_finite_clause<node_t>(f.conjuncts, f.P,
@@ -245,7 +245,7 @@ TEST_CASE("F2: tier 0, positives alone") {
 	CHECK(!bv_equivalent(got, parse("a:bv[2] = { 1 }:bv[2].")));
 }
 
-TEST_CASE("F3: tier 1, one negative literal") {
+TEST_CASE("F3: one negative literal is tier 1, answered by its condition") {
 	// `pos = ∀_x x·a = 0` is `T`; the condition `∃_x (x·a)′·x·b ≠ 0` is
 	// `a′·b ≠ 0`.
 	fixture f = make(tier1);
@@ -258,7 +258,7 @@ TEST_CASE("F3: tier 1, one negative literal") {
 		parse("!(a:bv[2]' & b:bv[2] = { 0 }:bv[2]).")));
 }
 
-TEST_CASE("F4: tier 1, one flat tree") {
+TEST_CASE("F4: one flat tree is tier 1, one condition per literal") {
 	// `∃X` distributes over the tree's `∨`: one condition per literal.
 	fixture f = make("ex x (x:bv[2] & a:bv[2] = { 0 }:bv[2] "
 		"&& (!(x:bv[2] & b:bv[2] = { 0 }:bv[2]) "

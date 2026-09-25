@@ -270,7 +270,7 @@ tref finite_tier2(const trefs& conjuncts, const block& X, ctx<node>& c) {
 			open.push_back(r);
 		if (acc.insert(r)) return _F<node>();
 	}
-	// THE JOINT CLOSING, over the survivors that share a free variable.
+	// THE JOINT CLOSING, over all survivors once two share a free variable.
 	bool shared = false;
 	for (size_t i = 0; i < open.size() && !shared; ++i)
 		for (size_t j = i + 1; j < open.size() && !shared; ++j)

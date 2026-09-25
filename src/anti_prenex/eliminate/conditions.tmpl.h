@@ -5,10 +5,11 @@
  * @brief Template implementations for conditions.h. conditions.h says what
  * each procedure means; the comments here say how it is built.
  *
- * The pieces come from the files below: `parts` (§6) for every grouping,
- * `norm_equation`, `term_of`, `simplify_term` and `simplify_atom` (§3) for the
- * rewrite, `discharge` (§7) for every quantified atom that goes out, the
- * result joins (§3) for every formula, and `rewrap` (§3) for what is frozen.
+ * The pieces come from the files below: `parts` and `partition_parts` (§6)
+ * for every grouping, `norm_equation`, `term_of`, `simplify_term` and
+ * `simplify_atom` (§3) for the rewrite, `discharge` (§7) for every quantified
+ * atom that goes out, the result joins (§3) for every formula, and `rewrap`
+ * (§3) for what is frozen.
  * The union of a list of terms is the hooked binary `build_bf_or`, which the
  * term simplifier then absorbs into the representation.
  */

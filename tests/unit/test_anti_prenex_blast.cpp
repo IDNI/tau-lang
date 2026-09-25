@@ -165,7 +165,7 @@ TEST_CASE("B3: an alternation is decided whole") {
 		"&& x:bv[2] | y:bv[2] = { 3 }:bv[2]).")) == true);
 }
 
-TEST_CASE("B4: a constant's bits, and the ring sum") {
+TEST_CASE("B4: the sweep reads a constant's bits and the ring sum") {
 	// x·10 = 10 holds for x ∈ {10, 11}, not for x = 00.
 	CHECK(decide(parse("ex x (x:bv[2] & { 2 }:bv[2] = { 2 }:bv[2]).")) == true);
 	CHECK(decide(parse("all x (x:bv[2] & { 2 }:bv[2] = { 2 }:bv[2]).")) == false);
@@ -173,7 +173,7 @@ TEST_CASE("B4: a constant's bits, and the ring sum") {
 	CHECK(decide(parse("ex x (x:bv[2] ^ { 1 }:bv[2] = { 0 }:bv[2]).")) == true);
 }
 
-TEST_CASE("B5: a unit nested inside the matrix") {
+TEST_CASE("B5: the sweep decides a unit nested inside the matrix") {
 	// By hand: y = 0 meets `y·x = 0` and every other y meets `y ≠ 0`, so the
 	// inner ∀y holds for every x and the query is ∃x (x ≠ 0): true.
 	CHECK(decide(parse("ex x (!(x:bv[2] = { 0 }:bv[2]) && all y ("
@@ -181,7 +181,7 @@ TEST_CASE("B5: a unit nested inside the matrix") {
 		) == true);
 }
 
-TEST_CASE("B6: a functional quantifier in the query") {
+TEST_CASE("B6: the sweep reads a functional quantifier in the query") {
 	// ∀_y (x·y) = (x·0)·(x·1) = 0, so the equation holds for every x.
 	CHECK(decide(chain_query()) == true);
 }

@@ -7,7 +7,8 @@
  *
  * TWO ENGINES SERVE `bv[n]`, split by translatability. The PURE fragment —
  * (¬)equations over `∪ · ′` and the ring sum, functional quantifiers
- * included — is the finite method's (finite.h), decided without the solver.
+ * included — is the finite method's (finite.h), which asks the solver only
+ * where its sweep gives up.
  * The rest is the solver's: a block variable under an arithmetic operator
  * admits no Shannon expansion, so no BDD-engine move applies to it (§1 leaf
  * hazard), and an order atom is arithmetic. Tau writes the ring sum `^`; its
@@ -25,10 +26,10 @@
  * conversion that would move one to the pure side (`IS_LINEAR_ARITHMETIC`,
  * `LINEAR_ARITHMETIC_TO_BA`) is §9's open item.
  *
- * WHAT NEITHER ENGINE READS FREEZES (invariant 3): a reference, a unit whose
- * body the solver cannot translate, and an impure conjunct carrying a
- * functional quantifier — the solver has no term-level binder, and the
- * finite side reads pure content alone.
+ * WHAT NEITHER ENGINE READS FREEZES (invariant 3): a reference, a temporal
+ * operator, a unit whose body the solver cannot translate, and an impure
+ * conjunct carrying a functional quantifier — the solver has no term-level
+ * binder, and the finite side reads pure content alone.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__BITVECTOR_H__

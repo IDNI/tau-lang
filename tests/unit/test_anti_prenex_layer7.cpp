@@ -193,7 +193,7 @@ TEST_CASE("N2: R12's shape resolves before the method dispatch") {
 	CHECK(bv_equivalent(got, parse("y:bv[2] = { 0 }:bv[2].")));
 }
 
-TEST_CASE("N3: the finite method's tiers 0 and 1 end to end") {
+TEST_CASE("N3: the finite method's tiers 0 and 1 resolve end to end") {
 	// F2 is R12's shape, resolved as in N2. F3 and F4 pin nothing: no
 	// conjunct is disjunctive but a negative tree, so the settle move takes
 	// the block home (§6), the router hands the pure clause to the finite
