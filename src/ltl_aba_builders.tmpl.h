@@ -221,6 +221,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	add_consistency_constraints<node>(sol.atoms, sol.skeleton,
 		&sol.consistency_constraints, has_past /*polarity_complete*/,
 		std::move(shift_chain_input_assumptions));
+	if (ltl_observed_abstraction)
+		add_present_twins<node>(sol.atoms, sol.output_props, sol.skeleton);
 
 	// Append DFA tester constraints and register state variables as outputs.
 	append_tester_constraints(sol.skeleton, testers);
@@ -259,7 +261,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 // finds none (false). An error is undecided.
 template <NodeType node>
 static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
-	bool output)
+	bool output, bool* lost = nullptr)
 {
 	result<bool> r;
 	auto backend_failed = [&]() -> result<bool> {
@@ -369,9 +371,13 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 					if (wres.path_cap_reached) break;
 					clauses = std::move(wres.blocking_clauses);
 				}
-				if (clauses.empty())
+				if (clauses.empty() && sol.observed)
+					clauses = add_forceability_observations<node>(sol);
+				if (clauses.empty()) {
+					if (lost) *lost = true;
 					return undecided("the strategy loses against the "
 						"data and no blocking clause was found");
+				}
 			}
 		}
 
@@ -393,12 +399,59 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
 		if (!ltlsynt_opt) return backend_failed();
 		auto& [ok, hoa] = *ltlsynt_opt;
-		if (!ok) return r.with_value(false);
+		if (!ok) {
+			if (sol.observation_props.empty()) return r.with_value(false);
+			return undecided("no strategy wins once the claims the "
+				"data cannot force are observed, but the observations "
+				"give the environment choices the data may not allow");
+		}
 		auto aut_opt = r.merge_take(parse_hoa(hoa));
 		if (!aut_opt) return backend_failed();
 		sol.aut = std::move(*aut_opt);
 		gate_counter_props<node>(sol);
 	}
+}
+
+// Refines `sol`. When its strategy loses against the data and no path can
+// be blocked, the formula is solved again as the observed abstraction and
+// that strategy is refined, observations added as it loses; `sol` then
+// holds the observed solution. The first attempt is a rejected candidate.
+template <NodeType node>
+static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
+	bool output)
+{
+	using tau = tree<node>;
+	result<bool> r;
+	bool lost = false;
+	auto first = refine_ltl_aba_solution<node>(sol, output, &lost);
+	if (first.has_value() || !lost) return first;
+	{
+		auto sc = r.open("rejected candidate");
+		r.info("the strategy loses against the data; the formula is "
+			"solved again with observations",
+			{{label::value, truncate_for_message(tau::get(fm).to_str())}});
+		report rep = std::move(first).report();
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
+	std::optional<std::optional<ltl_aba_solution<node>>> second;
+	{
+		const bool outer = ltl_observed_abstraction;
+		ltl_observed_abstraction = true;
+		second = r.merge_take(solve_ltl_aba<node>(fm));
+		ltl_observed_abstraction = outer;
+	}
+	if (!second) return r;
+	if (!*second) return r.with_error(code::solver_error,
+		"UNKNOWN: the strategy loses against the data and the observed "
+		"abstraction has none; realizability could not be decided");
+	auto& observed = **second;
+	observed.observed = true;
+	auto refined = r.merge_take(
+		refine_ltl_aba_solution<node>(observed, output));
+	if (!refined) return r;
+	if (*refined) sol = std::move(observed);
+	return r.with_value(*refined);
 }
 
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
@@ -488,7 +541,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	if (!maybe) return unrealizable("propositional");
 
 	auto refined = r.merge_take(
-		refine_ltl_aba_solution<node>(*maybe, output));
+		refine_or_observe<node>(fm, *maybe, output));
 	if (!refined) return r;
 	if (!*refined) return unrealizable("ABA-refined");
 	return r.with_value(true);
@@ -760,7 +813,7 @@ ltl_to_safety_formula_full(tref fm) {
 	// Execute the strategy the realizability check accepts, not ltlsynt's
 	// first one, which may take an edge the ABA rules out.
 	if (sol.executable) {
-		auto refined = refine_ltl_aba_solution<node>(sol, false);
+		auto refined = refine_or_observe<node>(fm, sol, false);
 		if (!refined.has_value() || !refined.value()) {
 			if (!refined.has_value()) refined.print();
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "

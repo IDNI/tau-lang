@@ -265,6 +265,14 @@ inline size_t ltl_window_max_paths() {
  */
 inline thread_local bool ltl_verdict_incomplete = false;
 
+/**
+ * @brief Set while the observed abstraction is built (a second solve after
+ * a strategy lost against the data): the consistency constraints then
+ * forbid only combinations no data satisfies, since observations tell a
+ * strategy when a claim depending on the inputs can be kept.
+ */
+inline thread_local bool ltl_observed_abstraction = false;
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__LTL_ABA_LIMITS_H__

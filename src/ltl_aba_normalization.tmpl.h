@@ -439,15 +439,19 @@ static bool aba_existential_feasible(tref fm) {
 // Per-step feasibility under an adversarial input: each free stream/time
 // instance is quantified in chronological order (earliest shift outermost),
 // input instances universally, everything else existentially -- a later
-// instance may depend on an earlier one, never the reverse.
+// instance may depend on an earlier one, never the reverse. Under
+// ltl_observed_abstraction every instance is existential.
 template <NodeType node>
 static bool aba_synthesis_feasible(tref fm) {
 	using tau = tree<node>;
 	if (tau::get(fm).equals_T()) return true;
 	if (tau::get(fm).equals_F()) return false;
+	const bool observed = ltl_observed_abstraction;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
+	static cache_t& strict_cache = tau::template create_cache<cache_t>();
+	static cache_t& observed_cache = tau::template create_cache<cache_t>();
+	cache_t& cache = observed ? observed_cache : strict_cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	auto is_input = [](tref v) {
@@ -467,7 +471,8 @@ static bool aba_synthesis_feasible(tref fm) {
 	});
 	tref q_fm = fm;
 	for (auto it = vars.rbegin(); it != vars.rend(); ++it)
-		q_fm = is_input(*it) ? tau::build_wff_all(*it, q_fm, false)
+		q_fm = is_input(*it) && !observed
+			? tau::build_wff_all(*it, q_fm, false)
 		                      : tau::build_wff_ex(*it, q_fm, false);
 	// q_fm is closed by construction, so a solving BA can decide it directly
 	// through its own quantifier support instead of DNF/Shannon case-split.
@@ -1959,6 +1964,76 @@ static result<std::string> apply_step_counter_encoding(
 	return r.with_value(std::move(extra));
 }
 
+// Every relative io_var of `fm` moved `delta` steps later (x[t-j] becomes
+// x[t-j+delta]), rebuilt in one spelling so that equal formulas compare
+// equal; each variable keeps its input or output side. The caller keeps
+// every shift >= 0.
+template <NodeType node>
+static tref shift_io_vars(tref fm, int_t delta) {
+	using tau = tree<node>;
+	subtree_map<node, tref> m;
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		if (is_io_initial<node>(v)) continue;
+		int_t sh = get_io_var_shift<node>(v) - delta;
+		DBG(assert(sh >= 0);)
+		size_t tid = find_ba_type<node>(v);
+		const std::string& name = get_var_name<node>(v);
+		m[v] = sh == 0
+			? tau::trim(is_input_var<node>(v)
+				? tau::build_in_var_at_t(build_var_name<node>(name), tid)
+				: tau::build_out_var_at_t(build_var_name<node>(name), tid))
+			: tau::trim(is_input_var<node>(v)
+				? tau::build_in_var_at_t_minus(name, (size_t)sh, tid)
+				: tau::build_out_var_at_t_minus(name, (size_t)sh, tid));
+	}
+	return m.empty() ? fm : rewriter::replace<node>(fm, m);
+}
+
+// ── present-time twins of past-reading atoms ────────────────────────────────
+// A system atom whose io_vars all read t-k (k >= 1) is decided k steps before
+// the step that reads it, but ltlsynt sees its prop as a free choice at that
+// later step. For the observed abstraction, its present-time twin (the same
+// atom read at t) gets a prop of its own tied by G(twin <-> X^k(prop)), so
+// a strategy sets the value while it is still open. The twins come after
+// the consistency constraints and so are not constrained by them.
+template <NodeType node>
+static void add_present_twins(
+    std::vector<std::pair<tref, std::string>>& atoms,
+    std::vector<std::string>& output_props,
+    std::string& skeleton)
+{
+	using tau = tree<node>;
+	size_t next = 0;
+	for (auto& [_, name] : atoms)
+		if (name.size() > 1 && name[0] == 'p'
+			&& std::all_of(name.begin() + 1, name.end(),
+				[](unsigned char c) { return std::isdigit(c); }))
+				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	const size_t n = atoms.size();
+	for (size_t i = 0; i < n; ++i) {
+		tref a = atoms[i].first;
+		if (atom_is_positional<node>(a) || is_pure_input_atom<node>(a))
+			continue;
+		auto k = atom_uniform_shift<node>(a);
+		if (!k || *k < 1) continue;
+		tref twin = shift_io_vars<node>(a, *k);
+		std::string pname;
+		for (auto& [b, bname] : atoms)
+			if (!atom_is_positional<node>(b)
+				&& tau::subtree_equals(shift_io_vars<node>(b, 0), twin))
+					{ pname = bname; break; }
+		if (pname.empty()) {
+			pname = "p" + std::to_string(next++);
+			atoms.emplace_back(twin, pname);
+			output_props.push_back(pname);
+		}
+		std::string later = atoms[i].second;
+		for (int_t s = 0; s < *k; ++s) later = "X(" + later + ")";
+		std::string c = "G(" + pname + " <-> " + later + ")";
+		if (skeleton.find(c) == std::string::npos) skeleton += " && " + c;
+	}
+}
+
 // ── Internal: solve LTL(ABA) problem ─────────────────────────────────────────
 //
 // Bundles the common steps shared by is_ltl_aba_realizable and
@@ -1983,6 +2058,13 @@ struct ltl_aba_solution {
 	// away (atom_is_positional can no longer find them); -1 means
 	// build_program_desc derives highest_initial_pos from `atoms` as usual.
 	int_t counter_highest_initial_pos = -1;
+	// Built under ltl_observed_abstraction: a losing strategy gets
+	// observations (add_forceability_observations) instead of a verdict.
+	bool observed = false;
+	// Input props add_forceability_observations introduced. They give the
+	// environment choices the data may not allow, so once one exists an
+	// UNREALIZABLE answer from ltlsynt is not a verdict.
+	std::vector<std::string> observation_props;
 	// Props apply_step_counter_encoding resolved a hoisted conjunct's atom
 	// to: table_step_provider::produce grounds these at the counter's own
 	// absolute step (time_point) instead of the lookback-shifted
@@ -2291,6 +2373,67 @@ static window_oracle_result window_infeasible_paths(
 	return result;
 }
 
+// Quantifies the io_vars of one step for the data checks below. A variable
+// of a two-element type is expanded into its two values, which leaves the
+// normalizer nothing to eliminate; any other quantifier is left to the
+// normalizer, and one it leaves standing is not decided (nullptr).
+template <NodeType node>
+struct data_quantifier {
+	using tau = tree<node>;
+	std::map<size_t, bool> two_element;
+
+	bool is_two_element(tref v) {
+		size_t tid = find_ba_type<node>(v);
+		auto it = two_element.find(tid);
+		if (it != two_element.end()) return it->second;
+		tref x = tau::get(tau::bf, v);
+		bool two = !aba_existential_feasible<node>(tau::build_wff_and(
+			tau::build_wff_neg(tau::build_bf_eq(x,
+				build_bf_f_type<node>(tid))),
+			tau::build_wff_neg(tau::build_bf_eq(x,
+				build_bf_t_type<node>(tid)))));
+		two_element.emplace(tid, two);
+		return two;
+	}
+
+	tref quantify(tref v, tref fm, bool exists) {
+		if (!is_two_element(v))
+			return exists ? tau::build_wff_ex(v, fm, false)
+				: tau::build_wff_all(v, fm, false);
+		size_t tid = find_ba_type<node>(v);
+		auto at = [&](tref c) {
+			subtree_map<node, tref> m{ { v, tau::trim(c) } };
+			return rewriter::replace<node>(fm, m);
+		};
+		tref lo = at(build_bf_f_type<node>(tid));
+		tref hi = at(build_bf_t_type<node>(tid));
+		return exists ? tau::build_wff_or(lo, hi)
+			: tau::build_wff_and(lo, hi);
+	}
+
+	static tref eliminate(tref fm) {
+		auto n = normalize_non_temp<node>(fm);
+		if (!n.has_value() || !n.value()
+			|| tau::get(n.value()).find_top(is_quantifier<node>))
+				return nullptr;
+		return n.value();
+	}
+
+	// The io_vars of `fm` read at the current step, inputs and outputs.
+	static std::pair<trefs, trefs> current_vars(tref fm) {
+		trefs ins, outs;
+		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+			if (is_io_initial<node>(v) || get_io_var_shift<node>(v) != 0)
+				continue;
+			auto& bucket = is_input_var<node>(v) ? ins : outs;
+			if (std::none_of(bucket.begin(), bucket.end(),
+				[&](tref w) { return tau::subtree_equals(w, v); }))
+					bucket.push_back(v);
+		}
+		return { ins, outs };
+	}
+};
+
 // ── Strategy check against the data (exact oracle) ──────────────────────────
 //
 // The edge and window oracles ask whether a guard, or a window of guards, has
@@ -2336,24 +2479,8 @@ static strategy_data_verdict strategy_wins_on_data(
 			if (is_io_initial<node>(v))
 				return strategy_data_verdict::undecided;
 
-	// Every io_var of `fm` moved `delta` steps later (x[t-j] -> x[t-j+delta]);
-	// a variable that would read the future is left out by the caller.
-	auto shift_vars = [&](tref fm, int_t delta) -> tref {
-		subtree_map<node, tref> m;
-		for (tref v : io_vars_of(fm)) {
-			int_t sh = get_io_var_shift<node>(v) - delta;
-			DBG(assert(sh >= 0);)
-			size_t tid = find_ba_type<node>(v);
-			const std::string& name = get_var_name<node>(v);
-			m[v] = sh == 0
-				? tau::trim(is_input_var<node>(v)
-					? tau::build_in_var_at_t(build_var_name<node>(name), tid)
-					: tau::build_out_var_at_t(build_var_name<node>(name), tid))
-				: tau::trim(is_input_var<node>(v)
-					? tau::build_in_var_at_t_minus(name, (size_t)sh, tid)
-					: tau::build_out_var_at_t_minus(name, (size_t)sh, tid));
-		}
-		return m.empty() ? fm : rewriter::replace<node>(fm, m);
+	auto shift_vars = [](tref fm, int_t delta) {
+		return shift_io_vars<node>(fm, delta);
 	};
 
 	// The edge guards over the atoms, in the same io_var spelling as the
@@ -2367,45 +2494,7 @@ static strategy_data_verdict strategy_wins_on_data(
 			guards[s].emplace_back(shift_vars(g, 0), e.dst);
 		}
 
-	// A quantifier the normalizer leaves standing is not decided here.
-	auto eliminate = [](tref fm) -> tref {
-		auto n = normalize_non_temp<node>(fm);
-		if (!n.has_value() || !n.value()
-			|| tau::get(n.value()).find_top(is_quantifier<node>))
-				return nullptr;
-		return n.value();
-	};
-
-	// A variable of a two-element type is quantified by expanding it into
-	// its two values, which leaves the normalizer nothing to eliminate.
-	std::map<size_t, bool> two_element;
-	auto is_two_element = [&](tref v) {
-		size_t tid = find_ba_type<node>(v);
-		auto it = two_element.find(tid);
-		if (it != two_element.end()) return it->second;
-		tref x = tau::get(tau::bf, v);
-		bool two = !aba_existential_feasible<node>(tau::build_wff_and(
-			tau::build_wff_neg(tau::build_bf_eq(x,
-				build_bf_f_type<node>(tid))),
-			tau::build_wff_neg(tau::build_bf_eq(x,
-				build_bf_t_type<node>(tid)))));
-		two_element.emplace(tid, two);
-		return two;
-	};
-	auto quantify = [&](tref v, tref fm, bool exists) {
-		if (!is_two_element(v))
-			return exists ? tau::build_wff_ex(v, fm, false)
-				: tau::build_wff_all(v, fm, false);
-		size_t tid = find_ba_type<node>(v);
-		auto at = [&](tref c) {
-			subtree_map<node, tref> m{ { v, tau::trim(c) } };
-			return rewriter::replace<node>(fm, m);
-		};
-		tref lo = at(build_bf_f_type<node>(tid));
-		tref hi = at(build_bf_t_type<node>(tid));
-		return exists ? tau::build_wff_or(lo, hi)
-			: tau::build_wff_and(lo, hi);
-	};
+	data_quantifier<node> dq;
 
 	std::vector<tref> R(k, tau::_T());
 	for (rounds = 0; !max_rounds || rounds < max_rounds; ) {
@@ -2419,18 +2508,11 @@ static strategy_data_verdict strategy_wins_on_data(
 					tau::build_wff_and(g, shift_vars(R[d], 1)));
 			// Inputs of step t outermost, then its outputs: the system
 			// answers the inputs it sees.
-			trefs ins, outs;
-			for (tref v : io_vars_of(body)) {
-				if (get_io_var_shift<node>(v) != 0) continue;
-				auto& bucket = is_input_var<node>(v) ? ins : outs;
-				if (std::none_of(bucket.begin(), bucket.end(),
-					[&](tref w) { return tau::subtree_equals(w, v); }))
-						bucket.push_back(v);
-			}
+			auto [ins, outs] = data_quantifier<node>::current_vars(body);
 			tref q = body;
-			for (tref v : outs) q = quantify(v, q, true);
-			for (tref v : ins) q = quantify(v, q, false);
-			tref n = eliminate(q);
+			for (tref v : outs) q = dq.quantify(v, q, true);
+			for (tref v : ins) q = dq.quantify(v, q, false);
+			tref n = dq.eliminate(q);
 			if (!n) return strategy_data_verdict::undecided;
 			next[s] = n;
 			// next[s] implies R[s], so they differ only if R[s] admits a
@@ -2446,6 +2528,145 @@ static strategy_data_verdict strategy_wins_on_data(
 		if (!changed) return strategy_data_verdict::wins;
 	}
 	return strategy_data_verdict::undecided;
+}
+
+// The observations are functions of the data, so a combination of their
+// values no data produces is not a move of the environment: it is assumed
+// away, as the minimal infeasible partial valuations G(!(...)) wrapped
+// around the skeleton. Beyond `max_observations` props nothing is assumed,
+// which only leaves the environment more choices.
+template <NodeType node>
+static void assume_observation_consistency(ltl_aba_solution<node>& sol,
+	size_t max_observations = 8)
+{
+	using tau = tree<node>;
+	const auto& obs = sol.observation_props;
+	const size_t n = obs.size();
+	if (n == 0 || n > max_observations) return;
+	std::vector<tref> fm(n);
+	for (size_t i = 0; i < n; ++i)
+		for (auto& [a, name] : sol.atoms)
+			if (name == obs[i]) { fm[i] = a; break; }
+	// a partial valuation: bit i of `mask` says obs[i] is set, bit i of
+	// `val` its value
+	std::vector<std::pair<size_t, size_t>> infeasible;
+	auto covered = [&](size_t mask, size_t val) {
+		for (auto& [m, v] : infeasible)
+			if ((m & mask) == m && (val & m) == v) return true;
+		return false;
+	};
+	std::string assumptions;
+	for (size_t k = 1; k <= n; ++k)
+		for (size_t mask = 1; mask < (size_t{1} << n); ++mask) {
+			size_t bits = 0;
+			for (size_t m = mask; m; m &= m - 1) ++bits;
+			if (bits != k) continue;
+			for (size_t val = 0; val < (size_t{1} << n); ++val) {
+				if ((val & ~mask) != 0 || covered(mask, val)) continue;
+				tref conj = tau::_T();
+				std::vector<std::pair<std::string, bool>> lits;
+				for (size_t i = 0; i < n; ++i) {
+					if (!(mask >> i & 1)) continue;
+					bool pos = val >> i & 1;
+					conj = tau::build_wff_and(conj,
+						pos ? fm[i] : tau::build_wff_neg(fm[i]));
+					lits.emplace_back(obs[i], pos);
+				}
+				if (aba_existential_feasible<node>(conj)) continue;
+				infeasible.emplace_back(mask, val);
+				std::string c = "G(!(" + product_clause_text(lits) + "))";
+				if (sol.skeleton.find(c) != std::string::npos) continue;
+				assumptions += (assumptions.empty() ? "" : " && ") + c;
+			}
+		}
+	if (!assumptions.empty())
+		sol.skeleton = "(" + assumptions + ") -> (" + sol.skeleton + ")";
+}
+
+// A product of a strategy edge claims values for the atoms of one step; its
+// pure-input literals are what lets the edge fire. A claim the system cannot
+// force every time the edge fires -- the environment picks the current
+// inputs, and the history has already decided part of it -- is what makes a
+// strategy lose against the data while every guard has some data. Such a
+// claim gets an input prop observing whether the data lets the system force
+// it now (the claim with the current outputs quantified away), and the
+// constraint G(claim -> observation), so the next strategy makes the claim
+// only when it can be kept. A single literal that cannot be forced is
+// observed on its own, which serves every product making it; a product is
+// observed whole only when each of its literals can be forced alone.
+// Returns the constraints, none when every claim can be forced.
+template <NodeType node>
+static std::vector<std::string> add_forceability_observations(
+    ltl_aba_solution<node>& sol)
+{
+	using tau = tree<node>;
+	std::vector<std::string> clauses;
+	const bool single_type =
+		formula_type_set<node>::from_atoms(sol.atoms).single_type();
+	size_t next = 0;
+	for (auto& [_, name] : sol.atoms)
+		if (name.size() > 1 && name[0] == 'p'
+			&& std::all_of(name.begin() + 1, name.end(),
+				[](unsigned char c) { return std::isdigit(c); }))
+				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	data_quantifier<node> dq;
+	std::set<std::string> seen;
+	auto is_observation = [&](const std::string& name) {
+		return std::find(sol.observation_props.begin(),
+			sol.observation_props.end(), name)
+				!= sol.observation_props.end();
+	};
+	// Observes `claim` (named `text`) unless it can be forced whenever
+	// `trigger` holds; true when it can.
+	auto observe = [&](tref claim, tref trigger, const std::string& text) {
+		auto [ins, outs] = data_quantifier<node>::current_vars(claim);
+		tref forceable = claim;
+		for (tref v : outs) forceable = dq.quantify(v, forceable, true);
+		forceable = dq.eliminate(forceable);
+		if (!forceable) return true;
+		if (!aba_existential_feasible<node>(tau::build_wff_and(
+			trigger, tau::build_wff_neg(forceable)))) return true;
+		if (!seen.insert(text).second) return false;
+		if (sol.skeleton.find("G(" + text + " -> ") != std::string::npos)
+			return false;
+		std::string obs = "p" + std::to_string(next++);
+		sol.atoms.emplace_back(forceable, obs);
+		sol.input_props.push_back(obs);
+		sol.observation_props.push_back(obs);
+		clauses.push_back("G(" + text + " -> " + obs + ")");
+		return false;
+	};
+	const std::vector<std::pair<tref, std::string>> atoms = sol.atoms;
+	for (int s = 0; s < sol.aut.num_states; ++s)
+		for (const auto& e : sol.aut.edges[s])
+			for (auto& p : build_guard_live_products<node>(e.guard_label,
+				sol.aut.aps, atoms, single_type))
+		{
+			tref claim = tau::_T(), trigger = tau::_T();
+			std::vector<std::pair<tref, std::pair<std::string, bool>>> own;
+			std::vector<std::pair<std::string, bool>> named;
+			bool all_named = true;
+			for (auto& gl : p.lits) {
+				claim = tau::build_wff_and(claim, gl.lit);
+				auto nl = name_literal<node>(gl, atoms);
+				if (!nl) { all_named = false; continue; }
+				// an earlier observation is the environment's, like an
+				// input literal
+				if (gl.pure_input || is_observation(nl->first))
+					trigger = tau::build_wff_and(trigger, gl.lit);
+				else own.emplace_back(gl.lit, *nl);
+				named.push_back(std::move(*nl));
+			}
+			if (!all_named || own.empty()) continue;
+			bool each_forceable = true;
+			for (auto& [lit, nl] : own)
+				if (!observe(lit, trigger, product_clause_text({ nl })))
+					each_forceable = false;
+			if (each_forceable)
+				observe(claim, trigger, product_clause_text(named));
+		}
+	if (!clauses.empty()) assume_observation_consistency<node>(sol);
+	return clauses;
 }
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────

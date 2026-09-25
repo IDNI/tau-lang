@@ -855,3 +855,9 @@ add_repl_test(realizable_cmd-data_check_copy_of_past_input
 # the chain is blocked once the strategy loses against the data.
 add_repl_test(realizable_cmd-data_check_chain_longer_than_window
 	"realizable (always o2[t]:bv[1] = o1[t-2]:bv[1] && o3[t]:bv[1] = o2[t-2]:bv[1] && !(o1[t]:bv[1] = o3[t]:bv[1]) && o3[t-2]:bv[1] = o1[t]:bv[1]) && (sometimes o1[t-1]:bv[1] = 1)" ": F")
+# A claim over an input the strategy cannot see is observed: set o1 to the
+# input seen at the step before, or output the terminal constant at once.
+add_repl_test(realizable_cmd-data_check_observed_copy_then_check
+	"realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": T")
+add_repl_test(realizable_cmd-data_check_observed_until_past_input
+	"realizable (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X&Y}:sbf)" ": T")

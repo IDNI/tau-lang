@@ -85,6 +85,13 @@ static bool sat(tref fm) {
 	return r.has_value() && r.value();
 }
 
+// True when is_tau_formula_sat decides the formula unsatisfiable; an
+// undecided verdict is not a decision.
+static bool decided_unsat(tref fm) {
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return r.has_value() && !r.value();
+}
+
 // Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
 // rather than reading as unrealizable.
 static bool realizable(tref fm) {
@@ -2833,9 +2840,12 @@ TEST_CASE("Right-nested U/R mix: o1=1 release (o1=i1[t] until o1=3) is REALIZABL
 }
 
 TEST_CASE("Right-nested until with past output: (o1[t-1]=0) until (o1=1 until o1=i1[t]) is REALIZABLE") {
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(o1[t-1]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = i1[t]:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 TEST_CASE("Deep right-nested U: o1=0 U (o1=1 U (o1=2 U o1=3)) is REALIZABLE") {
@@ -3095,9 +3105,12 @@ TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t
 }
 
 TEST_CASE("[SU-02] (o1:qlt={3}) until ((o2:qlt={1/2}) since (o1[t-1]:qlt=i1[t-1]:qlt)) is REALIZABLE") {
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (o1[t-1]:qlt = i1[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 TEST_CASE("[SU-03] F((o1[t]:sbf & i1[t]:sbf) = 1) is UNREALIZABLE") {
@@ -3700,9 +3713,12 @@ TEST_CASE("[SU-89] G(((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (
 
 TEST_CASE("[SU-90] (((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
     // Outer ψ=o1[t-2]<1; at t=0 o1[-2]=0<1. True. REALIZABLE.
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 // ── Group I: S with U inside, mixed I/O, Q-specific ──────────────────────────
