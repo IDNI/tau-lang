@@ -1922,6 +1922,29 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	return false;
 }
 
+// fm with every input stream read as an output: satisfiable exactly when
+// some input sequence lets fm hold, i.e. when some trace satisfies it.
+// The stream is renamed as well as re-tagged, so that a later pass that
+// resolves io_vars by name prefix does not read it as an input again.
+template <NodeType node>
+tref inputs_as_outputs(tref fm) {
+	using tau = tree<node>;
+	subtree_map<node, tref> flip;
+	for (tref v : tau::get(fm).select_all([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::io_var) && t.is_input_variable(); }))
+	{
+		const auto& t = tau::get(v);
+		trefs ch;
+		ch.push_back(build_var_name<node>(
+			"o_in_" + get_var_name<node>(v)));
+		for (size_t i = 1; i < t.children_size(); ++i)
+			ch.push_back(t.child(i));
+		flip.emplace(v, tau::get(node::output_variable(), ch));
+	}
+	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
+}
+
 // Check for temporal formulas if f1 implies f2
 template <NodeType node>
 bool is_tau_impl(tref f1, tref f2) {
