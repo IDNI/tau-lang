@@ -9,8 +9,12 @@
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
 
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <deque>
+#include <iterator>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
@@ -51,6 +55,13 @@ struct tau_decision_cache {
 
 } // namespace detail
 
+// The record of `normalize_tau` and the switch of its memo, defined
+// with the decision's memo below; the operand pass takes a recorded
+// main as it is.
+template <typename node>
+bool is_normalized_main(tref main);
+inline int ba_normalized_memo_mode();
+
 // Main formula of `fm` with its temporal quantifiers normalized;
 // normalize_scopes=false leaves the formulas below the temporal
 // quantifiers as they are. Used by ~, &, |, ^ below so newly combined
@@ -76,6 +87,22 @@ static result<tref> normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
+	// A main `normalize_tau` returned is a fixed point of this pass (the
+	// scopes below the hulls are already normal forms, and the pass
+	// leaves them as they are), so the operators take it as it is
+	// instead of running the pass over the whole constant again. Same
+	// record and switch as the decision's memo (ba_normalized_memo); the
+	// shadow mode runs the pass anyway and counts every main it changes,
+	// which is what measures the fixed point.
+	if (is_normalized_main<node>(key)) {
+		++tau_ba_normalized_memo_hits;
+		if (ba_normalized_memo_mode() == 2) {
+			TAU_TRY(tref res,
+				(normalize_temporal_quantifiers<node, false>(key)));
+			if (res != key) ++tau_ba_normalized_memo_mismatches;
+		}
+		return r.with_value(key);
+	}
 	// compute before emplace: normalisation can create new trees, and a
 	// rehash of `cache` must not happen with a half-built entry in it.
 	TAU_TRY(tref res, (normalize_temporal_quantifiers<node, false>(key)));
@@ -221,6 +248,61 @@ static void pin_decided_key(tref key) {
 	while (pins.size() > ba_decision_pins) pins.pop_front();
 }
 
+// Mode of `ba_normalized_memo` (tau_ba.h): the environment variable
+// TAU_BA_NORMALIZED_MEMO, read once, overrides the flag.
+inline int ba_normalized_memo_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_MEMO");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	// When selected through the environment variable, the shadow mode
+	// reports its counts once, at exit, so a whole run can be checked for
+	// mains the normalizer would have changed.
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized memo shadow: hits %zu,"
+			" mismatches %zu\n", tau_ba_normalized_memo_hits,
+			tau_ba_normalized_memo_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_memo;
+}
+
+inline int ba_normalized_conjunction_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_CONJUNCTION");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized conjunction shadow:"
+			" hits %zu (shaped %zu), mismatches %zu\n",
+			tau_ba_normalized_conjunction_hits,
+			tau_ba_normalized_conjunction_shaped,
+			tau_ba_normalized_conjunction_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_conjunction;
+}
+
+// Mains that `normalize_tau` returned. Registered with the GC, so a main
+// that does not survive a sweep is forgotten with its tree. External
+// linkage on purpose: `normalize_tau` and the decision can be instantiated
+// in different translation units, and both must see the one cache.
+template <typename node>
+subtree_unordered_map<node, bool>& normalized_mains() {
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	return cache;
+}
+
+template <typename node>
+bool is_normalized_main(tref main) {
+	return ba_normalized_memo_mode() > 0
+		&& normalized_mains<node>().find(main)
+			!= normalized_mains<node>().end();
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -239,8 +321,24 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
-	auto normalized = r.merge_take(normalizer<node>(fm.nso_rr));
-	if (!normalized) return r;
+	std::optional<tref> normalized;
+	if (is_normalized_main<node>(key)) {
+		// The main is a normal form `normalize_tau` returned, which the
+		// normalizer maps to itself; deciding it directly saves the
+		// renormalization of the whole constant. Correct regardless of
+		// tree identity: `compute` decides any well-formed formula and
+		// the main is equivalent to its renormalization; the identity is
+		// what the shadow mode checks.
+		if (ba_normalized_memo_mode() == 2) {
+			normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+			if (!normalized) return r;
+			if (*normalized != key) ++tau_ba_normalized_memo_mismatches;
+		} else normalized = key;
+		++tau_ba_normalized_memo_hits;
+	} else {
+		normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+		if (!normalized) return r;
+	}
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
@@ -313,11 +411,53 @@ inline bool ba_component_factoring_enabled() {
 	return env ? *env : ba_component_factoring;
 }
 
+template <typename node>
+static int factored_tau_valid(tref fm);
+// satisfiability.tmpl.h: the fingerprint of the runtime budgets that can
+// change a verdict, read there by the whole-formula memo.
+template <NodeType node>
+size_t verdict_budget_fingerprint();
+
+/**
+ * @brief The dual of a `sometimes` formula: `G(!D)` for `F(D)`, in NNF.
+ *
+ * A complemented `:tau` constant `{K}'` whose body is an always-conjunction
+ * normalizes to a `sometimes` over the DNF of `!K`. Neither factored path
+ * can split that shape (the units are always-clauses); `F(D) == !G(!D)`
+ * maps both questions back to the always/CNF units of `K`, which the
+ * per-unit caches already hold: `sat(F(D)) == !valid(G(!D))` and
+ * `valid(F(D)) == !sat(G(!D))`. Both identities are the engine's own
+ * definitions of the two predicates (`valid(X)` is decided as `!sat(!X)`),
+ * so the dual adds no assumption beyond the per-unit factoring.
+ *
+ * Returns nullptr when @p fm is not a `sometimes` formula, or when its body
+ * holds a temporal operator of its own: the dual of a nested temporal body
+ * is not an always-conjunction the unit split could take apart, and pushing
+ * the negation through the full-LTL operators is the LTL pipeline's job.
+ * The callers pass the normalized main, where the complement of an
+ * always-conjunction is one `sometimes` over a DNF; a disjunction of
+ * several `sometimes`, as `to_nnf` alone produces, is not taken apart here
+ * and goes to the units path.
+ */
+template <typename node>
+static tref sometimes_dual(tref fm) {
+	using tau = tree<node>;
+	const tau& t = tau::get(fm);
+	if (!t.has_child() || !t.child_is(tau::wff_sometimes)) return nullptr;
+	const tref body = tau::trim2(fm);
+	if (tau::get(body).find_top(is_temporal_quantifier<node>)) return nullptr;
+	return to_nnf<node>(tau::build_wff_always(tau::build_wff_neg(body)));
+}
+
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
 static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
+	// sat(F(D)) == !valid(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_valid<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	for (tref u : units)
@@ -331,40 +471,47 @@ static int factored_tau_sat(tref fm) {
 			if (nm.empty()) return -1;
 			supp[i].push_back(nm);
 		}
-	std::vector<std::vector<std::string>> cn;
-	std::vector<trefs> cc;
-	auto shares = [](const std::vector<std::string>& a,
-			 const std::vector<std::string>& b) {
-		for (const auto& x : a) for (const auto& y : b)
-			if (x == y) return true;
-		return false;
+	// The groups are the connected components of the units under "share
+	// a name": a name is owned by the group of the first unit that
+	// mentions it, and a unit that mentions names of two groups merges
+	// them (union-find over unit indices, path halving). Near-linear in the
+	// number of names; the groups are listed by their first unit, the
+	// units of a group in their order.
+	std::vector<size_t> parent(units.size());
+	for (size_t i = 0; i < units.size(); ++i) parent[i] = i;
+	auto find = [&parent](size_t a) {
+		while (parent[a] != a) a = parent[a] = parent[parent[a]];
+		return a;
 	};
+	std::unordered_map<std::string, size_t> owner;
+	for (size_t i = 0; i < units.size(); ++i)
+		for (const std::string& nm : supp[i]) {
+			auto [it, fresh] = owner.try_emplace(nm, i);
+			if (fresh) continue;
+			size_t a = find(i), b = find(it->second);
+			if (a != b) parent[std::max(a, b)] = std::min(a, b);
+		}
+	std::vector<trefs> cc;
+	std::vector<size_t> slot(units.size(), SIZE_MAX);
 	for (size_t i = 0; i < units.size(); ++i) {
-		std::vector<size_t> hit;
-		for (size_t c = 0; c < cn.size(); ++c)
-			if (shares(cn[c], supp[i])) hit.push_back(c);
-		if (hit.empty()) {
-			cn.push_back(supp[i]);
-			cc.push_back(trefs{ units[i] });
-			continue;
+		size_t root = find(i);
+		if (slot[root] == SIZE_MAX) {
+			slot[root] = cc.size();
+			cc.emplace_back();
 		}
-		size_t base = hit[0];
-		cn[base].insert(cn[base].end(),
-			supp[i].begin(), supp[i].end());
-		cc[base].push_back(units[i]);
-		for (size_t k = hit.size(); k-- > 1; ) {
-			size_t c = hit[k];
-			cn[base].insert(cn[base].end(),
-				cn[c].begin(), cn[c].end());
-			cc[base].insert(cc[base].end(),
-				cc[c].begin(), cc[c].end());
-			cn.erase(cn.begin() + c);
-			cc.erase(cc.begin() + c);
-		}
+		cc[slot[root]].push_back(units[i]);
 	}
 	if (cc.size() < 2) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// As the whole-formula memo of is_tau_formula_sat: every runtime
+	// budget can change a verdict, so the remembered components are
+	// dropped whenever the budgets moved.
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget) {
+		cache.clear();
+		cache_budget = fp;
+	}
 	bool all_sat = true;
 	for (size_t c = 0; c < cc.size() && all_sat; ++c) {
 		tref f = cc[c][0];
@@ -377,7 +524,10 @@ static int factored_tau_sat(tref fm) {
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
 		auto sat = is_tau_formula_sat<node>(f);
-		bool sres = sat.has_value() && sat.value();
+		// an undecided component leaves the question undecided: decline,
+		// and the caller's whole-formula decision reports it as before
+		if (!sat.has_value()) return -1;
+		const bool sres = sat.value();
 		pin_decided_key<node>(f);
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
@@ -390,10 +540,19 @@ static int factored_tau_sat(tref fm) {
 template <typename node>
 static int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
+	// valid(F(D)) == !sat(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_sat<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget) {
+		cache.clear();
+		cache_budget = fp;
+	}
 	bool all = true;
 	for (size_t i = 0; i < units.size() && all; ++i) {
 		if (auto it = cache.find(units[i]); it != cache.end()) {
@@ -401,7 +560,8 @@ static int factored_tau_valid(tref fm) {
 			continue;
 		}
 		auto imp = is_tau_impl<node>(tau::_T(), units[i]);
-		bool vres = imp.has_value() && imp.value();
+		if (!imp.has_value()) return -1;
+		const bool vres = imp.value();
 		pin_decided_key<node>(units[i]);
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
@@ -409,9 +569,40 @@ static int factored_tau_valid(tref fm) {
 	return all ? 1 : 0;
 }
 
+
+// The solver's bad splitter of a Tau constant is a fresh uninterpreted
+// constant `<:splitN> != 0` (tau_splitter_one calls tau_bad_splitter on
+// `T`, so the element is that bare formula), and the properness checks of
+// the step solver probe the element with is_zero and is_one -- the second
+// being the zero test of its complement -- before they commit a witness.
+// Both answers follow from the shape alone: an uninterpreted constant
+// `!= 0` is satisfiable (c := 1) and not valid (c := 0), and so is `= 0`.
+// Answering them here keeps the solver's checks and saves a full temporal
+// decision per probe -- two per minted constant, and the step solver mints
+// a fresh one on every step.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool is_uconst_zero_test(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (!fm.nso_rr.rec_relations.empty() || !fm.nso_rr.main) return false;
+	const tau& w = tau::get(fm.nso_rr.main->get());
+	if (!(w.child_is(tau::bf_neq) || w.child_is(tau::bf_eq))) return false;
+	tref l = w[0].first(), r = w[0].second();
+	if (!l || !r || !tau::get(r).equals_0()) return false;
+	// l must be exactly bf(variable(uconst_name)), the shape
+	// build_bf_uconst makes: one uninterpreted constant and nothing else,
+	// checked positively so that no operator, stream or constant around it
+	// passes.
+	const tau& tl = tau::get(l);
+	return tl.is(tau::bf) && tl.child_is(tau::variable)
+		&& tl[0].child_is(tau::uconst_name);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -428,6 +619,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -474,6 +666,230 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// The Boole normal form of a conjunction of clauses is a conjunction of two
+// left-nested chains: the unit clauses (an equality or inequality each),
+// ordered by the comparator the syntactic path simplification sorts its
+// assumptions with, applied to their positive atoms (an inequality reaches
+// that sort as the negation of its equality), and the clauses that are
+// disjunctions, in traversal order of the input. The shape comes from syntactic_formula_simplification,
+// the first and the last step of term_boole_normal_form:
+// simplify_using_equality flattens the conjunction, stable-sorts the
+// equalities to its front (simplify_using_equality_sort_atms; a disjunction
+// keeps its place among the disjunctions) and left-folds it, and
+// syntactic_path_simplification collects the unit clauses of a conjunction
+// as assumptions (disjunctions are skipped), sorts them with
+// syntactic_path_simplification_wff_comp (equalities first, then
+// subtree_less), left-folds them and conjoins them in front of the
+// remainder, whose replaced atoms the hook rules `T && $X ::= $X` and
+// `$X && T ::= $X` remove; the steps in between leave that arrangement in
+// place, and the last pass fixes it. A new clause conjoined in
+// front of such a normal form therefore lands at the inner end of the
+// clause chain (the traversal lists it first, and a left fold nests the
+// first element innermost), one conjoined behind it at the outer end, and
+// a new unit at its place in the unit chain, while every other node stays
+// as it is. `shaped_conjunction` builds that result from the two bodies
+// without running the normalization: `big` is the body of the normal form,
+// `one` the body of the single clause, `front` says whether the clause is
+// the first operand. The result is a conjunction of the same clauses in
+// another arrangement, so it is equivalent to the input by construction;
+// that it is the same tree the normalization returns is measured (the
+// shadow mode compares the two). nullptr when `big` has another shape,
+// when `one` is neither a unit nor a disjunction, when a body mentions a
+// variable that is not a stream, or when `one` mentions a stream
+// occurrence `big` already mentions (the syntactic passes simplify clauses
+// on a shared occurrence against each other, so the shape alone does not
+// give the result there).
+//
+// Forward declaration: heuristics/syntactic_path_simplification.tmpl.h,
+// which defines the comparator, is included after this header.
+template <NodeType node>
+bool syntactic_path_simplification_wff_comp(tref l, tref r);
+
+template <typename node>
+static tref shaped_conjunction(tref big, tref one, bool front) {
+	using tau = tree<node>;
+	auto is_and = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child() && t.child_is(tau::wff_and); };
+	auto is_or = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child() && t.child_is(tau::wff_or); };
+	auto is_unit = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child()
+			&& (t.child_is(tau::bf_eq) || t.child_is(tau::bf_neq)); };
+	// elements of a left-nested chain ((a && b) && c) -> [a, b, c]
+	auto spine = [&](tref n) {
+		trefs out;
+		while (is_and(n)) {
+			out.push_back(tau::get(n)[0].second());
+			n = tau::get(n)[0].first();
+		}
+		out.push_back(n);
+		std::reverse(out.begin(), out.end());
+		return out;
+	};
+	auto chain = [](const trefs& v) {
+		tref acc = v[0];
+		for (size_t i = 1; i < v.size(); ++i)
+			acc = tau::build_wff_and(acc, v[i]);
+		return acc;
+	};
+	// A body with both kinds is AND(unit chain, clause chain), whose left
+	// spine ends in the clause chain as one element (a unit is never a
+	// conjunction); a body with one kind is that chain itself.
+	trefs units, clauses, el = spine(big);
+	if (el.size() >= 2 && is_and(el.back())) {
+		clauses = spine(el.back());
+		el.pop_back();
+		units = el;
+	} else {
+		size_t i = 0;
+		while (i < el.size() && is_unit(el[i])) units.push_back(el[i++]);
+		while (i < el.size()) clauses.push_back(el[i++]);
+	}
+	for (tref u : units) if (!is_unit(u)) return nullptr;
+	for (tref c : clauses) if (!is_or(c)) return nullptr;
+	// The stream occurrences a body mentions (`name[index]`), by printed
+	// text without the type: the same stream can occur as differently
+	// typed variable nodes, which the hash-consing keeps apart, and a
+	// different time offset is a different atom to the syntactic passes.
+	// A variable that is neither a stream occurrence nor the time index
+	// of one (a free non-stream variable, which simplify_using_equality
+	// can relate to others) leaves the body outside the shape, so it is
+	// reported as such. Kept per body in a GC-registered cache, so the body a step
+	// returns answers the next step's lookup, and the merge is one pass
+	// over two sorted lists.
+	using streams_t = std::vector<std::string>;
+	using streams_cache_t = subtree_unordered_map<node, streams_t>;
+	static streams_cache_t& streams_of =
+		tree<node>::template create_cache<streams_cache_t>();
+	bool other_variable = false;
+	auto stream_names = [&other_variable](tref f) {
+		streams_t names;
+		subtree_set<node> in_stream;
+		for (tref v : tau::get(f).select_all(is<node, tau::variable>))
+			if (is_io_var<node>(v))
+				for (tref w : tau::get(v).select_all(is<node, tau::variable>))
+					in_stream.insert(w);
+		for (tref v : tau::get(f).select_all(is<node, tau::variable>)) {
+			if (is_io_var<node>(v)) {
+				std::string s = tau::get(v).to_str();
+				names.push_back(s.substr(0, s.find(':')));
+			} else if (!in_stream.contains(v)) other_variable = true;
+		}
+		std::sort(names.begin(), names.end());
+		names.erase(std::unique(names.begin(), names.end()), names.end());
+		return names;
+	};
+	auto it = streams_of.find(big);
+	if (it == streams_of.end())
+		it = streams_of.emplace(big, stream_names(big)).first;
+	const streams_t& have = it->second;
+	streams_t add = stream_names(one);
+	if (other_variable) return nullptr;
+	// A clause on a stream the body already mentions is not assembled:
+	// the normalization simplifies such clauses against each other (a
+	// unit against a clause or another unit on the same stream, and
+	// resolvable clauses), so the shape alone does not give the result.
+	for (const auto& s : add)
+		if (std::binary_search(have.begin(), have.end(), s)) return nullptr;
+	if (is_unit(one)) {
+		// The path simplification keys an inequality by its positive
+		// atom (`l != r` reaches it as `!(l = r)` and the sort compares
+		// the trimmed keys), so a unit's place is that of the equality
+		// over the same terms; with every key an equality the comparator
+		// reduces to subtree_less over the keys. The position a stable
+		// sort by the comparator gives: ties under it are equal keys,
+		// which the stream check has already excluded.
+		auto key = [](tref u) {
+			const tau& t = tau::get(u);
+			if (!t.child_is(tau::bf_neq)) return u;
+			return tau::build_bf_eq(t[0].first(), t[0].second());
+		};
+		const tref k = key(one);
+		auto pos = std::lower_bound(units.begin(), units.end(), k,
+			[&key](tref a, tref kb) {
+				return syntactic_path_simplification_wff_comp<node>(
+					key(a), kb); });
+		units.insert(pos, one);
+	} else if (is_or(one)) {
+		if (front) clauses.insert(clauses.begin(), one);
+		else clauses.push_back(one);
+	} else return nullptr;
+	streams_t merged;
+	merged.reserve(have.size() + add.size());
+	std::merge(have.begin(), have.end(), add.begin(), add.end(),
+		std::back_inserter(merged));
+	tref out = units.empty() ? chain(clauses)
+		: clauses.empty() ? chain(units)
+		: tau::build_wff_and(chain(units), chain(clauses));
+	streams_of.insert_or_assign(out, std::move(merged));
+	++tau_ba_normalized_conjunction_shaped;
+	return out;
+}
+
+// The normal form of `a && b` built from the normal forms of its sides
+// (ba_normalized_conjunction): the always-hull over the Boole normal form
+// of the two bodies conjoined, in operand order. That is the tree the
+// pipeline returns for such a main: normalize_temporal_quantifiers
+// squeezes the always-hulls into one and applies term_boole_normal_form
+// to its scope, and the passes before it (quantifier and arithmetic
+// elimination, widening) map a body that is already their output to
+// itself. A side is a normal form
+// `normalize_tau` returned or a single clause (an always-hull), which is
+// normalized on its own first; a side that is itself a conjunction is not
+// normalized here, so a constant that arrives as one large conjunction
+// keeps the pipeline.
+// nullptr when the main or a side has another shape, or when a body holds
+// a quantifier or a temporal operator (those the pipeline eliminates or
+// scopes).
+template <typename... BAs>
+requires BAsPack<BAs...>
+static tref normalized_conjunction(tref main) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	const tau& m = tau::get(main);
+	if (!m.has_child() || !m.child_is(tau::wff_and)) return nullptr;
+	auto is_hull = [](tref f) {
+		const tau& t = tau::get(f);
+		return t.has_child() && t.child_is(tau::wff_always);
+	};
+	auto normal_form = [&](tref side) -> tref {
+		if (is_normalized_main<node>(side)) return side;
+		if (!is_hull(side)) return nullptr;
+		return normalize_tau(tau_ba<BAs...>(side)).nso_rr.main->get();
+	};
+	auto body = [&](tref nf) -> tref {
+		if (!nf || !is_hull(nf)) return nullptr;
+		tref b = tau::trim2(nf);
+		if (tau::get(b).find_top([](tref n) {
+			return is_quantifier<node>(n)
+				|| is_child_temporal_quantifier<node>(n); }))
+			return nullptr;
+		return b;
+	};
+	tref l = body(normal_form(m[0].first()));
+	if (!l) return nullptr;
+	tref r = body(normal_form(m[0].second()));
+	if (!r) return nullptr;
+	// one side a single clause (no conjunction at its top): the shape of
+	// the other gives the result
+	auto single = [](tref f) {
+		const tau& t = tau::get(f);
+		return !t.has_child() || !t.child_is(tau::wff_and); };
+	tref shaped = single(l) ? shaped_conjunction<node>(r, l, true)
+		: single(r) ? shaped_conjunction<node>(l, r, false) : nullptr;
+	if (shaped) {
+		++tau_ba_normalized_conjunction_hits;
+		return tau::build_wff_always(shaped);
+	}
+	auto bnf = term_boole_normal_form<node>(tau::build_wff_and(l, r));
+	if (!bnf.has_value()) return nullptr;
+	++tau_ba_normalized_conjunction_hits;
+	return tau::build_wff_always(bnf.value());
+}
+
 // Normalizes a tau_ba constant: applies its rec relations to the main
 // formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
 // result carries the normalized main only — the rec relations, already
@@ -486,19 +902,54 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	{
 		std::lock_guard<std::mutex> lock(cache::mtx());
 		auto& memo = cache::normalize_memo();
-		if (auto it = memo.find(fm.nso_rr); it != memo.end())
+		if (auto it = memo.find(fm.nso_rr); it != memo.end()) {
+			normalized_mains<node>().insert_or_assign(
+				it->second.main->get(), true);
 			return tau_ba<BAs...>(it->second.rec_relations, it->second.main);
+		}
+	}
+	if (fm.nso_rr.rec_relations.empty()
+		&& is_normalized_main<node>(fm.nso_rr.main->get()))
+	{
+		// A normal form this function returned earlier: normalizing it
+		// again yields the same main.
+		++tau_ba_normalized_memo_hits;
+		if (ba_normalized_memo_mode() != 2) return fm;
+		auto applied = nso_rr_apply<node>(fm.nso_rr);
+		if (!applied.has_value()) return fm;
+		auto simplified = simp_tau_unsat_valid<node>(applied.value());
+		if (!simplified.has_value()) return fm;
+		if (simplified.value() != fm.nso_rr.main->get())
+			++tau_ba_normalized_memo_mismatches;
+		return fm;
 	}
 	// No safe normalized form exists on failure; return the element
 	// unchanged, matching splitter()'s fallback below.
 	auto applied = nso_rr_apply<node>(fm.nso_rr);
 	if (!applied.has_value()) return fm;
-	auto simplified = simp_tau_unsat_valid<node>(applied.value());
+	const int conjunction = fm.nso_rr.rec_relations.empty()
+		? ba_normalized_conjunction_mode() : 0;
+	tref built = conjunction > 0
+		? normalized_conjunction<BAs...>(applied.value()) : nullptr;
+	auto simplified = simp_tau_unsat_valid<node>(applied.value(), 0, false,
+		conjunction == 1 ? built : nullptr);
 	if (!simplified.has_value()) return fm;
+	if (built && conjunction == 2) {
+		// the shadow runs the unsat/valid simplification a second time,
+		// on the built form, so it pays the validity check twice
+		auto direct = simp_tau_unsat_valid<node>(applied.value(), 0,
+			false, built);
+		if (!direct.has_value() || direct.value() != simplified.value())
+			++tau_ba_normalized_conjunction_mismatches;
+	}
 	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
-	if (!bdd_node_table_exhausted)
+	// A normal form computed while the bdd node table was exhausted may
+	// be incomplete: neither memoized nor recorded as a fixed point.
+	if (!bdd_node_table_exhausted) {
+		normalized_mains<node>().insert_or_assign(simplified.value(), true);
 		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
+	}
 	return out;
 }
 
