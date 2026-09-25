@@ -188,10 +188,10 @@ tref build_wff_always(tref l) {
 template <NodeType node>
 tref build_wff_conditional(tref x, tref y, tref z) {
 	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::wff_and,
-		build_wff_imply<node>(x, y),
-		build_wff_imply<node>(build_wff_neg<node>(x), z)));
+	// Guarded branches: an assignment under its guard stays a branch the
+	// anti-prenex case witness can read (anti_prenex.md §3, TRY_CASE_WITNESS).
+	return build_wff_or<node>(build_wff_and<node>(x, y),
+		build_wff_and<node>(build_wff_neg<node>(x), z));
 }
 
 // Largest purely numeric variable name in fm, bound or free (0 when there is
