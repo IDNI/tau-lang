@@ -50,6 +50,53 @@ inline size_t ba_decision_pins = 4096;
 /// Misses of the cached is_zero/is_one predicate (decisions computed rather
 /// than found), for tests and diagnostics.
 inline size_t tau_ba_predicate_misses = 0;
+/// Reuse of a Tau-BA constant's own normal form. `normalize_tau` records
+/// every main it returns; the cached `is_zero`/`is_one` decision of such a
+/// main, and a second `normalize_tau` of it, skip the renormalization the
+/// decision procedure would otherwise run over the whole constant again
+/// (the normal form is a fixed point of the normalizer). The decision is
+/// sound on the recorded main regardless of tree identity: the main and
+/// its renormalization are equivalent, and the decision procedure accepts
+/// any well-formed formula; that the two coincide is what makes the skip
+/// exact, and what the shadow mode measures. 0 = off, 1 = on, 2 = shadow:
+/// the normalization runs anyway and every main it changes is counted in
+/// `tau_ba_normalized_memo_mismatches`. The environment variable
+/// TAU_BA_NORMALIZED_MEMO (0, 1 or 2; any other value selects 0) overrides
+/// the flag. Mains are recorded in every mode, so a mode switched during a
+/// run finds the record complete.
+inline int ba_normalized_memo = 1;
+/// Renormalizations skipped by `ba_normalized_memo`, and mains the shadow
+/// mode found changed by the normalizer, for tests and diagnostics.
+inline size_t tau_ba_normalized_memo_hits = 0;
+inline size_t tau_ba_normalized_memo_mismatches = 0;
+/// Conjunction of two normal forms. For a main `a && b` whose sides are
+/// always-hulls `normalize_tau` returned (a side that is a single clause is
+/// normalized on its own first), `normalize_tau` builds the normal form as
+/// the always-hull over the Boole normal form of the two bodies conjoined,
+/// in operand order, and hands it to the unsat/valid simplification in
+/// place of the pipeline's normalization. Where the normal form of the
+/// larger side has the shape the Boole normal form gives a conjunction of
+/// clauses, and the other side is one clause, the result is assembled from
+/// that shape directly (see `shaped_conjunction`), without a normalization
+/// pass at all. The pipeline (quantifier and
+/// arithmetic elimination, temporal DNF and its reduction) otherwise runs
+/// over the whole conjunction although both sides are already its fixed
+/// points; on a run that accumulates clauses into a `:tau` constant this
+/// is a renormalization of the whole constant every step. The
+/// satisfiability and validity decisions are unchanged. 0 = off, 1 = on,
+/// 2 = shadow: the pipeline runs anyway and is returned, and every result
+/// that differs from the built form is counted in
+/// `tau_ba_normalized_conjunction_mismatches`. The environment variable
+/// TAU_BA_NORMALIZED_CONJUNCTION (0, 1 or 2; any other value selects 0)
+/// overrides the flag.
+inline int ba_normalized_conjunction = 1;
+/// Normal forms `ba_normalized_conjunction` built, of which those built
+/// from the shape of the normal form alone (see `shaped_conjunction`), and
+/// results the shadow mode found to differ from the built form, for tests
+/// and diagnostics.
+inline size_t tau_ba_normalized_conjunction_hits = 0;
+inline size_t tau_ba_normalized_conjunction_shaped = 0;
+inline size_t tau_ba_normalized_conjunction_mismatches = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
