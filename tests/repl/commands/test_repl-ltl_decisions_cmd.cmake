@@ -78,10 +78,11 @@ add_repl_test(ltl_decisions-per_literal_guard_sat
 add_repl_test(ltl_decisions-per_literal_guard_realizable
 	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T")
 
-# a consistency cap that gave up cannot decide UNREALIZABLE
-add_repl_test_fail(ltl_decisions-consistency_cap_is_unknown
+# a consistency cap that gives up leaves the abstraction open; the input
+# tautology is decided on the data
+add_repl_test(ltl_decisions-consistency_cap_is_unknown
 	"set maxsubsets 1. realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))"
-	"could not be decided")
+	": T")
 
 # a binary temporal or negated operand of U is wrapped, so the print
 # re-parses as the same tree

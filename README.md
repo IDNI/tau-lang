@@ -726,8 +726,26 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    combinations no data satisfies forbidden. That abstraction gives the
    environment choices the data may not allow, so it answers REALIZABLE
    when its strategy wins against the data and UNKNOWN otherwise.
+6. The **data game** decides exactly. `ltlsynt --print-game-hoa` prints
+   the parity game of the skeleton of (2), without any constraint the
+   later steps add (`--algo=acd`, or `--algo=sd` when ACD states the
+   condition in another form), and that game is played on the data: at every step the
+   environment picks the inputs after the history is fixed, the system
+   then picks the outputs, and each atom of a move is read on those
+   values. The winning regions are sets of histories (the last values of
+   every stream) computed with Zielonka's algorithm. When every stream has
+   a two-valued type (`bv[1]`) a region is a bit set and the game runs
+   before (4) and (5); over any other type a region is a formula whose
+   quantifiers the normalizer eliminates, and the game settles an
+   UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
+   are played like any other step, their inputs by the environment and
+   their outputs by the system. The game answers UNKNOWN only when a
+   quantifier cannot be eliminated or a fixpoint reaches the
+   refinement-round cap; (4) and (5) then keep their answer.
 
-A formula is **realizable** iff (4) succeeds and the strategy wins in (5).  The external tool
+A formula is **realizable** iff its data game is won; where that game is
+undecided, iff (4) succeeds and the strategy wins in (5). Execution (`run`)
+takes the strategy of (4) and (5). The external tool
 `ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
 
 #### Synthesis algorithms
@@ -767,7 +785,7 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
 | `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
-| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, and fixpoint rounds of its check of a strategy against the data (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
+| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
@@ -874,7 +892,10 @@ one clause the deepest lookback counts for every literal:
 `G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` leaves both outputs unconstrained
 for steps 0 and 1, whatever their individual shifts.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
-agrees with `G q` when `p` is contradictory.
+agrees with `G q` when `p` is contradictory. A past value that no clause
+guards, such as the one a top-level `since` reads at step 0, belongs to
+a step before step 0, played like any other step: the environment picks
+its inputs and the system its outputs.
 
 ### Known LTL limitations
 
@@ -932,7 +953,10 @@ is supported by the encoding:
   the specification has inputs, the witness path is pinned by one *direction*
   output per input stream, which names the value that path takes next, and the
   constraint is read one step later, where "the path follows the directions"
-  is a plain `always`.  The encoding is then exact.  A past operator (`S`,
+  is a plain `always`.  The encoding is then exact.  The witness state has
+  already read its input, so its branch starts with the input the
+  environment gave: `E (F i1[t] = 1)` is realizable, `E (always i1[t] = 1)`
+  is not, since the first input may be 0.  A past operator (`S`,
   `T`) inside χ has no such form: that witness keeps the all-paths encoding,
   which is stricter than `E`, so an unrealizable result is reported as UNKNOWN.
 - `A χ` in positive polarity inside a universal context (under `&&`, `G` or

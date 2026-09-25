@@ -837,16 +837,13 @@ add_repl_test(realizable_cmd-delay_chain_initial_conditions_pinned_source_unreal
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_unrealizable
 	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1 && i1[t] = 0)" ": F")
 
-# The strategy is played against the data before a REALIZABLE verdict: the
-# environment picks each input after the history is fixed. o2[t] is o1[t-1],
-# fixed a step before i1[t], so o2 cannot be made to meet i1; no strategy
-# over the atoms shows that as a path without data, so the verdict is open.
-add_repl_test_fail(realizable_cmd-data_check_history_fixed_before_input
-	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))"
-	"loses against the data")
-add_repl_test_fail(realizable_cmd-data_check_past_atom_against_input
-	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))"
-	"loses against the data")
+# The environment picks each input after the history is fixed. o2[t] is
+# o1[t-1], fixed a step before i1[t], so o2 cannot be made to meet i1; the
+# synthesis game played on the data shows it.
+add_repl_test(realizable_cmd-data_check_history_fixed_before_input
+	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))" ": F")
+add_repl_test(realizable_cmd-data_check_past_atom_against_input
+	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))" ": F")
 # o1 copies i1 one step later, so the same relation one step back is won.
 add_repl_test(realizable_cmd-data_check_copy_of_past_input
 	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t-1]:bv[1]))" ": T")
@@ -861,3 +858,30 @@ add_repl_test(realizable_cmd-data_check_observed_copy_then_check
 	"realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": T")
 add_repl_test(realizable_cmd-data_check_observed_until_past_input
 	"realizable (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X&Y}:sbf)" ": T")
+
+# The synthesis game played on the data decides what the abstraction over
+# the atoms leaves open or rejects: inputs are picked by the environment at
+# each step, after the history, and outputs after them.
+add_repl_test(realizable_cmd-data_game_history_fixed_before_input_tau
+	"realizable G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t]))" ": F")
+add_repl_test(realizable_cmd-data_game_delayed_copy_of_past_input
+	"realizable (always o1[1]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o2[t]:bv[1])" ": T")
+add_repl_test(realizable_cmd-data_game_value_fixed_two_steps_before_input
+	"realizable (always o1[0]:bv[1] = 0 && o1[t]:bv[1] = o2[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": F")
+# no input sequence avoids i1[t-1] = i1[t] || i1[t-1] = 1 for two steps
+add_repl_test(realizable_cmd-data_game_unavoidable_input_goal
+	"realizable (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) && (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T")
+add_repl_test(realizable_cmd-data_game_unavoidable_input_goal_ltl
+	"realizable (T U (o2[t]:bv[1] = i2[t-1]:bv[1])) && (T U ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T")
+add_repl_test(realizable_cmd-data_game_mirrored_input_goal
+	"realizable (always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 && o1[t]:bv[1] = i1[t]:bv[1]) && (sometimes (!(o1[t]:bv[1] = 1) || i1[t-1]:bv[1] = 1))" ": T")
+# the always part reads two steps back, so the goal holds during its warm-up
+add_repl_test(realizable_cmd-data_game_outputs_goal_in_warm_up
+	"realizable (always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] && (o2[t-1] = 1 && o2[t-1] = o1[t-1]) && !(o1[t-2] = 0)) && (sometimes o1[t] = o2[t-1])" ": T")
+# o2 is always 1, so the environment keeps i2 at 0
+add_repl_test(realizable_cmd-data_game_constant_output_against_input
+	"realizable (always o2[t-1]:bv[1] = 1) && (sometimes i2[t]:bv[1] = o2[t]:bv[1])" ": F")
+add_repl_test(realizable_cmd-data_game_constant_output_against_input_ltl
+	"realizable (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F")
+add_repl_test(realizable_cmd-data_game_sat_ltl_spelling
+	"sat (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F")
