@@ -218,19 +218,14 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == expected );
 	}
 
-	// "b = 0 ? a1 = c : d = e" desugars (via build_wff_conditional/
-	// build_wff_imply hooks) to "(b != 0 || a1 = c) && (b = 0 || d = e)":
-	// a1 = c occurs exactly once, only under wff_or/wff_and (no negation,
-	// xor, implication or quantifier boundary), so it is in a monotone
-	// position and IS eliminable, unlike the negation/xor/imply/rimply/
-	// equiv cases above where the same atom is duplicated (once positive,
-	// once negated) by the desugaring and is therefore kept by the
-	// occurrence-count check instead.
+	// The conditional desugars to "(b = 0 && a1 = c) || (!(b = 0) && d = e)":
+	// a1 = c occurs once, under wff_and/wff_or only, so it is monotone and
+	// eliminable, unlike the cases above where desugaring duplicates the atom.
 	TEST_CASE("atom under desugared conditional is substituted away") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("(b = 0) ? (a1 = c) : (d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = parse("b = 0 || d = e");
+		tref expected = parse("b = 0 || (!(b = 0) && d = e)");
 		CHECK( tau::get(result) == tau::get(expected) );
 	}
 
