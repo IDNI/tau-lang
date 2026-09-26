@@ -1426,14 +1426,22 @@ struct data_game_step_provider : step_provider<node> {
 					value = other;
 				} else sys.insert(g);
 			}
-			// first a value found at an earlier step or the complement of
-			// an excluded value, which a Boolean algebra always has
+			// first a value found at an earlier step, the type's splitter
+			// of 1 and its complement, or the complement of an excluded
+			// value, which a Boolean algebra always has
 			if (!value && !sys.empty()) {
 				tref all = tau::_T();
 				trefs candidates;
 				for (auto it = found.rbegin(); it != found.rend(); ++it)
 					if (tau::get((*it)->get()).get_ba_type() == tid)
 						candidates.push_back((*it)->get());
+				if (tref split = node::ba::splitter_one(
+					get_ba_type_tree<node>(tid)))
+				{
+					candidates.push_back(split);
+					candidates.push_back(normalize_ba<node>(
+						tau::build_bf_neg(split)));
+				}
 				for (tref g : sys) {
 					all = tau::build_wff_and(all, g);
 					for (tref side : { tau::get(g)[0].first(),
@@ -1473,6 +1481,7 @@ struct data_game_step_provider : step_provider<node> {
 			return std::nullopt;
 		for (const auto& [_, v] : sol) {
 			ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+			ledger.pin(tree<node>::geth(v));
 			if (std::none_of(found.begin(), found.end(), [&](const htref& h) {
 				return tau::subtree_equals(h->get(), v); }))
 					found.push_back(tree<node>::geth(v));
