@@ -1,4 +1,4 @@
-// Service worker that adds the COOP/COEP response headers tau_repl.js needs
+// Service worker that adds the COOP/COEP response headers tau_repl_web.js needs
 // for SharedArrayBuffer (its FTXUI REPL is built -pthread). A registration
 // fallback for servers that do not set these headers themselves (see
 // scripts/tau-repl-serve.sh, which does).

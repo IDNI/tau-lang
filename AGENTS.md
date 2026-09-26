@@ -145,23 +145,52 @@ report over a trace channel when you must measure, count, or benchmark.
 
 ## WebAssembly
 
-Tau builds for wasm through Emscripten as three separate artifacts: a **library**
-(`tau.js`/`tau.wasm`, an embind wrapper over `src/api.h`), **the test suite**, and
-**the REPL** (`tau_repl.js`, FTXUI over xterm.js). They are separate because their
-link requirements conflict — see the constraints below.
+Tau builds for wasm through Emscripten as four separate artifacts: a
+**library** (`tau.js`/`tau.wasm`, an embind wrapper over `src/api.h`),
+**the test suite**, **the CLI** (`tau_repl.js`, the REPL suite runs it
+under node), and **the browser REPL** (`tau_repl_web.js`, FTXUI over
+xterm.js).
+Each pack builds in one directory, named after the preset. The release family's
+base folder is `build/release-wasm`, shared by `release-wasm`,
+`release-wasm-all-tests`, `release-wasm-all-tests-browser`, `release-wasm-repl`
+and `release-wasm-repl-tests`; the no-threads pack uses
+`build/release-wasm-nothreads`, and the browser REPL keeps its own
+`build/release-wasm-repl-browser` because its link settings conflict with the
+others — see the constraints below. Every preset exists as `release-wasm-*`,
+`devel-wasm-*` and `debug-wasm-*`, in `build/release-wasm*`,
+`build/devel-wasm*` and `build/debug-wasm*`, with the native devel/debug
+families' own build-type settings. The no-thread pack is `<type>-wasm-nothreads`
+(`release-wasm-nothreads`, `devel-wasm-nothreads`, `debug-wasm-nothreads`, and
+their `-all-tests` variants) in `build/<type>-wasm-nothreads`.
+| preset | builds | runs |
+|---|---|---|
+| `release-wasm` | the library | nothing |
+| `release-wasm-all-tests` | the library, the C++ suite and the CLI | the C++ suite, the REPL suite and the js parity check, under node |
+| `release-wasm-all-tests-browser` | the above, plus Chrome | the compiled suite in headless Chrome |
+| `release-wasm-repl` | the CLI | nothing |
+| `release-wasm-repl-tests` | the CLI | the REPL suite under node |
+| `release-wasm-repl-browser` | the browser REPL page | nothing |
+| `release-wasm-repl-tests-browser` | the browser REPL page | the REPL suite inside it, in headless Chrome |
+| `release-wasm-nothreads`, `release-wasm-nothreads-all-tests`, `release-wasm-nothreads-all-tests-browser` | as above, without `-pthread` | as above |
 
 ```bash
-./dev dep-emsdk.sh                                  # emsdk → $TAU_SHARED_PREFIX/emsdk
+./dev dep-emsdk.sh                                       # emsdk → $TAU_SHARED_PREFIX/emsdk
+./dev preset release-wasm                                # tau.js + tau.wasm + tau.esm.mjs
+node build/release-wasm/tau.node.js                      # smoke test
+node bindings/js/tests/parity.js                         # wasm vs native, 140 checks
 
-./dev preset emscripten                             # tau.js + tau.wasm + tau.esm.mjs
-node build/emscripten/tau.node.js                   # smoke test
-node bindings/js/tests/parity.js                    # wasm vs native, 140 checks
+./dev preset release-wasm-all-tests run                  # C++ suite, REPL suite and parity, under node
+ctest --test-dir build/release-wasm -R test_repl -j 8    # the REPL cases alone
+./dev preset release-wasm-all-tests-browser run          # the compiled suite in headless Chrome
 
-./dev preset debug-emscripten-tests                 # tau's own suite for wasm
-ctest --test-dir build/debug-emscripten-tests -j 8  # runs each test under node
+./dev preset release-wasm-nothreads                      # tau.js, no SharedArrayBuffer (see below)
+./dev preset release-wasm-nothreads-all-tests run        # suite and CLI, no threads
 
-./dev preset emscripten-pthread                     # tau_repl.js (needs pthreads)
-./dev tau-repl-serve [port] [build-dir]             # serve the REPL page
+
+./dev preset release-wasm-repl-browser                   # tau_repl_web.js (needs pthreads)
+./dev preset release-wasm-repl-tests-browser run         # the REPL suite inside the browser REPL
+./dev tau-repl-serve [port] [build-dir]                  # serve the REPL page
+
 ```
 
 Options:
@@ -173,16 +202,23 @@ Options:
   `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
   via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.
 - `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl.js`. Emscripten-only; fatal otherwise.
+- `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl_web.js`. Emscripten-only; fatal otherwise.
+- `-DTAU_WASM_PTHREADS=OFF` — drops `-pthread` (the `release-wasm-nothreads`
+  preset). Default ON. Emscripten-only; fatal otherwise.
+- `-DTAU_WASM_REPL_MODEL=sleep|pthreads` selects how the FTXUI REPL waits
+  for input. The default, `sleep`, links JSPI into every executable that
+  compiles the FTXUI REPL. `pthreads` is not implemented yet. The option is
+  Emscripten-only. A non-default value is fatal on a native build.
 
 Four constraints, each of which has broken a build here:
-- **The pack is `sbf,tau,qint,qlt`.** `bv`/`hsb` need cvc5 and `nlang` needs curl,
-  neither of which is ported. So the wasm build is permanently the "pack without
-  `bv`" configuration that exercises a capability fold's empty case.
-- **The library must stay pthread-free.** pthreads mean `SharedArrayBuffer`, which
-  means the embedding page needs COOP/COEP, which would stop `tau.js` being
-  droppable on an arbitrary host. Only the REPL is `-pthread`, because FTXUI's
-  `ScreenInteractive::Install()` spawns threads with no single-threaded fallback;
-  it also needs `-sJSPI`, for the `emscripten_sleep()` in FTXUI's input loop.
+- **The distributable wasm build uses the pack `sbf,tau,qint,qlt`.** `nlang` needs
+  curl, which is not ported. This pack exercises a capability fold's empty case.
+- **`-pthread` is the default for every wasm target.** Threads are distributable and
+  used widely. `-DTAU_WASM_PTHREADS=OFF` (the `release-wasm-nothreads` preset) keeps
+  the droppable configuration: it drops `SharedArrayBuffer`, so the embedding page
+  needs no COOP/COEP. In FTXUI, `ScreenInteractive::Install()` spawns threads with
+  no single-threaded fallback, so the REPL always needs `-pthread` and `-sJSPI`, for
+  the `emscripten_sleep()` call in the FTXUI input loop.
 - **Every linked object must agree on the exception encoding.** Tau builds with
   `-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0`; a Boost dist built the other way
   fails `wasm-ld` with undefined `__cpp_exception`. `dep-boost.sh` stamps each wasm

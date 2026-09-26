@@ -119,7 +119,16 @@ option(TAU_BUILD_BINDING_PYTHON_NANOBIND "Build the nanobind Python binding" OFF
 option(TAU_BUILD_BINDING_PYTHON_CTYPE    "Build the ctypes Python binding"   OFF)
 option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
 option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
-option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl.js (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl_web.js (Emscripten only)" OFF)
+# Default ON only for Emscripten -- a plain option(... ON) would fatal below
+# on every native configure, since the option applies to wasm only.
+if(EMSCRIPTEN)
+	option(TAU_WASM_PTHREADS   "Build wasm with -pthread; needs SharedArrayBuffer and COOP/COEP (Emscripten only)" ON)
+else()
+	option(TAU_WASM_PTHREADS   "Build wasm with -pthread; needs SharedArrayBuffer and COOP/COEP (Emscripten only)" OFF)
+endif()
+set(TAU_WASM_REPL_MODEL "sleep" CACHE STRING
+	"How the FTXUI REPL waits for input under Emscripten: sleep (JSPI) or pthreads (Emscripten only)")
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 
@@ -178,6 +187,8 @@ set_property(CACHE TAU_BUILD_BINDING_PYTHON_CTYPE PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_WASM         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WASM_PTHREADS           PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WASM_REPL_MODEL         PROPERTY STRINGS "sleep" "pthreads")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -248,13 +259,42 @@ if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
 		"a native build.")
 endif()
 
+if(TAU_WASM_PTHREADS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_WASM_PTHREADS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+if(NOT TAU_WASM_REPL_MODEL STREQUAL "sleep" AND NOT TAU_WASM_REPL_MODEL STREQUAL "pthreads")
+	message(FATAL_ERROR
+		"TAU_WASM_REPL_MODEL must be 'sleep' or 'pthreads' (got "
+		"'${TAU_WASM_REPL_MODEL}').")
+endif()
+
+if(NOT TAU_WASM_REPL_MODEL STREQUAL "sleep" AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_WASM_REPL_MODEL=${TAU_WASM_REPL_MODEL} requires the Emscripten "
+		"toolchain (configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no "
+		"meaning for a native build.")
+endif()
+
+if(TAU_WASM_REPL_MODEL STREQUAL "pthreads")
+	message(FATAL_ERROR "TAU_WASM_REPL_MODEL=pthreads is not implemented")
+endif()
+
+# FTXUI's ScreenInteractive::Install() (js/repl/CMakeLists.txt) spawns
+# threads unconditionally, so the REPL cannot link a non-pthread build.
+if(TAU_BUILD_REPL_WASM AND NOT TAU_WASM_PTHREADS)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_WASM=ON requires TAU_WASM_PTHREADS=ON.")
+endif()
 # emcc requires every linked object to agree on -pthread (shared vs
 # non-shared wasm memory), so this goes on the global flags -- ahead of
-# add_subdirectory(src) and js/repl's FetchContent_MakeAvailable(ftxui) --
-# rather than as a target_compile_options() on tau_repl alone. Boost is a
-# prebuilt dependency, so it gets its own pthread-enabled dist instead
-# (TAU_BOOST_PTHREAD below).
-if(TAU_BUILD_REPL_WASM)
+# add_subdirectory(src) and js/repl's FTXUI build -- rather than as a
+# target_compile_options() on tau_repl alone. Boost is a prebuilt dependency,
+# so it gets its own pthread-enabled dist instead (TAU_BOOST_PTHREAD below).
+if(TAU_WASM_PTHREADS)
 	string(APPEND CMAKE_C_FLAGS " -pthread")
 	string(APPEND CMAKE_CXX_FLAGS " -pthread")
 	string(APPEND CMAKE_EXE_LINKER_FLAGS " -pthread")
@@ -372,6 +412,7 @@ message(STATUS "TAU_BUILD_BINDING_PYTHON_CTYPE: ${TAU_BUILD_BINDING_PYTHON_CTYPE
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
 message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
+message(STATUS "TAU_WASM_PTHREADS: ${TAU_WASM_PTHREADS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
@@ -683,10 +724,10 @@ if (TAU_BUILD_BINDING_JS)
 endif()
 
 #
-# Building the FTXUI REPL as a wasm executable (tau_repl.js/.wasm). A
+# Building the FTXUI REPL as a wasm executable (tau_repl_web.js/.wasm). A
 # separate target from bindings/js's tau.js: this one is built -pthread (see
 # the global flags above), so it does not reach the binding, which stays
-# pthread-free (D11, .local/build-emscripten.md).
+# pthread-free.
 #
 if (TAU_BUILD_REPL_WASM)
 	message(STATUS "Building wasm REPL (FTXUI + pthreads)")

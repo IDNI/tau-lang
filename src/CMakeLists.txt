@@ -211,6 +211,11 @@ if(TAU_BUILD_EXECUTABLE)
 		target_link_libraries(${TAU_EXECUTABLE_NAME}
 			ftxui::screen ftxui::dom ftxui::component)
 		target_compile_definitions(${TAU_EXECUTABLE_NAME} PRIVATE TAU_PARSER_HAS_FTXUI)
+		if(EMSCRIPTEN AND TAU_WASM_REPL_MODEL STREQUAL "sleep")
+			# FTXUI's Emscripten input listener calls emscripten_sleep,
+			# which needs JSPI at link time.
+			target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE "SHELL:-s JSPI")
+		endif()
 		message(STATUS "tau: FTXUI REPL enabled (legacy via -X)")
 	elseif(NOT TAU_DONT_USE_FTXUI)
 		message(WARNING "tau: FTXUI not available — legacy terminal REPL will be used")

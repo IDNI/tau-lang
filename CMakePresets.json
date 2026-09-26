@@ -121,9 +121,24 @@
 			"binaryDir": "${sourceDir}/build/release-wasm"
 		},
 		{
+			"name": "_build_dir-release-wasm-nothreads",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-wasm-nothreads"
+		},
+		{
+			"name": "_build_dir-release-wasm-repl-browser",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-wasm-repl-browser"
+		},
+		{
 			"name": "_build_dir-devel-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/devel-wasm"
+		},
+		{
+			"name": "_build_dir-devel-wasm-nothreads",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-wasm-nothreads"
 		},
 		{
 			"name": "_build_dir-devel-wasm-repl-browser",
@@ -136,9 +151,9 @@
 			"binaryDir": "${sourceDir}/build/debug-wasm"
 		},
 		{
-			"name": "_build_dir-release-wasm-repl-browser",
+			"name": "_build_dir-debug-wasm-nothreads",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-wasm-repl-browser"
+			"binaryDir": "${sourceDir}/build/debug-wasm-nothreads"
 		},
 		{
 			"name": "_build_dir-debug-wasm-repl-browser",
@@ -315,6 +330,13 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BAS": "tau,qint,qlt,nlang,bv,sbf,hsb"
+			}
+		},
+		{
+			"name": "_wasm-nothreads",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_WASM_PTHREADS": "OFF"
 			}
 		},
 		{
@@ -656,22 +678,6 @@
 			]
 		},
 		{
-			"name": "devel-wasm",
-			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm"]
-		},
-		{
-			"name": "devel-wasm-all-tests",
-			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
-		},
-		{
-			"name": "devel-wasm-repl-browser",
-			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-browser"]
-		},
-		{
-			"name": "debug-wasm",
-			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm"]
-		},
-		{
 			"name": "release-wasm-all-tests",
 			"inherits": [
 				"_build_dir-release-wasm",
@@ -682,10 +688,6 @@
 				"_build-wasm-tests",
 				"_build-type-release"
 			]
-		},
-		{
-			"name": "debug-wasm-all-tests",
-			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
 		},
 		{
 			"name": "release-wasm-repl-browser",
@@ -699,8 +701,72 @@
 			]
 		},
 		{
+			"name": "release-wasm-nothreads",
+			"displayName": "wasm library without -pthread",
+			"inherits": [
+				"_build_dir-release-wasm-nothreads",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_bas-wasm",
+				"_wasm-nothreads",
+				"_build-binding-js",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests",
+			"displayName": "wasm library, C++ suite and CLI without -pthread",
+			"inherits": [
+				"_build_dir-release-wasm-nothreads",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_bas-wasm",
+				"_wasm-nothreads",
+				"_build-binding-js",
+				"_build-wasm-tests",
+				"_build-repl-tests",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "devel-wasm",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm"]
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
+		},
+		{
+			"name": "devel-wasm-repl-browser",
+			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-browser"]
+		},
+		{
+			"name": "devel-wasm-nothreads",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads"]
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads-all-tests"]
+		},
+		{
+			"name": "debug-wasm",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm"]
+		},
+		{
+			"name": "debug-wasm-all-tests",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
+		},
+		{
 			"name": "debug-wasm-repl-browser",
 			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-browser"]
+		},
+		{
+			"name": "debug-wasm-nothreads",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads"]
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads-all-tests"]
 		},
 		{
 			"name": "relwithdebinfo-make-gcc",
@@ -1257,6 +1323,22 @@
 			"configurePreset": "release-wasm"
 		},
 		{
+			"name": "release-wasm-all-tests",
+			"configurePreset": "release-wasm-all-tests"
+		},
+		{
+			"name": "release-wasm-repl-browser",
+			"configurePreset": "release-wasm-repl-browser"
+		},
+		{
+			"name": "release-wasm-nothreads",
+			"configurePreset": "release-wasm-nothreads"
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests",
+			"configurePreset": "release-wasm-nothreads-all-tests"
+		},
+		{
 			"name": "devel-wasm",
 			"configurePreset": "devel-wasm"
 		},
@@ -1269,24 +1351,32 @@
 			"configurePreset": "devel-wasm-repl-browser"
 		},
 		{
-			"name": "debug-wasm",
-			"configurePreset": "debug-wasm"
+			"name": "devel-wasm-nothreads",
+			"configurePreset": "devel-wasm-nothreads"
 		},
 		{
-			"name": "release-wasm-all-tests",
-			"configurePreset": "release-wasm-all-tests"
+			"name": "devel-wasm-nothreads-all-tests",
+			"configurePreset": "devel-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "debug-wasm",
+			"configurePreset": "debug-wasm"
 		},
 		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
 		},
 		{
-			"name": "release-wasm-repl-browser",
-			"configurePreset": "release-wasm-repl-browser"
-		},
-		{
 			"name": "debug-wasm-repl-browser",
 			"configurePreset": "debug-wasm-repl-browser"
+		},
+		{
+			"name": "debug-wasm-nothreads",
+			"configurePreset": "debug-wasm-nothreads"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"configurePreset": "debug-wasm-nothreads-all-tests"
 		},
 		{
 			"name": "relwithdebinfo",
@@ -1459,12 +1549,24 @@
 			"configurePreset": "release-wasm-all-tests"
 		},
 		{
+			"name": "release-wasm-nothreads-all-tests",
+			"configurePreset": "release-wasm-nothreads-all-tests"
+		},
+		{
 			"name": "devel-wasm-all-tests",
 			"configurePreset": "devel-wasm-all-tests"
 		},
 		{
+			"name": "devel-wasm-nothreads-all-tests",
+			"configurePreset": "devel-wasm-nothreads-all-tests"
+		},
+		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"configurePreset": "debug-wasm-nothreads-all-tests"
 		},
 		{
 			"name": "debug-binding-python-tests",

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Serve the browser REPL page (js/repl/CMakeLists.txt's output: index.html,
-# tau_repl.js/.wasm, vendor/) with the COOP/COEP headers SharedArrayBuffer
+# tau_repl_web.js/.wasm, vendor/) with the COOP/COEP headers SharedArrayBuffer
 # needs, so the page's own sw.js fallback (js/repl/sw.js) is never exercised
 # on a server that already does this.
 #

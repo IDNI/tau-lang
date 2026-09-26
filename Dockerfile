@@ -500,6 +500,15 @@ RUN if [ "$TESTS" = "yes" ]; then \
 	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
+# Tau's no-thread coverage: the droppable, no-SharedArrayBuffer configuration
+# is kept measured so it does not rot now that -pthread is the default for
+# every other wasm target.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Running wasm no-thread tests" && \
+	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+fi
+
 # parity.js compares the wasm module against the native tau built above; the
 # js_parity ctest entry in ${BUILD_PRESET}-all-tests runs it. TAU_WASM_JS names
 # this preset's module, so a non-default BUILD_PRESET does not fall back to

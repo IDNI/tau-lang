@@ -3,12 +3,12 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 # tau_repl: the FTXUI REPL (src/main.cpp) built as its own wasm executable,
 # separate from bindings/js's embind library (tau.js). FTXUI's
 # ScreenInteractive::Install() unconditionally spawns two std::threads, so
-# this target is built -pthread -- carrying SharedArrayBuffer and requiring
-# COOP/COEP on whatever page embeds it. That requirement is scoped to this
-# preset (TAU_BUILD_REPL_WASM): it does not reach bindings/js's tau.js, which
-# stays pthread-free (D11, .local/build-emscripten.md).
-# Output name is "tau_repl", distinct from the binding's "tau" -- both land
-# in the same build directory (see .local/build-emscripten.md, Phase 5).
+# this target requires -pthread regardless of TAU_WASM_PTHREADS (enforced by
+# the fatal check in the top-level CMakeLists.txt) -- carrying
+# SharedArrayBuffer and requiring COOP/COEP on whatever page embeds it.
+# Output name is "tau_repl_web": the CLI now emits tau_repl.js, so this
+# target moves aside to keep the wasm CLI, the JS binding and this page
+# in one build directory.
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 	message(FATAL_ERROR "run js/repl cmake from root with -DTAU_BUILD_REPL_WASM=ON")
@@ -18,7 +18,9 @@ if(NOT EMSCRIPTEN)
 	message(FATAL_ERROR "js/repl requires the emscripten toolchain (-DTAU_BUILD_EMSCRIPTEN=ON)")
 endif()
 
-include(ftxui)
+# tau-ftxui resolves FTXUI from the store prefix on CMAKE_PREFIX_PATH when
+# TAU_DEPS_FROM_STORE is ON, the parser's own module otherwise.
+include(tau-ftxui)
 if(NOT TAU_PARSER_HAS_FTXUI_DEP)
 	message(FATAL_ERROR "js/repl: FTXUI not available -- required for the wasm REPL")
 endif()
@@ -36,27 +38,24 @@ target_compile_definitions(tau_repl PRIVATE TAU_PARSER_HAS_FTXUI)
 add_dependencies(tau_repl tau_header)
 
 # PROXY_TO_PTHREAD moves main() (and so ScreenInteractive::Loop()'s blocking
-# read) onto a worker pthread, off the browser main thread. -pthread itself
-# is a global flag (top-level CMakeLists.txt), applied to every linked
-# object including FTXUI's own FetchContent build, since emcc requires them
-# all to agree on it. -fwasm-exceptions comes from target_setup() above
-# (cmake/tau-common.cmake); STACK_SIZE matches bindings/js/CMakeLists.txt's
-# -- the same grammar-table static-init overflow (16MiB default-stack
-# overflow) applies to this executable too. INITIAL_MEMORY is explicit
-# because the default (16 MiB) is smaller than STACK_SIZE alone, leaving no
-# room for static data; wasm-ld caught this at link time ("initial memory
-# too small").
+# read) onto a worker pthread, off the browser main thread. -pthread is a
+# global flag (top-level CMakeLists.txt), so every linked object agrees on it.
 #
-# JSPI is still needed despite PROXY_TO_PTHREAD: FTXUI's own Emscripten
-# input-listener loop (screen_interactive.cpp's __EMSCRIPTEN__ branch) calls
-# emscripten_sleep() unconditionally, which aborts at runtime
-# ("compile your program with async support") without it, regardless of
-# which thread runs the loop. Confirmed by running under Node before adding
-# this flag. JSPI coexists with -fwasm-exceptions (unlike plain ASYNCIFY).
+# STACK_SIZE and INITIAL_MEMORY match bindings/js/CMakeLists.txt: the
+# generated grammar tables overflow the default stack at static-init, and
+# the default INITIAL_MEMORY leaves no room for static data on top of it.
+#
+# JSPI follows TAU_WASM_REPL_MODEL: FTXUI's Emscripten input listener calls
+# emscripten_sleep() unconditionally in the sleep model, which aborts at
+# runtime without it. JSPI coexists with -fwasm-exceptions, unlike ASYNCIFY.
+set(TAU_REPL_LINK_FLAGS "-s PROXY_TO_PTHREAD -s STACK_SIZE=16777216 -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1 -s ASSERTIONS=1")
+if(TAU_WASM_REPL_MODEL STREQUAL "sleep")
+	set(TAU_REPL_LINK_FLAGS "${TAU_REPL_LINK_FLAGS} -s JSPI")
+endif()
 set_target_properties(tau_repl PROPERTIES
-	OUTPUT_NAME "tau_repl"
+	OUTPUT_NAME "tau_repl_web"
 	SUFFIX ".js"
-	LINK_FLAGS "-s PROXY_TO_PTHREAD -s JSPI -s STACK_SIZE=16777216 -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1 -s ASSERTIONS=1")
+	LINK_FLAGS "${TAU_REPL_LINK_FLAGS}")
 
 # The page around tau_repl.js/.wasm: xterm.js glue, the COOP/COEP
 # service-worker fallback and the terminal chrome, ported from
