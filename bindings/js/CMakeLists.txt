@@ -79,3 +79,26 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/native.js
 		${CMAKE_BINARY_DIR}/tests/
 	COMMENT "Copying JS bindings package assets (LICENSE, tests)")
+
+# The store producer publishes exactly the files package.json's "files"
+# list names, taken from this build directory (which is the installable
+# package). This is not an npm publish: no registry and no token, the same
+# content-addressed store every other package uses. The producer cmd comes
+# from tau-deps, so the identity records this configure's compiler and flags.
+if(TAU_DEPS_FROM_STORE)
+	tau_deps_producer_command(_tau_js_producer_cmd
+		"${CMAKE_SOURCE_DIR}/scripts/dep-tau-js-package.sh")
+	get_filename_component(_tau_js_parser_entry "${TAU_PARSER_SDK_PREFIX}" DIRECTORY)
+	get_filename_component(_tau_js_parser_id "${_tau_js_parser_entry}" NAME)
+	get_filename_component(_tau_js_ftxui_entry "${TAU_FTXUI_PREFIX}" DIRECTORY)
+	get_filename_component(_tau_js_ftxui_id "${_tau_js_ftxui_entry}" NAME)
+	add_custom_target(tau_js_publish
+		COMMAND ${_tau_js_producer_cmd}
+			"-DTAU_JS_PACKAGE_DIR=${CMAKE_BINARY_DIR}"
+			"-DTAU_JS_PACKAGE_VERSION=${TAU_VERSION}"
+			"-DTAU_JS_PARSER_SDK_ID=${_tau_js_parser_id}"
+			"-DTAU_JS_FTXUI_ID=${_tau_js_ftxui_id}"
+		DEPENDS tau_js tau_js_esm tau_js_package_assets
+		USES_TERMINAL
+		COMMENT "Publishing the @idni/tau-lang package to the store")
+endif()

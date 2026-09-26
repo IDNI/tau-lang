@@ -197,6 +197,7 @@ ctest --test-dir build/release-wasm -R test_repl -j 8    # the REPL cases alone
 ./dev preset release-wasm-repl-tests-browser run         # the REPL suite inside the browser REPL
 ./dev tau-repl-serve [port] [build-dir]                  # serve the REPL page
 
+./dev preset release-wasm --target tau_js_publish        # publish the npm package to the store
 ```
 
 Options:
@@ -249,6 +250,14 @@ on (`release-wasm-all-tests`, `release-wasm-repl-tests`,
 `build/release-wasm`; every other wasm preset skips them, so their compiled suites
 still defer to them instead. `release-wasm-repl-tests-browser` replays those same
 cases in the browser REPL page.
+The wasm library is also the npm package: configure writes `package.json` into the
+build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies the
+`LICENSE.md` and the test scripts its `files` list names, so the build directory is
+the installable package. `tau_js_publish` runs the `dep-tau-js-package.sh` producer,
+which puts exactly those listed files into the local store like every other package.
+There is no npm registry and no npm token anywhere in the build or CI. The package
+is the library only, never the REPL; its threading follows the preset, so
+`release-wasm-nothreads` yields a library without `-pthread`.
 
 ## Architecture
 
