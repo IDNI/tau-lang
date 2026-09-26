@@ -154,12 +154,17 @@ struct interpreter {
 	 * @brief Build an interpreter from a normalized Tau specification.
 	 * @param spec Normalized Tau formula.
 	 * @param ctx I/O context.
+	 * @param as_written The specification before the caller normalized
+	 * it, when the caller did; the functional shape of a specification
+	 * (`functional_step_shape`) is read off this form, since the
+	 * normalizer's equality propagation dissolves the conditional
+	 * structure the shape is made of. Defaults to `spec` itself.
 	 * @return Initialized interpreter, or an error result if the spec is
 	 * unsatisfiable or fails to normalize (a `bv_widening` width-cap
 	 * violation, already logged by the widening pass).
 	 */
 	static result<interpreter> make_interpreter(tref spec,
-		const io_context<node>& ctx);
+		const io_context<node>& ctx, tref as_written = nullptr);
 
 	/**
 	 * @brief Build a table-driven interpreter with no spec-derived state.
@@ -679,7 +684,15 @@ private:
 	void prune_memory(size_t completed_time_point);
 
 	/// @brief Find an executable specification clause from DNF.
-	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0);
+	/// @param functional The clause is a part of a specification of
+	/// functional shape (`functional_step_shape`): its continuation
+	/// fixpoint, run check and constant closure are settled from the
+	/// shape.
+	/// @param spec_max_initial The greatest time point of an initial
+	/// condition of the specification as written (-1 when it has none);
+	/// the constant closure is settled from the shape only below it.
+	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0,
+		bool functional = false, int_t spec_max_initial = -1);
 
 	/// @brief Recompute the executable continuations of a part's ordered
 	/// alternatives. Alternatives that are not executable are dropped from

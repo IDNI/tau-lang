@@ -198,6 +198,18 @@ result<std::string> api<node>::onf(const std::string& fm, const std::string& var
 }
 
 template <NodeType node>
+result<std::string> api<node>::without(const std::string& fm,
+	const std::string& clause)
+{
+	return with_budget<node>([&] {
+		return get_formula(fm).and_then([&clause](tref k) {
+			return get_formula(clause).and_then(
+				[k](tref c) { return without(k, c); });
+		}).transform([](tref v) { return to_str(v); });
+	});
+}
+
+template <NodeType node>
 result<std::string> api<node>::pnf(const std::string& fm) {
 	return with_budget<node>([&] {
 		return get_formula(fm).and_then(

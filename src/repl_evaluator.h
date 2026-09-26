@@ -326,6 +326,8 @@ private:
 	tref mnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to ONF.
 	tref onf_cmd(const tt& n);
+	/// @brief The normal form of the formula in @p n without one conjunct.
+	tref without_cmd(const tt& n);
 
 	/// @brief Evaluate a raw command node @p n.
 	int eval_cmd(const tt& n);

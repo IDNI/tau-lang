@@ -104,6 +104,7 @@ LANGUAGE SEMANTICS & RULES (CRITICAL — read every point)
    - normalize <expr>. — normalize a formula
    - dnf/cnf/anf/nnf/pnf/mnf <expr>. — normal form conversions
    - onf <var> <expr>. — order normal form w.r.t. variable
+   - without <expr> <clause>. — normal form of an always-conjunction without one conjunct
    - qelim <wff>. — quantifier elimination
    - subst <expr> [<from> / <to>]. — substitution
    - inst <expr> [<var> / <val>]. — instantiation
