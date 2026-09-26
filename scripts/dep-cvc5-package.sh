@@ -47,26 +47,51 @@ _dep_cvc5_url_archive() {
 	printf '%s' "${url##*/}"
 }
 
+# Print the "<major>.<minor>.<patch>" version from a gmp.h.
+_dep_cvc5_gmp_version() {
+	local header="$1" major minor patch
+	major="$(awk '/#define __GNU_MP_VERSION /{print $3}' "$header")"
+	minor="$(awk '/#define __GNU_MP_VERSION_MINOR /{print $3}' "$header")"
+	patch="$(awk '/#define __GNU_MP_VERSION_PATCHLEVEL /{print $3}' "$header")"
+	[ -n "$major" ] && [ -n "$minor" ] || return 1
+	printf '%s.%s.%s' "$major" "$minor" "${patch:-0}"
+}
+
+# The gmp.h cvc5's FindGMP resolves to, or nothing when it falls back to the
+# download. Linux carries GMP in /usr/include. macOS has no system GMP, so
+# FindGMP picks the Homebrew copy when its prefix search reaches it.
+_dep_cvc5_gmp_header() {
+	if [ "$(dep_host_os)" = linux ] \
+			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ]; then
+		[ -f /usr/include/gmp.h ] && printf '%s' /usr/include/gmp.h
+		return 0
+	fi
+	if [ "$(dep_host_os)" = darwin ] && command -v brew > /dev/null 2>&1; then
+		local prefix
+		prefix="$(brew --prefix gmp 2>/dev/null || true)"
+		if [ -n "$prefix" ] && [ -f "${prefix}/include/gmp.h" ]; then
+			printf '%s' "${prefix}/include/gmp.h"
+		fi
+	fi
+	return 0
+}
+
 # Resolve the system GMP, if the host provides it, before the build. cvc5's
 # FindGMP uses the system GMP when gmp.h is on the include path and only then
 # falls back to the download, so this is the same choice the configure makes.
-# The system copy is a Linux host library, so windows-x86_64-mingw and macOS always download.
-# MSVC can point at an MSVC-compatible GMP with -DCVC5_CMAKE_PREFIX; without
-# one cvc5 auto-downloads (and then has to build) GMP.
+# windows-x86_64-mingw cross-builds and MSVC reach the download unless
+# -DCVC5_CMAKE_PREFIX points at an MSVC-compatible GMP.
 _dep_cvc5_gmp() {
 	if [ -n "${CVC5_CMAKE_PREFIX:-}" ]; then
 		printf 'external|%s' "$CVC5_CMAKE_PREFIX"
 		return 0
 	fi
-	if [ "$(dep_host_os)" = linux ] \
-			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ] \
-			&& [ -f /usr/include/gmp.h ]; then
-		local major minor patch
-		major="$(awk '/#define __GNU_MP_VERSION /{print $3}' /usr/include/gmp.h)"
-		minor="$(awk '/#define __GNU_MP_VERSION_MINOR /{print $3}' /usr/include/gmp.h)"
-		patch="$(awk '/#define __GNU_MP_VERSION_PATCHLEVEL /{print $3}' /usr/include/gmp.h)"
-		if [ -n "$major" ] && [ -n "$minor" ]; then
-			printf 'system|%s.%s.%s' "$major" "$minor" "${patch:-0}"
+	local header version
+	header="$(_dep_cvc5_gmp_header)"
+	if [ -n "$header" ]; then
+		version="$(_dep_cvc5_gmp_version "$header")" || version=""
+		if [ -n "$version" ]; then
+			printf 'system|%s' "$version"
 			return 0
 		fi
 	fi
