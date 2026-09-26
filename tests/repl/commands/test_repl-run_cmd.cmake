@@ -111,9 +111,10 @@ add_repl_test(run_cmd-ltl_correctness-adv_u_03_alt
 add_repl_test(run_cmd-ltl_correctness-adv_w_01_o1_until_o0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) weak_until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
+# a weak until need not release: F at every step is a run of it
 add_repl_test(run_cmd-ltl_correctness-adv_w_02_o0_until_o1_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 0) weak_until (o1[t] = 1)."
-	"o1\\[[0-9]+\\] := T")
+	"o1\\[5\\] := [TF]")
 
 # ── ADV-SBF / ADV-BV: no input; every output is non-empty ─────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_sbf_01_g_x_and_y
@@ -640,13 +641,14 @@ set_tests_properties("test_repl-run_cmd-sbf_multiline_value" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o1\\[0\\] := x \\| x' y")
 
 # ── MIRROR: F and sometimes are one operator, so both spellings mirror ───────
-# The input alternates F and T, so a mirroring program outputs F, T, F.
+# The input alternates F and T: the goal is met at step 0, where o1 mirrors
+# the F, and the run goes on.
 add_repl_test(run_cmd-mirror_01_f_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps F (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+	"o1\\[0\\] := F.*o1\\[2\\] := ")
 add_repl_test(run_cmd-mirror_02_sometimes_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps sometimes (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+	"o1\\[0\\] := F.*o1\\[2\\] := ")
 add_repl_test(run_cmd-mirror_03_always_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
 	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")

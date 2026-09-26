@@ -734,10 +734,14 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    then picks the outputs, and each atom of a move is read on those
    values. The winning regions are sets of histories (the last values of
    every stream) computed with Zielonka's algorithm. When every stream has
-   a two-valued type (`bv[1]`) or is read only through equalities with
+   a two-valued type (`bv[1]`), is read only through equalities with
    streams of its type, `0` and `1` (in a type with enough elements, such
-   as the default type), a region is a BDD over codes of those values and
-   the game runs before (4) and (5); otherwise a region is a formula whose
+   as the default type), possibly with a complement on one side
+   (`x = y'`, read on the pairs `{v, v'}` of a Boolean algebra), or has a
+   type of at most 16 values (`bv[2]` .. `bv[4]`, read in any way, with
+   arithmetic too), a region is a BDD over codes of those values and
+   the game runs before (4) and (5); otherwise, or when the BDD grows
+   past its node limit, a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
    UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
    are played like any other step, their inputs by the environment and
@@ -746,8 +750,23 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    refinement-round cap; (4) and (5) then keep their answer.
 
 A formula is **realizable** iff its data game is won; where that game is
-undecided, iff (4) succeeds and the strategy wins in (5). Execution (`run`)
-takes the strategy of (4) and (5). The external tool
+undecided, iff (4) succeeds and the strategy wins in (5).
+
+**Execution (`run`)** plays the strategy of the procedure that decided the
+formula. When the data game decides it, Zielonka's algorithm also yields a
+winning strategy of the system there: in an attractor, each history takes a
+move into the part attracted before it, so the distance to the goal
+decreases; in the vertices of the highest odd priority it takes any move
+that stays in the part the system wins; elsewhere the strategies of the
+smaller games solved on the way apply. The strategy remembers the game
+vertex and reads the last values of every stream. At each step it follows
+the edge the inputs take, asks the solver for outputs within the move of
+the vertex reached (a value no stream holds when its code says so), and
+follows the edge those outputs take. The values before step 0 are its own:
+every input 0 and outputs for which the start is won. Such a run reads
+every input at every step, and it does not accept a revision of the
+specification. Otherwise `run` executes the strategy of (4) and (5), as a
+safety formula (below). The external tool
 `ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
 
 #### Synthesis algorithms
@@ -825,7 +844,8 @@ constant tests through the full path and reports disagreements, and
 Φ_Δ of the atomless algebra on matching shapes. `TAU_CODEGEN_RUN_SDK_LINK_TEST`
 opts the codegen test suite into a minutes-long real `cmake` build.
 
-**Execution**: when the interpreter pipeline is given a realizable LTL formula,
+**Execution**: when the interpreter pipeline is given a realizable LTL formula
+that the data game does not decide,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
 self-loop guard directly.  Multi-state strategies are encoded using one-hot
@@ -2813,6 +2833,9 @@ extension).  The program behaves like `tau <spec.tau>`: it reads inputs,
 prints outputs, and exits when its input closes.  Exit code `0` on success,
 `1` on every failure, with the reason in the `compile failed:` message (see
 [Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
+The program carries the strategy of the abstraction (steps 4 and 5 of the
+realizability algorithm); a spec that only the data game decides is refused
+with a message saying so, and `run` executes it.
 
 Emitting a C++ *header* with the synthesized class (`tau_program`, with the
 `declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)

@@ -183,6 +183,13 @@ struct formula_regions {
 	std::optional<bool> reached(tref f) {
 		return dq.reached_before_start(f);
 	}
+	// The positions from which the chooser of vertex `i` takes edge `j`
+	// into `Y`.
+	tref move(int i, size_t j, const std::vector<tref>& Y) {
+		const auto& e = a.v[i].edges[j];
+		tref tgt = e.shift ? shift_io_vars<node>(Y[e.dst], 1) : Y[e.dst];
+		return norm(tau::build_wff_and(e.label, tgt));
+	}
 
 	tref pre(int p, int i, const std::vector<tref>& Y,
 		const std::vector<tref>& G)
@@ -292,15 +299,15 @@ struct data_bdd {
 		};
 		return go(a);
 	}
-	// Every variable v of `a` renamed v - d; false in `ok` when one is
-	// below d.
-	id lower(id a, uint32_t d, bool& ok) {
+	// Every variable v of `a` renamed v - d; false in `ok` when v modulo
+	// `block` is below d.
+	id lower(id a, uint32_t d, uint32_t block, bool& ok) {
 		std::unordered_map<id, id> seen;
 		std::function<id(id)> go = [&](id n) -> id {
 			if (n <= T) return n;
 			if (auto it = seen.find(n); it != seen.end()) return it->second;
 			const nd x = nodes[n];
-			if (x.var < d) { ok = false; return F; }
+			if (x.var % block < d) { ok = false; return F; }
 			const id r = mk(x.var - d, go(x.lo), go(x.hi));
 			seen.emplace(n, r);
 			return r;
@@ -317,23 +324,49 @@ struct data_bdd {
 // which of its values are equal (its equality type); the codes realize
 // every such type of a window, and so does the type when it has as many
 // elements as a window has values plus 0 and 1 (make_code_window checks
-// it), which makes the game on the codes the game on the data. The bits of
-// stream s at step t-k are variables k * per_step + offset[s] + b, so
-// moving a region to the next step subtracts per_step.
+// it), which makes the game on the codes the game on the data.
+//
+// A stream also compared with the complement of another (x = y') takes an
+// orbit code instead: in a Boolean algebra no value is its own complement,
+// so the values fall into pairs {v, v'}, {0, 1} among them. The code is the
+// pair (bits 0 .. width-2, pair 0 for {0, 1}) and which of the two it is
+// (the last bit, 1 for 1 and for the complement of the value first met).
+// Equalities and complements read the values only through these pairs, and
+// the type realizes every such pattern of a window when it has as many
+// values, none equal to another or to its complement, as the window holds
+// (make_code_window checks it).
+//
+// A stream of a type with few elements (at most 16, a power of two, such as
+// bv[n] for small n) read in any other way takes a value code: code c is the
+// c-th element, values[c], element 0 being 0. The code then is the value,
+// and each comparison is tabulated over the values of its streams.
+//
+// Bit b of stream s at step t-k is variable b * block() + k * S + s, S the
+// number of streams: the same bit of every value sits in one layer, so an
+// equality of two values stays small in the BDD, and moving a region to the
+// next step subtracts S.
 struct code_window {
 	struct stream {
 		std::string name;
 		bool input = false;
 		bool two = false;       // a two-element type, one bit
-		size_t width = 1, offset = 0;
+		bool orbit = false;     // an orbit code, see above
+		std::vector<htref> values;   // a value code: the elements
+		size_t width = 1;
+		// whether the stream's values are the codes themselves
+		bool finite() const { return two || !values.empty(); }
 	};
 	std::vector<stream> streams;
 	std::map<std::string, size_t> index;
-	size_t per_step = 0, depth = 0;
-	uint32_t var(size_t s, size_t k, size_t b) const {
-		return (uint32_t)(k * per_step + streams[s].offset + b);
+	size_t depth = 0, max_width = 0;
+	uint32_t block() const {
+		return (uint32_t)((depth + 1) * streams.size());
 	}
-	uint32_t vars() const { return (uint32_t)((depth + 1) * per_step); }
+	uint32_t step() const { return (uint32_t)streams.size(); }
+	uint32_t var(size_t s, size_t k, size_t b) const {
+		return (uint32_t)(b * block() + k * streams.size() + s);
+	}
+	uint32_t vars() const { return (uint32_t)(max_width * block()); }
 };
 
 // One side of an equality read on codes: an io_var (its variable node) or
@@ -343,12 +376,14 @@ struct code_side { tref var = nullptr; int constant = -1; };
 
 // The sides of `cmp` when it is an equality or a disequality between io_vars
 // and the constants 0 and 1, else nullopt; `equal` tells which. A
-// complement is read off: x' = c is x = c', and x' = y' is x = y.
+// complement is read off: x' = c is x = c', and x' = y' is x = y; `flip`
+// tells an equality of one variable with the complement of the other.
 template <NodeType node>
 static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
-	bool& equal)
+	bool& equal, bool& flip)
 {
 	using tau = tree<node>;
+	flip = false;
 	const auto& t = tau::get(cmp);
 	if (!t.has_child()) return std::nullopt;
 	const auto nt = t[0].value.nt;
@@ -374,7 +409,7 @@ static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
 		complement[i] = true;
 	}
 	if (sides[0].var && sides[1].var) {
-		if (complement[0] != complement[1]) return std::nullopt;
+		flip = complement[0] != complement[1];
 		return sides;
 	}
 	for (size_t i = 0; i < 2; ++i)
@@ -382,8 +417,99 @@ static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
 	return sides;
 }
 
+// Whether a window of `n` values of type `tid` realizes every pattern its
+// codes can take: `n` values distinct from 0, 1 and one another, and with
+// `orbits` from each other's complements, none its own complement.
+template <NodeType node>
+static bool codes_realized(size_t tid, size_t n, bool orbits) {
+	using tau = tree<node>;
+	auto var = [&](size_t j) {
+		return build_out_var_at_t<node>(build_var_name<node>(
+			"o__code" + std::to_string(j)), tid);
+	};
+	auto decided_false = [](tref f) {
+		auto sat = is_non_temp_nso_satisfiable<node>(f);
+		return sat.has_value() && !sat.value();
+	};
+	if (orbits) {
+		tref x = var(0);
+		if (!decided_false(tau::build_bf_eq(x, tau::build_bf_neg(x)))
+			|| !decided_false(tau::build_bf_neq(x, tau::build_bf_neg(
+				tau::build_bf_neg(x))))
+			|| !decided_false(tau::build_bf_neq(build_bf_t_type<node>(tid),
+				tau::build_bf_neg(build_bf_f_type<node>(tid)))))
+				return false;
+	}
+	tref all = tau::_T();
+	trefs fresh;
+	for (size_t j = 0; j < n; ++j) {
+		tref x = var(j);
+		all = tau::build_wff_and(all, tau::build_wff_and(
+			tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
+			tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
+		for (tref y : fresh) {
+			all = tau::build_wff_and(all, tau::build_bf_neq(x, y));
+			if (orbits) all = tau::build_wff_and(all,
+				tau::build_bf_neq(x, tau::build_bf_neg(y)));
+		}
+		fresh.push_back(x);
+	}
+	auto sat = is_non_temp_nso_satisfiable<node>(all);
+	return sat.has_value() && sat.value();
+}
+
+// The elements of type `tid` when it has at most `max` of them, a power of
+// two, and its constants of the values 0, 1, ... name them: element 0 is 0,
+// no two are equal and no other value exists.
+template <NodeType node>
+static std::optional<trefs> finite_elements(size_t tid, size_t max) {
+	using tau = tree<node>;
+	// the number of elements per type and bound, 0 for too many; the
+	// checks call the solver
+	static std::map<std::pair<std::string, size_t>, size_t> known;
+	auto type_name = get_ba_type_name<node>(tid);
+	if (!type_name.has_value()) return std::nullopt;
+	const std::string name = type_name.value();
+	if (auto it = known.find({ name, max }); it != known.end()) {
+		if (!it->second) return std::nullopt;
+		trefs els;
+		for (size_t v = 0; v < it->second; ++v)
+			els.push_back(pack_value_constant<node>(tid, v));
+		return els;
+	}
+	auto remember = [&](std::optional<trefs> els) {
+		known.emplace(std::pair{ name, max }, els ? els->size() : 0);
+		return els;
+	};
+	auto decided_false = [](tref f) {
+		auto sat = is_non_temp_nso_satisfiable<node>(f);
+		return sat.has_value() && !sat.value();
+	};
+	trefs els;
+	for (size_t n = 2; n <= max; n *= 2) {
+		while (els.size() < n) {
+			tref e = pack_value_constant<node>(tid, els.size());
+			if (!e) return remember(std::nullopt);
+			for (tref d : els)
+				if (!decided_false(tau::build_bf_eq(e, d)))
+					return remember(std::nullopt);
+			els.push_back(e);
+		}
+		if (!decided_false(tau::build_bf_neq(els[0],
+			build_bf_f_type<node>(tid)))) return remember(std::nullopt);
+		tref x = build_out_var_at_t<node>(build_var_name<node>("o__code"),
+			tid);
+		tref other = tau::_T();
+		for (tref e : els)
+			other = tau::build_wff_and(other, tau::build_bf_neq(x, e));
+		if (decided_false(other)) return remember(els);
+	}
+	return remember(std::nullopt);
+}
+
 // The code window of `atoms`, when every stream has a two-element type or
-// is read only through equalities; at most `max_vars` variables.
+// is read only through equalities and complements, or has few elements;
+// at most `max_vars` variables.
 template <NodeType node>
 static std::optional<code_window> make_code_window(
 	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars)
@@ -406,44 +532,50 @@ static std::optional<code_window> make_code_window(
 			w.streams.push_back(s);
 			type_of[it->second] = find_ba_type<node>(v);
 		}
-	// A stream of another type is read only through equalities.
+	// A stream of another type is read only through equalities, or has few
+	// elements; the types some complement relates take orbit codes.
+	std::set<size_t> orbit_types, value_types;
 	for (auto& [atom, _] : atoms)
 		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
 			auto vars = tau::get(c).select_top(is_child<node, tau::io_var>);
 			if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
 				return w.streams[w.index.at(get_var_name<node>(v))].two; }))
 					continue;
-			bool equal;
-			if (!code_equality<node>(c, equal)) return std::nullopt;
+			bool equal, flip;
+			if (!code_equality<node>(c, equal, flip)) {
+				for (tref v : vars)
+					if (!w.streams[w.index.at(get_var_name<node>(v))].two)
+						value_types.insert(find_ba_type<node>(v));
+			} else if (flip) orbit_types.insert(find_ba_type<node>(vars[0]));
 		}
-	// Each such type needs as many values as a window holds, plus 0 and 1.
+	for (size_t tid : value_types) {
+		auto els = finite_elements<node>(tid, 16);
+		if (!els) return std::nullopt;
+		for (size_t s = 0; s < w.streams.size(); ++s)
+			if (type_of[s] == tid)
+				for (tref e : *els)
+					w.streams[s].values.push_back(tau::geth(e));
+	}
+	// Each other type needs as many values as a window holds, plus 0 and 1.
 	std::map<size_t, size_t> slots;
 	for (size_t s = 0; s < w.streams.size(); ++s)
-		if (!w.streams[s].two) slots[type_of[s]] += w.depth + 1;
+		if (!w.streams[s].finite()) slots[type_of[s]] += w.depth + 1;
 	std::map<size_t, size_t> width;
 	for (auto& [tid, n] : slots) {
+		const bool orbits = orbit_types.contains(tid);
+		// codes 0 .. n+1, or pairs 0 .. n and the bit telling the value
 		size_t bits = 1;
-		while ((size_t{1} << bits) < n + 2) ++bits;
-		width[tid] = bits;
-		tref all = tau::_T();
-		trefs fresh;
-		for (size_t j = 0; j < n; ++j) {
-			tref x = build_out_var_at_t<node>(build_var_name<node>(
-				"o__code" + std::to_string(j)), tid);
-			all = tau::build_wff_and(all, tau::build_wff_and(
-				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
-				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
-			for (tref y : fresh)
-				all = tau::build_wff_and(all, tau::build_bf_neq(x, y));
-			fresh.push_back(x);
-		}
-		auto sat = is_non_temp_nso_satisfiable<node>(all);
-		if (!sat.has_value() || !sat.value()) return std::nullopt;
+		while ((size_t{1} << bits) < n + (orbits ? 1 : 2)) ++bits;
+		width[tid] = bits + (orbits ? 1 : 0);
+		if (!codes_realized<node>(tid, n, orbits)) return std::nullopt;
 	}
 	for (size_t s = 0; s < w.streams.size(); ++s) {
-		w.streams[s].width = w.streams[s].two ? 1 : width[type_of[s]];
-		w.streams[s].offset = w.per_step;
-		w.per_step += w.streams[s].width;
+		auto& x = w.streams[s];
+		x.orbit = !x.finite() && orbit_types.contains(type_of[s]);
+		if (x.values.empty()) x.width = x.two ? 1 : width[type_of[s]];
+		else for (x.width = 0; (size_t{1} << x.width) < x.values.size();)
+			++x.width;
+		w.max_width = std::max(w.max_width, x.width);
 	}
 	if (w.vars() > max_vars) return std::nullopt;
 	return w;
@@ -488,47 +620,66 @@ struct code_regions {
 		return qs;
 	}
 
-	// The code of io_var `v` equals `c`, or the code of io_var `u`.
-	region code_eq(tref v, int c, tref u) {
+	// The value of io_var `v` equals the constant `c`, or the value of io_var
+	// `u`, or its complement with `flip`.
+	region code_eq(tref v, int c, tref u, bool flip = false) {
 		const size_t s = w.index.at(get_var_name<node>(v));
 		const size_t k = (size_t)get_io_var_shift<node>(v);
+		const auto& x = w.streams[s];
+		// the last bit of an orbit code tells the value of its pair
+		const size_t last = x.orbit ? x.width - 1 : x.width;
 		region r = data_bdd::T;
-		for (size_t b = 0; b < w.streams[s].width; ++b) {
+		for (size_t b = 0; b < x.width; ++b) {
 			region bit;
 			if (u) {
 				const size_t s2 = w.index.at(get_var_name<node>(u));
 				const size_t k2 = (size_t)get_io_var_shift<node>(u);
-				region x = bdd.var(w.var(s, k, b));
-				region y = bdd.var(w.var(s2, k2, b));
-				bit = bdd.disj(bdd.conj(x, y),
-					bdd.conj(bdd.neg(x), bdd.neg(y)));
-			} else bit = bdd.var(w.var(s, k, b), (c >> b) & 1);
+				region p = bdd.var(w.var(s, k, b));
+				region q = bdd.var(w.var(s2, k2, b), !(flip && b == last));
+				bit = bdd.disj(bdd.conj(p, q),
+					bdd.conj(bdd.neg(p), bdd.neg(q)));
+			} else if (x.orbit)
+				bit = bdd.var(w.var(s, k, b), b == last && c == 1);
+			else bit = bdd.var(w.var(s, k, b), (c >> b) & 1);
 			r = bdd.conj(r, bit);
 		}
 		return r;
 	}
 
-	// A subformula over two-element streams, tabulated by substituting 0
-	// and 1 and normalizing.
-	std::optional<region> two_element(tref cmp) {
-		std::vector<std::pair<tref, uint32_t>> vars;
-		for (tref v : tau::get(cmp).select_top(is_child<node, tau::io_var>))
-			if (std::none_of(vars.begin(), vars.end(),
-				[&](auto& p) { return tau::subtree_equals(p.first, v); }))
-					vars.emplace_back(v, w.var(
-						w.index.at(get_var_name<node>(v)),
-						(size_t)get_io_var_shift<node>(v), 0));
+	// A comparison over streams whose codes are their values, tabulated by
+	// substituting each combination of values and normalizing; nullopt
+	// beyond 4096 combinations.
+	std::optional<region> tabulate(tref cmp) {
+		struct slot { tref var; size_t s, k; trefs values; };
+		std::vector<slot> vars;
+		size_t combinations = 1;
+		for (tref v : tau::get(cmp).select_top(is_child<node, tau::io_var>)) {
+			if (std::any_of(vars.begin(), vars.end(),
+				[&](auto& x) { return tau::subtree_equals(x.var, v); }))
+					continue;
+			const size_t s = w.index.at(get_var_name<node>(v));
+			const size_t tid = find_ba_type<node>(v);
+			slot x{ v, s, (size_t)get_io_var_shift<node>(v), {} };
+			if (w.streams[s].two) x.values = { build_bf_f_type<node>(tid),
+				build_bf_t_type<node>(tid) };
+			else for (const auto& e : w.streams[s].values)
+				x.values.push_back(e->get());
+			combinations *= x.values.size();
+			if (combinations > 4096) return std::nullopt;
+			vars.push_back(std::move(x));
+		}
 		region r = data_bdd::F;
-		for (size_t val = 0; val < (size_t{1} << vars.size()); ++val) {
+		for (size_t val = 0; val < combinations; ++val) {
 			subtree_map<node, tref> m;
 			region cube = data_bdd::T;
-			for (size_t j = 0; j < vars.size(); ++j) {
-				const bool one = val >> j & 1;
-				const size_t tid = find_ba_type<node>(vars[j].first);
-				m.emplace(vars[j].first, tau::trim(one
-					? build_bf_t_type<node>(tid)
-					: build_bf_f_type<node>(tid)));
-				cube = bdd.conj(cube, bdd.var(vars[j].second, one));
+			size_t rest = val;
+			for (const auto& x : vars) {
+				const size_t c = rest % x.values.size();
+				rest /= x.values.size();
+				m.emplace(x.var, tau::trim(x.values[c]));
+				for (size_t b = 0; b < w.streams[x.s].width; ++b)
+					cube = bdd.conj(cube, bdd.var(w.var(x.s, x.k, b),
+						c >> b & 1));
 			}
 			auto n = normalize_non_temp<node>(rewriter::replace<node>(cmp, m));
 			if (!n.has_value() || !n.value()) return std::nullopt;
@@ -577,14 +728,14 @@ struct code_regions {
 		}
 		auto vars = t.select_top(is_child<node, tau::io_var>);
 		if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
-			return w.streams[w.index.at(get_var_name<node>(v))].two; }))
-				return two_element(f);
-		bool equal;
-		auto sides = code_equality<node>(f, equal);
+			return w.streams[w.index.at(get_var_name<node>(v))].finite(); }))
+				return tabulate(f);
+		bool equal, flip;
+		auto sides = code_equality<node>(f, equal, flip);
 		if (!sides) return std::nullopt;
 		auto& [l, rr] = *sides;
 		region r;
-		if (l.var && rr.var) r = code_eq(l.var, -1, rr.var);
+		if (l.var && rr.var) r = code_eq(l.var, -1, rr.var, flip);
 		else if (l.var) r = code_eq(l.var, rr.constant, nullptr);
 		else if (rr.var) r = code_eq(rr.var, l.constant, nullptr);
 		else r = l.constant == rr.constant ? data_bdd::T : data_bdd::F;
@@ -616,7 +767,7 @@ struct code_regions {
 			region tgt = mine ? Y[e.dst] : bdd.disj(Y[e.dst], bdd.neg(G[e.dst]));
 			if (e.shift) {
 				bool ok = true;
-				tgt = bdd.lower(tgt, (uint32_t)w.per_step, ok);
+				tgt = bdd.lower(tgt, w.step(), w.block(), ok);
 				if (!ok) { failed = true; return data_bdd::F; }
 			}
 			const region l = labels[edge_base[i] + j];
@@ -629,6 +780,17 @@ struct code_regions {
 		return check(body);
 	}
 
+	region move(int i, size_t j, const std::vector<region>& Y) {
+		const auto& e = a.v[i].edges[j];
+		region tgt = Y[e.dst];
+		if (e.shift) {
+			bool ok = true;
+			tgt = bdd.lower(tgt, w.step(), w.block(), ok);
+			if (!ok) { failed = true; return data_bdd::F; }
+		}
+		return check(bdd.conj(labels[edge_base[i] + j], tgt));
+	}
+
 	std::optional<bool> reached(region r) {
 		for (size_t k = 1; k <= w.depth; ++k) {
 			r = bdd.quantify(r, step_vars(k, false), true);
@@ -639,21 +801,37 @@ struct code_regions {
 	}
 };
 
-// Zielonka's algorithm over the regions of `R`.
+// Zielonka's algorithm over the regions of `R`. With `record` set, it also
+// keeps a winning strategy of the system: for each system vertex and edge,
+// the positions (history, inputs and the outputs chosen) from which the
+// system takes that edge. The strategy is positional and composed as in
+// the proof of Zielonka's algorithm: in an attractor of the system, the
+// moves into the part attracted earlier (a rank that decreases); in the
+// vertices of the top priority when it is odd and the system wins the whole
+// subgame, any move staying in the subgame; elsewhere the strategies of the
+// subgames solved recursively. The domains of these pieces are disjoint, so
+// their union is one strategy.
 template <typename R>
 struct data_game_solver {
 	using region = typename R::region;
+	using moves_t = std::vector<std::vector<region>>;
 	R& r;
 	size_t n;
 	size_t max_rounds;
+	bool record;
 	std::vector<std::vector<int>> preds;
-	std::vector<int> priority;
+	std::vector<int> priority, owner;
+	std::vector<size_t> edges;
 
-	data_game_solver(R& regions, const auto& arena, size_t rounds)
-		: r(regions), n(arena.v.size()), max_rounds(rounds), preds(n)
+	data_game_solver(R& regions, const auto& arena, size_t rounds,
+		bool keep_strategy = false)
+		: r(regions), n(arena.v.size()), max_rounds(rounds),
+		record(keep_strategy), preds(n)
 	{
 		for (size_t i = 0; i < n; ++i) {
 			priority.push_back(arena.v[i].priority);
+			owner.push_back(arena.v[i].owner);
+			edges.push_back(arena.v[i].edges.size());
 			for (const auto& e : arena.v[i].edges)
 				if (std::find(preds[e.dst].begin(), preds[e.dst].end(),
 					(int)i) == preds[e.dst].end())
@@ -661,13 +839,33 @@ struct data_game_solver {
 		}
 	}
 
+	struct won {
+		std::vector<region> env, sys;
+		moves_t moves;   // of the system, over its region
+	};
+
+	moves_t no_moves() const {
+		moves_t m(n);
+		if (record) for (size_t i = 0; i < n; ++i)
+			if (owner[i] == 1) m[i].assign(edges[i], r.bottom());
+		return m;
+	}
+	void add_moves(moves_t& to, const moves_t& from) {
+		for (size_t i = 0; i < from.size(); ++i)
+			for (size_t j = 0; j < from[i].size(); ++j)
+				to[i][j] = r.disj(to[i][j], from[i][j]);
+	}
+
 	bool empty(const std::vector<region>& X) {
 		for (const auto& x : X) if (!r.empty(x)) return false;
 		return true;
 	}
 
+	// The attractor of `Y` for player `p` in the subgame `G`; with `moves`,
+	// the system's moves of each position it adds into the part added
+	// before it.
 	std::vector<region> attractor(int p, std::vector<region> Y,
-		const std::vector<region>& G)
+		const std::vector<region>& G, moves_t* moves = nullptr)
 	{
 		std::vector<bool> dirty(n, true);
 		for (size_t round = 0; !r.failed; ++round) {
@@ -682,7 +880,12 @@ struct data_game_solver {
 				if (r.empty(G[i])) continue;
 				region grown = r.disj(Y[i],
 					r.conj(G[i], r.pre(p, (int)i, Y, G)));
-				if (r.empty(r.minus(grown, Y[i]))) continue;
+				region added = r.minus(grown, Y[i]);
+				if (r.empty(added)) continue;
+				if (moves && owner[i] == 1)
+					for (size_t j = 0; j < edges[i]; ++j)
+						(*moves)[i][j] = r.disj((*moves)[i][j],
+							r.conj(added, r.move((int)i, j, Y)));
 				Y[i] = std::move(grown);
 				changed = true;
 				for (int j : preds[i]) dirty[j] = true;
@@ -700,49 +903,613 @@ struct data_game_solver {
 		return out;
 	}
 
-	// The regions of the subgame `G` won by the environment (first) and
-	// by the system (second).
-	std::pair<std::vector<region>, std::vector<region>> solve(
-		const std::vector<region>& G)
-	{
+	// The regions of the subgame `G` won by the environment and by the
+	// system, with the system's strategy when recording.
+	won solve(const std::vector<region>& G) {
 		const std::vector<region> none(n, r.bottom());
 		int top = -1;
 		for (size_t i = 0; i < n; ++i)
 			if (!r.empty(G[i])) top = std::max(top, priority[i]);
-		if (top < 0 || r.failed) return { none, none };
+		if (top < 0 || r.failed) return { none, none, no_moves() };
 		const int p = top & 1;
 		std::vector<region> U(n, r.bottom());
 		for (size_t i = 0; i < n; ++i)
 			if (priority[i] == top) U[i] = G[i];
-		auto sub = solve(minus(G, attractor(p, U, G)));
-		if (r.failed) return { none, none };
-		auto& lost = p ? sub.first : sub.second;
-		if (empty(lost))
-			return p ? std::pair{ none, G } : std::pair{ G, none };
-		auto B = attractor(1 - p, lost, G);
+		moves_t attracted = no_moves();
+		auto A = attractor(p, U, G, record && p ? &attracted : nullptr);
+		auto sub = solve(minus(G, A));
+		if (r.failed) return { none, none, no_moves() };
+		auto& lost = p ? sub.env : sub.sys;
+		if (empty(lost)) {
+			if (!p) return { G, none, no_moves() };
+			won all{ none, G, std::move(sub.moves) };
+			if (record) {
+				add_moves(all.moves, attracted);
+				for (size_t i = 0; i < n; ++i)
+					if (owner[i] == 1 && !r.empty(U[i]))
+						for (size_t j = 0; j < edges[i]; ++j)
+							all.moves[i][j] = r.disj(all.moves[i][j],
+								r.conj(U[i], r.move((int)i, j, G)));
+			}
+			return all;
+		}
+		moves_t kept = no_moves();
+		auto B = attractor(1 - p, lost, G,
+			record && !p ? &kept : nullptr);
 		auto rest = solve(minus(G, B));
-		if (r.failed) return { none, none };
-		auto& theirs = p ? rest.first : rest.second;
+		if (r.failed) return { none, none, no_moves() };
+		auto& theirs = p ? rest.env : rest.sys;
 		for (size_t i = 0; i < n; ++i) theirs[i] = r.disj(theirs[i], B[i]);
+		if (record && !p) {
+			add_moves(rest.moves, sub.moves);
+			add_moves(rest.moves, kept);
+		}
 		return rest;
 	}
 
-	// nullopt when undecided
-	std::optional<bool> system_wins(int init) {
+	// The solution of the whole game; nullopt when undecided.
+	std::optional<won> solve_all() {
 		const std::vector<region> all(n, r.top());
-		auto won = solve(all);
+		auto w = solve(all);
 		if (r.failed) return std::nullopt;
-		return r.reached(won.second[init]);
+		return w;
 	}
 };
 
+// ── A strategy of the data game ──────────────────────────────────────────────
+//
+// data_game_solver's moves, played one step at a time. The memory is the
+// game vertex, an environment vertex when a step starts, and the last
+// `depth` values of every stream, which the caller keeps. A step follows the
+// edge the inputs take to a system vertex, asks a solver for outputs in one
+// of that vertex's moves, and follows the edge those outputs take. The
+// values of the steps before step 0 are the strategy's own: every input is 0
+// and the outputs are chosen so that the initial vertex is won, which the
+// system can do whatever the inputs of those steps are.
+template <NodeType node>
+struct data_game_strategy {
+	using tau = tree<node>;
+	using values = subtree_map<node, tref>;
+	// Solves a formula over the outputs of absolute step `t`; nullopt when
+	// it has no solution.
+	using solver_fn = std::function<std::optional<values>(tref, int_t)>;
+	// The value of a stream (name, type, input) at an absolute step >= 0,
+	// or nullptr when there is none.
+	using value_fn = std::function<tref(const std::string&, size_t, bool,
+		int_t)>;
+
+	struct stream { std::string name; size_t tid = 0; bool input = false; };
+	struct vertex { int picks = -1; std::vector<int> dst; };
+
+	std::vector<stream> streams;
+	std::map<std::string, size_t> index;
+	size_t depth = 0;
+	// picks 0: the environment chooses the inputs, 1: the system the
+	// outputs, -1: nobody (a coloured vertex or a sink)
+	std::vector<vertex> v;
+	int init = 0;
+
+	virtual ~data_game_strategy() = default;
+
+	void reset() { at = init; ready = false; }
+
+	// The outputs of absolute step `t`, keyed like the solver keys them.
+	result<values> step(const value_fn& get, int_t t, const solver_fn& solve) {
+		result<values> r;
+		if (!ready) {
+			TAU_TRY(bool chosen, choose_before(solve));
+			if (!chosen) return r.with_error(code::internal_error,
+				"the data game strategy found no values before step 0");
+			ready = true;
+		}
+		window w(streams.size(), std::vector<tref>(depth + 1, nullptr));
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 0; k <= depth; ++k) {
+				const int_t time = t - (int_t)k;
+				if (k == 0 && !streams[s].input) continue;
+				tref x = time < 0 ? before[s][(size_t)(-time - 1)]->get()
+					: get(streams[s].name, streams[s].tid,
+						streams[s].input, time);
+				if (!x) return r.with_error(code::internal_error,
+					"the data game strategy reads the unknown value of "
+					+ streams[s].name + " at step "
+					+ std::to_string(time));
+				w[s][k] = x;
+			}
+		if (v[at].picks == 0) {
+			int next = -1;
+			for (size_t j = 0; j < v[at].dst.size() && next < 0; ++j) {
+				auto holds = holds_label(at, j, w);
+				if (!holds) return r.with_error(code::solver_error,
+					"the data game strategy cannot read an edge label");
+				if (*holds) next = follow(v[at].dst[j]);
+			}
+			if (next < 0) return r.with_error(code::internal_error,
+				"the data game strategy has no edge for the inputs");
+			at = next;
+		}
+		values out;
+		// a sink: the play is decided and no output matters
+		if (v[at].picks != 1) return r.with_value(std::move(out));
+		TAU_TRY(tref c, constraint(at, w, t));
+		auto sol = solve(c, t);
+		if (!sol) return r.with_error(code::internal_error,
+			"the data game strategy has no outputs in its move");
+		for (size_t s = 0; s < streams.size(); ++s) {
+			if (streams[s].input) continue;
+			tref key = build_out_var_at_n<node>(streams[s].name, t,
+				streams[s].tid);
+			auto it = sol->find(key);
+			tref x = it != sol->end() ? it->second
+				: build_bf_f_type<node>(streams[s].tid);
+			out.emplace(key, x);
+			w[s][0] = x;
+		}
+		for (const auto& [key, x] : *sol) out.emplace(key, x);
+		for (size_t j = 0; j < v[at].dst.size(); ++j) {
+			auto holds = holds_move(at, j, w);
+			if (!holds) return r.with_error(code::solver_error,
+				"the data game strategy cannot read a move");
+			if (*holds) {
+				at = follow(v[at].dst[j]);
+				return r.with_value(std::move(out));
+			}
+		}
+		return r.with_error(code::internal_error,
+			"the outputs take no move of the data game strategy");
+	}
+
+protected:
+	// w[s][k]: the value of stream s at step t-k, nullptr for an output of
+	// step t before it is chosen
+	using window = std::vector<std::vector<tref>>;
+	int at = 0;
+	bool ready = false;
+	// before[s][k-1]: the value of stream s at step -k
+	std::vector<std::vector<htref>> before;
+
+	// whether the label of edge `j` of environment vertex `i` holds
+	virtual std::optional<bool> holds_label(int i, size_t j,
+		const window& w) = 0;
+	// whether move `j` of system vertex `i` holds
+	virtual std::optional<bool> holds_move(int i, size_t j,
+		const window& w) = 0;
+	// a formula over the outputs of step `t` whose solutions are the
+	// moves of system vertex `i`
+	virtual result<tref> constraint(int i, const window& w, int_t t) = 0;
+	// fills `before`
+	virtual result<bool> choose_before(const solver_fn& solve) = 0;
+
+	int follow(int x) const {
+		while (v[x].picks < 0 && v[x].dst.size() == 1 && v[x].dst[0] != x)
+			x = v[x].dst[0];
+		return x;
+	}
+
+	// Fresh names for the outputs before step 0 while they are solved.
+	static tref before_var(size_t s, size_t k, size_t tid) {
+		return build_out_var_at_n<node>("o__dg_before" + std::to_string(s)
+			+ "_" + std::to_string(k), 0, tid);
+	}
+	// The value `sol` gives `var`, 0 when it gives none.
+	static tref value_of(const values& sol, tref var, size_t tid) {
+		auto it = sol.find(var);
+		return it != sol.end() ? it->second : build_bf_f_type<node>(tid);
+	}
+};
+
+// The strategy of a game played on code_regions.
+template <NodeType node>
+struct code_strategy : data_game_strategy<node> {
+	using base = data_game_strategy<node>;
+	using tau = tree<node>;
+	using typename base::window;
+	using typename base::values;
+	using typename base::solver_fn;
+	using base::streams;
+
+	code_window w;
+	data_bdd bdd;
+	std::vector<std::vector<data_bdd::id>> labels, moves;
+	data_bdd::id won_init = data_bdd::F;
+
+	code_strategy(code_window win, data_bdd b)
+		: w(std::move(win)), bdd(std::move(b)) {}
+
+protected:
+	using base::before;
+
+	// Whether two values are equal; nullopt when undecided.
+	std::optional<bool> same(tref x, tref y) {
+		if (tau::subtree_equals(x, y)) return true;
+		auto n = normalize_non_temp<node>(tau::build_bf_eq(x, y));
+		if (!n.has_value() || !n.value()) return std::nullopt;
+		const auto& t = tau::get(n.value());
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		return std::nullopt;
+	}
+
+	static tref complement(tref x) {
+		return normalize_ba<node>(tau::build_bf_neg(x));
+	}
+
+	// The bits of the known values of `win`, -1 for an unknown one. A
+	// value of a coded stream gets code 0 when it is 0, 1 when it is 1,
+	// and otherwise the code of the first equal value met or a new one; a
+	// value of an orbit-coded stream gets the pair of the first value met
+	// it equals or complements, or a new one.
+	std::optional<std::vector<int>> encode(const window& win) {
+		std::vector<int> bits(w.vars(), -1);
+		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
+		for (size_t k = 0; k < win[0].size(); ++k)
+			for (size_t s = 0; s < streams.size(); ++s) {
+				tref x = win[s][k];
+				if (!x) continue;
+				const size_t tid = streams[s].tid;
+				const auto& ws = w.streams[s];
+				size_t c;
+				if (!ws.values.empty()) {
+					c = ws.values.size();
+					for (size_t j = 0; j < ws.values.size(); ++j) {
+						auto eq = same(x, ws.values[j]->get());
+						if (!eq) return std::nullopt;
+						if (*eq) { c = j; break; }
+					}
+					if (c == ws.values.size()) return std::nullopt;
+					for (size_t b = 0; b < ws.width; ++b)
+						bits[w.var(s, k, b)] = (int)(c >> b & 1);
+					continue;
+				}
+				auto one = same(x, build_bf_t_type<node>(tid));
+				if (!one) return std::nullopt;
+				if (ws.two) c = *one ? 1 : 0;
+				else if (*one) c = ws.orbit ? size_t{1} << (ws.width - 1) : 1;
+				else {
+					auto zero = same(x, build_bf_f_type<node>(tid));
+					if (!zero) return std::nullopt;
+					if (*zero) c = 0;
+					else {
+						auto& reps = seen[tid];
+						const size_t fresh = ws.orbit ? reps.size() + 1
+							: reps.size() + 2;
+						c = fresh;
+						for (auto& [y, cy] : reps) {
+							auto eq = same(x, y);
+							if (!eq) return std::nullopt;
+							if (*eq) { c = cy; break; }
+							if (!ws.orbit) continue;
+							auto neq = same(x, complement(y));
+							if (!neq) return std::nullopt;
+							if (*neq) {
+								c = cy | size_t{1} << (ws.width - 1);
+								break;
+							}
+						}
+						if (c == fresh) reps.emplace_back(x, c);
+					}
+				}
+				for (size_t b = 0; b < ws.width; ++b)
+					bits[w.var(s, k, b)] = (int)(c >> b & 1);
+			}
+		return bits;
+	}
+
+	// nullopt when the BDD reads an unknown bit
+	std::optional<bool> eval(data_bdd::id n, const std::vector<int>& bits) {
+		while (n > data_bdd::T) {
+			const auto& x = bdd.nodes[n];
+			if (bits[x.var] < 0) return std::nullopt;
+			n = bits[x.var] ? x.hi : x.lo;
+		}
+		return n == data_bdd::T;
+	}
+
+	// Completes the unknown bits of `bits` along a path of `n` to true.
+	bool pick(data_bdd::id n, std::vector<int>& bits) {
+		std::set<data_bdd::id> dead;
+		std::function<bool(data_bdd::id)> go = [&](data_bdd::id m) {
+			if (m <= data_bdd::T) return m == data_bdd::T;
+			if (dead.contains(m)) return false;
+			const auto x = bdd.nodes[m];
+			if (bits[x.var] >= 0) return go(bits[x.var] ? x.hi : x.lo);
+			for (int b : { 0, 1 }) {
+				bits[x.var] = b;
+				if (go(b ? x.hi : x.lo)) return true;
+			}
+			bits[x.var] = -1;
+			dead.insert(m);
+			return false;
+		};
+		if (!go(n)) return false;
+		for (auto& b : bits) if (b < 0) b = 0;
+		return true;
+	}
+
+	size_t code_of(const std::vector<int>& bits, size_t s, size_t k) const {
+		size_t c = 0;
+		for (size_t b = 0; b < w.streams[s].width; ++b)
+			if (bits[w.var(s, k, b)] > 0) c |= size_t{1} << b;
+		return c;
+	}
+
+	// The formula giving each of `slots` (stream, step back, variable) the
+	// value its code in `bits` stands for, next to the known values of
+	// `win`.
+	tref decode(const std::vector<int>& bits, const window& win,
+		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
+	{
+		tref f = tau::_T();
+		for (size_t i = 0; i < slots.size(); ++i) {
+			auto [s, k, x] = slots[i];
+			const size_t tid = streams[s].tid;
+			const auto& ws = w.streams[s];
+			const size_t c = code_of(bits, s, k);
+			// an orbit code: the pair and the value in it
+			const size_t side = ws.orbit ? c >> (ws.width - 1) : 0;
+			const size_t pair = ws.orbit
+				? c & ((size_t{1} << (ws.width - 1)) - 1) : c;
+			auto as = [&](tref y, size_t other) {
+				return ws.orbit && side != other ? complement(y) : y;
+			};
+			if (!ws.values.empty()) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x,
+					ws.values[c]->get()));
+				continue;
+			}
+			if (ws.two || (ws.orbit ? pair == 0 : c < 2)) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x,
+					(ws.orbit ? side : c) ? build_bf_t_type<node>(tid)
+						: build_bf_f_type<node>(tid)));
+				continue;
+			}
+			auto same_pair = [&](size_t c2) {
+				return ws.orbit ? (c2 & ((size_t{1} << (ws.width - 1)) - 1))
+					== pair : c2 == c;
+			};
+			auto side_of = [&](size_t c2) {
+				return ws.orbit ? c2 >> (ws.width - 1) : 0;
+			};
+			tref known = nullptr;
+			for (size_t s2 = 0; s2 < streams.size() && !known; ++s2)
+				if (streams[s2].tid == tid && !w.streams[s2].two)
+					for (size_t k2 = 0; k2 < win[s2].size(); ++k2)
+						if (win[s2][k2] && same_pair(code_of(bits, s2, k2))) {
+							known = as(win[s2][k2],
+								side_of(code_of(bits, s2, k2)));
+							break;
+						}
+			if (known) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x, known));
+				continue;
+			}
+			// a value none of the window holds, nor its complement
+			f = tau::build_wff_and(f, tau::build_wff_and(
+				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
+				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
+			for (size_t s2 = 0; s2 < streams.size(); ++s2)
+				if (streams[s2].tid == tid)
+					for (tref y : win[s2]) if (y) {
+						f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
+						if (ws.orbit) f = tau::build_wff_and(f,
+							tau::build_bf_neq(x, complement(y)));
+					}
+			for (size_t i2 = 0; i2 < i; ++i2) {
+				auto [s2, k2, y] = slots[i2];
+				if (streams[s2].tid != tid || w.streams[s2].two) continue;
+				const size_t c2 = code_of(bits, s2, k2);
+				if (same_pair(c2))
+					f = tau::build_wff_and(f, tau::build_bf_eq(x,
+						side_of(c2) == side ? y : tau::build_bf_neg(y)));
+				else {
+					f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
+					if (ws.orbit) f = tau::build_wff_and(f,
+						tau::build_bf_neq(x, tau::build_bf_neg(y)));
+				}
+			}
+		}
+		return f;
+	}
+
+	std::optional<bool> holds_label(int i, size_t j, const window& win)
+		override
+	{
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(labels[i][j], *bits);
+	}
+
+	std::optional<bool> holds_move(int i, size_t j, const window& win)
+		override
+	{
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(moves[i][j], *bits);
+	}
+
+	result<tref> constraint(int i, const window& win, int_t t) override {
+		result<tref> r;
+		auto bits = encode(win);
+		if (!bits) return r.with_error(code::solver_error,
+			"the data game strategy cannot compare the values");
+		data_bdd::id any = data_bdd::F;
+		for (auto m : moves[i]) any = bdd.disj(any, m);
+		if (bdd.full || !pick(any, *bits))
+			return r.with_error(code::internal_error,
+				"the data game strategy has no move from the history");
+		std::vector<std::tuple<size_t, size_t, tref>> slots;
+		for (size_t s = 0; s < streams.size(); ++s)
+			if (!streams[s].input)
+				slots.emplace_back(s, 0, build_out_var_at_n<node>(
+					streams[s].name, t, streams[s].tid));
+		return r.with_value(decode(*bits, win, slots));
+	}
+
+	result<bool> choose_before(const solver_fn& solve) override {
+		result<bool> r;
+		const size_t n = streams.size(), d = w.depth;
+		std::vector<int> bits(w.vars(), -1);
+		window win(n, std::vector<tref>(d + 1, nullptr));
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				if (streams[s].input) {
+					for (size_t b = 0; b < w.streams[s].width; ++b)
+						bits[w.var(s, k, b)] = 0;
+					win[s][k] = build_bf_f_type<node>(streams[s].tid);
+				}
+		if (!pick(won_init, bits)) return r.with_value(false);
+		std::vector<std::tuple<size_t, size_t, tref>> slots;
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				if (!streams[s].input)
+					slots.emplace_back(s, k,
+						this->before_var(s, k, streams[s].tid));
+		values sol;
+		if (!slots.empty()) {
+			auto got = solve(decode(bits, win, slots), 0);
+			if (!got) return r.with_value(false);
+			sol = std::move(*got);
+		}
+		before.assign(n, {});
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				before[s].push_back(tau::geth(streams[s].input
+					? win[s][k] : this->value_of(sol, this->before_var(
+						s, k, streams[s].tid), streams[s].tid)));
+		return r.with_value(true);
+	}
+};
+
+// The strategy of a game played on formula_regions.
+template <NodeType node>
+struct formula_strategy : data_game_strategy<node> {
+	using base = data_game_strategy<node>;
+	using tau = tree<node>;
+	using typename base::window;
+	using typename base::values;
+	using typename base::solver_fn;
+	using base::streams;
+	using base::index;
+
+	std::vector<std::vector<htref>> labels, moves;
+	htref won_init;
+
+protected:
+	using base::before;
+
+	// `f` with each io_var replaced by its value in `win`; an output of
+	// step t with no value becomes the output variable of absolute step
+	// `t`.
+	tref at_step(tref f, const window& win, int_t t) {
+		subtree_map<node, tref> m;
+		for (tref x : tau::get(f).select_top(is_child<node, tau::io_var>)) {
+			const size_t s = index.at(get_var_name<node>(x));
+			const size_t k = (size_t)get_io_var_shift<node>(x);
+			tref val = win[s][k];
+			m.emplace(x, tau::trim(val ? val : build_out_var_at_n<node>(
+				streams[s].name, t, streams[s].tid)));
+		}
+		return rewriter::replace<node>(f, m);
+	}
+
+	std::optional<bool> truth(tref f, const window& win) {
+		auto n = normalize_non_temp<node>(at_step(f, win, 0));
+		if (!n.has_value() || !n.value()) return std::nullopt;
+		const auto& t = tau::get(n.value());
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		return std::nullopt;
+	}
+
+	std::optional<bool> holds_label(int i, size_t j, const window& win)
+		override
+	{
+		return truth(labels[i][j]->get(), win);
+	}
+
+	std::optional<bool> holds_move(int i, size_t j, const window& win)
+		override
+	{
+		return truth(moves[i][j]->get(), win);
+	}
+
+	result<tref> constraint(int i, const window& win, int_t t) override {
+		result<tref> r;
+		tref any = tau::_F();
+		for (const auto& m : moves[i])
+			any = tau::build_wff_or(any, m->get());
+		auto n = normalize_non_temp<node>(at_step(any, win, t));
+		if (!n.has_value() || !n.value()) return r.with_error(
+			code::solver_error, "the data game strategy cannot read "
+			"its move");
+		return r.with_value(n.value());
+	}
+
+	result<bool> choose_before(const solver_fn& solve) override {
+		result<bool> r;
+		const size_t n = streams.size();
+		subtree_map<node, tref> m;
+		for (tref x : tau::get(won_init->get()).select_top(
+			is_child<node, tau::io_var>))
+		{
+			const size_t s = index.at(get_var_name<node>(x));
+			const size_t k = (size_t)get_io_var_shift<node>(x);
+			const size_t tid = streams[s].tid;
+			m.emplace(x, tau::trim(streams[s].input
+				? build_bf_f_type<node>(tid)
+				: this->before_var(s, k, tid)));
+		}
+		auto sol = solve(rewriter::replace<node>(won_init->get(), m), 0);
+		if (!sol) return r.with_value(false);
+		before.assign(n, {});
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= this->depth; ++k) {
+				const size_t tid = streams[s].tid;
+				before[s].push_back(tau::geth(streams[s].input
+					? build_bf_f_type<node>(tid)
+					: this->value_of(*sol, this->before_var(s, k, tid),
+						tid)));
+			}
+		return r.with_value(true);
+	}
+};
+
+// The streams, depth and vertices of a strategy of `arena` over `atoms`.
+template <NodeType node>
+static void describe_strategy(data_game_strategy<node>& st,
+	const data_arena<node>& arena,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using tau = tree<node>;
+	using chooser = typename data_arena<node>::chooser;
+	for (auto& [atom, _] : atoms)
+		for (tref x : tau::get(atom).select_top(is_child<node, tau::io_var>)) {
+			st.depth = std::max(st.depth, (size_t)get_io_var_shift<node>(x));
+			auto [it, fresh] = st.index.emplace(get_var_name<node>(x),
+				st.streams.size());
+			if (fresh) st.streams.push_back({ it->first,
+				find_ba_type<node>(x), is_input_stream<node>(x) });
+		}
+	for (const auto& x : arena.v) {
+		typename data_game_strategy<node>::vertex y;
+		y.picks = x.picks == chooser::inputs ? 0
+			: x.picks == chooser::outputs ? 1 : -1;
+		for (const auto& e : x.edges) y.dst.push_back(e.dst);
+		st.v.push_back(std::move(y));
+	}
+	st.init = arena.init;
+	st.reset();
+}
+
 // Decides the realizability of `skeleton` over `atoms` on the data; over
-// formula regions only when `formulas` is set.
+// formula regions only when `formulas` is set. With `strategy`, a won game
+// also gives the system's strategy there.
 template <NodeType node>
 static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const std::vector<std::pair<tref, std::string>>& atoms,
 	const std::vector<std::string>& input_props,
-	const std::vector<std::string>& output_props, bool formulas)
+	const std::vector<std::string>& output_props, bool formulas,
+	std::shared_ptr<data_game_strategy<node>>* strategy = nullptr)
 {
 	using tau = tree<node>;
 	result<data_game_verdict> r;
@@ -767,21 +1534,52 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 		arena = {};
 	}
 	if (!built) return r.with_value(data_game_verdict::undecided);
+	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
-	bool on_codes = false;
 	if (window) {
 		code_regions<node> codes(arena, *window, size_t{1} << 21);
-		if ((on_codes = codes.init())) {
+		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
-			data_game_solver solver(codes, arena, 0);
-			wins = solver.system_wins(arena.init);
+			data_game_solver solver(codes, arena, 0, keep);
+			auto w = solver.solve_all();
+			if (w) wins = codes.reached(w->sys[arena.init]);
+			if (keep && wins && *wins && !codes.failed) {
+				auto st = std::make_shared<code_strategy<node>>(
+					*window, std::move(codes.bdd));
+				describe_strategy<node>(*st, arena, atoms);
+				for (size_t i = 0; i < arena.v.size(); ++i) {
+					st->labels.emplace_back(
+						codes.labels.begin() + codes.edge_base[i],
+						codes.labels.begin() + codes.edge_base[i]
+							+ arena.v[i].edges.size());
+					st->moves.push_back(w->moves[i]);
+				}
+				st->won_init = w->sys[arena.init];
+				*strategy = st;
+			}
 		}
 	}
-	if (!on_codes && formulas) {
+	// codes the BDD cannot hold leave the game to the formulas
+	if (!wins && formulas) {
 		formula_regions<node> regions(arena);
 		data_game_solver solver(regions, arena,
-			ltl_max_refinement_rounds());
-		wins = solver.system_wins(arena.init);
+			ltl_max_refinement_rounds(), keep);
+		auto w = solver.solve_all();
+		if (w) wins = regions.reached(w->sys[arena.init]);
+		if (keep && wins && *wins) {
+			auto st = std::make_shared<formula_strategy<node>>();
+			describe_strategy<node>(*st, arena, atoms);
+			for (size_t i = 0; i < arena.v.size(); ++i) {
+				st->labels.emplace_back();
+				for (const auto& e : arena.v[i].edges)
+					st->labels.back().push_back(tau::geth(e.label));
+				st->moves.emplace_back();
+				for (tref m : w->moves[i])
+					st->moves.back().push_back(tau::geth(m));
+			}
+			st->won_init = tau::geth(w->sys[arena.init]);
+			*strategy = st;
+		}
 	}
 	LOG_DEBUG << "[ltl_aba] data game: " << arena.v.size() << " vertices, "
 		<< (wins ? (*wins ? "system wins" : "environment wins")

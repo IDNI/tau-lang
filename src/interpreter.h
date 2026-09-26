@@ -58,12 +58,26 @@ struct step_provider {
 
 	/// @brief True to skip the appear_within_lookback input filter in step().
 	virtual bool skip_lookback_filter() const { return false; }
+
+	/// @brief Past steps the provider reads beyond the spec's own lookback.
+	virtual int_t lookback() const { return 0; }
+
+	/// @brief Starts the provider's own memory afresh (interpreter::reset).
+	virtual void reset() {}
+
+	/// @brief False when the provider cannot follow a revised spec.
+	virtual bool revisable() const { return true; }
 };
 
 /// @brief Default step_provider: re-runs the general solver every step. Full
 /// definition in interpreter.tmpl.h; forward-declared for make_interpreter's use.
 template <NodeType node>
 struct solve_step_provider;
+
+/// @brief step_provider playing a strategy of the data game; defined in
+/// interpreter.tmpl.h.
+template <NodeType node>
+struct data_game_step_provider;
 
 /**
  * @brief Step-by-step interpreter for a normalized Tau specification.
