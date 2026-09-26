@@ -228,10 +228,11 @@ function(_tau_add_test_target N src work_dir)
 	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
 	if(EMSCRIPTEN)
 		# the generated grammar tables overflow the default 64KiB wasm stack
-		# at module load (see bindings/js/CMakeLists.txt); test binaries link
-		# the same tables and hit the identical corrupt-heap abort without this
+		# at module load. With -pthread, memory is shared and cannot grow at
+		# startup, so INITIAL_MEMORY must hold the static data and the stack.
 		target_link_options(${N} PRIVATE
 			"SHELL:-s STACK_SIZE=16777216"
+			"SHELL:-s INITIAL_MEMORY=33554432"
 			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
 	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")

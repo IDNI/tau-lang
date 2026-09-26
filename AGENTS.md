@@ -186,6 +186,7 @@ ctest --test-dir build/release-wasm -R test_repl -j 8    # the REPL cases alone
 ./dev preset release-wasm-nothreads                      # tau.js, no SharedArrayBuffer (see below)
 ./dev preset release-wasm-nothreads-all-tests run        # suite and CLI, no threads
 
+./dev preset release-wasm-repl-tests run                 # tau's own REPL suite, run under node
 
 ./dev preset release-wasm-repl-browser                   # tau_repl_web.js (needs pthreads)
 ./dev preset release-wasm-repl-tests-browser run         # the REPL suite inside the browser REPL
@@ -229,9 +230,12 @@ Four constraints, each of which has broken a build here:
   word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
 
 The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
-1493 REPL tests are not built for wasm (they would turn on `TAU_BUILD_EXECUTABLE`
-and collide with `tau.js`), so the compiled suites that natively defer to them are
-built for wasm instead.
+1493 REPL tests run for wasm only through a preset that turns `TAU_BUILD_REPL_TESTS`
+on (`release-wasm-all-tests`, `release-wasm-repl-tests`,
+`release-wasm-nothreads-all-tests`), which builds the wasm CLI in
+`build/release-wasm`; every other wasm preset skips them, so their compiled suites
+still defer to them instead. `release-wasm-repl-tests-browser` replays those same
+cases in the browser REPL page.
 
 ## Architecture
 

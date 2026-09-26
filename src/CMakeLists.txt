@@ -207,6 +207,27 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
+	if(EMSCRIPTEN)
+		# the JS binding owns tau.js, so the CLI emits tau_repl.js to
+		# share the build dir.
+		set_target_properties(${TAU_EXECUTABLE_NAME} PROPERTIES OUTPUT_NAME "tau_repl")
+		# grammar tables overflow the default 64KiB wasm stack at static init.
+		# Shared memory cannot grow at startup, so INITIAL_MEMORY must hold static
+		# data plus the stack, with growth added for the varying heap use.
+		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
+			"SHELL:-s STACK_SIZE=16777216"
+			"SHELL:-s INITIAL_MEMORY=33554432"
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+		# NODEFS backs the full-root /host mount tau_stdin_node.pre.js installs,
+		# so a wasm REPL test under the node emulator can open host files.
+		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
+			"SHELL:-lnodefs.js")
+		# with no Module["stdin"], Emscripten maps stdin to a tty device,
+		# so a piped run never sees EOF and the line editor spins
+		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
+			"SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tau_stdin_node.pre.js")
+		set_property(TARGET ${TAU_EXECUTABLE_NAME} APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tau_stdin_node.pre.js)
+	endif()
 	if(TAU_PARSER_HAS_FTXUI_DEP)
 		target_link_libraries(${TAU_EXECUTABLE_NAME}
 			ftxui::screen ftxui::dom ftxui::component)
