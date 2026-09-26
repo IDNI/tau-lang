@@ -624,12 +624,28 @@ interpreter<node>::interpreter(
 template <NodeType node>
 result<interpreter<node>>
 	interpreter<node>::make_interpreter(tref spec,
-		const io_context<node>& ctx)
+		const io_context<node>& ctx, tref as_written)
 {
 	result<interpreter<node>> r;
 	if (!spec) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	if (!as_written) as_written = spec;
+	// The greatest time point of an initial condition of the specification
+	// as written (-1 when it has none), for the closures settled from the
+	// functional shape.
+	int_t functional_max_initial = -1;
+	// The conjuncts of the normalized always-part of a specification
+	// whose form as written is of functional shape (`functional_step_shape`),
+	// each with the operands of its conjunctions and disjunctions sorted;
+	// empty otherwise. A part of a clause whose always-part is made of
+	// these conjuncts is executed with its continuation fixpoint, run
+	// check and constant closure settled from the shape: the partition
+	// keeps every conjunct that mentions an output of a part in that
+	// part, so a part holds the definitions of its outputs and everything
+	// they read at the time point, and the argument for the whole holds
+	// for the part.
+	subtree_set<node> functional_conjuncts;
 	// Every io_var must carry its input/output classification before the
 	// spec is stepped: transform_io_var refuses an unclassified one. The
 	// spec entry points resolve against ctx before reaching here, but the
@@ -756,8 +772,29 @@ result<interpreter<node>>
 	// handle: ltl_to_safety_formula_full below applies its own LTL-specific
 	// transform, so the general normalizer must not touch spec first.
 	if (!realizability_has_game_operators<node>(spec) && !witness_ltl_route) {
+		// The functional shape is read off the always-part of the
+		// specification as written (`functional_shape_body`), before any
+		// normalization: the normalizer propagates the equations between
+		// streams into the guards, and the conditional structure the
+		// shape is made of is gone. The always-part the normalizer
+		// produces is the formula the shape applies to.
+		bool functional = false;
+		if (functional_continuation_mode() != 0)
+			if (tref body = functional_shape_body<node>(as_written); body) {
+				functional = functional_step_shape<node>(body);
+				if (functional) {
+					const trefs vs = tau::get(body).select_top(is_child<node, tau::io_var>);
+					functional_max_initial = vs.empty() ? -1 : get_max_initial<node>(vs);
+				}
+			}
 		TAU_TRY(tref nr, normalizer<node>(spec));
 		spec = nr;
+		if (functional) {
+			const trefs aws = tau::get(spec).select_top(is_child<node, tau::wff_always>);
+			if (aws.size() == 1)
+				for (tref c : get_cnf_wff_clauses<node>(tau::trim2(aws[0])))
+					functional_conjuncts.insert(tau::trim_right_sibling(ac_canonical<node>(c)));
+		}
 	}
 post_normalization:
 	// Full LTL formulas (F/U/R/W) need a different execution strategy.
@@ -800,10 +837,23 @@ post_normalization:
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
 		auto spec_partition = create_spec_partition(clause, output_partition);
 		std::vector<htrefs> ubt_ctn;
+		std::vector<bool> functional_parts;
 		bool executable = true;
 		for (auto& [spec_part, out_rep] : spec_partition) {
 			tref clause_t = spec_part->get();
-			auto ubd_ctn_part = get_executable_spec(clause_t);
+			// The shape applies to a part whose always-part is made of
+			// conjuncts of the one the normalizer produced (compared
+			// with sorted operands, since the part is assembled afresh).
+			bool functional = false;
+			if (!functional_conjuncts.empty())
+				if (tref aw = tau::get(clause_t).find_top(is_child<node, tau::wff_always>); aw) {
+					functional = true;
+					for (tref c : get_cnf_wff_clauses<node>(tau::trim2(aw)))
+						if (!functional_conjuncts.contains(tau::trim_right_sibling(ac_canonical<node>(c)))) {
+							functional = false; break; }
+				}
+			auto ubd_ctn_part = get_executable_spec(clause_t, 0, functional,
+				functional_max_initial);
 			if (!ubd_ctn_part.has_value()) {
 				// Need to try next clause
 				clause_failures.emplace_back(clause,
@@ -811,6 +861,7 @@ post_normalization:
 				executable = false; break;
 			}
 			ubt_ctn.push_back({ tree<node>::geth(ubd_ctn_part.value()) });
+			functional_parts.push_back(functional);
 		}
 		if (!executable) continue;
 		// All parts of spec are realizable; each starts with a single
@@ -822,6 +873,8 @@ post_normalization:
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_parts, output_partition,
 			memory, ctx_eff };
+		i.functional_parts = functional_parts;
+		i.functional_max_initial = functional_max_initial;
 
 		// Cache the LTL synthesis solution (if any) for downstream
 		// introspection of the Mealy strategy. Empty for pure-safety /
@@ -856,6 +909,7 @@ post_normalization:
 				// no representative.
 				i.ubt_ctn.push_back(htrefs{
 					tree<node>::geth(warmup) });
+				i.functional_parts.push_back(false);
 				i.original_spec.emplace_back(htrefs{
 					tree<node>::geth(warmup) }, nullptr);
 				i.compute_lookback_and_initial();
@@ -1944,11 +1998,40 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	bool part_exhausted = false;
 	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
 	// which are greater than current time_point in a time-compatible fashion
-	for (const htrefs& part : ubt_ctn) {
+	for (size_t pi = 0; pi < ubt_ctn.size(); ++pi) {
+		const htrefs& part = ubt_ctn[pi];
 		trefs part_alts;
 		part_alts.reserve(part.size());
+		// A part of functional shape, with no initial condition of the
+		// specification beyond t, keeps the conjuncts whose coordinates
+		// are all reached and drops the rest: every dropped conjunct
+		// defines an output at a later coordinate, or constrains later
+		// inputs and holds for every value of them, so the quantified
+		// rest holds for every value of the reached coordinates and the
+		// elimination would return the kept conjuncts (see
+		// `factorized_continuation`). An initial condition beyond t pins
+		// a later output the definitions determine as well, so the
+		// elimination decides that case. (`highest_initial_pos` counts
+		// the run prefix of the continuation as well, whose conjuncts
+		// are instances of the step.)
+		const int fmode = factorized_continuation_mode();
+		const bool by_shape = fmode != 0 && pi < functional_parts.size()
+			&& functional_parts[pi] && functional_max_initial <= t;
 		for (const auto& h : part) {
 		auto step_ubt_ctn = update_to_time_point(h->get(), ut);
+		tref kept = nullptr;
+		if (by_shape) {
+			for (tref c : get_cnf_wff_clauses<node>(step_ubt_ctn)) {
+				bool reached = true;
+				for (tref v : tau::get(c).select_top(is_child<node, tau::io_var>))
+					if (get_io_time_point<node>(v) > t) { reached = false; break; }
+				if (reached) kept = kept ? tau::build_wff_and(kept, c) : c;
+			}
+			if (!kept) kept = tau::_T();
+			++factorized_continuation_warmups;
+			// In the shadow mode the elimination runs as well and decides.
+			if (fmode == 1) { part_alts.push_back(kept); continue; }
+		}
 		auto io_vars = tau::get(step_ubt_ctn).select_top(
 				is_child<node, tau::io_var>);
 		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
@@ -1972,9 +2055,16 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		// pushing an un-eliminated formula when normalization fails (e.g.
 		// a bv-widening cap violation, already logged by the pass).
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
-		if (normalized.has_value())
+		if (normalized.has_value()) {
+			// Shadow: the kept conjuncts must be equivalent to the
+			// eliminated formula.
+			if (kept) {
+				const int v = closed_equivalence<node>(normalized.value(), kept);
+				if (v == 0) ++factorized_continuation_mismatches;
+				else if (v < 0) ++factorized_continuation_undecided;
+			}
 			part_alts.push_back(normalized.value());
-		else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
+		} else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
 		}
 		if (!part.empty() && part_alts.empty()) part_exhausted = true;
 		upd_ubt_ctn.push_back(std::move(part_alts));
@@ -2159,7 +2249,8 @@ void interpreter<node>::compute_lookback_and_initial() {
 
 template <NodeType node>
 result<tref> interpreter<node>::get_executable_spec(
-	tref& clause, const size_t start_time)
+	tref& clause, const size_t start_time, const bool functional,
+	const int_t spec_max_initial)
 {
 	result<tref> r;
 	if (!clause) {
@@ -2172,7 +2263,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	{
 		auto sc = r.open("transform_to_execution");
 		TAU_TRY_OR(executable,
-			transform_to_execution<node>(clause, start_time, true),
+			transform_to_execution<node>(clause, start_time, true, functional),
 			code::unsat, "Specification part could not be "
 			"transformed to an executable form");
 	}
@@ -2193,7 +2284,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	}
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
-		executable, io_vars, start_time);
+		executable, io_vars, start_time, functional, spec_max_initial);
 	if (!constraints) {
 		return r.with_assert_check_error(code::unsat,
 			"Uninterpreted-constant constraints failed to normalize");
@@ -2731,6 +2822,8 @@ result<bool> interpreter<node>::update(tref update) {
 	// Commit: every component was validated by plan_update, so nothing
 	// below can fail and leave the interpreter half-updated.
 	ubt_ctn = std::move(plan->ubt_ctn);
+	// A revised part is not read for its shape.
+	functional_parts.assign(ubt_ctn.size(), false);
 	original_spec = std::move(plan->spec);
 	++spec_revision_;
 	output_partition = std::move(plan->partition);

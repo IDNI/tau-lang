@@ -650,3 +650,35 @@ add_repl_test(run_cmd-mirror_02_sometimes_alt
 add_repl_test(run_cmd-mirror_03_always_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
 	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+
+# The continuation fixpoint settled from the functional shape of the
+# specification, in the shadow mode: the implication decides and must agree
+# with the shape; a specification whose outputs are functions of the inputs
+# and of the previous values is settled from the shape at every check.
+add_test(NAME "test_repl-run_cmd-functional_shape_shadow"
+	COMMAND bash -c "printf 'set charvar off\\nrun 3 steps always ((o1[0]:bv[8] = { 0 }:bv[8]) && (o1[t]:bv[8] = o1[t-1]:bv[8] + { 1 }:bv[8]) && (o3[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]) && ((o3[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8]))).\\n1\\n5\\nq\\n' | TAU_FUNCTIONAL_CONTINUATION=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-functional_shape_shadow" PROPERTIES
+	PASS_REGULAR_EXPRESSION "by shape [1-9], mismatches 0, undecided 0"
+	FAIL_REGULAR_EXPRESSION "Error")
+# A specification with a choice among outputs is not of the shape and is
+# decided by the implication, with no mismatch either.
+add_test(NAME "test_repl-run_cmd-choice_not_functional_shape_shadow"
+	COMMAND bash -c "printf 'set charvar off\\nrun 2 steps always ((o2[t]:bv[8] = { 0 }:bv[8] || o2[t]:bv[8] = { 1 }:bv[8]) && (o1[t]:bv[8] = i1[t]:bv[8])).\\n1\\n5\\nq\\n' | TAU_FUNCTIONAL_CONTINUATION=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-choice_not_functional_shape_shadow" PROPERTIES
+	PASS_REGULAR_EXPRESSION "by shape 0, mismatches 0, undecided 0"
+	FAIL_REGULAR_EXPRESSION "Error")
+# The shape found for one specification applies to that construction only:
+# a formula normalized later in the same session is decided on its own.
+add_test(NAME "test_repl-run_cmd-functional_shape_then_normalize"
+	COMMAND bash -c "printf 'set charvar off\\nrun 2 steps always ((o1[t]:bv[8] = i1[t]:bv[8] + { 1 }:bv[8]) && ((o1[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8]))).\\n1\\n5\\nn always (o12[t]:tau = 0 && o12[t-1]:tau = 1).\\nn always (o3[t]:bv[8] = i1[t]:bv[8]).\\nq\\n' | TAU_FUNCTIONAL_CONTINUATION=1 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-functional_shape_then_normalize" PROPERTIES
+	PASS_REGULAR_EXPRESSION "always o3\\[t\\]:bv\\[8\\] = i1\\[t\\]:bv\\[8\\]"
+	FAIL_REGULAR_EXPRESSION "Error")
+# The continuation kept as a conjunction and the warm-up kept from the
+# functional shape, in the shadow mode: the one formula and the elimination
+# decide and must agree.
+add_test(NAME "test_repl-run_cmd-factorized_continuation_shadow"
+	COMMAND bash -c "printf 'set charvar off\\nrun 3 steps always ((o1[0]:bv[8] = { 0 }:bv[8]) && (o1[t]:bv[8] = o1[t-1]:bv[8] + { 1 }:bv[8]) && (o3[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]) && ((o3[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8]))).\\n1\\n5\\nq\\n' | TAU_FACTORIZED_CONTINUATION=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-factorized_continuation_shadow" PROPERTIES
+	PASS_REGULAR_EXPRESSION "kept [1-9], warm-ups [1-9], mismatches 0, undecided 0"
+	FAIL_REGULAR_EXPRESSION "Error")

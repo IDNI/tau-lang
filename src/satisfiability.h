@@ -69,7 +69,8 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * uninterpreted constants are involved at all.
  */
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time);
+tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time,
+	bool functional = false, int_t spec_max_initial = -1);
 
 /**
  * @brief Transform a normalized Tau formula into execution form.
@@ -98,7 +99,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
-					const bool output = false);
+					const bool output = false, const bool functional = false);
 
 
 /**
@@ -206,6 +207,10 @@ template <typename node> static int factored_tau_valid(tref fm);
  * @param fm Formula to simplify.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
+ * @param normalized The normal form of @p fm when the caller already holds
+ * one; the normalization is then skipped (default: none). It must be
+ * equivalent to @p fm and in the form `normalize_with_temp_simp` returns
+ * (the temporal DNF), since the per-path checks read it as such.
  * @return Simplified formula, or `nullptr` when normalization fails on a
  * `bv_widening` width-cap violation (already logged by the widening pass).
  *
@@ -228,7 +233,7 @@ template <typename node> static int factored_tau_valid(tref fm);
  */
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
-				const bool output = false);
+				const bool output = false, tref normalized = nullptr);
 
 } // namespace idni::tau_lang
 

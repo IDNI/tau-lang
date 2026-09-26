@@ -94,6 +94,19 @@ struct definitions {
 		return &global_scope;
 	}
 
+	/**
+	 * @brief Merge the streams of an inference result into the global
+	 * type scope.
+	 *
+	 * The result of `infer_ba_types` seeded by mention holds the streams
+	 * the formula mentions and the ones it introduced; the rest of the
+	 * scope is untouched, so the result is merged into the scope. A
+	 * stream the inference typed anew takes its new type.
+	 */
+	void merge_global_scope(const subtree_map<node, size_t>& inferred) {
+		merge_type_scope<node>(global_scope, inferred);
+	}
+
 	/** @brief Replace the global type scope with @p global_scope. */
 	// RR-14: by value -- the old non-const lvalue reference moved from
 	// the caller's map silently; now the transfer is visible at the call

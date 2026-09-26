@@ -370,6 +370,23 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::without_cmd(const tt& n) {
+	// grammar: "without" __ nf_cmd_arg __ nf_cmd_arg -- the formula, then
+	// the conjunct to remove
+	tref r = nullptr;
+	auto formula = get_any(n[1].get());
+	auto clause = formula ? get_any(n[2].get()) : nullptr;
+	if (formula && clause) {
+		auto res = tau_api::without(formula, clause);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
+	}
+	return r;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value) {
@@ -2217,6 +2234,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::unrealizable_cmd:   result = unrealizable_cmd(command); break;
 	// normal forms
 	case tau::onf_cmd:            result = onf_cmd(command); break;
+	case tau::without_cmd:        result = without_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
 	case tau::cnf_cmd:            result = cnf_cmd(command); break;
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
@@ -2512,6 +2530,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  mnf                     convert a Tau expression to minterm normal form\n"
 		<< "  nnf                     convert a Tau expression to negation normal form\n"
 		<< "  onf                     convert a Tau formula to order normal form\n"
+		<< "  without                 the normal form of an always-conjunction without one of its conjuncts\n"
 		<< "\n"
 
 		<< "History and definitions:\n"
@@ -2822,6 +2841,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  onf <var> <tau>           converts the given tau formula to ONF using <var>\n"
 		<< "  onf <var> <repl_history>  converts the Tau formula stored at the specified repl history position to ONF using <var>\n";
+		break;
+	case tau::without_sym: out
+		<< "without gives the normal form of an always-conjunction without one of its conjuncts\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  without <tau> <tau>              the normal form of the first formula without the conjunct equal to the second (a single clause)\n"
+		<< "  without <repl_history> <tau>     the same for a formula stored at the specified repl history position\n"
+		<< "                                   (either argument may be a repl history position)\n";
 		break;
 	case tau::subst_sym: out
 		<< "the substitute command substitutes one or more Tau expressions in a Tau expression by other Tau expressions\n"

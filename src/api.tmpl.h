@@ -2,6 +2,10 @@
 
 #include "api.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <optional>
+
 #include "tau_tree_builders.h"
 
 #undef LOG_CHANNEL_NAME
@@ -879,6 +883,22 @@ result<tref> api<node>::onf(tref expr, tref var) {
 }
 
 template <NodeType node>
+result<tref> api<node>::without(tref formula, tref clause) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		if (!formula || !clause) return r.with_assert_check_error(
+			code::invalid_argument, messages::invalid_arguments);
+		TAU_TRY(tref k, normalize_formula(formula));
+		TAU_TRY(tref c, normalize_formula(clause));
+		tref w = normal_form_without<node>(k, c);
+		if (!w) r.error(code::internal_error, "Normalization failed");
+		else    r = w;
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
+}
+
+template <NodeType node>
 result<tref> api<node>::pnf(tref expr) {
 	return with_budget<node>([&] {
 		result<tref> r;
@@ -1208,6 +1228,24 @@ result<bool> api<node>::sat(tref fm) {
 	});
 }
 
+// Mode of api::sat_factored, the environment variable taking precedence;
+// selected through the environment, the shadow mode reports at exit.
+template <NodeType node>
+static int sat_factored_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_API_SAT_FACTORED");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "api sat factored shadow: hits %zu,"
+			" mismatches %zu\n", api<node>::sat_factored_hits,
+			api<node>::sat_factored_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : api<node>::sat_factored;
+}
+
 // sat() after its simplify/flatten prefix. realizable() has already paid
 // that prefix (simplify is a full type-inference traversal with no memo)
 // when it asks for the unsat shortcut, so it enters here directly.
@@ -1233,6 +1271,38 @@ result<bool> api<node>::sat_prepared(tref fm) {
 		tref target = (sat_has_ltl_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
 			? fm : nf;
+		// A conjunction is satisfiable exactly when each of its
+		// variable-disjoint components is (a trace for the whole is the
+		// traces of the components side by side), and the components are
+		// the same across queries that share their conjuncts: a query
+		// that conjoins one clause to a held formula decides that
+		// clause's component and finds the others remembered.
+		// factored_tau_sat is the per-component decision the Tau-BA
+		// constants already use: it splits `always` hulls into their
+		// conjuncts, groups the conjuncts by the names of their free
+		// variables and decides each group with is_tau_formula_sat. It
+		// declines (-1) unless the formula is a conjunction of at least
+		// two conjuncts, on a conjunct holding an embedded BA constant or
+		// a nameless free variable, on fewer than two groups and on a
+		// group is_tau_formula_sat leaves undecided; the whole-formula
+		// decision below then runs as before. A full-LTL formula whose
+		// normal form keeps a data quantifier is routed raw (target != nf)
+		// and skips the factoring.
+		const int factored = target == nf && ba_component_factoring_enabled()
+			? sat_factored_mode<node>() : 0;
+		if (factored > 0)
+			if (int f = factored_tau_sat<node>(target); f >= 0) {
+				++sat_factored_hits;
+				if (factored == 1)
+					return r.with_assert_check_value(f == 1);
+				TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
+					code::internal_error,
+					"is_tau_formula_sat returned neither a value "
+					"nor an error while checking satisfiability");
+				if (!r.has_value() || r.value() != (f == 1))
+					++sat_factored_mismatches;
+				return r;
+			}
 		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
 			code::internal_error,
 			"is_tau_formula_sat returned neither a value nor an "
@@ -1554,7 +1624,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// ltl_to_safety_formula_full; a backend failure must not terminate the
 		// caller.  No interpreter is the honest answer here, and
 		// make_interpreter's own result<T> error propagates through r.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx, applied),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)
@@ -1602,7 +1672,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		ctx.output_remaps = options.output_remaps;
 		// See the tref overload: make_interpreter's own result<T> error
 		// propagates through r rather than terminating the caller.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx, applied),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)
@@ -1670,7 +1740,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 			return r.with_assert_check_error(code::internal_error, "Type inference failed");
 		}
 		defs.get_io_context()->update_types(infer_result.second);
-		defs.set_global_scope(std::move(infer_result.second));
+		defs.merge_global_scope(infer_result.second);
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
 		// This arises because the CFG parser is ambiguous: G(X) && G(Y) can

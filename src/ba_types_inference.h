@@ -30,6 +30,32 @@ struct type_inference_options {
 	bool use_defaults = true; ///< Assign unresolved nodes to the `tau` type if `true`.
 };
 
+/// Seeding of the type resolver from a global scope (`infer_ba_types`
+/// with a `global_scope`). The inference of a formula depends on the
+/// scope entries of the streams the formula mentions (as io variables or
+/// as the streams its input and output definitions declare) and on no
+/// other, so the resolver is seeded with those only, one lookup per
+/// mentioned stream. 0 = the whole scope is walked; 1 = by mention, the
+/// default;
+/// 2 = shadow: seed by mention, infer once more from the whole scope and
+/// count every disagreement of the inferred tree or of a mentioned
+/// stream's type in `type_scope_seed_mismatches`. The environment
+/// variable TAU_TYPE_SCOPE_SEED (0, 1 or 2; any other value selects 0)
+/// overrides the flag.
+inline int type_scope_seed = 1;
+/// Calls seeded by mention, and disagreements the shadow mode found.
+inline size_t type_scope_seed_hits = 0;
+inline size_t type_scope_seed_mismatches = 0;
+inline int type_scope_seed_mode();
+
+/// Merge the streams of an inference result into a global type scope: the
+/// result seeded by mention holds the mentioned and the newly typed streams
+/// and no other, so it is merged into the scope; a stream the inference
+/// typed anew takes its new type.
+template <NodeType node>
+void merge_type_scope(subtree_map<node, size_t>& scope,
+	const subtree_map<node, size_t>& inferred);
+
 /**
  * @brief Infer and propagate BA type ids for all nodes in the tree @p n.
  *

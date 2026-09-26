@@ -261,6 +261,18 @@ struct api {
 	 * sweep. Default 1.5 (kept); <= 0 disables gc.
 	 */
 	static void set_gc_growth_factor(double f);
+	/// Decide `sat` of an always-conjunction over streams by its
+	/// stream-disjoint components (the factoring `is_zero` of a Tau-BA
+	/// constant uses, tau_ba.h `ba_component_factoring`), each component
+	/// remembered across queries, instead of one decision over the whole
+	/// formula. 0 = off, 1 = on, 2 = shadow: both are computed and every
+	/// disagreement is counted in `sat_factored_mismatches`. The
+	/// environment variable TAU_API_SAT_FACTORED (0, 1 or 2) overrides it.
+	static inline int sat_factored = 1;
+	/// Factored decisions taken, and disagreements the shadow mode found,
+	/// for tests and diagnostics.
+	static inline size_t sat_factored_hits = 0;
+	static inline size_t sat_factored_mismatches = 0;
 	/**
 	 * @brief Cap on live interned tree nodes; 0 = unlimited (default).
 	 *
@@ -670,8 +682,26 @@ struct api {
 						const std::string& var);
 	/// @copydoc onf(const std::string&, const std::string&)
 	static result<tref> onf(tref formula, tref var);
+
 	/// @copydoc onf(const std::string&, const std::string&)
 	static result<htref> onf(htref formula, htref var);
+
+	/// The normal form of an always-conjunction without one of its
+	/// conjuncts: @p formula and @p clause are normalized, and the result
+	/// is the normal form of the top-level conjuncts of @p formula minus
+	/// the one equal to @p clause (a single clause). The normalized
+	/// @p formula comes back unchanged when it is no always-conjunction,
+	/// when @p clause is no single clause, or when no conjunct equals it;
+	/// a failed normalization of the remainder is an `internal_error`.
+	/// Where the normal form has the shape the Boole normal form gives a
+	/// conjunction of clauses, the result is assembled from that shape
+	/// without a normalization pass (tau_ba.h `ba_normalized_without`).
+	static result<std::string> without(const std::string& formula,
+						const std::string& clause);
+	/// @copydoc without(const std::string&, const std::string&)
+	static result<tref> without(tref formula, tref clause);
+	/// @copydoc without(const std::string&, const std::string&)
+	static result<htref> without(htref formula, htref clause);
 
 	/// Convert a formula to prenex normal form (PNF): all quantifiers
 	/// pulled to the front.
