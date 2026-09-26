@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 
-// Phase 4: the whole ctest suite, in headless Chrome, in one run -- not
-// one test as run-in-chrome.js does. Same harness/server/exit-status
-// contract (browser-harness.js), just applied to every test ctest knows
-// about instead of one passed on the command line.
+// The whole ctest suite, in headless Chrome, in one run rather than one test
+// as run-in-chrome.js does; same harness/server/exit-status contract
+// (browser-harness.js).
 //
-// The test list comes from `ctest --show-only=json-v1`, not a hardcoded
-// list, so this tracks whatever the build actually registered (each
-// test's command gives its exact <name>.js path, and its own TIMEOUT
-// property is honoured rather than one fixed bound -- `ctest --timeout`
-// does not override a per-test TIMEOUT, see .local/build-emscripten.md).
+// The test list comes from `ctest --show-only=json-v1`, not a hardcoded list,
+// so this tracks whatever the build registered; each test's own TIMEOUT is
+// honoured, which `ctest --timeout` does not override.
 //
 // One browser for the whole run, one page per test (EXITSTATUS/Module/FS
 // state persist on a page, so tests must not share one), with concurrency
@@ -20,7 +17,7 @@
 // share one, which is the common case for a real ctest suite.
 //
 // Usage:
-//   node run-suite-in-chrome.js [build-dir] [--concurrency=N]
+//   node run-suite-in-chrome.js <build-dir> [--concurrency=N]
 //       [--extra=<path-to-js-or-name>]...
 //
 // --extra points at any emscripten MODULARIZE=0 output pair (path with or
@@ -34,7 +31,7 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 const {
-	DEFAULT_BUILD_DIR, DEFAULT_TIMEOUT_MS, resolveTarget, createServer, loadPuppeteer,
+	DEFAULT_TIMEOUT_MS, requireBuildDir, resolveTarget, createServer, loadPuppeteer,
 	resolveChromePath, runTest,
 } = require('./browser-harness');
 
@@ -67,7 +64,7 @@ function parseArgs(argv) {
 
 function printUsage() {
 	process.stderr.write(
-		'usage: run-suite-in-chrome.js [build-dir] [--concurrency=N] [--extra=<path>]...\n');
+		'usage: run-suite-in-chrome.js <build-dir> [--concurrency=N] [--extra=<path>]...\n');
 }
 
 // Reads ctest's own view of the suite rather than any list this script
@@ -87,11 +84,15 @@ function loadCtestTests(buildDir) {
 		const timeoutMs = typeof props.TIMEOUT === 'number'
 			? Math.round(props.TIMEOUT * 1000)
 			: DEFAULT_TIMEOUT_MS;
-		return { name: t.name, jsPath, timeoutMs };
+		// TAU_NODE_ONLY marks a ctest entry that runs under node itself and
+		// must not be re-run through this batch (js_parity, repl_browser_suite
+		// -- both commands end in .js but are not emscripten test pairs).
+		const nodeOnly = props.TAU_NODE_ONLY === true || props.TAU_NODE_ONLY === 'TRUE';
+		return { name: t.name, jsPath, timeoutMs, nodeOnly };
 	// TAU_BUILD_BROWSER_TESTS registers this script itself as the
 	// `browser_suite` entry, whose last argument is a build directory rather
 	// than a test; without this the batch would try to run itself.
-	}).filter((t) => t.jsPath.endsWith('.js'));
+	}).filter((t) => t.jsPath.endsWith('.js') && !t.nodeOnly);
 }
 
 function loadExtraTests(extraArgs, buildDir) {
@@ -153,7 +154,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 
 async function main() {
 	const opts = parseArgs(process.argv.slice(2));
-	const buildDir = path.resolve(opts.buildDir || DEFAULT_BUILD_DIR);
+	const buildDir = requireBuildDir(opts.buildDir);
 	const concurrency = opts.concurrency || Number(process.env.TAU_BROWSER_TEST_CONCURRENCY) || DEFAULT_CONCURRENCY;
 
 	let puppeteer;

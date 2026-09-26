@@ -172,6 +172,11 @@ their `-all-tests` variants) in `build/<type>-wasm-nothreads`.
 | `release-wasm-repl-browser` | the browser REPL page | nothing |
 | `release-wasm-repl-tests-browser` | the browser REPL page | the REPL suite inside it, in headless Chrome |
 | `release-wasm-nothreads`, `release-wasm-nothreads-all-tests`, `release-wasm-nothreads-all-tests-browser` | as above, without `-pthread` | as above |
+The two `*-browser` suite presets reconfigure the node folder with
+`TAU_BUILD_BROWSER_TESTS=ON`, so the compiled suite is not built twice.
+`release-wasm-repl-tests-browser` replays the node build's ctest REPL cases in
+`build/release-wasm-repl-browser` (`TAU_REPL_BROWSER_TEST_LIST_DIR`), so configure the
+node build (`release-wasm-repl-tests`) first.
 
 ```bash
 ./dev dep-emsdk.sh                                       # emsdk → $TAU_SHARED_PREFIX/emsdk
@@ -199,10 +204,15 @@ Options:
   `include(use-emscripten)` before `project()`, which is why no preset names a
   `toolchainFile` (a preset-supplied one never loads at that point).
 - `-DTAU_BUILD_BINDING_JS=ON` — the embind library, mirroring `TAU_BUILD_BINDING_PYTHON_NANOBIND`.
-- `-DTAU_BUILD_BROWSER_TESTS=ON` — runs the wasm suite in headless Chrome as the
+- `-DTAU_BUILD_BROWSER_TESTS=ON` — runs the compiled wasm suite in headless Chrome as the
   `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
   via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.
-- `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl.js`. Emscripten-only; fatal otherwise.
+- `-DTAU_BUILD_REPL_BROWSER_TESTS=ON` — replays the REPL suite inside the browser REPL
+  page as the `repl_browser_suite` ctest entry; requires `TAU_BUILD_REPL_WASM=ON`, whose
+  page it drives, and reads its case list from the node build of the same build type
+  (`TAU_REPL_BROWSER_TEST_LIST_DIR`, set per family by the `*-wasm-repl-tests-browser`
+  presets, default `build/release-wasm`). Installs Chrome and `puppeteer-core` the same
+  way. Emscripten-only; fatal otherwise.
 - `-DTAU_PARITY_REQUIRE_NATIVE=ON` — make a missing or out-of-date native tau a fatal
   configure error instead of dropping the `js_parity` test. The `*-wasm-all-tests`
   presets and the `wasm-node` Docker stage set it. Emscripten-only.

@@ -1,82 +1,44 @@
 #!/usr/bin/env node
 
 // Proves the browser REPL page (js/repl/CMakeLists.txt's output: index.html,
-// tau_repl.js/.wasm, vendor/) actually starts and accepts input in headless
-// Chrome, end to end -- not just that the wasm module links and runs under
-// Node (which .local/build-emscripten.md's D11 already established).
+// tau_repl_web.js/.wasm, vendor/) starts and accepts input in headless Chrome
+// end to end, not only that the wasm module links and runs under Node.
 //
-// Reuses loadPuppeteer/resolveChromePath from browser-harness.js rather
-// than reimplementing Chrome discovery -- the doctest harness and this
-// script must agree on where Chrome comes from. createServer from that
-// same file is NOT reused: it sets no COOP/COEP headers (the doctest
-// targets it serves are pthread-free and don't need them), so this script
-// runs its own minimal static server that does, mirroring
-// scripts/tau-repl-serve.sh's header/MIME behaviour without shelling out to
-// it (a plain `http` server here keeps the check a single Node process,
-// matching run-in-chrome.js's shape).
+// loadPuppeteer/resolveChromePath/createCoiServer come from browser-harness.js
+// so this script, the doctest harness and the REPL suite runner agree on where
+// Chrome comes from and how the page is served. createCoiServer routes the
+// REPL page's own asset set, which createServer's doctest routing does not.
 //
 // Usage:
 //   node repl-browser-check.js [build-dir]
 //
-// build-dir defaults to build/emscripten-pthread (the emscripten-pthread
-// preset's binary dir) and must contain index.html, tau_repl.js/.wasm and
-// vendor/ -- point it at a broken copy of that directory to exercise the
-// failure path (see .local/build-emscripten.md's Phase 5 checklist item).
+// build-dir defaults to build/release-wasm-repl-browser (the
+// release-wasm-repl-browser preset's binary dir) and must contain index.html,
+// tau_repl_web.js/.wasm and vendor/; a broken copy exercises the failure path.
 //
 // Exits 0 only if every step below succeeds, non-zero otherwise:
 //   - the page loads and window.crossOriginIsolated is true
 //   - the welcome banner appears in the xterm terminal buffer
 //   - typing "help" + Enter produces new terminal output
 
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { loadPuppeteer, resolveChromePath } = require('./browser-harness');
+const { createCoiServer, loadPuppeteer, resolveChromePath } = require('./browser-harness');
 
-const DEFAULT_BUILD_DIR = path.join(__dirname, '..', '..', '..', 'build', 'emscripten-pthread');
+const DEFAULT_BUILD_DIR = path.join(__dirname, '..', '..', '..', 'build', 'release-wasm-repl-browser');
 const TIMEOUT_MS = Number(process.env.TAU_REPL_CHECK_TIMEOUT_MS) || 30000;
 
-const MIME_TYPES = {
-	'.html': 'text/html',
-	'.js': 'application/javascript',
-	'.mjs': 'application/javascript',
-	'.wasm': 'application/wasm',
-	'.css': 'text/css',
-};
 
-// Same two headers scripts/tau-repl-serve.sh sends -- serving them here
-// means the page's own sw.js COOP/COEP fallback is never exercised by this
-// check either, which is asserted below rather than assumed.
-function createCoiServer(dir) {
-	const server = http.createServer((req, res) => {
-		const url = new URL(req.url, 'http://localhost');
-		const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
-		const filePath = path.join(dir, decodeURIComponent(pathname));
-		res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-		res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-		fs.readFile(filePath, (err, data) => {
-			if (err) { res.writeHead(404); res.end(); return; }
-			res.writeHead(200, { 'Content-Type': MIME_TYPES[path.extname(filePath)] || 'application/octet-stream' });
-			res.end(data);
-		});
-	});
-	return new Promise((resolve) => {
-		server.listen(0, '127.0.0.1', () => {
-			const port = server.address().port;
-			resolve({ baseUrl: `http://127.0.0.1:${port}`, close: () => new Promise((r) => server.close(r)) });
-		});
-	});
-}
-
-// Reads only the visible rows of the xterm scrollback -- the terminal is an
-// internal canvas/DOM grid, not plain text nodes, so buffer.active's own
-// line API is the only way to recover what it is showing.
+// Reads the visible rows. The viewport starts at buffer.viewportY (line 0 is
+// the top of the scrollback), so a marker that scrolled off the top is still
+// matched.
 async function terminalText(page) {
 	return page.evaluate(() => {
 		const buf = window.term.buffer.active;
+		const top = buf.viewportY;
 		const lines = [];
 		for (let y = 0; y < window.term.rows; y++) {
-			const line = buf.getLine(y);
+			const line = buf.getLine(top + y);
 			if (line) lines.push(line.translateToString(true));
 		}
 		return lines.join('\n');
@@ -132,7 +94,7 @@ async function main() {
 	const buildDir = path.resolve(process.argv[2] || DEFAULT_BUILD_DIR);
 	if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
 		process.stderr.write(`${buildDir}/index.html not found -- build it first:\n`
-			+ '  ./dev preset emscripten-pthread -DTAU_BUILD_JOBS=4\n');
+			+ '  ./dev preset release-wasm-repl-browser -DTAU_BUILD_JOBS=4\n');
 		process.exit(2);
 	}
 

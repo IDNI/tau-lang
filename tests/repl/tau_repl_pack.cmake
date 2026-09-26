@@ -26,6 +26,16 @@ endfunction()
 # Records that <name> was skipped, for the summary.
 function(tau_repl_record_skip name)
 	set_property(GLOBAL APPEND PROPERTY TAU_REPL_SKIPPED "${name}")
+# A wasm REPL test can open host files through the NODEFS mount the CLI's
+# node pre-js installs (src/tau_stdin_node.pre.js) under the Emscripten node
+# emulator. The browser REPL page has no such mount, so TAU_BUILD_REPL_BROWSER_TESTS
+# turns it off and a hostfs case skips with the same HOSTFS reason.
+if(EMSCRIPTEN AND CMAKE_CROSSCOMPILING_EMULATOR
+   AND NOT TAU_BUILD_REPL_BROWSER_TESTS)
+	set(TAU_REPL_NODEFS_HOSTFS TRUE)
+else()
+	set(TAU_REPL_NODEFS_HOSTFS FALSE)
+endif()
 endfunction()
 
 # Prints how many REPL cases the configured pack could not run.

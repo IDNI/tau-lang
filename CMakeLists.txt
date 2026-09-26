@@ -119,6 +119,7 @@ option(TAU_BUILD_BINDING_PYTHON_NANOBIND "Build the nanobind Python binding" OFF
 option(TAU_BUILD_BINDING_PYTHON_CTYPE    "Build the ctypes Python binding"   OFF)
 option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
 option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_BROWSER_TESTS "Run the REPL suite inside the browser REPL page, in headless Chrome (Emscripten only)" OFF)
 option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl_web.js (Emscripten only)" OFF)
 # The native tau parity.js diffs the wasm module against. Not built here: it
 # is the one input this configure cannot make, so a missing binary drops the
@@ -129,6 +130,11 @@ set(TAU_PARITY_NATIVE_BIN "${CMAKE_SOURCE_DIR}/build/release/tau" CACHE FILEPATH
 # out-of-date native tau fails the configure instead of dropping the gate.
 option(TAU_PARITY_REQUIRE_NATIVE
 	"Fail the configure when the js_parity native tau is missing or from another commit" OFF)
+# Where the browser REPL suite finds the ctest registration whose REPL commands
+# it replays: the node build of the same build type. The wasm presets set this
+# per family; the default below is their release folder.
+set(TAU_REPL_BROWSER_TEST_LIST_DIR "${CMAKE_SOURCE_DIR}/build/release-wasm" CACHE PATH
+	"ctest build directory whose test_repl-* cases the browser REPL suite replays")
 # Default ON only for Emscripten -- a plain option(... ON) would fatal below
 # on every native configure, since the option applies to wasm only.
 if(EMSCRIPTEN)
@@ -195,6 +201,7 @@ set_property(CACHE TAU_BUILD_BINDING_PYTHON_NANOBIND PROPERTY STRINGS "OFF" "ON"
 set_property(CACHE TAU_BUILD_BINDING_PYTHON_CTYPE PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_REPL_BROWSER_TESTS PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_WASM         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WASM_PTHREADS           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WASM_REPL_MODEL         PROPERTY STRINGS "sleep" "pthreads")
@@ -261,6 +268,20 @@ if(TAU_BUILD_BROWSER_TESTS AND NOT EMSCRIPTEN)
 		"a native build.")
 endif()
 
+if(TAU_BUILD_REPL_BROWSER_TESTS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_BROWSER_TESTS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+# The suite drives the browser REPL page (js/repl's tau_repl_web.js), so the
+# page has to be built in this same directory for the suite to load it.
+if(TAU_BUILD_REPL_BROWSER_TESTS AND NOT TAU_BUILD_REPL_WASM)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_BROWSER_TESTS=ON requires TAU_BUILD_REPL_WASM=ON "
+		"(the browser REPL page the suite drives).")
+endif()
 if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
 	message(FATAL_ERROR
 		"TAU_BUILD_REPL_WASM=ON requires the Emscripten toolchain "
@@ -420,6 +441,7 @@ message(STATUS "TAU_BUILD_BINDING_PYTHON_NANOBIND: ${TAU_BUILD_BINDING_PYTHON_NA
 message(STATUS "TAU_BUILD_BINDING_PYTHON_CTYPE: ${TAU_BUILD_BINDING_PYTHON_CTYPE}")
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
+message(STATUS "TAU_BUILD_REPL_BROWSER_TESTS: ${TAU_BUILD_REPL_BROWSER_TESTS}")
 message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
 message(STATUS "TAU_WASM_PTHREADS: ${TAU_WASM_PTHREADS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
@@ -536,13 +558,13 @@ endif()
 
 #
 # Install Chrome and the JS browser-test-harness devDependencies, only when
-# the wasm suite is to be run in a real browser (TAU_BUILD_BROWSER_TESTS,
-# Emscripten-only -- checked above). dep-chrome.sh and dep-js-test-deps.sh
-# are each idempotent, the same way dep-boost.sh/dep-cvc5.sh are above: a
-# second configure with the dependency already in place returns in well
-# under a second.
+# a wasm suite is to be run in a real browser (TAU_BUILD_BROWSER_TESTS or
+# TAU_BUILD_REPL_BROWSER_TESTS, Emscripten-only -- checked above).
+# dep-chrome.sh and dep-js-test-deps.sh are each idempotent: a second
+# configure with the dependency already in place returns in well under a
+# second.
 #
-if(TAU_BUILD_BROWSER_TESTS)
+if(TAU_BUILD_BROWSER_TESTS OR TAU_BUILD_REPL_BROWSER_TESTS)
 	# emsdk bundles its own node/npm/npx (see external/parser/cmake/
 	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
 	# putting its bin/ first on PATH means neither script below needs a
@@ -551,7 +573,7 @@ if(TAU_BUILD_BROWSER_TESTS)
 	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
 	if(_tau_emsdk_node_bin_count EQUAL 0)
 		message(FATAL_ERROR
-			"TAU_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not found "
+			"Browser wasm tests need emsdk's bundled node, not found "
 			"under ${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node. Run './dev dep-emsdk.sh' "
 			"first (the Emscripten toolchain itself already requires it).")
 	endif()

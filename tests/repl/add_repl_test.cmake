@@ -2,6 +2,14 @@ include(tau_repl_pack)
 
 # include(add_repl_test) to use new tree
 
+# A ltlsynt or hostfs case cannot run in the browser REPL page, but the browser
+# suite reads the node build's registration, where those cases are present; the
+# property carries the skip over to the browser instead of dropping the case.
+function(tau_repl_mark_browser_skip test_name requires)
+	if(requires)
+		set_tests_properties("${test_name}" PROPERTIES TAU_BROWSER_SKIP "${requires}")
+	endif()
+endfunction()
 function(add_repl_test test_name test_cmd test_regex)
 	tau_repl_unsupported(_tau_skip "${test_cmd}")
 	if(_tau_skip)
@@ -14,6 +22,7 @@ function(add_repl_test test_name test_cmd test_regex)
 		PASS_REGULAR_EXPRESSION "${test_regex}"
 		FAIL_REGULAR_EXPRESSION "Error"
 	)
+	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
 endfunction()
 
 function(add_repl_test_fail test_name test_cmd test_regex)
@@ -27,6 +36,7 @@ function(add_repl_test_fail test_name test_cmd test_regex)
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "${test_regex}"
 	)
+	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
 endfunction()
 
 function(add_echo_repl_test test_name test_cmd test_regex)
@@ -41,6 +51,7 @@ function(add_echo_repl_test test_name test_cmd test_regex)
 		PASS_REGULAR_EXPRESSION "${test_regex}"
 		FAIL_REGULAR_EXPRESSION "Error"
 	)
+	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
 endfunction()
 
 function(add_echo_repl_test_fail test_name test_cmd test_regex)
@@ -54,6 +65,7 @@ function(add_echo_repl_test_fail test_name test_cmd test_regex)
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "${test_regex}"
 	)
+	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
 endfunction()
 
 # add_multiline_repl_test(<test_name> <test_regex> <line1> [<line2> ...])
@@ -78,4 +90,5 @@ function(add_multiline_repl_test test_name test_regex)
 		PASS_REGULAR_EXPRESSION "${test_regex}"
 		FAIL_REGULAR_EXPRESSION "Error"
 	)
+	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
 endfunction()

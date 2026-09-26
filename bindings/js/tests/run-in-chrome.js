@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
-// Phase 4 feasibility spike: drives one wasm/doctest binary (Node runs
-// them today, see tests/native.js's sibling on the Node side and
-// tests/CMakeLists.txt's TEST_RUNNER swap) inside headless Chrome instead,
-// and reports the same two things a shell cares about -- the captured
-// doctest output and the process exit status.
+// Drives one wasm/doctest binary (Node runs them today, see tests/native.js's
+// sibling on the Node side and tests/CMakeLists.txt's TEST_RUNNER swap) inside
+// headless Chrome instead, and reports the same two things a shell cares
+// about -- the captured doctest output and the process exit status.
 //
 // The harness page, static server and exit-status contract live in
 // browser-harness.js, shared with run-suite-in-chrome.js (the whole ctest
@@ -13,11 +12,11 @@
 // Usage:
 //   node run-in-chrome.js <test-name-or-path> [build-dir]
 //
-// <test-name-or-path> is either a bare name looked up as
-// <build-dir>/<name>.js (build-dir defaults to build/debug-emscripten-tests)
-// or a path (relative/absolute, with or without ".js") to any emscripten
-// MODULARIZE=0 output pair <x>.js/<x>.wasm -- used here to point at a
-// scratch binary outside the tree for the forced-failure check.
+// <test-name-or-path> is either a bare name looked up as <build-dir>/<name>.js
+// (then <build-dir> is required) or a path (relative/absolute, with or without
+// ".js") to any emscripten MODULARIZE=0 output pair <x>.js/<x>.wasm -- used
+// here to point at a scratch binary outside the tree for the forced-failure
+// check.
 //
 // Requires puppeteer-core, installed as a devDependency of
 // bindings/js/package.json ("cd bindings/js && npm install"), and a Chrome
@@ -25,7 +24,7 @@
 // puts under the shared prefix.
 
 const {
-	DEFAULT_BUILD_DIR, resolveTarget, createServer, loadPuppeteer, resolveChromePath, runTest,
+	resolveTarget, createServer, loadPuppeteer, resolveChromePath, runTest,
 	DEFAULT_TIMEOUT_MS,
 } = require('./browser-harness');
 const path = require('path');
@@ -51,7 +50,7 @@ async function main() {
 		process.stderr.write('usage: run-in-chrome.js <test-name-or-path> [build-dir]\n');
 		process.exit(2);
 	}
-	const buildDir = buildDirArg ? path.resolve(buildDirArg) : DEFAULT_BUILD_DIR;
+	const buildDir = buildDirArg ? path.resolve(buildDirArg) : undefined;
 	const { dir, name } = resolveTarget(targetArg, buildDir);
 
 	let puppeteer;

@@ -264,6 +264,20 @@
 			}
 		},
 		{
+			"name": "_build-browser-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BROWSER_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-browser-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_BROWSER_TESTS": "ON"
+			}
+		},
+		{
 			"name": "_build-all",
 			"hidden": true,
 			"cacheVariables": {
@@ -694,6 +708,11 @@
 			}
 		},
 		{
+			"name": "release-wasm-all-tests-browser",
+			"displayName": "wasm library, C++ suite and CLI, in headless Chrome",
+			"inherits": ["release-wasm-all-tests", "_build-browser-tests"]
+		},
+		{
 			"name": "release-wasm-repl",
 			"displayName": "wasm CLI (tau_repl.js)",
 			"inherits": [
@@ -729,6 +748,14 @@
 			]
 		},
 		{
+			"name": "release-wasm-repl-tests-browser",
+			"displayName": "browser REPL page and the REPL suite in it",
+			"inherits": ["release-wasm-repl-browser", "_build-repl-browser-tests"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/release-wasm"
+			}
+		},
+		{
 			"name": "release-wasm-nothreads",
 			"displayName": "wasm library without -pthread",
 			"inherits": [
@@ -760,12 +787,21 @@
 			}
 		},
 		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"displayName": "the no-thread pack, in headless Chrome",
+			"inherits": ["release-wasm-nothreads-all-tests", "_build-browser-tests"]
+		},
+		{
 			"name": "devel-wasm",
 			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm"]
 		},
 		{
 			"name": "devel-wasm-all-tests",
 			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests-browser"]
 		},
 		{
 			"name": "devel-wasm-repl",
@@ -780,6 +816,13 @@
 			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-browser"]
 		},
 		{
+			"name": "devel-wasm-repl-tests-browser",
+			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-tests-browser"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/devel-wasm"
+			}
+		},
+		{
 			"name": "devel-wasm-nothreads",
 			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads"]
 		},
@@ -788,12 +831,20 @@
 			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads-all-tests"]
 		},
 		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads-all-tests-browser"]
+		},
+		{
 			"name": "debug-wasm",
 			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm"]
 		},
 		{
 			"name": "debug-wasm-all-tests",
 			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
+		},
+		{
+			"name": "debug-wasm-all-tests-browser",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests-browser"]
 		},
 		{
 			"name": "debug-wasm-repl",
@@ -808,12 +859,23 @@
 			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-browser"]
 		},
 		{
+			"name": "debug-wasm-repl-tests-browser",
+			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-tests-browser"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/debug-wasm"
+			}
+		},
+		{
 			"name": "debug-wasm-nothreads",
 			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads"]
 		},
 		{
 			"name": "debug-wasm-nothreads-all-tests",
 			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads-all-tests"]
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads-all-tests-browser"]
 		},
 		{
 			"name": "relwithdebinfo-make-gcc",
@@ -1374,6 +1436,10 @@
 			"configurePreset": "release-wasm-all-tests"
 		},
 		{
+			"name": "release-wasm-all-tests-browser",
+			"configurePreset": "release-wasm-all-tests-browser"
+		},
+		{
 			"name": "release-wasm-repl",
 			"configurePreset": "release-wasm-repl"
 		},
@@ -1386,6 +1452,10 @@
 			"configurePreset": "release-wasm-repl-browser"
 		},
 		{
+			"name": "release-wasm-repl-tests-browser",
+			"configurePreset": "release-wasm-repl-tests-browser"
+		},
+		{
 			"name": "release-wasm-nothreads",
 			"configurePreset": "release-wasm-nothreads"
 		},
@@ -1394,12 +1464,20 @@
 			"configurePreset": "release-wasm-nothreads-all-tests"
 		},
 		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"configurePreset": "release-wasm-nothreads-all-tests-browser"
+		},
+		{
 			"name": "devel-wasm",
 			"configurePreset": "devel-wasm"
 		},
 		{
 			"name": "devel-wasm-all-tests",
 			"configurePreset": "devel-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"configurePreset": "devel-wasm-all-tests-browser"
 		},
 		{
 			"name": "devel-wasm-repl",
@@ -1414,6 +1492,10 @@
 			"configurePreset": "devel-wasm-repl-browser"
 		},
 		{
+			"name": "devel-wasm-repl-tests-browser",
+			"configurePreset": "devel-wasm-repl-tests-browser"
+		},
+		{
 			"name": "devel-wasm-nothreads",
 			"configurePreset": "devel-wasm-nothreads"
 		},
@@ -1422,12 +1504,20 @@
 			"configurePreset": "devel-wasm-nothreads-all-tests"
 		},
 		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"configurePreset": "devel-wasm-nothreads-all-tests-browser"
+		},
+		{
 			"name": "debug-wasm",
 			"configurePreset": "debug-wasm"
 		},
 		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-all-tests-browser",
+			"configurePreset": "debug-wasm-all-tests-browser"
 		},
 		{
 			"name": "debug-wasm-repl",
@@ -1442,12 +1532,20 @@
 			"configurePreset": "debug-wasm-repl-browser"
 		},
 		{
+			"name": "debug-wasm-repl-tests-browser",
+			"configurePreset": "debug-wasm-repl-tests-browser"
+		},
+		{
 			"name": "debug-wasm-nothreads",
 			"configurePreset": "debug-wasm-nothreads"
 		},
 		{
 			"name": "debug-wasm-nothreads-all-tests",
 			"configurePreset": "debug-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"configurePreset": "debug-wasm-nothreads-all-tests-browser"
 		},
 		{
 			"name": "relwithdebinfo",
@@ -1620,36 +1718,72 @@
 			"configurePreset": "release-wasm-all-tests"
 		},
 		{
+			"name": "release-wasm-all-tests-browser",
+			"configurePreset": "release-wasm-all-tests-browser"
+		},
+		{
 			"name": "release-wasm-repl-tests",
 			"configurePreset": "release-wasm-repl-tests"
+		},
+		{
+			"name": "release-wasm-repl-tests-browser",
+			"configurePreset": "release-wasm-repl-tests-browser"
 		},
 		{
 			"name": "release-wasm-nothreads-all-tests",
 			"configurePreset": "release-wasm-nothreads-all-tests"
 		},
 		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"configurePreset": "release-wasm-nothreads-all-tests-browser"
+		},
+		{
 			"name": "devel-wasm-all-tests",
 			"configurePreset": "devel-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"configurePreset": "devel-wasm-all-tests-browser"
 		},
 		{
 			"name": "devel-wasm-repl-tests",
 			"configurePreset": "devel-wasm-repl-tests"
 		},
 		{
+			"name": "devel-wasm-repl-tests-browser",
+			"configurePreset": "devel-wasm-repl-tests-browser"
+		},
+		{
 			"name": "devel-wasm-nothreads-all-tests",
 			"configurePreset": "devel-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"configurePreset": "devel-wasm-nothreads-all-tests-browser"
 		},
 		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
 		},
 		{
+			"name": "debug-wasm-all-tests-browser",
+			"configurePreset": "debug-wasm-all-tests-browser"
+		},
+		{
 			"name": "debug-wasm-repl-tests",
 			"configurePreset": "debug-wasm-repl-tests"
 		},
 		{
+			"name": "debug-wasm-repl-tests-browser",
+			"configurePreset": "debug-wasm-repl-tests-browser"
+		},
+		{
 			"name": "debug-wasm-nothreads-all-tests",
 			"configurePreset": "debug-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"configurePreset": "debug-wasm-nothreads-all-tests-browser"
 		},
 		{
 			"name": "debug-binding-python-tests",

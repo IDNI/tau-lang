@@ -1,23 +1,20 @@
-// Shared plumbing for driving emscripten MODULARIZE=0 doctest binaries
-// (<x>.js/<x>.wasm pairs) inside headless Chrome, used by both
-// run-in-chrome.js (one test) and run-suite-in-chrome.js (the whole ctest
-// suite). Kept in one place so the harness page, the static server and the
-// exit-status contract can't drift between the two the way tref and
-// has_gpp did (see AGENTS.md's comment-style section and
-// .local/build-emscripten.md Phase 4).
+// Shared plumbing for driving emscripten MODULARIZE=0 binaries and the browser
+// REPL page inside headless Chrome: the harness page, the static server and
+// Chrome discovery, so the callers cannot drift from one another.
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const DEFAULT_BUILD_DIR = path.join(__dirname, '..', '..', '..', 'build', 'debug-emscripten-tests');
 const DEVRC = path.join(__dirname, '..', '..', '..', 'external', 'parser', 'scripts', 'devrc');
 const DEFAULT_TIMEOUT_MS = Number(process.env.TAU_BROWSER_TEST_TIMEOUT_MS) || 30000;
 
 const MIME_TYPES = {
 	'.wasm': 'application/wasm',
 	'.js': 'text/javascript',
+	'.mjs': 'application/javascript',
+	'.css': 'text/css',
 	'.html': 'text/html',
 };
 
@@ -25,8 +22,19 @@ const MIME_TYPES = {
 // explicit path (relative/absolute, with or without ".js") to the
 // directory/basename of an emscripten output pair, verifying both the
 // ".js" and ".wasm" halves exist.
+// Resolves the build directory a caller passed; the callers own their
+// defaults, so a missing one is an error here rather than a silent stale build.
+function requireBuildDir(dir) {
+	if (!dir)
+		throw new Error('a build directory is required (the directory holding the <test>.js/<test>.wasm pairs)');
+	return path.resolve(dir);
+}
+
 function resolveTarget(arg, buildDir) {
 	const looksLikePath = arg.includes('/') || arg.endsWith('.js');
+	if (!looksLikePath && !buildDir)
+		throw new Error(`a build directory is required for the bare test name '${arg}' `
+			+ '(pass it as the next argument, or pass a path to the .js)');
 	const jsPath = looksLikePath
 		? path.resolve(process.cwd(), arg.endsWith('.js') ? arg : `${arg}.js`)
 		: path.join(buildDir, `${arg}.js`);
@@ -61,6 +69,8 @@ window.Module = {
 // makes that sharing possible.
 function createServer(dir) {
 	const server = http.createServer((req, res) => {
+		res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+		res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
 		const url = new URL(req.url, 'http://localhost');
 		if (url.pathname === '/__harness__.html') {
 			const scriptName = url.searchParams.get('script');
@@ -88,7 +98,43 @@ function createServer(dir) {
 			resolve({
 				server,
 				baseUrl: `http://127.0.0.1:${port}`,
-				close: () => new Promise((r) => server.close(r)),
+				close: () => new Promise((r) => {
+					server.closeAllConnections?.();
+					server.close(r);
+				}),
+			});
+		});
+	});
+}
+
+// Static server for the browser REPL page (index.html, index.mjs, xterm.css,
+// tau_repl_web.js/.wasm, vendor/). Its own routing and MIME set because
+// createServer() above serves doctest output pairs, not this asset set.
+//
+// COOP/COEP go on every response so the page is cross-origin isolated from its
+// first load, without the sw.js registration-and-reload fallback.
+function createCoiServer(dir) {
+	const server = http.createServer((req, res) => {
+		const url = new URL(req.url, 'http://localhost');
+		const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+		const filePath = path.join(dir, decodeURIComponent(pathname));
+		res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+		res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+		fs.readFile(filePath, (err, data) => {
+			if (err) { res.writeHead(404); res.end(); return; }
+			res.writeHead(200, { 'Content-Type': MIME_TYPES[path.extname(filePath)] || 'application/octet-stream' });
+			res.end(data);
+		});
+	});
+	return new Promise((resolve) => {
+		server.listen(0, '127.0.0.1', () => {
+			const port = server.address().port;
+			resolve({
+				baseUrl: `http://127.0.0.1:${port}`,
+				close: () => new Promise((r) => {
+					server.closeAllConnections?.();
+					server.close(r);
+				}),
 			});
 		});
 	});
@@ -221,12 +267,13 @@ async function runTest(browser, { baseUrl, name, timeoutMs }) {
 }
 
 module.exports = {
-	DEFAULT_BUILD_DIR,
+	requireBuildDir,
 	DEFAULT_TIMEOUT_MS,
 	MIME_TYPES,
 	resolveTarget,
 	harnessHtml,
 	createServer,
+	createCoiServer,
 	loadPuppeteer,
 	resolveChromePath,
 	runTest,

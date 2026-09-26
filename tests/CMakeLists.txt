@@ -450,6 +450,26 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 	endif()
 endif ()
 
+#
+# The REPL suite inside the browser REPL page, in headless Chrome
+# (TAU_BUILD_REPL_BROWSER_TESTS). The test list comes from the node build's
+# ctest registration, because the page's own directory holds only the page
+# (see AGENTS.md): run ./dev preset release-wasm-repl-tests before this suite.
+#
+if (TAU_BUILD_REPL_BROWSER_TESTS)
+	enable_testing()
+	add_test(NAME repl_browser_suite
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/repl-suite-in-chrome.js"
+			"${PROJECT_BINARY_DIR}"
+			"${TAU_REPL_BROWSER_TEST_LIST_DIR}")
+	# A page load per test; the node suite's own wall time is minutes, and
+	# the browser reloads a ~20 MB module each time.
+	set_tests_properties(repl_browser_suite PROPERTIES
+		TIMEOUT 7200
+		TAU_NODE_ONLY TRUE)
+endif ()
+
 # ctest runs the binaries the build tree holds and never builds them; the
 # build_tree fixture (the parser's ctest-build-tree.cmake, vendored as
 # cmake/tau-shared-ctest-build-tree.cmake for the store path) builds them
