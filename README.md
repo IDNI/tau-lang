@@ -145,15 +145,11 @@ handling, parallel jobs and build directories.
 The parser is a git submodule at `external/parser/`; `./dev` initializes it
 automatically on first use.
 
-CVC5 is built into `~/.tau/cvc5` by the CMake configure step if it is not there
-yet. Boost is taken from the system by default, and only built into `~/.tau/boost`
-when that is required (cross-compiling for Windows, or a position-independent
-build). You can also build either dependency explicitly:
-
-```bash
-./dev dep-boost
-./dev dep-cvc5
-```
+Dependencies resolve from the local store at `~/.tau/store`. Configure reads a
+missing package from the remote store named by `TAU_STORE_REMOTE` (a private GHCR
+OCI artifact per entry) and, when that has none either, builds it with the preset's
+compiler. `./dev store-pull` prefetches named entries and `./dev store-publish`
+uploads the local entries the remote lacks.
 
 To build the binaries:
 

@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
   actions: write
+  packages: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
 jobs:
   check_date:
@@ -119,6 +123,7 @@ jobs:
         run: |
           ./dev docker nightly --load \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps
         env:
@@ -143,8 +148,6 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
-      # bump to force a rebuild of the cached ~/.tau dependency tree
-      TAU_DEPS_EPOCH: 1
     steps:
       - uses: actions/checkout@v7
         with:
@@ -154,24 +157,32 @@ jobs:
       - name: Stamp nightly version
         run: printf '%s' "$(head -n 1 VERSION)-$(date +%F)" > VERSION
 
-      # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
-      - name: Cache ~/.tau (cvc5 + boost)
-        id: cache-tau
-        uses: actions/cache@v4
+      # The store is content-addressed; a miss is built with the preset's
+      # AppleClang and reused by the next run.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
         with:
-          path: ~/.tau
-          key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
+          path: ~/.tau/store
+          key: tau-store-macos-15-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-15-
 
-      - name: Build cvc5
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-cvc5.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
 
-      - name: Build boost
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build macOS packages (.dmg + .zip)
         run: ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       # upload-artifact globs literally and will not expand ~,
       # so hand it an absolute path through the env
@@ -181,7 +192,7 @@ jobs:
       - name: Upload macOS packages
         uses: actions/upload-artifact@v4
         with:
-          name: packages-macos
+          name: release-packages-macos
           path: ${{ env.PKG_DIR }}
 
   publish:

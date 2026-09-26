@@ -7,6 +7,15 @@ on:
     branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  # Normal CI only reads the store packages; the trusted deps-store.yml owns
+  # packages: write.
+  packages: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -108,6 +117,7 @@ jobs:
         run: |
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BAS=${{ matrix.pack }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
@@ -155,9 +165,96 @@ jobs:
         run: |
           ./dev docker test-with-testnet \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-release-default
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # One job builds emsdk and the browser test dependencies, so the wasm gates
+  # import them instead of each gate building them. Change the scope to force
+  # a rebuild. These gates build the distributable wasm pack only; the wasm
+  # dependencies resolve from the local store at configure time
+  # (cmake/tau-deps.cmake), never the older ~/.tau dist path.
+  wasm-deps:
+    name: Build wasm deps images (emsdk, Chrome)
+    needs: deps
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build wasm-deps and wasm-browser-deps stages
+        run: |
+          ./dev docker wasm-browser-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-to   type=gha,scope=tau-wasm-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  wasm-node:
+    name: WebAssembly (Node.js)
+    needs: wasm-deps
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build and test
+        run: |
+          ./dev docker wasm-node \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  wasm-browser:
+    name: WebAssembly (browser)
+    needs: wasm-deps
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build and test
+        run: |
+          ./dev docker wasm-browser \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -167,40 +264,33 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
-      # bump to force a rebuild of the cached ~/.tau dependency tree
-      TAU_DEPS_EPOCH: 1
+      TAU_STORE_KEEP: 3
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
-      - name: Restore ~/.tau (cvc5 + boost)
-        id: cache-tau
+      # The store is content-addressed, so a restored entry is reused and a
+      # miss is built here with the preset's own AppleClang. The key does not
+      # need to describe the recipes: a stale key costs a rebuild, never a
+      # wrong package.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau
-          key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
-
-      - name: Build cvc5
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-cvc5.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      - name: Build boost
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      # saved here, before the build, so a failing build or test does not
-      # discard the deps and force a rebuild on the next run
-      - name: Save ~/.tau (cvc5 + boost)
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau
-          key: ${{ steps.cache-tau.outputs.cache-primary-key }}
+          path: ~/.tau/store
+          key: tau-store-macos-15-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-15-
 
       - name: Install nanobind, spot, and coreutils for the test suites
         run: brew install nanobind spot coreutils
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -210,6 +300,15 @@ jobs:
         run: |
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # saved after the run, so a build failure still keeps the packages that
+      # did resolve and the next run does not rebuild them
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -233,4 +332,64 @@ jobs:
 
       - name: Run tau
         run: ./build/release/tau -v
+
+  # The MSVC target now builds cvc5 (bv and hsb), nlang (store curl) and the
+  # full test suite, all resolved from the preset's own compiler; a miss is
+  # built here and cached. The MSVC shell comes from ilammy/msvc-dev-cmd, so
+  # the producers' vcvars64.bat search is only a local fallback.
+  windows:
+    name: Windows release (MSVC)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # cl.exe is on PATH only inside a developer command prompt.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The Spot package is a host tool built with MSYS2 UCRT64 g++ (nothing
+      # links it); the runner ships MSYS2 but not always this toolchain.
+      - name: Install the MSYS2 UCRT64 toolchain
+        if: steps.cache-store.outputs.cache-hit != 'true'
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
+
+      - name: Build and test tau (Release, MSVC)
+        run: ./dev preset release-msvc-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 

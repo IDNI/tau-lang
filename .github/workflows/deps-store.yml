@@ -1,0 +1,151 @@
+name: Dependencies (store)
+
+# The only job allowed to write packages. It runs after a successful Test
+# Release, or by hand, and only on the protected branches. Recipes therefore
+# come from the protected branch, never from a pull request head.
+on:
+  workflow_run:
+    workflows: [ "Test Release" ]
+    types: [ completed ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # One private OCI artifact per store entry, tagged <dep>-<id>.
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Always the protected branch, never a pull request head.
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # The Linux packages must carry the compiler the Docker consumers use, so
+      # they are built and published from the same image the tests build in.
+      # TESTS=no keeps it to a configure and a tau build; the store is what the
+      # run leaves behind and TAU_STORE_PUBLISH uploads.
+      - name: Resolve and publish the Linux store packages
+        run: |
+          ./dev docker build-release \
+            --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=ON \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The wasm and MinGW packages are built on this host too, in the same
+      # images their consumers use, so their ids match as well.
+      - name: Resolve and publish the wasm store packages
+        run: |
+          ./dev docker wasm-node \
+            --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=ON \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve and publish the MinGW store packages
+        run: |
+          ./dev docker w64-build \
+            --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=ON \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The macOS packages are AppleClang-built and cannot come from the Linux job.
+  publish-macos:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
+    runs-on: macos-15
+    env:
+      TAU_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # Resolves every dependency, builds the ones the remote lacks with the
+      # preset's AppleClang, then publishes them.
+      - name: Resolve and publish the macOS store packages
+        run: |
+          ./dev preset release-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The MSVC packages are cl.exe-built and cannot come from the Linux job.
+  publish-windows:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve and publish the MSVC store packages
+        run: |
+          ./dev preset release-msvc-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

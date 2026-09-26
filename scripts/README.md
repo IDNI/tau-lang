@@ -187,9 +187,10 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 
 See [`docker.sh`](docker.sh) — `docker tau`, `docker packages`, `docker w64-*`, …
 
-[`with-gh-token`](with-gh-token) authenticates the cvc5/boost clones when the
-image build is passed `--secret id=gh_token`. It is extensionless because only
-`scripts/*.sh` are `./dev` subcommands.
+[`with-gh-token`](with-gh-token) authenticates the cvc5/boost clones and the
+oras pull from the remote store when the image build is passed
+`--secret id=gh_token`. It is extensionless because only `scripts/*.sh` are
+`./dev` subcommands.
 
 ## Distributed builds (icecream)
 

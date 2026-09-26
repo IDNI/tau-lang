@@ -57,8 +57,10 @@ case "${CMD}" in
                 echo "  w64-build     - build w64-build image"
                 echo "  w64-packages  - release packages (Windows)"
                 echo "  w64-nightly   - nightly release packages (Windows)"
-                echo "  wasm-deps     - build wasm-deps image"
-                echo "  wasm-build    - build wasm-build image, and (TESTS=yes) run the wasm suite"
+                echo "  wasm-deps         - build wasm-deps image"
+                echo "  wasm-node         - build wasm-node image, and (TESTS=yes) run the node suite"
+                echo "  wasm-browser-deps - build wasm-browser-deps image (Chrome, npm packages)"
+                echo "  wasm-browser      - build wasm-browser image, and (TESTS=yes) run the browser suite"
                 ;;
         "build")
                 build "${@:2}"
@@ -122,8 +124,14 @@ case "${CMD}" in
         "wasm-deps")
                 build --target wasm-deps -t tau:wasm-deps "${@:2}"
                 ;;
-        "wasm-build")
-                build --target wasm-build -t tau:wasm-build "${@:2}"
+        "wasm-node")
+                build --target wasm-node -t tau:wasm-node "${@:2}"
+                ;;
+        "wasm-browser-deps")
+                build --target wasm-browser-deps -t tau:wasm-browser-deps "${@:2}"
+                ;;
+        "wasm-browser")
+                build --target wasm-browser -t tau:wasm-browser "${@:2}"
                 ;;
         *)
                 echo "Unknown docker action: ${CMD}"
