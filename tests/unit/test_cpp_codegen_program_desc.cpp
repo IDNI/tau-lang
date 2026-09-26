@@ -20,7 +20,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <sys/wait.h>
 
 using namespace idni::tau_lang;
 
@@ -65,29 +64,34 @@ bool has(const std::string& s, const std::string& pat) {
 	return s.find(pat) != std::string::npos;
 }
 
-bool has_gpp() {
-	return ::system("g++ --version >/dev/null 2>&1") == 0;
+bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
+
+// Per-process scratch directory, unique per checkout (no fixed /tmp names).
+const std::string& cg_tmp_dir() {
+	static const std::string dir = tau_test_tmp("cg_program_desc").string();
+	return dir;
+}
+const std::string cg_tmp(const std::string& name) {
+	return cg_tmp_dir() + "/" + name;
 }
 
-// Write `header_src` + `main_src` to the test's scratch directory, compile
-// with g++, run, return the first stdout line ("" on any compile/run failure).
+// Write `header_src` + `main_src` to the scratch dir, compile with the host
+// compiler, run, return the first stdout line ("" on any failure).
 std::string compile_and_run(
     const std::string& header_src,
     const std::string& main_src,
     const std::string& tag)
 {
-	const std::string dir = suite_scratch_dir().string();
-	std::string hdr  = dir + "/_tau_cg_pd_" + tag + ".h";
-	std::string mainf = dir + "/_tau_cg_pd_" + tag + "_main.cpp";
-	std::string exe  = dir + "/_tau_cg_pd_" + tag + "_exe";
+	const std::string hdr  = cg_tmp("_tau_cg_pd_" + tag + ".h");
+	const std::string mainf = cg_tmp("_tau_cg_pd_" + tag + "_main.cpp");
+	const std::string exe  = cg_tmp("_tau_cg_pd_" + tag + "_exe")
+		+ tau_test_exe_suffix();
 	{ std::ofstream f(hdr); f << header_src; }
 	{ std::ofstream f(mainf); f << main_src; }
-	std::string cmd = "g++ -O2 -std=c++23 -I\"" + dir + "\" -o \"" + exe
-		+ "\" \"" + mainf + "\" 2>&1";
-	if (::system(cmd.c_str()) != 0) return "";
-	std::string run_cmd = "\"" + exe + "\" > \"" + exe + ".out\" 2>&1";
-	if (::system(run_cmd.c_str()) != 0) return "";
-	std::ifstream out(exe + ".out");
+	if (!tau_test_compile(exe, { mainf }, cg_tmp_dir(), 23).ok) return "";
+	auto run = tau_test_run({ exe });
+	if (run.exit_code != 0) return "";
+	std::istringstream out(run.out);
 	std::string line;
 	std::getline(out, line);
 	return line;
@@ -131,17 +135,14 @@ bool run_sdk_link_test() {
 	return v && *v && std::string(v) != "0";
 }
 
-// Run `cmd`, returning its combined stdout+stderr and its exit code.
+// Run `argv`, returning its combined stdout+stderr and whether it exited
+// cleanly. spawn_capture decides the exit code itself, so only the
+// zero/non-zero distinction leaves the helper (see tau_test_run).
 struct captured_run { std::string out; int exit_code = -1; };
-captured_run run_capture_ec(const std::string& cmd) {
-	captured_run r;
-	FILE* p = popen((cmd + " 2>&1").c_str(), "r");
-	if (!p) return r;
-	char buf[256];
-	while (std::fgets(buf, sizeof(buf), p)) r.out += buf;
-	int status = pclose(p);
-	r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	return r;
+captured_run run_capture_ec(const std::string& exe_path,
+	const std::string& stdin_data = "") {
+	auto run = tau_test_run({ exe_path }, stdin_data);
+	return { run.out + run.err, run.exit_code };
 }
 
 } // namespace
@@ -198,8 +199,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK_FALSE(has(s, "void revise("));
 	}
 
-	TEST_CASE("emit_program: echo spec compiles and runs (self-contained)") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+	TEST_CASE("emit_program: echo spec compiles and runs (self-contained)"
+	          * doctest::skip(!can_spawn_subprocess())) {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d = build_program_desc_prop(
 			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd3");
 		REQUIRE_FALSE(d.needs_tau_link);
@@ -227,7 +229,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// ── (b) PWR x witness refusal ─────────────────────────────────────────
 
-	TEST_CASE("build_program_desc: revisable refuses witness outputs") {
+	TEST_CASE("build_program_desc: revisable refuses witness outputs" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "refused", /*revisable=*/true);
@@ -239,7 +241,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			"PWR revision with data-atom outputs is not supported"));
 	}
 
-	TEST_CASE("build_program_desc: witness output still builds when not revisable") {
+	TEST_CASE("build_program_desc: witness output still builds when not revisable" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "witness_ok", /*revisable=*/false);
@@ -432,7 +434,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	TEST_CASE("emit_program: revisable=true compiles, steps, and revises") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d1 = build_program_desc_prop(
 			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true);
 		std::ostringstream os1;
@@ -530,7 +532,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(d->outputs.size() == 1);
 	}
 
-	TEST_CASE("build_program_desc: relative-only (lookback) spec bakes lookback, no highest_initial_pos") {
+	TEST_CASE("build_program_desc: relative-only (lookback) spec bakes lookback, no highest_initial_pos" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "lookback");
@@ -570,7 +572,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// A no-input positional artifact runs exactly highest_initial_pos+1
 	// steps and exits cleanly.
 	TEST_CASE("emitted driver loop: no-input positional spec runs highest_initial_pos+1 steps") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
@@ -638,7 +640,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("emitted driver loop: 3-position flag spec outputs a distinct "
 	          "combination at each step through ordinary edge outputs") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
@@ -961,7 +963,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// The artifact reads i1 from stdin and echoes it to o1 until input ends.
 	TEST_CASE("echo.tau: compile_spec emits the artifact, "
 	          "piped inputs come back in order, exit code 0") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		namespace stdfs = std::filesystem;
 		stdfs::path bdir = suite_scratch_dir() / "_tau_cg_pd_echo";
 		std::error_code ec;
@@ -979,8 +981,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE_MESSAGE(res.has_value(), err.str());
 		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		auto run = run_capture_ec(
-			"printf '2\\n7\\n4\\n' | " + res.value().exe_path);
+		auto run = run_capture_ec(res.value().exe_path, "2\n7\n4\n");
 		MESSAGE("echo artifact output: ", run.out);
 		CHECK(run.exit_code == 0);
 		// Each piped input value comes back on the o1 stream, in order
@@ -1004,7 +1005,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// and the literal's own codegen_constant_expr rendering (qlt_rational(1, 2),
 	// not a re-parsed string).
 	TEST_CASE("build_program_desc: atom_desc captures a ground-equality atom "
-	          "over a real BA type") {
+	          "over a real BA type" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:qlt = {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "atom_ground");
@@ -1407,8 +1408,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: file-bound input stream is captured "
 	          "as binding::file with its filename, console output unchanged") {
 		compile_detail::scoped_clean_definitions<node_t> clean_defs;
+		const std::string stream_file = cg_tmp("_tau_cg_pd_stream_test.in");
 		std::string src =
-			"i1:tau := in file(\"/tmp/_tau_cg_pd_stream_test.in\").\n"
+			"i1:tau := in file(\"" + stream_file + "\").\n"
 			"o1:tau := out console.\n"
 			"G(o1[t]:tau = i1[t]:tau).";
 		tref fm = parse_like_compile_spec(src);
@@ -1426,8 +1428,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(d->input_streams.size() == 1);
 		CHECK(d->input_streams[0].name == "i1");
 		CHECK(d->input_streams[0].bind == stream_desc::binding::file);
-		CHECK(d->input_streams[0].filename ==
-			"/tmp/_tau_cg_pd_stream_test.in");
+		CHECK(d->input_streams[0].filename == stream_file);
 
 		REQUIRE(d->output_streams.size() == 1);
 		CHECK(d->output_streams[0].name == "o1");
@@ -1438,7 +1439,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		compile_detail::emit_main(*d, os);
 		std::string s = os.str();
 		CHECK(has(s, "ctx.add_input_file(\"i1\", "));
-		CHECK(has(s, "\"/tmp/_tau_cg_pd_stream_test.in\")"));
+		CHECK(has(s, "\"" + stream_file + "\")"));
 		CHECK(has(s, "ctx.add_output_console(\"o1\", "));
 		CHECK_FALSE(has(s, "add_input_console(\"i1\""));
 		CHECK_FALSE(has(s, "add_output_file(\"o1\""));
@@ -1446,7 +1447,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// No stream_ctx given (build_program_desc's default): every stream stays
 	// console-bound, matching every existing call site above verbatim.
-	TEST_CASE("build_program_desc: without stream_ctx, streams default to console") {
+	TEST_CASE("build_program_desc: without stream_ctx, streams default to console" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "no_ctx_default");

@@ -42,7 +42,6 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <sys/wait.h>
 #include <vector>
 
 using namespace idni::tau_lang;
@@ -166,38 +165,21 @@ std::optional<std::string> resolve_tau_exe() {
 
 struct proc_result { std::string out, err; int exit_code = -1; };
 
-// Run `exe_cmd`, feeding it stdin_file's content, into separate stdout/stderr
-// captures identified by `tag` (unique per fixture and side).
-proc_result run_piped(const std::string& exe_cmd, const stdfs::path& stdin_file,
-	const std::string& tag)
+// Run `argv`, feeding it `tape` on stdin, capturing stdout and stderr apart
+// (the comparison is on stdout alone; stderr is reported, never asserted).
+proc_result run_piped(const std::vector<std::string>& argv,
+	const std::string& tape)
 {
-	stdfs::path out_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".out");
-	stdfs::path err_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".err");
-	std::string cmd = exe_cmd
-		+ " < \"" + stdin_file.string() + "\""
-		+ " > \"" + out_path.string() + "\""
-		+ " 2> \"" + err_path.string() + "\"";
-	int status = std::system(cmd.c_str());
-	proc_result r;
-	r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	r.out = read_file(out_path);
-	r.err = read_file(err_path);
-	std::error_code ec;
-	stdfs::remove(out_path, ec);
-	stdfs::remove(err_path, ec);
-	return r;
+	auto run = tau_test_run(argv, tape);
+	return { run.out, run.err, run.exit_code };
 }
 
-// tests/codegen_specs/<name>.in sibling (literal stdin, absent = empty),
-// written to a temp file so both sides read the exact same bytes.
-stdfs::path write_stdin_tape(const stdfs::path& spec_path, const std::string& tag) {
+// tests/codegen_specs/<name>.in sibling: the literal stdin fed to both sides,
+// one value per line in prompt order; absent means the spec has no inputs.
+std::string read_tape(const stdfs::path& spec_path) {
 	stdfs::path in_path = spec_path;
 	in_path.replace_extension(".in");
-	std::string content = stdfs::exists(in_path) ? read_file(in_path) : "";
-	stdfs::path tape_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".stdin");
-	std::ofstream f(tape_path, std::ios::binary);
-	f << content;
-	return tape_path;
+	return stdfs::exists(in_path) ? read_file(in_path) : "";
 }
 
 long long elapsed_ms(std::chrono::steady_clock::time_point t0) {
@@ -429,7 +411,8 @@ TEST_SUITE("codegen_parity") {
 	// Checks the corpus is well-formed, not parity: every fixture is
 	// readable/non-empty and every .in belongs to a fixture. No solving, no
 	// compiling, no subprocess -- stays in the millisecond range.
-	TEST_CASE("codegen_specs corpus is well-formed") {
+	TEST_CASE("codegen_specs corpus is well-formed"
+	          * doctest::skip(!codegen_specs_dir().has_value())) {
 		auto dir = codegen_specs_dir();
 		REQUIRE_MESSAGE(dir.has_value(), "codegen_specs directory not found");
 		auto fixtures = discover_fixtures(*dir);
@@ -578,12 +561,12 @@ TEST_SUITE("codegen_parity") {
 			REQUIRE_MESSAGE(!src.empty(),
 				name << ": spec file not found or empty");
 
-			stdfs::path stdin_file = write_stdin_tape(spec_path, name);
+			std::string tape = read_tape(spec_path);
 			std::error_code ec;
 
 			auto t0 = std::chrono::steady_clock::now();
-			auto cli = run_piped("\"" + *tau_exe + "\" \"" + spec_path.string()
-				+ "\" -q -b off", stdin_file, name + "_cli");
+			auto cli = run_piped({ *tau_exe, spec_path.string(),
+				"-q", "-b", "off" }, tape);
 			auto cli_ms = elapsed_ms(t0);
 
 			stdfs::path build_dir = suite_scratch_dir() / ("_tau_cg_parity_build_" + name);
@@ -604,7 +587,6 @@ TEST_SUITE("codegen_parity") {
 					     << cli.out);
 				MESSAGE(name, ": compile_spec refused: ", why.str());
 				stdfs::remove_all(build_dir, ec);
-				stdfs::remove(stdin_file, ec);
 				continue;
 			}
 
@@ -615,8 +597,8 @@ TEST_SUITE("codegen_parity") {
 			// variable ever needs real input) diverges on step count
 			// alone, not on interpreter/artifact semantics.
 			auto t2 = std::chrono::steady_clock::now();
-			auto artifact = run_piped("\"" + res.value().exe_path + "\" -q -b off",
-				stdin_file, name + "_artifact");
+			auto artifact = run_piped({ res.value().exe_path,
+				"-q", "-b", "off" }, tape);
 			auto run_ms = elapsed_ms(t2);
 			MESSAGE(name, ": artifact run ", run_ms, " ms, exit ",
 				artifact.exit_code);
@@ -643,7 +625,6 @@ TEST_SUITE("codegen_parity") {
 				// witness differently).
 				stdfs::path in_path = spec_path;
 				in_path.replace_extension(".in");
-				std::string tape = stdfs::exists(in_path) ? read_file(in_path) : "";
 				auto cli_ok = trace_is_admissible(src,
 					extract_output_trace(cli_body), tape);
 				auto artifact_ok = trace_is_admissible(src,
@@ -687,13 +668,13 @@ TEST_SUITE("codegen_parity") {
 					"\n--- artifact stderr ---\n", artifact.err);
 
 			stdfs::remove_all(build_dir, ec);
-			stdfs::remove(stdin_file, ec);
 		}
 	}
 
 	// Opt-in, kept separate from the corpus loop above: that loop's -q would
-	// idle-quit before a __step_ge<k> guard for k > 1 is ever exercised, so
-	// both sides here run unbounded except by a wall-clock timeout.
+	// idle-quit before a __step_ge<k> guard for k > 1 is ever exercised. The
+	// tape carries blank lines to answer the continue prompt, so both sides
+	// step past the guard, and spawn_capture's timeout_sec bounds the run.
 	TEST_CASE("compile+run vs interpreter: __step_ge-bearing spec over 4+ steps") {
 		if (!run_parity_test()) {
 			MESSAGE("TAU_CODEGEN_RUN_PARITY_TEST not set; skipping the "
@@ -713,7 +694,6 @@ TEST_SUITE("codegen_parity") {
 		std::string src = read_file(spec_path);
 		REQUIRE_MESSAGE(!src.empty(), name << ": spec file not found or empty");
 
-		stdfs::path stdin_file = write_stdin_tape(spec_path, name + "_stepguard");
 		std::error_code ec;
 		stdfs::path build_dir = suite_scratch_dir() /
 			("_tau_cg_parity_build_" + name + "_stepguard");
@@ -723,12 +703,15 @@ TEST_SUITE("codegen_parity") {
 		std::ostringstream err; res.print(err);
 		REQUIRE_MESSAGE(res.has_value(), name << ": compile_spec failed: " << err.str());
 
-		// No -q: the run keeps stepping past its own eventuality instead
-		// of idling out; `timeout` is the only thing that stops it.
-		auto cli = run_piped("timeout 10 \"" + *tau_exe + "\" \""
-			+ spec_path.string() + "\" -b off", stdin_file, name + "_sg_cli");
-		auto artifact = run_piped("timeout 10 \"" + res.value().exe_path + "\" -b off",
-			stdin_file, name + "_sg_artifact");
+		// No -q, so the run keeps stepping past its own eventuality instead
+		// of idling out. A blank line answers each continue prompt, so the
+		// tape must be long enough to reach the guard; the 10 s bound is a
+		// safety net for a run that still stalls.
+		std::string tape = read_tape(spec_path) + std::string(8, '\n');
+		auto cli = tau_test_run({ *tau_exe, spec_path.string(), "-b", "off" },
+			tape, 10);
+		auto artifact = tau_test_run({ res.value().exe_path, "-b", "off" },
+			tape, 10);
 
 		auto cli_trace = extract_output_trace(extract_console_body(cli.out));
 		auto artifact_trace =
@@ -741,9 +724,9 @@ TEST_SUITE("codegen_parity") {
 			     << " step(s); need at least 4\n--- artifact stdout ---\n"
 			     << artifact.out);
 
-		// Compare only the shared prefix: the two sides' bounded-by-wall-
-		// clock run lengths may differ, but every step both reached must
-		// agree, including step 1 onward where __step_ge1 first reads true.
+		// Compare only the shared prefix: every step both sides reached
+		// must agree, including step 1 onward where __step_ge1 first reads
+		// true.
 		size_t n = std::min<size_t>(4,
 			std::min(cli_trace.size(), artifact_trace.size()));
 		for (size_t i = 0; i < n; ++i) {
@@ -758,7 +741,6 @@ TEST_SUITE("codegen_parity") {
 		}
 
 		stdfs::remove_all(build_dir, ec);
-		stdfs::remove(stdin_file, ec);
 	}
 
 	// Opt-in (TAU_PHI_DELTA_SWAP_MEASURE=1): synthesis-time wall clock for

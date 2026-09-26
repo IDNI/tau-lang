@@ -1,43 +1,35 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Round-trip test: emit C++ program from a known hoa_automaton, write it to
-// a temp file, compile it with g++ -O3 -flto, link + run a tiny driver,
-// and check runtime behavior matches the synthesized strategy.
+// a temp file, compile it with the host C++ compiler, link + run a tiny
+// driver, and check runtime behavior matches the synthesized strategy.
 
 #include "test_init.h"
+#include "test_tau_helpers.h"
 #include "cpp_codegen.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <unistd.h>
 
-// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
-// predictable /tmp names -- concurrent checkouts running this suite used
-// to clobber each other's headers/binaries.
+// CG-N11: per-process scratch directory instead of fixed, predictable /tmp
+// names -- concurrent checkouts running this suite used to clobber each
+// other's headers/binaries. tau_test_tmp puts it under the platform temp dir
+// with a random suffix, so the suite also builds and runs on MinGW and MSVC.
 static const std::string& cg_tmp_dir() {
-	static const std::string dir = [] {
-		std::string t = "/tmp/tau_cg_XXXXXX";
-		char* p = ::mkdtemp(t.data());
-		return std::string(p ? p : "/tmp");
-	}();
+	static const std::string dir = tau_test_tmp("cg_roundtrip").string();
 	return dir;
 }
-static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
-
+static std::string cg_tmp(const std::string& name) {
+	return cg_tmp_dir() + "/" + name;
+}
 
 using namespace idni::tau_lang;
 
 namespace {
-
-// PID-suffixed temp path prefix — avoids CG-N11-style collisions with the
-// other codegen test files' fixed /tmp/_tau_* names when ctest runs them
-// concurrently.
-std::string unique_tmp(const std::string& suffix) {
-	return cg_tmp("_tau_cg_rt_") + std::to_string(::getpid()) + "_" + suffix;
-}
 
 hoa_automaton echo_spec() {
 	hoa_automaton a;
@@ -51,14 +43,13 @@ hoa_automaton echo_spec() {
 	return a;
 }
 
-bool has_gpp() {
-	return system("g++ --version >/dev/null 2>&1") == 0;
-}
+bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 bool compile_and_run_echo(const std::string& header_src) {
 	const std::string hdr_path = cg_tmp("_tau_codegen_test_ctrl.h");
 	const std::string main_path = cg_tmp("_tau_codegen_test_main.cpp");
-	const std::string exe_path = cg_tmp("_tau_codegen_test_exe");
+	const std::string exe_path = cg_tmp("_tau_codegen_test_exe")
+		+ tau_test_exe_suffix();
 
 	{
 		std::ofstream f(hdr_path);
@@ -83,16 +74,12 @@ bool compile_and_run_echo(const std::string& header_src) {
 		    "}\n";
 	}
 
-	std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I" + cg_tmp_dir() + " -o ")
-	                + exe_path + " " + main_path + " 2>&1";
-	// Ensure the header is findable via -I<dir> and the #include matches.
-	int rc = system(cmd.c_str());
-	if (rc != 0) return false;
-
-	rc = system((std::string(exe_path) + " >" + cg_tmp("_tau_codegen_test_out")).c_str());
-	if (rc != 0) return false;
-
-	std::ifstream out(cg_tmp("_tau_codegen_test_out"));
+	// The header is found through -I<scratch dir>, matching the #include.
+	if (!tau_test_compile(exe_path, { main_path }, cg_tmp_dir(), 17,
+		/*ndebug=*/false, /*lto=*/true).ok) return false;
+	auto run = tau_test_run({ exe_path });
+	if (run.exit_code != 0) return false;
+	std::istringstream out(run.out);
 	std::string line; std::getline(out, line);
 	return line == "OK";
 }
@@ -105,11 +92,11 @@ std::string compile_and_run(const std::string& header_src,
                              const std::string& main_body,
                              const std::string& tag,
                              const std::string& preamble = "") {
-	std::string hdr_path  = unique_tmp(tag + ".h");
-	std::string hdr_name  = hdr_path.substr(hdr_path.rfind('/') + 1);
-	std::string main_path = unique_tmp(tag + "_main.cpp");
-	std::string exe_path  = unique_tmp(tag + "_exe");
-	std::string out_path  = unique_tmp(tag + "_out");
+	std::string hdr_path  = cg_tmp("_tau_cg_rt_" + tag + ".h");
+	std::string hdr_name  = std::filesystem::path(hdr_path).filename().string();
+	std::string main_path = cg_tmp("_tau_cg_rt_" + tag + "_main.cpp");
+	std::string exe_path  = cg_tmp("_tau_cg_rt_" + tag + "_exe")
+		+ tau_test_exe_suffix();
 
 	{ std::ofstream f(hdr_path); f << header_src; }
 	{
@@ -121,11 +108,11 @@ std::string compile_and_run(const std::string& header_src,
 		  << "int main() {\n" << main_body << "\n}\n";
 	}
 
-	std::string cmd = "g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o " + exe_path
-	                 + " " + main_path + " 2>&1";
-	if (system(cmd.c_str()) != 0) return "";
-	if (system((exe_path + " >" + out_path).c_str()) != 0) return "";
-	std::ifstream out(out_path);
+	if (!tau_test_compile(exe_path, { main_path }, cg_tmp_dir()).ok)
+		return "";
+	auto run = tau_test_run({ exe_path });
+	if (run.exit_code != 0) return "";
+	std::istringstream out(run.out);
 	std::string line; std::getline(out, line);
 	return line;
 }
@@ -134,8 +121,8 @@ std::string compile_and_run(const std::string& header_src,
 
 TEST_SUITE("cpp_codegen_roundtrip") {
 
-	TEST_CASE("echo spec: emit → g++ -O3 → run passes") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+	TEST_CASE("echo spec: emit → host C++ compiler → run passes") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d = build_program_desc_prop(
 			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_ctrl");
 		REQUIRE_FALSE(d.needs_tau_link);
@@ -230,7 +217,7 @@ TEST_SUITE("cpp_codegen_open") {
 	// CG-N2 (compiled): the paren'd disjunctive conjunct "(0|1)" must gate
 	// the edge -- with a=F,b=F,c=T the edge must NOT fire.
 	TEST_CASE("[CG-GUARD-02] compiled: parenthesised disjunctive conjunct must gate the edge") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		hoa_automaton a;
 		a.num_states = 1;
 		a.initial_state = 0;
@@ -253,7 +240,7 @@ TEST_SUITE("cpp_codegen_open") {
 
 	// CG-N9 (compiled): a guard label "f" listed first must never fire.
 	TEST_CASE("[CG-GUARD-03] compiled: guard 'f' must never fire") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		hoa_automaton a;
 		a.num_states = 2;
 		a.initial_state = 0;
@@ -278,7 +265,7 @@ TEST_SUITE("cpp_codegen_open") {
 	// CG-RT2: multi-state compiled roundtrip -- full cycle plus the
 	// no-matching-edge ok==false path.
 	TEST_CASE("[CG-RT-02] compiled 3-state roundtrip: full cycle + ok=false on no match") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		hoa_automaton a;
 		a.num_states = 3;
 		a.initial_state = 0;

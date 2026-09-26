@@ -13,23 +13,21 @@
 
 #include <cstdlib>
 #include <fstream>
-#include <unistd.h>
 #include <optional>
 #include <sstream>
 #include <string>
 
-// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
-// predictable /tmp names -- concurrent checkouts running this suite used
-// to clobber each other's headers/binaries.
+// CG-N11: per-process scratch directory instead of fixed, predictable /tmp
+// names -- concurrent checkouts running this suite used to clobber each
+// other's headers/binaries. tau_test_tmp puts it under the platform temp dir
+// with a random suffix, so the suite also builds and runs on MinGW and MSVC.
 static const std::string& cg_tmp_dir() {
-	static const std::string dir = [] {
-		std::string t = "/tmp/tau_cg_XXXXXX";
-		char* p = ::mkdtemp(t.data());
-		return std::string(p ? p : "/tmp");
-	}();
+	static const std::string dir = tau_test_tmp("cg_pwr").string();
 	return dir;
 }
-static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+static std::string cg_tmp(const std::string& name) {
+	return cg_tmp_dir() + "/" + name;
+}
 
 
 using namespace idni::tau_lang;
@@ -97,14 +95,13 @@ static bool has(const std::string& s, const std::string& pat) {
 	return s.find(pat) != std::string::npos;
 }
 
-static bool has_gpp() {
-	return ::system("g++ --version >/dev/null 2>&1") == 0;
-}
+static bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 static bool compile_and_run_ok_step(const std::string& header_src) {
 	const std::string hdr = cg_tmp("_tau_codegen_pwr_test.h");
 	const std::string main_f = cg_tmp("_tau_codegen_pwr_main.cpp");
-	const std::string exe = cg_tmp("_tau_codegen_pwr_exe");
+	const std::string exe = cg_tmp("_tau_codegen_pwr_exe")
+		+ tau_test_exe_suffix();
 	{
 		std::ofstream f(hdr);
 		f << header_src;
@@ -125,12 +122,10 @@ static bool compile_and_run_ok_step(const std::string& header_src) {
 			"  return 0;\n"
 			"}\n";
 	}
-	std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
-		+ exe + " " + main_f + " >" + cg_tmp("_tau_codegen_pwr_build") + " 2>&1";
-	if (::system(cmd.c_str()) != 0) return false;
-	std::string run_cmd = std::string(exe) + " > " + cg_tmp("_tau_codegen_pwr_out") + " 2>&1";
-	if (::system(run_cmd.c_str()) != 0) return false;
-	std::ifstream out(cg_tmp("_tau_codegen_pwr_out"));
+	if (!tau_test_compile(exe, { main_f }, cg_tmp_dir()).ok) return false;
+	auto run = tau_test_run({ exe });
+	if (run.exit_code != 0) return false;
+	std::istringstream out(run.out);
 	std::string line;
 	std::getline(out, line);
 	return line == "OK";
@@ -163,7 +158,7 @@ TEST_SUITE("cpp_codegen_pwr") {
 	}
 
 	TEST_CASE("PWR-revised generated header compiles and steps" * doctest::skip(!ltlsynt_available())) {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto generated = emit_revised_cpp(
 			"G(o1[t] = 0).",
 			"G(o1[t] = 1).",
@@ -242,12 +237,13 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 	}
 
 	TEST_CASE("PWR revisable class compiles and steps" * doctest::skip(!ltlsynt_available())) {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "pwr_tbl_run");
 		REQUIRE(generated.has_value());
 		const std::string hdr = cg_tmp("_tau_pwr_tbl_test.h");
 		const std::string main_f = cg_tmp("_tau_pwr_tbl_main.cpp");
-		const std::string exe = cg_tmp("_tau_pwr_tbl_exe");
+		const std::string exe = cg_tmp("_tau_pwr_tbl_exe")
+			+ tau_test_exe_suffix();
 		{
 			std::ofstream f(hdr);
 			f << *generated;
@@ -268,20 +264,18 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 				"  return 0;\n"
 				"}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
-			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_tbl_build") + " 2>&1";
-		CHECK(::system(cmd.c_str()) == 0);
-		std::string run_cmd = std::string(exe)
-			+ " > " + cg_tmp("_tau_pwr_tbl_out") + " 2>&1";
-		CHECK(::system(run_cmd.c_str()) == 0);
-		std::ifstream out(cg_tmp("_tau_pwr_tbl_out"));
+		auto cc = tau_test_compile(exe, { main_f }, cg_tmp_dir());
+		CHECK_MESSAGE(cc.ok, cc.out);
+		auto run = tau_test_run({ exe });
+		CHECK(run.exit_code == 0);
+		std::istringstream out(run.out);
 		std::string line;
 		std::getline(out, line);
 		CHECK(line == "OK");
 	}
 
 	TEST_CASE("PWR revise() compiles and resets state" * doctest::skip(!ltlsynt_available())) {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		// Generate two strategies from different specs, then revise().
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "pwr_rev_t");
 		REQUIRE(gen1.has_value());
@@ -316,7 +310,8 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 
 		const std::string hdr = cg_tmp("_tau_pwr_rev_test.h");
 		const std::string main_f = cg_tmp("_tau_pwr_rev_main.cpp");
-		const std::string exe = cg_tmp("_tau_pwr_rev_exe");
+		const std::string exe = cg_tmp("_tau_pwr_rev_exe")
+			+ tau_test_exe_suffix();
 		{
 			std::ofstream f(hdr);
 			f << *gen1;
@@ -343,19 +338,12 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
-			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_rev_build") + " 2>&1";
-		if (::system(cmd.c_str()) != 0) {
-			std::ifstream blog(cg_tmp("_tau_pwr_rev_build"));
-			std::string blog_str((std::istreambuf_iterator<char>(blog)),
-				std::istreambuf_iterator<char>());
-			MESSAGE("compile failed: ", blog_str);
-		}
-		CHECK(::system(cmd.c_str()) == 0);
-		std::string run_cmd = std::string(exe)
-			+ " > " + cg_tmp("_tau_pwr_rev_out") + " 2>&1";
-		CHECK(::system(run_cmd.c_str()) == 0);
-		std::ifstream out(cg_tmp("_tau_pwr_rev_out"));
+		auto cc = tau_test_compile(exe, { main_f }, cg_tmp_dir());
+		if (!cc.ok) MESSAGE("compile failed: ", cc.out);
+		CHECK(cc.ok);
+		auto run = tau_test_run({ exe });
+		CHECK(run.exit_code == 0);
+		std::istringstream out(run.out);
 		std::string line;
 		std::getline(out, line);
 		CHECK(line == "OK");
@@ -368,7 +356,7 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 
 	// CG-RT4 / CG-N5 (FIXED, Batch O6): revise()'s validation used to be
 	// assert()-only; under -DNDEBUG (the flag customer release builds use,
-	// and which g++ -O2 alone does NOT define) those asserts compiled out,
+	// and which -O2 alone does NOT define) those asserts compiled out,
 	// so an invalid strategy (initial_state out of range for num_states)
 	// caused OOB std::vector indexing (UB) on the next step() instead of
 	// being rejected. revise() is now `bool` with real runtime refusal;
@@ -378,13 +366,14 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 	// refused with the running strategy and state untouched, and a valid
 	// revision afterwards still succeeds.
 	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid strategy under -DNDEBUG") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrNdebug");
 		REQUIRE(gen1.has_value());
 
 		const std::string hdr = cg_tmp("_tau_pwr_ndebug_test.h");
 		const std::string main_f = cg_tmp("_tau_pwr_ndebug_main.cpp");
-		const std::string exe = cg_tmp("_tau_pwr_ndebug_exe");
+		const std::string exe = cg_tmp("_tau_pwr_ndebug_exe")
+			+ tau_test_exe_suffix();
 		{ std::ofstream f(hdr); f << *gen1; }
 		{
 			std::ofstream f(main_f);
@@ -429,13 +418,12 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -DNDEBUG -std=c++17 -I" + cg_tmp_dir() + " -o ")
-			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_ndebug_build") + " 2>&1";
-		REQUIRE(::system(cmd.c_str()) == 0);
-		std::string run_cmd = std::string(exe)
-			+ " > " + cg_tmp("_tau_pwr_ndebug_out") + " 2>&1";
-		int rc = ::system(run_cmd.c_str());
-		std::ifstream out(cg_tmp("_tau_pwr_ndebug_out"));
+		auto cc = tau_test_compile(exe, { main_f }, cg_tmp_dir(), 17,
+			/*ndebug=*/true);
+		REQUIRE_MESSAGE(cc.ok, cc.out);
+		auto run = tau_test_run({ exe });
+		int rc = run.exit_code;
+		std::istringstream out(run.out);
 		std::string line;
 		std::getline(out, line);
 		CHECK(rc == 0);

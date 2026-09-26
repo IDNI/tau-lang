@@ -17,7 +17,9 @@ set(TAU_TESTS_REQUIRE_CODEGEN
 	test_cpp_codegen_roundtrip
 	test_cpp_codegen_pwr
 	test_cpp_codegen_bench
-	test_cpp_codegen_data_atoms)
+	test_cpp_codegen_data_atoms
+	test_cpp_codegen_program_desc
+	test_codegen_parity)
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
@@ -294,6 +296,10 @@ function(_tau_add_owned_test src)
 	get_filename_component(_n "${src}" NAME_WE)
 	if(_n IN_LIST TAU_SKIP_TESTS)
 		message(STATUS "Skipping C++ test ${_n} (covered by REPL test)")
+		return()
+	endif()
+	if(EMSCRIPTEN AND _n IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
+		message(STATUS "Skipping ${_n}: codegen not supported under Emscripten yet")
 		return()
 	endif()
 	if(NOT EXISTS "${src}")

@@ -15,7 +15,6 @@
 #include <optional>
 #include <sstream>
 #include <string>
-#include <sys/wait.h>
 
 using namespace idni::tau_lang;
 
@@ -47,24 +46,21 @@ bool run_sdk_link_test() {
 	return v && *v && std::string(v) != "0";
 }
 
-// Run `cmd`, returning its combined stdout+stderr and its exit code.
+// Run the artifact, returning its combined stdout+stderr and whether it
+// exited cleanly. spawn_capture decides the exit code itself, so only the
+// zero/non-zero distinction leaves the helper (see tau_test_run).
 struct captured_run { std::string out; int exit_code = -1; };
-captured_run run_capture(const std::string& cmd) {
-	captured_run r;
-	FILE* p = popen((cmd + " 2>&1").c_str(), "r");
-	if (!p) return r;
-	char buf[256];
-	while (std::fgets(buf, sizeof(buf), p)) r.out += buf;
-	int status = pclose(p);
-	r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	return r;
+captured_run run_capture(const std::string& exe_path) {
+	auto run = tau_test_run({ exe_path });
+	return { run.out + run.err, run.exit_code };
 }
 
 } // namespace
 
 TEST_SUITE("bv_codegen") {
 
-	TEST_CASE("G(o1:bv[8] = 1): emits tref o1 with a bv factory expression, not a bool flag") {
+	TEST_CASE("G(o1:bv[8] = 1): emits tref o1 with a bv factory expression, not a bool flag"
+	          * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:bv = { 1 }:bv[8])");
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol);
@@ -82,7 +78,8 @@ TEST_SUITE("bv_codegen") {
 		CHECK(has(s, "o.o1 ="));
 	}
 
-	TEST_CASE("G(o1:bv[8] = 1): a width-less constant still emits a bv witness, typed from o1") {
+	TEST_CASE("G(o1:bv[8] = 1): a width-less constant still emits a bv witness, typed from o1"
+	          * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:bv[8] = { 1 })");
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol);

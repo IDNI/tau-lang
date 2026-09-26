@@ -78,15 +78,10 @@ static bool run_sdk_link_test() {
 	return v && *v && std::string(v) != "0";
 }
 
-// Run `cmd`, return its combined stdout+stderr.
-static std::string run_capture(const std::string& cmd) {
-	std::string out;
-	FILE* p = popen((cmd + " 2>&1").c_str(), "r");
-	if (!p) return out;
-	char buf[256];
-	while (std::fgets(buf, sizeof(buf), p)) out += buf;
-	pclose(p);
-	return out;
+// Run the artifact, returning its combined stdout+stderr.
+static std::string run_capture(const std::string& exe_path) {
+	auto run = tau_test_run({ exe_path });
+	return run.out + run.err;
 }
 
 // Extract (p, q) from the running artifact's printed "{ p/q }" qlt witness.

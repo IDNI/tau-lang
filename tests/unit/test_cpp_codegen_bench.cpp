@@ -19,6 +19,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "test_memory_query.h"
 #include "cpp_codegen.h"
 #include "tau_compile.h"
 #include "ltl_aba.h"
@@ -28,22 +29,20 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <unistd.h>
 #include <sstream>
 #include <string>
 
-// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
-// predictable /tmp names -- concurrent checkouts running this suite used
-// to clobber each other's headers/binaries.
+// CG-N11: per-process scratch directory instead of fixed, predictable /tmp
+// names -- concurrent checkouts running this suite used to clobber each
+// other's headers/binaries. tau_test_tmp puts it under the platform temp dir
+// with a random suffix, so the suite also builds and runs on MinGW and MSVC.
 static const std::string& cg_tmp_dir() {
-	static const std::string dir = [] {
-		std::string t = "/tmp/tau_cg_XXXXXX";
-		char* p = ::mkdtemp(t.data());
-		return std::string(p ? p : "/tmp");
-	}();
+	static const std::string dir = tau_test_tmp("cg_bench").string();
 	return dir;
 }
-static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+static std::string cg_tmp(const std::string& name) {
+	return cg_tmp_dir() + "/" + name;
+}
 
 
 using namespace idni::tau_lang;
@@ -101,9 +100,7 @@ static const char* ATOMLESS2_FORMULA =
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static bool has_gpp() {
-    return ::system("g++ --version >/dev/null 2>&1") == 0;
-}
+static bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 // Used by the cpp_codegen_bench_correctness suite below, which still drives
 // build_program_desc/emit_program directly (not compile_spec) to assert the
@@ -150,26 +147,29 @@ static compiled_result compiled_seconds(const char* formula_str,
         return { -1.0, true, why.str() };
     }
 
-    stdfs::path tape = suite_scratch_dir() / ("_tau_bench_" + tag + ".stdin");
-    {
-        std::ofstream f(tape);
-        for (long t = 0; t < N; ++t) {
-            const char* v = (t & 1) ? "T." : "F.";
-            for (size_t k = 0; k < input_vars.size(); ++k) f << v << "\n";
+    // The artifact reads each input from stdin (console_prompt_input_stream::get
+    // does one std::getline per call) and stops cleanly at EOF, so "run N steps"
+    // means feeding it exactly N*input_vars.size() lines: for each of the N
+    // steps, one value per input var, in the order the artifact's own run_loop
+    // asks for them. All input vars share the same alternating T./F. value at
+    // a given step (order among them does not matter since they agree), matching
+    // interp_seconds' own fill pattern below.
+    std::string tape;
+    for (long t = 0; t < N; ++t) {
+        const char* v = (t & 1) ? "T." : "F.";
+        for (size_t k = 0; k < input_vars.size(); ++k) {
+            tape += v;
+            tape += '\n';
         }
     }
 
-    stdfs::path out = suite_scratch_dir() / ("_tau_bench_" + tag + ".out");
-    std::string cmd = "\"" + res.value().exe_path + "\" < \"" + tape.string()
-                     + "\" > \"" + out.string() + "\" 2>/dev/null";
     auto t0 = clk::now();
-    int rc = ::system(cmd.c_str());
+    auto run = tau_test_run({ res.value().exe_path }, tape);
     auto t1 = clk::now();
 
     stdfs::remove_all(bdir, ec);
-    stdfs::remove(tape, ec);
-    stdfs::remove(out, ec);
-    if (rc != 0) return { -1.0, false, "artifact exited with a nonzero status" };
+    if (run.exit_code != 0)
+        return { -1.0, false, "artifact exited with a nonzero status" };
     return { std::chrono::duration<double>(t1 - t0).count(), false, "" };
 }
 
@@ -210,20 +210,6 @@ static double interp_seconds(const char* formula_str,
 
 TEST_SUITE("cpp_codegen_bench") {
 
-    // Return available memory in bytes from /proc/meminfo, or 0 on failure.
-    static long available_mem_bytes() {
-        std::ifstream f("/proc/meminfo");
-        std::string line;
-        while (std::getline(f, line)) {
-            if (line.rfind("MemAvailable:", 0) == 0) {
-                long kb = 0;
-                sscanf(line.c_str(), "MemAvailable: %ld kB", &kb);
-                return kb * 1024L;
-            }
-        }
-        return 0;
-    }
-
     // Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST/TAU_CODEGEN_RUN_PARITY_TEST
     // -- each spec below drives a real cmake configure+build (compile_spec),
     // and every step of both the compiled artifact and the interpreter is a
@@ -241,7 +227,7 @@ TEST_SUITE("cpp_codegen_bench") {
                 "throughput comparison (drives cmake configure+build per spec)");
             return;
         }
-        if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+        if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 
         struct bench_spec {
             const char* name;
@@ -278,7 +264,7 @@ TEST_SUITE("cpp_codegen_bench") {
 
         for (auto& s : specs) {
             if (std::string(s.name) == "atomless2"
-                    && available_mem_bytes() < ATOMLESS_MIN_MEM) {
+                    && tau_test_available_mem_bytes() < (uint64_t)ATOMLESS_MIN_MEM) {
                 MESSAGE("Spec        : atomless2 — SKIPPED (< 8 GB free)");
                 continue;
             }
@@ -340,7 +326,7 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 	static const char* CONST_FLAG_FORMULA =
 	    "G (o1[t]:bv[1] = {1}:bv[1]).";
 	TEST_CASE("[CG-BENCH-CORR-01] every step of the compiled spec reports ok=true") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		tref fm = parse_formula(CONST_FLAG_FORMULA);
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -355,7 +341,8 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 
 		const std::string hdr_path = cg_tmp("_tau_bench_corr_hdr.h");
 		const std::string main_path = cg_tmp("_tau_bench_corr_main.cpp");
-		const std::string exe_path = cg_tmp("_tau_bench_corr_exe");
+		const std::string exe_path = cg_tmp("_tau_bench_corr_exe")
+			+ tau_test_exe_suffix();
 		{ std::ofstream f(hdr_path); f << hdr_os.str(); }
 		const long N = 10000L;
 		{
@@ -374,12 +361,11 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
-		                + exe_path + " " + main_path + " 2>&1";
-		REQUIRE(::system(cmd.c_str()) == 0);
-		REQUIRE(::system((std::string(exe_path)
-			+ " >" + cg_tmp("_tau_bench_corr_out")).c_str()) == 0);
-		std::ifstream out(cg_tmp("_tau_bench_corr_out"));
+		auto cc = tau_test_compile(exe_path, { main_path }, cg_tmp_dir());
+		REQUIRE_MESSAGE(cc.ok, cc.out);
+		auto run = tau_test_run({ exe_path });
+		REQUIRE(run.exit_code == 0);
+		std::istringstream out(run.out);
 		unsigned sum = 0; out >> sum;
 		CHECK(sum == (unsigned)N);
 	}
