@@ -8,18 +8,18 @@
 set(TAU_SHARED_HELPERS_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 set(TAU_SHARED_HELPER_PROVENANCE
-	"tau-shared-resolve.cmake|cmake/tau-resolve.cmake|61fce476f1c8ed87116d07a33f686331d0a79730ca3cf77ade4ce870acb2f7ed|warn"
+	"tau-shared-resolve.cmake|cmake/tau-resolve.cmake|8c68acb3536ea71ea63a3f34791087b68ede2b4e55f5eb4a85fcbd786dacf566|warn"
 	"tau-shared-ccache.cmake|cmake/use-ccache.cmake|0e178c553711db49560551f7e123322284824f7124e51a1759e3f912bb71105a|warn"
 	"tau-shared-emscripten.cmake|cmake/use-emscripten.cmake|981a7a80f819a413cc56b88b1b626187851a008f28ec718cae6a52d82e7d52f5|warn"
 	"tau-shared-version-license.cmake|cmake/version_license.cmake|feb5407b9cd874f5ec786145d9c7af3d361f221be6576e77f9e9e03b7fa12ab2|warn"
 	"tau-shared-ctest-build-tree.cmake|cmake/ctest-build-tree.cmake|714a581f7e63588c1626ca05fab4260cb543072a011cceb0fa1ecb8b3b20481e|warn"
 )
 
-# Tau-side files that choose which helper library a producer loads. They are not
-# part of any package identity -- editing one would not invalidate a package --
-# so a strict content guard is what stops them from drifting. Each entry is
+# Files that choose which helper library a producer loads. A strict content
+# guard catches a change a package identity would miss. Each entry is
 # "<repo-relative path>|<sha256>".
 set(TAU_SHIM_PROVENANCE
+	"external/parser/scripts/devrc|2fe740f12c89bf79557076d95e3114aafa223f8edaf805128f547e0cda192f65"
 	"scripts/devrc|dfa47e774df68bf0895cf5fda7474a10c14d3f6ae2252d97a97589e6f29535f9"
 )
 

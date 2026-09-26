@@ -39,6 +39,12 @@
 
 include_guard(GLOBAL)
 
+# Functions record the policies in effect where they are defined, so the
+# functions below need a current policy under `cmake -P` and under include(),
+# while the file that includes this module keeps its own.
+cmake_policy(PUSH)
+cmake_policy(VERSION 3.10...3.31)
+
 # Default memory budget (MiB) per compile job when auto-detecting
 # TAU_BUILD_JOBS. Single source for the two places this literal is needed:
 # the TAU_BUILD_JOB_MEMORY_MB cache variable's default (include mode) and
@@ -233,3 +239,5 @@ else()
 	unset(TAU_BUILD_JOB_MEMORY_MB_DOC)
 	unset(TAU_SHARED_PREFIX_DOC)
 endif()
+
+cmake_policy(POP)
