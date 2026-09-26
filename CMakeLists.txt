@@ -34,6 +34,38 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+# Every supported platform consumes the LOCAL store, which builds a missing
+# package with this preset's compiler. The target value names the platform the
+# package runs on and travels in the id, so one GHCR tag space covers them all.
+option(TAU_DEPS_FROM_STORE
+	"Resolve every dependency from the local store; OFF builds against the in-tree parser"
+	ON)
+if(TAU_BUILD_EMSCRIPTEN)
+	set(TAU_DEPS_TARGET "wasm")
+elseif(APPLE)
+	# CMAKE_SYSTEM_PROCESSOR is arm64 or x86_64; a fat or unknown slice has no
+	# package and is a hard error rather than a silent native fallback.
+	if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+		set(TAU_DEPS_TARGET "darwin-arm64")
+	elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+		set(TAU_DEPS_TARGET "darwin-x86_64")
+	else()
+		message(FATAL_ERROR
+			"unsupported macOS architecture '${CMAKE_SYSTEM_PROCESSOR}'; "
+			"only arm64 and x86_64 have store packages")
+	endif()
+elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	set(TAU_DEPS_TARGET "w64")
+elseif(WIN32 AND MSVC)
+	set(TAU_DEPS_TARGET "win-msvc-x64")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	set(TAU_DEPS_TARGET "native")
+else()
+	message(FATAL_ERROR
+		"no dependency-store target for ${CMAKE_SYSTEM_NAME}/"
+		"${CMAKE_CXX_COMPILER_ID}; add one to cmake/tau-deps.cmake")
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(GNUInstallDirs)
@@ -42,6 +74,12 @@ include(FetchContent)
 # The vendored shared helpers warn when the parser's copies have moved on.
 include(tau-shared-helpers.provenance)
 tau_shared_helpers_check_provenance()
+
+# How cvc5 and Boost are provided: a store package the platform builds with
+# this preset's compiler.
+option(TAU_LTO "Build the library and the executables with link time optimization" ON)
+set(TAU_STORE_KEEP "3" CACHE STRING
+	"Store entries to keep per dependency, by last use (0 disables eviction)")
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
@@ -355,6 +393,10 @@ tau_registered_ba_ids(TAU_REGISTERED_BA_IDS)
 tau_generate_pack_header()
 message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
+if(TAU_DEPS_FROM_STORE)
+	include(tau-deps)
+endif()
+
 #
 # Add cvc5 library, only when a BA of the configured pack requires it.
 # This gates the dependency build too: dep-cvc5.sh is what makes a pack
@@ -581,8 +623,13 @@ version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
 if(TAU_ADDRESS_SANITIZER)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-	set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+		set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+	else()
+		message(WARNING
+			"TAU_ADDRESS_SANITIZER is ignored on ${CMAKE_CXX_COMPILER_ID}")
+	endif()
 endif()
 
 #
@@ -744,21 +791,32 @@ install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 
-# Install cvc5 runtime dependencies
+# Install cvc5 runtime dependencies, only when a BA of the configured pack
+# requires cvc5. A pack that does not must neither reference cvc5::cvc5 nor
+# install any cvc5 file; a pack that does must have the target.
 include(install_cvc5)
-if (TAU_RPM_PACKAGE)
-	execute_process(COMMAND rpm --eval "%{_lib}"
-			OUTPUT_VARIABLE rpm_libdir
-			OUTPUT_STRIP_TRAILING_WHITESPACE)
-	set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
-	install_cvc5("${rpm_libdir}/tau" "LinuxFiles" "Linux")
-elseif (TAU_DEB_PACKAGE)
-	set(CMAKE_INSTALL_LIBDIR "lib")
-	install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
-elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
-	install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
-elseif (TAU_MACOS_PACKAGE)
-	install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Darwin")
+if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	if(NOT TARGET cvc5::cvc5)
+		message(FATAL_ERROR
+			"TAU_BAS=${TAU_BAS} requires cvc5 but no cvc5::cvc5 target was found")
+	endif()
+	if (TAU_RPM_PACKAGE)
+		execute_process(COMMAND rpm --eval "%{_lib}"
+				OUTPUT_VARIABLE rpm_libdir
+				OUTPUT_STRIP_TRAILING_WHITESPACE)
+		set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
+		install_cvc5("${rpm_libdir}/tau" "LinuxFiles" "Linux")
+	elseif (TAU_DEB_PACKAGE)
+		set(CMAKE_INSTALL_LIBDIR "lib")
+		install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
+	elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
+		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
+	elseif (TAU_MACOS_PACKAGE)
+		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Darwin")
+	endif()
+else()
+	message(STATUS
+		"cvc5 not required by TAU_BAS=${TAU_BAS}; no cvc5 runtime installed")
 endif()
 
 # Set CPack generators

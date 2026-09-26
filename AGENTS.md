@@ -76,6 +76,7 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
+- `-DTAU_DEPS_FROM_STORE=OFF` — build against the in-tree parser and its cmake modules instead of the dependency store
 - WebAssembly-only options are listed under [WebAssembly](#webassembly).
 
 Hashing is done in `uint64_t` regardless of the platform's `size_t` width
