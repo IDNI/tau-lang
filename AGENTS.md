@@ -38,10 +38,18 @@ to catch an assert, not to measure or to verify. The `release` family builds
 with `-O3 -DNDEBUG`, which removes every `DBG(...)` block, so an assert never
 fires there. The `debug` family adds `-ggdb3` for a gdb session.
 
-Other presets: `{devel,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
-`coverage`, `release-packages-{deb,rpm}`, `release-mingw*`. Default preset is
-`release` if omitted. The emscripten family is documented under
-[WebAssembly](#webassembly) below.
+Other presets: `{release,devel,debug}-{tests,tau,all}`, `relwithdebinfo-{tests,tau,all}`,
+`coverage`, `release-packages-{deb,rpm,macos}` (the package presets stay release
+only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-packages-zip`,
+`{release,devel,debug}-msvc-{tau,tests,all}`, `{release,devel,debug}-msvc-all-clang-cl`,
+`{release,devel,debug}-binding-python`,
+`{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
+`release-all`), `msvc-all` (alias of `release-msvc-all`).
+Every preset has the `release-`, `devel-` and `debug-` twins addendum 2 asks for — the
+`-DTAU_BAS` variants and the MSVC, w64, python and ninja-test families included.
+Default preset is `release` if omitted. macOS uses the `release`/`debug` family as-is,
+where `clang`/`clang++` resolve to AppleClang. The wasm family is documented
+under [WebAssembly](#webassembly) below.
 
 Notes:
 - Arguments may appear in any order: preset name, `run`, `-D…`, `-v`,

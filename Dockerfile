@@ -18,11 +18,11 @@
 #   - w64-packages: creates a release packages (installer and zip file)
 # - WebAssembly branch is (see AGENTS.md's WebAssembly section for the constraints):
 #   - wasm-deps: extends the native dependencies with emsdk and boost for emscripten
-#   - wasm-build: builds tau.js/tau.wasm/tau.esm.mjs, and (TESTS=yes) the wasm suite
+#   - wasm-node: builds tau.js/tau.wasm/tau.esm.mjs, and (TESTS=yes) the wasm suite
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
-# use --build-arg TESTS="no" to skip running tests (build, w64-build, wasm-build)
+# use --build-arg TESTS="no" to skip running tests (build, w64-build, wasm-node)
 # use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
@@ -359,13 +359,13 @@ ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 # own, with no i386 multiarch needed for these mingw-w64-x86_64 binaries
 RUN echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Running tests: $TESTS" && \
-	./dev preset ${BUILD_PRESET}-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+	./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_EXECUTABLE=ON && \
 	if [ "$TESTS" = "yes" ]; then \
 		apt-get update && apt-get install -y --no-install-recommends wine && \
-		./dev preset ${BUILD_PRESET}-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine && \
-		ctest --test-dir build/${BUILD_PRESET}-mingw -j ${BUILD_JOBS} \
+		ctest --test-dir build/${BUILD_PRESET}-w64 -j ${BUILD_JOBS} \
 			--output-on-failure; \
 	fi
 
@@ -380,8 +380,8 @@ ARG BUILD_JOBS=5
 WORKDIR /tau-lang
 
 RUN echo "(BUILD) -- Building Windows packages" && \
-	./dev preset release-mingw-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
-	./dev preset release-mingw-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	./dev preset release-w64-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset release-w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
 # ============================================================
@@ -415,7 +415,7 @@ RUN ln -s "$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)/node" /usr/local/bin/
 # WebAssembly build image: tau.js / tau.wasm / tau.esm.mjs, and (if TESTS=yes)
 # builds and runs the wasm test suite, the browser suite and the parity check
 
-FROM wasm-deps AS wasm-build
+FROM wasm-deps AS wasm-node
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -437,8 +437,8 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_PRESET=debug-emscripten picks the debugging preset family
-ARG BUILD_PRESET=emscripten
+# Argument BUILD_PRESET=debug-wasm picks the debugging preset family
+ARG BUILD_PRESET=release-wasm
 
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes

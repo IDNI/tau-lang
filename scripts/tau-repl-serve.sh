@@ -8,17 +8,17 @@
 # Usage:
 #   ./dev tau-repl-serve [port] [build-dir]
 #
-# build-dir defaults to build/emscripten-pthread (the emscripten-pthread
+# build-dir defaults to build/release-wasm-repl-browser (the release-wasm-repl-browser
 # preset's binary dir, see CMakePresets.json); port defaults to 8088.
 
 source "$(dirname "${BASH_SOURCE[0]}")/env"
 
 PORT="${1:-8088}"
-BUILD_DIR="${2:-${REPO_ROOT}/build/emscripten-pthread}"
+BUILD_DIR="${2:-${REPO_ROOT}/build/release-wasm-repl-browser}"
 
 if [ ! -f "${BUILD_DIR}/index.html" ]; then
 	echo "Error: ${BUILD_DIR}/index.html not found." >&2
-	echo "Build first: ./dev preset emscripten-pthread -DTAU_BUILD_JOBS=4" >&2
+	echo "Build first: ./dev preset release-wasm-repl-browser -DTAU_BUILD_JOBS=4" >&2
 	exit 1
 fi
 

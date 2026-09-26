@@ -33,7 +33,7 @@
 			"toolchainFile": "${sourceDir}/external/parser/cmake/mingw-w64-x86_64.cmake"
 		},
 		{
-			"name": "_toolchain-emscripten",
+			"name": "_toolchain-wasm",
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_EMSCRIPTEN": "ON"
@@ -55,14 +55,14 @@
 			"binaryDir": "${sourceDir}/build/devel"
 		},
 		{
-			"name": "_build_dir-release-mingw",
+			"name": "_build_dir-release-w64",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-mingw"
+			"binaryDir": "${sourceDir}/build/release-w64"
 		},
 		{
-			"name": "_build_dir-debug-mingw",
+			"name": "_build_dir-debug-w64",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-mingw"
+			"binaryDir": "${sourceDir}/build/debug-w64"
 		},
 		{
 			"name": "_build_dir-relwithdebinfo",
@@ -70,24 +70,24 @@
 			"binaryDir": "${sourceDir}/build/relwithdebinfo"
 		},
 		{
-			"name": "_build_dir-emscripten",
+			"name": "_build_dir-release-wasm",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/emscripten"
+			"binaryDir": "${sourceDir}/build/release-wasm"
 		},
 		{
-			"name": "_build_dir-debug-emscripten",
+			"name": "_build_dir-debug-wasm",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-emscripten"
+			"binaryDir": "${sourceDir}/build/debug-wasm"
 		},
 		{
-			"name": "_build_dir-emscripten-pthread",
+			"name": "_build_dir-release-wasm-repl-browser",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/emscripten-pthread"
+			"binaryDir": "${sourceDir}/build/release-wasm-repl-browser"
 		},
 		{
-			"name": "_build_dir-debug-emscripten-pthread",
+			"name": "_build_dir-debug-wasm-repl-browser",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-emscripten-pthread"
+			"binaryDir": "${sourceDir}/build/debug-wasm-repl-browser"
 		},
 		{
 			"name": "_build_dir-coverage",
@@ -384,73 +384,51 @@
 			]
 		},
 		{
-			"name": "release-mingw",
+			"name": "release-w64",
 			"inherits": [
-				"_build_dir-release-mingw",
+				"_build_dir-release-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-release"
 			]
 		},
 		{
-			"name": "debug-mingw",
+			"name": "debug-w64",
 			"inherits": [
-				"_build_dir-debug-mingw",
+				"_build_dir-debug-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-debug"
 			]
 		},
 		{
-			"name": "emscripten",
+			"name": "release-wasm",
 			"inherits": [
-				"_build_dir-emscripten",
+				"_build_dir-release-wasm",
 				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-binding-js",
 				"_build-type-release"
 			]
 		},
 		{
-			"name": "debug-emscripten",
+			"name": "debug-wasm",
 			"inherits": [
-				"_build_dir-debug-emscripten",
+				"_build_dir-debug-wasm",
 				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-binding-js",
 				"_build-type-debug"
 			]
 		},
 		{
-			"name": "emscripten-tests",
+			"name": "release-wasm-all-tests",
 			"inherits": [
-				"_build_dir-emscripten",
+				"_build_dir-release-wasm",
 				"_generator-make",
-				"_toolchain-emscripten",
-				"_bas-wasm",
-				"_build-wasm-tests",
-				"_build-type-release"
-			]
-		},
-		{
-			"name": "debug-emscripten-tests",
-			"inherits": [
-				"_build_dir-debug-emscripten",
-				"_generator-make",
-				"_toolchain-emscripten",
-				"_bas-wasm",
-				"_build-wasm-tests",
-				"_build-type-debug"
-			]
-		},
-		{
-			"name": "emscripten-all",
-			"inherits": [
-				"_build_dir-emscripten",
-				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-binding-js",
 				"_build-wasm-tests",
@@ -458,11 +436,11 @@
 			]
 		},
 		{
-			"name": "debug-emscripten-all",
+			"name": "debug-wasm-all-tests",
 			"inherits": [
-				"_build_dir-debug-emscripten",
+				"_build_dir-debug-wasm",
 				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-binding-js",
 				"_build-wasm-tests",
@@ -470,22 +448,22 @@
 			]
 		},
 		{
-			"name": "emscripten-pthread",
+			"name": "release-wasm-repl-browser",
 			"inherits": [
-				"_build_dir-emscripten-pthread",
+				"_build_dir-release-wasm-repl-browser",
 				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-repl-wasm",
 				"_build-type-release"
 			]
 		},
 		{
-			"name": "debug-emscripten-pthread",
+			"name": "debug-wasm-repl-browser",
 			"inherits": [
-				"_build_dir-debug-emscripten-pthread",
+				"_build_dir-debug-wasm-repl-browser",
 				"_generator-make",
-				"_toolchain-emscripten",
+				"_toolchain-wasm",
 				"_bas-wasm",
 				"_build-repl-wasm",
 				"_build-type-debug"
@@ -734,16 +712,16 @@
 			"inherits": ["devel", "_build-binding-python"]
 		},
 		{
-			"name": "release-mingw-packages",
+			"name": "release-w64-packages",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_windows-package"
 			]
 		},
 		{
-			"name": "release-mingw-packages-zip",
+			"name": "release-w64-packages-zip",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_windows-zip-package"
 			]
 		}
@@ -906,44 +884,36 @@
 			"configurePreset": "debug-asan"
 		},
 		{
-			"name": "release-mingw",
-			"configurePreset": "release-mingw"
+			"name": "release-w64",
+			"configurePreset": "release-w64"
 		},
 		{
-			"name": "debug-mingw",
-			"configurePreset": "debug-mingw"
+			"name": "debug-w64",
+			"configurePreset": "debug-w64"
 		},
 		{
-			"name": "emscripten",
-			"configurePreset": "emscripten"
+			"name": "release-wasm",
+			"configurePreset": "release-wasm"
 		},
 		{
-			"name": "debug-emscripten",
-			"configurePreset": "debug-emscripten"
+			"name": "debug-wasm",
+			"configurePreset": "debug-wasm"
 		},
 		{
-			"name": "emscripten-tests",
-			"configurePreset": "emscripten-tests"
+			"name": "release-wasm-all-tests",
+			"configurePreset": "release-wasm-all-tests"
 		},
 		{
-			"name": "debug-emscripten-tests",
-			"configurePreset": "debug-emscripten-tests"
+			"name": "debug-wasm-all-tests",
+			"configurePreset": "debug-wasm-all-tests"
 		},
 		{
-			"name": "emscripten-all",
-			"configurePreset": "emscripten-all"
+			"name": "release-wasm-repl-browser",
+			"configurePreset": "release-wasm-repl-browser"
 		},
 		{
-			"name": "debug-emscripten-all",
-			"configurePreset": "debug-emscripten-all"
-		},
-		{
-			"name": "emscripten-pthread",
-			"configurePreset": "emscripten-pthread"
-		},
-		{
-			"name": "debug-emscripten-pthread",
-			"configurePreset": "debug-emscripten-pthread"
+			"name": "debug-wasm-repl-browser",
+			"configurePreset": "debug-wasm-repl-browser"
 		},
 		{
 			"name": "relwithdebinfo",
@@ -994,12 +964,12 @@
 			"configurePreset": "devel-binding-python-tests"
 		},
 		{
-			"name": "release-mingw-packages",
-			"configurePreset": "release-mingw-packages"
+			"name": "release-w64-packages",
+			"configurePreset": "release-w64-packages"
 		},
 		{
-			"name": "release-mingw-packages-zip",
-			"configurePreset": "release-mingw-packages-zip"
+			"name": "release-w64-packages-zip",
+			"configurePreset": "release-w64-packages-zip"
 		}
 	],
 	"testPresets": [
@@ -1092,20 +1062,12 @@
 			"configurePreset": "release-api-tests"
 		},
 		{
-			"name": "emscripten-tests",
-			"configurePreset": "emscripten-tests"
+			"name": "release-wasm-all-tests",
+			"configurePreset": "release-wasm-all-tests"
 		},
 		{
-			"name": "debug-emscripten-tests",
-			"configurePreset": "debug-emscripten-tests"
-		},
-		{
-			"name": "emscripten-all",
-			"configurePreset": "emscripten-all"
-		},
-		{
-			"name": "debug-emscripten-all",
-			"configurePreset": "debug-emscripten-all"
+			"name": "debug-wasm-all-tests",
+			"configurePreset": "debug-wasm-all-tests"
 		},
 		{
 			"name": "debug-binding-python-tests",

@@ -111,12 +111,12 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-tau run -- --help
 ./dev preset release-packages-deb
 ./dev preset release-packages-rpm
-./dev preset release-mingw-packages
+./dev preset release-w64-packages
 ./dev preset debug-asan
 ./dev preset coverage
-./dev preset emscripten                 # wasm library (tau.js/.wasm/.esm.mjs)
-./dev preset debug-emscripten-tests     # tau's own suite, run under node
-./dev preset emscripten-pthread         # wasm REPL (tau_repl.js)
+./dev preset release-wasm                 # wasm library (tau.js/.wasm/.esm.mjs)
+./dev preset debug-wasm-all-tests         # tau's own suite, run under node
+./dev preset release-wasm-repl-browser    # wasm REPL (tau_repl.js)
 ```
 
 Default preset name is `release` if omitted.
@@ -129,7 +129,7 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 - `packages` — legacy: DEB then RPM in `build-Release/packages`
 - `w64-packages` — legacy: Windows NSIS and ZIP
 - Preset: `./dev preset release-packages-deb`, `./dev preset release-packages-rpm`,
-  `./dev preset release-mingw-packages`
+  `./dev preset release-w64-packages`
 
 ## Testing
 
@@ -137,11 +137,10 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 - `test-debug`, `test-release`, `test-relwithdebinfo` — build all tests + ctest
   (pass `-DTAU_BUILD_TESTS=ON` via each script; extra `-D` flags forwarded)
 - `test-wine` — cross-build and run tests under Wine
-- WebAssembly: configure the `debug-emscripten-tests` preset, then
-  `ctest --test-dir build/debug-emscripten-tests -j 8` runs every test under
-  node. Adding `-DTAU_BUILD_BROWSER_TESTS=ON` registers `browser_suite`, which
-  drives the same binaries in headless Chrome. See the WebAssembly section of
-  [`AGENTS.md`](../AGENTS.md) for the constraints.
+- WebAssembly: configure a wasm preset, then `ctest --test-dir build/<folder>
+  -j 8` runs every test under node (Emscripten's toolchain sets node as the
+  test emulator). The browser presets run their suite in headless Chrome
+  instead; see `AGENTS.md`'s WebAssembly section for the full preset table.
 - `test-with-tau-testnet [<PRESET>] [<CMAKE_OPTIONS>] [-- <PYTEST_ARGS>]` —
   clone [tau-testnet](https://github.com/IDNI/tau-testnet), build the Python
   binding from the current source, and run tau-testnet's pytest suite against
@@ -173,7 +172,7 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 
 - `tau-repl-serve [port] [build-dir]` — static server with the COOP/COEP headers
   `SharedArrayBuffer` needs and the right `application/wasm` MIME type. Defaults
-  to `build/emscripten-pthread`, which the `emscripten-pthread` preset produces.
+  to `build/release-wasm-repl-browser`, which the `release-wasm-repl-browser` preset produces.
 
 ## Debugging
 
