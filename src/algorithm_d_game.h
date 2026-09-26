@@ -28,9 +28,9 @@
 #include <cassert>
 #include <cctype>
 #include <cstdio>
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 #include <sys/wait.h>
-#endif // __EMSCRIPTEN__
+#endif
 #include <functional>
 #include <map>
 #include <optional>
@@ -459,6 +459,7 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 	};
 
 	while (std::getline(ss, line)) {
+		if (!line.empty() && line.back() == '\r') line.pop_back();
 		if (line.empty()) continue;
 		if (line == "--BODY--") { in_body = true; continue; }
 		if (line == "--END--")  { break; }

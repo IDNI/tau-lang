@@ -5,6 +5,7 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "spot"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cctype>
@@ -14,7 +15,17 @@
 #include <optional>
 #include <thread>
 
-#ifndef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
+// no process model
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <signal.h>
 #include <spawn.h>
@@ -55,7 +66,7 @@ inline std::optional<verdict_line> parse_verdict_line(const std::string& out) {
 
 // ── spawn_capture ────────────────────────────────────────────────────────
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
 
 inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int, std::function<bool(int)>)
@@ -70,6 +81,181 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	return r.with_error(code::not_found,
 		"no process model is available under this build",
 		{{label::name, argv[0]}});
+}
+
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+
+inline std::string win_quote_arg(const std::string& arg) {
+	if (arg.find_first_of(" \t\n\v\"") == std::string::npos)
+		return arg;
+	std::string out = "\"";
+	for (size_t i = 0; i < arg.size(); ++i) {
+		if (arg[i] == '\\') {
+			size_t n = 0;
+			while (i + n < arg.size() && arg[i + n] == '\\')
+				++n;
+			if (i + n == arg.size() || arg[i + n] == '"')
+				out.append(n * 2, '\\');
+			else out.append(n, '\\');
+			i += n - 1;
+		} else if (arg[i] == '"') out += "\\\"";
+		else out += arg[i];
+	}
+	return out + '"';
+}
+
+// PATH first, then TAU_SPOT_BIN (the store package's bin dir, set by
+// configure). Never link Spot; only exec ltlsynt/autfilt/ltlfilt. SearchPathA
+// with a null base searches the current directory before PATH, so the walk is
+// explicit: an ltlsynt.exe dropped beside tau must not be picked up.
+inline bool win_find_exe(const std::string& name, char* exe, DWORD exe_sz) {
+	if (name.find_first_of("\\/") != std::string::npos) {
+		if (GetFileAttributesA(name.c_str()) == INVALID_FILE_ATTRIBUTES)
+			return false;
+		if (name.size() >= exe_sz) return false;
+		memcpy(exe, name.c_str(), name.size() + 1);
+		return true;
+	}
+	bool ends_exe = name.size() >= 4
+		&& name.compare(name.size() - 4, 4, ".exe") == 0;
+	auto search_in = [&](const std::string& dir) -> bool {
+		if (dir.empty()) return false;
+		std::string full = dir;
+		if (full.back() != '\\' && full.back() != '/')
+			full += '\\';
+		full += name;
+		if (!ends_exe) full += ".exe";
+		if (GetFileAttributesA(full.c_str()) == INVALID_FILE_ATTRIBUTES)
+			return false;
+		if (full.size() >= exe_sz) return false;
+		memcpy(exe, full.c_str(), full.size() + 1);
+		return true;
+	};
+	auto env_var = [](const char* var, std::string& out) -> bool {
+		DWORD need = GetEnvironmentVariableA(var, nullptr, 0);
+		if (need == 0) return false;
+		std::vector<char> buf(need);
+		if (!GetEnvironmentVariableA(var, buf.data(), need)) return false;
+		out.assign(buf.data(), need - 1);
+		return true;
+	};
+	std::string path;
+	if (env_var("PATH", path)) {
+		size_t start = 0;
+		for (;;) {
+			size_t sep = path.find(';', start);
+			std::string dir = path.substr(start,
+				sep == std::string::npos ? std::string::npos
+					: sep - start);
+			if (search_in(dir)) return true;
+			if (sep == std::string::npos) break;
+			start = sep + 1;
+		}
+	}
+	std::string spot_bin;
+	return env_var("TAU_SPOT_BIN", spot_bin) && search_in(spot_bin);
+}
+
+inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
+	int timeout_sec, std::function<bool(int)> exit_ok)
+{
+	result<std::string> r;
+
+	if (argv.empty())
+		return r.with_error(code::invalid_argument,
+			"spawn_capture requires a non-empty argv");
+
+	char exe[MAX_PATH];
+	if (!win_find_exe(argv[0], exe, MAX_PATH))
+		return r.with_error(code::not_found,
+			"the command was not found on PATH",
+			{{label::name, argv[0]}});
+
+	std::string cmdline = win_quote_arg(exe);
+	for (size_t i = 1; i < argv.size(); ++i) {
+		cmdline += ' ';
+		cmdline += win_quote_arg(argv[i]);
+	}
+
+	SECURITY_ATTRIBUTES sa{};
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+	HANDLE rd = nullptr, wr = nullptr;
+	if (!CreatePipe(&rd, &wr, &sa, 0))
+		return r.with_error(code::io_error, "failed to prepare the "
+			"subprocess pipe", {{label::name, "CreatePipe"}});
+	SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+
+	HANDLE nul = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
+		&sa, OPEN_EXISTING, 0, nullptr);
+
+	STARTUPINFOA si{};
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+	si.hStdOutput = wr;
+	si.hStdError = (nul != INVALID_HANDLE_VALUE) ? nul : wr;
+
+	PROCESS_INFORMATION pi{};
+	std::vector<char> cl(cmdline.begin(), cmdline.end());
+	cl.push_back('\0');
+	BOOL ok = CreateProcessA(exe, cl.data(), nullptr, nullptr, TRUE,
+		CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+	CloseHandle(wr);
+	if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
+	if (!ok) {
+		CloseHandle(rd);
+		return r.with_error(code::io_error, "failed to spawn the command",
+			{{label::name, argv[0]}});
+	}
+	CloseHandle(pi.hThread);
+
+	std::atomic<bool> done{false};
+	std::thread killer;
+	if (timeout_sec > 0) {
+		HANDLE proc = pi.hProcess;
+		killer = std::thread([proc, timeout_sec, &done]() {
+			const long long polls = 10LL * timeout_sec;
+			for (long long i = 0; i < polls && !done.load(); ++i)
+				Sleep(100);
+			if (!done.load())
+				TerminateProcess(proc, 128 + 15);
+		});
+	}
+
+	std::string out;
+	char buf[4096];
+	DWORD got = 0;
+	for (;;) {
+		if (!ReadFile(rd, buf, sizeof(buf), &got, nullptr) || got == 0)
+			break;
+		out.append(buf, buf + got);
+	}
+	CloseHandle(rd);
+
+	done.store(true);
+	if (killer.joinable()) killer.join();
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	DWORD ec = 0;
+	GetExitCodeProcess(pi.hProcess, &ec);
+	CloseHandle(pi.hProcess);
+	// MinGW Spot writes text-mode CRLF; hoa.tgf and line parsers want LF.
+	out.erase(std::remove(out.begin(), out.end(), '\r'), out.end());
+
+	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << ec
+		<< ", stdout=" << out;
+
+	int exit_code = (int)ec;
+	if (exit_code == 143)
+		return r.with_error(code::runtime_error,
+			"the command was killed by the timeout watchdog",
+			{{label::exit_code, exit_code},
+			 {label::timeout, timeout_sec}});
+	if (!exit_ok(exit_code))
+		return r.with_error(code::runtime_error,
+			"the command exited with an unexpected code",
+			{{label::exit_code, exit_code}});
+	return r.with_value(std::move(out));
 }
 
 #else // POSIX
@@ -110,6 +296,16 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 
 	pid_t pid;
 	int rc = posix_spawnp(&pid, cargv[0], &fa, nullptr, cargv.data(), environ);
+	if (rc == ENOENT && argv[0].find('/') == std::string::npos) {
+		// posix_spawnp reads PATH only; the store package's bin dir is
+		// named by TAU_SPOT_BIN, which configure exports.
+		if (const char* bin = ::getenv("TAU_SPOT_BIN"); bin && *bin) {
+			std::string full = std::string(bin) + "/" + argv[0];
+			cargv[0] = const_cast<char*>(full.c_str());
+			rc = posix_spawnp(&pid, cargv[0], &fa, nullptr,
+				cargv.data(), environ);
+		}
+	}
 	posix_spawn_file_actions_destroy(&fa);
 	::close(pipefd[1]);
 	if (rc != 0) {
@@ -182,7 +378,7 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	return r.with_value(std::move(out));
 }
 
-#endif // __EMSCRIPTEN__
+#endif // spawn_capture platforms
 
 // ── public surface ───────────────────────────────────────────────────────
 
