@@ -14,6 +14,8 @@
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 
 using namespace idni::tau_lang;
 
@@ -137,13 +139,6 @@ TEST_SUITE("parse_hoa") {
 // of a returned exit code. The pipe drain must also outrun a child that
 // writes more than the pipe buffer.
 
-// Whether spawn_capture can start a process here: the wasm build has no
-// process model, and answers every spawn as a missing binary.
-static bool process_spawning_available() {
-	static const bool ok = spawn_capture({"true"}).has_value();
-	return ok;
-}
-
 TEST_SUITE("spawn_capture") {
 
 	struct EnvGuard {
@@ -164,10 +159,13 @@ TEST_SUITE("spawn_capture") {
 
 	// NOTE (SY-3): the missing SIGKILL escalation for TERM-ignoring children
 	// is deliberately not tested — a faithful test would hang the suite.
-	TEST_CASE("[SPAWN-01] the timeout watchdog is a runtime_error with a timeout attr"
-		* doctest::skip(!process_spawning_available())) {
+	TEST_CASE("[SPAWN-01] the timeout watchdog is a runtime_error with a timeout attr" * doctest::skip(!can_spawn_subprocess())) {
 		auto t0 = std::chrono::steady_clock::now();
+#ifdef _WIN32
+		auto r = spawn_capture({"ping", "-n", "11", "127.0.0.1"}, 1);
+#else
 		auto r = spawn_capture({"sleep", "10"}, 1);
+#endif
 		auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
 			std::chrono::steady_clock::now() - t0).count();
 		CHECK(elapsed < 5);
@@ -187,37 +185,62 @@ TEST_SUITE("spawn_capture") {
 	// IN-N1 / Batch 3: a missing backend is no verdict -- call_ltlsynt
 	// returns a result<T> error instead of answering {false, ""} (= UNREALIZABLE).
 	TEST_CASE("[SPAWN-03] call_ltlsynt without Spot returns an error result") {
-		EnvGuard g("PATH", "/nonexistent");
+		EnvGuard g_path("PATH", "C:\\nonexistent_tau_spot_path");
+		EnvGuard g_bin("TAU_SPOT_BIN", "C:\\nonexistent_tau_spot_bin");
+		EnvGuard g_pfx("TAU_SHARED_PREFIX", "C:\\nonexistent_tau_prefix");
+		EnvGuard g_up("USERPROFILE", "C:\\nonexistent_tau_home");
+		EnvGuard g_home("HOME", "C:\\nonexistent_tau_home");
 		auto r = call_ltlsynt("F(p0)", {}, {"p0"});
 		CHECK(r.has_error());
 		CHECK(!r.has_value());
 	}
 
-	TEST_CASE("[SPAWN-04] 70KB of child output round-trips through the pipe"
-		* doctest::skip(!process_spawning_available())) {
+	TEST_CASE("[SPAWN-04] 70KB of child output round-trips through the pipe" * doctest::skip(!can_spawn_subprocess())) {
+#ifdef _WIN32
+		auto path = std::filesystem::temp_directory_path()
+			/ "tau_spawn04.txt";
+		{
+			std::ofstream f(path, std::ios::binary);
+			std::string data(70000, 'A');
+			f.write(data.data(), (std::streamsize)data.size());
+			REQUIRE(f.good());
+		}
+		// Separate argv words: cmd's /c quote-eating breaks nested
+		// `type "path"` when the whole command is one CreateProcess arg.
+		auto r = spawn_capture({"cmd", "/c", "type", path.string()});
+		std::filesystem::remove(path);
+#else
 		auto r = spawn_capture({"dd", "if=/dev/zero", "bs=70000", "count=1"});
+#endif
 		CHECK(r.has_value());
 		CHECK(r.value().size() == 70000);
 	}
 
-	TEST_CASE("[SPAWN-05] empty argv is invalid_argument") {
+	TEST_CASE("[SPAWN-05] empty argv is invalid_argument" * doctest::skip(!can_spawn_subprocess())) {
 		auto r = spawn_capture({});
 		CHECK(r.has_error());
 		CHECK(!r.has_value());
 		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
 
-	TEST_CASE("[SPAWN-06] a signal death is a runtime_error"
-		* doctest::skip(!process_spawning_available())) {
+	TEST_CASE("[SPAWN-06] a signal death is a runtime_error" * doctest::skip(!can_spawn_subprocess())) {
+#ifdef _WIN32
+		auto r = spawn_capture({"ping", "-n", "20", "127.0.0.1"}, 1);
+#else
 		auto r = spawn_capture({"sh", "-c", "kill -TERM $$"});
+#endif
 		CHECK(r.has_error());
 		CHECK(report_has_code(r.report(), code::runtime_error));
 	}
 
-	TEST_CASE("[SPAWN-07] a usage/internal error exit is a runtime_error"
-		* doctest::skip(!process_spawning_available())) {
+	TEST_CASE("[SPAWN-07] a usage/internal error exit is a runtime_error" * doctest::skip(!can_spawn_subprocess())) {
+#ifdef _WIN32
+		auto r = spawn_capture({"cmd", "/c", "exit", "2"}, 0,
+			[](int c) { return c == 0 || c == 1; });
+#else
 		auto r = spawn_capture({"sh", "-c", "exit 2"}, 0,
 			[](int c) { return c == 0 || c == 1; });
+#endif
 		CHECK(r.has_error());
 		CHECK(report_has_code(r.report(), code::runtime_error));
 	}

@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <filesystem>
 #include <random>
 
 #include "test_init.h"
@@ -8,23 +9,36 @@
 #	include "interpreter.h"
 #endif
 
-std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
-	// define the characters to use in the random string
-	const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	// length of the random string
+// Empty prefix → system temp dir. Paths use `/` so Tau `file("...")`
+// literals do not treat Windows backslashes as escapes.
+std::string random_file(const std::string& extension = ".out",
+	const std::string prefix = "")
+{
+	const char charset[] =
+		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	const size_t length = 10;
-	// random number generator
 	std::random_device rd;
 	std::mt19937 generator(rd());
 	std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
+	std::string dir = prefix;
+	if (dir.empty()) {
+		dir = std::filesystem::temp_directory_path().string();
+		if (!dir.empty() && dir.back() != '/' && dir.back() != '\\')
+			dir.push_back('/');
+		for (char& c : dir) if (c == '\\') c = '/';
+	}
 	std::ostringstream oss;
-	// add default location
-	oss << prefix;
-	// generate random string
+	oss << dir;
 	for (size_t i = 0; i < length; ++i) oss << charset[dist(generator)];
-	// append the file extension and return the file name
 	oss << extension;
 	return oss.str();
+}
+
+// Windows refuses unlink while a stream still holds the file; drop the
+// handle first (destroy interpreter / io_context) then call this.
+inline void remove_temp(const std::string& path) {
+	std::error_code ec;
+	std::filesystem::remove(path, ec);
 }
 
 tref create_spec(const char* spec) {

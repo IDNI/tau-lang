@@ -43,7 +43,7 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 template <NodeType node>
 static tref bv_constant(size_t bitwidth, size_t value) {
 	return tree<node>::get_ba_constant(
-		make_bitvector_value(bitwidth, value), bv_type_id<node>(bitwidth));
+		make_bitvector_value(bitwidth, value), bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 }
 
 // Bitvector type-id shorthands. These live here rather than in core: nothing

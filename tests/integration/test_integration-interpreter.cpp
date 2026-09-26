@@ -36,12 +36,15 @@ TEST_SUITE("Execution: revision stream continuity") {
 		// the REPL does (raw step() does neither).
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		REQUIRE( maybe_i.has_value() );
-		std::filesystem::remove(in_file);
 		// The three proposals are all satisfiable and mutually
 		// compatible, so u must carry them in file order; with the
 		// rewind bug every step re-read the first line and o2/o3 never
 		// appeared in any u value.
 		auto values = u_out->get_values();
+		// Drop file handles before unlink (Windows cannot delete open files).
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
 		REQUIRE( values.size() == 3 );
 		CHECK( values[1].find("o2") != std::string::npos );
 		CHECK( values[2].find("o3") != std::string::npos );
@@ -75,8 +78,10 @@ TEST_SUITE("Execution: revision stream continuity") {
 			std::string line;
 			while (std::getline(f, line)) if (!line.empty()) ++lines;
 		}
-		std::filesystem::remove(in_file);
-		std::filesystem::remove(out_file);
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
+		remove_temp(out_file);
 		CHECK( lines == 3 );
 	}
 
@@ -148,8 +153,10 @@ TEST_SUITE("Execution: revision stream continuity") {
 		std::string u2 = tree<node_t>::get(
 			step2.value().first.value().begin()->second).to_str();
 
-		std::filesystem::remove(file_a);
-		std::filesystem::remove(file_b);
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(file_a);
+		remove_temp(file_b);
 		CHECK( u2.find("o2") != std::string::npos );
 	}
 }

@@ -59,10 +59,15 @@ uint64_t rand_int(rng_t& rng, uint64_t lo, uint64_t hi) {
 	return std::uniform_int_distribution<uint64_t>(lo, hi)(rng);
 }
 
+/// @brief Like rand_int, but bounded by size_t hi, so the narrowing is exact.
+static size_t rand_index(rng_t& rng, size_t lo, size_t hi) {
+	return static_cast<size_t>(rand_int(rng, lo, hi));
+}
+
 /// @brief Uniformly pick one element of @p v, mirroring `random.choice`.
 template <typename T>
 const T& rand_choice(rng_t& rng, const std::vector<T>& v) {
-	return v[rand_int(rng, 0, v.size() - 1)];
+	return v[rand_index(rng, 0, v.size() - 1)];
 }
 
 /// @brief Sample @p k distinct elements of @p v, mirroring `random.sample`.
@@ -132,7 +137,7 @@ strings choose_exprs_for_iteration(rng_t& rng, size_t idx,
 	if (idx <= count) return { base_patterns[idx - 1] };
 	if (idx <= 2 * count) return strings(base_patterns.begin(),
 		base_patterns.begin() + std::min(idx - count + 1, count));
-	size_t rand_len = rand_int(rng, std::max<size_t>(3, count / 3), count);
+	size_t rand_len = rand_index(rng, std::max<size_t>(3, count / 3), count);
 	return rand_sample(rng, base_patterns, rand_len);
 }
 
