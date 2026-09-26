@@ -37,45 +37,58 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja" AND TAU_IS_GNU_OR_CLANG)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-# AppleClang rejects -ffat-lto-objects under LTO; plain -flto=auto works.
-# The probe needs -flto=auto: without it the flag is accepted everywhere.
-include(CheckCXXCompilerFlag)
-set(CMAKE_REQUIRED_FLAGS "-flto=auto")
-check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
-unset(CMAKE_REQUIRED_FLAGS)
-if(TAU_HAVE_FAT_LTO_OBJECTS)
-	set(TAU_FAT_LTO ";-ffat-lto-objects")
-else()
-	set(TAU_FAT_LTO "")
-endif()
-
-option(TAU_LTO "Build the library and the executables with link time optimization" ON)
-
-# LTO only pays off when something LTO-links it; test targets are all -fno-lto.
-# -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
-# library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
+# LTO only pays off when something LTO-links it; test targets are all -fno-lto
+# (GNU/Clang) or omit /GL (MSVC). -ffat-lto-objects lets -fno-lto targets link
+# an LTO-built library; em++ has no equivalent, so wasm takes LTO-off whole.
+set(TAU_LTO_COMPILE_FLAGS "")
+set(TAU_LTO_COMPILE "")
+set(TAU_LTO_LINK "")
 if (TAU_LTO AND (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON_NANOBIND
 	OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	AND NOT EMSCRIPTEN)
-	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
-	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
-	set(TAU_LTO_LINK "-flto=auto")
+	if(TAU_IS_GNU_OR_CLANG)
+		# AppleClang rejects -ffat-lto-objects under LTO; plain -flto=auto
+		# works. The probe needs -flto=auto: without it the flag is accepted
+		# everywhere.
+		include(CheckCXXCompilerFlag)
+		set(CMAKE_REQUIRED_FLAGS "-flto=auto")
+		check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
+		unset(CMAKE_REQUIRED_FLAGS)
+		if(TAU_HAVE_FAT_LTO_OBJECTS)
+			set(TAU_FAT_LTO ";-ffat-lto-objects")
+		else()
+			set(TAU_FAT_LTO "")
+		endif()
+		set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
+		set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
+		set(TAU_LTO_LINK "-flto=auto")
+	elseif(MSVC)
+		set(TAU_LTO_COMPILE_FLAGS "/GL")
+		set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
+		set(TAU_LTO_LINK "/LTCG")
+	endif()
 else()
-	set(TAU_LTO_COMPILE_FLAGS "")
-	set(TAU_LTO_COMPILE "")
-	set(TAU_LTO_LINK "")
 	message(STATUS "LTO off")
 endif()
 
-set(TAU_DEVEL_OPTIONS "-O0;-DDEBUG;-g0")
-set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
-set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")
-# Coverage mirrors Debug semantics; --coverage itself is added in CMakeLists.txt.
-# Without -DDEBUG (and with no -DNDEBUG) asserts stay live while bdd_handle::b is
-# private, which does not compile -- see bdd_handle.h.
-set(TAU_COVERAGE_OPTIONS "-O0;-DDEBUG;-ggdb3")
+# cl.exe spells the same optimization levels and debug flags differently.
+if(MSVC)
+	set(TAU_DEVEL_OPTIONS "/Od;/DDEBUG;/Zi")
+	set(TAU_DEBUG_OPTIONS "/Od;/DDEBUG;/Zi")
+	set(TAU_RELEASE_OPTIONS "/O2;/DNDEBUG${TAU_LTO_COMPILE}")
+	set(TAU_RELWITHDEBINFO_OPTIONS "/O2;/DNDEBUG${TAU_LTO_COMPILE};/Zi")
+	set(TAU_COVERAGE_OPTIONS "/Od;/DDEBUG;/Zi")
+else()
+	set(TAU_DEVEL_OPTIONS "-O0;-DDEBUG;-g0")
+	set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
+	set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
+	set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")
+	# Coverage mirrors Debug semantics. --coverage itself is added in
+	# CMakeLists.txt. Without -DDEBUG (and with no -DNDEBUG) asserts stay live
+	# while bdd_handle::b is private, which does not compile -- see bdd_handle.h.
+	set(TAU_COVERAGE_OPTIONS "-O0;-DDEBUG;-ggdb3")
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(COMPILE_OPTIONS "${TAU_DEBUG_OPTIONS}")
@@ -100,7 +113,8 @@ message(STATUS "TAU_LINK_OPTIONS ${TAU_LINK_OPTIONS}")
 # gold links noticeably faster than bfd; use it everywhere when available.
 # em++ always links (it ignores -fuse-ld=gold rather than rejecting it), so
 # the check below passes there too, but wasm-ld is em++'s only real linker.
-if(EMSCRIPTEN)
+# MSVC has no gold; skip the probe entirely.
+if(EMSCRIPTEN OR NOT TAU_IS_GNU_OR_CLANG)
 	set(TAU_LINKER "")
 else()
 	include(CheckLinkerFlag)
@@ -147,7 +161,14 @@ function(target_setup target)
 			# -ftemplate-backtrace-limit=0
 		)
 	else()
-		target_compile_options(${target} PRIVATE /W4)
+		# /utf-8: the sources carry UTF-8 in comments and string literals.
+		# NOMINMAX: windows.h's min/max macros would break std::min/std::max.
+		target_compile_options(${target} PRIVATE
+			/W4 /EHsc /utf-8 /bigobj)
+		target_compile_definitions(${target} PRIVATE
+			NOMINMAX
+			WIN32_LEAN_AND_MEAN
+			_CRT_DECLARE_NONSTDC_NAMES=0)
 	endif()
 	if(EMSCRIPTEN)
 		target_compile_options(${target} PRIVATE
@@ -223,6 +244,13 @@ function(target_setup target)
 		endif()
 	endif()
 	target_link_options(${target} PRIVATE "${TAU_LINK_OPTIONS}" ${TAU_LINKER})
+	# Windows default stack is 1 MiB; tau_ba splitters and ocltl decode on
+	# moderate k need more (Linux soft limit is typically 8 MiB). Match the
+	# wasm STACK_SIZE so MSVC builds do not SIGSEGV / 0xc0000409 on the
+	# same cases that pass elsewhere.
+	if(MSVC)
+		target_link_options(${target} PRIVATE "/STACK:16777216")
+	endif()
 	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

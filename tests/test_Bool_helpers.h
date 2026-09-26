@@ -23,8 +23,15 @@ namespace idni::tau_lang {
 // why it stayed hidden until bv cases were added to the tests using this pack.
 namespace test_Bool_init_detail {
 	struct _CleanupRegistrar {
-		// __attribute__((used)) so LTO does not DCE the registration.
-		__attribute__((used)) _CleanupRegistrar() {
+		// Keep the constructor live under LTO so atexit registration is not
+		// DCE'd. MSVC has no __attribute__((used)); dllexport is the
+		// equivalent keep-alive for a static object in a linked archive.
+#if defined(_MSC_VER)
+		__declspec(dllexport)
+#else
+		__attribute__((used))
+#endif
+		_CleanupRegistrar() {
 			std::atexit([]() { ba_constants<node_t>::cleanup(); });
 		}
 	};

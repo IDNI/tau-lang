@@ -28,8 +28,8 @@ map<string, size_t> m;
 // Intern name s: return its symbol, appending a new entry to v/m the
 // first time the name is seen
 sym_t var_dict(const char* s) {
-	if (auto it = m.find(s); it != m.end()) return it->second;
-	return m.emplace(s, v.size()), v.push_back(s), v.size() - 1;
+	if (auto it = m.find(s); it != m.end()) return static_cast<sym_t>(it->second);
+	return m.emplace(s, v.size()), v.push_back(s), static_cast<sym_t>(v.size() - 1);
 }
 
 // Returned by value: a pointer into the function-local static buffer this

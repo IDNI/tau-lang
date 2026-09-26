@@ -51,6 +51,13 @@ system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
 configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too).
 
+`windows-x86_64-msvc` builds the full pack from the store, cvc5 included, and runs the
+C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
+CI; a producer's `vcvars64.bat` search is only a local fallback. The
+`setenv`/`unsetenv` shim of the tests lives in `tests/test_init.h` for every
+Windows compiler, and the `popen`/`pclose` shim for MSVC alone — never in the
+library.
+
 Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
 exist but are ONLY for gdb debugging sessions — never use them for building,
 verification, or test runs.

@@ -207,7 +207,12 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #define TAU_LOG_LINE_PATH        __FILE__      << ":" << __LINE__ << " "
 #define LOG_LINE_PATH            TAU_LOG_LINE_PATH
 // LOG_TRACE << LOG_LINE << "message";
+// cl.exe has no __FILE_NAME__, so it prints the full path instead.
+#if defined(_MSC_VER)
+#define TAU_LOG_LINE             __FILE__ << ":" << __LINE__ << " "
+#else
 #define TAU_LOG_LINE             __FILE_NAME__ << ":" << __LINE__ << " "
+#endif
 #define LOG_LINE                 TAU_LOG_LINE
 
 // -----------------------------------------------------------------------------

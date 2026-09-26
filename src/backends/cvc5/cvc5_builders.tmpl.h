@@ -174,26 +174,26 @@ inline Term make_bitvector_extract(const Term& t, size_t hi, size_t lo) {
 // value must fit in `size` bits (cvc5 rejects it otherwise).
 inline cvc5::Term make_bitvector_cte(const size_t size,
 		const std::string& str, const size_t base) {
-	return cvc5_term_manager.mkBitVector(size, str, base);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), str, static_cast<uint32_t>(base));
 }
 
 // All-zeros value (the algebra's bottom element).
 inline cvc5::Term make_bitvector_bottom_elem(const size_t size) {
-	return cvc5_term_manager.mkBitVector(size, 0);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), 0);
 }
 
 // All-ones value (the algebra's top element).
 inline cvc5::Term make_bitvector_top_elem(const size_t size) {
-	return cvc5_term_manager.mkBitVector(size, std::string(size, '1'), 2);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), std::string(size, '1'), 2);
 }
 
-inline cvc5::Term make_bitvector_value(const size_t size, const size_t value) {
-	return cvc5_term_manager.mkBitVector(size, value);
+inline cvc5::Term make_bitvector_value(const size_t size, const uint64_t value) {
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value);
 }
 
 // `base` defaults to 2 at the declaration in cvc5.h.
 inline cvc5::Term make_bitvector_value(const size_t size, const std::string& value, const size_t base) {
-	return cvc5_term_manager.mkBitVector(size, value, base);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value, static_cast<uint32_t>(base));
 }
 
 // TRAP: builds a cvc5 BOOLEAN `true` (mkBoolean), not a bitvector.
@@ -207,11 +207,11 @@ inline cvc5::Term make_bitvector_false() {
 }
 
 inline cvc5::Term make_bitvector_zero(const size_t size) {
-	return cvc5_term_manager.mkBitVector(size, 0);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), 0);
 }
 
 inline cvc5::Term make_bitvector_one(const size_t size) {
-	return cvc5_term_manager.mkBitVector(size, 1);
+	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), 1);
 }
 
 } // namespace idni::tau_lang

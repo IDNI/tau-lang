@@ -112,7 +112,7 @@ add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
 target_link_libraries(${TAU_OBJECT_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_BA_LINK_LIBS})
-if (TAU_BUILD_PIC)
+if (TAU_BUILD_PIC AND NOT MSVC)
 	target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 endif()
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
@@ -139,7 +139,7 @@ add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
 target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_BA_LINK_LIBS})
-if (TAU_BUILD_PIC)
+if (TAU_BUILD_PIC AND NOT MSVC)
 	target_compile_options(${TAU_STATIC_LIB_NAME} PRIVATE -fPIC)
 endif()
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
@@ -148,7 +148,6 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	${TAU_PARSER_SOURCE_INCLUDE}
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
-	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -164,6 +163,12 @@ endif()
 # extern-declares, when TAU_ARTIFACT_PREINST is on.
 if(TAU_ARTIFACT_PREINST)
 	target_sources(${TAU_STATIC_LIB_NAME} PRIVATE instantiate_artifact_pack.cpp)
+	if(MSVC)
+		# /GL+LTCG rejects this TU (LNK1377 on tau_ba::tau_ba). It
+		# instantiates the whole artifact pack; keep it out of LTCG.
+		set_source_files_properties(instantiate_artifact_pack.cpp
+			PROPERTIES COMPILE_OPTIONS "/GL-")
+	endif()
 endif()
 
 #
@@ -195,7 +200,7 @@ endif()
 # executable
 #
 
-include(ftxui)
+include(tau-ftxui)
 
 if(TAU_BUILD_EXECUTABLE)
 	add_executable(${TAU_EXECUTABLE_NAME})

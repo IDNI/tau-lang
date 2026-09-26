@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include "doctest.h"
 #include "defs.h"
@@ -28,6 +29,27 @@ using namespace idni;
 // `struct label` that makes an unqualified `label::` ambiguous; write
 // `tau_lang::label::` in a test instead.
 using namespace idni::tau_lang;
+
+#if defined(_WIN32)
+// Windows has no POSIX setenv/unsetenv; MinGW-w64 and MSVC both carry
+// _putenv_s, and an empty value removes the variable, which is unsetenv.
+inline int setenv(const char* name, const char* value, int overwrite) {
+	if (!name || !value) return -1;
+	if (!overwrite && std::getenv(name)) return 0;
+	return _putenv_s(name, value) == 0 ? 0 : -1;
+}
+inline int unsetenv(const char* name) {
+	if (!name) return -1;
+	return _putenv_s(name, "") == 0 ? 0 : -1;
+}
+#endif
+
+#if defined(_WIN32) && defined(_MSC_VER)
+// _CRT_DECLARE_NONSTDC_NAMES=0 hides the CRT's popen alias, so map the
+// names here for the tests that use them; MinGW-w64 declares them itself.
+#define popen  _popen
+#define pclose _pclose
+#endif
 
 // Experiment overrides for the preprocessing/solver placement parameters;
 // every variable left unset keeps the shipped default, so an unset

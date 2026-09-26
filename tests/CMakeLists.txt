@@ -218,16 +218,24 @@ function(_tau_add_test_target N src work_dir)
 	# extern template declarations for the test BA packs, instantiated in libTAU
 	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's
 	if(NOT "${N}" STREQUAL "test_cvc5")
-		target_compile_options(${N} PUBLIC
-			-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
+		if(MSVC)
+			target_compile_options(${N} PUBLIC
+				/FI${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
+		else()
+			target_compile_options(${N} PUBLIC
+				-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
+		endif()
 	endif()
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
 	add_dependencies(${N} tau_header)
-	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
-	target_compile_options(${N} PUBLIC -fno-lto)
-	target_link_options(${N} PUBLIC -fno-lto)
-	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
+	if(TAU_IS_GNU_OR_CLANG)
+		target_compile_options(${N} PUBLIC -Wno-unused-function)
+		target_compile_options(${N} PUBLIC -fno-lto)
+		target_link_options(${N} PUBLIC -fno-lto)
+		target_compile_options(${N} PUBLIC
+			-Wstrict-overflow=2 -Wno-error=strict-overflow)
+	endif()
 	if(EMSCRIPTEN)
 		# the generated grammar tables overflow the default 64KiB wasm stack
 		# at module load. With -pthread, memory is shared and cannot grow at

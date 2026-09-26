@@ -16,6 +16,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 #include "backends/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
@@ -71,7 +72,7 @@ enum bdd_params {
 template<uint8_t params = INV_IN | INV_OUT | VARSHIFT>
 class bdd_options {
 	constexpr bdd_options(auto idWidth, auto shiftWidth) :
-		idW(idWidth), shiftW(shiftWidth) {}
+		idW(static_cast<uint8_t>(idWidth)), shiftW(static_cast<uint8_t>(shiftWidth)) {}
 
 public:
 	// bit width for id and shift
@@ -138,10 +139,18 @@ struct bdd_reference {
 	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(id) {}
+	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(static_cast<ref_type>(id)) {}
 	bdd_reference(auto in, auto out, auto shift, auto id) : in(in), out(out),
 								shift(shift),
-								id(id) {}
+								id(static_cast<ref_type>(id)) {}
+
+	// id indexes the universe vector V; ID_WIDTH never exceeds size_t's
+	// range, checked once here rather than at each V[n.id] use.
+	size_t idx() const {
+		DBG(assert(id <= static_cast<ref_type>(
+			std::numeric_limits<size_t>::max())));
+		return static_cast<size_t>(id);
+	}
 
 	bool operator==(const bdd_reference x) const {
 		return in == x.in && out == x.out && shift == x.shift &&
@@ -168,7 +177,8 @@ struct bdd_reference {
 	// Rebase x's absolute top variable to parent-relative form, v
 	// being the parent's variable; used when storing children in a
 	// skeleton. Leaves (shift == 0) pass through unchanged.
-	static bdd_reference to_shift_node(const bdd_reference x, uint_t v) {
+	// v shares x.shift's width, so a shift-domain value never narrows.
+	static bdd_reference to_shift_node(const bdd_reference x, ref_type v) {
 		if(x.shift == 0) return x;
 		if constexpr (INV_ORDER)
 			return bdd_reference(x.in, x.out, v + 1 - x.shift, x.id);
@@ -178,7 +188,7 @@ struct bdd_reference {
 	// Inverse of to_shift_node: restore a parent-relative child
 	// reference to absolute variable numbering, v being the parent's
 	// variable; used when decoding a stored skeleton.
-	static bdd_reference to_bdd_node(const bdd_reference x, uint_t v) {
+	static bdd_reference to_bdd_node(const bdd_reference x, ref_type v) {
 		if(x.shift == 0) return x;
 		if constexpr (INV_ORDER)
 			return bdd_reference(x.in, x.out, v - x.shift + 1, x.id);
@@ -189,7 +199,7 @@ struct bdd_reference {
 	// involved in a cached operation) for use as a cache key, so one
 	// cache entry serves every uniformly shifted instance. INV_ORDER
 	// only; requires s >= x.shift.
-	static bdd_reference to_cache_node(const bdd_reference x, int_t s) {
+	static bdd_reference to_cache_node(const bdd_reference x, ref_type s) {
 		static_assert(INV_ORDER);
 		if (x.shift == 0) return x;
 		DBG(assert(s >= x.shift));
@@ -198,7 +208,7 @@ struct bdd_reference {
 
 	// Inverse of to_cache_node: rebase a cached result back to the
 	// query's reference level s. INV_ORDER only.
-	static bdd_reference from_cache_node(const bdd_reference x, int_t s) {
+	static bdd_reference from_cache_node(const bdd_reference x, ref_type s) {
 		static_assert(INV_ORDER);
 		if (x.shift == 0) return x;
 		return bdd_reference(x.in, x.out, s - x.shift + 1, x.id);
@@ -226,7 +236,7 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(id) {}
+	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(static_cast<ref_type>(id)) {}
 
 	bool operator==(const bdd_reference x) const {
 		return in == x.in && out == x.out && id == x.id;
@@ -371,7 +381,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	// true iff this value / the referenced entry is a leaf constant
 	bool leaf() const { return holds_alternative<B>(*this); }
-	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.id]); }
+	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.idx()]); }
 	// Variable-order comparator: var_cmp(a, b) is true when a comes
 	// strictly before b in the BDD order (ascending by default,
 	// descending with INV_ORDER)
@@ -652,12 +662,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	static bdd get(bdd_ref n) {
 		constexpr auto get_bdd_node = [](const bdd_ref n) {
 			if constexpr (o.has_varshift()) {
-				const bdd_skeleton& s = V[n.id];
+				const bdd_skeleton& s = V[n.idx()];
 				if(s.leaf()) return bdd(std::get<B>(s));
 				const auto& x = std::get<node_skeleton<bdd_ref>>(s);
 				return bdd(n.shift, bdd_ref::to_bdd_node(x.h, n.shift),
 					   bdd_ref::to_bdd_node(x.l, n.shift));
-			} else return V[n.id];
+			} else return V[n.idx()];
 		};
 #ifdef DEBUG
 		if constexpr (!o.has_inv_out()) assert(!n.out);
@@ -1308,10 +1318,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bdd get(bdd_ref n) {
 		constexpr auto get_bdd_node = [](const bdd_ref n) {
 			if constexpr (o.has_varshift()) {
-				const node_skeleton<bdd_ref>& s = V[n.id];
+				const node_skeleton<bdd_ref>& s = V[n.idx()];
 				return bdd(n.shift, bdd_ref::to_bdd_node(s.h, n.shift),
 					   bdd_ref::to_bdd_node(s.l, n.shift));
-			} else return V[n.id];
+			} else return V[n.idx()];
 		};
 #ifdef DEBUG
 		if constexpr (!o.has_inv_out()) assert(!n.out);
