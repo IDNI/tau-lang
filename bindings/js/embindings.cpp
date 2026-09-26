@@ -89,7 +89,7 @@ val js_get_spec(const std::string& spec) {
 val js_normalize_formula(const std::string& formula) {
 	g_last_error.clear();
 	try {
-		if (auto r = tau_api::normalize_formula(formula); r)
+		if (auto r = tau_api::normalize_formula(formula); r.has_value())
 			return val(*r);
 		else set_last_error(r);
 	} catch (const std::exception&) {}
@@ -130,7 +130,7 @@ val js_solve(const std::string& formula, const std::string& mode) {
 	g_last_error.clear();
 	try {
 		auto r = tau_api::solve(formula, parse_solver_mode(mode));
-		if (!r) { set_last_error(r); return val::null(); }
+		if (!r.has_value()) { set_last_error(r); return val::null(); }
 		val out = val::object();
 		for (auto& [var, value] : *r) out.set(var, value);
 		return out;
@@ -142,7 +142,7 @@ int js_interpreter_create(const std::string& spec) {
 	g_last_error.clear();
 	try {
 		auto interp = tau_api::get_interpreter(spec);
-		if (!interp) { set_last_error(interp); return 0; }
+		if (!interp.has_value()) { set_last_error(interp); return 0; }
 		int handle = g_next_handle++;
 		g_interpreters[handle] = std::make_unique<interpreter<node_t>>(
 			std::move(*interp));
@@ -168,7 +168,7 @@ val js_interpreter_step(int handle, val inputs) {
 		}
 		auto r = tau_api::step(interp, std::move(step_inputs),
 			/*interactive=*/false);
-		if (!r) { set_last_error(r); return val::null(); }
+		if (!r.has_value()) { set_last_error(r); return val::null(); }
 		val out = val::object();
 		for (auto& [sa, value] : *r) out.set(sa.name, value);
 		out.set("state", static_cast<double>(interp.time_point));
@@ -194,6 +194,95 @@ void js_interpreter_free(int handle) {
 	g_interpreters.erase(handle);
 }
 
+// The value a BA-declared option holds after the call, or null with the
+// reason in getLastError() when no algebra of the pack declares the name.
+val js_ba_option_value(const result<size_t>& r) {
+	if (r.has_value()) return val(static_cast<double>(r.value()));
+	set_last_error(r);
+	return val::null();
+}
+
+val js_set_ba_option(const std::string& name, double value) {
+	g_last_error.clear();
+	if (!(value >= 0)) {
+		g_last_error = "set_ba_option: the value must be a "
+			"non-negative number";
+		return val::null();
+	}
+	try {
+		return js_ba_option_value(tau_api::set_ba_option(name,
+			static_cast<size_t>(value)));
+	} catch (const std::exception&) { return val::null(); }
+}
+
+val js_get_ba_option(const std::string& name) {
+	g_last_error.clear();
+	try {
+		return js_ba_option_value(tau_api::get_ba_option(name));
+	} catch (const std::exception&) { return val::null(); }
+}
+
+val js_ba_option_names() {
+	val out = val::array();
+	size_t i = 0;
+	for (const std::string& name : tau_api::ba_option_names())
+		out.set(i++, name);
+	return out;
+}
+
+// Runtime budgets and engine switches, under the camelCase form of the
+// Python binding's names. Each forwards to the api setter the CLI option
+// and the REPL `set` option of the same meaning write.
+//
+// The api setters of the ltlsynt route are not bound: this build has no
+// process model, so ltlsynt never runs and the ltlsynt timeout, the choice
+// of ltlsynt encoding, and the caps on what ltlsynt returns (HOA states,
+// HOA guard cubes, strategy paths of the window oracle) have nothing to
+// act on. The two LTL(ABA) budgets that act before or without ltlsynt
+// (setLtlQeMaxVars, setLtlMaxRefinementRounds) are bound.
+struct count_setter {
+	const char* name;
+	void (*set)(size_t);
+};
+constexpr count_setter count_setters[] = {
+	{ "setBlockMaxSplits", &tau_api::set_block_max_splits },
+	{ "setBlockMaxRounds", &tau_api::set_block_max_rounds },
+	{ "setCqeMaxClauses", &tau_api::set_cqe_max_clauses },
+	{ "setLgrsMaxVars", &tau_api::set_lgrs_max_vars },
+	{ "setBlockSqueezeCap", &tau_api::set_block_squeeze_cap },
+	{ "setMaxFixpointSteps", &tau_api::set_max_fixpoint_steps },
+	{ "setMaxFlagSearchSteps", &tau_api::set_max_flag_search_steps },
+	{ "setMaxDefPasses", &tau_api::set_max_def_passes },
+	{ "setMaxEnumSteps", &tau_api::set_max_enum_steps },
+	{ "setMaxProbeSteps", &tau_api::set_max_probe_steps },
+	{ "setMaxRewriteRounds", &tau_api::set_max_rewrite_rounds },
+	{ "setMaxSimplifyRounds", &tau_api::set_max_simplify_rounds },
+	{ "setGcMinSize", &tau_api::set_gc_min_size },
+	{ "setTrefBudget", &tau_api::set_tref_budget },
+	{ "setTrefBudgetSoftPercent", &tau_api::set_tref_budget_soft_percent },
+	{ "setSpecSizeWarn", &tau_api::set_spec_size_warn },
+	{ "setMaxRevisionAlts", &tau_api::set_max_revision_alts },
+	{ "setMaxConsistencySubsets", &tau_api::set_max_consistency_subsets },
+	{ "setCacheBound", &tau_api::set_cache_bound },
+	{ "setMaxCoverProducts", &tau_api::set_max_cover_products },
+	{ "setLtlQeMaxVars", &tau_api::set_ltl_qe_max_vars },
+	{ "setLtlMaxRefinementRounds",
+		&tau_api::set_ltl_max_refinement_rounds },
+	{ "setBaDecisionPins", &tau_api::set_ba_decision_pins },
+};
+
+struct flag_setter {
+	const char* name;
+	void (*set)(bool);
+};
+constexpr flag_setter flag_setters[] = {
+	{ "setPreprocessing", &tau_api::set_preprocessing },
+	{ "setBaComponentFactoring", &tau_api::set_ba_component_factoring },
+	{ "setPwrSemanticFallback", &tau_api::set_pwr_semantic_fallback },
+	{ "setStepDefinitionalPropagation",
+		&tau_api::set_step_definitional_propagation },
+};
+
 } // namespace
 
 EMSCRIPTEN_BINDINGS(tau) {
@@ -215,11 +304,24 @@ EMSCRIPTEN_BINDINGS(tau) {
 	emscripten::function("setBlasting", &tau_api::set_preprocessing);
 	emscripten::function("setIndenting", &tau_api::set_indenting);
 	emscripten::function("setHighlighting", &tau_api::set_highlighting);
+	emscripten::function("setColors", &tau_api::set_colors);
 	emscripten::function("setJson", &tau_api::set_json);
 	emscripten::function("setSeverity", optional_override(
 		[](const std::string& lvl) {
 			tau_api::set_severity(parse_severity(lvl));
 		}));
+
+	for (const count_setter& s : count_setters)
+		emscripten::function(s.name, s.set);
+	for (const flag_setter& s : flag_setters)
+		emscripten::function(s.name, s.set);
+	emscripten::function("setGcGrowthFactor",
+		&tau_api::set_gc_growth_factor);
+	emscripten::function("trefCount", optional_override(
+		[]() { return static_cast<double>(tau_api::tref_count()); }));
+	emscripten::function("baOptionNames", &js_ba_option_names);
+	emscripten::function("setBaOption", &js_set_ba_option);
+	emscripten::function("getBaOption", &js_get_ba_option);
 
 	emscripten::function("interpreterCreate", &js_interpreter_create);
 	emscripten::function("interpreterStep", &js_interpreter_step);

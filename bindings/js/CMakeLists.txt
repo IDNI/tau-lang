@@ -73,6 +73,7 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_BINARY_DIR}/tests
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/parity.js
+		${CMAKE_CURRENT_SOURCE_DIR}/tests/budgets.js
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/native.js
 		${CMAKE_BINARY_DIR}/tests/
 	COMMENT "Copying JS bindings package assets (LICENSE, tests)")
