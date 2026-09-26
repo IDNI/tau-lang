@@ -110,7 +110,9 @@ ARG BUILD_JOBS=5
 # installs oras, the pinned client configure uses to read a missing package
 # from the remote store; dep-oras.sh verifies the release by sha256.
 COPY ./dev /tau-lang/
-COPY ./external/parser/scripts/devrc /tau-lang/external/parser/scripts/
+COPY ./external/parser/scripts/devrc \
+	./external/parser/scripts/dep-build \
+	/tau-lang/external/parser/scripts/
 COPY ./external/parser/cmake/tau-resolve.cmake /tau-lang/external/parser/cmake/
 COPY ./scripts/env /tau-lang/scripts/
 COPY ./scripts/dep-oras.sh /tau-lang/scripts/
