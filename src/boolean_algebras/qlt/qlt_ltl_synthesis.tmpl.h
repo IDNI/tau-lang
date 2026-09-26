@@ -386,10 +386,14 @@ static std::optional<bool> eval_pure_output_atom_at(
 			long lo_pos = 2L * ja + 1;
 			long hi_pos = 2L * jb + 1;
 			long pp = static_cast<long>(*p);
+#if defined(__GNUC__)
 			#pragma GCC diagnostic push
 			#pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
 			bool in_range = (pp >= lo_pos && pp <= hi_pos);
+#if defined(__GNUC__)
 			#pragma GCC diagnostic pop
+#endif
 			return (op == tau::bf_eq) ? in_range : !in_range;
 		}
 		if (cs.size() != 1) return std::nullopt;

@@ -6,19 +6,28 @@
 namespace idni::tau_lang {
 
 // BA1-4: pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
+#if defined(_MSC_VER) && !defined(__clang__)
+#	include <__msvc_int128.hpp>
+using int128_t_ = std::_Signed128;
+#else
 __extension__ typedef __int128 int128_t_;
+#endif
 
 // --- internal helper ---
 
+#if !defined(_MSC_VER)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
 static long long qlt_gcd(long long a, long long b) {
 	unsigned long long ua = a < 0 ? 0ULL - (unsigned long long)a : (unsigned long long)a;
 	unsigned long long ub = b < 0 ? 0ULL - (unsigned long long)b : (unsigned long long)b;
 	while (ub) { ua %= ub; std::swap(ua, ub); }
 	return (long long)(ua ? ua : 1ULL);
 }
+#if !defined(_MSC_VER)
 #pragma GCC diagnostic pop
+#endif
 
 // --- qlt_rational ---
 

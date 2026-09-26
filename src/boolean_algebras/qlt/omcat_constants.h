@@ -16,6 +16,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__OMCAT_CONSTANTS_H__
 
 #include <algorithm>
+#include <climits>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,21 @@ inline rational parse_rat_literal(const std::string& src) {
 			for (size_t i = 0; i < fpart.size(); ++i) denom *= 10;
 			long long sign = (ipart.size() && ipart[0] == '-') ? -1 : 1;
 			long long scaled = 0, num = 0;
+#if defined(_MSC_VER) && !defined(__clang__)
+			// MSVC has no __builtin_*_overflow; widen through 128-bit.
+			omcat_int128_ scaled128 =
+				(omcat_int128_) std::abs(ival) * denom;
+			omcat_int128_ num128 = scaled128 + fval;
+			num128 *= sign;
+			if (num128 > LLONG_MAX || num128 < LLONG_MIN) {
+				LOG_WARNING << "rational parse: '" << src
+					<< "' does not fit an exact rational literal; "
+					"returning sentinel";
+				return rational(0, 0);
+			}
+			num = (long long) num128;
+			(void)scaled;
+#else
 			if (__builtin_mul_overflow(std::abs(ival), denom, &scaled)
 				|| __builtin_add_overflow(scaled, fval, &num)
 				|| __builtin_mul_overflow(num, sign, &num))
@@ -74,6 +90,7 @@ inline rational parse_rat_literal(const std::string& src) {
 					"returning sentinel";
 				return rational(0, 0);
 			}
+#endif
 			return rational(num, denom);
 		} catch (...) {
 			LOG_WARNING << "rational parse failed for decimal, returning sentinel";

@@ -23,6 +23,9 @@
 #include <utility>
 #include <limits>
 #include <vector>
+#if defined(_MSC_VER) && !defined(__clang__)
+#	include <__msvc_int128.hpp>
+#endif
 
 namespace idni::tau_lang::omcat {
 
@@ -41,7 +44,11 @@ struct rational {
 };
 
 /// @brief 128-bit integer used for overflow-free cross-multiplication.
+#if defined(_MSC_VER) && !defined(__clang__)
+using omcat_int128_ = std::_Signed128;
+#else
 __extension__ typedef __int128 omcat_int128_;
+#endif
 
 /**
  * @brief Three-way compare two rationals by 128-bit cross-multiplication.
