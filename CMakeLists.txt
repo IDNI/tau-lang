@@ -517,7 +517,11 @@ if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	if(TAU_DEPS_FROM_STORE)
 		tau_deps_resolve_curl()
 	endif()
-	find_package(CURL REQUIRED)
+	if(TAU_HAVE_STORE_CURL)
+		message(STATUS "curl from store: ${TAU_CURL_PREFIX}")
+	else()
+		find_package(CURL REQUIRED)
+	endif()
 else()
 	message(STATUS "curl not required by TAU_BAS=${TAU_BAS}; skipping")
 endif()
@@ -547,7 +551,17 @@ if(CMAKE_CROSSCOMPILING)
 	list(APPEND CMAKE_FIND_ROOT_PATH "${_boost_root}")
 endif()
 find_package(Boost REQUIRED COMPONENTS log)
+# MSVC autolink wants a tagged libboost_log_setup-vc143-...lib; the store Boost
+# installs layout=system (libboost_log_setup.lib), so disable autolink and ask
+# for the component explicitly.
+if(MSVC)
+	add_compile_definitions(BOOST_ALL_NO_LIB)
+	find_package(Boost REQUIRED COMPONENTS log_setup)
+endif()
 set(TAU_BOOST_LIBS Boost::log)
+if(TARGET Boost::log_setup)
+	list(APPEND TAU_BOOST_LIBS Boost::log_setup)
+endif()
 if (Boost_FOUND)
 	message(STATUS "Boost_DIR: ${Boost_DIR}")
 	message(STATUS "Boost version: ${Boost_VERSION}")
@@ -604,7 +618,7 @@ else()
 	set(CMAKE_BUILD_RPATH "\${ORIGIN}")
 	set(CMAKE_INSTALL_RPATH "\${ORIGIN}:\${ORIGIN}/../lib/tau:\${ORIGIN}/../lib64/tau")
 endif()
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_RPATH FALSE)
 message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
@@ -705,7 +719,8 @@ endif()
 # default), so when tau LTO-compiles, mixing LTO and non-LTO objects in the
 # same COMDAT groups breaks gold's LTO plugin at link time. Force the parser
 # static lib to LTO-compile too whenever tau does, to keep everything uniform.
-if (TARGET tauparser_static AND TAU_LTO_COMPILE_FLAGS AND COMPILE_OPTIONS MATCHES "flto")
+if (TARGET tauparser_static AND TAU_LTO_COMPILE_FLAGS AND
+	(COMPILE_OPTIONS MATCHES "flto" OR COMPILE_OPTIONS MATCHES "/GL"))
 	target_compile_options(tauparser_static PRIVATE "${TAU_LTO_COMPILE_FLAGS}")
 endif()
 
@@ -862,8 +877,7 @@ endif()
 # Install executable and documentation
 if (TAU_BUILD_EXECUTABLE)
 	install(TARGETS ${TAU_EXECUTABLE_NAME}
-		RUNTIME DESTINATION ${TAU_PKG_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
-		CONFIGURATIONS Release)
+		RUNTIME DESTINATION ${TAU_PKG_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 endif()
 install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 		"${CMAKE_CURRENT_SOURCE_DIR}/README.md"
@@ -896,6 +910,22 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
 	elseif (TAU_MACOS_PACKAGE)
 		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Darwin")
+	else()
+		# Plain cmake --install: bundle the cvc5 closure beside the executable so
+		# the relative CMAKE_INSTALL_RPATH finds it. Without this the absolute
+		# store path from the link would be the only way libcvc5 resolves. An
+		# SDK-only install (no executable, no shared library) needs no runtime
+		# copy: its consumer resolves cvc5 through find_dependency.
+		if(TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+				OR TAU_BUILD_SHARED_LIBRARY)
+			if (WIN32)
+				install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
+			elseif (APPLE)
+				install_cvc5("${CMAKE_INSTALL_LIBDIR}/tau" "${TAU_PKG_COMPONENT}" "Darwin")
+			else()
+				install_cvc5("${CMAKE_INSTALL_LIBDIR}/tau" "${TAU_PKG_COMPONENT}" "Linux")
+			endif()
+		endif()
 	endif()
 else()
 	message(STATUS
