@@ -37,8 +37,15 @@
 #include "logging.h"
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
-// common std::hash templates and specializations
-#include "../external/parser/src/defs.h"
+// common std::hash templates and specializations. In installed parser mode the
+// parser is an SDK package and its defs.h comes from the package include path.
+// Subdir mode names the in-tree path through TAU_PARSER_DEFS_INCLUDE so the
+// header text never names the parser source path in an installed SDK.
+#ifdef TAU_PARSER_DEFS_INSTALLED
+#include <tauparser/defs.h>
+#else
+#include TAU_PARSER_DEFS_INCLUDE
+#endif
 
 // Macros to ease searching and sorting
 // Binary search of y in x

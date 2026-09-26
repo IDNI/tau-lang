@@ -115,7 +115,7 @@ endif()
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	${TAU_PARSER_SOURCE_INCLUDE}
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
@@ -142,7 +142,7 @@ endif()
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	${TAU_PARSER_SOURCE_INCLUDE}
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -173,7 +173,7 @@ target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_B
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	${TAU_PARSER_SOURCE_INCLUDE}
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<INSTALL_INTERFACE:.>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
@@ -202,7 +202,7 @@ if(TAU_BUILD_EXECUTABLE)
 	target_include_directories(${TAU_EXECUTABLE_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
-		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		${TAU_PARSER_SOURCE_INCLUDE}
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
@@ -228,7 +228,7 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 	target_include_directories(${TAU_EXE_SHARED_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
-		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		${TAU_PARSER_SOURCE_INCLUDE}
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)

@@ -168,6 +168,15 @@ function(target_setup target)
 	target_compile_features(${target} PRIVATE cxx_std_23)
 	# grammars are compiled ahead of time, so tau never parses .tgf at runtime
 	target_compile_definitions(${target} PRIVATE TAU_PARSER_NO_TGF)
+	if(TAU_DEPS_FROM_STORE)
+		# src/defs.h pulls the parser's defs.h from the SDK package.
+		target_compile_definitions(${target} PRIVATE TAU_PARSER_DEFS_INSTALLED)
+	else()
+		# src/defs.h includes the parser defs through this macro so its text
+		# never names the external/parser path an installed SDK must not carry.
+		target_compile_definitions(${target} PRIVATE
+			"TAU_PARSER_DEFS_INCLUDE=\"../external/parser/src/defs.h\"")
+	endif()
 	# generated tau_pack.h describing the configured BA pack, and beside it the
 	# BA parsers generated from the pack's grammars
 	if(TAU_PACK_INCLUDE_DIR)

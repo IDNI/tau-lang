@@ -246,6 +246,8 @@ function(tau_generate_pack_header)
 	# this first write well-formed.
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
 	set(TAU_CODEGEN_BA_PACKAGE_DIRS "")
+	set(TAU_CODEGEN_BUILD_DIR "${CMAKE_BINARY_DIR}")
+	set(TAU_CODEGEN_PARSER_LIB "${CMAKE_BINARY_DIR}/libtauparser.a")
 
 	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
 
@@ -295,6 +297,7 @@ function(tau_generate_pack_header)
 		message(FATAL_ERROR "TAU_BOOL_CARRIERS must name at least one BA id")
 	endif()
 	add_compile_definitions(TAU_PACK_BOOL_CARRIERS="${_carriers}")
+	set(TAU_PACK_BOOL_CARRIERS_RESOLVED "${_carriers}" PARENT_SCOPE)
 	string(REPLACE "," ";" _carrier_ids "${_carriers}")
 	set(_carrier_in_pack FALSE)
 	foreach(_id ${_carrier_ids})
@@ -328,6 +331,17 @@ endfunction()
 # template's layout drifts from the one those archives were compiled against.
 #
 function(tau_finalize_pack_compile_definitions)
+	set(TAU_CODEGEN_BUILD_DIR "${CMAKE_BINARY_DIR}")
+	if(TAU_DEPS_FROM_STORE)
+		# MSVC names a static library .lib; MinGW and the Unix toolchains keep .a.
+		if(MSVC)
+			set(TAU_CODEGEN_PARSER_LIB "${TAU_PARSER_SDK_PREFIX}/lib/tauparser.lib")
+		else()
+			set(TAU_CODEGEN_PARSER_LIB "${TAU_PARSER_SDK_PREFIX}/lib/libtauparser.a")
+		endif()
+	else()
+		set(TAU_CODEGEN_PARSER_LIB "${CMAKE_BINARY_DIR}/libtauparser.a")
+	endif()
 	set(_resolved "")
 	foreach(_def IN LISTS TAU_DEFINITIONS)
 		if(${_def})
@@ -347,10 +361,15 @@ function(tau_finalize_pack_compile_definitions)
 			endforeach()
 		endif()
 	endif()
+	if(TAU_DEPS_FROM_STORE)
+		# The parser headers come from the SDK; src/defs.h selects its include.
+		list(APPEND _resolved "TAU_PARSER_DEFS_INSTALLED")
+	endif()
 	if(_resolved)
 		list(REMOVE_DUPLICATES _resolved)
 	endif()
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}" PARENT_SCOPE)
 	# find_package(<pkg> CONFIG) records where it found the package in
 	# <pkg>_DIR; the emitted project is pointed at the same place
 	set(_pkg_dirs "")
@@ -360,6 +379,16 @@ function(tau_finalize_pack_compile_definitions)
 		endif()
 	endforeach()
 	set(TAU_CODEGEN_BA_PACKAGE_DIRS "${_pkg_dirs}")
+	# Parser include directories for the emitted project: the in-tree source in
+	# subdir mode, the SDK include dirs when the deps come from the store.
+	if(TAU_DEPS_FROM_STORE)
+		set(TAU_CODEGEN_PARSER_INCLUDE_DIRS
+			"${TAU_PARSER_SDK_PREFIX}/include/tauparser;${TAU_PARSER_SDK_PREFIX}/include")
+	else()
+		set(TAU_CODEGEN_PARSER_INCLUDE_DIRS
+			"${TAU_SDK_ROOT_PATH}/external/parser/src")
+	endif()
+	set(TAU_CODEGEN_BOOST_LIBDIR "${BOOST_LIBDIR}")
 	configure_file(
 		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
 		"${TAU_PACK_INCLUDE_DIR}/tau_pack.h"
