@@ -25,13 +25,13 @@ include(tau_repl_pack)
 add_test(NAME "test_codegen_cli-always_one_emits"
 	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'always o1[t] = 1' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
 set_tests_properties("test_codegen_cli-always_one_emits" PROPERTIES
-	PASS_REGULAR_EXPRESSION "compiled:(.*\n)*.*EXIT=0"
+	PASS_REGULAR_EXPRESSION "compiled:.*EXIT=0"
 	FAIL_REGULAR_EXPRESSION "EXIT=1")
 
 add_test(NAME "test_codegen_cli-unrealizable_exit_3"
 	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'always (o1[t] = 1 && o1[t] = 0)' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
 set_tests_properties("test_codegen_cli-unrealizable_exit_3" PROPERTIES
-	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE(.*\n)*.*EXIT=1")
+	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE.*EXIT=1")
 
 # CG-N6: ltlsynt stubbed to fail like an internal/usage error (exit 2, no
 # verdict line -- see tests/repl/stubs/ltlsynt). The synthesis layer must
@@ -40,7 +40,7 @@ set_tests_properties("test_codegen_cli-unrealizable_exit_3" PROPERTIES
 add_test(NAME "test_codegen_cli-backend_failure_exit_4"
 	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'F (o1[t] = 1)' > \"$d/spec.tau\"; PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
 set_tests_properties("test_codegen_cli-backend_failure_exit_4" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlsynt produced no verdict(.*\n)*.*EXIT=1"
+	PASS_REGULAR_EXPRESSION "ltlsynt produced no verdict.*EXIT=1"
 	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|terminate called")
 
 # only the data game decides this spec: compile says so instead of calling

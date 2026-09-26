@@ -119,4 +119,4 @@ add_repl_test_fail(set_cmd-bvmaxwidth_enable_rejected
 # exact mode is on, in the same session.
 add_repl_test(set_cmd-bvwidening_changes_semantics
 	"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]. set bv-widening on. sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]"
-	"%1.*: T(.*\n)*.*%2.*: F")
+	"%1.*: T.*%2.*: F")

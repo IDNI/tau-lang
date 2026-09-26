@@ -119,7 +119,7 @@ add_test(NAME "test_repl-ltl_cmd-backend_failure_is_unknown"
 	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1. sat always o1[t] = 1\""
 )
 set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
-	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n(.*\n)*.*: T"
+	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n.*: T"
 	FAIL_REGULAR_EXPRESSION "REALIZABLE|Aborted|core dumped")
 
 # ── Batch 3: error ≠ verdict ───────────────────────────────────────────────
