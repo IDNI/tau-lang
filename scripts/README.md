@@ -86,6 +86,8 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `debug`, `release`, `relwithdebinfo`, `coverage` — shorthand for `build`
 - `w64-debug`, `w64-release` — Windows cross-build (MinGW toolchain from parser)
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
+- `dep-oras` — the pinned oras client, verified by sha256, for reading the remote
+  store. CI runs it; a local build needs it only with `TAU_STORE_REMOTE` set.
 - `dep-*-package` — the store producers configure runs itself (`dep-cvc5-package`,
   `dep-boost-package`, `dep-curl-package`, `dep-spot-package`); called by hand
   only to prefetch. `dep-spot-package` builds the Spot CLI Tau execs, never

@@ -1,15 +1,29 @@
 #!/bin/sh
 # Run a command with git authenticated to github.com when a gh_token secret
-# is mounted; without it clones stay anonymous. The token stays in this
-# process's environment, so it never reaches a gitconfig or an image layer.
+# is mounted, and with oras authenticated to the TAU_STORE_REMOTE registry
+# when that variable names one. Without the secret clones and store reads
+# stay anonymous. The token stays in this process's environment and in a
+# temporary oras credential directory that is removed before the command
+# returns, so it never reaches a gitconfig or an image layer.
 #
 # No .sh extension: only scripts/*.sh are ./dev subcommands.
 
+oras_config=""
 if [ -s /run/secrets/gh_token ]; then
 	GIT_CONFIG_COUNT=1
 	GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/gh_token)@github.com/.insteadOf"
 	GIT_CONFIG_VALUE_0="https://github.com/"
 	export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+	if [ -n "${TAU_STORE_REMOTE:-}" ] && command -v oras >/dev/null 2>&1; then
+		oras_config="$(mktemp -d)"
+		DOCKER_CONFIG="$oras_config"
+		export DOCKER_CONFIG
+		oras login "${TAU_STORE_REMOTE%%/*}" -u "${GITHUB_ACTOR:-tau}" \
+			--password-stdin < /run/secrets/gh_token >&2 || true
+	fi
 fi
 
-exec "$@"
+"$@"
+rc=$?
+[ -n "$oras_config" ] && rm -rf "$oras_config"
+exit $rc
