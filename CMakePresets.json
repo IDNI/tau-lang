@@ -95,6 +95,16 @@
 			"binaryDir": "${sourceDir}/build/release-wasm"
 		},
 		{
+			"name": "_build_dir-devel-wasm",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-wasm"
+		},
+		{
+			"name": "_build_dir-devel-wasm-repl-browser",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-wasm-repl-browser"
+		},
+		{
 			"name": "_build_dir-debug-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-wasm"
@@ -108,6 +118,11 @@
 			"name": "_build_dir-debug-wasm-repl-browser",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-wasm-repl-browser"
+		},
+		{
+			"name": "_build_dir-devel-w64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-w64"
 		},
 		{
 			"name": "_build_dir-coverage-gcc",
@@ -422,6 +437,15 @@
 			]
 		},
 		{
+			"name": "devel-w64",
+			"inherits": [
+				"_build_dir-devel-w64",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-devel"
+			]
+		},
+		{
 			"name": "release-wasm",
 			"inherits": [
 				"_build_dir-release-wasm",
@@ -433,15 +457,20 @@
 			]
 		},
 		{
+			"name": "devel-wasm",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm"]
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
+		},
+		{
+			"name": "devel-wasm-repl-browser",
+			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-browser"]
+		},
+		{
 			"name": "debug-wasm",
-			"inherits": [
-				"_build_dir-debug-wasm",
-				"_generator-make",
-				"_toolchain-wasm",
-				"_bas-wasm",
-				"_build-binding-js",
-				"_build-type-debug"
-			]
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm"]
 		},
 		{
 			"name": "release-wasm-all-tests",
@@ -457,15 +486,7 @@
 		},
 		{
 			"name": "debug-wasm-all-tests",
-			"inherits": [
-				"_build_dir-debug-wasm",
-				"_generator-make",
-				"_toolchain-wasm",
-				"_bas-wasm",
-				"_build-binding-js",
-				"_build-wasm-tests",
-				"_build-type-debug"
-			]
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
 		},
 		{
 			"name": "release-wasm-repl-browser",
@@ -480,14 +501,7 @@
 		},
 		{
 			"name": "debug-wasm-repl-browser",
-			"inherits": [
-				"_build_dir-debug-wasm-repl-browser",
-				"_generator-make",
-				"_toolchain-wasm",
-				"_bas-wasm",
-				"_build-repl-wasm",
-				"_build-type-debug"
-			]
+			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-browser"]
 		},
 		{
 			"name": "relwithdebinfo-make-gcc",
@@ -564,6 +578,10 @@
 			"inherits": ["devel-ninja-clang", "_build-tests"]
 		},
 		{
+			"name": "debug-ninja-tests",
+			"inherits": ["debug-ninja-clang", "_build-tests"]
+		},
+		{
 			"name": "debug-ninja",
 			"inherits": ["debug-ninja-clang"]
 		},
@@ -622,6 +640,18 @@
 		{
 			"name": "debug-tests",
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
+		},
+		{
+			"name": "debug-tests-nobv",
+			"inherits": ["debug-tests"],
+			"binaryDir": "${sourceDir}/build/debug-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
+		},
+		{
+			"name": "debug-tests-bvonly",
+			"inherits": ["debug-tests"],
+			"binaryDir": "${sourceDir}/build/debug-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
 		},
 		{
 			"name": "release-repl-tests",
@@ -684,6 +714,22 @@
 			]
 		},
 		{
+			"name": "release-asan",
+			"inherits": [
+				"release",
+				"_sanitize-address",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "devel-asan",
+			"inherits": [
+				"devel",
+				"_sanitize-address",
+				"_build-type-devel"
+			]
+		},
+		{
 			"name": "relwithdebinfo",
 			"inherits": ["relwithdebinfo-ninja-clang"]
 		},
@@ -720,16 +766,24 @@
 			"inherits": ["release", "_build-binding-python"]
 		},
 		{
-			"name": "release-binding-python-tests",
-			"inherits": ["release", "_build-binding-python"]
-		},
-		{
-			"name": "debug-binding-python-tests",
+			"name": "debug-binding-python",
 			"inherits": ["debug", "_build-binding-python", "_build-type-debug"]
 		},
 		{
-			"name": "devel-binding-python-tests",
+			"name": "devel-binding-python",
 			"inherits": ["devel", "_build-binding-python"]
+		},
+		{
+			"name": "release-binding-python-tests",
+			"inherits": ["release-binding-python"]
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"inherits": ["debug-binding-python"]
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"inherits": ["devel-binding-python"]
 		},
 		{
 			"name": "release-w64-packages",
@@ -804,6 +858,10 @@
 			"configurePreset": "devel-ninja-tests"
 		},
 		{
+			"name": "debug-ninja-tests",
+			"configurePreset": "debug-ninja-tests"
+		},
+		{
 			"name": "debug-ninja",
 			"configurePreset": "debug-ninja"
 		},
@@ -846,6 +904,14 @@
 		{
 			"name": "devel-tests-bvonly",
 			"configurePreset": "devel-tests-bvonly"
+		},
+		{
+			"name": "debug-tests-nobv",
+			"configurePreset": "debug-tests-nobv"
+		},
+		{
+			"name": "debug-tests-bvonly",
+			"configurePreset": "debug-tests-bvonly"
 		},
 		{
 			"name": "debug-repl-tests",
@@ -904,6 +970,14 @@
 			"configurePreset": "debug-asan"
 		},
 		{
+			"name": "release-asan",
+			"configurePreset": "release-asan"
+		},
+		{
+			"name": "devel-asan",
+			"configurePreset": "devel-asan"
+		},
+		{
 			"name": "release-w64",
 			"configurePreset": "release-w64"
 		},
@@ -912,8 +986,24 @@
 			"configurePreset": "debug-w64"
 		},
 		{
+			"name": "devel-w64",
+			"configurePreset": "devel-w64"
+		},
+		{
 			"name": "release-wasm",
 			"configurePreset": "release-wasm"
+		},
+		{
+			"name": "devel-wasm",
+			"configurePreset": "devel-wasm"
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"configurePreset": "devel-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-repl-browser",
+			"configurePreset": "devel-wasm-repl-browser"
 		},
 		{
 			"name": "debug-wasm",
@@ -970,6 +1060,14 @@
 		{
 			"name": "release-binding-python",
 			"configurePreset": "release-binding-python"
+		},
+		{
+			"name": "debug-binding-python",
+			"configurePreset": "debug-binding-python"
+		},
+		{
+			"name": "devel-binding-python",
+			"configurePreset": "devel-binding-python"
 		},
 		{
 			"name": "release-binding-python-tests",
@@ -1030,6 +1128,10 @@
 			"configurePreset": "devel-ninja-tests"
 		},
 		{
+			"name": "debug-ninja-tests",
+			"configurePreset": "debug-ninja-tests"
+		},
+		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
 		},
@@ -1048,6 +1150,14 @@
 		{
 			"name": "devel-tests-bvonly",
 			"configurePreset": "devel-tests-bvonly"
+		},
+		{
+			"name": "debug-tests-nobv",
+			"configurePreset": "debug-tests-nobv"
+		},
+		{
+			"name": "debug-tests-bvonly",
+			"configurePreset": "debug-tests-bvonly"
 		},
 		{
 			"name": "debug-repl-tests",
@@ -1084,6 +1194,10 @@
 		{
 			"name": "release-wasm-all-tests",
 			"configurePreset": "release-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"configurePreset": "devel-wasm-all-tests"
 		},
 		{
 			"name": "debug-wasm-all-tests",

@@ -114,9 +114,10 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-w64-packages
 ./dev preset debug-asan
 ./dev preset coverage
-./dev preset release-wasm                 # wasm library (tau.js/.wasm/.esm.mjs)
-./dev preset debug-wasm-all-tests         # tau's own suite, run under node
-./dev preset release-wasm-repl-browser    # wasm REPL (tau_repl.js)
+./dev preset release-wasm                        # wasm library (tau.js/.wasm/.esm.mjs)
+./dev preset debug-wasm-all-tests                # tau's own suite, run under node
+./dev preset release-wasm-repl-browser           # wasm REPL (tau_repl.js)
+./dev preset devel-wasm-all-tests run            # every wasm preset also has a devel- and a debug- twin
 ```
 
 Default preset name is `release` if omitted.
