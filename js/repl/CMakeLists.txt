@@ -57,36 +57,18 @@ set_target_properties(tau_repl PROPERTIES
 	SUFFIX ".js"
 	LINK_FLAGS "${TAU_REPL_LINK_FLAGS}")
 
-# The page around tau_repl.js/.wasm: xterm.js glue, the COOP/COEP
-# service-worker fallback and the terminal chrome, ported from
-# ~/Projects/parser.devel/js/tgf/ (see .local/build-emscripten.md, D6/D11/B7).
-# target_setup() (cmake/tau-common.cmake) points every target's
-# RUNTIME_OUTPUT_DIRECTORY at CMAKE_BINARY_DIR, not this directory's own
-# binary dir, so tau_repl.js/.wasm land there too -- the page must join them
-# at CMAKE_BINARY_DIR for a same-directory "<script src=tau_repl.js>" to work.
+# Page glue and vendored xterm.js come from the parser's shared terminal
+# package (external/parser/js/tau-wasm-terminal), the same one the TGF page
+# uses. ADDON_NAMES keep writes the author's addon-fit.js / addon-webgl.js
+# names, which js/repl/index.html loads. bindings/js/package.json carries the
+# xterm deps as devDependencies; ./dev dep-js-test-deps.sh (or a plain
+# "npm install --prefix bindings/js") installs them.
 set(TAU_REPL_PAGE_DIR "${CMAKE_BINARY_DIR}")
+include("${CMAKE_SOURCE_DIR}/external/parser/js/tau-wasm-terminal/tau-wasm-terminal.cmake")
+tau_wasm_terminal_page("${TAU_REPL_PAGE_DIR}"
+	PACKAGE_DIR "${CMAKE_SOURCE_DIR}/bindings/js/node_modules"
+	ADDON_NAMES keep)
+# Tau's own page glue stays Tau's; copied after the shared files so it wins.
 configure_file(index.html "${TAU_REPL_PAGE_DIR}/index.html" COPYONLY)
 configure_file(index.mjs "${TAU_REPL_PAGE_DIR}/index.mjs" COPYONLY)
 configure_file(sw.js "${TAU_REPL_PAGE_DIR}/sw.js" COPYONLY)
-
-# xterm.js comes from npm (D6), not a vendored blob: bindings/js/package.json
-# carries it as a devDependency and ./dev dep-js-test-deps.sh (or a plain
-# "npm install --prefix bindings/js") installs it, same as puppeteer-core for
-# the headless-Chrome test harness. Copy the built UMD/CSS files next to
-# tau_repl.js at configure time rather than referencing node_modules/ from
-# the served page, so the page's directory stays self-contained.
-set(TAU_JS_TEST_DIR "${CMAKE_SOURCE_DIR}/bindings/js")
-set(TAU_XTERM_JS "${TAU_JS_TEST_DIR}/node_modules/@xterm/xterm/lib/xterm.js")
-set(TAU_XTERM_CSS "${TAU_JS_TEST_DIR}/node_modules/@xterm/xterm/css/xterm.css")
-set(TAU_XTERM_FIT_JS "${TAU_JS_TEST_DIR}/node_modules/@xterm/addon-fit/lib/addon-fit.js")
-# The top-level CMakeLists.txt only auto-runs dep-chrome.sh/dep-js-test-deps.sh
-# for TAU_BUILD_BROWSER_TESTS, not TAU_BUILD_REPL_WASM -- left that way rather
-# than widened, since a FATAL_ERROR naming the one command to run is the same
-# idiom TAU_PARSER_HAS_FTXUI_DEP above already uses for a missing dependency.
-if(NOT EXISTS "${TAU_XTERM_JS}" OR NOT EXISTS "${TAU_XTERM_CSS}" OR NOT EXISTS "${TAU_XTERM_FIT_JS}")
-	message(FATAL_ERROR
-		"js/repl: xterm.js not found under ${TAU_JS_TEST_DIR}/node_modules. "
-		"Run './dev dep-js-test-deps.sh' first.")
-endif()
-file(COPY "${TAU_XTERM_JS}" "${TAU_XTERM_CSS}" "${TAU_XTERM_FIT_JS}"
-	DESTINATION "${TAU_REPL_PAGE_DIR}/vendor")

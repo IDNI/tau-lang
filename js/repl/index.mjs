@@ -1,96 +1,21 @@
-// Tau REPL browser page - xterm.js glue around the FTXUI REPL built as
-// tau_repl.js/tau_repl.wasm (js/repl/CMakeLists.txt).
+// Tau REPL browser page - the shared terminal host
+// (external/parser/js/tau-wasm-terminal/terminal.js, copied beside this file
+// by js/repl/CMakeLists.txt) plus Tau's spec-file upload.
 (function() {
 'use strict';
 
-// COOP/COEP via ServiceWorker - required for SharedArrayBuffer (pthreads)
-if ('serviceWorker' in navigator && !window.crossOriginIsolated) {
-  const url_sw = new URL('./sw.js', location.href);
-  navigator.serviceWorker.register(url_sw).then(() => location.reload());
-  return;
-}
-
-// --- Terminal setup ---
-
-const term_element = document.querySelector('#terminal');
-const term = new Terminal();
-term.options.scrollback = 1000;
-term.options.convertEol = true; // REPL output uses bare \n; map to \r\n
-term.options.fontFamily =
-  "'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono', monospace";
-term.open(term_element);
-
-const fit_addon = new FitAddon.FitAddon();
-term.loadAddon(fit_addon);
-
-const stdin_buffer  = [];
-const stdout_buffer = [];
-const stderr_buffer = [];
-
-const stdin = () => stdin_buffer.shift() || 0;
-
-const stdout = code => {
-  if (code == 0 || code == 10) {
-    if (code == 10) stdout_buffer.push(code);
-    if (stdout_buffer.length) {
-      term.write(new Uint8Array(stdout_buffer));
-      stdout_buffer.length = 0;
-    }
-  } else {
-    stdout_buffer.push(code);
-  }
-};
-
-// stderr renders into the terminal, like native tau on a tty (this is also
-// where Boost.Log's default sink -- the welcome banner -- ends up).
-const stderr = code => {
-  if (code == 0 || code == 10) {
-    if (code == 10) stderr_buffer.push(code);
-    if (stderr_buffer.length) {
-      term.write(new Uint8Array(stderr_buffer));
-      stderr_buffer.length = 0;
-    }
-  } else {
-    stderr_buffer.push(code);
-  }
-};
-
-const onBinary = e => {
-  for (const c of e) stdin_buffer.push(c.charCodeAt(0));
-};
-
-term.onBinary(onBinary);
-term.onData(onBinary);
-window.term = term;
-window.sendReplInput = text => {
-  for (const c of text) stdin_buffer.push(c.charCodeAt(0));
-};
-term.resize(140, 43);
-
-// --- Module glue (must be set BEFORE loading the WASM script) ---
-
-window.Module = {
-  preRun: [],
-  onRuntimeInitialized: () => {
-    if (window.Module._ftxui_on_resize === undefined) return;
-    fit_addon.fit();
-    const resize_handler = () => {
-      const dims = fit_addon.proposeDimensions();
-      term.resize(dims.cols, dims.rows);
-      window.Module._ftxui_on_resize(dims.cols, dims.rows);
-      fit_addon.fit();
-    };
-    const resize_observer = new ResizeObserver(resize_handler);
-    resize_observer.observe(term_element);
-    resize_handler();
-  },
-};
-
-window.Module.preRun.push(() => {
-  FS.init(stdin, stdout, stderr);
+// The shared start() registers the COOP/COEP service worker (returning null
+// while the page reloads) and sets up xterm, the resize/_ftxui_on_resize
+// wiring, the immediate-flush stdout+stderr queue and the stdin callback, then
+// loads the program script. window.term and window.sendReplInput come from it.
+const terminal = tau_wasm_terminal.start({
+  element: document.querySelector('#terminal'),
+  program: 'tau_repl_web.js',
+  arguments: [],
 });
+if (!terminal) return; // service worker reload in progress
 
-// --- Spec file upload ---
+// --- Spec file upload (Tau-specific) ---
 
 var upload   = document.getElementById('upload');
 var statusEl = document.getElementById('status');
@@ -116,11 +41,5 @@ upload.addEventListener('change', function(e) {
   };
   reader.readAsArrayBuffer(file);
 });
-
-// --- Load the WASM runtime ---
-
-var script = document.createElement('script');
-script.src = 'tau_repl.js';
-document.head.appendChild(script);
 
 })();
