@@ -53,10 +53,13 @@ configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too).
 
 `windows-x86_64-msvc` builds the full pack from the store, cvc5 included, and runs the
 C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
-CI; a producer's `vcvars64.bat` search is only a local fallback. The
-`setenv`/`unsetenv` shim of the tests lives in `tests/test_init.h` for every
-Windows compiler, and the `popen`/`pclose` shim for MSVC alone — never in the
-library.
+CI; a producer's `vcvars64.bat` search is only a local fallback. The suites
+carry no platform skip of their own: `tests/test_helpers.h` gives every
+platform a scratch directory, a host-compiler probe and `tau_test_run` over
+`spawn_capture`, and `tests/test_memory_query.h` reports available and current
+memory per platform. A suite that needs an isolated case re-executes its own
+binary as a worker and lets the parent bound it with `spawn_capture`'s
+`timeout_sec`, so the same case runs on Linux, macOS, MinGW and MSVC.
 
 Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
 exist but are ONLY for gdb debugging sessions — never use them for building,
