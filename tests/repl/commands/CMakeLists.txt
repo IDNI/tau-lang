@@ -111,5 +111,22 @@ include(test_repl-compile_verb.cmake)
 # TODO (VERY_HIGH) add tests for examples command
 # TODO (VERY_HIGH) add tests for outputs command
 
+# The Spot store package's bin dir, for every REPL case defined above. CTest
+# has no per-directory environment, and these cases are registered directly
+# through add_test(), so each test's existing ENVIRONMENT (TAU_EMULATOR on a
+# cross build) is extended rather than replaced.
+if(TAU_SPOT_BIN)
+	get_property(_tau_repl_tests DIRECTORY PROPERTY TESTS)
+	foreach(_tau_repl_test ${_tau_repl_tests})
+		get_test_property("${_tau_repl_test}" ENVIRONMENT _tau_repl_env)
+		if(_tau_repl_env STREQUAL "NOTFOUND")
+			set(_tau_repl_env "")
+		endif()
+		list(APPEND _tau_repl_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+		set_tests_properties("${_tau_repl_test}" PROPERTIES
+			ENVIRONMENT "${_tau_repl_env}")
+	endforeach()
+endif()
+
 # sample for comparing output with a file
 #add_test(NAME test_name COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> | diff - test_name.dump")

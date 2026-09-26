@@ -86,16 +86,17 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `debug`, `release`, `relwithdebinfo`, `coverage` — shorthand for `build`
 - `w64-debug`, `w64-release` — Windows cross-build (MinGW toolchain from parser)
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
-- `dep-boost`, `dep-cvc5` — build dependencies into `~/.tau`
+- `dep-*-package` — the store producers configure runs itself (`dep-cvc5-package`,
+  `dep-boost-package`, `dep-curl-package`, `dep-spot-package`); called by hand
+  only to prefetch. `dep-spot-package` builds the Spot CLI Tau execs, never
+  links: MSYS2 UCRT64 g++ on `win-msvc-x64`, the preset's compiler elsewhere, and
+  a host with `ltlsynt` on `PATH` skips it entirely.
 - `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
   the parser's own script, so one install serves both repos
 - `dep-chrome`, `dep-js-test-deps` — pinned Chrome for Testing and
   `puppeteer-core`, for the browser test suite. A configure with
   `-DTAU_BUILD_BROWSER_TESTS=ON` runs both itself, so they are rarely called by
   hand. Neither needs a system node: emsdk bundles node/npm/npx.
-- `dep-boost --emscripten [-DTAU_BOOST_PTHREAD=ON]` — the wasm Boost dists. Two
-  exist because the REPL links `-pthread` and the library must not:
-  `dist-wasm` (`threading=single`) and `dist-wasm-pthread`
 - `binding <BIND_LANG>` — build bindings (currently `python`)
 
 Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME`, `-G GENERATOR`.

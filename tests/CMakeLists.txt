@@ -245,9 +245,16 @@ function(_tau_add_test_target N src work_dir)
 	else()
 		set(_TAU_TEST_TIMEOUT 600)
 	endif()
+	set(_tau_test_env
+		"LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}")
+	# The Spot store package's bin dir, when configure had to build one; the
+	# suite helpers probe TAU_SPOT_BIN after PATH.
+	if(TAU_SPOT_BIN)
+		list(APPEND _tau_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+	endif()
 	set_tests_properties(${N}
 		PROPERTIES WORKING_DIRECTORY ${work_dir}
-		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}"
+		ENVIRONMENT "${_tau_test_env}"
 		TIMEOUT ${_TAU_TEST_TIMEOUT})
 endfunction()
 

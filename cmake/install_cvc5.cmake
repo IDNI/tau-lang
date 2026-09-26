@@ -7,8 +7,10 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 #   COMPONENT:   install component name
 #   SYSTEM_NAME: target platform
 function(install_cvc5 DESTINATION COMPONENT SYSTEM_NAME)
-	set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX_RESOLVED}/cvc5/dist")
-	set(CVC5_LIB_DIR "${CVC5_DIST_DIR}/lib")
+	# cvc5 comes from the store; the install code below takes the real library
+	# directory from the imported target, so no dist path is needed here.
+	set(CVC5_DIST_DIR "${CVC5_STORE_PREFIX}")
+	set(CVC5_LIB_DIR "")
 	set(CVC5_LIB_PATTERN "*.so*")
 	set(CVC5_IS_CROSS_WIN FALSE)
 
@@ -18,29 +20,35 @@ function(install_cvc5 DESTINATION COMPONENT SYSTEM_NAME)
 	set(CVC5_TOOLCHAIN_DLLS "")
 
 	if(SYSTEM_NAME STREQUAL "Windows")
-		set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX_RESOLVED}/cvc5/dist-w64")
-		set(CVC5_LIB_DIR "${CVC5_DIST_DIR}/bin")
 		set(CVC5_LIB_PATTERN "*.dll")
-		set(CVC5_IS_CROSS_WIN TRUE)
-
-		set(CVC5_TOOLCHAIN_DLL_NAMES
-			"libgcc_s_seh-1.dll"
-			"libgcc_s_dw2-1.dll"
-			"libstdc++-6.dll"
-			"libwinpthread-1.dll")
-		foreach(_dll ${CVC5_TOOLCHAIN_DLL_NAMES})
-			execute_process(COMMAND "${CMAKE_CXX_COMPILER}"
-				"-print-file-name=${_dll}"
-				OUTPUT_VARIABLE _dll_path
-				OUTPUT_STRIP_TRAILING_WHITESPACE)
-			if(_dll_path AND NOT _dll_path STREQUAL "${_dll}")
-				if(EXISTS "${_dll_path}")
-					list(APPEND CVC5_TOOLCHAIN_DLLS
-						"${_dll_path}")
+		if(MSVC)
+			# The MSVC store cvc5 ships its own DLLs beside the import
+			# library; the MSVC runtime is a system component.
+			set(CVC5_IS_CROSS_WIN FALSE)
+		else()
+			# MinGW cross: the toolchain DLLs are copied beside the cvc5
+			# runtime, because the installed binary must start without a
+			# MinGW runtime on PATH.
+			set(CVC5_IS_CROSS_WIN TRUE)
+			set(CVC5_TOOLCHAIN_DLL_NAMES
+				"libgcc_s_seh-1.dll"
+				"libgcc_s_dw2-1.dll"
+				"libstdc++-6.dll"
+				"libwinpthread-1.dll")
+			foreach(_dll ${CVC5_TOOLCHAIN_DLL_NAMES})
+				execute_process(COMMAND "${CMAKE_CXX_COMPILER}"
+					"-print-file-name=${_dll}"
+					OUTPUT_VARIABLE _dll_path
+					OUTPUT_STRIP_TRAILING_WHITESPACE)
+				if(_dll_path AND NOT _dll_path STREQUAL "${_dll}")
+					if(EXISTS "${_dll_path}")
+						list(APPEND CVC5_TOOLCHAIN_DLLS
+							"${_dll_path}")
+					endif()
 				endif()
-			endif()
-		endforeach()
-		list(REMOVE_DUPLICATES CVC5_TOOLCHAIN_DLLS)
+			endforeach()
+			list(REMOVE_DUPLICATES CVC5_TOOLCHAIN_DLLS)
+		endif()
 	endif()
 
 	set(_cvc5_install_code [[
@@ -137,7 +145,8 @@ message("=== Finished installing cvc5 runtime dependencies ===")
 ]])
 	string(CONFIGURE "${_cvc5_install_code}"
 		_cvc5_install_code @ONLY)
+	# No CONFIGURATIONS filter: a Debug install needs the cvc5 runtime as much
+	# as a Release one, or the installed binary cannot start.
 	install(CODE "${_cvc5_install_code}"
-		COMPONENT "${COMPONENT}"
-		CONFIGURATIONS Release)
+		COMPONENT "${COMPONENT}")
 endfunction()

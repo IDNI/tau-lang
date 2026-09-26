@@ -399,39 +399,25 @@ endif()
 
 #
 # Add cvc5 library, only when a BA of the configured pack requires it.
-# This gates the dependency build too: dep-cvc5.sh is what makes a pack
-# without bv or hsb pay for cvc5 it never links.
+# This gates the dependency build too, so a pack without bv or hsb never pays
+# for cvc5 it does not link.
 #
 if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-	set(DEP_CVC5_ARGS
-		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
-		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED})
-	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/cvc5)
-	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
-	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		list(APPEND DEP_CVC5_ARGS --w64)
-		set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
+	# The wasm pack has no cvc5 port. Say so and name the fix instead of
+	# failing deep inside a producer.
+	if(TAU_DEPS_TARGET STREQUAL "wasm")
+		message(FATAL_ERROR
+			"the wasm pack has no cvc5 port, but TAU_BAS=${TAU_BAS} requires cvc5")
 	endif()
-	if(APPLE)
-		list(APPEND DEP_CVC5_ARGS --darwin)
-	endif()
-	message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
-	message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
 
-	if(DEFINED CVC5_DIR AND NOT "${CVC5_DIR}" STREQUAL "")
-		message(STATUS "Using caller-provided CVC5_DIR: ${CVC5_DIR}")
-		find_package(cvc5 CONFIG REQUIRED
-			PATHS ${CVC5_DIR}
-			NO_DEFAULT_PATH)
-	else()
-		execute_process(
-			COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
-			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-			COMMAND_ERROR_IS_FATAL ANY
-		)
-		find_package(cvc5 CONFIG REQUIRED
-			PATHS ${CVC5_LIBDIR}/cmake/cvc5)
-	endif()
+	tau_deps_ensure_prefix(cvc5
+		"${PROJECT_SOURCE_DIR}/scripts/dep-cvc5-package.sh" CVC5_STORE_PREFIX)
+	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
+	message(STATUS "cvc5 from store: CVC5_DIR=${CVC5_DIR}")
+
+	find_package(cvc5 CONFIG REQUIRED
+		PATHS ${CVC5_DIR}
+		NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 	message(STATUS "cvc5 found: ${cvc5_FOUND}")
 	message(STATUS "cvc5 version: ${cvc5_VERSION}")
 else()
@@ -444,6 +430,11 @@ endif()
 # targets are directory-scoped and TAU_BA_LINK_LIBS is consumed in tests/ too.
 #
 if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	# Linux and macOS ship libcurl, so they use the system one. A Windows target
+	# has none, so it builds the static store curl and defines CURL::libcurl here.
+	if(TAU_DEPS_FROM_STORE)
+		tau_deps_resolve_curl()
+	endif()
 	find_package(CURL REQUIRED)
 else()
 	message(STATUS "curl not required by TAU_BAS=${TAU_BAS}; skipping")
@@ -452,55 +443,19 @@ endif()
 #
 # Add Boost log library
 #
-set(DEP_BOOST_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}
-	-DTAU_BUILD_PIC=${TAU_BUILD_PIC})
-set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/boost)
-set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	list(APPEND DEP_BOOST_ARGS --w64)
-	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
-endif()
-if(APPLE)
-	list(APPEND DEP_BOOST_ARGS --darwin)
-endif()
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-	list(APPEND DEP_BOOST_ARGS --emscripten)
-	if(TAU_BUILD_REPL_WASM)
-		# tau_repl links -pthread (see above); Boost.Log must be built
-		# against the same threading model or wasm-ld's EH/thread ABI
-		# checks reject the link, the same way the exceptions mismatch
-		# did for the non-pthread dist.
-		list(APPEND DEP_BOOST_ARGS -DTAU_BOOST_PTHREAD=ON)
-		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm-pthread/${CMAKE_INSTALL_LIBDIR})
-	else()
-		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm/${CMAKE_INSTALL_LIBDIR})
-	endif()
-endif()
-message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
-message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
-
-if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten"
-	OR TAU_BUILD_PIC)
-		set(TAU_BUILD_BOOST ON)
-else()
-		set(TAU_BUILD_BOOST OFF)
-endif()
-
-if(TAU_BUILD_BOOST)
-	execute_process(
-		COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		COMMAND_ERROR_IS_FATAL ANY # SW-12: fail here, not at find_package
-	)
+if(TAU_DEPS_FROM_STORE)
+	tau_deps_ensure_prefix(boost
+		"${PROJECT_SOURCE_DIR}/scripts/dep-boost-package.sh" BOOST_STORE_PREFIX)
+	# The installed Boost config lives under lib/cmake and the libraries under
+	# lib, both inside the package prefix.
+	set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")
+	message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
 endif()
 
 # cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
 file(GLOB _boost_config "${BOOST_LIBDIR}/cmake/Boost-*/BoostConfig.cmake")
-if (TAU_BUILD_BOOST OR _boost_config)
+if (_boost_config)
 	get_filename_component(Boost_DIR "${_boost_config}" DIRECTORY)
 endif()
 # a cross toolchain confines find_package to CMAKE_FIND_ROOT_PATH, which
@@ -510,6 +465,7 @@ if(CMAKE_CROSSCOMPILING)
 	list(APPEND CMAKE_FIND_ROOT_PATH "${_boost_root}")
 endif()
 find_package(Boost REQUIRED COMPONENTS log)
+set(TAU_BOOST_LIBS Boost::log)
 if (Boost_FOUND)
 	message(STATUS "Boost_DIR: ${Boost_DIR}")
 	message(STATUS "Boost version: ${Boost_VERSION}")
