@@ -12,7 +12,13 @@ Tau is an expressive, decidable, and executable formal software specification la
 
 Prefer building via `./dev preset` from the project root. It configures (fresh),
 builds, and optionally tests/runs using `CMakePresets.json`. Build output goes
-to `build/<preset>` (e.g. `build/debug`, `build/release`).
+to `build/<build type>` (e.g. `build/debug`, `build/release`); a non-default
+toolchain adds a suffix (`-gcc`, `-w64`, `-msvc`, `-msvc-clang-cl`), the wasm
+family adds `-wasm[-nothreads|-repl-browser]`, and the generator never splits a
+folder. The bv-only and no-bv packs are the one exception: they configure the
+same sources with a different pack, so `{release,devel,debug}-tests-bvonly`
+builds in `build/<type>-bvonly` and `{release,devel,debug}-tests-nobv` in
+`build/<type>-nobv`.
 
 ```bash
 ./dev preset <PRESET> [run] [<CMAKE_OPTIONS>]

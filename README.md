@@ -164,7 +164,7 @@ To build the binaries:
 ```
 
 Alternatively, use the CMake presets declared in
-[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`):
+[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`; a non-default toolchain adds `-gcc`, `-w64`, `-msvc` or `-msvc-clang-cl`, and the wasm family `-wasm`):
 
 ```bash
 ./dev preset release-tau run -- --help

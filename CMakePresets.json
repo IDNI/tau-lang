@@ -55,6 +55,21 @@
 			"binaryDir": "${sourceDir}/build/devel"
 		},
 		{
+			"name": "_build_dir-release-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-gcc"
+		},
+		{
+			"name": "_build_dir-debug-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-gcc"
+		},
+		{
+			"name": "_build_dir-devel-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-gcc"
+		},
+		{
 			"name": "_build_dir-release-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-w64"
@@ -68,6 +83,11 @@
 			"name": "_build_dir-relwithdebinfo",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/relwithdebinfo"
+		},
+		{
+			"name": "_build_dir-relwithdebinfo-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/relwithdebinfo-gcc"
 		},
 		{
 			"name": "_build_dir-release-wasm",
@@ -90,9 +110,9 @@
 			"binaryDir": "${sourceDir}/build/debug-wasm-repl-browser"
 		},
 		{
-			"name": "_build_dir-coverage",
+			"name": "_build_dir-coverage-gcc",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/coverage"
+			"binaryDir": "${sourceDir}/build/coverage-gcc"
 		},
 		{
 			"name": "_build-type-debug",
@@ -269,7 +289,7 @@
 		{
 			"name": "release-make-gcc",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-release-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-release"
@@ -278,7 +298,7 @@
 		{
 			"name": "debug-make-gcc",
 			"inherits": [
-				"_build_dir-debug",
+				"_build_dir-debug-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-debug"
@@ -287,7 +307,7 @@
 		{
 			"name": "devel-make-gcc",
 			"inherits": [
-				"_build_dir-devel",
+				"_build_dir-devel-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-devel"
@@ -296,7 +316,7 @@
 		{
 			"name": "devel-ninja-gcc",
 			"inherits": [
-				"_build_dir-devel",
+				"_build_dir-devel-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-devel"
@@ -305,7 +325,7 @@
 		{
 			"name": "release-ninja-gcc",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-release-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-release"
@@ -314,7 +334,7 @@
 		{
 			"name": "debug-ninja-gcc",
 			"inherits": [
-				"_build_dir-debug",
+				"_build_dir-debug-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-debug"
@@ -472,7 +492,7 @@
 		{
 			"name": "relwithdebinfo-make-gcc",
 			"inherits": [
-				"_build_dir-relwithdebinfo",
+				"_build_dir-relwithdebinfo-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-relwithdebinfo"
@@ -481,7 +501,7 @@
 		{
 			"name": "coverage-make-gcc",
 			"inherits": [
-				"_build_dir-coverage",
+				"_build_dir-coverage-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-coverage"
