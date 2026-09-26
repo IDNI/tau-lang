@@ -304,6 +304,7 @@ EMSCRIPTEN_BINDINGS(tau) {
 	emscripten::function("setBlasting", &tau_api::set_preprocessing);
 	emscripten::function("setIndenting", &tau_api::set_indenting);
 	emscripten::function("setHighlighting", &tau_api::set_highlighting);
+	emscripten::function("setColors", &tau_api::set_colors);
 	emscripten::function("setJson", &tau_api::set_json);
 	emscripten::function("setSeverity", optional_override(
 		[](const std::string& lvl) {

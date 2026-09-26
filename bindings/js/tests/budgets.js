@@ -94,6 +94,24 @@ function runTrefBudget(tau) {
 	check(tau.sat('x = 0') === true, 'setTrefBudget(0) lifts the refusal');
 }
 
+// setColors decides whether a diagnostic carries ANSI escapes.
+function runColors(tau) {
+	const refusal = (colors) => {
+		tau.setColors(colors);
+		tau.setTrefBudget(1);
+		tau.sat('x = 0');
+		const why = tau.getLastError();
+		tau.setTrefBudget(0);
+		return why;
+	};
+	const plain = refusal(false);
+	const colored = refusal(true);
+	check(plain.includes('memory budget exhausted') && !plain.includes('\u001b'),
+		`setColors(false) leaves the diagnostic plain: ${JSON.stringify(plain)}`);
+	check(colored.includes('\u001b'),
+		'setColors(true) colors the diagnostic');
+}
+
 function runFixpointSteps(tau) {
 	const spec = 'always o1[t] = o1[t-2]';
 	tau.setMaxFixpointSteps(1);
@@ -145,6 +163,7 @@ tauModule().then((tau) => {
 	try {
 		runEverySetter(tau);
 		runTrefBudget(tau);
+		runColors(tau);
 		runFixpointSteps(tau);
 		runBaOptions(tau);
 	} catch (e) {
