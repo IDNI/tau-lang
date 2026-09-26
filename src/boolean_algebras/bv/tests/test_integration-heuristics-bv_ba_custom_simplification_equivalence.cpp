@@ -5,14 +5,11 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
-#include <unistd.h>
-#include <sys/wait.h>
-#include <csignal>
 #include <cstdio>
-#include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <chrono>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Differential correctness harness for bv_ba_custom_simplification.
@@ -20,11 +17,12 @@
 // For a corpus term T this proves T == S for every input, where
 // S = bv_ba_custom_simplification(T), by asking cvc5 whether "T != S" is
 // unsat (bv_formula_sat_status on build_bf_neq(T, S)). A known bug can
-// SIGABRT/SIGSEGV the process, so each term runs in a forked child; the
-// parent classifies the outcome from the child's exit status/signal, with
-// a wall-clock watchdog so a hang cannot stall the whole run. No outcome is
-// ever silently dropped: every term ends up EQUIVALENT / NOT_EQUIVALENT /
-// CRASHED / ORACLE_UNAVAILABLE.
+// SIGABRT/SIGSEGV the process, so each term runs in a child process of this
+// same binary, re-executed with --bv-diff-child; the parent classifies the
+// outcome from the child's exit status, with spawn_capture's wall-clock
+// watchdog so a hang cannot stall the whole run. No outcome is ever silently
+// dropped: every term ends up EQUIVALENT / NOT_EQUIVALENT / CRASHED /
+// ORACLE_UNAVAILABLE.
 // ---------------------------------------------------------------------------
 
 tref parse_bf(const std::string& sample) {
@@ -49,7 +47,7 @@ struct diff_result {
 	std::string detail;
 };
 
-// Runs in the forked child: computes S and proves T == S via cvc5, writes
+// Runs in the worker child: computes S and proves T == S via cvc5, writes
 // one line "OUTCOME|detail" to out_path. Never throws past this function --
 // a cvc5 API exception is an oracle failure, not a crash of the target.
 static void run_child(const std::string& sample, const std::filesystem::path& out_path) {
@@ -113,67 +111,63 @@ static void run_child(const std::string& sample, const std::filesystem::path& ou
 	}
 }
 
-// Runs sample in a forked child so a crash in bv_ba_custom_simplification
-// cannot take down the rest of the corpus. Polls with a wall-clock watchdog
-// so a hang is killed and reported instead of stalling the run.
+// The worker's entry point: one corpus term per process, so a crash or a
+// runaway cannot take the suite down, and the parent can bound it with a
+// wall-clock kill. Returns -1 for every other argv, leaving doctest to run.
+static int bv_diff_child_main(int argc, char** argv) {
+	if (argc < 4 || std::string(argv[1]) != "--bv-diff-child") return -1;
+	bdd_init<Bool>();
+	run_child(std::string(argv[2]), std::filesystem::path(argv[3]));
+	return 0;
+}
+
+namespace {
+	struct _bv_diff_child_registrar {
+		_bv_diff_child_registrar() { test_child_hook = &bv_diff_child_main; }
+	};
+	inline _bv_diff_child_registrar _bv_diff_child_registrar_instance;
+}
+
+// The parent's scratch directory, shared by every term of one run.
+static const std::filesystem::path& bv_diff_scratch() {
+	static const std::filesystem::path dir = tau_test_tmp("bv_diff");
+	return dir;
+}
+
+// Runs sample in a child process so a crash in bv_ba_custom_simplification
+// cannot take down the rest of the corpus; spawn_capture's 10 s watchdog
+// kills and reports a hang instead of stalling the run.
 static diff_result run_isolated(const std::string& sample, int index) {
-	auto out_path = std::filesystem::temp_directory_path()
-		/ ("tau_bv_diff_" + std::to_string(getpid()) + "_" + std::to_string(index) + ".txt");
-	std::filesystem::remove(out_path);
+	const std::string self = tau_test_exe_path();
+	if (self.empty()) return { diff_outcome::oracle_unavailable,
+		"no test executable path (TAU_TEST_EXE_PATH); cannot isolate: "
+			+ sample };
+	auto out_path = bv_diff_scratch()
+		/ ("case_" + std::to_string(index) + ".txt");
+	std::error_code ec;
+	std::filesystem::remove(out_path, ec);
 
-	// doctest installs its own SIGABRT/SIGSEGV/etc handlers in the parent;
-	// fork() inherits them, so without resetting them a child crash gets
-	// caught by doctest's handler (which flushes stdio, replaying the
-	// inherited buffer) instead of just terminating the child. Flush now
-	// and restore default dispositions in the child.
-	std::fflush(stdout);
-	std::fflush(stderr);
-	pid_t pid = fork();
-	if (pid < 0) return { diff_outcome::oracle_unavailable, "fork() failed" };
-	if (pid == 0) {
-		for (int sig : { SIGABRT, SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP })
-			std::signal(sig, SIG_DFL);
-		run_child(sample, out_path);
-		std::_Exit(0);
-	}
-
-	constexpr auto per_term_timeout = std::chrono::seconds(10);
-	auto start = std::chrono::steady_clock::now();
-	int status = 0;
-	bool timed_out = false;
-	for (;;) {
-		pid_t r = waitpid(pid, &status, WNOHANG);
-		if (r == pid) break;
-		if (std::chrono::steady_clock::now() - start > per_term_timeout) {
-			kill(pid, SIGKILL);
-			waitpid(pid, &status, 0);
-			timed_out = true;
-			break;
-		}
-		usleep(2000);
-	}
-
-	if (timed_out) {
-		std::filesystem::remove(out_path);
-		return { diff_outcome::crashed, "timed out after 10s (killed) for: " + sample };
-	}
-	if (WIFSIGNALED(status)) {
-		int sig = WTERMSIG(status);
-		std::filesystem::remove(out_path);
+	auto run = tau_test_run({ self, "--bv-diff-child", sample,
+		out_path.string() }, "", 10);
+	if (run.timed_out) {
+		std::filesystem::remove(out_path, ec);
 		return { diff_outcome::crashed,
-			std::string("terminated by signal ") + strsignal(sig) + " for: " + sample };
+			"timed out after 10s (killed) for: " + sample };
 	}
-	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-		std::filesystem::remove(out_path);
-		return { diff_outcome::crashed, "abnormal exit status for: " + sample };
+	if (run.exit_code != 0) {
+		std::filesystem::remove(out_path, ec);
+		return { diff_outcome::crashed,
+			"child did not exit cleanly for: " + sample
+				+ " :: " + run.err };
 	}
 
 	std::ifstream in(out_path);
 	std::string line;
 	std::getline(in, line);
-	std::filesystem::remove(out_path);
+	std::filesystem::remove(out_path, ec);
 	auto sep = line.find('|');
-	if (sep == std::string::npos) return { diff_outcome::oracle_unavailable, "no result written for: " + sample };
+	if (sep == std::string::npos) return { diff_outcome::oracle_unavailable,
+		"no result written for: " + sample };
 	std::string tag = line.substr(0, sep);
 	std::string detail = line.substr(sep + 1);
 	if (tag == "EQUIVALENT") return { diff_outcome::equivalent, detail };
@@ -350,6 +344,9 @@ TEST_SUITE("bv_ba_custom_simplification differential correctness") {
 		// return a non-equivalent formula. A crash is a known, separate
 		// bug (not fixed here) and is reported above, not asserted on.
 		CHECK(n_not_equiv == 0);
+		// Every child spawn failing would leave n_equiv at 0 and still
+		// pass the assertion above; at least one case must have run.
+		CHECK(n_equiv > 0);
 	}
 }
 
