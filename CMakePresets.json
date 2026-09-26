@@ -333,13 +333,6 @@
 			}
 		},
 		{
-			"name": "_bas-wasm",
-			"hidden": true,
-			"cacheVariables": {
-				"TAU_BAS": "sbf,tau,qint,qlt"
-			}
-		},
-		{
 			"name": "_bas-msvc",
 			"hidden": true,
 			"cacheVariables": {
@@ -686,7 +679,6 @@
 				"_build_dir-release-wasm",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_build-binding-js",
 				"_build-type-release"
 			]
@@ -697,7 +689,6 @@
 				"_build_dir-release-wasm",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_build-binding-js",
 				"_build-wasm-tests",
 				"_build-repl-tests",
@@ -719,7 +710,6 @@
 				"_build_dir-release-wasm",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_build-executable",
 				"_build-type-release"
 			]
@@ -731,7 +721,6 @@
 				"_build_dir-release-wasm",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_build-repl-tests",
 				"_build-type-release"
 			]
@@ -742,7 +731,6 @@
 				"_build_dir-release-wasm-repl-browser",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_build-repl-wasm",
 				"_build-type-release"
 			]
@@ -762,7 +750,6 @@
 				"_build_dir-release-wasm-nothreads",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_wasm-nothreads",
 				"_build-binding-js",
 				"_build-type-release"
@@ -775,7 +762,6 @@
 				"_build_dir-release-wasm-nothreads",
 				"_generator-make",
 				"_toolchain-wasm",
-				"_bas-wasm",
 				"_wasm-nothreads",
 				"_build-binding-js",
 				"_build-wasm-tests",

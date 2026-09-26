@@ -15,8 +15,10 @@ if(NOT DEFINED TAU_SOURCE_ROOT)
 		CACHE INTERNAL "Tau src root for BA manifests")
 endif()
 
-set(TAU_BAS "tau,qint,qlt,nlang,bv,sbf,hsb" CACHE STRING
-	"Comma-separated enabled BA ids")
+# The store targets a manifest may name in TAU_BA_UNSUPPORTED_TARGETS.
+set(TAU_BA_KNOWN_TARGETS
+	linux-x86_64 darwin-arm64 darwin-x86_64
+	windows-x86_64-mingw windows-x86_64-msvc wasm32-emscripten)
 
 # Ordered preference for the Boolean carrier — the BA whose type core builds a
 # plain 0/1 in. Passed through to the compile-time fold rather than resolved
@@ -66,6 +68,10 @@ macro(_tau_load_ba_registry)
 			unset(TAU_BA_TESTS)
 			unset(TAU_BA_LINK_LIBS)
 			unset(TAU_BA_REQUIRES_PACKAGES)
+			unset(TAU_BA_UNSUPPORTED_TARGETS)
+			foreach(_t ${TAU_BA_KNOWN_TARGETS})
+				unset(TAU_BA_UNSUPPORTED_REASON_${_t})
+			endforeach()
 			include(${_mf})
 			if(NOT TAU_BA_ID)
 				message(FATAL_ERROR "ba.cmake missing TAU_BA_ID: ${_mf}")
@@ -91,10 +97,71 @@ macro(_tau_load_ba_registry)
 			set(TAU_BA_${TAU_BA_ID}_LINK_LIBS "${TAU_BA_LINK_LIBS}")
 			set(TAU_BA_${TAU_BA_ID}_REQUIRES_PACKAGES
 				"${TAU_BA_REQUIRES_PACKAGES}")
+			set(TAU_BA_${TAU_BA_ID}_UNSUPPORTED_TARGETS
+				"${TAU_BA_UNSUPPORTED_TARGETS}")
+			foreach(_t ${TAU_BA_UNSUPPORTED_TARGETS})
+				set(TAU_BA_${TAU_BA_ID}_UNSUPPORTED_REASON_${_t}
+					"${TAU_BA_UNSUPPORTED_REASON_${_t}}")
+			endforeach()
 		endforeach()
 		set(_TAU_BA_REGISTRY_LOADED TRUE)
 	endif()
 endmacro()
+
+#
+# Sets <out_unsupported> TRUE and <out_reason> when <id>'s manifest names
+# <target> in TAU_BA_UNSUPPORTED_TARGETS.
+#
+function(_tau_ba_target_support out_unsupported out_reason id target)
+	set(${out_unsupported} FALSE PARENT_SCOPE)
+	set(${out_reason} "" PARENT_SCOPE)
+	if(NOT DEFINED TAU_BA_${id}_UNSUPPORTED_TARGETS)
+		return()
+	endif()
+	if(NOT target IN_LIST TAU_BA_${id}_UNSUPPORTED_TARGETS)
+		return()
+	endif()
+	set(${out_unsupported} TRUE PARENT_SCOPE)
+	set(_reason "${TAU_BA_${id}_UNSUPPORTED_REASON_${target}}")
+	if(NOT _reason)
+		set(_reason "no reason given")
+	endif()
+	set(${out_reason} "${_reason}" PARENT_SCOPE)
+endfunction()
+
+#
+# The default pack: the default list minus every BA whose manifest does not
+# support the store target, one STATUS line per skipped BA. The list starts
+# with the wasm-supported BAs in the order the wasm pack names them.
+#
+function(_tau_bas_default_for_target out)
+	_tau_load_ba_registry()
+	set(_all sbf tau qint qlt nlang bv hsb)
+	set(_kept "")
+	foreach(_id ${_all})
+		_tau_ba_target_support(_unsupported _reason "${_id}" "${TAU_DEPS_TARGET}")
+		if(_unsupported)
+			message(STATUS "skipping ${_id} on ${TAU_DEPS_TARGET}: ${_reason}")
+		else()
+			list(APPEND _kept "${_id}")
+		endif()
+	endforeach()
+	list(JOIN _kept "," _joined)
+	set(${out} "${_joined}" PARENT_SCOPE)
+endfunction()
+
+# -DTAU_BAS wins; otherwise the default list minus the BAs whose manifest does
+# not support the store target.
+if(DEFINED TAU_BAS)
+	set(TAU_BAS "${TAU_BAS}" CACHE STRING "Comma-separated enabled BA ids")
+elseif(DEFINED TAU_DEPS_TARGET)
+	_tau_bas_default_for_target(_tau_default)
+	set(TAU_BAS "${_tau_default}" CACHE STRING
+		"Comma-separated enabled BA ids")
+else()
+	set(TAU_BAS "sbf,tau,qint,qlt,nlang,bv,hsb" CACHE STRING
+		"Comma-separated enabled BA ids")
+endif()
 
 #
 # A macro, not a function: it appends to the caller's OUT variable, like
@@ -140,6 +207,15 @@ function(tau_resolve_ba_pack)
 		if(NOT DEFINED TAU_BA_${_id}_HEADER)
 			message(FATAL_ERROR
 				"Unknown BA id '${_id}' in TAU_BAS=${TAU_BAS}")
+		endif()
+		if(DEFINED TAU_DEPS_TARGET)
+			_tau_ba_target_support(_unsupported _reason "${_id}"
+				"${TAU_DEPS_TARGET}")
+			if(_unsupported)
+				message(FATAL_ERROR
+					"BA '${_id}' does not support target "
+					"'${TAU_DEPS_TARGET}': ${_reason}")
+			endif()
 		endif()
 		list(APPEND _headers "${TAU_BA_${_id}_HEADER}")
 		if(TAU_BA_${_id}_SOURCES)

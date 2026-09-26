@@ -242,8 +242,10 @@ Options:
   Emscripten-only. A non-default value is fatal on a native build.
 
 Four constraints, each of which has broken a build here:
-- **The distributable wasm build uses the pack `sbf,tau,qint,qlt`.** `nlang` needs
-  curl, which is not ported. This pack exercises a capability fold's empty case.
+- **A BA manifest names the store targets it does not support.** A wasm
+  configure drops `bv`, `hsb` and `nlang` from the default pack and prints a
+  reason for each; an explicit `TAU_BAS` naming one of them is fatal. This pack
+  exercises a capability fold's empty case.
 - **`-pthread` is the default for every wasm target.** Threads are distributable and
   used widely. `-DTAU_WASM_PTHREADS=OFF` (the `release-wasm-nothreads` preset) keeps
   the droppable configuration: it drops `SharedArrayBuffer`, so the embedding page
@@ -316,7 +318,8 @@ A backend serves an engine as well as an algebra. The Spot backend serves LTL
 synthesis, and no BA asks for it.
 
 The BAs of a build are its **pack**, chosen at configure time with
-`-DTAU_BAS=` (default `tau,qint,qlt,nlang,bv,sbf,hsb`). `cmake/tau_bas.cmake`
+`-DTAU_BAS=` (default `sbf,tau,qint,qlt,nlang,bv,hsb`, minus the BAs a
+manifest does not support on the store target). `cmake/tau_bas.cmake`
 globs `src/boolean_algebras/*/ba.cmake` manifests and generates `tau_pack.h`
 into the build tree, providing `tau_pack::node_t`, `TAU_PACK_BASE_BAS` and
 `TAU_PACK_FULL_BAS` — use those instead of spelling a pack literally.

@@ -13,3 +13,7 @@ set(TAU_BA_TESTS
 	tests/test_integration-solver-hsb.cpp
 )
 set(TAU_BA_TEST_REQUIRES_test_hsb bv qint sbf)
+
+# cvc5 links the host GMP, so a wasm build is not distributable.
+set(TAU_BA_UNSUPPORTED_TARGETS wasm32-emscripten)
+set(TAU_BA_UNSUPPORTED_REASON_wasm32-emscripten "nondistributable: cvc5 links GMP")

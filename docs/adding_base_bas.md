@@ -43,6 +43,32 @@ type the pack does not own is rejected against that list — including a
 parameterized one, matched by family name, so `:bv[8]` needs `bv` in the pack.
 `tau --version` prints the same list.
 
+## The targets a BA does not support
+
+A manifest may name the dependency-store targets the algebra cannot build
+for, with a reason each:
+
+```cmake
+set(TAU_BA_UNSUPPORTED_TARGETS wasm32-emscripten)
+set(TAU_BA_UNSUPPORTED_REASON_wasm32-emscripten "nondistributable: cvc5 links GMP")
+```
+
+The target names are `linux-x86_64`, `darwin-arm64`,
+`darwin-x86_64`, `windows-x86_64-mingw`, `windows-x86_64-msvc` and
+`wasm32-emscripten`. When `-DTAU_BAS` is unset, every BA whose
+manifest names the current target is dropped from the default pack and its
+reason is printed:
+
+```
+-- skipping bv on wasm32-emscripten: nondistributable: cvc5 links GMP
+```
+
+Naming such a BA in an explicit `-DTAU_BAS=` is a fatal error carrying the same
+reason. The manifest stays in place, so a target that supports the BA still
+gets it. `bv` and `hsb` name `wasm32-emscripten` because cvc5 links the host
+GMP, so a wasm build is not distributable; `nlang` names `wasm32-emscripten`
+because curl has no wasm port.
+
 ## What a BA must provide
 
 ### The value type

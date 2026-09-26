@@ -33,12 +33,18 @@ register a phantom BA in every build. Write one when you copy the directory.
    # set(TAU_BA_TESTS tests/test_<id>.cpp)
    # set(TAU_BA_LINK_LIBS <target>)
    # set(TAU_BA_REQUIRES_PACKAGES <package>)
+   # the store targets this BA does not support, with a reason each:
+   # set(TAU_BA_UNSUPPORTED_TARGETS wasm32-emscripten)
+   # set(TAU_BA_UNSUPPORTED_REASON_wasm32-emscripten "curl has no wasm port")
    ```
 
    Sources, grammar and suites are all the plugin's own: `<id>/parser/<id>.tgf`
    is generated into the build tree when the BA is in the pack, `<id>/tests/`
    is registered then too, and a suite needing another algebra says so with
-   `set(TAU_BA_TEST_REQUIRES_test_<name> bv qlt)`.
+   `set(TAU_BA_TEST_REQUIRES_test_<name> bv qlt)`. A target named in
+   `TAU_BA_UNSUPPORTED_TARGETS` drops the BA from the default pack for that
+   target and prints `TAU_BA_UNSUPPORTED_REASON_<target>`; naming the BA in an
+   explicit `-DTAU_BAS=` is fatal with the same reason.
 
 3. Configure with the id in the pack: `./dev preset devel -DTAU_BAS=tau,sbf,<id>`.
 

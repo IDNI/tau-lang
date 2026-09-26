@@ -486,13 +486,6 @@ endif()
 # for cvc5 it does not link.
 #
 if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-	# The wasm pack has no cvc5 port. Say so and name the fix instead of
-	# failing deep inside a producer.
-	if(TAU_DEPS_TARGET STREQUAL "wasm")
-		message(FATAL_ERROR
-			"the wasm pack has no cvc5 port, but TAU_BAS=${TAU_BAS} requires cvc5")
-	endif()
-
 	tau_deps_ensure_prefix(cvc5
 		"${PROJECT_SOURCE_DIR}/scripts/dep-cvc5-package.sh" CVC5_STORE_PREFIX)
 	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
