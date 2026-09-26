@@ -203,6 +203,9 @@ Options:
   `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
   via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.
 - `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl.js`. Emscripten-only; fatal otherwise.
+- `-DTAU_PARITY_REQUIRE_NATIVE=ON` — make a missing or out-of-date native tau a fatal
+  configure error instead of dropping the `js_parity` test. The `*-wasm-all-tests`
+  presets and the `wasm-node` Docker stage set it. Emscripten-only.
 - `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl_web.js`. Emscripten-only; fatal otherwise.
 - `-DTAU_WASM_PTHREADS=OFF` — drops `-pthread` (the `release-wasm-nothreads`
   preset). Default ON. Emscripten-only; fatal otherwise.

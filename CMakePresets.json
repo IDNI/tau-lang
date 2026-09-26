@@ -686,6 +686,34 @@
 				"_bas-wasm",
 				"_build-binding-js",
 				"_build-wasm-tests",
+				"_build-repl-tests",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_PARITY_REQUIRE_NATIVE": "ON"
+			}
+		},
+		{
+			"name": "release-wasm-repl",
+			"displayName": "wasm CLI (tau_repl.js)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_bas-wasm",
+				"_build-executable",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-repl-tests",
+			"displayName": "wasm CLI and REPL suite (node)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_bas-wasm",
+				"_build-repl-tests",
 				"_build-type-release"
 			]
 		},
@@ -726,7 +754,10 @@
 				"_build-wasm-tests",
 				"_build-repl-tests",
 				"_build-type-release"
-			]
+			],
+			"cacheVariables": {
+				"TAU_PARITY_REQUIRE_NATIVE": "ON"
+			}
 		},
 		{
 			"name": "devel-wasm",
@@ -735,6 +766,14 @@
 		{
 			"name": "devel-wasm-all-tests",
 			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
+		},
+		{
+			"name": "devel-wasm-repl",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-repl"]
+		},
+		{
+			"name": "devel-wasm-repl-tests",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-repl-tests"]
 		},
 		{
 			"name": "devel-wasm-repl-browser",
@@ -755,6 +794,14 @@
 		{
 			"name": "debug-wasm-all-tests",
 			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
+		},
+		{
+			"name": "debug-wasm-repl",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-repl"]
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-repl-tests"]
 		},
 		{
 			"name": "debug-wasm-repl-browser",
@@ -1327,6 +1374,14 @@
 			"configurePreset": "release-wasm-all-tests"
 		},
 		{
+			"name": "release-wasm-repl",
+			"configurePreset": "release-wasm-repl"
+		},
+		{
+			"name": "release-wasm-repl-tests",
+			"configurePreset": "release-wasm-repl-tests"
+		},
+		{
 			"name": "release-wasm-repl-browser",
 			"configurePreset": "release-wasm-repl-browser"
 		},
@@ -1347,6 +1402,14 @@
 			"configurePreset": "devel-wasm-all-tests"
 		},
 		{
+			"name": "devel-wasm-repl",
+			"configurePreset": "devel-wasm-repl"
+		},
+		{
+			"name": "devel-wasm-repl-tests",
+			"configurePreset": "devel-wasm-repl-tests"
+		},
+		{
 			"name": "devel-wasm-repl-browser",
 			"configurePreset": "devel-wasm-repl-browser"
 		},
@@ -1365,6 +1428,14 @@
 		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-repl",
+			"configurePreset": "debug-wasm-repl"
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"configurePreset": "debug-wasm-repl-tests"
 		},
 		{
 			"name": "debug-wasm-repl-browser",
@@ -1549,6 +1620,10 @@
 			"configurePreset": "release-wasm-all-tests"
 		},
 		{
+			"name": "release-wasm-repl-tests",
+			"configurePreset": "release-wasm-repl-tests"
+		},
+		{
 			"name": "release-wasm-nothreads-all-tests",
 			"configurePreset": "release-wasm-nothreads-all-tests"
 		},
@@ -1557,12 +1632,20 @@
 			"configurePreset": "devel-wasm-all-tests"
 		},
 		{
+			"name": "devel-wasm-repl-tests",
+			"configurePreset": "devel-wasm-repl-tests"
+		},
+		{
 			"name": "devel-wasm-nothreads-all-tests",
 			"configurePreset": "devel-wasm-nothreads-all-tests"
 		},
 		{
 			"name": "debug-wasm-all-tests",
 			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"configurePreset": "debug-wasm-repl-tests"
 		},
 		{
 			"name": "debug-wasm-nothreads-all-tests",

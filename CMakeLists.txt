@@ -120,6 +120,15 @@ option(TAU_BUILD_BINDING_PYTHON_CTYPE    "Build the ctypes Python binding"   OFF
 option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
 option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
 option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl_web.js (Emscripten only)" OFF)
+# The native tau parity.js diffs the wasm module against. Not built here: it
+# is the one input this configure cannot make, so a missing binary drops the
+# js_parity test unless TAU_PARITY_REQUIRE_NATIVE turns that into an error.
+set(TAU_PARITY_NATIVE_BIN "${CMAKE_SOURCE_DIR}/build/release/tau" CACHE FILEPATH
+	"Native tau binary bindings/js/tests/parity.js compares the wasm module against")
+# The wasm presets that promise the js_parity gate turn this on, so a missing or
+# out-of-date native tau fails the configure instead of dropping the gate.
+option(TAU_PARITY_REQUIRE_NATIVE
+	"Fail the configure when the js_parity native tau is missing or from another commit" OFF)
 # Default ON only for Emscripten -- a plain option(... ON) would fatal below
 # on every native configure, since the option applies to wasm only.
 if(EMSCRIPTEN)
@@ -694,13 +703,15 @@ add_subdirectory("src")
 # CTestTestfile.cmake and `ctest` reports "No tests were found".
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BENCHMARK
+ OR TAU_BUILD_BROWSER_TESTS OR TAU_BUILD_REPL_BROWSER_TESTS
  OR TAU_BUILD_BINDING_PYTHON_NANOBIND OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	include(CTest)
 endif ()
 
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
- OR TAU_BUILD_BENCHMARK)
+ OR TAU_BUILD_BENCHMARK OR TAU_BUILD_BROWSER_TESTS
+ OR TAU_BUILD_REPL_BROWSER_TESTS)
 	message(STATUS "Building tests")
 	add_subdirectory(tests)
 	include(tau-shared-ctest-build-tree)

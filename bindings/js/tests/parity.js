@@ -66,7 +66,7 @@ const path = require('path');
 const native = require('./native');
 
 const WASM_JS = process.env.TAU_WASM_JS
-	|| path.join(__dirname, '..', '..', '..', 'build', 'emscripten', 'tau.js');
+	|| path.join(__dirname, '..', '..', '..', 'build', 'release-wasm', 'tau.js');
 const SCRATCH_DIR = process.env.TAU_PARITY_SCRATCH_DIR || os.tmpdir();
 
 let failed = false;

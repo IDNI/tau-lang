@@ -396,6 +396,60 @@ if (EMSCRIPTEN AND TAU_BUILD_BROWSER_TESTS)
 	set_tests_properties(browser_suite PROPERTIES TIMEOUT 1200)
 endif ()
 
+#
+# The JavaScript parity check: the wasm module against a native tau from this
+# same source and pack (bindings/js/tests/parity.js). A preset that promises
+# this gate sets TAU_PARITY_REQUIRE_NATIVE, which fails on a missing or stale one.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
+	if (NOT EXISTS "${TAU_PARITY_NATIVE_BIN}")
+		if (TAU_PARITY_REQUIRE_NATIVE)
+			message(FATAL_ERROR
+				"js_parity is required by this preset, but no native tau is at "
+				"${TAU_PARITY_NATIVE_BIN} (build it first: "
+				"./dev preset release-tau -DTAU_BAS=sbf,tau)")
+		endif()
+		message(STATUS
+			"js_parity not registered: no native tau at ${TAU_PARITY_NATIVE_BIN} "
+			"(build it with ./dev preset release-tau -DTAU_BAS=sbf,tau)")
+	else()
+		# The native tau is the parity ground truth, so a stale one from another
+		# commit would compare the wasm module against the wrong build.
+		if (TAU_PARITY_REQUIRE_NATIVE)
+			execute_process(
+				COMMAND "${TAU_PARITY_NATIVE_BIN}" --version
+				OUTPUT_VARIABLE _tau_parity_native_version
+				OUTPUT_STRIP_TRAILING_WHITESPACE
+				RESULT_VARIABLE _tau_parity_native_rc
+				ERROR_QUIET)
+			if (NOT _tau_parity_native_rc EQUAL 0)
+				message(FATAL_ERROR
+					"js_parity: ${TAU_PARITY_NATIVE_BIN} did not run "
+					"(exit ${_tau_parity_native_rc}); rebuild it")
+			endif()
+			if (TAU_GIT_COMMIT_HASH)
+				string(FIND "${_tau_parity_native_version}" "${TAU_GIT_COMMIT_HASH}"
+					_tau_parity_hash_pos)
+				if (_tau_parity_hash_pos EQUAL -1)
+					message(FATAL_ERROR
+						"js_parity: native tau at ${TAU_PARITY_NATIVE_BIN} reports "
+						"'${_tau_parity_native_version}', not this commit "
+						"(${TAU_GIT_COMMIT_HASH}); rebuild it with "
+						"./dev preset release-tau -DTAU_BAS=sbf,tau")
+				endif()
+			endif()
+		endif()
+		enable_testing()
+		add_test(NAME js_parity
+			COMMAND "${NODE_EXECUTABLE}"
+				"${PROJECT_SOURCE_DIR}/bindings/js/tests/parity.js")
+		set_tests_properties(js_parity PROPERTIES
+			ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js;TAU_NATIVE_BIN=${TAU_PARITY_NATIVE_BIN}"
+			TIMEOUT 600
+			TAU_NODE_ONLY TRUE)
+	endif()
+endif ()
+
 # ctest runs the binaries the build tree holds and never builds them; the
 # build_tree fixture (the parser's ctest-build-tree.cmake, vendored as
 # cmake/tau-shared-ctest-build-tree.cmake for the store path) builds them
