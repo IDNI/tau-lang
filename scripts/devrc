@@ -1,0 +1,9 @@
+# Tau-root devrc shim.
+#
+# The shared dep_* function library (dep_entry, dep_var, dep_jobs, dep_ensure,
+# ...) lives in the parser submodule. The dep-*-package.sh producers source
+# "${DEV_ROOT}/scripts/devrc" with DEV_ROOT at the Tau root, so this shim keeps
+# their content byte-identical to the parser copies and their recorded recipe
+# hash unchanged. The shim does not change which devrc the helper hashes name:
+# the parser's devrc sets __devrc_dir to its own directory.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../external/parser/scripts" && pwd)/devrc"

@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/parser/cmake)
 
 # Read version from file and strip prerelease information for cmake project VERSION property
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_VERSION)
@@ -17,16 +16,13 @@ option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 if(TAU_USE_CCACHE)
 	# include(<module>), not include(<file>): an argument carrying the .cmake
 	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
-	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
-	# actually lives (external/parser/cmake). With the extension this failed
-	# with "include could not find requested file: use-ccache.cmake" on every
-	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
-	# forced a regenerate, e.g. adding a test target.
-	include(use-ccache)
+	# is never looked up on CMAKE_MODULE_PATH. tau-shared-ccache.cmake is the
+	# vendored copy (see cmake/tau-shared-helpers.provenance.cmake).
+	include(tau-shared-ccache)
 endif()
 
 if(TAU_BUILD_EMSCRIPTEN)
-	include(use-emscripten)
+	include(tau-shared-emscripten)
 	set_emscripten_toolchain()
 endif()
 
@@ -42,6 +38,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(GNUInstallDirs)
 include(FetchContent)
+
+# The vendored shared helpers warn when the parser's copies have moved on.
+include(tau-shared-helpers.provenance)
+tau_shared_helpers_check_provenance()
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
@@ -79,12 +79,28 @@ option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legac
 # resolve TAU_SHARED_PREFIX and TAU_BUILD_JOBS from -D/env/auto into
 # TAU_SHARED_PREFIX_RESOLVED / TAU_BUILD_JOBS_RESOLVED (consumers below must
 # read the _RESOLVED name, not the bare cache variable -- see
-# external/parser/cmake/tau-resolve.cmake). Already include()d once above
-# (before project()) when TAU_BUILD_EMSCRIPTEN is ON, via use-emscripten.cmake;
+# cmake/tau-shared-resolve.cmake). Already include()d once above (before
+# project()) when TAU_BUILD_EMSCRIPTEN is ON, via tau-shared-emscripten.cmake;
 # the include_guard makes this a no-op in that case, and both paths set the
 # same directory-scope variables, so ordering relative to project() doesn't
 # matter here.
-include(tau-resolve)
+include(tau-shared-resolve)
+
+# Windows ships a WSL bash.exe ahead of Git's on PATH; cmake execute_process
+# must not pick that (it remaps drive letters and cannot see Windows cmake).
+find_program(TAU_BASH NAMES bash
+	PATHS
+		"C:/Program Files/Git/bin"
+		"C:/Program Files/Git/usr/bin"
+		"C:/Program Files (x86)/Git/bin"
+	NO_DEFAULT_PATH
+	NO_CACHE)
+if(NOT TAU_BASH)
+	find_program(TAU_BASH NAMES bash NO_CACHE)
+endif()
+if(NOT TAU_BASH)
+	set(TAU_BASH bash)
+endif()
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
@@ -487,13 +503,13 @@ if(TAU_BUILD_BROWSER_TESTS)
 
 	execute_process(
 		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
-			bash ./dev dep-chrome.sh
+			${TAU_BASH} ./dev dep-chrome.sh
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		COMMAND_ERROR_IS_FATAL ANY
 	)
 	execute_process(
 		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
-			bash ./dev dep-js-test-deps.sh
+			${TAU_BASH} ./dev dep-js-test-deps.sh
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		COMMAND_ERROR_IS_FATAL ANY
 	)
@@ -559,7 +575,7 @@ add_custom_target(tau_parsers ALL DEPENDS ${TAU_GENERATED_PARSER_HEADERS})
 #
 # Generate version_license.h file
 #
-include(version_license)
+include(tau-shared-version-license)
 version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
@@ -627,6 +643,8 @@ if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_BENCHMARK)
 	message(STATUS "Building tests")
 	add_subdirectory(tests)
+	include(tau-shared-ctest-build-tree)
+	tau_require_build_tree()
 endif ()
 
 #

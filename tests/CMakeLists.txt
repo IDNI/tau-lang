@@ -387,3 +387,12 @@ if (EMSCRIPTEN AND TAU_BUILD_BROWSER_TESTS)
 	# without masking a genuine hang.
 	set_tests_properties(browser_suite PROPERTIES TIMEOUT 1200)
 endif ()
+
+# ctest runs the binaries the build tree holds and never builds them; the
+# build_tree fixture (the parser's ctest-build-tree.cmake, vendored as
+# cmake/tau-shared-ctest-build-tree.cmake for the store path) builds them
+# first, so no test -- the browser batch included -- runs a stale or missing
+# target. Call after the last add_test() of this directory: it attaches
+# FIXTURES_REQUIRED to the tests registered in this directory scope.
+include(tau-shared-ctest-build-tree)
+tau_require_build_tree()
