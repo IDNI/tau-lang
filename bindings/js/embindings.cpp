@@ -89,7 +89,7 @@ val js_get_spec(const std::string& spec) {
 val js_normalize_formula(const std::string& formula) {
 	g_last_error.clear();
 	try {
-		if (auto r = tau_api::normalize_formula(formula); r)
+		if (auto r = tau_api::normalize_formula(formula); r.has_value())
 			return val(*r);
 		else set_last_error(r);
 	} catch (const std::exception&) {}
@@ -130,7 +130,7 @@ val js_solve(const std::string& formula, const std::string& mode) {
 	g_last_error.clear();
 	try {
 		auto r = tau_api::solve(formula, parse_solver_mode(mode));
-		if (!r) { set_last_error(r); return val::null(); }
+		if (!r.has_value()) { set_last_error(r); return val::null(); }
 		val out = val::object();
 		for (auto& [var, value] : *r) out.set(var, value);
 		return out;
@@ -142,7 +142,7 @@ int js_interpreter_create(const std::string& spec) {
 	g_last_error.clear();
 	try {
 		auto interp = tau_api::get_interpreter(spec);
-		if (!interp) { set_last_error(interp); return 0; }
+		if (!interp.has_value()) { set_last_error(interp); return 0; }
 		int handle = g_next_handle++;
 		g_interpreters[handle] = std::make_unique<interpreter<node_t>>(
 			std::move(*interp));
@@ -168,7 +168,7 @@ val js_interpreter_step(int handle, val inputs) {
 		}
 		auto r = tau_api::step(interp, std::move(step_inputs),
 			/*interactive=*/false);
-		if (!r) { set_last_error(r); return val::null(); }
+		if (!r.has_value()) { set_last_error(r); return val::null(); }
 		val out = val::object();
 		for (auto& [sa, value] : *r) out.set(sa.name, value);
 		out.set("state", static_cast<double>(interp.time_point));
