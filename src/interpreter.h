@@ -154,12 +154,17 @@ struct interpreter {
 	 * @brief Build an interpreter from a normalized Tau specification.
 	 * @param spec Normalized Tau formula.
 	 * @param ctx I/O context.
+	 * @param as_written The specification before the caller normalized
+	 * it, when the caller did; the functional shape of a specification
+	 * (`functional_step_shape`) is read off this form, since the
+	 * normalizer's equality propagation dissolves the conditional
+	 * structure the shape is made of. Defaults to `spec` itself.
 	 * @return Initialized interpreter, or an error result if the spec is
 	 * unsatisfiable or fails to normalize (a `bv_widening` width-cap
 	 * violation, already logged by the widening pass).
 	 */
 	static result<interpreter> make_interpreter(tref spec,
-		const io_context<node>& ctx);
+		const io_context<node>& ctx, tref as_written = nullptr);
 
 	/**
 	 * @brief Build a table-driven interpreter with no spec-derived state.
@@ -439,6 +444,26 @@ struct interpreter {
 	/// multi-state Mealy initial-output part pushed by make_interpreter
 	/// has a representative-less entry in `original_spec` too (IN-N11).
 	std::vector<htrefs> ubt_ctn;
+	/// Per part of `ubt_ctn`, whether the part is of functional shape
+	/// (`functional_step_shape`): its warm-up (`get_ubt_ctn_at`) keeps the
+	/// conjuncts of the reached coordinates and drops the rest. Empty or
+	/// false where the shape is not known.
+	std::vector<bool> functional_parts;
+	/// The greatest time point of an initial condition of the specification
+	/// as written (-1 when it has none): a part of functional shape is
+	/// warmed up by its reached conjuncts only from that time point on.
+	int_t functional_max_initial = -1;
+	/// The definitions of a specification whose every part is of
+	/// functional shape (`functional_program`), evaluated at every step in
+	/// place of solving the step formula (`functional_step_evaluation`);
+	/// empty where the shape does not apply, and after an update.
+	functional_program<node> functional_program_;
+	/// @brief The outputs of the current time point evaluated from the
+	/// definitions, in their dependency order, at the memory.
+	/// @return The values, keyed like the solver's, or nothing when a
+	/// guard literal is not decided or a witness is not folded to a
+	/// constant at the values it reads.
+	std::optional<solution<node>> evaluate_functional_step();
 	// Table mode only: atoms (input guards + witness templates) a table
 	// strategy may consult, seeded by make_table_interpreter and consulted
 	// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves
@@ -679,7 +704,15 @@ private:
 	void prune_memory(size_t completed_time_point);
 
 	/// @brief Find an executable specification clause from DNF.
-	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0);
+	/// @param functional The clause is a part of a specification of
+	/// functional shape (`functional_step_shape`): its continuation
+	/// fixpoint, run check and constant closure are settled from the
+	/// shape.
+	/// @param spec_max_initial The greatest time point of an initial
+	/// condition of the specification as written (-1 when it has none);
+	/// the constant closure is settled from the shape only below it.
+	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0,
+		bool functional = false, int_t spec_max_initial = -1);
 
 	/// @brief Recompute the executable continuations of a part's ordered
 	/// alternatives. Alternatives that are not executable are dropped from

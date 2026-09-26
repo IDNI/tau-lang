@@ -39,6 +39,9 @@ set(TESTS
 	bv_quantifier_free_decision
 	bv_case_split
 	bv_definitional_elimination
+	functional_continuation
+	factorized_continuation
+	functional_step
 )
 
 foreach(X IN LISTS TESTS)

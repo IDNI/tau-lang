@@ -171,3 +171,89 @@ add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 # assignments by dependency).
 add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
+
+# A complemented `:tau` constant `{K}'` normalizes to a `sometimes` over the
+# DNF of `!K`; the factored predicates decide it through the always dual
+# `F(D) == !G(!D)` (tau_ba.tmpl.h, sometimes_dual). Pin both questions on a
+# satisfiable-but-not-valid, a valid and an unsatisfiable two-clause
+# constant.
+add_repl_test(normalize_cmd-tau_complement_sat_not_valid_zero "set charvar off. normalize { (always (o1[t] != 0 || o2[t] = 0)) && (always o3[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_sat_not_valid_one  "set charvar off. normalize { (always (o1[t] != 0 || o2[t] = 0)) && (always o3[t] = 0) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_valid_zero         "set charvar off. normalize { (always (o1[t] = 0 || o1[t] != 0)) && (always (o2[t] = 0 || o2[t] != 0)) }:tau' = 0" ": T")
+add_repl_test(normalize_cmd-tau_complement_valid_one          "set charvar off. normalize { (always (o1[t] = 0 || o1[t] != 0)) && (always (o2[t] = 0 || o2[t] != 0)) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_unsat_one          "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 1" ": T")
+add_repl_test(normalize_cmd-tau_complement_unsat_zero         "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 0" ": F")
+# The same two questions on constants that read an input stream. An input
+# stream is universally quantified: `always i1[t] = 0` has no realization, so
+# the pinned constant is unsatisfiable and its complement valid (`= 1` gives
+# T); the guarded one is realizable with `o1[t] = 1` and not valid (both F).
+# The verdicts are those of the monolithic path on the unpatched binary.
+add_repl_test(normalize_cmd-tau_complement_input_guard_zero   "set charvar off. normalize { (always (i1[t] = 0 || o1[t] != 0)) && (always o2[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_guard_one    "set charvar off. normalize { (always (i1[t] = 0 || o1[t] != 0)) && (always o2[t] = 0) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_pinned_zero  "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_pinned_one   "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 1" ": T")
+
+# `syntactic_variable_simplification` (normal_forms_bf.tmpl.h) eliminates a
+# variable whose two substitutions agree. The substituted terms are brought to
+# canonical form before the comparison -- but not when the term carries a tau
+# constant, since canonicalizing such a term decides the constants it holds.
+# Pin that a variable next to a tau constant is still eliminated, through the
+# later passes: the formula with the variable is equivalent to the one without
+# it (a verdict, as the printed order of a term is not pinned across
+# platforms), and not to a wrong one; the last case is the control without a
+# tau constant.
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated      "set charvar off. normalize ((({always o1[t] = 0}:tau & x & y | {always o1[t] = 0}:tau & x' & y) = 0) <-> ({always o1[t] = 0}:tau & y = 0))" ": T")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_not  "set charvar off. normalize ((({always o1[t] = 0}:tau & x & y | {always o1[t] = 0}:tau & x' & y) = 0) <-> ({always o1[t] = 0}:tau & y != 0))" ": F")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_neq  "set charvar off. normalize ({always o1[t] = 0}:tau & x | {always o1[t] = 0}:tau & x') != 0" ": T")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_zero "set charvar off. normalize ({always o1[t] = 0}:tau & x | {always o1[t] = 0}:tau & x') = 0" ": F")
+add_repl_test(normalize_cmd-tau_coefficient_two_clause_constant     "set charvar off. normalize ({always (o1[t] = 0 || o2[t] != 0)}:tau & x | {always (o1[t] = 0 || o2[t] != 0)}:tau & x') = 0" ": F")
+add_repl_test(normalize_cmd-variable_eliminated_control              "set charvar off. normalize ((a & x | a & x') = 0) <-> (a = 0)" ": T")
+# An uninterpreted `:tau` constant tested against 0, the shape the solver's
+# bad splitter mints (`<:splitN> != 0`), is decided by its shape alone:
+# satisfiable, not valid, and so is its complement. The four controls carry
+# a stream or a second constant next to the symbol -- as a conjunct, a
+# disjunct or a product -- and take the ordinary temporal decision; their
+# verdicts are those of the unpatched binary.
+add_repl_test(normalize_cmd-tau_uconst_neq_zero_is_not_zero "set charvar off. normalize { <:c> != 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_neq_zero_is_not_one  "set charvar off. normalize { <:c> != 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_eq_zero_is_not_zero  "set charvar off. normalize { <:c> = 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_eq_zero_is_not_one   "set charvar off. normalize { <:c> = 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_with_stream_zero     "set charvar off. normalize { <:c> != 0 && o1[t] = 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_with_stream_one      "set charvar off. normalize { <:c> != 0 || o1[t] = 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_product_stream_zero  "set charvar off. normalize { (<:c> & o1[t]) != 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_product_uconst_one   "set charvar off. normalize { (<:c> & <:d>) != 0 }:tau = 1" ": F")
+
+
+# The type inference of a REPL line is seeded from the types the session has
+# recorded for the streams the line mentions (ba_types_inference.tmpl.h,
+# `seed_type_scope`), and the types it infers are merged back into that
+# record. The lines are fed one by one on standard input: the commands of
+# one input line are parsed and inferred as one tree, so only separate
+# lines exercise the session's record. Pin, across lines, that a stream
+# typed in an earlier line keeps its type when a later line mentions it
+# untyped, that a stream typed next to it takes the same type, that the
+# streams a line does not mention keep theirs, that two earlier lines
+# joined in a third keep both types, that an I/O definition types a stream
+# the same way, and that a later line contradicting the recorded type is
+# rejected, as a formula, as an I/O definition and as a redefinition.
+function(add_repl_lines_test test_name lines test_regex)
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash -c "printf '${lines}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${test_regex}"
+		FAIL_REGULAR_EXPRESSION "Error")
+endfunction()
+function(add_repl_lines_test_fail test_name lines test_regex)
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash -c "printf '${lines}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${test_regex}")
+endfunction()
+add_repl_lines_test(normalize_cmd-type_scope_stream_typed_from_earlier_line     "n o1[t]:sbf = 0.\\nn o1[t] = 1.\\nq\\n" "always o1\\[t\\]:sbf' = 0")
+add_repl_lines_test(normalize_cmd-type_scope_untyped_stream_next_to_typed        "n o1[t]:sbf = 0.\\nn o1[t] = i1[t].\\nq\\n" "always o1\\[t\\]:sbf = i1\\[t\\]:sbf")
+add_repl_lines_test(normalize_cmd-type_scope_unmentioned_streams_keep_types      "n o1[t]:sbf = 0.\\nn o2[t]:tau = 0.\\nn o3[t]:sbf = 0.\\nn o2[t] = 1.\\nn o1[t] = 1.\\nq\\n" "always o2\\[t\\]:tau' = 0[^#]*always o1\\[t\\]:sbf' = 0")
+add_repl_lines_test(normalize_cmd-type_scope_two_earlier_lines_joined            "n o1[t]:sbf = 0.\\nn o2[t] = 0.\\nn o2[t] = 1 && o1[t] = 1.\\nq\\n" "always (o1\\[t\\]:sbf' = 0 && o2\\[t\\]:tau' = 0|o2\\[t\\]:tau' = 0 && o1\\[t\\]:sbf' = 0)")
+add_repl_lines_test(normalize_cmd-type_scope_io_definition_types_stream          "i1:sbf := in console.\\no1:tau := out console.\\nn i1[t] = 1 && o1[t] = 1.\\nq\\n" "always (o1\\[t\\]:tau' = 0 && i1\\[t\\]:sbf' = 0|i1\\[t\\]:sbf' = 0 && o1\\[t\\]:tau' = 0)")
+add_repl_lines_test_fail(normalize_cmd-type_scope_conflict_with_earlier_line     "n o1[t]:sbf = 0.\\nn o1[t] = o2[t]:tau.\\nq\\n" "Incompatible type information in o1")
+add_repl_lines_test_fail(normalize_cmd-type_scope_definition_conflicts_with_earlier_line "n o1[t]:sbf = 0.\\no1:tau := out console.\\nq\\n" "Incompatible type information in o1")
+add_repl_lines_test_fail(normalize_cmd-type_scope_redefinition_conflicts         "i1:sbf := in console.\\ni1:tau := in console.\\nq\\n" "Incompatible type information in i1")

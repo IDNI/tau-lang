@@ -279,6 +279,18 @@ result<htref> api<node>::onf(htref expr, htref var) {
 }
 
 template <NodeType node>
+result<htref> api<node>::without(htref formula, htref clause) {
+	return with_budget<node>([&] {
+		if (!formula || !clause) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return without(formula->get(), clause->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
+}
+
+template <NodeType node>
 result<htref> api<node>::pnf(htref expr) {
 	return with_budget<node>([&] {
 		if (!expr) {

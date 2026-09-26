@@ -440,6 +440,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ nnf_cmd,             50 },
 			{ mnf_cmd,             50 },
 			{ onf_cmd,             50 },
+			{ without_cmd,         50 },
 			{ inst_cmd,            50 },
 			{ subst_cmd,           50 },
 			{ def_rr_cmd,          50 },
@@ -743,6 +744,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case nnf_cmd:           out("nnf "); break;
 			case mnf_cmd:           out("mnf "); break;
 			case onf_cmd:           out("onf "); break;
+			case without_cmd:       out("without "); break;
 			case def_print_cmd:
 			case def_rr_cmd:
 			case def_list_cmd:      out("defs "); break;

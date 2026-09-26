@@ -1221,6 +1221,79 @@ void inference_error_message(
 // | wff      | wff_ex            | wff_ex       | wff_ex       | resolve the quantified variables
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
 
+inline int type_scope_seed_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_TYPE_SCOPE_SEED");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	// When selected through the environment variable, the shadow mode
+	// reports its counts once, at exit, so a whole run can be checked for
+	// an inference the whole scope would have changed.
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "type scope seed shadow: hits %zu,"
+			" mismatches %zu\n", type_scope_seed_hits,
+			type_scope_seed_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : type_scope_seed;
+}
+
+template <NodeType node>
+void merge_type_scope(subtree_map<node, size_t>& scope,
+	const subtree_map<node, size_t>& inferred)
+{
+	for (const auto& [var, type] : inferred)
+		if (is_io_var<node>(var)) scope.insert_or_assign(var, type);
+}
+
+// Seed `resolver` with every stream of `global_scope` (the walk over the
+// whole scope), or with the streams `n` mentions only.
+template <NodeType node>
+void seed_type_scope(type_scoped_resolver<node>& resolver,
+	const subtree_map<node, size_t>& global_scope, tref n, bool by_mention)
+{
+	using tau = tree<node>;
+	if (!by_mention) {
+		for (auto [var, type] : global_scope) {
+			// We only insert io streams into the global scope
+			if (!is_io_var<node>(var)) continue;
+			auto untyped = canonize<node>(var);
+			resolver.insert(untyped);
+			resolver.assign(untyped, type);
+		}
+		return;
+	}
+	// The scope is keyed by the canonical stream (canonize: the name
+	// alone, as the I/O context and the inference key it), so a mentioned
+	// stream is one lookup; a stream the scope does not know is left to
+	// the inference. A formula mentions a stream as an io variable
+	// (`variable` over `io_var`) or as the stream an input or output
+	// definition declares (the definition's first child is its name).
+	std::unordered_set<tref> seen;
+	auto seed = [&](tref untyped) {
+		if (!seen.insert(untyped).second) return;
+		auto it = global_scope.find(untyped);
+		if (it == global_scope.end()) return;
+		resolver.insert(untyped);
+		resolver.assign(untyped, it->second);
+	};
+	auto mentions = [](tref x) {
+		const auto& t = tau::get(x);
+		return is_io_var<node>(x)
+			|| t.is(tau::input_def) || t.is(tau::output_def);
+	};
+	for (tref v : tau::get(n).select_all(mentions)) {
+		const auto& t = tau::get(v);
+		// the stream's `variable` node (a bare io_var child is visited too
+		// and skipped)
+		if (t.is(tau::variable)) seed(canonize<node>(v));
+		else if (t.is(tau::input_def) || t.is(tau::output_def))
+			seed(canonize<node>(tau::get(tau::variable,
+				tau::get(tau::io_var, t.first()))));
+	}
+}
+
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
  		const subtree_map<node, size_t>* global_scope,
@@ -1230,15 +1303,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 
 	type_scoped_resolver<node> resolver;
 
-	// Adding global_scope info to resolver
-	if (global_scope)
-		for (auto [var, type] : *global_scope) {
-			// We only insert io streams into the global scope
-			if (!is_io_var<node>(var)) continue;
-			auto untyped = canonize<node>(var);
-			resolver.insert(untyped);
-			resolver.assign(untyped, type);
-		}
+	// Adding global_scope info to resolver: the streams `n` mentions
+	// (type_scope_seed), or the whole scope
+	const int seed = global_scope ? type_scope_seed_mode() : 0;
+	if (global_scope) {
+		seed_type_scope<node>(resolver, *global_scope, n, seed > 0);
+		if (seed > 0) ++type_scope_seed_hits;
+	}
 
 	// In order to infer types of function symbols depending on predefined
 	// definitions, we keep a map of those present symbol definitions
@@ -1255,7 +1326,24 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		}
 	}
 
-	return infer_ba_types<node>(n, available_function_symbols, resolver, options);
+	auto inferred = infer_ba_types<node>(n, available_function_symbols,
+		resolver, options);
+	// The shadow mode infers once more from the whole scope and compares
+	// the tree and the types of the mentioned streams.
+	if (seed == 2) {
+		type_scoped_resolver<node> whole;
+		seed_type_scope<node>(whole, *global_scope, n, false);
+		auto reference = infer_ba_types<node>(n, available_function_symbols,
+			whole, options);
+		if (reference.first != inferred.first) ++type_scope_seed_mismatches;
+		for (const auto& [var, type] : inferred.second) {
+			if (!is_io_var<node>(var)) continue;
+			auto it = reference.second.find(var);
+			if (it == reference.second.end() || it->second != type)
+				++type_scope_seed_mismatches;
+		}
+	}
+	return inferred;
 }
 
 // This function version is introduced for debugging purposes as it allows

@@ -793,6 +793,18 @@ constant tests through the full path and reports disagreements, and
 Φ_Δ of the atomless algebra on matching shapes. `TAU_CODEGEN_RUN_SDK_LINK_TEST`
 opts the codegen test suite into a minutes-long real `cmake` build.
 
+**Normal-form reuse switches.** Four three-way switches (`0` off, `1` on, the default, `2` shadow: both paths run, every disagreement is counted and reported at exit when the variable is set) govern the reuse of the normal forms of tau constants: `TAU_BA_NORMALIZED_MEMO` (a normal form `normalize_tau` returned is decided and renormalized without a further normalization pass and, as an operand of the constant operators, taken as it is), `TAU_BA_NORMALIZED_CONJUNCTION` (the normal form of a conjunction of normal forms is built from their bodies, or assembled from their shape), `TAU_API_SAT_FACTORED` (`api::sat` decides an always-conjunction over streams by its stream-disjoint components) and `TAU_BA_NORMALIZED_WITHOUT` (the normal form of an always-conjunction without one of its conjuncts is assembled from its shape).
+
+
+
+**Type scope seeding.** `TAU_TYPE_SCOPE_SEED` governs how the type inference of a REPL line or of a step's input is seeded from the streams the session has seen: `0` walks the whole scope on every call, `1` (the default) seeds the streams the formula mentions only, `2` is the shadow mode, which seeds by mention, infers once more from the whole scope, and counts every disagreement, reported at exit.
+
+**Continuation fixpoint from the functional shape.** `TAU_FUNCTIONAL_CONTINUATION` governs how the fixpoint of the unbounded continuation is settled: `0` decides the implication between two consecutive iterates only, `1` (the default) settles the fixpoint, the run check and the constant closure from the functional shape of the specification where it has one (every output of a time point defined by one equation or one conditional tree over the inputs, the earlier outputs and the other outputs of the time point, without a cycle) and decides the implication elsewhere, `2` is the shadow mode, which lets the implication decide every check and counts the checks the shape would have settled, those among them whose implication does not hold or could not be decided, and the closures it would have settled, reported at exit together with the number of checks.
+
+**Factorized continuation.** `TAU_FACTORIZED_CONTINUATION` governs the form of the unbounded continuation of a specification of functional shape (see `TAU_FUNCTIONAL_CONTINUATION`) and its warm-up: `0` normalizes the continuation as one formula, whose disjunctive normal form multiplies the cases of the definitions along the chains of definitions reading each other, and warms every part up by quantifying the coordinates not yet reached and eliminating them, `1` (the default) normalizes the continuation conjunct by conjunct, keeps the conjunction, which is the form the interpreter grounds and solves at every step, and warms a part of the shape up by keeping the conjuncts of the reached coordinates alone, which is what the elimination returns for such a part (before the last initial condition of the specification, and after an update, every part is eliminated), `2` is the shadow mode, which computes both forms and both warm-ups, lets the one formula and the elimination decide, and counts every disagreement the normalizer finds and every equivalence it cannot decide, reported at exit together with the number of continuations and warm-ups kept when the variable is set. The line printed when the fixpoint is reached shows the form that is kept.
+
+**Functional step evaluation.** `TAU_FUNCTIONAL_STEP_EVALUATION` governs how the step of a specification of functional shape (see `TAU_FUNCTIONAL_CONTINUATION`) is computed: `0` solves the step formula, `1` (the default) evaluates the outputs of the time point from the definitions the shape reads off the specification, in the order in which the definitions read each other, where every part of the specification is of the shape, once the continuation is used verbatim and after the last initial condition (a guard literal is normalized at the values it reads, the cell whose literals all fail forces the output, and its witness is folded by normalizing its equation with the output, or, where the algebra writes that equation as a term equated with zero, by solving the one equation; a literal the normalizer does not decide or a witness that yields no constant returns the step to the solver, as does a part revised by an update; the evaluation applies while every part has one alternative and the specification does not read the `this` stream), `2` is the shadow mode, which evaluates as well, lets the solver decide every step, and counts every output whose evaluated value the normalizer finds different from the solved one, and every one whose equality it does not decide, reported at exit together with the number of steps evaluated and of steps returned to the solver when the variable is set.
+
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
@@ -1085,7 +1097,20 @@ Note that before a Tau specification is executed, it is checked for satisfiabili
 that it can be executed indefinitely as described above. During this process the specification
 is also converted to what we call _unbounded continuation_ which essentially adds all implicit
 assumptions from a specification ensuring that the solutions for output stream values
-do not make the execution contradictory in a future step.
+do not make the execution contradictory in a future step. The continuation is built
+time point by time point until a fixpoint is reached. A specification of functional
+shape, whose outputs are functions of its inputs and of the earlier outputs, is a
+fixpoint as soon as the lookback is covered: the block a time point adds holds for every
+value of what it reads from outside, so adding it changes nothing. The shape is read off
+the specification as written, before it is normalized, and settles the fixpoint, the run
+check and the constant closure without deciding the implication between the two iterates
+(`TAU_FUNCTIONAL_CONTINUATION`, see the environment variables below). Such a
+continuation is kept as the conjunction of its conjuncts' normal forms, and its
+warm-up keeps the conjuncts of the reached coordinates (`TAU_FACTORIZED_CONTINUATION`).
+Once the continuation is used verbatim and after the last initial condition, the step of
+such a specification is not solved either: its outputs are evaluated from the definitions, in the order in which they read each other, the cell whose guard
+literals fail at the values read forcing the output to its witness
+(`TAU_FUNCTIONAL_STEP_EVALUATION`).
 
 It is not always the case that the values which can be assigned to outputs are unique.
 For this reason, a single specification can give rise to a multitude of different programs
@@ -3208,6 +3233,11 @@ expression.
 
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
+
+* `without <repl_memory|tau> <repl_memory|tau>`: computes the normal form of
+the given always-conjunction without the conjunct equal to the given single
+clause; the normalized formula itself when it is no always-conjunction or no
+conjunct equals the clause.
 
 ## **Specification execution**
 
