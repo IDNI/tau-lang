@@ -3620,6 +3620,19 @@ returning a `tau.result`).
 
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
 
+The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
+carries the same budgets and switches under the camelCase form of those names
+(`tau.setMaxFixpointSteps(1000)`, `tau.setTrefBudget(n)`,
+`tau.setPreprocessing(false)`, `tau.trefCount()`, ...) and the options the
+algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
+`tau.getBaOption(name)`, which return the value now in force, or `null` with
+the reason in `tau.getLastError()` when the build declares no such option).
+The WebAssembly build cannot run `ltlsynt`, so the options of that route
+(`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
+`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`) have no counterpart
+there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
+each of them in use.
+
 # **The Theory behind the Tau Language**
 
 * GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)

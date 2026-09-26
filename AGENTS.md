@@ -141,6 +141,7 @@ link requirements conflict — see the constraints below.
 ./dev preset emscripten                             # tau.js + tau.wasm + tau.esm.mjs
 node build/emscripten/tau.node.js                   # smoke test
 node bindings/js/tests/parity.js                    # wasm vs native, 140 checks
+node bindings/js/tests/budgets.js                   # budget setters, BA options
 
 ./dev preset debug-emscripten-tests                 # tau's own suite for wasm
 ctest --test-dir build/debug-emscripten-tests -j 8  # runs each test under node
