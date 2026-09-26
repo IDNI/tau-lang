@@ -1071,7 +1071,10 @@
 				"debug",
 				"_sanitize-address",
 				"_build-type-debug"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
 		},
 		{
 			"name": "release-asan",
@@ -1079,7 +1082,10 @@
 				"release",
 				"_sanitize-address",
 				"_build-type-release"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
 		},
 		{
 			"name": "devel-asan",
@@ -1087,7 +1093,22 @@
 				"devel",
 				"_sanitize-address",
 				"_build-type-devel"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "debug-asan-tests",
+			"inherits": ["debug-asan", "_build-tests"]
+		},
+		{
+			"name": "devel-asan-tests",
+			"inherits": ["devel-asan", "_build-tests"]
+		},
+		{
+			"name": "release-asan-tests",
+			"inherits": ["release-asan", "_build-tests"]
 		},
 		{
 			"name": "relwithdebinfo",
@@ -1336,6 +1357,18 @@
 		{
 			"name": "devel-asan",
 			"configurePreset": "devel-asan"
+		},
+		{
+			"name": "debug-asan-tests",
+			"configurePreset": "debug-asan-tests"
+		},
+		{
+			"name": "devel-asan-tests",
+			"configurePreset": "devel-asan-tests"
+		},
+		{
+			"name": "release-asan-tests",
+			"configurePreset": "release-asan-tests"
 		},
 		{
 			"name": "release-w64",
@@ -1853,6 +1886,18 @@
 		{
 			"name": "debug-msvc-all-clang-cl",
 			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-asan-tests",
+			"configurePreset": "debug-asan-tests"
+		},
+		{
+			"name": "devel-asan-tests",
+			"configurePreset": "devel-asan-tests"
+		},
+		{
+			"name": "release-asan-tests",
+			"configurePreset": "release-asan-tests"
 		},
 		{
 			"name": "devel-msvc-all-clang-cl",
