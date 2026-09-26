@@ -112,6 +112,7 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-packages-deb
 ./dev preset release-packages-rpm
 ./dev preset release-w64-packages
+./dev preset release-msvc-all-clang-cl run  # clang-cl on the MSVC ABI
 ./dev preset debug-asan
 ./dev preset coverage
 ./dev preset release-wasm                        # wasm library (tau.js/.wasm/.esm.mjs)
