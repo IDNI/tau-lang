@@ -245,8 +245,9 @@ Tau-lang offers two ways to execute a specification:
 1. **Interpret** the spec directly — solve each time step on the fly.
    Use `tau`.  Best for iteration and REPL use.
 2. **Compile** the spec to a standalone executable ahead of time.
-   Use `tau compile`.  Best for deployment: the synthesis happens once, at
-   compile time, and the program only steps the strategy.
+   Use `tau compile`.  Best for deployment: the program makes the moves
+   `tau` makes.  When `tau` plays a finite machine, the synthesis happens
+   once, at compile time, and the program only steps that machine.
 
 Both use the same spec language.  You can start with the interpreter while
 authoring a spec and switch to the compiler for production.
@@ -270,12 +271,15 @@ results, or run short jobs from the shell.
 
 ## Compile a spec to an executable (`tau compile`)
 
-`tau compile` parses a specification, runs the same LTL(ABA) synthesis
-pipeline as the interpreter, and turns the synthesized strategy into a
-standalone executable: it emits a small CMake project next to the spec
-(`<spec>.build/`, one `main.cpp` that drives the strategy through the same run
-loop `tau <spec>` uses, linked against the emitting build's libTAU), builds it,
-and copies the program to the requested path.
+`tau compile` parses a specification, prepares its execution exactly as the
+interpreter does, and turns it into a standalone executable: it emits a small
+CMake project next to the spec (`<spec>.build/`, one `main.cpp` that drives
+the same run loop `tau <spec>` uses, linked against the emitting build's
+libTAU), builds it, and copies the program to the requested path.  The
+program makes the moves `run` makes.  When `run` plays the finite machine of
+the data game's strategy, the program carries that machine; otherwise `run`
+solves as it goes, and the program executes the embedded specification the
+same way.
 
 ```sh
 # 1. Write a spec (mirror-input example).
@@ -301,7 +305,7 @@ not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
 only when `realizable` would answer F; when realizability is undecided the
 message says UNKNOWN and names the budget or the reason that stopped it.
 The global options, the budgets among them, are given before the verb
-(`tau --ltl-timeout 120 compile spec.tau`).  A spec whose strategy cannot be executed (an
+(`tau --ltl-timeout 120 compile spec.tau`).  A spec `run` cannot execute (an
 Algorithm-B verdict over the `qlt` type, see the synthesis algorithms below)
 is refused the same way.
 
@@ -315,8 +319,8 @@ with the spec on every input trace.  Unrealizable specs are rejected up front.
 
 Pointwise revision (PWR) happens before code generation: a spec already
 produced by PWR can be compiled and stepped like any other realizable spec.
-Runtime PWR/spec patching remains the interpreter's responsibility, not a
-feature of compiled programs.
+A spec whose tau-typed update stream `u` revises it while it runs is
+executed by the program as `run` executes it, revisions included.
 
 See the [command-line reference](#command-line-interface) for the `tau`
 options.
@@ -2857,12 +2861,15 @@ extension).  The program behaves like `tau <spec.tau>`: it reads inputs,
 prints outputs, and exits when its input closes.  Exit code `0` on success,
 `1` on every failure, with the reason in the `compile failed:` message (see
 [Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
-The program carries the strategy of the abstraction (steps 4 and 5 of the
-realizability algorithm), or, for a spec that only the data game decides,
-the Mealy machine of that game's strategy, which `run` plays too. A spec the
-data game decides only over formulas, over the bits of a bitvector wider
-than 4 bits, or over the order types of `qlt` values has no such machine; it
-is refused with a message saying so, and `run` executes it.
+The program makes the moves `run` makes, because `tau compile` asks the
+interpreter what it executes. When `run` plays the Mealy machine of the data
+game's strategy, the program carries that machine. Otherwise `run` solves as
+it goes: each step through the safety pipeline, and, for a strategy of the
+abstraction (steps 4 and 5 of the realizability algorithm) or of a data game
+with no such machine (decided over formulas, over the bits of a bitvector
+wider than 4 bits, or over the order types of `qlt` values), that game or
+synthesis when it starts. The program then executes the embedded spec the
+same way, with the same solver, so it needs `ltlsynt` where `run` does.
 
 Emitting a C++ *header* with the synthesized class (`tau_program`, with the
 `declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)
