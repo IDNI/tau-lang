@@ -421,4 +421,48 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( cvc5_options == cvc5_option_set::ext_rewrite_no_models );
 		cvc5_options = saved;
 	}
+	// The normalizer and tree caches are keyed on the formula alone: a
+	// setter that changes a semantic option empties them, one that leaves
+	// the options as they were keeps them.
+	TEST_CASE("a semantic option change empties the tree caches") {
+		using cache_t = subtree_unordered_map<node_t, tref>;
+		static cache_t& cache = tau::template create_cache<cache_t>();
+		tref key = tau::_T();
+		auto fill = [&] { cache.clear(); cache.emplace(key, key); };
+		const size_t saved_sr = max_simplify_rounds;
+		const size_t saved_fp = max_fixpoint_steps;
+
+		fill();
+		tau_api::set_max_simplify_rounds(saved_sr);
+		CHECK( cache.contains(key) );
+		tau_api::set_max_simplify_rounds(saved_sr + 1);
+		CHECK_FALSE( cache.contains(key) );
+		tau_api::set_max_simplify_rounds(saved_sr);
+
+		fill();
+		tau_api::set_max_fixpoint_steps(saved_fp + 1);
+		CHECK_FALSE( cache.contains(key) );
+		tau_api::set_max_fixpoint_steps(saved_fp);
+
+		fill();
+		const auto names = tau_api::ba_option_names();
+		if (!names.empty()) {
+			auto before = tau_api::get_ba_option(names.front());
+			REQUIRE( before.has_value() );
+			const size_t v = before.value();
+			CHECK( tau_api::set_ba_option(names.front(), v).has_value() );
+			CHECK( cache.contains(key) );
+			CHECK( tau_api::set_ba_option(names.front(),
+				v == 0 ? 1 : 0).has_value() );
+			CHECK_FALSE( cache.contains(key) );
+			CHECK( tau_api::set_ba_option(names.front(), v).has_value() );
+		}
+
+		// a display option is not semantic
+		fill();
+		tau_api::set_indenting(!pretty_printer_indenting);
+		tau_api::set_indenting(!pretty_printer_indenting);
+		CHECK( cache.contains(key) );
+		cache.clear();
+	}
 }

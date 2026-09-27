@@ -2083,6 +2083,7 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
 	else TAU_LOG_ERROR << "Invalid value: expected a count\n";
 }
+	option_change_guard<node> guard;
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -2107,6 +2108,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 }
 
 template <typename... BAs>
+	option_change_guard<node> guard;
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	api<node>::set_charvar(opt.charvar = value);

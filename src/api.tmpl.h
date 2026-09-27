@@ -63,6 +63,50 @@ tref get_update(interpreter<node>& i, const assignment<node>& output) {
 // common API settings
 // ------------------------------------------------------------
 
+namespace api_detail {
+
+// Every runtime option that can change what a normalization or a decision
+// computes: the verdict fingerprint and the knobs outside it.
+template <NodeType node>
+size_t semantic_options_fingerprint() {
+	size_t seed = verdict_budget_fingerprint<node>();
+	auto mix = [&seed](size_t v) {
+		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+	};
+	mix(block_boole_max_splits);
+	mix(block_max_rounds);
+	mix(cqe_max_clauses);
+	mix(lgrs_max_vars);
+	mix(max_blast_reentry_depth);
+	mix(block_squeeze_cap);
+	mix(max_def_passes);
+	mix(max_enum_steps);
+	mix(max_probe_steps);
+	mix(max_rewrite_rounds);
+	mix(max_simplify_rounds);
+	mix((size_t) preprocess_placement);
+	mix((size_t) preprocess_method);
+	mix((size_t) solver_placement);
+	mix((size_t) cvc5_options);
+	mix(pwr_semantic_fallback);
+	mix(interpreter<node>::definitional_propagation);
+	mix(interpreter<node>::max_revision_alts);
+	mix(pack_ba_component_factoring_enabled<node>());
+	return seed;
+}
+
+} // namespace api_detail
+
+template <NodeType node>
+option_change_guard<node>::option_change_guard()
+	: before(api_detail::semantic_options_fingerprint<node>()) {}
+
+template <NodeType node>
+option_change_guard<node>::~option_change_guard() {
+	if (api_detail::semantic_options_fingerprint<node>() != before)
+		tree<node>::clear_caches();
+}
+
 template <NodeType node>
 void api<node>::set_charvar(bool charvar) {
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
@@ -72,11 +116,13 @@ void api<node>::set_charvar(bool charvar) {
 
 template <NodeType node>
 void api<node>::set_preprocessing(bool enabled) {
+	option_change_guard<node> guard;
 	preprocessing = enabled;
 }
 
 template <NodeType node>
 void api<node>::set_preprocess_placement(int site) {
+	option_change_guard<node> guard;
 	preprocess_placement = (site >= static_cast<int>(preprocess_site::per_leaf)
 		&& site <= static_cast<int>(preprocess_site::per_formula))
 			? static_cast<preprocess_site>(site) : preprocess_site::per_leaf;
@@ -84,6 +130,7 @@ void api<node>::set_preprocess_placement(int site) {
 
 template <NodeType node>
 void api<node>::set_preprocess_method(int mode) {
+	option_change_guard<node> guard;
 	preprocess_method = (mode >= static_cast<int>(preprocess_mode::anti_prenex_result)
 		&& mode <= static_cast<int>(preprocess_mode::defer))
 			? static_cast<preprocess_mode>(mode)
@@ -92,6 +139,7 @@ void api<node>::set_preprocess_method(int mode) {
 
 template <NodeType node>
 void api<node>::set_solver_placement(int site) {
+	option_change_guard<node> guard;
 	solver_placement = (site >= static_cast<int>(solver_site::eager)
 		&& site <= static_cast<int>(solver_site::per_formula))
 			? static_cast<solver_site>(site) : solver_site::eager;
@@ -99,6 +147,7 @@ void api<node>::set_solver_placement(int site) {
 
 template <NodeType node>
 void api<node>::set_cvc5_options(int set) {
+	option_change_guard<node> guard;
 	cvc5_options = (set >= static_cast<int>(cvc5_option_set::baseline)
 		&& set <= static_cast<int>(cvc5_option_set::combined_best))
 			? static_cast<cvc5_option_set>(set)
@@ -110,66 +159,79 @@ void api<node>::set_cvc5_options(int set) {
 // setters translate.
 template <NodeType node>
 void api<node>::set_block_max_splits(size_t n) {
+	option_change_guard<node> guard;
 	block_boole_max_splits = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
 void api<node>::set_block_max_rounds(size_t n) {
+	option_change_guard<node> guard;
 	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
 void api<node>::set_cqe_max_clauses(size_t n) {
+	option_change_guard<node> guard;
 	cqe_max_clauses = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
 void api<node>::set_lgrs_max_vars(size_t n) {
+	option_change_guard<node> guard;
 	lgrs_max_vars = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
 void api<node>::set_max_blast_reentry_depth(size_t n) {
+	option_change_guard<node> guard;
 	max_blast_reentry_depth = n;
 }
 
 template <NodeType node>
 void api<node>::set_block_squeeze_cap(size_t n) {
+	option_change_guard<node> guard;
 	block_squeeze_cap = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_fixpoint_steps(size_t n) {
+	option_change_guard<node> guard;
 	max_fixpoint_steps = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_flag_search_steps(size_t n) {
+	option_change_guard<node> guard;
 	max_flag_search_steps = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_def_passes(size_t n) {
+	option_change_guard<node> guard;
 	max_def_passes = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_enum_steps(size_t n) {
+	option_change_guard<node> guard;
 	max_enum_steps = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_probe_steps(size_t n) {
+	option_change_guard<node> guard;
 	max_probe_steps = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_rewrite_rounds(size_t n) {
+	option_change_guard<node> guard;
 	max_rewrite_rounds = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_simplify_rounds(size_t n) {
+	option_change_guard<node> guard;
 	max_simplify_rounds = n;
 }
 
@@ -205,11 +267,13 @@ void api<node>::set_spec_size_warn(size_t n) {
 
 template <NodeType node>
 void api<node>::set_max_revision_alts(size_t n) {
+	option_change_guard<node> guard;
 	interpreter<node>::max_revision_alts = n;
 }
 
 template <NodeType node>
 void api<node>::set_max_consistency_subsets(size_t n) {
+	option_change_guard<node> guard;
 	max_consistency_subsets = n;
 }
 
@@ -220,6 +284,7 @@ void api<node>::set_cache_bound(size_t n) {
 
 template <NodeType node>
 void api<node>::set_max_cover_products(size_t n) {
+	option_change_guard<node> guard;
 	max_cover_products = n;
 }
 
@@ -230,47 +295,56 @@ void api<node>::set_ltl_timeout_sec(long seconds) {
 }
 
 template <NodeType node>
+	option_change_guard<node> guard;
 void api<node>::set_ltl_algorithm(const std::string& alg) {
 	ltl_algorithm_param = alg;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
+	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_hoa_max_states(size_t n) {
+	option_change_guard<node> guard;
 	ltl_hoa_max_states_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_guard_max_cubes(size_t n) {
+	option_change_guard<node> guard;
 	ltl_guard_max_cubes_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_max_refinement_rounds(size_t n) {
+	option_change_guard<node> guard;
 	ltl_max_refinement_rounds_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_window_max_paths(size_t n) {
+	option_change_guard<node> guard;
 	ltl_window_max_paths_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
+	option_change_guard<node> guard;
 	pwr_semantic_fallback = on;
 }
 
 template <NodeType node>
 void api<node>::set_step_definitional_propagation(bool on) {
+	option_change_guard<node> guard;
 	interpreter<node>::definitional_propagation = on;
 }
 
 template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
+	option_change_guard<node> guard;
 	pretty_printer_indenting = indenting;
 }
 
@@ -281,6 +355,7 @@ void api<node>::set_ba_component_factoring(bool state) {
 
 template <NodeType node>
 void api<node>::set_ba_decision_pins(size_t n) {
+	option_change_guard<node> guard;
 	pack_set_ba_decision_pins<node>(n);
 }
 
@@ -322,6 +397,7 @@ result<size_t> api<node>::set_ba_option(const std::string& name,
 	if (o->kind == ba_option_kind::flag) o->set_flag(value != 0);
 	else o->set_count(value);
 	return r.with_value(api_detail::ba_option_value(*o));
+	option_change_guard<node> guard;
 }
 
 template <NodeType node>
