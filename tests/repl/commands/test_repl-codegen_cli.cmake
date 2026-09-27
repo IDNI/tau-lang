@@ -55,3 +55,17 @@ if(NOT _tau_skip)
 		FAIL_REGULAR_EXPRESSION "only through|UNREALIZABLE|EXIT=1"
 		TIMEOUT 900 RUN_SERIAL TRUE)
 endif()
+
+# an edge solves a witness atom jointly with the templates of its
+# variable: the program needs that atom too, and used to stop at start
+# (map::at)
+set(_tw_spec "(always o2[0]:bv[1] = 0 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes !(!(o1[t]:bv[1] = 1)))")
+tau_repl_unsupported(_tau_skip "${_tw_spec}")
+if(NOT _tau_skip)
+	add_test(NAME "test_codegen_cli-template_witness_atom_emitted"
+		COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' '${_tw_spec}' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?; printf '\\n\\n\\n' | \"$d/exe\"")
+	set_tests_properties("test_codegen_cli-template_witness_atom_emitted" PROPERTIES
+		PASS_REGULAR_EXPRESSION "EXIT=0.*o2\\[0\\] := 0"
+		FAIL_REGULAR_EXPRESSION "map::at|terminate called|EXIT=1"
+		TIMEOUT 900 RUN_SERIAL TRUE)
+endif()

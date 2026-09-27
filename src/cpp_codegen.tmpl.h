@@ -1013,6 +1013,21 @@ result<program_desc> build_program_desc(
 			}
 		}
 	}
+	// An edge solves a witness atom of a template variable jointly with
+	// the templates, so the artifact needs that atom too.
+	{
+		std::set<std::string> have;
+		for (const auto& a : d.atoms) have.insert(a.prop);
+		for (const auto& es : d.edges)
+			for (const auto& ed : es)
+				for (const auto& prop : ed.witness_template_props) {
+					if (!have.insert(prop).second) continue;
+					TAU_TRY(auto ge, build_atom_ground_expr<node>(
+						prop_to_atom.at(prop)));
+					d.atoms.push_back({prop, std::move(ge)});
+					d.needs_tau_link = true;
+				}
+	}
 
 	return r.with_value(std::move(d));
 }
