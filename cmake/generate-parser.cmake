@@ -19,6 +19,8 @@ function(generate_parser tgf_filename out_dir)
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${out_dir}"
 		COMMAND ${TAU_TGF_EXECUTABLE} "${tgf_filename}" gen
 			--header-only false --output-dir "${out_dir}"
+		COMMAND ${CMAKE_COMMAND} -DHEADER=${_header}
+			-P "${PROJECT_SOURCE_DIR}/cmake/sanitize-generated.cmake"
 		DEPENDS ${TAU_TGF_DEPEND} "${tgf_filename}"
 		COMMENT "Generating parser from ${_stem}.tgf"
 		VERBATIM)

@@ -8,14 +8,16 @@ foreach(header_file ${TAU_HEADERS_LIST})
         # one is relative to TAU_SOURCE_DIR
         if(IS_ABSOLUTE "${header_file}")
                 set(_path "${header_file}")
+                get_filename_component(_marker "${header_file}" NAME)
         else()
                 set(_path "${TAU_SOURCE_DIR}/${header_file}")
+                set(_marker "${header_file}")
         endif()
         file(READ "${_path}" HEADER_CONTENT ENCODING UTF-8)
         string(APPEND TAU_HEADER_CONTENT "\
 \n\
 // -----------------------------------------------------------------------------\n\
-// ${header_file}\n\
+// ${_marker}\n\
 \n\
 ${HEADER_CONTENT}\n\
 \n\
