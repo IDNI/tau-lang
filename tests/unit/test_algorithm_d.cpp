@@ -138,7 +138,9 @@ State: 1
 [t] 1
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		CHECK(g.num_states == 2);
 		CHECK(g.init == 0);
 		REQUIRE(g.aps.size() == 2u);
@@ -169,10 +171,8 @@ State: 1
 	}
 
 	// The header comes from an external process; a garbled or absurd header
-	// yields the empty game (num_states == 0), which call_ltlsynt_game
-	// refuses as "no verdict" -- never an exception (std::stoi used to
-	// throw) and never a game built on a garbage count.
-	TEST_CASE("[ALG-D-32b] garbled header integers yield the empty game") {
+	// is a parse error, never a game built on a garbage count.
+	TEST_CASE("[ALG-D-32b] garbled header integers are a parse error") {
 		const std::string tail = R"(
 AP: 1 "p0"
 acc-name: all
@@ -182,44 +182,48 @@ State: 0
 --END--
 )";
 		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: abc\nStart: 0" + tail).num_states == 0);
+			"HOA: v1\nStates: abc\nStart: 0" + tail).has_error());
 		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 0\nStart: 0" + tail).num_states == 0);
+			"HOA: v1\nStates: 0\nStart: 0" + tail).has_error());
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 99999999999999999999\nStart: 0" + tail)
-				.num_states == 0);
+				.has_error());
 		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 1\nStart: -1" + tail).num_states == 0);
+			"HOA: v1\nStates: 1\nStart: -1" + tail).has_error());
 		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 1\nStart: x" + tail).num_states == 0);
+			"HOA: v1\nStates: 1\nStart: x" + tail).has_error());
 		// The state cap is the runtime parameter ltl_hoa_max_states.
 		const long saved = ltl_hoa_max_states_param;
 		ltl_hoa_max_states_param = 3;
 		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 4\nStart: 0" + tail).num_states == 0);
-		CHECK(alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 3\nStart: 0" + tail).num_states == 3);
+			"HOA: v1\nStates: 4\nStart: 0" + tail).has_error());
+		auto ok3_r = alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 3\nStart: 0" + tail);
+		REQUIRE(ok3_r.has_value());
+		CHECK(ok3_r.value().num_states == 3);
 		ltl_hoa_max_states_param = saved;
 	}
 
 	TEST_CASE("[ALG-D-32c] more atomic propositions than the game can "
-	          "enumerate yield the empty game") {
+	          "enumerate are refused") {
 		std::string aps;
 		for (int i = 0; i <= ltl_max_game_aps; ++i)
 			aps += " \"p" + std::to_string(i) + "\"";
 		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: "
 			+ std::to_string(ltl_max_game_aps + 1) + aps
 			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
-		CHECK(alg_d::parse_synth_game_hoa(hoa).num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
 		// ltl_max_game_aps itself is accepted.
 		std::string ok = "HOA: v1\nStates: 1\nStart: 0\nAP: "
 			+ std::to_string(ltl_max_game_aps)
 			+ aps.substr(0, aps.rfind(" \""))
 			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
-		CHECK(alg_d::parse_synth_game_hoa(ok).num_states == 1);
+		auto ok_r = alg_d::parse_synth_game_hoa(ok);
+		REQUIRE(ok_r.has_value());
+		CHECK(ok_r.value().num_states == 1);
 	}
 
-	TEST_CASE("[ALG-D-32d] a decomposed multi-game text yields the empty game") {
+	TEST_CASE("[ALG-D-32d] a decomposed multi-game text is refused") {
 		std::string one = R"(HOA: v1
 States: 1
 Start: 0
@@ -230,8 +234,10 @@ State: 0
 [t] 0
 --END--
 )";
-		CHECK(alg_d::parse_synth_game_hoa(one).num_states == 1);
-		CHECK(alg_d::parse_synth_game_hoa(one + one).num_states == 0);
+		auto one_r = alg_d::parse_synth_game_hoa(one);
+		REQUIRE(one_r.has_value());
+		CHECK(one_r.value().num_states == 1);
+		CHECK(alg_d::parse_synth_game_hoa(one + one).has_error());
 	}
 
 	TEST_CASE("[ALG-D-32e] a guard with an absurd AP index reads as false, "
@@ -253,7 +259,9 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 1);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -277,7 +285,9 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 2);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -301,7 +311,9 @@ State: 0 {2}
 State: 1
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 2u);
 		// color 2 (even, accepting under min-even since a run stuck on
 		// state 0 has min color 2) must land on an ODD max-odd priority
@@ -322,7 +334,9 @@ State: 0 {2}
 State: 1 {1}
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 2u);
 		CHECK(g.state_priority[0] == 3);  // even winner 2 -> odd 3
 		CHECK(g.state_priority[1] == 2);  // odd loser 1 -> even 2
@@ -340,7 +354,9 @@ State: 0 {2}
 State: 1 {1}
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 2u);
 		CHECK(g.state_priority[0] == 2);
 		CHECK(g.state_priority[1] == 1);
@@ -356,7 +372,9 @@ controllable-AP: 0 2
 State: 0
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.controllable.size() == 3u);
 		CHECK(g.controllable[0]);
 		CHECK_FALSE(g.controllable[1]);
@@ -373,7 +391,9 @@ properties: trans-acc
 State: 0
 --END--
 )";
-		alg_d::synth_game g1 = alg_d::parse_synth_game_hoa(hoa_trans);
+		auto g1_r = alg_d::parse_synth_game_hoa(hoa_trans);
+		REQUIRE(g1_r.has_value());
+		alg_d::synth_game g1 = g1_r.value();
 		CHECK(g1.trans_acc);
 
 		std::string hoa_no_trans = R"(HOA: v1
@@ -384,7 +404,9 @@ AP: 1 "p0"
 State: 0
 --END--
 )";
-		alg_d::synth_game g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
+		auto g2_r = alg_d::parse_synth_game_hoa(hoa_no_trans);
+		REQUIRE(g2_r.has_value());
+		alg_d::synth_game g2 = g2_r.value();
 		CHECK_FALSE(g2.trans_acc);
 	}
 
@@ -397,7 +419,9 @@ AP: 1 "my_ap"
 State: 0
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.aps.size() == 1u);
 		CHECK(g.aps[0] == "my_ap");
 	}
@@ -415,7 +439,9 @@ not a transition line
 [1] 0
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.trans.size() == 2u);
 		REQUIRE(g.trans[0].size() == 2u);
 		CHECK(std::get<0>(g.trans[0][0]) == "0");
@@ -446,7 +472,9 @@ State: 2
 [t] 1
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.player.size() == 3u);
 		CHECK(g.player[0] == 0);
 		CHECK(g.player[1] == 1);
@@ -480,7 +508,9 @@ State: 3
 [!1] 0
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.player.size() == 4u);
 		CHECK(g.player[0] == 0);
 		CHECK(g.player[1] == 0);
@@ -507,9 +537,11 @@ State: 3
 
 	TEST_CASE("[ALG-D-62] a parity acceptance is known, a Streett one is not") {
 		auto game = [](const std::string& acc) {
-			return alg_d::parse_synth_game_hoa("HOA: v1\nStates: 1\n"
+			auto r = alg_d::parse_synth_game_hoa("HOA: v1\nStates: 1\n"
 				"Start: 0\nAP: 1 \"p0\"\n" + acc + "--BODY--\n"
 				"State: 0\n[t] 0\n--END--\n");
+			REQUIRE(r.has_value());
+			return r.value();
 		};
 		auto buchi = game("acc-name: Buchi\nAcceptance: 1 Inf(0)\n");
 		CHECK(buchi.acc_known);
@@ -542,7 +574,9 @@ State: 3
 			"State: 0\n"
 			"[t] 0\n"
 			"--END--\n";
-		auto g = alg_d::parse_synth_game_hoa(fixture);
+		auto g_r = alg_d::parse_synth_game_hoa(fixture);
+		REQUIRE(g_r.has_value());
+		auto g = g_r.value();
 		REQUIRE(g.state_priority.size() == 1);
 		CHECK(g.state_priority[0] == 1);
 	}
@@ -559,7 +593,9 @@ State: 3
 			"State: 0\n"
 			"[t] 0\n"
 			"--END--\n";
-		auto g = alg_d::parse_synth_game_hoa(fixture);
+		auto g_r = alg_d::parse_synth_game_hoa(fixture);
+		REQUIRE(g_r.has_value());
+		auto g = g_r.value();
 		REQUIRE(g.state_priority.size() == 1);
 		CHECK(g.state_priority[0] == 0);
 	}
@@ -694,7 +730,9 @@ State: 1
 [t] 0
 --END--
 )";
-		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		alg_d::synth_game g = g_r.value();
 		REQUIRE(g.state_priority.size() == 2u);
 		// The rejecting colour must dominate the uncoloured priority and be
 		// even (even = env wins under the max-odd convention).
@@ -1006,7 +1044,9 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // pattern 1 (d_0 = true) feasible
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		auto pg_r = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
 		int base_n = g.num_states * T1_size;
 		CHECK(pg.n_states > base_n);
 		// The sys base state (0,rho=0) = index 0 must reach a stub with the
@@ -1036,7 +1076,9 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // D-pattern 1 feasible at (rho=0,rho'=0)
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		auto pg_r = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
 		auto W1 = alg_d::zielonka_win_player1(pg);
 		CHECK(W1.count(0));
 	}
@@ -1059,7 +1101,9 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {0}; // only pattern 0 feasible — guard needs 1
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		auto pg_r = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
 		// Base sys state must have no successors (dead end).
 		CHECK(pg.succs[0].empty());
 		auto W1 = alg_d::zielonka_win_player1(pg);
@@ -1091,7 +1135,9 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1};         // only pattern 1 feasible
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/2, /*init_rho=*/0);
+		auto pg_r = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/2, /*init_rho=*/0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
 		REQUIRE(pg.n_states >= 3);
 		CHECK(pg.succs[1].empty());            // sys dead end
 		CHECK(pg.succs[0].size() == 2);
@@ -1171,8 +1217,10 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 
 		// From ρ₀ = type_of(0) = 1 (the point {0}) the only strategy
 		// edge is infeasible: the init state is a sys dead end — lost.
-		auto pg1 = alg_d::build_product_game(g, T1_size, T3, type_A,
+		auto pg1_r = alg_d::build_product_game(g, T1_size, T3, type_A,
 			/*K=*/1, /*init_rho=*/1);
+		REQUIRE(pg1_r.has_value());
+		auto pg1 = pg1_r.value();
 		CHECK(pg1.init == g.init * T1_size + 1);
 		auto W1 = alg_d::zielonka_win_player1(pg1);
 		CHECK_FALSE(W1.count(pg1.init));
@@ -1180,8 +1228,10 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		// From ρ₀ = 2 the self-loop is feasible and all-odd: won.  The
 		// retired ∃ρ₀ loop reported this game realizable regardless of
 		// the initial memory, which is the unsound (E) reading.
-		auto pg2 = alg_d::build_product_game(g, T1_size, T3, type_A,
+		auto pg2_r = alg_d::build_product_game(g, T1_size, T3, type_A,
 			/*K=*/1, /*init_rho=*/2);
+		REQUIRE(pg2_r.has_value());
+		auto pg2 = pg2_r.value();
 		CHECK(pg2.init == g.init * T1_size + 2);
 		auto W2 = alg_d::zielonka_win_player1(pg2);
 		CHECK(W2.count(pg2.init) == 1);

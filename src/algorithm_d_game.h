@@ -383,12 +383,15 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
  * Reads the header (states, start, APs, controllable APs, state players,
  * acceptance) and the body transitions, then derives state and edge
  * priorities in the solver's max-odd convention as described in the body
- * comments.  A text containing more than one `HOA:` block (a decomposed
- * specification) yields an empty game.
+ * comments.
  * @param hoa_text HOA text to parse.
- * @return The parsed game; `num_states == 0` when nothing was parsed.
+ * @return The parsed game, or an error result for a text that yields no
+ * game: a decomposed multi-game text, a malformed header integer, more
+ * atomic propositions than the product game can enumerate, or a text
+ * without a state count.
  */
-inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
+inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
+	result<synth_game> r;
 	synth_game g;
 
 	// A decomposed specification prints one game per part. Parsing only the
@@ -399,11 +402,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 		p = hoa_text.find("HOA:", p + 4))
 		if (p == 0 || hoa_text[p - 1] == '\n') ++n_games;
 	if (n_games > 1) {
-		LOG_ERROR << "[ltl_aba:algD] the synthesis game HOA holds "
-			<< n_games << " games (a decomposed specification); only "
-			"a single game can be parsed -- run ltlsynt with "
-			"--decompose=no";
-		return g;
+		return r.with_error(code::unsupported_operation,
+			"the synthesis game HOA holds several games (a decomposed "
+			"specification); only a single game can be parsed -- run "
+			"ltlsynt with --decompose=no",
+			{{label::value, std::to_string(n_games)}});
 	}
 
 	// Header integers come from an external process: parse them with a
@@ -468,10 +471,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 			if (line.substr(0,7) == "States:") {
 				const long n = header_int(line.substr(7), max_states);
 				if (n < 1) {
-					LOG_ERROR << "[ltl_aba:algD] malformed synthesis "
-						"game HOA: bad state count '" << line.substr(7)
-						<< "'";
-					return synth_game{};
+					return r.with_error(code::parse_error,
+						"malformed synthesis game HOA: bad state "
+						"count",
+						{{label::value, truncate_for_message(
+							line.substr(7))}});
 				}
 				g.num_states = (int) n;
 				g.player.assign(g.num_states, 0);
@@ -482,10 +486,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (line.substr(0,6) == "Start:") {
 				const long n = header_int(line.substr(6), INT_MAX);
 				if (n < 0) {
-					LOG_ERROR << "[ltl_aba:algD] malformed synthesis "
-						"game HOA: bad start state '" << line.substr(6)
-						<< "'";
-					return synth_game{};
+					return r.with_error(code::parse_error,
+						"malformed synthesis game HOA: bad start "
+						"state",
+						{{label::value, truncate_for_message(
+							line.substr(6))}});
 				}
 				g.init = (int) n;
 			} else if (line.substr(0,3) == "AP:") {
@@ -495,11 +500,13 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 				// a signed shift is undefined at 31 and the loop is
 				// hopeless well before (ltl_max_game_aps).
 				if (n < 0 || n > ltl_max_game_aps) {
-					LOG_ERROR << "[ltl_aba:algD] synthesis game with "
-						<< n << " atomic propositions exceeds the "
-						<< ltl_max_game_aps << " the product game can "
-						"enumerate; refusing";
-					return synth_game{};
+					return r.with_error(
+						code::unsupported_operation,
+						"the synthesis game has more atomic "
+						"propositions than the product game can "
+						"enumerate; refusing",
+						{{label::limit, ltl_max_game_aps},
+						 {label::value, std::to_string(n)}});
 				}
 				g.aps.resize(n);
 				g.controllable.resize(n, false);
@@ -657,7 +664,12 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 			}
 		}
 	}
-	return g;
+	if (g.num_states == 0) {
+		return r.with_error(code::parse_error,
+			"the synthesis game HOA carries no state count; "
+			"no game was parsed");
+	}
+	return r.with_value(std::move(g));
 }
 
 // ── Call ltlsynt and get parity game ──────────────────────────────────────
@@ -832,9 +844,10 @@ inline int initial_memory(const std::vector<omcat::rational>& sorted_constants) 
  * @param type_A D-bitmask per T3 type.
  * @param K Number of D propositions.
  * @param init_rho Initial memory, from `initial_memory()`.
- * @return The product game.
+ * @return The product game, or an error result when the game has more
+ * atomic propositions than the assignment enumeration supports.
  */
-inline product_game build_product_game(
+inline result<product_game> build_product_game(
 	const synth_game& G,
 	int T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
@@ -842,15 +855,17 @@ inline product_game build_product_game(
 	int K,                             // number of D propositions
 	int init_rho)                      // initial memory, from initial_memory()
 {
+	result<product_game> r;
 	const int n_aps = (int)G.aps.size();
 	// The assignment loops below shift `1 << n_aps`; the parser already
 	// refuses such a game, this guards games built by hand (tests, the
-	// semantic PWR). An empty product reads as "no game" upstream.
+	// semantic PWR).
 	if (n_aps > ltl_max_game_aps) {
-		LOG_ERROR << "[ltl_aba:algD] product game over " << n_aps
-			<< " atomic propositions exceeds the " << ltl_max_game_aps
-			<< " the assignment enumeration supports; refusing";
-		return product_game{};
+		return r.with_error(code::unsupported_operation,
+			"the product game has more atomic propositions than "
+			"the assignment enumeration supports; refusing",
+			{{label::limit, ltl_max_game_aps},
+			 {label::value, std::to_string(n_aps)}});
 	}
 
 	// Fast feasibility lookup: given (pos_m, pos_y, D_pattern), does any T3 type match?
@@ -1061,7 +1076,7 @@ inline product_game build_product_game(
 			}
 		}
 	}
-	return pg;
+	return r.with_value(std::move(pg));
 }
 
 // ── Zielonka parity game solver ───────────────────────────────────────────
@@ -1322,13 +1337,9 @@ inline result<bool> solve_algorithm_d(
 	TAU_TRY(auto G, call_ltlsynt_game(phi_star, {}, D_outs));
 	if (G.num_states == 0) { return r.with_value(false); }
 
-	// Build product game (G × T_1). An empty product is a refused
-	// construction (too many APs), not an UNREALIZABLE verdict.
-	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
-	if (pg.n_states == 0) {
-		return r.with_error(code::solver_error,
-			messages::algorithm_d_no_verdict);
-	}
+	// Build product game (G × T_1). A refused construction (too many
+	// APs) is not an UNREALIZABLE verdict.
+	TAU_TRY(auto pg, build_product_game(G, T1_size, T3, type_A, K, init_rho));
 
 	// Solve parity game with Zielonka
 	auto W1 = zielonka_win_player1(pg);
@@ -1394,12 +1405,8 @@ inline result<alg_d_result> solve_algorithm_d_full(
 	TAU_TRY(result.synth_game, call_ltlsynt_game(phi_star, {}, D_outs));
 	if (result.synth_game.num_states == 0) { return r.with_value(std::move(result)); }
 
-	result.product_game = build_product_game(
-		result.synth_game, T1_size, T3, type_A, K, init_rho);
-	if (result.product_game.n_states == 0) {
-		return r.with_error(code::solver_error,
-			messages::algorithm_d_no_verdict);
-	}
+	TAU_TRY(result.product_game, build_product_game(
+		result.synth_game, T1_size, T3, type_A, K, init_rho));
 
 	result.winning_region = zielonka_win_player1(result.product_game);
 

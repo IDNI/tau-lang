@@ -295,14 +295,10 @@ inline result<synth_game> call_ltlsynt_game(
 	// order, so an eviction triggered by this insert can only remove
 	// OLDER entries (bound >= 1) — reading it back right after is safe.
 	// A rejected header (bad counts, too many APs, a decomposed
-	// multi-game text) is the EMPTY game from the hand-written parser;
-	// like a spot failure that is no verdict, not an UNREALIZABLE one, so
-	// refuse here instead of caching it.
-	synth_game game = parse_synth_game_hoa(hoa);
-	if (game.num_states == 0) {
-		return r.with_error(code::parse_error, "malformed synthesis game "
-			"HOA from ltlsynt; the parity game could not be built");
-	}
+	// multi-game text) is a parser error; like a spot failure that is no
+	// verdict, not an UNREALIZABLE one, so refuse here instead of caching
+	// it.
+	TAU_TRY(auto game, parse_synth_game_hoa(hoa));
 	auto [it, inserted] = cache.emplace(key, std::move(game));
 	(void) inserted;  // the find above missed, so this always inserts
 	return r.with_value(it->second);
