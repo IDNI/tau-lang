@@ -135,7 +135,7 @@ TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 	}
 
 	// Unsatisfiable constants
-	TEST_CASE("NEG-UNREAL-06: F(false) — eventually false is never satisfiable") {
+	TEST_CASE("NEG-UNREAL-06: F(false) — eventually false is never satisfiable" * doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("F (0 = 1)."));
 	}
 

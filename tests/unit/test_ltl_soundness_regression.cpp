@@ -72,7 +72,7 @@ TEST_SUITE("LTL soundness regression (k-ary positive forbids)") {
 
 	// Regression: any structural tri-atom formula that previously passed
 	// should still pass.  Add a few representative shapes.
-	TEST_CASE("three qlt atoms in F, each individually feasible") {
+	TEST_CASE("three qlt atoms in F, each individually feasible" * doctest::skip(!ltlsynt_available())) {
 		CHECK(realizable(
 			"F ((o1[t]:qlt > {0}:qlt)"
 			" && (o1[t]:qlt < {1}:qlt)"
@@ -107,7 +107,7 @@ TEST_SUITE("LTL soundness regression (k-ary positive forbids)") {
 
 	// Mixed-output-lookback triple: must not be falsely forbidden
 	// (pure-output-lookback safety-pipeline anomaly).
-	TEST_CASE("triple with output lookback, REAL (not spuriously blocked)") {
+	TEST_CASE("triple with output lookback, REAL (not spuriously blocked)" * doctest::skip(!ltlsynt_available())) {
 		CHECK(realizable(
 			"F ( (o1[t] = 0) && (o1[t-1] = 1) && (o1[t-2] = 0) )."
 		));

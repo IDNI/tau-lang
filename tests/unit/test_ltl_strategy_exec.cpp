@@ -110,7 +110,7 @@ TEST_SUITE("Strategy execution: G constant tau") {
 
 TEST_SUITE("Strategy execution: F constant tau") {
 
-	TEST_CASE("[EXEC-F-01] F(o1=0):tau — strategy sets o1=F at step 0") {
+	TEST_CASE("[EXEC-F-01] F(o1=0):tau — strategy sets o1=F at step 0" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("F (o1[t] = 0).", 1);
 		auto vals = o1->get_values();
@@ -118,7 +118,7 @@ TEST_SUITE("Strategy execution: F constant tau") {
 		CHECK(vals[0] == "F");
 	}
 
-	TEST_CASE("[EXEC-F-02] F(o1=1):tau — strategy sets o1=T at step 0") {
+	TEST_CASE("[EXEC-F-02] F(o1=1):tau — strategy sets o1=T at step 0" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("F (o1[t] = 1).", 1);
 		auto vals = o1->get_values();
@@ -126,7 +126,7 @@ TEST_SUITE("Strategy execution: F constant tau") {
 		CHECK(vals[0] == "T");
 	}
 
-	TEST_CASE("[EXEC-F-03] F(o1={T.}:tau) — step 0 must satisfy") {
+	TEST_CASE("[EXEC-F-03] F(o1={T.}:tau) — step 0 must satisfy" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("F (o1[t]:tau = {T.}:tau).", 3);
 		auto vals = o1->get_values();
@@ -146,7 +146,7 @@ TEST_SUITE("Strategy execution: Until") {
 	// (o1=0) U (o1=1): strategy may immediately satisfy right (o1=T at t=0)
 	// OR hold left for a while then satisfy right.  Either way, after the
 	// first T, the U obligation is discharged and subsequent values are free.
-	TEST_CASE("[EXEC-U-01] (o1=0) U (o1=1):tau — at least one step is T") {
+	TEST_CASE("[EXEC-U-01] (o1=0) U (o1=1):tau — at least one step is T" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("(o1[t] = 0) until (o1[t] = 1).", 4);
 		auto vals = o1->get_values();
@@ -165,7 +165,7 @@ TEST_SUITE("Strategy execution: Until") {
 	// (o1=0) W (o1=1): weak until — strategy may also keep o1=F forever.
 	// The obligation is satisfied even if T never comes. Check that at least
 	// all pre-T steps are F.
-	TEST_CASE("[EXEC-U-02] (o1=0) W (o1=1):tau — all steps before T are F") {
+	TEST_CASE("[EXEC-U-02] (o1=0) W (o1=1):tau — all steps before T are F" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("(o1[t] = 0) weak_until (o1[t] = 1).", 4);
 		auto vals = o1->get_values();
@@ -179,7 +179,7 @@ TEST_SUITE("Strategy execution: Until") {
 	// (o1=0) W (i1=1): weak until — left must hold until input turns 1 (if ever).
 	// Unlike U, weak until does not require right to eventually hold.
 	// We provide input: F, F, T. Steps 0,1 must have o1=F; step 2 is free.
-	TEST_CASE("[EXEC-U-03] (o1=0):tau W (i1=1):tau — output F until input T") {
+	TEST_CASE("[EXEC-U-03] (o1=0):tau W (i1=1):tau — output F until input T" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		strings i1_vals = {"F.", "F.", "T.", "T."};
 		auto o1 = run_with_i1("(o1[t] = 0) weak_until (i1[t] = 1).", i1_vals, 4);
@@ -199,7 +199,7 @@ TEST_SUITE("Strategy execution: G(F(phi))") {
 
 	// G(F(o1=0)):tau — output must be F infinitely often.
 	// In a finite run of N steps, the strategy visits 0 at least floor(N/2) times.
-	TEST_CASE("[EXEC-GF-01] G(F(o1=0)):tau — F appears at least once in 6 steps") {
+	TEST_CASE("[EXEC-GF-01] G(F(o1=0)):tau — F appears at least once in 6 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 0)).", 6);
 		auto vals = o1->get_values();
@@ -209,7 +209,7 @@ TEST_SUITE("Strategy execution: G(F(phi))") {
 		CHECK(found_F);
 	}
 
-	TEST_CASE("[EXEC-GF-02] G(F(o1=1)):tau — T appears at least once in 6 steps") {
+	TEST_CASE("[EXEC-GF-02] G(F(o1=1)):tau — T appears at least once in 6 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 1)).", 6);
 		auto vals = o1->get_values();
@@ -222,7 +222,7 @@ TEST_SUITE("Strategy execution: G(F(phi))") {
 	// G(F(o1=0)) && G(F(o1=1)): both liveness conditions must hold.
 	// This is the merged form G(F(o1=0) && F(o1=1)) — tau-lang merges same-type G&&G.
 	// We check each independently via composition.
-	TEST_CASE("[EXEC-GF-03] G(F(o1=0)):tau && REALIZABLE check for G(F(o1=1))") {
+	TEST_CASE("[EXEC-GF-03] G(F(o1=0)):tau && REALIZABLE check for G(F(o1=1))" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		// Verify G(F(o1=0)) — at least one F in 4 steps
 		auto o1a = run_no_input("G (F (o1[t] = 0)).", 4);
@@ -271,7 +271,7 @@ TEST_SUITE("Strategy execution: G input mirroring") {
 	}
 
 	// F(o1=i1):tau — output matches input at some step
-	TEST_CASE("[EXEC-IO-03] F(o1=i1):tau — output matches current input at step 0") {
+	TEST_CASE("[EXEC-IO-03] F(o1=i1):tau — output matches current input at step 0" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		strings i1_vals = {"<:a> = 0", "<:b> = 0", "<:c> = 0"};
 		auto o1 = run_with_i1("F (o1[t]:tau = i1[t]:tau).", i1_vals, 3);
@@ -333,7 +333,7 @@ TEST_SUITE("Strategy execution: sbf type") {
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
-	TEST_CASE("[EXEC-SBF-02] F(o1={X|Z}:sbf) — step 0 produces sbf constant") {
+	TEST_CASE("[EXEC-SBF-02] F(o1={X|Z}:sbf) — step 0 produces sbf constant" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -348,7 +348,7 @@ TEST_SUITE("Strategy execution: sbf type") {
 		CHECK(!vals[0].empty());
 	}
 
-	TEST_CASE("[EXEC-SBF-03] G(F(o1={X&Y}:sbf)) — sbf appears at least once in 4 steps") {
+	TEST_CASE("[EXEC-SBF-03] G(F(o1={X&Y}:sbf)) — sbf appears at least once in 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -386,7 +386,7 @@ TEST_SUITE("Strategy execution: bv type") {
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
-	TEST_CASE("[EXEC-BV-02] F(o1={5}:bv[8]) — bv value produced at step 0") {
+	TEST_CASE("[EXEC-BV-02] F(o1={5}:bv[8]) — bv value produced at step 0" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -409,7 +409,7 @@ TEST_SUITE("Strategy execution: multi-state Mealy") {
 
 	// G(F(o1=0)):tau typically produces a 2-state Mealy machine.
 	// Verify: run for 8 steps, output=F appears at least every 2 steps.
-	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau multi-state — F every 2 steps") {
+	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau multi-state — F every 2 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 0)).", 8);
 		auto vals = o1->get_values();
@@ -422,7 +422,7 @@ TEST_SUITE("Strategy execution: multi-state Mealy") {
 	}
 
 	// G(F(o1=1)):tau — T appears at least every 2 steps
-	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau multi-state — T every 2 steps") {
+	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau multi-state — T every 2 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 1)).", 8);
 		auto vals = o1->get_values();
@@ -435,7 +435,7 @@ TEST_SUITE("Strategy execution: multi-state Mealy") {
 
 	// Release formula: (o1=0) R (o1=1) — right (T) holds until and including
 	// when left (F) first holds. Simplest strategy: o1=T always (right always holds).
-	TEST_CASE("[EXEC-MS-03] (o1=0) R (o1=1):tau — every step satisfies right (T)") {
+	TEST_CASE("[EXEC-MS-03] (o1=0) R (o1=1):tau — every step satisfies right (T)" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("(o1[t] = 0) release (o1[t] = 1).", 5);
 		auto vals = o1->get_values();
@@ -485,7 +485,7 @@ TEST_SUITE("Strategy execution: semantic self-verification") {
 	}
 
 	// Verify F(o1=0) satisfies F: some output in the run must be F
-	TEST_CASE("[EXEC-VER-04] F(o1=0) — at least one output is F within 4 steps") {
+	TEST_CASE("[EXEC-VER-04] F(o1=0) — at least one output is F within 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("F (o1[t] = 0).", 4);
 		auto vals = o1->get_values();
@@ -495,7 +495,7 @@ TEST_SUITE("Strategy execution: semantic self-verification") {
 	}
 
 	// Verify F(o1=1) satisfies F: some output in the run must be T
-	TEST_CASE("[EXEC-VER-05] F(o1=1) — at least one output is T within 4 steps") {
+	TEST_CASE("[EXEC-VER-05] F(o1=1) — at least one output is T within 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("F (o1[t] = 1).", 4);
 		auto vals = o1->get_values();
@@ -526,7 +526,7 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 		}
 	};
 
-	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to TAU_LTL_EXPORT_STRATEGY_FILE") {
+	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to TAU_LTL_EXPORT_STRATEGY_FILE" * doctest::skip(!ltlsynt_available())) {
 		std::string tmp = "/tmp/tau_strat_test_" + std::to_string(::getpid()) + ".hoa";
 		{
 			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE", tmp.c_str());
@@ -551,7 +551,7 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 		CHECK(written);
 	}
 
-	TEST_CASE("[SQ1-02] state count logged for realizable formula") {
+	TEST_CASE("[SQ1-02] state count logged for realizable formula" * doctest::skip(!ltlsynt_available())) {
 		// F(G(o=0)) should produce a strategy with States: 1
 		auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0)).").value_or(nullptr));
 		REQUIRE(fm.has_value());

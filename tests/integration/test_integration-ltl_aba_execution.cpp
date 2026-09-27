@@ -376,7 +376,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 
 TEST_SUITE("LTL Execution (tau): F formulas") {
 
-	TEST_CASE("F(o1[t]:tau = 0) – 4 steps realizable") {
+	TEST_CASE("F(o1[t]:tau = 0) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("F(o1[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -387,7 +387,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("F(o1[t]:tau = 1) – 4 steps realizable") {
+	TEST_CASE("F(o1[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("F(o1[t]:tau = 1).");
 		io_context<node_t> ctx;
@@ -398,7 +398,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("F(o1[t]:tau = i1[t]:tau) – 5 steps realizable") {
+	TEST_CASE("F(o1[t]:tau = i1[t]:tau) – 5 steps realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("F(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
@@ -411,7 +411,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	TEST_CASE("F(o1[t]:tau = 0 && o2[t]:tau = 1) – 4 steps realizable") {
+	TEST_CASE("F(o1[t]:tau = 0 && o2[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("F(o1[t]:tau = 0 && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
@@ -425,7 +425,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(o2->get_values().size() == 4);
 	}
 
-	TEST_CASE("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0) – 5 steps") {
+	TEST_CASE("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0) – 5 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -451,7 +451,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 
 TEST_SUITE("LTL Execution (tau): U R W formulas") {
 
-	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 4 steps") {
+	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -462,7 +462,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)") {
+	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -473,7 +473,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	TEST_CASE("(o1[t]:tau = 0) release (o1[t]:tau = 1) – 4 steps (release)") {
+	TEST_CASE("(o1[t]:tau = 0) release (o1[t]:tau = 1) – 4 steps (release)" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("(o1[t]:tau = 0) release (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
@@ -484,7 +484,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0) – 5 steps (weak until)") {
+	TEST_CASE("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0) – 5 steps (weak until)" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -495,7 +495,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	TEST_CASE("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1) – 5 steps weak until (no input vars)") {
+	TEST_CASE("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1) – 5 steps weak until (no input vars)" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto spec = create_spec("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
@@ -743,7 +743,7 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 
 	// F(o1:sbf = {X & Y}:sbf) — output equals compound constant eventually.
-	TEST_CASE("F(o1:sbf = {X & Y}) eventually, 4 steps") {
+	TEST_CASE("F(o1:sbf = {X & Y}) eventually, 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -755,7 +755,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 	}
 
 	// F(o1:sbf = {X | (Y & Z)}:sbf) — nontrivial three-variable constant, eventually.
-	TEST_CASE("F(o1:sbf = {X | (Y & Z)}) eventually, 5 steps") {
+	TEST_CASE("F(o1:sbf = {X | (Y & Z)}) eventually, 5 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -767,7 +767,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 	}
 
 	// (o1:sbf = {X & Y}) U (o1:sbf = {X | Z}) — until with sbf constants.
-	TEST_CASE("({X & Y}:sbf) U ({X | Z}:sbf) until, 4 steps") {
+	TEST_CASE("({X & Y}:sbf) U ({X | Z}:sbf) until, 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -780,7 +780,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 	}
 
 	// (o1:sbf = {X | (Y & Z)}) W (o1:sbf = {X & Y}) — weak until.
-	TEST_CASE("({X|(Y&Z)}:sbf) W ({X&Y}:sbf) weak-until, 5 steps") {
+	TEST_CASE("({X|(Y&Z)}:sbf) W ({X&Y}:sbf) weak-until, 5 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -793,7 +793,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 	}
 
 	// G(F(o1:sbf = {X & Y}:sbf)) — nontrivial sbf constant, infinitely often.
-	TEST_CASE("G(F(o1:sbf = {X & Y})) inf-often, 6 steps") {
+	TEST_CASE("G(F(o1:sbf = {X & Y})) inf-often, 6 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -941,7 +941,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 	}
 
 	// F(o1:bv[8] = {#b10110101}:bv[8]) — eventually outputs nontrivial bit pattern.
-	TEST_CASE("F(o1:bv[8] = {#b10110101}) eventually, 4 steps") {
+	TEST_CASE("F(o1:bv[8] = {#b10110101}) eventually, 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -953,7 +953,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 	}
 
 	// (o1:bv[8] = {#b00001111}) U (o1:bv[8] = {#b11110000}) — complementary nibbles until.
-	TEST_CASE("({#b00001111}:bv[8]) U ({#b11110000}:bv[8]) until, 5 steps") {
+	TEST_CASE("({#b00001111}:bv[8]) U ({#b11110000}:bv[8]) until, 5 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -966,7 +966,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 	}
 
 	// G(F(o1:bv[8] = {255}:bv[8])) — output equals 255 infinitely often, 6 steps.
-	TEST_CASE("G(F(o1:bv[8] = {255})) inf-often constant output, 6 steps") {
+	TEST_CASE("G(F(o1:bv[8] = {255})) inf-often constant output, 6 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -978,7 +978,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 	}
 
 	// (o1:bv[8] = {5}) W (o1:bv[8] = {#b10110101}) — decimal then binary weak-until, 4 steps.
-	TEST_CASE("({5}:bv[8]) W ({#b10110101}:bv[8]) weak-until, 4 steps") {
+	TEST_CASE("({5}:bv[8]) W ({#b10110101}:bv[8]) weak-until, 4 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -993,7 +993,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 	// (o1:bv[8] = {#b00001111}) R (o1:bv[8] = {#b11110000}) — release, 5 steps.
 	// p R q: q holds until (and including) when p holds; or q holds forever.
 	// System can always output q (upper nibble), satisfying R vacuously.
-	TEST_CASE("({#b00001111}:bv[8]) R ({#b11110000}:bv[8]) release, 5 steps") {
+	TEST_CASE("({#b00001111}:bv[8]) R ({#b11110000}:bv[8]) release, 5 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -1007,7 +1007,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 
 	// G(F(o1:bv[8] = {#b10110101})) && G(F(o1:bv[8] != {#b10110101})) — alternating.
 	// Requires a 2-state Mealy machine — multi-state encoding.
-	TEST_CASE("G(F(o1:bv[8]={#b10110101})) && G(F(o1:bv[8]!={#b10110101})) alternating, 6 steps") {
+	TEST_CASE("G(F(o1:bv[8]={#b10110101})) && G(F(o1:bv[8]!={#b10110101})) alternating, 6 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();

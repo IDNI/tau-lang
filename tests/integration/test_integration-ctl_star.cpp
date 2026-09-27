@@ -836,7 +836,7 @@ TEST_SUITE("CTL* semantics - A / E verdicts") {
 		CHECK(ctl_realizable("A (always o1[t] = 1).") == std::optional<bool>(true));
 	}
 
-	TEST_CASE("[CTLS-AE-03] E(F o1=1) is realizable") {
+	TEST_CASE("[CTLS-AE-03] E(F o1=1) is realizable" * doctest::skip(!ltlsynt_available())) {
 		CHECK(ctl_realizable("E (F o1[t] = 1).") == std::optional<bool>(true));
 	}
 
@@ -852,7 +852,7 @@ TEST_SUITE("CTL* semantics - A / E verdicts") {
 	// An input can never be forced. sat(A χ) agrees with sat(χ): the LTL
 	// rule leaves an unrealizable full-LTL formula undecided, the safety
 	// pipeline decides G.
-	TEST_CASE("[CTLS-AE-05] A(F i1=1) is unrealizable, its sat undecided like F i1=1") {
+	TEST_CASE("[CTLS-AE-05] A(F i1=1) is unrealizable, its sat undecided like F i1=1" * doctest::skip(!ltlsynt_available())) {
 		CHECK(ctl_realizable("A (F i1[t] = 1).") == std::optional<bool>(false));
 		CHECK(ctl_sat("A (F i1[t] = 1).") == ctl_sat("F (i1[t] = 1)."));
 	}
@@ -862,7 +862,7 @@ TEST_SUITE("CTL* semantics - A / E verdicts") {
 		CHECK(ctl_sat("A (always i1[t] = 1).") == std::optional<bool>(false));
 	}
 
-	TEST_CASE("[CTLS-AE-07] A(F o1=1) is realizable") {
+	TEST_CASE("[CTLS-AE-07] A(F o1=1) is realizable" * doctest::skip(!ltlsynt_available())) {
 		CHECK(ctl_realizable("A (F o1[t] = 1).") == std::optional<bool>(true));
 		CHECK(ctl_sat("A (F o1[t] = 1).") == std::optional<bool>(true));
 	}

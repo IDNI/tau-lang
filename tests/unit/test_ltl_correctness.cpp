@@ -202,7 +202,7 @@ static bool check_G_lookback1(const strings& outs, const strings& ins) {
 TEST_SUITE("LTL correctness: equivalences") {
 
 	// G(φ) ≡ ¬F(¬φ) — global/eventual duality
-	TEST_CASE("[EQUIV-01] G(o=0) ≡ ¬F(¬(o=0)): same realizability") {
+	TEST_CASE("[EQUIV-01] G(o=0) ≡ ¬F(¬(o=0)): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t] = 0).");
 		bool r2 = realizable("! F (! (o1[t] = 0)).");
@@ -210,13 +210,13 @@ TEST_SUITE("LTL correctness: equivalences") {
 		CHECK(r1); // both should be REALIZABLE
 	}
 
-	TEST_CASE("[EQUIV-02] G(o=1) ≡ ¬F(¬(o=1)): same realizability") {
+	TEST_CASE("[EQUIV-02] G(o=1) ≡ ¬F(¬(o=1)): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK(realizable("G (o1[t] = 1).") == realizable("! F (! (o1[t] = 1))."));
 	}
 
 	// F(φ) ≡ T U φ (T is wff_t, written as (1=1) or just use the tau constant)
-	TEST_CASE("[EQUIV-03] F(o=0) ≡ F(o=0): trivial self-equivalence") {
+	TEST_CASE("[EQUIV-03] F(o=0) ≡ F(o=0): trivial self-equivalence" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		// Both parse paths of F(o=0) should agree
 		bool r1 = realizable("F (o1[t] = 0).");
@@ -243,7 +243,7 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	// φ U ψ realizability implies φ W ψ realizability (W is weaker)
-	TEST_CASE("[EQUIV-06] (o=1) U (o=0) realizable → (o=1) W (o=0) realizable") {
+	TEST_CASE("[EQUIV-06] (o=1) U (o=0) realizable → (o=1) W (o=0) realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool u = realizable("(o1[t] = 1) until (o1[t] = 0).");
 		bool w = realizable("(o1[t] = 1) weak_until (o1[t] = 0).");
@@ -251,7 +251,7 @@ TEST_SUITE("LTL correctness: equivalences") {
 		CHECK(w); // W must also be realizable (W is weaker — fewer obligations)
 	}
 
-	TEST_CASE("[EQUIV-07] (o=0) U (o=1) realizable → (o=0) W (o=1) realizable") {
+	TEST_CASE("[EQUIV-07] (o=0) U (o=1) realizable → (o=0) W (o=1) realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool u = realizable("(o1[t] = 0) until (o1[t] = 1).");
 		bool w = realizable("(o1[t] = 0) weak_until (o1[t] = 1).");
@@ -260,7 +260,7 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	// φ R ψ ≡ ¬(¬φ U ¬ψ) — release/until duality
-	TEST_CASE("[EQUIV-08] (o=0) R (o=1) ≡ ¬(¬(o=0) U ¬(o=1)): same realizability") {
+	TEST_CASE("[EQUIV-08] (o=0) R (o=1) ≡ ¬(¬(o=0) U ¬(o=1)): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool r1 = realizable("(o1[t] = 0) release (o1[t] = 1).");
 		bool r2 = realizable("! (! (o1[t] = 0)) until (! (o1[t] = 1)).");
@@ -268,12 +268,12 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	// G(F(φ)) realizability — phi = 0 and phi = 1 both realizable
-	TEST_CASE("[EQUIV-09] G(F(o=0)) is realizable") {
+	TEST_CASE("[EQUIV-09] G(F(o=0)) is realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK(realizable("G (F (o1[t] = 0))."));
 	}
 
-	TEST_CASE("[EQUIV-10] G(F(o=1)) is realizable") {
+	TEST_CASE("[EQUIV-10] G(F(o=1)) is realizable" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK(realizable("G (F (o1[t] = 1))."));
 	}
@@ -286,7 +286,7 @@ TEST_SUITE("LTL correctness: equivalences") {
 		CHECK(r1 == r2);
 	}
 
-	TEST_CASE("[EQUIV-12] ¬¬F(o=1) ≡ F(o=1): same realizability") {
+	TEST_CASE("[EQUIV-12] ¬¬F(o=1) ≡ F(o=1): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool r1 = realizable("F (o1[t] = 1).");
 		bool r2 = realizable("! ! F (o1[t] = 1).");
@@ -299,13 +299,13 @@ TEST_SUITE("LTL correctness: equivalences") {
 		CHECK_FALSE(realizable("G (o1[t] = 0) && G (o1[t] = 1)."));
 	}
 
-	TEST_CASE("[EQUIV-14] F(o=0) && G(o=1) is UNREALIZABLE") {
+	TEST_CASE("[EQUIV-14] F(o=0) && G(o=1) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable("F (o1[t] = 0) && G (o1[t] = 1)."));
 	}
 
 	// Mixed-input unrealizability: env always blocks mixed atom
-	TEST_CASE("[EQUIV-15] F((o1&i1)={T.}:tau) is UNREALIZABLE — env blocks") {
+	TEST_CASE("[EQUIV-15] F((o1&i1)={T.}:tau) is UNREALIZABLE — env blocks" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable("F ((o1[t] & i1[t]) = {T.}:tau)."));
 	}
@@ -317,7 +317,7 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	// sbf type equivalences
-	TEST_CASE("[EQUIV-17] G(o={X&Y}:sbf) ≡ ¬F(¬(o={X&Y}:sbf)): same realizability") {
+	TEST_CASE("[EQUIV-17] G(o={X&Y}:sbf) ≡ ¬F(¬(o={X&Y}:sbf)): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t]:sbf = {X & Y}:sbf).");
 		bool r2 = realizable("! F (! (o1[t]:sbf = {X & Y}:sbf)).");
@@ -750,14 +750,14 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 
 	// ── satisfiability (mirrors the execution cases) ─────────────────────────
 
-	TEST_CASE("[TRG-SAT-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) is REALIZABLE") {
+	TEST_CASE("[TRG-SAT-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) is REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Violating requirement rejected: the T forces ψ at every step, the second
 	// conjunct forbids it at every step.
-	TEST_CASE("[TRG-SAT-02] (φ T ψ) && G(¬ψ) is UNREALIZABLE") {
+	TEST_CASE("[TRG-SAT-02] (φ T ψ) && G(¬ψ) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt) "
@@ -766,14 +766,14 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 
 	// ψ is a pure-input atom: the environment falsifies it and ψ is required
 	// at every step, so no strategy exists.
-	TEST_CASE("[TRG-SAT-03] (o1={1/4}:qlt) T (i1={3/4}:qlt) is UNREALIZABLE") {
+	TEST_CASE("[TRG-SAT-03] (o1={1/4}:qlt) T (i1={3/4}:qlt) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "(o1[t]:qlt = {1/4}:qlt) trigger (i1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Duality: φ T ψ ≡ ¬(¬φ S ¬ψ) — both must get the same verdict.
-	TEST_CASE("[TRG-SAT-04] φ T ψ ≡ ¬(¬φ S ¬ψ): same realizability") {
+	TEST_CASE("[TRG-SAT-04] φ T ψ ≡ ¬(¬φ S ¬ψ): same realizability" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		bool r1 = realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).");
 		bool r2 = realizable("! ((! (o1[t]:qlt = {1/4}:qlt)) "
@@ -882,7 +882,7 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 
 	// Sat-path cross-check: the ppLTLTT tester encoding (independent of the
 	// execution encoding) must agree that both LT2 specs are realizable.
-	TEST_CASE("[LT2-SAT-01] both LT-2 shapes are REALIZABLE") {
+	TEST_CASE("[LT2-SAT-01] both LT-2 shapes are REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK(realizable(
 		    "! ((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt))."));
@@ -1079,7 +1079,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// The sat path must agree: both reproducer specs are UNREALIZABLE (the
 	// environment refuses ψ at t = 0).  These already held before the fix —
 	// they pin that verdict and execution now agree.
-	TEST_CASE("[LAN3-SAT-01] the reproducer specs are UNREALIZABLE") {
+	TEST_CASE("[LAN3-SAT-01] the reproducer specs are UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "always ((o1[t]:qlt = {0}:qlt) && "

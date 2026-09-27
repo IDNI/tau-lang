@@ -49,7 +49,7 @@ TEST_SUITE("multi-type LTL cross-validation") {
 	}
 
 	// Mixed G+F with different BAs.
-	TEST_CASE("MT-03: G(qlt) && F(bv) ⇒ REAL") {
+	TEST_CASE("MT-03: G(qlt) && F(bv) ⇒ REAL" * doctest::skip(!ltlsynt_available())) {
 		CHECK(realizable(
 			"G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt))"
 			" && F ((o2[t]:bv[8] = {#b10110101}:bv[8]))."
@@ -74,7 +74,7 @@ TEST_SUITE("multi-type LTL cross-validation") {
 	}
 
 	// F-mix: each F can be satisfied independently.
-	TEST_CASE("MT-06: F(qlt) && F(sbf) both reachable ⇒ REAL") {
+	TEST_CASE("MT-06: F(qlt) && F(sbf) both reachable ⇒ REAL" * doctest::skip(!ltlsynt_available())) {
 		CHECK(realizable(
 			"F ((o1[t]:qlt = {1/3}:qlt))"
 			" && F ((o2[t]:sbf = {X & Y}:sbf))."

@@ -1686,7 +1686,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("G(F(o1:hsb != {bot}:hsb)) is REALIZABLE (liveness)") {
+	TEST_CASE("G(F(o1:hsb != {bot}:hsb)) is REALIZABLE (liveness)" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -1803,7 +1803,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("G(F(o:hsb = top)) liveness") {
+	TEST_CASE("G(F(o:hsb = top)) liveness" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -1918,7 +1918,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("multiple temporal operators: GF with hsb") {
+	TEST_CASE("multiple temporal operators: GF with hsb" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -1975,7 +1975,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("nested always-eventually pattern") {
+	TEST_CASE("nested always-eventually pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -2008,7 +2008,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("response: i != bot implies F(o != bot)") {
+	TEST_CASE("response: i != bot implies F(o != bot)" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:hsb != {bot}:hsb)).");
@@ -2091,7 +2091,7 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("GF(o = top) and GF(o = bot) — infinitely often alternating") {
+	TEST_CASE("GF(o = top) and GF(o = bot) — infinitely often alternating" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec(
 			"G (F (o1[t]:hsb = {top}:hsb)) && G (F (o1[t]:hsb = {bot}:hsb)).");
@@ -2358,7 +2358,7 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Liveness with mixed types ---
 
-	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv[8]!=0) REALIZABLE") {
+	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv[8]!=0) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2423,7 +2423,7 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Mixed-type response pattern ---
 
-	TEST_CASE("G(i:bv[8]!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern") {
+	TEST_CASE("G(i:bv[8]!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2454,7 +2454,7 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Temporal: alternating hsb and bv liveness ---
 
-	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv[8]=0b11111111) alternating REALIZABLE") {
+	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv[8]=0b11111111) alternating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2553,7 +2553,7 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	// --- Until with mixed types ---
 
-	TEST_CASE("(o:hsb=top) U (o2:bv[8]=255) REALIZABLE") {
+	TEST_CASE("(o:hsb=top) U (o2:bv[8]=255) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2603,7 +2603,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Frame formula: ticks happen infinitely often ---
 
-	TEST_CASE("GF(tick) frame formula REALIZABLE") {
+	TEST_CASE("GF(tick) frame formula REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2648,7 +2648,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Combined frame + constraint: two-axis spec ---
 
-	TEST_CASE("GF(tick) && G(tick -> admit!=bot) two-axis REALIZABLE") {
+	TEST_CASE("GF(tick) && G(tick -> admit!=bot) two-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2664,7 +2664,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Full two-axis with bv + hsb: frame + inner + outer ---
 
-	TEST_CASE("GF(tick) && G(tick->admit!=bot) && G(token!=0->admit!=bot) REALIZABLE") {
+	TEST_CASE("GF(tick) && G(tick->admit!=bot) && G(token!=0->admit!=bot) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2682,7 +2682,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 	// --- Two-point annotation pattern: Point A (input) + Point B (output) ---
 	// Ref: tau_neuro.tex Definition 16: B = B_A x B_B
 
-	TEST_CASE("G(i_embed:hsb!=bot -> o_admit:hsb!=bot) && GF(tick) two-point REALIZABLE") {
+	TEST_CASE("G(i_embed:hsb!=bot -> o_admit:hsb!=bot) && GF(tick) two-point REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2713,7 +2713,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Safety: never output token when inadmissible ---
 
-	TEST_CASE("G(~admit -> ~token) safety constraint REALIZABLE") {
+	TEST_CASE("G(~admit -> ~token) safety constraint REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2729,7 +2729,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Liveness: eventually produce a nonzero token after each tick ---
 
-	TEST_CASE("G(tick -> F(token!=0)) post-tick liveness REALIZABLE") {
+	TEST_CASE("G(tick -> F(token!=0)) post-tick liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2744,7 +2744,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Response: input admissibility implies eventual output token ---
 
-	TEST_CASE("G(i:hsb!=bot -> F(o:bv[8]!=0)) input-to-output response REALIZABLE") {
+	TEST_CASE("G(i:hsb!=bot -> F(o:bv[8]!=0)) input-to-output response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2759,7 +2759,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Multi-stream two-axis: tick + embed(hsb) + token(bv) + admit(hsb) ---
 
-	TEST_CASE("four-stream two-axis spec REALIZABLE") {
+	TEST_CASE("four-stream two-axis spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2793,7 +2793,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Until across types: admissible until tick ---
 
-	TEST_CASE("(admit!=bot) U (tick) mixed-axis until REALIZABLE") {
+	TEST_CASE("(admit!=bot) U (tick) mixed-axis until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -2808,7 +2808,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	// --- Accumulator-like pattern: count via alternating ---
 
-	TEST_CASE("GF(token=255) && GF(token=0) alternating bv REALIZABLE") {
+	TEST_CASE("GF(token=255) && GF(token=0) alternating bv REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3174,7 +3174,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("LTL coherence: G(new_assert -> F(checked)) REALIZABLE") {
+	TEST_CASE("LTL coherence: G(new_assert -> F(checked)) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3201,7 +3201,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("LTL coherence: GF(admit!=bot) liveness REALIZABLE") {
+	TEST_CASE("LTL coherence: GF(admit!=bot) liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3214,7 +3214,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("LTL multi-variable: full pipeline — tick + coherence + token gating REALIZABLE") {
+	TEST_CASE("LTL multi-variable: full pipeline — tick + coherence + token gating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3393,7 +3393,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	// --- Commitment tracking: eventually discharge ---
 
-	TEST_CASE("G(pending:sbf -> F(discharged:hsb!=bot)) REALIZABLE — commitment") {
+	TEST_CASE("G(pending:sbf -> F(discharged:hsb!=bot)) REALIZABLE — commitment" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3407,7 +3407,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("GF(o_check:hsb!=bot) liveness for periodic checking REALIZABLE") {
+	TEST_CASE("GF(o_check:hsb!=bot) liveness for periodic checking REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3422,7 +3422,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	// --- Failure escalation: mode transitions ---
 
-	TEST_CASE("G(fail:sbf -> F(recovery:hsb!=bot)) response to failure REALIZABLE") {
+	TEST_CASE("G(fail:sbf -> F(recovery:hsb!=bot)) response to failure REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3468,7 +3468,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	// --- Multi-accumulator: trust + violations + pending ---
 
-	TEST_CASE("trust+violation+pending three-stream accumulator REALIZABLE") {
+	TEST_CASE("trust+violation+pending three-stream accumulator REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3487,7 +3487,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	// --- Forgiveness decay: after long compliance, relax ---
 
-	TEST_CASE("G(compliant:sbf -> F(relaxed:hsb=top)) forgiveness REALIZABLE") {
+	TEST_CASE("G(compliant:sbf -> F(relaxed:hsb=top)) forgiveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3561,7 +3561,7 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	// --- PRE_COMMIT(α, β) ≡ G(thinking∧α → F(response∧β)) ---
 
-	TEST_CASE("G(thinking&&plan:hsb!=bot -> F(response&&execute:hsb!=bot)) PRE_COMMIT REALIZABLE") {
+	TEST_CASE("G(thinking&&plan:hsb!=bot -> F(response&&execute:hsb!=bot)) PRE_COMMIT REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3595,7 +3595,7 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	// --- Phase transition: thinking → response ordered ---
 
-	TEST_CASE("G(think:sbf -> F(respond:sbf)) phase ordering REALIZABLE") {
+	TEST_CASE("G(think:sbf -> F(respond:sbf)) phase ordering REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3611,7 +3611,7 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	// --- Thinking budget: thinking tokens bounded ---
 
-	TEST_CASE("G(thinking -> token:bv[8]!=0) && GF(response:sbf) budget pattern REALIZABLE") {
+	TEST_CASE("G(thinking -> token:bv[8]!=0) && GF(response:sbf) budget pattern REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3645,7 +3645,7 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	// --- Phase-qualified + accumulator: thinking violation count ---
 
-	TEST_CASE("G(thinking && violation -> F(response && recovery)) combined REALIZABLE") {
+	TEST_CASE("G(thinking && violation -> F(response && recovery)) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3734,7 +3734,7 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	// --- Level 3: conditional positive → G(scope → F(concept)) ---
 
-	TEST_CASE("G(scope:sbf -> F(o_do:hsb!=bot)) — L3 conditional-positive REALIZABLE") {
+	TEST_CASE("G(scope:sbf -> F(o_do:hsb!=bot)) — L3 conditional-positive REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3782,7 +3782,7 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	// --- Level 4: accumulated preference refinement ---
 
-	TEST_CASE("GF(o_preferred:hsb!=bot) — L4 liveness preference REALIZABLE") {
+	TEST_CASE("GF(o_preferred:hsb!=bot) — L4 liveness preference REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3811,7 +3811,7 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	// --- Multi-revision stacking: 3 L3 revisions compatible ---
 
-	TEST_CASE("three L3 revisions stacked REALIZABLE") {
+	TEST_CASE("three L3 revisions stacked REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3829,7 +3829,7 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	// --- L3+L4 combined: immediate + accumulated ---
 
-	TEST_CASE("L3 G(avoid) + L4 GF(preferred) combined REALIZABLE") {
+	TEST_CASE("L3 G(avoid) + L4 GF(preferred) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3939,7 +3939,7 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	// --- Cross-axis: G_outer × tick-based inner-temporal ---
 
-	TEST_CASE("GF(tick) && G(tick->inner_check:hsb!=bot) cross-axis REALIZABLE") {
+	TEST_CASE("GF(tick) && G(tick->inner_check:hsb!=bot) cross-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -3970,7 +3970,7 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	// --- Mechanistic: hidden-layer representation constraints ---
 
-	TEST_CASE("G(dangerous:sbf -> F(safety_active:hsb!=bot)) safety circuit REALIZABLE") {
+	TEST_CASE("G(dangerous:sbf -> F(safety_active:hsb!=bot)) safety circuit REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4082,7 +4082,7 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	// --- Adaptive enforcement via accumulator + two-point ---
 
-	TEST_CASE("G(pointA:sbf=viol -> F(pointB:hsb!=bot)) cross-point escalation REALIZABLE") {
+	TEST_CASE("G(pointA:sbf=viol -> F(pointB:hsb!=bot)) cross-point escalation REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4135,7 +4135,7 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	// --- Product Mealy state: multi-accumulator + two-point + phase ---
 
-	TEST_CASE("trust + phase + two-point product spec REALIZABLE") {
+	TEST_CASE("trust + phase + two-point product spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4235,7 +4235,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	// --- Size 2: Until pattern ---
 
-	TEST_CASE("LTL template a0 U a1 — until REALIZABLE") {
+	TEST_CASE("LTL template a0 U a1 — until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4251,7 +4251,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	// --- Size 3: response pattern ---
 
-	TEST_CASE("LTL template G(a0 -> F(a1)) — response REALIZABLE") {
+	TEST_CASE("LTL template G(a0 -> F(a1)) — response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4265,7 +4265,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("LTL template G(a0 -> F(a1 && a2)) — response with conjunction REALIZABLE") {
+	TEST_CASE("LTL template G(a0 -> F(a1 && a2)) — response with conjunction REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4299,7 +4299,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	// --- Size 3: nested temporal ---
 
-	TEST_CASE("LTL template GF(a0) — recurrence REALIZABLE") {
+	TEST_CASE("LTL template GF(a0) — recurrence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec("G (F (o_a0[t]:hsb != {bot}:hsb)).");
@@ -4311,7 +4311,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("LTL template FG(a0) — persistence REALIZABLE") {
+	TEST_CASE("LTL template FG(a0) — persistence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec("F (G (o_a0[t]:hsb != {bot}:hsb)).");
@@ -4325,7 +4325,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	// --- Size 4: guarded until ---
 
-	TEST_CASE("LTL template G(a0 -> (a1 U a2)) — guarded until REALIZABLE") {
+	TEST_CASE("LTL template G(a0 -> (a1 U a2)) — guarded until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4356,7 +4356,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("two-point G(a0 -> F(!a1)) — input eventually suppresses REALIZABLE") {
+	TEST_CASE("two-point G(a0 -> F(!a1)) — input eventually suppresses REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4372,7 +4372,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	// --- CoT-aware templates ---
 
-	TEST_CASE("CoT G(a0 -> (a0 U a1)) — thinking persists until response REALIZABLE") {
+	TEST_CASE("CoT G(a0 -> (a0 U a1)) — thinking persists until response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4403,7 +4403,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("accumulator G(acc0 -> F(a0)) — threshold eventually triggers REALIZABLE") {
+	TEST_CASE("accumulator G(acc0 -> F(a0)) — threshold eventually triggers REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4417,7 +4417,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		}
 	}
 
-	TEST_CASE("accumulator G(acc0 && a0 -> F(a1)) — joint trigger REALIZABLE") {
+	TEST_CASE("accumulator G(acc0 && a0 -> F(a1)) — joint trigger REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4457,7 +4457,7 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	// --- Spec consolidation: conjunction of multiple clauses ---
 
-	TEST_CASE("Spec consolidation: 4 independent clauses realizable") {
+	TEST_CASE("Spec consolidation: 4 independent clauses realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4476,7 +4476,7 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	// --- Clause addition: base spec + new clause still realizable ---
 
-	TEST_CASE("Clause addition: G(a) + G(b -> F(c)) composed REALIZABLE") {
+	TEST_CASE("Clause addition: G(a) + G(b -> F(c)) composed REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4623,7 +4623,7 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 
 	// --- Synthesis timeout fallback: split spec into independent parts ---
 
-	TEST_CASE("Spec splitting: independent sub-specs individually realizable") {
+	TEST_CASE("Spec splitting: independent sub-specs individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		// Sub-spec 1
@@ -4685,7 +4685,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 		}
 	}
 
-	TEST_CASE("Clause split: G(trigger -> F(response)) individually realizable") {
+	TEST_CASE("Clause split: G(trigger -> F(response)) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref c2 = spec(
@@ -4699,7 +4699,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 		}
 	}
 
-	TEST_CASE("Clause split: GF(a) individually realizable") {
+	TEST_CASE("Clause split: GF(a) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref c3 = spec("G (F (o_check[t]:hsb != {bot}:hsb)).");
@@ -4713,7 +4713,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	// --- Joint formula: all clauses composed ---
 
-	TEST_CASE("Joint 3-clause formula realizable") {
+	TEST_CASE("Joint 3-clause formula realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref joint = spec(
@@ -4731,7 +4731,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	// --- LLM-side clause removal: drop LLM clause, keep spec clauses ---
 
-	TEST_CASE("Drop LLM clause: remaining spec clauses still realizable") {
+	TEST_CASE("Drop LLM clause: remaining spec clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		// Full joint: LLM clause + spec clause + user clause
@@ -4813,7 +4813,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	// --- Clause deactivation: inactive clauses excluded from formula ---
 
-	TEST_CASE("Deactivate clause: 2 of 3 clauses still realizable") {
+	TEST_CASE("Deactivate clause: 2 of 3 clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		// Active clauses only
@@ -4830,7 +4830,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	// --- Mode A 5-clause joint formula: LLM + spec + user origins ---
 
-	TEST_CASE("Multi-clause 5-clause joint: mixed origins REALIZABLE") {
+	TEST_CASE("Multi-clause 5-clause joint: mixed origins REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4850,7 +4850,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	// --- Drop all LLM clauses, keep user+spec ---
 
-	TEST_CASE("Drop all LLM clauses: user+spec subset REALIZABLE") {
+	TEST_CASE("Drop all LLM clauses: user+spec subset REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref user_spec = spec(
