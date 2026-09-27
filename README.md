@@ -94,6 +94,19 @@ ARM64 architectures):
 * deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
 * rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
 
+- `tau` runs and interprets specs.
+- `tau-sdk` compiles native specs into programs and links against Tau.
+- `tau-sdk-windows-x86_64-mingw` is the same box for the Windows (MinGW)
+  target.
+- `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target.
+- `tau-sdk-linux-arm64` is the same box for the Linux arm64 target, built by
+  cross compilation from an x86 host.
+
+Install the SDK for each platform you target: one box carries one platform's
+archive, headers, bundled dependencies, presets and toolchain, and nothing of
+another. All boxes share the prefix and install under
+`/usr/lib/tau/sdk/<platform>/`.
+
 The executable is installed in `/usr/bin/tau`.
 
 ## **Windows**

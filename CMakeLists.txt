@@ -826,6 +826,30 @@ elseif (TAU_MACOS_PACKAGE)
 	set(TAU_PKG_DOCS_DESTINATION ".")
 endif()
 
+# deb/rpm split the install into the runtime package `tau` (this component)
+# and the SDK package `tau-sdk` (the SDK's "Library" component); every other
+# generator keeps one file component.
+if (TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
+	set(TAU_PKG_COMPONENT "Runtime")
+endif()
+
+# The build-time toolchain a cross platform's SDK box needs, per package
+# format; the distro names are spelled here only. The wasm rpm entry is empty
+# because emsdk is not a distro package.
+if(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-windows-x86_64-mingw")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "g++-mingw-w64-x86-64")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "mingw64-gcc-c++")
+elseif(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-linux-arm64")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "g++-aarch64-linux-gnu")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "gcc-c++-aarch64-linux-gnu")
+elseif(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-wasm32-emscripten")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "emscripten")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "")
+else()
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "")
+endif()
+
 # The machine arch a native deb/rpm package runs on. A cross SDK box is
 # machine-independent and overrides this with `all`/`noarch` below.
 set(TAU_PACKAGE_DEB_ARCH "amd64")
@@ -856,13 +880,16 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		message(FATAL_ERROR
 			"TAU_BAS=${TAU_BAS} requires cvc5 but no cvc5::cvc5 target was found")
 	endif()
-	if (TAU_RPM_PACKAGE)
+	# The runtime cvc5 closure belongs to the executable package only: a
+	# cross SDK box is packaged alone, and its consumer resolves cvc5 through
+	# find_dependency inside the box.
+	if (TAU_RPM_PACKAGE AND TAU_BUILD_EXECUTABLE)
 		execute_process(COMMAND rpm --eval "%{_lib}"
 				OUTPUT_VARIABLE rpm_libdir
 				OUTPUT_STRIP_TRAILING_WHITESPACE)
 		set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
-		install_cvc5("${rpm_libdir}/tau" "LinuxFiles" "Linux")
-	elseif (TAU_DEB_PACKAGE)
+		install_cvc5("${rpm_libdir}/tau" "${TAU_PKG_COMPONENT}" "Linux")
+	elseif (TAU_DEB_PACKAGE AND TAU_BUILD_EXECUTABLE)
 		set(CMAKE_INSTALL_LIBDIR "lib")
 		install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
 	elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
@@ -876,7 +903,24 @@ else()
 endif()
 
 # Set CPack generators
-set(CPACK_COMPONENTS_ALL ${TAU_PKG_COMPONENT})
+set(CPACK_COMPONENTS_ALL "")
+if(TAU_BUILD_EXECUTABLE)
+	list(APPEND CPACK_COMPONENTS_ALL "${TAU_PKG_COMPONENT}")
+endif()
+if(TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
+	# Runtime = the tau executable and its cvc5 runtime; Library = the SDK.
+	# A cross platform packages its SDK box alone, so it has no Runtime.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+	endif()
+	set(CPACK_DEB_COMPONENT_INSTALL ON)
+	set(CPACK_RPM_COMPONENT_INSTALL ON)
+	set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "tau")
+	set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "The tau CLI and REPL")
+	set(CPACK_COMPONENT_LIBRARY_DISPLAY_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_COMPONENT_LIBRARY_DESCRIPTION
+		"The tau static SDK for one platform: libTAU.a, its headers, TauConfig and the compile script")
+endif()
 if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_GENERATOR "NSIS")
 	# NSIS (Windows Installer) specific settings
@@ -902,25 +946,68 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 		set(CPACK_DMG_FORMAT "UDZO")
 	endif()
-elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
+elseif (TAU_RPM_PACKAGE)
 	set(CPACK_GENERATOR "RPM")
-	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")
+	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "tau")
+	set(CPACK_RPM_LIBRARY_PACKAGE_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_RPM_RUNTIME_FILE_NAME
+		"${CPACK_PACKAGE_FILE_NAME}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm")
 	set(CPACK_RPM_PACKAGE_AUTOREQ " no")
 	set(CPACK_RPM_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_RPM_ARCH}")
+	# A cross SDK box for another Linux target ships that target's objects, so
+	# rpmbuild refuses `noarch`; a non-Linux cross box has no RPM arch to name.
+	if(TAU_SDK_PACKAGE_SUFFIX AND NOT TAU_SDK_PACKAGE_SUFFIX STREQUAL "-linux-arm64")
+		set(CPACK_RPM_PACKAGE_ARCHITECTURE "noarch")
+	endif()
+	set(CPACK_RPM_LIBRARY_FILE_NAME
+		"${TAU_SDK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm")
 	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
 	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-	# cvc5 dependencies: glibc, gmp, libstdc++
-	set(CPACK_RPM_PACKAGE_REQUIRES "glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
-	set(CPACK_RPM_PACKAGE_DOC_DIR "share/doc/${PROJECT_NAME}")
-elseif (TAU_BUILD_EXECUTABLE AND TAU_DEB_PACKAGE)
+	# A cross SDK box needs the toolchain that builds an artifact against it,
+	# which is not a distro package for emsdk.
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_RPM_LIBRARY_PACKAGE_REQUIRES "tau")
+		if(TAU_SDK_RPM_TOOLCHAIN_DEPENDS)
+			string(APPEND CPACK_RPM_LIBRARY_PACKAGE_REQUIRES
+				", ${TAU_SDK_RPM_TOOLCHAIN_DEPENDS}")
+		endif()
+	else()
+		set(CPACK_RPM_LIBRARY_PACKAGE_REQUIRES
+			"tau, glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+	endif()
+	# cvc5 dependencies: glibc, gmp, libstdc++; the SDK package needs the
+	# runtime package for the `tau` binary its script resolves the SDK from.
+	set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES
+		"glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+elseif (TAU_DEB_PACKAGE)
 	set(CPACK_GENERATOR "DEB")
 	# DEB specific settings
-	set(CPACK_DEBIAN_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.deb")
 	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
-	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6
-	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
-	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
 	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_DEB_ARCH}")
+	# A cross SDK box is machine independent, so its package is `all`.
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "all")
+	endif()
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME "tau")
+	set(CPACK_DEBIAN_LIBRARY_PACKAGE_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_DEBIAN_RUNTIME_FILE_NAME
+		"${CPACK_PACKAGE_FILE_NAME}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
+	set(CPACK_DEBIAN_LIBRARY_FILE_NAME
+		"${TAU_SDK_PACKAGE_NAME}_${CPACK_PACKAGE_VERSION}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
+	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6; tau-sdk
+	# depends on tau, and a cross box on the toolchain that builds against it.
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS
+		"libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
+			"tau, ${TAU_SDK_DEB_TOOLCHAIN_DEPENDS}")
+	else()
+		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
+			"tau, libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	endif()
+	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_SECTION "utils")
+	set(CPACK_DEBIAN_LIBRARY_PACKAGE_SECTION "devel")
 endif()
 
 # Include the CPack module

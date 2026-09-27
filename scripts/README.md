@@ -115,6 +115,13 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-packages-deb
 ./dev preset release-packages-rpm
 ./dev preset release-w64-packages
+./dev preset release-w64-sdk-packages-deb   # SDK box only, DEB
+./dev preset release-w64-sdk-packages-rpm
+./dev preset release-wasm-sdk-packages-deb  # the wasm box, DEB
+./dev preset release-wasm-sdk-packages-rpm
+./dev preset release-arm64-sdk-packages-deb  # the Linux arm64 box, DEB
+./dev preset release-arm64-sdk-packages-rpm
+./dev preset release-arm64-tests run        # arm64 cross tests, under qemu
 ./dev preset release-msvc-all-clang-cl run  # clang-cl on the MSVC ABI
 ./dev preset debug-asan
 ./dev preset coverage
@@ -135,6 +142,20 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 - `w64-packages` — legacy: Windows NSIS and ZIP
 - Preset: `./dev preset release-packages-deb`, `./dev preset release-packages-rpm`,
   `./dev preset release-w64-packages`
+
+The deb and rpm packages split in two. `tau` runs and interprets specs.
+`tau-sdk` compiles specs into programs and links against Tau.
+
+A cross platform has its own SDK package: `tau-sdk-windows-x86_64-mingw`,
+`tau-sdk-wasm32-emscripten` and `tau-sdk-linux-arm64`, one box each, no
+executable. The presets
+`release-w64-sdk-packages-deb`, `release-w64-sdk-packages-rpm`,
+`release-wasm-sdk-packages-deb`, `release-wasm-sdk-packages-rpm`,
+`release-arm64-sdk-packages-deb` and `release-arm64-sdk-packages-rpm` build and
+package those boxes. The name carries `package`, so `./dev preset` runs `cpack`
+after the build. The `arm64` box is the Linux arm64 target, cross-compiled from
+x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
+`qemu-user` to run their tests).
 
 ## Testing
 

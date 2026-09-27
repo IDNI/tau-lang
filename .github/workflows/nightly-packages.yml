@@ -137,7 +137,7 @@ jobs:
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: packages-linux
+          name: packages-linux-x86_64
           path: ${{ env.PKG_DIR }}
 
   # The native arm64 packages are built on an arm host, in the same container
@@ -175,6 +175,201 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: packages-linux-arm64
+          path: ${{ env.PKG_DIR }}
+
+  # The arm64 wheel is built on the arm runner: the interpreter, the extension
+  # and the bundled cvc5 runtime must all be aarch64, which the x86 job cannot
+  # produce. The platform tag is the interpreter's, so the file name carries the
+  # arm64 tag.
+  linux-arm64-wheel:
+    name: Linux arm64 wheel
+    needs: [ check_date, check_tests ]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04-arm
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # python3-dev, nanobind-dev and auditwheel are what the x86 test image
+      # installs for the binding; clang is the release preset's compiler.
+      - name: Install the wheel dependencies
+        run: |
+          ./dev setup-ubuntu-ci-deps.sh
+          sudo apt-get install -y --no-install-recommends \
+            clang python3-dev nanobind-dev python3-auditwheel
+
+      # The store is content-addressed; a miss is built here with the preset's
+      # own clang and reused by the next run.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-linux-arm64-${{ github.sha }}
+          restore-keys: |
+            tau-store-linux-arm64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The target builds the module, packs the wheel and publishes it to the
+      # local store under the linux-arm64 target.
+      - name: Build the arm64 wheel
+        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      # The repair step retags and rewrites the wheel. Check the repaired
+      # artifact before upload: its tag, module, bundled cvc5 runtime and paths.
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
+          export TAU_WHEEL_PATH
+          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the arm64 wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-arm64-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
+  # The x86_64 wheel is built on its own runner so the interpreter, the
+  # extension and the bundled cvc5 runtime are all x86_64. auditwheel retags it
+  # manylinux, so the file name carries the glibc floor, not linux_x86_64.
+  linux-x86_64-wheel:
+    name: Linux x86_64 wheel
+    needs: [ check_date, check_tests ]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # python3-dev, nanobind-dev and auditwheel are what the x86 test image
+      # installs for the binding; clang is the release preset's compiler.
+      - name: Install the wheel dependencies
+        run: |
+          ./dev setup-ubuntu-ci-deps.sh
+          sudo apt-get install -y --no-install-recommends \
+            clang python3-dev nanobind-dev python3-auditwheel
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-linux-x86_64-${{ github.sha }}
+          restore-keys: |
+            tau-store-linux-x86_64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build the x86_64 wheel
+        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      # The repair step retags and rewrites the wheel. Check the repaired
+      # artifact before upload: its tag, module, bundled cvc5 runtime and paths.
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
+          export TAU_WHEEL_PATH
+          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the x86_64 wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-x86_64-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
+  # One SDK box per platform, packaged on its own: a cross box cannot share the
+  # native box's install path or its toolchain.
+  linux-sdk:
+    name: Linux SDK packages (${{ matrix.preset }})
+    needs: [ check_date, check_tests ]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: release-w64-sdk-packages-deb
+          - preset: release-w64-sdk-packages-rpm
+          - preset: release-wasm-sdk-packages-deb
+          - preset: release-wasm-sdk-packages-rpm
+          - preset: release-arm64-sdk-packages-deb
+          - preset: release-arm64-sdk-packages-rpm
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The toolchain the platform preset cross-compiles with: MinGW from the
+      # distro, emsdk from the same script the wasm gates use. rpm and the
+      # archivers are the ones the Docker package image installs.
+      - name: Install the cross toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm unzip xz-utils
+          case "${{ matrix.preset }}" in
+            *-w64-*) sudo apt-get install -y --no-install-recommends mingw-w64 ;;
+            *-arm64-*) sudo apt-get install -y --no-install-recommends \
+              clang g++-aarch64-linux-gnu ;;
+            *) ./dev dep-emsdk ;;
+          esac
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The preset name contains `package`, so ./dev preset builds and packs.
+      - name: Build and package the SDK box
+        run: ./dev preset ${{ matrix.preset }} -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+      # upload-artifact globs literally and will not expand ~,
+      # so hand it an absolute path through the env
+      - name: Locate Linux packages
+        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload the SDK package
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-sdk-${{ matrix.preset }}
           path: ${{ env.PKG_DIR }}
 
   macos:
@@ -232,9 +427,161 @@ jobs:
           name: release-packages-macos
           path: ${{ env.PKG_DIR }}
 
+  # The macOS wheel is arm64 (the macos-15 image) and delocate retags it
+  # macosx_*_arm64. nanobind comes from Homebrew and delocate from pip. The
+  # cvc5 runtime resolves from the store with AppleClang.
+  macos-wheel:
+    name: macOS wheel
+    needs: [ check_date, check_tests ]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # macOS has no NIGHTLY build arg; stamp VERSION like the Dockerfile does
+      - name: Stamp nightly version
+        run: printf '%s' "$(head -n 1 VERSION)-$(date +%F)" > VERSION
+
+      - name: Install the wheel dependencies
+        run: |
+          brew install nanobind
+          python3 -m pip install --break-system-packages delocate \
+            || python3 -m pip install delocate
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-15-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-15-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build the macOS wheel
+        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      # The repair step retags and rewrites the wheel. Check the repaired
+      # artifact before upload: its tag, module, bundled cvc5 runtime and paths.
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
+          export TAU_WHEEL_PATH
+          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the macOS wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-darwin-arm64-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
+  # The MSVC wheel needs the developer command prompt for cl.exe and the MSVC
+  # dependency store. delvewheel bundles the cvc5 DLLs into the wheel.
+  windows-msvc-wheel:
+    name: Windows wheel (MSVC)
+    needs: [ check_date, check_tests ]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the wheel dependencies
+        run: python -m pip install nanobind delvewheel setuptools
+
+      # cl.exe is on PATH only inside a developer command prompt.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The Spot package is a host tool built with MSYS2 UCRT64 g++ (nothing
+      # links it); the runner ships MSYS2 but not always this toolchain.
+      - name: Install the MSYS2 UCRT64 toolchain
+        if: steps.cache-store.outputs.cache-hit != 'true'
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
+
+      - name: Build the MSVC wheel
+        run: |
+          python_exe="$(python -c 'import sys; print(sys.executable)')"
+          ./dev preset release-msvc-binding-python --target tau_wheel \
+            -DPython_EXECUTABLE="$python_exe" -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release-msvc/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      # The repair step rewrites the wheel. Check the repaired artifact before
+      # upload: its tag, module, bundled cvc5 DLLs and paths.
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls build/release-msvc/bindings/python/nanobind/wheel/*.whl)"
+          export TAU_WHEEL_PATH
+          python tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the MSVC wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows-x86_64-msvc-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
   publish:
     name: Publish nightly release
-    needs: [ linux, macos ]
+    needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
+      macos, macos-wheel, windows-msvc-wheel ]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

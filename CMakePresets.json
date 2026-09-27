@@ -280,6 +280,7 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
 				"TAU_DEB_PACKAGE": "ON"
 			}
 		},
@@ -288,6 +289,23 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
+				"TAU_RPM_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_sdk-deb-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
+				"TAU_DEB_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_sdk-rpm-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
 				"TAU_RPM_PACKAGE": "ON"
 			}
 		},
@@ -1167,6 +1185,42 @@
 				"release-w64",
 				"_windows-zip-package"
 			]
+		},
+		{
+			"name": "release-w64-sdk-packages-deb",
+			"displayName": "w64 SDK box, DEB package (no executable)",
+			"inherits": ["release-w64", "_sdk-deb-package"]
+		},
+		{
+			"name": "release-w64-sdk-packages-rpm",
+			"displayName": "w64 SDK box, RPM package (no executable)",
+			"inherits": ["release-w64", "_sdk-rpm-package"]
+		},
+		{
+			"name": "release-wasm-sdk-packages-deb",
+			"displayName": "wasm SDK box, DEB package (no executable)",
+			"inherits": ["release-wasm", "_sdk-deb-package"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "OFF"
+			}
+		},
+		{
+			"name": "release-wasm-sdk-packages-rpm",
+			"displayName": "wasm SDK box, RPM package (no executable)",
+			"inherits": ["release-wasm", "_sdk-rpm-package"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "OFF"
+			}
+		},
+		{
+			"name": "release-arm64-sdk-packages-deb",
+			"displayName": "arm64 SDK box, DEB package (no executable)",
+			"inherits": ["release-arm64", "_sdk-deb-package"]
+		},
+		{
+			"name": "release-arm64-sdk-packages-rpm",
+			"displayName": "arm64 SDK box, RPM package (no executable)",
+			"inherits": ["release-arm64", "_sdk-rpm-package"]
 		}
 	],
 	"buildPresets": [
@@ -1653,6 +1707,30 @@
 		{
 			"name": "release-w64-packages-zip",
 			"configurePreset": "release-w64-packages-zip"
+		},
+		{
+			"name": "release-w64-sdk-packages-deb",
+			"configurePreset": "release-w64-sdk-packages-deb"
+		},
+		{
+			"name": "release-w64-sdk-packages-rpm",
+			"configurePreset": "release-w64-sdk-packages-rpm"
+		},
+		{
+			"name": "release-wasm-sdk-packages-deb",
+			"configurePreset": "release-wasm-sdk-packages-deb"
+		},
+		{
+			"name": "release-wasm-sdk-packages-rpm",
+			"configurePreset": "release-wasm-sdk-packages-rpm"
+		},
+		{
+			"name": "release-arm64-sdk-packages-deb",
+			"configurePreset": "release-arm64-sdk-packages-deb"
+		},
+		{
+			"name": "release-arm64-sdk-packages-rpm",
+			"configurePreset": "release-arm64-sdk-packages-rpm"
 		}
 	],
 	"testPresets": [
