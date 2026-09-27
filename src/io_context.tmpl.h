@@ -169,9 +169,25 @@ inline bool console_prompt_output_stream::put(const std::string& value,
 inline file_input_stream::file_input_stream(const std::string& filename)
 	: serialized_constant_input_stream(), filename(filename)
 {
+	// A failed open stays on the stream: get() reports end-of-stream.
+	// make() turns that state into a report.
 	file.open(filename);
+	// TODO (HIGH) dropped error: file open failure -- logged instead of reported, the interpreter stream builders return no report
 	if (!file.is_open())
 		LOG_ERROR << "Failed to open file: '" << filename << "'";
+}
+
+inline result<std::shared_ptr<file_input_stream>>
+	file_input_stream::make(const std::string& filename)
+{
+	auto stream = std::make_shared<file_input_stream>(filename);
+	if (!stream->file.is_open()) {
+		result<std::shared_ptr<file_input_stream>> r;
+		return r.with_error(code::io_error, "failed to open file",
+			{{label::name, filename}});
+	}
+	result<std::shared_ptr<file_input_stream>> r;
+	return r.with_value(stream);
 }
 
 inline file_input_stream::~file_input_stream() {
@@ -210,9 +226,25 @@ inline file_output_stream::file_output_stream(const std::string& filename)
 	if (filename == "/dev/stdout") { shared_stream = &std::cout; return; }
 	if (filename == "/dev/stderr") { shared_stream = &std::cerr; return; }
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): open";)
+	// A failed open stays on the stream: put() reports failure. make()
+	// turns that state into a report.
 	file.open(filename);
+	// TODO (HIGH) dropped error: file open failure -- logged instead of reported, the interpreter stream builders return no report
 	if (!file.is_open())
 		LOG_ERROR << "Failed to open file: '" << filename << "'";
+}
+
+inline result<std::shared_ptr<file_output_stream>>
+	file_output_stream::make(const std::string& filename)
+{
+	auto stream = std::make_shared<file_output_stream>(filename);
+	if (!stream->file.is_open() && !stream->shared_stream) {
+		result<std::shared_ptr<file_output_stream>> r;
+		return r.with_error(code::io_error, "failed to open file",
+			{{label::name, filename}});
+	}
+	result<std::shared_ptr<file_output_stream>> r;
+	return r.with_value(stream);
 }
 
 inline std::shared_ptr<serialized_constant_output_stream>
@@ -360,9 +392,10 @@ size_t io_context<node>::type_of(tref var) const {
 }
 
 template <NodeType node>
-void io_context<node>::update_types(
+result<void> io_context<node>::update_types(
 	const subtree_map<node, size_t>& update)
 {
+	result<void> r;
 	// update types of inputs and outputs
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
@@ -399,17 +432,18 @@ void io_context<node>::update_types(
 		// debug build outright, while a release build (assert compiled
 		// out) silently filed it under `outputs` -- so `zzz[t] = 0.`
 		// crashed one configuration and became an output stream in the
-		// other. Report it and register nothing: both configurations
-		// now reach get_nso_rr's "I/O variable is not defined".
+		// other. Report it and let the caller fail; nothing about this
+		// name is registered.
 		if (!is_input && !is_output) {
-			LOG_ERROR << "Undefined I/O stream: " << name
-				<< " (a stream name must be \"this\", \"u\", or"
-				   " start with 'i' or 'o')\n";
-			continue;
+			return r.with_error(code::invalid_input_stream,
+				"undefined I/O stream; a stream name must be \"this\","
+				" \"u\", or start with 'i' or 'o'",
+				{{label::name, name}});
 		}
 		auto& streams = is_input ? inputs : outputs;
 		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}
+	return r.with_value();
 }
 
 template <NodeType node>
@@ -930,9 +964,10 @@ std::string adt_tuple_writer<node>::format(
 }
 
 template <NodeType node>
-bool adt_tuple_writer<node>::collect(size_t time_point,
+result<void> adt_tuple_writer<node>::collect(size_t time_point,
 	const std::vector<size_t>& path, const std::string& leaf)
 {
+	result<void> r;
 	// Completeness is judged by which PATHS have been collected, not by
 	// rec.size() alone: a repeated collect() for the same (time_point,
 	// path) -- an interpreter retry, a Task 8 wiring bug, a spec writing
@@ -940,8 +975,8 @@ bool adt_tuple_writer<node>::collect(size_t time_point,
 	// original entry in place, since map::operator[] assignment keeps
 	// rec.size() unchanged on an overwrite, silently making the record
 	// permanently one member short of ever completing (a real bug: no
-	// LOG_ERROR, no exception, just a pending entry that never fires). A
-	// repeat is treated as record corruption: LOG_ERROR (naming the
+	// error, no exception, just a pending entry that never fires). A
+	// repeat is treated as record corruption: report it (naming the
 	// stream, path, and time point) and discard the ENTIRE pending record
 	// for this time point -- no partial trust in a record one of whose
 	// members has already proven unreliable, mirroring the reader's own
@@ -954,21 +989,27 @@ bool adt_tuple_writer<node>::collect(size_t time_point,
 	// from scratch; in the common case (each output stream calls collect()
 	// exactly once per time point) that means the record for this time
 	// point is never emitted, which is the intended fail-safe: better a
-	// silently-dropped step (logged) than a step written from stale data.
+	// dropped step (reported) than a step written from stale data.
 	auto pit = pending.find(time_point);
 	if (pit != pending.end() && pit->second.contains(path)) {
-		LOG_ERROR << "ADT: duplicate write to '"
-			<< dict(layout.root_name_sid) << "." << adt_path_str(path)
-			<< "' for time point " << time_point << "\n";
 		pending.erase(pit);
-		return false;
+		return r.with_error(code::runtime_error,
+			"duplicate write to the tuple stream",
+			{{label::name, dict(layout.root_name_sid) + "."
+					+ adt_path_str(path)},
+			 {label::time_point, time_point}});
 	}
 	auto& rec = pending[time_point];
 	rec[path] = leaf;
-	if (rec.size() < layout.components.size()) return true; // still buffering
+	if (rec.size() < layout.components.size())
+		return r.with_value(); // still buffering
 	std::string literal = format(rec);
 	pending.erase(time_point);
-	return physical->put(literal, time_point);
+	if (!physical->put(literal, time_point))
+		return r.with_error(code::io_error,
+			"failed to write to the tuple stream",
+			{{label::name, dict(layout.root_name_sid)}});
+	return r.with_value();
 }
 
 // -----------------------------------------------------------------------------
@@ -987,7 +1028,8 @@ std::shared_ptr<serialized_constant_output_stream>
 
 template <NodeType node>
 bool adt_member_output_stream<node>::put(const std::string& value, size_t time_point) {
-	return writer->collect(time_point, path, value);
+	// TODO (HIGH) dropped error: the collect report -- the bool stream put() contract has no report channel
+	return writer->collect(time_point, path, value).has_value();
 }
 
 template <NodeType node>

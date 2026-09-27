@@ -1803,7 +1803,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 			DBG(LOG_TRACE << "inferred is nullptr";)
 			return r.with_assert_check_error(code::internal_error, "Type inference failed");
 		}
-		defs.get_io_context()->update_types(infer_result.second);
+		TAU_TRY_VOID(defs.get_io_context()->update_types(infer_result.second));
 		defs.set_global_scope(std::move(infer_result.second));
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.

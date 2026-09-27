@@ -179,6 +179,14 @@ private:
 struct file_input_stream : public serialized_constant_input_stream {
 	/** @brief Open the file at @p filename for reading. */
 	file_input_stream(const std::string& filename);
+	/**
+	 * @brief Open @p filename for reading, or return the failure.
+	 *
+	 * The constructor keeps a failed open on the stream, where `get()`
+	 * reports end-of-stream; this factory reports it instead.
+	 */
+	static result<std::shared_ptr<file_input_stream>> make(
+		const std::string& filename);
 	virtual ~file_input_stream();
 	/** @brief Rebuild by reopening the file from the beginning. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
@@ -210,6 +218,14 @@ protected:
 struct file_output_stream : public serialized_constant_output_stream {
 	/** @brief Open the file at @p filename for writing. */
 	file_output_stream(const std::string& filename);
+	/**
+	 * @brief Open @p filename for writing, or return the failure.
+	 *
+	 * The constructor keeps a failed open on the stream, where `put()`
+	 * reports failure; this factory reports it instead.
+	 */
+	static result<std::shared_ptr<file_output_stream>> make(
+		const std::string& filename);
 	virtual ~file_output_stream();
 	/** @brief Rebuild by reopening the file. */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
@@ -360,8 +376,9 @@ struct io_context {
 	/**
 	 * @brief Update the BA types of IO variables from @p global_scope.
 	 * @param global_scope Map of variable → type id from type inference.
+	 * @return The report of an undefined stream name, or nothing on success.
 	 */
-	void update_types(const subtree_map<node, size_t>& global_scope);
+	result<void> update_types(const subtree_map<node, size_t>& global_scope);
 
 	/** @brief Register a prompting console input stream for @p name with @p type_id. */
 	tref add_input_console(const std::string& name, size_t type_id);
@@ -544,10 +561,10 @@ struct adt_tuple_writer {
 	 * Once every layout component for @p time_point has been collected,
 	 * formats the nested tuple literal (members in layout order, nesting
 	 * rebuilt from their paths) and `put()`s it to the physical stream.
-	 * @return `true` while still buffering, or the physical stream's `put()`
-	 * result once the record completed.
+	 * @return The report of a duplicate write or a failed physical `put()`,
+	 * or nothing on success.
 	 */
-	bool collect(size_t time_point, const std::vector<size_t>& path,
+	result<void> collect(size_t time_point, const std::vector<size_t>& path,
 		const std::string& leaf);
 	/**
 	 * @brief The group's single physical stream.

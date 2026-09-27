@@ -553,22 +553,19 @@ add_multiline_repl_test(run_cmd-bound_relative_offset_accepted
 	"\\[3\\] f\\[n\\]\\(x\\)"
 	STDIN "r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf[n](x) := o1[n] = r[n](x).\\ndefs\\nq\\n")
 
-# --- a genuine step failure (not an input wait) ends the run ----------------
-# An unwritable output file makes api::step fail with code::io_error, not
-# code::invalid_state; continue_running() must report it and stop instead of
-# falling into the "continue?" prompt meant for an awaited input.
-# interpreter::write's own per-stream refusal (interpreter.tmpl.h) replaced
-# api::step's old blanket "Failed to write outputs" wrapper, which the
-# refactor dropped in favor of merging write()'s report as-is.
-add_repl_test(run_cmd-continue_running-genuine_step_error
+# --- a failed output-file open is reported when the run sets up -------------
+# Registering `out file(...)` opens the file, so a missing directory is an
+# io_error reported before the first step; the run must surface that report
+# named with the file it could not open.
+add_repl_test(run_cmd-output_open_error
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
-	"failed to write to the output stream" NO_FAIL_REGEX REQUIRES hostfs)
+	"failed to open file.*nonexistent_dir_xyz_tau_repl_test" NO_FAIL_REGEX REQUIRES hostfs)
 
 # GitHub #136: the same failure under a step budget ends the run too. `-b
 # false` because the benchmark report would print the error anyway.
 add_repl_test(run_cmd-continue_running-genuine_step_error_finite
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run 3 steps o1[t] = 1."
-	"failed to write to the output stream" NO_FAIL_REGEX REQUIRES hostfs
+	"failed to open file.*nonexistent_dir_xyz_tau_repl_test" NO_FAIL_REGEX REQUIRES hostfs
 	FLAGS -b false)
 
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------

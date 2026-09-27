@@ -359,7 +359,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				return r;
 			}
 			if (options.context) {
-				options.context->update_types(inferred.second);
+				TAU_TRY_VOID(
+					options.context->update_types(inferred.second));
 			}
 			if (options.global_scope)
 				*options.global_scope = std::move(inferred.second);

@@ -101,7 +101,7 @@ result<tref> tau_spec<node>::get() {
 		errors_.push_back("type inference failed");
 		return fail("type inference failed");
 	}
-	defs.get_io_context()->update_types(result.second);
+	TAU_TRY_VOID(defs.get_io_context()->update_types(result.second));
 	defs.set_global_scope(std::move(result.second));
 	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
 	if (mode_ == build_mode::as_written) {

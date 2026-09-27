@@ -262,68 +262,79 @@ TEST_SUITE("file streams") {
 	TEST_CASE("written values round-trip through a file") {
 		temp_path tf("roundtrip");
 		{
-			file_output_stream out(tf.str());
-			CHECK(out.put("line one"));
-			CHECK(out.put("line two"));
-		}   // destructor closes the file
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			auto& out = out_r.value();
+			CHECK(out->put("line one"));
+			CHECK(out->put("line two"));
+		}   // the last reference closes the file
 		CHECK(read_lines(tf.path)
 			== std::vector<std::string>{"line one", "line two"});
 
-		file_input_stream in(tf.str());
-		CHECK(in.get() == std::optional<std::string>("line one"));
-		CHECK(in.get() == std::optional<std::string>("line two"));
+		auto in_r = file_input_stream::make(tf.str());
+		REQUIRE(in_r.has_value());
+		auto& in = in_r.value();
+		CHECK(in->get() == std::optional<std::string>("line one"));
+		CHECK(in->get() == std::optional<std::string>("line two"));
 	}
 
 	TEST_CASE("reading past the end yields nullopt (AP2-6)") {
 		temp_path tf("eof");
 		{
-			file_output_stream out(tf.str());
-			CHECK(out.put("only"));
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			CHECK(out_r.value()->put("only"));
 		}
-		file_input_stream in(tf.str());
-		CHECK(in.get() == std::optional<std::string>("only"));
+		auto in_r = file_input_stream::make(tf.str());
+		REQUIRE(in_r.has_value());
+		CHECK(in_r.value()->get() == std::optional<std::string>("only"));
 		// AP2-6: EOF is nullopt per the base-class contract -- the old
 		// empty-string-forever behavior made EOF indistinguishable
 		// from a blank line.
-		CHECK(!in.get().has_value());
+		CHECK(!in_r.value()->get().has_value());
 	}
 
 	// The failure branch of the file_output_stream constructor: a path whose
-	// parent directory does not exist cannot be opened for writing. It logs
-	// an error rather than throwing, and put() then reports failure.
+	// parent directory does not exist cannot be opened for writing. make()
+	// reports it rather than throwing, and no stream is handed back.
 	TEST_CASE("opening an unwritable output path does not throw") {
 		const std::string bad =
 			(suite_scratch_dir() / "tau_test_io_context_absent_dir"
 				/ "out.txt").string();
 		REQUIRE(!std::filesystem::exists(
 			std::filesystem::path(bad).parent_path()));
-		file_output_stream out(bad);
-		CHECK(!out.put("never written"));
+		auto out = file_output_stream::make(bad);
+		REQUIRE(out.has_error());
+		CHECK(report_has_code(out.report(), code::io_error));
 	}
 
-	// Opening a missing file logs an error rather than throwing; get()
-	// then reports end-of-stream (AP2-6: previously an endless supply of
-	// empty strings). This is the failure branch of the constructor.
+	// Opening a missing file reports the failure rather than throwing; no
+	// stream is handed back, so get() cannot supply an endless run of empty
+	// lines (AP2-6). This is the failure branch of the constructor.
 	TEST_CASE("opening a missing file does not throw") {
 		const std::string missing =
 			(suite_scratch_dir() / "tau_test_io_context_definitely_absent")
 				.string();
 		std::error_code ec;
 		std::filesystem::remove(missing, ec);
-		file_input_stream in(missing);
-		CHECK(!in.get().has_value());
+		auto in = file_input_stream::make(missing);
+		REQUIRE(in.has_error());
+		CHECK(report_has_code(in.report(), code::io_error));
 	}
 
 	TEST_CASE("file_input_stream rebuild rereads from the beginning") {
 		temp_path tf("in_rebuild");
 		{
-			file_output_stream out(tf.str());
-			CHECK(out.put("alpha"));
-			CHECK(out.put("beta"));
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			CHECK(out_r.value()->put("alpha"));
+			CHECK(out_r.value()->put("beta"));
 		}
-		file_input_stream in(tf.str());
-		CHECK(in.get() == std::optional<std::string>("alpha"));
-		auto rebuilt = in.rebuild();
+		auto in_r = file_input_stream::make(tf.str());
+		REQUIRE(in_r.has_value());
+		auto& in = in_r.value();
+		CHECK(in->get() == std::optional<std::string>("alpha"));
+		auto rebuilt = in->rebuild();
 		REQUIRE(rebuilt != nullptr);
 		// Contrast with vector_input_stream::rebuild(), which continues from
 		// the cursor: this one REWINDS. See the long comment on
@@ -335,9 +346,10 @@ TEST_SUITE("file streams") {
 
 	TEST_CASE("file_output_stream rebuild reopens the file") {
 		temp_path tf("out_rebuild");
-		file_output_stream out(tf.str());
-		CHECK(out.put("first"));
-		auto rebuilt = out.rebuild();
+		auto out_r = file_output_stream::make(tf.str());
+		REQUIRE(out_r.has_value());
+		CHECK(out_r.value()->put("first"));
+		auto rebuilt = out_r.value()->rebuild();
 		REQUIRE(rebuilt != nullptr);
 		CHECK(rebuilt->put("second"));
 	}
@@ -347,8 +359,9 @@ TEST_SUITE("file streams") {
 	TEST_CASE("put through the base time-point overload writes the value") {
 		temp_path tf("tp");
 		{
-			file_output_stream out(tf.str());
-			serialized_constant_output_stream& base = out;
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			serialized_constant_output_stream& base = *out_r.value();
 			CHECK(base.put("tpvalue", 3));
 		}
 		CHECK(read_lines(tf.path) == std::vector<std::string>{"tpvalue"});
@@ -363,17 +376,19 @@ TEST_SUITE("file streams") {
 	TEST_CASE("a fresh open of an ordinary named file truncates prior content") {
 		temp_path tf("truncate");
 		{
-			file_output_stream out(tf.str());
-			CHECK(out.put("stale"));
-			CHECK(out.put("content"));
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			CHECK(out_r.value()->put("stale"));
+			CHECK(out_r.value()->put("content"));
 		}
 		CHECK(read_lines(tf.path)
 			== std::vector<std::string>{"stale", "content"});
 		{
 			// Re-open the SAME path fresh (same as a new `run` would): the
 			// old two lines must be gone, not appended to.
-			file_output_stream out(tf.str());
-			CHECK(out.put("fresh"));
+			auto out_r = file_output_stream::make(tf.str());
+			REQUIRE(out_r.has_value());
+			CHECK(out_r.value()->put("fresh"));
 		}
 		CHECK(read_lines(tf.path) == std::vector<std::string>{"fresh"});
 	}
@@ -396,14 +411,16 @@ TEST_SUITE("file streams") {
 	// unchanged path instead.
 	TEST_CASE("\"/dev/stdout\" writes through std::cout, not a private file") {
 		cout_capture out;
-		file_output_stream s("/dev/stdout");
-		CHECK(s.put("hello"));
+		auto s_r = file_output_stream::make("/dev/stdout");
+		REQUIRE(s_r.has_value());
+		CHECK(s_r.value()->put("hello"));
 		CHECK(out.str() == "hello\n");
 	}
 	TEST_CASE("\"/dev/stderr\" writes through std::cerr, not a private file") {
 		cerr_capture err;
-		file_output_stream s("/dev/stderr");
-		CHECK(s.put("world"));
+		auto s_r = file_output_stream::make("/dev/stderr");
+		REQUIRE(s_r.has_value());
+		CHECK(s_r.value()->put("world"));
 		CHECK(err.str() == "world\n");
 	}
 }
@@ -751,8 +768,10 @@ TEST_SUITE("adt tuple streams") {
 		auto values = std::make_shared<std::vector<std::string>>();
 		adt_tuple_writer<node_t> writer(
 			std::make_unique<vector_output_stream>(values), layout);
-		CHECK(writer.collect(0, { dict("a") }, "0"));       // still buffering
-		CHECK(writer.collect(0, { dict("p"), dict("x") }, "1")); // completes the record
+		auto buffering = writer.collect(0, { dict("a") }, "0");
+		REQUIRE(buffering.has_value());                     // still buffering
+		auto complete = writer.collect(0, { dict("p"), dict("x") }, "1");
+		REQUIRE(complete.has_value());                      // completes the record
 		REQUIRE(values->size() == 1);
 		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
 	}
@@ -762,11 +781,11 @@ TEST_SUITE("adt tuple streams") {
 		auto values = std::make_shared<std::vector<std::string>>();
 		adt_tuple_writer<node_t> writer(
 			std::make_unique<vector_output_stream>(values), layout);
-		writer.collect(0, { dict("a") }, "0");
-		writer.collect(1, { dict("a") }, "10");
+		REQUIRE(writer.collect(0, { dict("a") }, "0").has_value());
+		REQUIRE(writer.collect(1, { dict("a") }, "10").has_value());
 		CHECK(values->empty()); // neither time point complete yet
-		writer.collect(0, { dict("p"), dict("x") }, "1");
-		writer.collect(1, { dict("p"), dict("x") }, "11");
+		REQUIRE(writer.collect(0, { dict("p"), dict("x") }, "1").has_value());
+		REQUIRE(writer.collect(1, { dict("p"), dict("x") }, "11").has_value());
 		REQUIRE(values->size() == 2);
 		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
 		CHECK(values->at(1) == "{ a: \"10\", p: { x: \"11\" } }");
@@ -784,13 +803,16 @@ TEST_SUITE("adt tuple streams") {
 		auto values = std::make_shared<std::vector<std::string>>();
 		adt_tuple_writer<node_t> writer(
 			std::make_unique<vector_output_stream>(values), layout);
-		CHECK(writer.collect(0, { dict("a") }, "0"));       // first write: buffers
-		CHECK_FALSE(writer.collect(0, { dict("a") }, "1")); // repeat: hard error
+		auto first = writer.collect(0, { dict("a") }, "0");
+		REQUIRE(first.has_value());                         // first write: buffers
+		auto repeat = writer.collect(0, { dict("a") }, "1");
+		REQUIRE(repeat.has_error());                        // repeat: hard error
+		CHECK(report_has_code(repeat.report(), code::runtime_error));
 		// The genuinely-missing member arriving afterward starts a FRESH
 		// record (still buffering, since it's the only entry so far) that
 		// can never complete: "a" was lost when the repeat discarded the
 		// old record, and nothing collects it again in this test.
-		CHECK(writer.collect(0, { dict("p"), dict("x") }, "1"));
+		REQUIRE(writer.collect(0, { dict("p"), dict("x") }, "1").has_value());
 		CHECK(values->empty());
 	}
 

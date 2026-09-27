@@ -248,6 +248,34 @@ TEST_SUITE("interpreter: misbehaving streams") {
 		CHECK(!tau_api::step(maybe_i.value()).has_value());
 	}
 
+	// A refused write must route to the step-error path, not the input wait:
+	// continue_running separates the two from the report alone, so the write
+	// failure has to carry its own message and no input-wait flag.
+	TEST_CASE("a refused output write is a genuine step error, not an input "
+		  "wait")
+	{
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "T", "F" });
+		opts.output_remaps["o"] = std::make_shared<failing_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		// the same call repl_evaluator::continue_running makes
+		auto step_r = tau_api::step(maybe_i.value());
+		REQUIRE(!step_r.has_value());
+		CHECK_FALSE(step_awaiting_input(step_r.report()));
+		CHECK(report_has_code(step_r.report(),
+			code::invalid_output_stream));
+		bool found = false;
+		for (auto& n : step_r.report().nodes())
+			if (n.tag == code::invalid_output_stream
+				&& step_r.report().str(n.key).find(
+					"failed to write to the output stream")
+					!= std::string::npos)
+				found = true;
+		CHECK(found);
+	}
+
 	// Contrast: an EMPTY value is the graceful "no more inputs" signal rather
 	// than an error, so the run ends without the step reporting failure the
 	// way the error cases above do.
