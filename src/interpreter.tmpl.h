@@ -224,10 +224,11 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 			&& tau::get(base)[0].is(tau::bf_neg))
 			base = tau::get(base)[0].first();
 		if (is_excluded_output(base)) continue;
-		DBG(if (!tau::get(var)[0].child_is(tau::io_var))
-			LOG_ERROR << "write: non-io key: " << TAU_TO_STR(var)
-				<< "\n" << LOG_FM_DUMP(var) << "\n";)
-		assert(tau::get(var)[0].child_is(tau::io_var));
+		if (!tau::get(var)[0].child_is(tau::io_var))
+			return r.with_error(code::invalid_argument,
+				"write: the output key is not an io variable",
+				{{label::value,
+					truncate_for_message(TAU_TO_STR(var))}});
 		io_vars.push_back(var);
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
@@ -683,7 +684,6 @@ result<interpreter<node>>
 	if (has_ctl_star_operators<node>(spec)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(spec);
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
-			LOG_ERROR << "Tau specification is not executable (CTL* reduction failed)\n";
 			r.merge(std::move(reduction_r));
 			return r.with_assert_check_error(code::internal_error,
 				"Tau specification is not executable "
@@ -875,8 +875,6 @@ post_normalization:
 				"it for all inputs");
 		}
 		if (!safety_spec) {
-			LOG_ERROR << "Tau specification is not executable: no "
-				"strategy was synthesised (see `realizable`)\n";
 			return r.with_assert_check_error(code::unsat,
 				"Tau specification is not executable: no strategy "
 				"was synthesised (see `realizable`)");
@@ -1348,16 +1346,13 @@ struct solve_step_provider : step_provider<node> {
 						|| tau::get(v).is_input_variable()
 						|| get_io_time_point<node>(v) > (int_t)time_point;
 					if (!bad) continue;
-					LOG_ERROR << "Unsolved stream variable '" << TAU_TO_STR(v)
-						<< "' in the step formula at time point " << time_point
-						<< ": " << LOG_FM(current) << "\n";
-					std::stringstream keys_ss;
-					keys_ss << "memory keys:";
-					for (const auto& [k, mval] : local_memory)
-						keys_ss << " " << TAU_TO_STR(k);
-					LOG_ERROR << keys_ss.str() << "\n";
 					fold_path_diag();
-					return r.with_assert_check_value(std::nullopt);
+					return r.with_error(code::internal_error,
+						"an unsolved stream variable remained "
+						"in the step formula at this time point",
+						{{label::value,
+							truncate_for_message(TAU_TO_STR(v))},
+						 {label::time_point, time_point}});
 				}
 				auto path_solution = solution_with_max_update<node>(
 					current, time_point);
@@ -1812,23 +1807,23 @@ interpreter<node>::step(const assignment<node>& values)
 	// If the "this" input stream is present, write the current spec into it
 	if (has_this_stream) {
 		if constexpr (!pack_has_tau_ba_v<node>) {
-			LOG_ERROR << "the `this` stream needs the tau wrapper BA, "
-				"which this pack does not contain";
+			return r.with_error(code::unsupported_operation,
+				"the `this` stream needs the tau wrapper BA, "
+				"which this pack does not contain");
 		} else {
 			// IN-M2: feed back the spec this step will actually follow
 			// (first solvable alternative per part), not the disjunction.
 			auto packed = node::ba::pack_tau_ba(unsqueeze_always(
 				r.merge_take(executed_spec_fm(true)).value_or(nullptr)));
-			if (!packed) LOG_ERROR
-				<< "could not pack the executed spec for `this`";
-			else {
-				tref current_this_stream = build_in_var_at_n<node>(
-					"this", static_cast<int_t>(time_point),
+			if (!packed)
+				return r.with_error(code::internal_error,
+					"could not pack the executed spec for `this`");
+			tref current_this_stream = build_in_var_at_n<node>(
+				"this", static_cast<int_t>(time_point),
+				get_ba_type_id<node>(tau_type<node>()));
+			memory[current_this_stream] =
+				build_bf_ba_constant<node>(*packed,
 					get_ba_type_id<node>(tau_type<node>()));
-				memory[current_this_stream] =
-					build_bf_ba_constant<node>(*packed,
-						get_ba_type_id<node>(tau_type<node>()));
-			}
 		}
 	}
 

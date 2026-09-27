@@ -1869,10 +1869,10 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 	// Make sure that no function/predicate symbol is still present
 	if (auto ref = tau::get(fm).find_top(is<node, tau::ref>); ref) {
-		LOG_ERROR << "transform_to_execution: unresolved function or "
-			"predicate symbol " << LOG_FM(ref) << " found; "
-			"treating the formula as unsatisfiable";
-		return r.with_assert_check_value(_F<node>());
+		return r.with_error(code::internal_error,
+			"an unresolved function or predicate symbol survived "
+			"to the execution transform",
+			{{label::value, truncate_for_message(TAU_TO_STR(ref))}});
 	}
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
@@ -2025,12 +2025,9 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	// the error propagates to api::realizable/valid_spec/get_interpreter
 	// as a solver_error verdict.
 	if (st.size() >= 2) {
-		LOG_ERROR << "transform_to_execution: " << st.size()
-			<< " sometimes clauses survived the eventual-variable "
-			"transform; the formula cannot be decided by the "
-			"safety pipeline";
 		return r.with_assert_check_error(code::solver_error, "nested or multiple `sometimes` "
-			"clauses survived the eventual-variable transform");
+			"clauses survived the eventual-variable transform",
+			{{label::size, st.size()}});
 	}
 
 	tref res;

@@ -312,8 +312,8 @@ result<bool> simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 
 	if (!n) {
 		DBG(assert(false && "simplify_block_root: null subtree");)
-		LOG_ERROR << "simplify_block_root: null subtree, skipping";
-		return r.with_value(true);
+		return r.with_error(code::internal_error,
+			"simplify_block_root: null subtree");
 	}
 
 	auto nt = tau::get(n).get_type();
@@ -330,9 +330,9 @@ result<bool> simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 		DBG(assert((!args.empty() || !invs.empty())
 			&& "simplify_block_root: block collected no operands");)
 		if (args.empty() && invs.empty()) {
-			LOG_ERROR << "simplify_block_root: block rooted at "
-				<< LOG_NT(nt) << " collected no operands, leaving it unsimplified";
-			return r.with_value(true);
+			return r.with_error(code::internal_error,
+				"simplify_block_root: block collected no operands",
+				{{label::name, node::name(nt)}});
 		}
 
 		TAU_TRY(changes[n], build_simplification<node>(args, invs, operation, type));
@@ -378,8 +378,8 @@ result<std::pair<trefs, trefs>> collect_block_operand(tref n, size_t operation, 
 
 	if (!n) {
 		DBG(assert(false && "collect_block_operand: null subtree");)
-		LOG_ERROR << "collect_block_operand: null subtree, contributing nothing";
-		return r.with_value(std::pair<trefs, trefs>{});
+		return r.with_error(code::internal_error,
+			"collect_block_operand: null subtree");
 	}
 
 	auto nt = tau::get(n).get_type();

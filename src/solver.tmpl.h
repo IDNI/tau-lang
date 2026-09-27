@@ -2094,7 +2094,6 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 		std::optional<size_t> bv_partition_key;
 		// Partition types
 		bool path_sat = false;
-		bool clause_error = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
 			// If path is T, we skip in order to have empty type_partition
 			if (tau::get(conj).equals_T()) {
@@ -2120,19 +2119,19 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				// (calls that COULD match were expanded upstream, and a
 				// mismatched call is rejected by validate_rr_call_types)
 				// -- an uninterpreted predicate is fine to normalize but
-				// has no solutions to enumerate. Name it, instead of the
-				// generic message, so the user looks at the definition
-				// rather than at the solver.
+				// has no solutions to enumerate. Name it so the user
+				// looks at the definition rather than at the solver.
 				if (tref uref = tau::get(conj).find_top(
 						is<node, tau::ref>); uref)
-					LOG_ERROR << "Cannot solve `" << TAU_TO_STR(conj)
-						<< "`: it contains an unresolved reference `"
-						<< TAU_TO_STR(uref) << "` with no matching"
-						" definition";
-				else LOG_ERROR << "Found clause containing non-equation: "
-					<< TAU_TO_STR(path);
-				clause_error = true;
-				break;
+					return r.with_error(code::unsupported_operation,
+						"cannot solve a clause containing an "
+						"unresolved reference with no matching "
+						"definition",
+						{{label::value, truncate_for_message(TAU_TO_STR(uref))}});
+				return r.with_error(code::unsupported_operation,
+					"found a clause containing a non-equation "
+					"term the solver cannot handle",
+					{{label::value, truncate_for_message(TAU_TO_STR(path))}});
 			}
 			if (pack_type_is_non_aba_omcat<node>(type))
 				order_atoms[type].insert(conj);
@@ -2153,12 +2152,6 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		if (clause_error) {
-			return r.with_assert_check_error(code::solver_error,
-				"Found a clause containing a non-equation "
-				"term the solver cannot handle");
-		}
-
 		bool theory_sat = false, skip = false;
 		solution<node> clause_solution;
 		for (auto& [type, conjs] : type_partition) {

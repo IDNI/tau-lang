@@ -895,10 +895,10 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 
 	bool full = tau::get(normalized).equals_T();
 	if (lean && *lean != full) {
-		std::cerr << "[TAU_LEAN_DECIDE_CROSSCHECK] disagreement: lean="
-			<< *lean << " full=" << full << " formula=" << fm.to_str()
-			<< "\n";
-		std::abort();
+		return r.with_error(code::internal_error,
+			"the lean capture-conjunction shortcut disagreed with "
+			"the full normalization",
+			{{label::value, truncate_for_message(fm.to_str())}});
 	}
 	return r.with_assert_check_value(full);
 }

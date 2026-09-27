@@ -1686,8 +1686,6 @@ static result<tref> translate_ctl_star(tref fm,
 	// in any connective missing from the switches above; the survivor then
 	// reached the skeleton (constant "1") or bounced between
 	// is_tau_formula_sat and is_ltl_aba_realizable. Refuse instead.
-	LOG_ERROR << "translate_ctl_star: unhandled connective "
-		<< node::name(nt) << " with CTL* content in its subtree";
 	return r.with_error(code::solver_error,
 		"translate_ctl_star found an unhandled connective with CTL* "
 		"content in its subtree; the formula cannot be reduced to LTL",
