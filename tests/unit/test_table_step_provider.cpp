@@ -470,6 +470,28 @@ TEST_SUITE("table_step_provider") {
 			CHECK(atom_holds(tmpl, memory2, sol2.value(), 1));
 	}
 
+	// An atom over committed values only is decided by memory: a false one
+	// leaves the edge no solution for this history (the solver used to be
+	// handed the bare F and crashed), a true one nothing to solve.
+	TEST_CASE("ocltl_direct_decode_edge: an atom the committed values decide") {
+		bdd_init<Bool>();
+		trefs tmpls = {
+			parse_tmpl_atom("o1[t-1]:tau != {F.}:tau."),
+			parse_tmpl_atom("o2[t]:tau != {F.}:tau."),
+		};
+		fresh_element_ledger ledger;
+		assignment<node_t> zero, one;
+		zero[build_out_var_at_n<node_t>("o1", 0, tau_type_id<node_t>())]
+			= build_bf_f_type<node_t>(tau_type_id<node_t>());
+		one[build_out_var_at_n<node_t>("o1", 0, tau_type_id<node_t>())]
+			= build_bf_t_type<node_t>(tau_type_id<node_t>());
+		CHECK_FALSE(ocltl_direct_decode_edge<node_t>(
+			tmpls, zero, 1, 1, ledger).has_value());
+		auto sol = ocltl_direct_decode_edge<node_t>(tmpls, one, 1, 1, ledger);
+		REQUIRE(sol.has_value());
+		for (tref tmpl : tmpls) CHECK(atom_holds(tmpl, one, sol.value(), 1));
+	}
+
 	// During warm-up, get_ubt_ctn_at can quantify away the very coordinate
 	// a step is deciding, collapsing its projection to T; step() must not
 	// read that as "unconstrained" and zero-default into a value the
