@@ -183,9 +183,10 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	// to that same encoding.  Both matter here for the same reasons:
 	//
 	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
-	//     constant) gives `qlt_atom_holds_in_type3 == nullopt` for every
-	//     type, and the `h != false` test below maps nullopt to "the atom
-	//     holds" — so the atom is silently asserted rather than left out;
+	//     constant) gives `qlt_atom_holds_in_type3 == atom_verdict::undecided`
+	//     for every type, and the `h != atom_verdict::fails` test below maps
+	//     undecided to "the atom holds" — so the atom is silently asserted
+	//     rather than left out;
 	//   * two or more distinct output variables share the single Y slot, so
 	//     `o1 < c && o2 > c` collapses to a constraint on one witness.
 	//
