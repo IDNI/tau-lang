@@ -80,7 +80,11 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 	grounded.reserve(tmpls.size());
 	for (tref tmpl : tmpls) {
 		tref updated = update_to_time_point<node>(tmpl, (int_t)time_point);
-		grounded.push_back(rewriter::replace<node>(updated, memory));
+		// an atom the committed values decide is no disequality left to
+		// solve: a false one makes the edge unsat for this history
+		tref g = rewriter::replace<node>(updated, memory);
+		if (tau::get(g).equals_F()) return std::nullopt;
+		if (!tau::get(g).equals_T()) grounded.push_back(g);
 	}
 
 	// New output coordinates to decide, in first-appearance order. A free
