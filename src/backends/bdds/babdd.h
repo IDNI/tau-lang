@@ -696,8 +696,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// negative v its complement
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		// Advisory drop: bit() returns bdd_ref, not result<>, so a
-		// stale/corrupt id here has no channel to report through.
+		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
 		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
@@ -1338,8 +1337,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		// Advisory drop: bit() returns bdd_ref, not result<>, so a
-		// stale/corrupt id here has no channel to report through.
+		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
 		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}

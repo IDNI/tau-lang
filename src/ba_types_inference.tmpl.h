@@ -66,7 +66,7 @@ size_t find_effective_ba_type(tref t) {
 template <NodeType node>
 bool type_needs_param(size_t type_id) {
 	auto type_tree = ba_types<node>::type_tree(type_id);
-	// Advisory drop: bool contract has no channel for the id-validity report.
+	// TODO (HIGH) dropped error: type_tree's report -- type_needs_param returns bool, which cannot carry it.
 	return type_tree.has_value()
 		&& pack_type_family_incomplete<node>(type_id, type_tree.value());
 }
@@ -81,7 +81,7 @@ void default_typing_message(tref var, tref env, const bool bv = false) {
 	std::string type_info;
 	if (!(is_io_var<node>(var) || tau::get(var).is(tau::ba_constant))) {
 		auto nm = get_ba_type_name<node>(tau::get(var).get_ba_type());
-		// Advisory drop: LOG_DEBUG diagnostic contract has no channel for the report.
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- a LOG_DEBUG line cannot carry it.
 		type_info = nm.has_value() ? nm.value() : std::string("INVALID");
 	}
 	const std::string message = bv ? "(Default bv width) " : "(Default typing) ";
@@ -233,7 +233,7 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 				typeable_type_ids_by_type[nt][canonized] = type_id.value();
 				continue;
 			}
-			// Advisory drop: std::variant<typeables_type_id_map<node>, inference_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 			return inference_error{typeable, it->second, get_effective_ba_type<node>(typeable)}; // conflicting or invalid type id
 		}
 		typeable_type_ids_by_type[nt][canonized] = get_effective_ba_type<node>(typeable);
@@ -244,7 +244,7 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 		LOG_TRACE << "\ttype: " << LOG_NT(type) << "\n";
 		for (auto [t, tid] : typeables) {
 			auto nm = ba_types<node>::name(tid);
-			// Advisory drop: ostream `<<` chain contract cannot abort the line.
+			// TODO (HIGH) dropped error: name's report -- a LOG_TRACE stream chain cannot abort the line.
 			LOG_TRACE << "\t\t" << LOG_FM(t) << " : "
 				<< (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
 		}
@@ -291,7 +291,7 @@ std::optional<inference_error> unify_bound_vars_with_cast_operands(tref body,
 			auto it = vars.find(canonized);
 			if (it == vars.end()) continue; // free here: typed by its annotation
 			auto unified = unify<node>(it->second, type_id);
-			// Advisory drop: std::optional<inference_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 			if (unified.has_value())
 				it->second = unified.value();
 			else return inference_error{canonized, it->second, type_id};
@@ -465,7 +465,7 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		auto current_type = get_effective_ba_type<node>(n);
 		auto inferred_type = types.at(canonized);
 		auto unified = unify<node>(current_type, inferred_type);
-		// Advisory drop: std::optional<size_t> return contract has no channel for the id-validity report.
+		// TODO (HIGH) dropped error: unify's report -- the optional<size_t> return carries only a conflict.
 		if (!unified.has_value()) return std::nullopt;
 		return unified.value();
 	}
@@ -580,7 +580,7 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 			auto parsed = tau::get_ba_constant_from_source(
 				tau::get(n).child_data(), type.value());
 			tau::use_hooks = saved_hooks;
-			// Advisory drop: std::variant<tref, inference_error, parse_error> has no channel for the parse report.
+			// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- parse_error carries only the element and type id.
 			if (!parsed.has_value() || parsed.value() == nullptr) return parse_error{canonized, type.value()};
 			n = parsed.value();
 		}
@@ -640,7 +640,7 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 		if (fallback_type && !is_untyped<node>(fallback_type)
 			&& !is_untyped<node>(type)) {
 			auto unified = unify<node>(fallback_type, type);
-			// Advisory drop: std::variant<tref, inference_error, parse_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 			if (!unified.has_value())
 				return inference_error{ fallback, type,
 					fallback_type };
@@ -883,7 +883,7 @@ tref type_annotated_operands(tref n) {
 					if (tau::get(typed).data() == 0) {
 						auto parsed = tau::get_ba_constant_from_source(
 							tau::get(typed).child_data(), type);
-						// Advisory drop: tref-shaped local has no channel for the parse report.
+						// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the local typed tref cannot carry it.
 						typed = parsed.has_value() ? parsed.value() : nullptr;
 					}
 					if (typed)
@@ -1137,7 +1137,7 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 		if (it == available_function_symbols.end()
 			|| is_untyped<node>(it->second)) continue;
 		auto unified = unify<node>(type, it->second);
-		// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+		// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 		if (unified.has_value()) continue;
 		return inference_error{ func, it->second, type };
 	}
@@ -1157,7 +1157,7 @@ void inference_error_message(
 	if (std::holds_alternative<parse_error>(error)) {
 		auto parse_err = std::get<parse_error>(error);
 		auto nm = ba_types<node>::name(parse_err.type_id);
-		// Advisory drop: LOG_ERROR stream chain contract cannot abort the line.
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		LOG_ERROR << "Unable to parse  " << tau::get(parse_err.element) << " with type "
 			<< (nm.has_value() ? nm.value() : std::string("INVALID")) << " (valid: "
 			<< node::ba::types_joined() << ")\n";
@@ -1168,7 +1168,7 @@ void inference_error_message(
 	} else if (std::holds_alternative<incomplete_type_error>(error)) {
 		auto incomplete_err = std::get<incomplete_type_error>(error);
 		auto nm = ba_types<node>::name(incomplete_err.type_id);
-		// Advisory drop: LOG_ERROR stream chain contract cannot abort the line.
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		LOG_ERROR << "Incomplete type " << (nm.has_value() ? nm.value() : std::string("INVALID"))
 			<< " in " << tau::get(incomplete_err.element)
 			<< ". The type needs a parameter.\n";
@@ -1177,7 +1177,7 @@ void inference_error_message(
 		auto inference_err = std::get<inference_error>(error);
 		auto expected_nm = ba_types<node>::name(inference_err.expected);
 		auto found_nm = ba_types<node>::name(inference_err.found);
-		// Advisory drop: LOG_ERROR stream chain contract cannot abort the line.
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		LOG_ERROR << "Incompatible type information in "
 			<< tau::get(inference_err.element)
 			<< ", expected " << (expected_nm.has_value() ? expected_nm.value() : std::string("INVALID"))
@@ -1546,7 +1546,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									|| is_untyped<node>(tid))
 										continue;
 								auto unified = unify<node>(outer, tid);
-								// Advisory drop: local `error` accumulator has no channel for the id-validity report.
+								// TODO (HIGH) dropped error: unify's report -- the local error accumulator carries only the conflicting ids.
 								if (unified.has_value())
 									continue;
 								error = inference_error{ canonized,
@@ -1686,7 +1686,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 							tau::get(cast).first());
 						if (!operand_type) continue;
 						auto unified = unify<node>(completed, operand_type);
-						// Advisory drop: on_enter traversal callback fixed shape has no channel for the id-validity report.
+						// TODO (HIGH) dropped error: unify's report -- the on_enter callback returns a fixed shape with no report channel.
 						if (!unified.has_value()) continue;
 						completed = unified.value();
 						if (!type_needs_param<node>(completed)) break;
@@ -1993,7 +1993,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									if (tau::get(typed).data() == 0) {
 										auto parsed = tau::get_ba_constant_from_source(
 											tau::get(typed).child_data(), cast_type);
-										// Advisory drop: on_leave traversal callback fixed shape has no channel for the parse report.
+										// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the on_leave callback returns a fixed shape.
 										typed = parsed.has_value() ? parsed.value() : nullptr;
 									}
 									if (typed) {
@@ -2024,7 +2024,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// definition machinery.
 						const size_t target_type = tau::get(parent).get_ba_type();
 						auto target_type_tree = ba_types<node>::type_tree(target_type);
-						// Advisory drop: on_leave traversal callback fixed shape has no channel for the id-validity report.
+						// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
 						const auto target_family = target_type_tree.has_value()
 							? pack_type_family_param<node>(target_type_tree.value())
 							: std::nullopt;
@@ -2038,7 +2038,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 							if (t == 0) continue;
 							if (target_family) {
 								auto t_type_tree = ba_types<node>::type_tree(t);
-								// Advisory drop: on_leave traversal callback fixed shape has no channel for the id-validity report.
+								// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
 								auto tf = t_type_tree.has_value()
 									? pack_type_family_param<node>(t_type_tree.value())
 									: std::nullopt;

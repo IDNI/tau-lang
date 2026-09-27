@@ -71,8 +71,7 @@ static std::optional<bv> bv_single_equality_constant(tref var, tref conj) {
 template <NodeType node>
 static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	using tau = tree<node>;
-	// Advisory drop: ba_has_codegen_witness fixes this member to
-	// std::optional<std::string>, shared with sbf and qlt.
+	// TODO (HIGH) dropped error: get_ba_type_tree's report -- ba_has_codegen_witness fixes this member to std::optional<std::string>.
 	auto type_tree_r = tau::get(var).get_ba_type_tree();
 	if (!type_tree_r.has_value()) return std::nullopt;
 	auto width_r = get_bv_size<node>(type_tree_r.value());
@@ -94,8 +93,7 @@ template <NodeType node>
 static std::optional<std::string> bv_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
 	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
-	// Advisory drop: ba_has_codegen_constant_expr fixes this member to
-	// std::optional<std::string>, shared with sbf and qlt.
+	// TODO (HIGH) dropped error: get_ba_type_tree's report -- ba_has_codegen_constant_expr fixes this member to std::optional<std::string>.
 	auto type_tree_r = tau::get(cst).get_ba_type_tree();
 	if (!type_tree_r.has_value()) return std::nullopt;
 	auto width_r = get_bv_size<node>(type_tree_r.value());

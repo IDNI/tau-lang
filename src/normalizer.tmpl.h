@@ -995,6 +995,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
 	auto ndir1 = normalize_non_temp<node>(imp1);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
 	if (!ndir1.has_value()) {
 		LOG_ERROR << "are_nso_equivalent: normalization of "
 			<< LOG_FM(imp1) << " failed; answering negatively.";
@@ -1007,6 +1008,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 	auto ndir2 = normalize_non_temp<node>(imp2);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
 	if (!ndir2.has_value()) {
 		LOG_ERROR << "are_nso_equivalent: normalization of "
 			<< LOG_FM(imp2) << " failed; answering negatively.";
@@ -1252,6 +1254,7 @@ bool are_bf_equal(tref n1, tref n2) {
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
 	auto normalized = normalize_non_temp<node>(bf_equal_fm);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_bf_equal returns bool, so the negative answer has no channel for it.
 	if (!normalized.has_value()) {
 		LOG_ERROR << "are_bf_equal: normalization of " << LOG_FM(bf_equal_fm)
 			<< " failed; answering negatively.";
@@ -1741,6 +1744,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 					{
 						auto nbr = normalize_non_temp<node>(
 							tau::build_wff_neg(nb));
+						// TODO (HIGH) dropped error: normalize_non_temp's report -- the negated block is kept as is and only logged.
 						if (nbr.has_value()) br = nbr.value();
 						else LOG_ERROR << "normalize_with_temp_simp: "
 							"normalization of negated block "
@@ -2505,6 +2509,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "Normalize step";
 		if (nt == tau::wff) {
 			auto nres = normalize<node>(current);
+			// TODO (HIGH) dropped error: normalize's report -- calculate_fixed_point returns tref, so nullptr has no channel for it.
 			if (!nres.has_value()) {
 				LOG_ERROR << "calculate_fixed_point: normalization "
 					"failed at enumeration step " << i;

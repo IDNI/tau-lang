@@ -111,9 +111,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 				return it->second;
 			auto vn = (tt(n) | tt::Tree).to_str();
 			// a new constant of the right type, remembered as free.
-			// Advisory drop: merging either child's report here would
-			// trip result<bv>'s error/value invariant, turning an
-			// ordinary untranslatable-node decline into a spurious error.
+			// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant, turning a decline into a spurious error.
 			auto type_tree = tau::get(n).get_ba_type_tree();
 			if (!type_tree.has_value()) return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
@@ -145,7 +143,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			// gracefully instead of asserting/crashing.
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// Advisory drop: see the variable case above.
+			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
 			if (!type_tree.has_value()) return std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
@@ -157,7 +155,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::bf_f: {
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// Advisory drop: see the variable case above.
+			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
 			if (!type_tree.has_value()) return std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
@@ -179,7 +177,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::wff_neg: return make_term_not(l);
 		case tau::bf_neg: return make_bitvector_not(l);
 		case tau::bf_cast: {
-			// Advisory drop: see eval_leaf's variable case above.
+			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as eval_leaf's variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
 			if (!type_tree.has_value()) return std::nullopt;
 			auto target_size_r = get_bv_size<node>(type_tree.value());
@@ -284,9 +282,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		// a bound "variable" that is not one (variable capture in
 		// substitution) binds nothing; the body is taken as it is
 		if (!is<node>(v, tau::variable)) return true;
-		// Advisory drop: merging this child's report would trip
-		// result<bv>'s error/value invariant; a width failure here drops
-		// the binder the same way an unbound capture above does.
+		// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant; a width failure drops the binder like an unbound capture.
 		auto type_tree = tau::get(v).get_ba_type_tree();
 		if (!type_tree.has_value()) return true;
 		auto bv_size = get_bv_size<node>(type_tree.value());
@@ -654,9 +650,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 				cvc5::Solver qf_solver(cvc5_term_manager);
 				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = bv_eval_node<node>(tt(matrix), vars, free_vars);
-				// Advisory drop: bv_formula_sat_status returns a bare
-				// optional, so a genuine bv_eval_node failure folds
-				// into the same translation-failure branch as a decline.
+				// TODO (HIGH) dropped error: bv_eval_node's report -- bv_formula_sat_status returns a bare optional, so a failure folds into the translation-failure branch as a decline.
 				if (!qf_expr.has_value()) {
 					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
@@ -700,9 +694,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	config_cvc5_solver(solver, true);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	// Advisory drop: bv_formula_sat_status returns a bare optional, so a
-	// genuine bv_eval_node failure folds into the same
-	// translation-failure branch as a decline.
+	// TODO (HIGH) dropped error: bv_eval_node's report -- bv_formula_sat_status returns a bare optional, so a failure folds into the translation-failure branch as a decline.
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
@@ -759,9 +751,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	config_cvc5_solver(solver);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	// Advisory drop: solve_bv returns a bare optional, so a genuine
-	// bv_eval_node failure folds into the same translation-failure
-	// branch as a decline.
+	// TODO (HIGH) dropped error: bv_eval_node's report -- solve_bv returns a bare optional, so a failure folds into the translation-failure branch as a decline.
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)

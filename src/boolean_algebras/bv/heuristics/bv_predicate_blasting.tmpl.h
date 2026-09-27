@@ -1434,8 +1434,7 @@ static bool has_non_bv_operand(tref atomic) {
 		if (!is<node, tau::variable>(n)) return true;
 		size_t t = tau::get(n).get_ba_type();
 		if (!is_bv_type_family<node>(t)) return bad = true, false;
-		// Advisory drop: search_unique's bool contract carries no report
-		// channel; a widthless bv type disqualifies the operand either way.
+		// TODO (HIGH) dropped error: get_bv_type_bitwidth's report -- search_unique returns bool, and a widthless bv type disqualifies the operand either way.
 		if (auto bw = get_bv_type_bitwidth<node>(n); !bw.has_value())
 			return bad = true, false;
 		return true;

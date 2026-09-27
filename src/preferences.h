@@ -91,6 +91,7 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		// encoding); a preference is optional, so drop it rather than
 		// treat an undecided verdict as a decided one.
 		auto r = is_ltl_aba_realizable<node>(candidate, 0, false);
+		// TODO (HIGH) dropped error: is_ltl_aba_realizable's report -- a preference is optional, so the preference is dropped.
 		if (!r.has_value()) {
 			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 				<< entry.var_name << "' -- realizability could not "

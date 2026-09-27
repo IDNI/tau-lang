@@ -159,7 +159,7 @@ const typename tree<node>::template extractor<typename tree<node>::constant>
 			[](const traverser& t) -> constant {
 				// Empty-traverser guard (TT1-10), like num/data.
 				if (!t.has_value()) return constant{};
-				// Advisory drop: fixed extractor<T>(const traverser&) signature.
+				// TODO (HIGH) dropped error: ba_constants::get's report -- extractor<T>(const traverser&) has a fixed signature with no channel.
 				return ba_constants<node>::get(
 					t.value_tree().get_ba_constant_id()).value_or(constant{});
 			});

@@ -92,13 +92,13 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::ba_constant) {
 		auto tn = get_ba_type_name<node>(n.ba_type);
-		// Advisory drop: std::ostream& contract cannot abort the line.
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
 		if (n.data == 0)
 			os << " { UNPARSED } : " << type_name;
 		else if (auto c = ba_constants<node>::get(n.get_data()); c.has_value())
 			os << " { " << c.value() << " } : " << type_name;
-		// Advisory drop: the printer contract cannot abort a line.
+		// TODO (HIGH) dropped error: ba_constants::get's report -- the stream printer cannot abort the line.
 		else os << " { INVALID } : " << type_name;
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
@@ -153,7 +153,7 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "\n";
 	for (const auto& [var, type] : ctx.types) {
 		auto tn = get_ba_type_name<node>(type);
-		// Advisory drop: std::ostream& contract cannot abort the line.
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		os << "\t" << get_var_name<node>(var->get())
 			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << "\n";
 	}
@@ -163,7 +163,7 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
 		auto tn = get_ba_type_name<node>(ctx.type_of(var));
-		// Advisory drop: std::ostream& contract cannot abort the line.
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		os << "\t" << get_var_name<node>(var)
 			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << " := "
 			<< (output ? "out" : "in") << " "
@@ -648,7 +648,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				else out(tau::get(ref).get_ba_constant());
 				out(" }");
 				auto ba_type_tree = t.get_ba_type_tree();
-				// Advisory drop: printer callback shape has no channel for the id-validity report.
+				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
 				if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
 				else out(std::string("INVALID"));
 				break;
@@ -717,7 +717,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// annotation without its leading ':'
 				out("(");
 				auto ba_type_tree = t.get_ba_type_tree();
-				// Advisory drop: printer callback shape has no channel for the id-validity report.
+				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
 				if (ba_type_tree.has_value())
 					for (tref c : get(ba_type_tree.value()).children())
 						out(get(c));
@@ -1015,7 +1015,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// above, so the fix is general.
 				if (parent && !is_untyped<node>(tau::get(parent).get_ba_type())) {
 					auto ba_type_tree = tau::get(parent).get_ba_type_tree();
-					// Advisory drop: printer callback shape has no channel for the id-validity report.
+					// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
 					if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
 					else out(std::string("INVALID"));
 					type_printed = true;

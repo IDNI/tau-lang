@@ -55,7 +55,7 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 	auto root = scoped.root(element);
 	if (auto it = type_ids.find(root); it != type_ids.end()) {
 		auto merged_tid = unify<node>(it->second, tid);
-		// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+		// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 		if (!merged_tid.has_value())
 			return inference_error{n, it->second, tid}; // conflicting or invalid type id
 		type_ids.insert_or_assign(root, merged_tid.value());
@@ -72,12 +72,12 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, 
 	auto type_a = type_id_of(a);
 	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
-	// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+	// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 	if (!merged.has_value())
 		return inference_error{a, type_a, type_b}; // conflicting or invalid type id
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
-	// Advisory drop: ostream `<<` chain contract cannot abort the line.
+	// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
 	DBG(
 		auto to_name = [](size_t tid) {
 			auto nm = ba_types<node>::name(tid);
@@ -115,7 +115,7 @@ subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_reso
 		if (scoped_var.first == current_scope) {
 			current_types[scoped_var.second] =
 				type_id_of(scoped_var.second);
-			// Advisory drop: ostream `<<` chain contract cannot abort the line.
+			// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
 			DBG(auto nm = ba_types<node>::name(current_types[scoped_var.second]);
 				LOG_TRACE << "\t" << LOG_FM_DUMP(scoped_var.second)
 				<< " : " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";)
@@ -142,7 +142,7 @@ std::ostream& type_scoped_resolver<node>::dump(std::ostream& os) {
 	for (auto [e,_]: scoped.uf) {
 		auto type = type_ids.at(e);
 		auto nm = ba_types<node>::name(type);
-		// Advisory drop: std::ostream& contract cannot abort the line.
+		// TODO (HIGH) dropped error: ba_types::name's report -- the stream printer cannot abort the line.
 		os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
 			<< ", type: " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
 	}
@@ -233,7 +233,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (!unified.has_value())
 				return inference_error{typeable, inferred_type, type};
 			else inferred_type = unified.value();
@@ -262,7 +262,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (!unified.has_value())
 				return inference_error{t, inferred_type, type};
 			else inferred_type = unified.value();
@@ -299,7 +299,7 @@ std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<n
 	auto unified_type = default_type;
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
-			// Advisory drop: std::variant<size_t, inference_error> has no channel for the id-validity report.
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (auto unified = unify<node>(unified_type, type); unified.has_value()) {
 				unified_type = unified.value();
 			} else return inference_error{ typeable, type, unified_type}; // conflicting or invalid type id

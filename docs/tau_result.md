@@ -113,10 +113,10 @@ that state instead with a default-constructed `result<T>`.
 ## Dropping a report
 
 A report is dropped only at a call site whose signature cannot carry one.
-Name the blocking contract in a comment there:
+Name the operation that failed and the blocking contract in a comment there:
 
 ```cpp
-// Advisory drop: <the contract that blocks the report>.
+// TODO (HIGH) dropped error: <what fails> -- <the contract that blocks the report>.
 ```
 
 Real contracts in this codebase include:

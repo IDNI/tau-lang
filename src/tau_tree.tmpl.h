@@ -658,7 +658,7 @@ result<tref> tree<node>::get_ba_constant_from_source(
 				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
-	// Advisory drop: DEBUG-only trace line has no channel for a report here.
+	// TODO (HIGH) dropped error: ba_types::name's report -- a DEBUG-only trace line cannot carry it.
 	else LOG_TRACE << " -- typed: "
 		<< ba_types<node>::name(ba_type_id).value_or(std::string());
 	assert(ba_type_id > 0);
@@ -673,7 +673,7 @@ result<tref> tree<node>::get_ba_constant_from_source(
 	// cause was the Bool-pack test harness's get() specialization
 	// ignoring the requested type — fixed in tests/test_Bool_helpers.h,
 	// 2026-08-19. Nothing is wrong at this call site.)
-	// Advisory drop: LOG_ERROR contract cannot abort the line for a report.
+	// TODO (HIGH) dropped error: ba_constants::get's report -- the LOG_ERROR line cannot abort for it.
 	if (value == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
 		<< ba_types<node>::name(ba_type_id).value_or(std::string())
@@ -1013,7 +1013,7 @@ size_t tree<node>::get_ba_constant_id() const {
 template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	// Advisory drop: plain-value accessor contract.
+	// TODO (HIGH) dropped error: ba_constants::get's report -- get_ba_constant returns a plain constant, which cannot carry it.
 	// ba_constants indexes its pool with size_t.
 	const size_t id = static_cast<size_t>(this->data());
 	return ba_constants<node>::get(id).value_or(constant{});

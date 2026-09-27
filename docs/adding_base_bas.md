@@ -129,10 +129,10 @@ returns a result. Wrap the value with `result<bool>{...}`,
 Every other mandatory member keeps a fixed, non-`result` signature, such
 as `type_name`. A BA that meets a failure there cannot
 return a report, because the signature has no channel for one. Name the
-blocking contract on one line instead:
+operation that failed and the blocking contract instead:
 
 ```cpp
-// Advisory drop: <the contract that blocks the report>.
+// TODO (HIGH) dropped error: <what fails> -- <the contract that blocks the report>.
 ```
 
 Assert a whole pack at its first instantiation site:

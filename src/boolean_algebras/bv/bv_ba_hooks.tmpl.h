@@ -57,7 +57,7 @@ tref term_add(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return add_consts(
@@ -69,7 +69,7 @@ tref term_add(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return add_consts(
@@ -90,7 +90,7 @@ tref term_add(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return add_consts(
@@ -147,7 +147,7 @@ tref term_sub(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return sub_consts(
@@ -168,7 +168,7 @@ tref term_sub(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return sub_consts(
@@ -180,7 +180,7 @@ tref term_sub(tref symbol) {
 			if (c2.is_ba_constant() && c2.get_ba_type() > 0) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return sub_consts(
@@ -204,7 +204,7 @@ tref term_sub(tref symbol) {
 					return sub_consts(neg_c1, std::get<bv>(c2.get_ba_constant()), type_id);
 				if (c2.is(tau::bf_t)) {
 					auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
-					// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+					// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 					if (!width_r.has_value()) return nullptr;
 					const size_t width = width_r.value();
 					return sub_consts(neg_c1, make_bitvector_top_elem(width), type_id);
@@ -227,7 +227,7 @@ tref term_sub(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return sub_consts(
@@ -268,7 +268,7 @@ tref term_mul(tref symbol) {
 		// pass instead of wrapping now.
 		if (bv_widening) {
 			auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
-			// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+			// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 			if (!width_r.has_value()) return nullptr;
 			const size_t width = width_r.value();
 			auto nz = compare_bv_consts(c2, make_bitvector_bottom_elem(width));
@@ -294,7 +294,7 @@ tref term_mul(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return mul_consts(
@@ -306,7 +306,7 @@ tref term_mul(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return mul_consts(
@@ -327,7 +327,7 @@ tref term_mul(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return mul_consts(
@@ -392,7 +392,7 @@ tref term_div(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return div_consts(
@@ -404,7 +404,7 @@ tref term_div(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return div_consts(
@@ -427,7 +427,7 @@ tref term_div(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return div_consts(
@@ -448,7 +448,7 @@ tref term_div(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return div_consts(
@@ -502,7 +502,7 @@ tref term_mod(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return mod_consts(
@@ -531,7 +531,7 @@ tref term_mod(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return mod_consts(
@@ -582,7 +582,7 @@ tref term_shr(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shr_consts(
@@ -594,7 +594,7 @@ tref term_shr(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shr_consts(
@@ -611,7 +611,7 @@ tref term_shr(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shr_consts(
@@ -623,7 +623,7 @@ tref term_shr(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shr_consts(
@@ -642,7 +642,7 @@ tref term_shr(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shr_consts(
@@ -701,7 +701,7 @@ tref term_shl(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shl_consts(
@@ -713,7 +713,7 @@ tref term_shl(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shl_consts(
@@ -730,7 +730,7 @@ tref term_shl(tref symbol) {
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shl_consts(
@@ -742,7 +742,7 @@ tref term_shl(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shl_consts(
@@ -761,7 +761,7 @@ tref term_shl(tref symbol) {
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
-				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
 				if (!width_r.has_value()) return nullptr;
 				const size_t width = width_r.value();
 				return shl_consts(
@@ -1008,7 +1008,7 @@ tref term_cast(tref symbol, size_t target_type_id) {
 
 	auto src_width_r = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
 	auto target_width_r = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
-	// Advisory drop: the hook returns tref with no report channel, so a bitwidth failure leaves the term unrewritten.
+	// TODO (HIGH) dropped error: get_bv_width's report -- the hook returns tref with no report channel, so the term stays unrewritten.
 	if (!src_width_r.has_value() || !target_width_r.has_value()) return nullptr;
 	const size_t src_width = src_width_r.value();
 	const size_t target_width = target_width_r.value();

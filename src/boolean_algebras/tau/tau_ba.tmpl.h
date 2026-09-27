@@ -102,6 +102,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// The Boolean operator contract is total: a failed normalization
 	// falls back to the unnormalized main by definition, not as a
 	// dropped report.
+	// TODO (HIGH) dropped error: the operand's normalization report -- operator~ returns a plain tau_ba, which cannot carry it.
 	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
 		normalized_tau_ba_main(*this).value_or(main))));
 	auto nrec_relations = nso_rr.rec_relations;
@@ -114,7 +115,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 	// The Boolean operator contract is total: a failed normalization
 	// falls back to the unnormalized main by definition, not as a
 	// dropped report.
+	// TODO (HIGH) dropped error: the left operand's normalization report -- operator& returns a plain tau_ba, which cannot carry it.
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	// TODO (HIGH) dropped error: the right operand's normalization report -- operator& returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_and(lhs, rhs));
 	auto nrec_relations =
@@ -128,7 +131,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 	// The Boolean operator contract is total: a failed normalization
 	// falls back to the unnormalized main by definition, not as a
 	// dropped report.
+	// TODO (HIGH) dropped error: the left operand's normalization report -- operator| returns a plain tau_ba, which cannot carry it.
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	// TODO (HIGH) dropped error: the right operand's normalization report -- operator| returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_or(lhs, rhs));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
@@ -142,7 +147,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
 	// The Boolean operator contract is total: a failed normalization
 	// falls back to the unnormalized main by definition, not as a
 	// dropped report.
+	// TODO (HIGH) dropped error: the left operand's normalization report -- operator+ returns a plain tau_ba, which cannot carry it.
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	// TODO (HIGH) dropped error: the right operand's normalization report -- operator+ returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_xor(lhs, rhs));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
@@ -431,6 +438,8 @@ requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
 	// An undecidable is_one()/is_zero() falls to the side that never
 	// misreports a witness: not one, and (unless proven otherwise) zero.
+	// TODO (HIGH) dropped error: is_one's decision report -- operator== returns bool, which cannot carry it.
+	// TODO (HIGH) dropped error: is_zero's decision report -- operator== returns bool, which cannot carry it.
 	return b ? other.is_one().value_or(false)
 		 : other.is_zero().value_or(true);
 }

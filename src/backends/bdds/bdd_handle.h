@@ -668,7 +668,7 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			// Advisory drop: the printer contract cannot abort a line.
+			// TODO (HIGH) dropped error: var_dict's report -- the printer cannot abort the line.
 			if (auto name = var_dict(v < 0 ? -v : v); name.has_value())
 				s.insert(v < 0 ? name.value() + "'" : name.value());
 		bool first = true;

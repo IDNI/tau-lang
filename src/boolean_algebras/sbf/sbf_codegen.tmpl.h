@@ -115,9 +115,7 @@ static std::optional<std::string> sbf_codegen_constant_expr(tref cst) {
 	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
 	auto expr = sbf_constant_expr<node>(
 		std::get<sbf_ba>(tau::get(cst).get_ba_constant()));
-	// Advisory drop: codegen_constant_expr is fixed to
-	// std::optional<std::string> by ba_has_codegen_constant_expr, so a
-	// var_dict lookup failure has no report channel back to the pack descriptor.
+	// TODO (HIGH) dropped error: sbf_constant_expr's report -- codegen_constant_expr is fixed to std::optional<std::string> by ba_has_codegen_constant_expr.
 	if (!expr.has_value()) return std::nullopt;
 	return expr.value();
 }

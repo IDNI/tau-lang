@@ -1790,6 +1790,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// A fixpoint-step give-up surfaces as an error on `r`; propagate it.
 	if (!chi_fp) return r;
 	auto [chi_inf, steps] = *chi_fp;
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- the cap violation is carried as a null tree, which has no report channel.
 	chi_inf = normalize_non_temp<node>(chi_inf).value_or(nullptr);
 	// A cap violation surfaces as nullptr; propagate it rather than
 	// dereferencing it below.
@@ -1872,6 +1873,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				TAU_TO_STR(res), output);
 			return r.with_value(res);
 		}
+
 	}
 }
 

@@ -42,12 +42,14 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	// Undecidable falls to false here (never a witness of validity), the
 	// same fallback is_one() itself uses on its own decision failure.
 	static bool is_syntactic_one(const ba_t& x) {
+		// TODO (HIGH) dropped error: is_one's decision report -- is_syntactic_one returns bool, which cannot carry it.
 		return x.is_one().value_or(false);
 	}
 
 	// Undecidable falls to true here (never a witness of non-zeroness),
 	// mirroring is_zero()'s own fallback on decision failure.
 	static bool is_syntactic_zero(const ba_t& x) {
+		// TODO (HIGH) dropped error: is_zero's decision report -- is_syntactic_zero returns bool, which cannot carry it.
 		return x.is_zero().value_or(true);
 	}
 

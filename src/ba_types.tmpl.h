@@ -45,7 +45,7 @@ bool is_tau_type(tref t) {
 template <NodeType node>
 bool is_tau_type(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: type_tree's report -- is_tau_type returns bool, which cannot carry it.
 	return tt.has_value() && is_tau_type<node>(tt.value());
 }
 
@@ -110,7 +110,7 @@ bool is_untyped(tref t) {
 template <NodeType node>
 bool is_untyped(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: type_tree's report -- is_untyped returns bool, which cannot carry it.
 	return tt.has_value() && is_untyped<node>(tt.value());
 }
 
@@ -132,7 +132,7 @@ bool is_bool_type(tref t) {
 template <NodeType node>
 bool is_bool_type(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: type_tree's report -- is_bool_type returns bool, which cannot carry it.
 	return tt.has_value() && is_bool_type<node>(tt.value());
 }
 
@@ -163,7 +163,7 @@ bool type_tree_name_is(tref t, const char* name) {
 template <typename BA, NodeType node>
 bool type_tree_name_is(size_t ba_type_id, const char* name) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: type_tree's report -- type_tree_name_is returns bool, which cannot carry it.
 	return t.has_value() && type_tree_name_is<BA, node>(t.value(), name);
 }
 
@@ -253,7 +253,7 @@ size_t ba_types<node>::name_hash(size_t ba_type_id) {
 		return cache[ba_type_id];
 	if (ba_type_id >= cache.size()) cache.resize(ba_type_id + 1, 0);
 	auto nm = name(ba_type_id);
-	// Advisory drop: node::hashit()'s noexcept contract has no channel for a report here.
+	// TODO (HIGH) dropped error: name's report -- node::hashit's noexcept contract cannot carry it.
 	if (!nm.has_value()) {
 		static const size_t h_invalid = std::hash<std::string>{}(":invalid");
 		return h_invalid;
@@ -264,7 +264,7 @@ size_t ba_types<node>::name_hash(size_t ba_type_id) {
 template <NodeType node>
 std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
 	auto nm = name(tid);
-	// Advisory drop: std::ostream& contract cannot abort the line.
+	// TODO (HIGH) dropped error: name's report -- ba_types::print returns std::ostream&, which cannot abort the line.
 	return os << (nm.has_value() ? nm.value() : std::string("INVALID"));
 }
 
@@ -274,7 +274,7 @@ std::ostream& ba_types<node>::dump(std::ostream& os) {
 	os << "BA type_trees pool(" << type_trees().size() << "):\n";
 	for (size_t i = 0; i < type_trees().size(); ++i) {
 		auto nm = name(i);
-		// Advisory drop: std::ostream& contract cannot abort the line.
+		// TODO (HIGH) dropped error: name's report -- ba_types::dump writes to std::ostream, which cannot abort the line.
 		std::string s = nm.has_value() ? nm.value() : std::string("INVALID");
 		LOG_TRACE << "type: " << i;
 		LOG_TRACE << "val:  " << s;
@@ -350,7 +350,7 @@ size_t get_ba_type_id(tref ba_type) {
 template<NodeType node>
 tref get_ba_type_tree(size_t ba_type_id) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// Advisory drop: tref contract, nullptr is this function's existing invalid-id answer.
+	// TODO (HIGH) dropped error: type_tree's report -- get_ba_type_tree answers nullptr for an invalid id.
 	return t.has_value() ? t.value() : nullptr;
 }
 
@@ -438,7 +438,7 @@ std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids.size(); ++i) {
 		auto u = unify<node>(result.value(), nids[i]);
-		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
 		if (!u.has_value()) return std::nullopt;
 		result = u.value();
 	}
@@ -451,11 +451,11 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids1.size(); ++i) {
 		auto u1 = unify<node>(result.value(), nids1[i]);
-		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
 		if (!u1.has_value()) return std::nullopt;
 		result = u1.value();
 		auto u2 = unify<node>(result.value(), nids2[i]);
-		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
 		if (!u2.has_value()) return std::nullopt;
 		result = u2.value();
 	}
@@ -523,7 +523,7 @@ bool pack_owns_ba_type(size_t ba_type_id) {
 	using tau = tree<node>;
 	if (is_reserved_ba_type<node>(ba_type_id)) return true;
 	auto tt = ba_types<node>::type_tree(ba_type_id);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: type_tree's report -- pack_owns_ba_type returns bool, which cannot carry it.
 	if (!tt.has_value()) return false;
 	return pack_owns_ba_type_name<node>(tau::get(tt.value())[0].get_string());
 }
@@ -572,7 +572,7 @@ template <NodeType node>
 tref find_ba_type_tree (tref term) {
 	const size_t t = find_ba_type<node>(term);
 	auto tt = ba_types<node>::type_tree(t);
-	// Advisory drop: tref contract, nullptr is this function's existing not-found answer.
+	// TODO (HIGH) dropped error: type_tree's report -- find_ba_type_tree answers nullptr for a not-found id.
 	return tt.has_value() ? tt.value() : nullptr;
 }
 
@@ -597,7 +597,7 @@ bool is_buildable(size_t op, tref n, tref m) {
 	auto n_ba_type = tau::get(n).get_ba_type();
 	auto m_ba_type = tau::get(m).get_ba_type();
 	auto unified_r = unify<node>(n_ba_type, m_ba_type);
-	// Advisory drop: bool contract, no channel for a report here.
+	// TODO (HIGH) dropped error: unify's report -- is_buildable returns bool, which cannot carry it.
 	if (!unified_r.has_value()) return false;
 	size_t unified = unified_r.value();
 	switch (op) {

@@ -37,8 +37,7 @@ bool is_bv_type_family(tref t) {
 template<NodeType node>
 bool is_bv_type_family(size_t ba_type_id) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// Advisory drop: owns_type (ba_descriptor_complete) fixes this to bool,
-	// so an out-of-range id reads the same as "not a bv type".
+	// TODO (HIGH) dropped error: type_tree's report -- owns_type is fixed to bool, so an out-of-range id reads as "not a bv type".
 	if (!t.has_value()) return false;
 	return is_bv_type_family<node>(t.value());
 }

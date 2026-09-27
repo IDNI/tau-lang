@@ -178,6 +178,7 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	// the same conservative answer a decision failure elsewhere in the
 	// pack falls back to; use node::ba::is_zero directly for the report.
 	if (lt[0].is_ba_constant())
+		// TODO (HIGH) dropped error: is_zero's decision report -- is_zero returns bool, which cannot carry it.
 		return node::ba::is_zero(lt[0].get_ba_constant()).value_or(false);
 	if (lt.is(tau::bf))  return lt.equals_0();
 	if (lt.is(tau::wff)) return lt.equals_F();
@@ -198,6 +199,7 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	// more elaborate cases -- an undecided constant reads as "not one";
 	// use node::ba::is_one directly for the report.
 	if (lt[0].is_ba_constant())
+		// TODO (HIGH) dropped error: is_one's decision report -- is_one returns bool, which cannot carry it.
 		return node::ba::is_one(lt[0].get_ba_constant()).value_or(false);
 	if (lt.is(tau::bf))  return lt.equals_1();
 	if (lt.is(tau::wff)) return lt.equals_T();

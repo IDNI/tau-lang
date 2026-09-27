@@ -414,7 +414,7 @@ static bool aba_existential_feasible(tref fm) {
 					warned = true;
 					auto nm = get_ba_type_name<node>(
 						tree<node>::get(v).get_ba_type());
-					// Advisory drop: LOG_WARNING stream chain contract cannot abort the line.
+					// TODO (HIGH) dropped error: get_ba_type_name's report -- a LOG_WARNING stream chain cannot abort the line.
 					TAU_LOG_WARNING << "[ltl_aba] a "
 						<< (nm.has_value() ? nm.value() : std::string("INVALID"))
 						<< " output atom is taken as feasible: the "
