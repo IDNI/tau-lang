@@ -79,7 +79,7 @@ only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-package
 `{release,devel,debug}-binding-python`,
 `{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
 `release-all`), `msvc-all` (alias of `release-msvc-all`).
-Every preset has the `release-`, `devel-` and `debug-` twins addendum 2 asks for — the
+Every preset has its `release-`, `devel-` and `debug-` twins — the
 `-DTAU_BAS` variants and the MSVC, w64, python and ninja-test families included.
 Default preset is `release` if omitted. macOS uses the `release`/`debug` family as-is,
 where `clang`/`clang++` resolve to AppleClang. The wasm family is documented
@@ -197,6 +197,7 @@ Tau builds for wasm through Emscripten as four separate artifacts: a
 **the test suite**, **the CLI** (`tau_repl.js`, the REPL suite runs it
 under node), and **the browser REPL** (`tau_repl_web.js`, FTXUI over
 xterm.js).
+
 Each pack builds in one directory, named after the preset. The release family's
 base folder is `build/release-wasm`, shared by `release-wasm`,
 `release-wasm-all-tests`, `release-wasm-all-tests-browser`, `release-wasm-repl`
@@ -209,6 +210,7 @@ others — see the constraints below. Every preset exists as `release-wasm-*`,
 families' own build-type settings. The no-thread pack is `<type>-wasm-nothreads`
 (`release-wasm-nothreads`, `devel-wasm-nothreads`, `debug-wasm-nothreads`, and
 their `-all-tests` variants) in `build/<type>-wasm-nothreads`.
+
 | preset | builds | runs |
 |---|---|---|
 | `release-wasm` | the library | nothing |
@@ -219,6 +221,7 @@ their `-all-tests` variants) in `build/<type>-wasm-nothreads`.
 | `release-wasm-repl-browser` | the browser REPL page | nothing |
 | `release-wasm-repl-tests-browser` | the browser REPL page | the REPL suite inside it, in headless Chrome |
 | `release-wasm-nothreads`, `release-wasm-nothreads-all-tests`, `release-wasm-nothreads-all-tests-browser` | as above, without `-pthread` | as above |
+
 The two `*-browser` suite presets reconfigure the node folder with
 `TAU_BUILD_BROWSER_TESTS=ON`, so the compiled suite is not built twice.
 `release-wasm-repl-tests-browser` replays the node build's ctest REPL cases in
@@ -227,6 +230,7 @@ node build (`release-wasm-repl-tests`) first.
 
 ```bash
 ./dev dep-emsdk.sh                                       # emsdk → $TAU_SHARED_PREFIX/emsdk
+
 ./dev preset release-wasm                                # tau.js + tau.wasm + tau.esm.mjs
 node build/release-wasm/tau.node.js                      # smoke test
 node bindings/js/tests/parity.js                         # wasm vs native, 140 checks
@@ -284,10 +288,9 @@ Four constraints, each of which has broken a build here:
   no single-threaded fallback, so the REPL always needs `-pthread` and `-sJSPI`, for
   the `emscripten_sleep()` call in the FTXUI input loop.
 - **Every linked object must agree on the exception encoding.** Tau builds with
-  `-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0`; a Boost dist built the other way
-  fails `wasm-ld` with undefined `__cpp_exception`. `dep-boost.sh` stamps each wasm
-  dist with the encoding that produced it and rebuilds on a mismatch — b2 will not
-  otherwise notice a flag change, since its dependency tracking is mtime-based.
+  `-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0`; a Boost package built the other
+  way fails `wasm-ld` with undefined `__cpp_exception`. The encoding travels in the
+  store id's `cxxflags`, so a flag change selects a different Boost package.
 - **Values that must agree across platforms need a fixed width.** wasm32 is the only
   32-bit target here, and `size_t` is a word size, not a width. `tau_tree.h`'s node
   word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
@@ -301,6 +304,7 @@ on (`release-wasm-all-tests`, `release-wasm-repl-tests`,
 `build/release-wasm`; every other wasm preset skips them, so their compiled suites
 still defer to them instead. `release-wasm-repl-tests-browser` replays those same
 cases in the browser REPL page.
+
 The wasm library is also the npm package: configure writes `package.json` into the
 build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies the
 `LICENSE.md` and the test scripts its `files` list names, so the build directory is
@@ -309,6 +313,14 @@ which puts exactly those listed files into the local store like every other pack
 There is no npm registry and no npm token anywhere in the build or CI. The package
 is the library only, never the REPL; its threading follows the preset, so
 `release-wasm-nothreads` yields a library without `-pthread`.
+
+CI splits the wasm gate in two: the `wasm-node` Docker target builds the library,
+the suite under emsdk's node (the pthread suite and the `release-wasm-nothreads`
+suite) and the parity check, and `wasm-browser` builds the browser REPL page, runs
+the compiled suite in headless Chrome and checks the page starts. Both derive from
+the `wasm-deps` image, which installs only emsdk; Boost, FTXUI, unordered_dense
+and the parser SDK resolve from the store at configure time, with the pthread
+variant in the id.
 
 ## Architecture
 
@@ -493,7 +505,9 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
 
 - `.tmpl.h` files contain template implementations (included by their corresponding `.h`).
 - Task annotations: `TODO`, `DOING`, `IDEA`, `FIXME`, `REVIEW`, `DOCUMENTATION`, `MARK` with priority tags `(IMPORTANT)`, `(HIGH)`, `(MEDIUM)`, `(LOW)`, `(VERY LOW)`.
-- External dependencies (CVC5, Boost) are installed to `~/.tau/` by `./dev dep-cvc5.sh` and `./dev dep-boost.sh`.
+- External dependencies (CVC5, Boost, FTXUI, unordered_dense, the parser SDK, the host
+  `tgf`, and the Windows curl) resolve through the store at configure time; a missing
+  package is read from `TAU_STORE_REMOTE` or built from the preset.
 - The parser library is a git submodule at `external/parser/`.
 
 ### Errors
