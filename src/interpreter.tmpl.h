@@ -1628,6 +1628,12 @@ struct data_game_step_provider : step_provider<node> {
 		return strategy->state();
 	}
 	int_t lookback() const override { return (int_t)strategy->depth; }
+	// memory keeps the values of the fixed steps a revision reads
+	int_t highest_fixed_step() const override {
+		if (!spec) return 0;
+		return get_max_initial<node>(tree<node>::get(spec->get())
+			.select_top(is_child<node, tree<node>::io_var>));
+	}
 	void reset() override {
 		offset = 0;
 		strategy->reset();
@@ -2491,6 +2497,8 @@ void interpreter<node>::compute_lookback_and_initial() {
 	if (provider_) lookback = std::max(lookback, provider_->lookback());
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
+	if (provider_) highest_initial_pos = std::max(highest_initial_pos,
+		provider_->highest_fixed_step());
 	fixed_inputs_.clear();
 	for (tref v : io_vars)
 		if (is_io_initial<node>(v) && tau::get(v).is_input_variable())
@@ -3082,7 +3090,25 @@ result<typename interpreter<node>::update_plan>
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
-	tref running = rewriter::replace<node>(dg->spec->get(), memory);
+	// the fixed steps already played read their values
+	auto played = [&](tref fm) {
+		subtree_map<node, tref> values;
+		for (tref v : tau::get(fm).select_top(
+			is_child<node, tau::io_var>))
+		{
+			if (!is_io_initial<node>(v)) continue;
+			const int_t tp = get_io_time_point<node>(v);
+			if (tp >= (int_t)time_point) continue;
+			const size_t type = tau::get(v).get_ba_type();
+			tref name = get_var_name_node<node>(v);
+			auto it = memory.find(tau::get(v).is_input_variable()
+				? build_in_var_at_n<node>(name, tp, type)
+				: build_out_var_at_n<node>(name, tp, type));
+			if (it != memory.end()) values.emplace(v, tau::trim(it->second));
+		}
+		return rewriter::replace<node>(fm, values);
+	};
+	tref running = played(dg->spec->get());
 	std::vector<std::pair<tref, report>> failures;
 	auto revision_r = pointwise_revision(
 		htrefs{ tree<node>::geth(running) }, shifted_update, time_point);

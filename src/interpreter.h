@@ -73,6 +73,9 @@ struct step_provider {
 	/// @brief Past steps the provider reads beyond the spec's own lookback.
 	virtual int_t lookback() const { return 0; }
 
+	/// @brief The last fixed step the spec the provider plays reads.
+	virtual int_t highest_fixed_step() const { return 0; }
+
 	/// @brief Starts the provider's own memory afresh (interpreter::reset).
 	virtual void reset() {}
 
