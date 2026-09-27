@@ -62,12 +62,13 @@ endif()
 
 # Every skip reason, and the summary line it prints. A HOSTFS or SUBPROCESS
 # case registers disabled, so ctest lists it as not run instead of missing.
-set(TAU_REPL_SKIP_REASONS PACK LTLSYNT HOSTFS SUBPROCESS)
+set(TAU_REPL_SKIP_REASONS PACK LTLSYNT HOSTFS SUBPROCESS SDK)
 set(TAU_REPL_DISABLED_REASONS HOSTFS SUBPROCESS)
 set(TAU_REPL_SKIP_WHY_PACK "naming a BA outside TAU_BAS=${TAU_BAS}")
 set(TAU_REPL_SKIP_WHY_LTLSYNT "needing ltlsynt, which this build cannot run")
 set(TAU_REPL_SKIP_WHY_HOSTFS "opening a host file this build's filesystem cannot reach")
 set(TAU_REPL_SKIP_WHY_SUBPROCESS "spawning a host compiler, which a wasm module cannot run")
+set(TAU_REPL_SKIP_WHY_SDK "needing a platform SDK this build tree does not hold")
 
 # Sets <out> to the reason a case cannot run, or to an empty string. hostfs
 # gates on EMSCRIPTEN and the node emulator, not CMAKE_CROSSCOMPILING: a mingw

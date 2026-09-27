@@ -313,19 +313,10 @@ function(tau_generate_pack_header)
 		"Directory containing the generated tau_pack.h")
 	set(TAU_PACK_HEADER "${TAU_PACK_INCLUDE_DIR}/tau_pack.h")
 
-	# SDK root baked into tau_pack.h for `tau compile`; a caller may set this first.
-	if(NOT DEFINED TAU_SDK_ROOT_PATH OR TAU_SDK_ROOT_PATH STREQUAL "")
-		set(TAU_SDK_ROOT_PATH "${PROJECT_SOURCE_DIR}")
-	endif()
-	set(TAU_SDK_ROOT_PATH "${TAU_SDK_ROOT_PATH}" PARENT_SCOPE)
-
 	# Filled in for real by tau_finalize_pack_compile_definitions() once
 	# tauparser exists and the packages are found; empty here just keeps
 	# this first write well-formed.
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
-	set(TAU_CODEGEN_BA_PACKAGE_DIRS "")
-	set(TAU_CODEGEN_BUILD_DIR "${CMAKE_BINARY_DIR}")
-	set(TAU_CODEGEN_PARSER_LIB "${CMAKE_BINARY_DIR}/libtauparser.a")
 
 	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
 
@@ -367,35 +358,6 @@ function(tau_generate_pack_header)
 	set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
 		"${TAU_CODEGEN_ARTIFACT_PREINST_DEFINE}" PARENT_SCOPE)
 
-	# Under a Coverage build libTAU.a is instrumented, so a program `tau
-	# compile` links against it needs the coverage runtime too. With GCC that
-	# is this compiler's libgcov, named by path: the program may be built by
-	# another compiler (clang++ by default), whose --coverage runtime does not
-	# define the gcov symbols.
-	if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
-		set(TAU_CODEGEN_COVERAGE_DEFINE "#define TAU_CODEGEN_COVERAGE 1")
-		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			execute_process(
-				COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libgcov.a
-				OUTPUT_VARIABLE _tau_gcov_lib
-				OUTPUT_STRIP_TRAILING_WHITESPACE)
-			if(IS_ABSOLUTE "${_tau_gcov_lib}" AND EXISTS "${_tau_gcov_lib}")
-				string(APPEND TAU_CODEGEN_COVERAGE_DEFINE
-					"\n#define TAU_CODEGEN_COVERAGE_LIB \"${_tau_gcov_lib}\"")
-			endif()
-		endif()
-	else()
-		set(TAU_CODEGEN_COVERAGE_DEFINE "")
-	endif()
-	set(TAU_CODEGEN_COVERAGE_DEFINE
-		"${TAU_CODEGEN_COVERAGE_DEFINE}" PARENT_SCOPE)
-
-	# The compiler that builds libTAU.a: a program linking it is built by the
-	# same one, since GCC and Clang mangle constrained templates differently.
-	set(TAU_CODEGEN_CXX_DEFINE
-		"#define TAU_CODEGEN_CXX \"${CMAKE_CXX_COMPILER}\"")
-	set(TAU_CODEGEN_CXX_DEFINE "${TAU_CODEGEN_CXX_DEFINE}" PARENT_SCOPE)
-
 	# The carrier order reaches the fold as one macro rather than through
 	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
 	# includes tau_tree.h and so the traits themselves.
@@ -428,6 +390,8 @@ function(tau_generate_pack_header)
 	# inside tau, so `tau gen` writes a buildable project with no SDK on disk.
 	# The template's `@TAU_ARTIFACT_EXE_NAME@` placeholder stays literal, and
 	# platforms.json goes verbatim: `${fileDir}` resolves inside the artifact.
+	file(READ "${TAU_BAS_CMAKE_DIR}/tau-artifact-CMakeLists.txt.in"
+		TAU_ARTIFACT_CMAKE_TEMPLATE)
 	file(READ "${TAU_BAS_CMAKE_DIR}/presets/artifact-presets.json"
 		TAU_ARTIFACT_PRESETS_JSON)
 	file(READ "${TAU_BAS_CMAKE_DIR}/presets/platforms.json"
@@ -463,27 +427,15 @@ function(tau_generate_pack_header)
 endfunction()
 
 #
-# Re-writes tau_pack.h once tauparser exists (called after its add_subdirectory,
-# which tau_generate_pack_header() precedes), filling in the compile
-# definitions actually resolved active on this build: the TAU_DEFINITIONS
-# target_compile_definitions_if() would have applied, plus whatever tauparser
-# requires of its consumers (e.g. TAU_PARSER_MEASURE* once TAU_PARSER_BUILD_TGF
-# forces it on). A `tau compile` artifact links libTAU.a/libtauparser.a as
-# prebuilt archives, so its own TU needs the same toggles or a header-only
-# template's layout drifts from the one those archives were compiled against.
+# Resolve the compile definitions actually active on this build: the
+# TAU_DEFINITIONS target_compile_definitions_if() would have applied, plus
+# whatever tauparser requires of its consumers (e.g. TAU_PARSER_MEASURE* once
+# TAU_PARSER_BUILD_TGF forces it on). An artifact links libTAU.a as a prebuilt
+# archive, so its own TU needs the same toggles or a header-only template's
+# layout drifts from the archive. Also records where find_package resolved each
+# BA-required package, for the build-tree SDK's dependency hints.
 #
 function(tau_finalize_pack_compile_definitions)
-	set(TAU_CODEGEN_BUILD_DIR "${CMAKE_BINARY_DIR}")
-	if(TAU_DEPS_FROM_STORE)
-		# MSVC names a static library .lib; MinGW and the Unix toolchains keep .a.
-		if(MSVC)
-			set(TAU_CODEGEN_PARSER_LIB "${TAU_PARSER_SDK_PREFIX}/lib/tauparser.lib")
-		else()
-			set(TAU_CODEGEN_PARSER_LIB "${TAU_PARSER_SDK_PREFIX}/lib/libtauparser.a")
-		endif()
-	else()
-		set(TAU_CODEGEN_PARSER_LIB "${CMAKE_BINARY_DIR}/libtauparser.a")
-	endif()
 	set(_resolved "")
 	foreach(_def IN LISTS TAU_DEFINITIONS)
 		if(${_def})
@@ -513,28 +465,15 @@ function(tau_finalize_pack_compile_definitions)
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}" PARENT_SCOPE)
 	# find_package(<pkg> CONFIG) records where it found the package in
-	# <pkg>_DIR; the emitted project is pointed at the same place
+	# <pkg>_DIR; a build-tree SDK points its consumer at the same place.
 	set(_pkg_dirs "")
 	foreach(_pkg IN LISTS TAU_BA_REQUIRED_PACKAGES)
 		if(DEFINED ${_pkg}_DIR AND NOT "${${_pkg}_DIR}" MATCHES "NOTFOUND$")
 			list(APPEND _pkg_dirs "${_pkg}_DIR=${${_pkg}_DIR}")
 		endif()
 	endforeach()
-	set(TAU_CODEGEN_BA_PACKAGE_DIRS "${_pkg_dirs}")
-	# Parser include directories for the emitted project: the in-tree source in
-	# subdir mode, the SDK include dirs when the deps come from the store.
-	if(TAU_DEPS_FROM_STORE)
-		set(TAU_CODEGEN_PARSER_INCLUDE_DIRS
-			"${TAU_PARSER_SDK_PREFIX}/include/tauparser;${TAU_PARSER_SDK_PREFIX}/include")
-	else()
-		set(TAU_CODEGEN_PARSER_INCLUDE_DIRS
-			"${TAU_SDK_ROOT_PATH}/external/parser/src")
-	endif()
-	set(TAU_CODEGEN_BOOST_LIBDIR "${BOOST_LIBDIR}")
-	configure_file(
-		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
-		"${TAU_PACK_INCLUDE_DIR}/tau_pack.h"
-		@ONLY)
+	set(TAU_SDK_PACKAGE_DIRS "${_pkg_dirs}")
+	set(TAU_SDK_PACKAGE_DIRS "${_pkg_dirs}" PARENT_SCOPE)
 endfunction()
 
 #

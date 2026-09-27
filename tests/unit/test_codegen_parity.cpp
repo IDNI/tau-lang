@@ -358,10 +358,10 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 	}
 }
 
-// compile_spec<Node>'s step 1 (tau_compile.tmpl.h) under the same
-// scoped_clean_definitions guard compile_spec wraps its whole body in --
+// gen_spec<Node>'s step 1 (tau_compile.tmpl.h) under the same
+// scoped_clean_definitions guard gen_spec wraps its whole body in --
 // parse + infer, stopping well before the cmake configure+build. Exercises
-// the exact isolation mechanism compile_spec relies on without paying for an
+// the exact isolation mechanism gen_spec relies on without paying for an
 // artifact build.
 tref parse_like_compile_spec_step1(const std::string& src) {
 	compile_detail::scoped_clean_definitions<node_t> clean_defs;

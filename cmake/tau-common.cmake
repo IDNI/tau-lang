@@ -275,6 +275,22 @@ set(TAU_SHARED_LIB_NAME "${PROJECT_LIB_NAME}")
 set(TAU_EXECUTABLE_NAME "${PROJECT_NAME}")
 set(TAU_EXE_SHARED_NAME "${PROJECT_NAME}_shared")
 
+# The platform of this build: the build folder name `./dev preset` uses, which
+# names the SDK box's install root.
+get_filename_component(TAU_PLATFORM_NAME "${CMAKE_BINARY_DIR}" NAME)
+# A cross target gets its own box package: it cannot share the host-native
+# box's path or toolchain. The suffix is the store target value, not the build
+# folder's short preset suffix; a native arm64 build keeps the unsuffixed box.
+set(TAU_SDK_PACKAGE_SUFFIX "")
+if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
+	set(TAU_SDK_PACKAGE_SUFFIX "-windows-x86_64-mingw")
+elseif(TAU_DEPS_TARGET STREQUAL "wasm32-emscripten")
+	set(TAU_SDK_PACKAGE_SUFFIX "-wasm32-emscripten")
+elseif(TAU_DEPS_TARGET STREQUAL "linux-arm64" AND CMAKE_CROSSCOMPILING)
+	set(TAU_SDK_PACKAGE_SUFFIX "-linux-arm64")
+endif()
+set(TAU_SDK_PACKAGE_NAME "tau-sdk${TAU_SDK_PACKAGE_SUFFIX}")
+
 include(tau-platform-map)
 
 # Writes the platform names `./dev preset` uses and the tau preset that owns

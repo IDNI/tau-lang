@@ -105,6 +105,9 @@ include(test_repl-bdd_capacity.cmake)
 # `tau compile` verb
 include(test_repl-compile_verb.cmake)
 
+# `tau gen` verb
+include(test_repl-gen_verb.cmake)
+
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
 # TODO (VERY_HIGH) add tests  definition command

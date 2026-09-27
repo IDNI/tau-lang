@@ -112,7 +112,7 @@ std::string read_codegen_spec(const std::string& name) {
 	return "";
 }
 
-// Parse via the same spec grammar path compile_spec<Node> uses
+// Parse via the same spec grammar path gen_spec<Node> uses
 // (tau_compile.tmpl.h step 1): get_spec -> get_nso_rr -> nso_rr_apply ->
 // normalizer, falling back to the bare-formula grammar.
 tref parse_like_compile_spec(const std::string& src) {
@@ -149,14 +149,15 @@ captured_run run_capture_ec(const std::string& exe_path,
 
 TEST_SUITE("cpp_codegen_program_desc") {
 
-#ifdef TAU_PACK_BOOL_CARRIERS
-	TEST_CASE("the emitted CMakeLists pins TAU_PACK_BOOL_CARRIERS to the "
-	          "emitting build's order") {
-		const std::string cm = compile_detail::emit_cmake_sdk_linked("probe");
-		CHECK(cm.find("TAU_PACK_BOOL_CARRIERS=\\\"" TAU_PACK_BOOL_CARRIERS
-			"\\\"") != std::string::npos);
+	TEST_CASE("the emitted CMakeLists links the SDK and names the target") {
+		const std::string cm = compile_detail::artifact_cmake_text("probe");
+		CHECK(cm.find("find_package(Tau") != std::string::npos);
+		CHECK(cm.find("TAU::TAU") != std::string::npos);
+		CHECK(cm.find("add_executable(${TAU_ARTIFACT_EXE_NAME} main.cpp)")
+			!= std::string::npos);
+		CHECK(cm.find("set(TAU_ARTIFACT_EXE_NAME \"probe\"")
+			!= std::string::npos);
 	}
-#endif
 
 	// ── (a) build_program_desc_prop + emit_program ──────────────────────────
 

@@ -1,7 +1,8 @@
 # `tau compile --cxx <name>` must hand the name through to the emitted
-# project's configure instead of replacing it with whatever compiler is on
-# PATH. A CMake script so the case needs no shell, no mktemp and no grep.
-# Usage: cmake -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch> -P this.
+# project's configure instead of replacing it with the preset's compiler. A
+# CMake script so the case needs no shell, no mktemp and no grep.
+# Usage: cmake -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch> [-DPRESET=<platform>]
+#               [-DSDK=<sdk-dir>] -P this.
 if(NOT TAU OR NOT SPEC OR NOT TMP)
 	message(FATAL_ERROR "usage: -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch>")
 endif()
@@ -12,8 +13,18 @@ file(MAKE_DIRECTORY "${TMP}")
 set(_spec "${TMP}/spec.tau")
 file(COPY_FILE "${SPEC}" "${_spec}")
 
-execute_process(COMMAND "${TAU}" compile --cxx /nonexistent/c++ "${_spec}"
-	-o "${TMP}/out"
+set(_extra "")
+if(PRESET)
+	list(APPEND _extra --preset "${PRESET}")
+endif()
+set(_command "${TAU}")
+if(SDK)
+	# The preset's platform and the SDK must agree; the host SDK is passed for
+	# the same reason add_compile_test passes it.
+	set(_command "${CMAKE_COMMAND}" -E env "TAU_SDK_DIR=${SDK}" "${TAU}")
+endif()
+execute_process(COMMAND ${_command} compile --cxx /nonexistent/c++ "${_spec}"
+		-o "${TMP}/out" ${_extra}
 	RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err TIMEOUT 600)
 if(_rc STREQUAL "0")
 	message(FATAL_ERROR "tau compile succeeded with a nonexistent --cxx")

@@ -119,8 +119,6 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	${TAU_PARSER_SOURCE_INCLUDE}
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 
@@ -146,9 +144,15 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	${TAU_PARSER_SOURCE_INCLUDE}
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
+	# Generated headers an artifact compiles against: the pack header, the core
+	# parsers and the pack's own, plus any registered out-of-tree BA's.
+	$<BUILD_INTERFACE:${TAU_PACK_INCLUDE_DIR}>
+	$<BUILD_INTERFACE:${TAU_GENERATED_PARSER_DIR}>
 )
+if(TAU_BA_INCLUDE_DIRS)
+	target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
+		$<BUILD_INTERFACE:${TAU_BA_INCLUDE_DIRS}>)
+endif()
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
 add_dependencies(${TAU_STATIC_LIB_NAME} tau_header)
@@ -171,6 +175,277 @@ if(TAU_ARTIFACT_PREINST)
 	endif()
 endif()
 
+# The exported target carries what an artifact needs to compile against the
+# archive with the same ABI: the C++ standard, the interface definitions the
+# archive was built with, and DEBUG where the archive has it. Shared by the
+# build-tree SDK and the install export.
+target_compile_features(${TAU_STATIC_LIB_NAME} INTERFACE cxx_std_23)
+target_compile_definitions(${TAU_STATIC_LIB_NAME} INTERFACE
+	${TAU_RESOLVED_COMPILE_DEFINITIONS}
+	TAU_PARSER_NO_TGF
+	"TAU_PACK_BOOL_CARRIERS=\"${TAU_PACK_BOOL_CARRIERS_RESOLVED}\"")
+if(TAU_ARTIFACT_PREINST)
+	target_compile_definitions(${TAU_STATIC_LIB_NAME} INTERFACE
+		TAU_CODEGEN_ARTIFACT_PREINST)
+endif()
+if(CMAKE_BUILD_TYPE MATCHES "^(Debug|Devel|Coverage)$")
+	# An artifact must not compile NDEBUG into headers the archive compiled
+	# with asserts live.
+	target_compile_definitions(${TAU_STATIC_LIB_NAME} INTERFACE DEBUG)
+	if(MSVC)
+		target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE "/UNDEBUG")
+	else()
+		target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE "-UNDEBUG")
+	endif()
+endif()
+if(EMSCRIPTEN)
+	# Every linked object must agree on the exception encoding and on -pthread;
+	# the archive and the artifact TU would otherwise fail wasm-ld.
+	target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE
+		-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0)
+	target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE
+		-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0)
+	if(TAU_WASM_PTHREADS)
+		target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE -pthread)
+		target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE -pthread)
+	endif()
+endif()
+set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES EXPORT_NAME TAU)
+
+# cvc5 and curl are dependencies only when the pack this library was built for
+# links them.
+if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	set(TAU_SDK_FIND_CVC5 "find_dependency(cvc5 CONFIG)")
+else()
+	set(TAU_SDK_FIND_CVC5
+		"# cvc5 is not required by TAU_BAS=${TAU_BAS}; this SDK does not need it")
+endif()
+if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	set(TAU_SDK_FIND_CURL "find_dependency(CURL)")
+else()
+	set(TAU_SDK_FIND_CURL
+		"# curl is not required by TAU_BAS=${TAU_BAS}; this SDK does not need it")
+endif()
+# Every box installs under its own root, so two platforms' SDKs coexist in one
+# prefix instead of overwriting each other's headers and libraries. The
+# platform is the build folder name, the same value `./dev preset` names.
+set(TAU_SDK_INSTALL_ROOT "${CMAKE_INSTALL_LIBDIR}/tau/sdk/${TAU_PLATFORM_NAME}")
+set(TAU_SDK_CMAKE_DIR "${TAU_SDK_INSTALL_ROOT}/lib/cmake/Tau")
+include(CMakePackageConfigHelpers)
+
+#
+# Build-tree SDK: the compile script, the platform map and a package config, so
+# `tau compile` and the codegen tests resolve a box without an install; `tau
+# gen` needs none, since it carries the artifact templates itself. Keyed on the
+# archive target, not on TAU_BUILD_STATIC_LIBRARY: the target is built whenever
+# the executable or a test links it, even when the option only excludes it from
+# the default build.
+#
+if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
+	# The export set `export(EXPORT)` names is created here; the install rule
+	# it implies only matters to `cmake --install`, and must land where the
+	# installed export says it does.
+	install(TARGETS ${TAU_STATIC_LIB_NAME}
+		EXPORT TauTargets
+		ARCHIVE DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
+		COMPONENT "Library"
+		INCLUDES DESTINATION ${TAU_SDK_INSTALL_ROOT}/include)
+	set(TAU_SDK_DIR "${CMAKE_BINARY_DIR}/sdk")
+	file(MAKE_DIRECTORY "${TAU_SDK_DIR}/cmake")
+	export(EXPORT TauTargets
+		FILE "${TAU_SDK_DIR}/TauTargets.cmake"
+		NAMESPACE TAU::)
+	configure_package_config_file(
+		"${PROJECT_SOURCE_DIR}/cmake/TauConfig.cmake.in"
+		"${TAU_SDK_DIR}/TauConfig.cmake"
+		INSTALL_DESTINATION "sdk")
+	write_basic_package_version_file(
+		"${TAU_SDK_DIR}/TauConfigVersion.cmake"
+		VERSION "${PROJECT_VERSION}"
+		COMPATIBILITY AnyNewerVersion)
+	configure_file("${PROJECT_SOURCE_DIR}/cmake/tau-compile.cmake"
+		"${TAU_SDK_DIR}/cmake/tau-compile.cmake" COPYONLY)
+	# The artifact's wasm template includes these before project().
+	configure_file("${PROJECT_SOURCE_DIR}/cmake/tau-shared-emscripten.cmake"
+		"${TAU_SDK_DIR}/cmake/tau-shared-emscripten.cmake" COPYONLY)
+	configure_file("${PROJECT_SOURCE_DIR}/cmake/tau-shared-resolve.cmake"
+		"${TAU_SDK_DIR}/cmake/tau-shared-resolve.cmake" COPYONLY)
+	# The artifact presets, their include and their toolchains travel inside
+	# tau (cmake/tau_bas.cmake), so only the platform map an SDK consumer reads
+	# at compile time is written here.
+	tau_write_platform_map("${TAU_SDK_DIR}/cmake/tau-platforms.cmake")
+	# The platform this SDK serves, so a box whose path names no platform
+	# (the flat Windows zip) can still be resolved. Also the toolchain this box
+	# was built with: tau-compile.cmake warns on a host mismatch.
+	file(WRITE "${TAU_SDK_DIR}/cmake/tau-this-platform.txt"
+		"${TAU_PLATFORM_NAME}\n")
+	if(EMSCRIPTEN)
+		set(_tau_sdk_toolchain_id "Emscripten")
+		set(_tau_sdk_toolchain_version "")
+		if(EXISTS "${EMSCRIPTEN_DIR}/emscripten-version.txt")
+			file(READ "${EMSCRIPTEN_DIR}/emscripten-version.txt"
+				_tau_sdk_toolchain_version)
+			string(REGEX REPLACE "[^0-9.]" "" _tau_sdk_toolchain_version
+				"${_tau_sdk_toolchain_version}")
+		endif()
+	else()
+		set(_tau_sdk_toolchain_id "${CMAKE_CXX_COMPILER_ID}")
+		set(_tau_sdk_toolchain_version "${CMAKE_CXX_COMPILER_VERSION}")
+	endif()
+	file(WRITE "${TAU_SDK_DIR}/tau-toolchain.txt"
+		"set(TAU_SDK_TOOLCHAIN_ID \"${_tau_sdk_toolchain_id}\")\n"
+		"set(TAU_SDK_TOOLCHAIN_VERSION \"${_tau_sdk_toolchain_version}\")\n"
+		"set(TAU_SDK_TOOLCHAIN_CXX \"${CMAKE_CXX_COMPILER}\")\n")
+	# Where this build resolved each dependency, so a build-tree SDK consumer
+	# finds the same tauparser/Boost/cvc5. Kept in the SDK, never in `tau`.
+	set(_tau_sdk_dep_args "")
+	foreach(_entry IN LISTS TAU_SDK_PACKAGE_DIRS)
+		list(APPEND _tau_sdk_dep_args "-D${_entry}")
+	endforeach()
+	if(DEFINED Boost_DIR AND NOT "${Boost_DIR}" MATCHES "NOTFOUND$")
+		list(APPEND _tau_sdk_dep_args "-DBoost_DIR=${Boost_DIR}")
+	endif()
+	if(DEFINED tauparser_DIR AND NOT "${tauparser_DIR}" MATCHES "NOTFOUND$")
+		list(APPEND _tau_sdk_dep_args "-Dtauparser_DIR=${tauparser_DIR}")
+	endif()
+	file(WRITE "${TAU_SDK_DIR}/tau-sdk-deps.cmake"
+		"set(TAU_SDK_CONFIGURE_ARGS \"${_tau_sdk_dep_args}\")\n")
+endif()
+
+#
+# Install the SDK, its dependencies and its build script: installed parser
+# mode only, so the parser headers come from the parser SDK instead of the
+# source tree.
+#
+if(TAU_BUILD_STATIC_LIBRARY AND TAU_DEPS_FROM_STORE)
+	# Strip build-environment prefixes from __FILE__ and debug info so libTAU.a
+	# carries no absolute build, store, or home path. The store prefix may be a
+	# symlink, so map its resolved path too.
+	if(NOT MSVC)
+		get_filename_component(_tau_shared_real
+			"${TAU_SHARED_PREFIX_RESOLVED}" REALPATH)
+		get_filename_component(_tau_store_real
+			"${TAU_SHARED_PREFIX_RESOLVED}/store" REALPATH)
+		target_compile_options(${TAU_STATIC_LIB_NAME} PRIVATE
+			"-ffile-prefix-map=${PROJECT_SOURCE_DIR}="
+			"-ffile-prefix-map=${CMAKE_BINARY_DIR}="
+			"-ffile-prefix-map=${TAU_SHARED_PREFIX_RESOLVED}="
+			"-ffile-prefix-map=${_tau_shared_real}="
+			"-ffile-prefix-map=${_tau_store_real}=")
+	endif()
+
+	# Public headers: the whole src/ tree, minus the test-only doctest header.
+	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library"
+		FILES_MATCHING
+			PATTERN "*.h"
+			PATTERN "doctest.h" EXCLUDE
+			PATTERN "CMakeFiles" EXCLUDE
+			PATTERN "*.cmake" EXCLUDE)
+	# Generated parsers: core ones by bare name, BA ones under boolean_algebras/.
+	install(DIRECTORY "${TAU_GENERATED_PARSER_DIR}/"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library"
+		FILES_MATCHING PATTERN "*.generated.h")
+	install(DIRECTORY "${TAU_PACK_INCLUDE_DIR}/"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library"
+		FILES_MATCHING PATTERN "*.generated.h")
+	install(FILES "${TAU_PACK_INCLUDE_DIR}/tau_pack.h"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library")
+	# tau_compile.tmpl.h includes this generated header, so an installed SDK
+	# that carries that header must carry this one too.
+	install(FILES "${TAU_PACK_INCLUDE_DIR}/tau_artifact_template.h"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library")
+
+	install(EXPORT TauTargets
+		FILE TauTargets.cmake
+		NAMESPACE TAU::
+		DESTINATION ${TAU_SDK_CMAKE_DIR}
+		COMPONENT "Library")
+
+	# INSTALL_PREFIX is the box root, not the install prefix, so
+	# PACKAGE_PREFIX_DIR resolves to the box and the bundled parser config at
+	# <box>/cmake stays reachable from <box>/lib/cmake/Tau.
+	configure_package_config_file(
+		"${PROJECT_SOURCE_DIR}/cmake/TauConfig.cmake.in"
+		"${CMAKE_CURRENT_BINARY_DIR}/TauConfig.cmake"
+		INSTALL_DESTINATION "lib/cmake/Tau"
+		INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/${TAU_SDK_INSTALL_ROOT}")
+	write_basic_package_version_file(
+		"${CMAKE_CURRENT_BINARY_DIR}/TauConfigVersion.cmake"
+		VERSION "${PROJECT_VERSION}"
+		COMPATIBILITY AnyNewerVersion)
+	install(FILES
+		"${CMAKE_CURRENT_BINARY_DIR}/TauConfig.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}/TauConfigVersion.cmake"
+		DESTINATION ${TAU_SDK_CMAKE_DIR}
+		COMPONENT "Library")
+	# The compile script, in the cmake/ subdir `tau` resolves the SDK from.
+	install(FILES
+		"${PROJECT_SOURCE_DIR}/cmake/tau-compile.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-shared-emscripten.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-shared-resolve.cmake"
+		DESTINATION "${TAU_SDK_CMAKE_DIR}/cmake"
+		COMPONENT "Library")
+	# The platform map a consumer reads at compile time, and the platform and
+	# toolchain this box was built for.
+	install(FILES "${TAU_SDK_DIR}/cmake/tau-platforms.cmake"
+		DESTINATION "${TAU_SDK_CMAKE_DIR}/cmake"
+		COMPONENT "Library")
+	install(FILES "${TAU_SDK_DIR}/cmake/tau-this-platform.txt"
+		DESTINATION "${TAU_SDK_CMAKE_DIR}/cmake"
+		COMPONENT "Library")
+	install(FILES "${TAU_SDK_DIR}/tau-toolchain.txt"
+		DESTINATION ${TAU_SDK_CMAKE_DIR}
+		COMPONENT "Library")
+
+	# Bundle the dependency SDKs under this box root so an installed tau-sdk
+	# works without the build host's store. Each keeps its own CMake package
+	# and layout; TauConfig prepends this prefix to CMAKE_PREFIX_PATH.
+	install(DIRECTORY "${TAU_PARSER_SDK_PREFIX}/include/"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library")
+	install(DIRECTORY "${TAU_PARSER_SDK_PREFIX}/cmake/"
+		DESTINATION "${TAU_SDK_INSTALL_ROOT}/cmake"
+		COMPONENT "Library")
+	if(TARGET idni::tauparser_static)
+		install(FILES $<TARGET_FILE:idni::tauparser_static>
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
+			COMPONENT "Library")
+	endif()
+	install(DIRECTORY "${BOOST_STORE_PREFIX}/include/"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+		COMPONENT "Library")
+	install(DIRECTORY "${BOOST_STORE_PREFIX}/lib/cmake/"
+		DESTINATION "${TAU_SDK_INSTALL_ROOT}/lib/cmake"
+		COMPONENT "Library")
+	# Boost::log's own config also requires atomic, chrono, filesystem, thread
+	# and headers, so take every static archive; the shared ones stay out.
+	install(DIRECTORY "${BOOST_STORE_PREFIX}/lib/"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
+		COMPONENT "Library"
+		FILES_MATCHING PATTERN "*.a" PATTERN "*.lib")
+	if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+		install(DIRECTORY "${CVC5_STORE_PREFIX}/include/"
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/include
+			COMPONENT "Library")
+		install(DIRECTORY "${CVC5_STORE_PREFIX}/lib/cmake/"
+			DESTINATION "${TAU_SDK_INSTALL_ROOT}/lib/cmake"
+			COMPONENT "Library")
+		# cvc5 links libpoly beside itself; take the whole library directory
+		# so the SDK carries that closure too.
+		install(DIRECTORY "${CVC5_STORE_PREFIX}/lib/"
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
+			COMPONENT "Library"
+			FILES_MATCHING PATTERN "*.so*" PATTERN "*.dylib"
+				PATTERN "*.a" PATTERN "*.lib" PATTERN "*.dll")
+	endif()
+endif()
+
 #
 # shared library
 #
@@ -182,9 +457,7 @@ target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	${TAU_PARSER_SOURCE_INCLUDE}
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<INSTALL_INTERFACE:.>
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
@@ -211,8 +484,6 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		${TAU_PARSER_SOURCE_INCLUDE}
-		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
-		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
 	if(EMSCRIPTEN)
@@ -263,8 +534,6 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		${TAU_PARSER_SOURCE_INCLUDE}
-		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
-		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
 	add_dependencies(${TAU_EXE_SHARED_NAME} tau_header)
 	if(TAU_PARSER_HAS_FTXUI_DEP)

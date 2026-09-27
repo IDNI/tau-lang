@@ -62,3 +62,50 @@ add_compile_run_test(compile_verb-solves_as_run_from_start 6
 # or was refused, its bitvector output given no witness.
 add_compile_run_test(compile_verb-solves_as_run_witness 6
 	"always o1[t-1]:bv[1] = 1")
+
+# --preset, -D and the platform SDK: the artifact configure is driven by the
+# artifact's own CMakePresets.json, so these cases need an SDK to be present.
+# An unknown --preset is refused before any configure runs.
+add_compile_test(compile_verb-unknown_preset
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	PRESET no-such-platform EXPECT_FAIL NEEDS_SDK "${CMAKE_BINARY_DIR}/sdk")
+
+# A -D reaches the emitted project's configure: an unused cache variable
+# is named in configure.log.
+add_compile_test(compile_verb-define_reaches_configure
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	NEEDS_SDK "${CMAKE_BINARY_DIR}/sdk"
+	ARGS "-DEXTRA_ARGS=-DTAU_COMPILE_PROBE=1" "-DEXPECT_LOG=TAU_COMPILE_PROBE"
+		"-DNO_RUN=ON")
+
+# Without --preset the build is native: this build's SDK, cmake's compiler and
+# the build type the -D names.
+add_compile_test(compile_verb-native_build_type
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	NO_PRESET NO_SDK NEEDS_SDK "${CMAKE_BINARY_DIR}/sdk"
+	ARGS "-DEXTRA_ARGS=-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+		"-DEXPECT_LOG=RelWithDebInfo" "-DNO_RUN=ON")
+
+# TAU_CXX names the compiler when --cxx is not given.
+add_compile_test(compile_verb-tau_cxx_env
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	NO_PRESET NEEDS_SDK "${CMAKE_BINARY_DIR}/sdk"
+	ARGS "-DTAU_CXX_ENV=${CMAKE_CXX_COMPILER}"
+		"-DEXPECT_LOG=${CMAKE_CXX_COMPILER}" "-DNO_RUN=ON")
+
+# Output paths: the spec is never the output, an output equal to the spec
+# is refused, and a relative -o resolves against the caller's directory.
+foreach(_case same_spec default_out relative_out)
+	add_compile_test(compile_verb-paths_${_case}
+		"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+		CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_compile_paths.cmake"
+		NEEDS_SDK "${CMAKE_BINARY_DIR}/sdk" ARGS "-DCASE=${_case}")
+endforeach()
+
+# The MinGW platform build is almost never present; the case proves the
+# cross preset and its vendored toolchain resolve when it is.
+get_filename_component(_tau_build_base "${CMAKE_BINARY_DIR}" DIRECTORY)
+add_compile_test(compile_verb-release_w64
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	PRESET release-w64 NO_SDK NEEDS_SDK "${_tau_build_base}/release-w64/sdk"
+	ARGS "-DNO_RUN=ON")

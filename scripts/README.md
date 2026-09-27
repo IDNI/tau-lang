@@ -110,6 +110,15 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   `-DTAU_BUILD_BROWSER_TESTS=ON` runs both itself, so they are rarely called by
   hand. Neither needs a system node: emsdk bundles node/npm/npx.
 - `binding <BIND_LANG>` — build bindings (currently `python`)
+- `compile <artifact-dir> [--preset <name>] [-D NAME=VALUE]... [-G <generator>]`
+  — configure, build and copy an artifact directory that `tau gen` emitted,
+  through the same `cmake/tau-compile.cmake` script `tau compile` runs. The
+  artifact dir is the first argument. Without `--preset` the build is native
+  and uses `build/release/sdk`, cmake's compiler and a Release build type.
+  `--preset` names a platform or tau preset: the SDK is `build/<platform>/sdk`,
+  or the installed box at `lib/tau/sdk/<platform>/lib/cmake/Tau`. `-D` and `-G`
+  reach the emitted project configure, and a `-D` value wins over the preset.
+  `TAU_SDK_DIR` names the SDK in both cases.
 
 Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME`, `-G GENERATOR`.
 

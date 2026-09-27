@@ -95,12 +95,29 @@ Notes:
 - Legacy wrappers (`./dev debug`, `./dev release`, `./dev test-debug`, … →
   `build-Debug/`, `build-Release/`) still exist but should not be used for new work.
 
+`tau gen` writes an artifact folder with its own `CMakePresets.json`. `tau
+compile` builds it. Without `--preset` the build is native: it uses the SDK of
+the running tau (`<build>/sdk` for a build tree, else the installed box beside
+the binary), cmake's compiler and a `Release` build type unless a
+`-DCMAKE_BUILD_TYPE` is given. `./dev compile <dir>` builds an artifact the same
+way, native without `--preset` from `build/release/sdk`. `--cxx` or `TAU_CXX`
+names the compiler, and the flag wins. `--preset` takes a platform name or any
+`./dev preset` name, which
+maps to the platform of its build folder, and builds with that platform's SDK
+box and toolchain. A **platform** is the build folder name `./dev preset`
+uses: `release`, `devel`, `debug` and their `-gcc`, `-w64`, `-arm64`, `-msvc`,
+`-msvc-clang-cl`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
+at `build/<platform>/sdk/`, so a cross-platform artifact needs that platform
+built first. `-D NAME=VALUE` and `-G <generator>` go to the emitted project
+configure, and a `-D` value wins over the preset.
+
 Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_TESTS=ON` — build all test types (already ON in `*-tests`/`*-all` presets)
 - `-DTAU_BUILD_UNIT_TESTS=ON` — unit tests only
 - `-DTAU_BUILD_INTEGRATION=ON` — integration tests only
 - `-DTAU_BUILD_EXECUTABLE=ON` — build the `tau` CLI (already ON in `*-tau`/`*-all` presets)
 - `-DTAU_ARTIFACT_PREINST=ON` — pre-instantiate the artifact pack in libTAU.a for faster `tau compile` (defaults to `TAU_BUILD_EXECUTABLE`, sticky once set)
+- `-DTAU_BUILD_STATIC_LIBRARY=ON` — install the tau SDK (libTAU.a, headers, `TauConfig` and the `tau compile` script) under `<libdir>/tau/sdk/<platform>`. The `*-packages-*` presets set it
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)

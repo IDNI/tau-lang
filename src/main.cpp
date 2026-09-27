@@ -232,6 +232,12 @@ cli::options tau_options() {
 
 cli::commands tau_commands() {
 	cli::commands cs;
+	cli::command gen("gen",
+		"generates the C++ artifact for a Tau spec file (no build)");
+gen.add_option(cli::option("output", 'o', "")
+		.set_description("output directory (default: <spec>.build; "
+			"only with a single spec file)"));
+	cs[gen.name()] = gen;
 	cli::command compile("compile",
 		"compiles a Tau spec file into a standalone executable");
 	compile.add_option(cli::option("output", 'o', "")
@@ -239,13 +245,91 @@ cli::commands tau_commands() {
 			"file path without extension)"));
 	compile.add_option(cli::option("cxx", 'c', "")
 		.set_description("C++ compiler for the emitted project (default: "
-			"TAU_CXX, else the compiler Tau was built with, else "
-			"clang++ when on PATH, else cmake's default)"));
+			"TAU_CXX, else cmake's compiler, or the compiler of the "
+			"--preset platform)"));
+	compile.add_option(cli::option("preset", '\0', "")
+		.set_description("target platform or ./dev preset name; without it "
+			"tau compiles for this machine"));
+	compile.add_option(cli::option("define", 'D', "")
+		.set_description("cmake cache variable NAME=VALUE for the emitted "
+			"project's configure; repeatable"));
+	compile.add_option(cli::option("generator", 'G', "")
+		.set_description("cmake generator for the emitted project's "
+			"configure (the preset's generator otherwise)"));
 	cs[compile.name()] = compile;
 	return cs;
 }
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
+
+// Reads a spec file into src; "-" reads stdin. False when the file cannot be
+// opened. `tau gen` and `tau compile` share it with the interpreter's own
+// spec-file path.
+bool read_spec_file(const std::string& spec_file, std::string& src) {
+	if (spec_file == "-") {
+		std::ostringstream oss;
+		oss << std::cin.rdbuf(), src = oss.str();
+		return true;
+	}
+	DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
+	std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+	if (!ifs) return false;
+	auto l = ifs.tellg();
+	// A spec file's length fits streamsize, which is 32 bits on wasm32.
+	auto len = static_cast<std::streamsize>(l);
+	src.resize(len);
+	if (len > 0) ifs.seekg(0), ifs.read(&src[0], len);
+	return true;
+}
+
+// The cli table has no attached short-option value, so `-DNAME=VALUE` and
+// `-GNinja`, the spellings `./dev preset` accepts, are split into the option
+// and its value before the cli parses the compile verb's arguments.
+void expand_attached_short_values(std::vector<std::string>& args) {
+	size_t start = args.size();
+	for (size_t i = 1; i < args.size(); ++i)
+		if (args[i] == "compile") { start = i + 1; break; }
+	for (size_t i = start; i < args.size(); ++i) {
+		const std::string& a = args[i];
+		if (a.size() <= 2 || a[0] != '-' || (a[1] != 'D' && a[1] != 'G'))
+			continue;
+		// a aliases args[i]: keep the tail before the element is overwritten.
+		std::string value = a.substr(2);
+		args[i] = a.substr(0, 2);
+		args.insert(args.begin() + i + 1, std::move(value));
+		++i;
+	}
+}
+
+// `tau compile` forwards -D and -G to the emitted project's configure. The cli
+// table keeps only the last value of a repeated option, so the raw arguments
+// from the verb onward are scanned: a define is -DNAME=VALUE or -D NAME=VALUE
+// and may repeat, a generator is -G <gen>.
+std::vector<std::string> collect_compile_extra_args(
+	const std::vector<std::string>& args)
+{
+	std::vector<std::string> extra;
+	size_t start = args.size();
+	for (size_t i = 1; i < args.size(); ++i)
+		if (args[i] == "compile") { start = i + 1; break; }
+	for (size_t i = start; i < args.size(); ++i) {
+		const std::string& a = args[i];
+		if (a == "-D" || a == "--define") {
+			if (i + 1 < args.size()) extra.push_back("-D" + args[++i]);
+		} else if (a.rfind("-D", 0) == 0 && a.size() > 2) {
+			extra.push_back(a);
+		} else if (a == "-G" || a == "--generator") {
+			if (i + 1 < args.size()) {
+				extra.push_back("-G");
+				extra.push_back(args[++i]);
+			}
+		} else if (a.rfind("-G", 0) == 0 && a.size() > 2) {
+			extra.push_back("-G");
+			extra.push_back(a.substr(2));
+		}
+	}
+	return extra;
+}
 
 int run_tau_spec(string spec_file, cli::options& opts) {
 	const bool benchmarks = opts["benchmarks"].get<bool>();
@@ -270,16 +354,8 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	};
 	{
 		auto _ = rep.open_if(benchmarks, "reading input");
-		if (spec_file == "-") {
-			std::ostringstream oss;
-			oss << std::cin.rdbuf(), src = oss.str();
-		} else {
-			DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
-			std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-			if (!ifs) return error("Cannot open file " + spec_file);
-			auto l = ifs.tellg();
-			src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
-		}
+		if (!read_spec_file(spec_file, src))
+			return error("Cannot open file " + spec_file);
 	}
 	if (src.empty()) return finish(0);
 	auto gi = tau_api::get_interpreter(src);
@@ -315,6 +391,7 @@ int main(int argc, char** argv) {
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
+	expand_attached_short_values(args);
 
 	cli cl("tau", args, tau_commands(), "", tau_options());
 	cl.set_help_header("Usage: tau [ <specification file> ]");
@@ -438,28 +515,91 @@ int main(int argc, char** argv) {
 
 	// After the options, so a budget given with the verb (--ltl-timeout,
 	// --max-consistency-subsets, ...) applies to its synthesis too.
-	if (cmd.ok() && cmd.name() == "compile") {
-		auto files = cl.get_files();
+	if (cmd.ok() && cmd.name() == "gen") {
 		if (files.empty())
-			return error("Usage: tau compile <spec.tau> [-o out_exe]");
+			return error("Usage: tau gen <spec.tau>... [-o out_dir]");
+		size_t dash_count = 0;
+		for (const auto& f : files) if (f == "-") ++dash_count;
+		if (dash_count > 1)
+			return error("tau gen: '-' reads the spec from stdin and may "
+				"appear only once");
+		std::string out_dir = cmd.get<std::string>("output");
+		if (!out_dir.empty() && files.size() > 1)
+			return error("tau gen: -o names one output directory, but "
+				"several spec files were given");
+		for (const auto& spec_file : files) {
+			std::string src;
+			if (!read_spec_file(spec_file, src))
+				return error("Cannot open file: " + spec_file);
+			if (src.empty())
+				return error("Spec file is empty: " + spec_file);
+			// A spec file names its own dir; stdin has no name, so it uses
+			// the same `a` a compiler gives an unnamed input.
+			std::string dir = !out_dir.empty() ? out_dir
+				: (spec_file == "-" ? "a.build" : spec_file + ".build");
+			TAU_LOG_INFO << "tau gen: " << spec_file;
+			auto res = gen_spec<node_t>(src, dir, "program", cmd.name());
+			if (!res.has_value()) {
+				res.print();
+				return 1;
+			}
+			TAU_LOG_INFO << "generated: " << res.value().exe_path;
+		}
+		return 0;
+	}
+
+	if (cmd.ok() && cmd.name() == "compile") {
+		if (files.empty())
+			return error("Usage: tau compile <spec.tau> [-o out_exe] "
+				"[--preset <name>] [-D NAME=VALUE]... [-G <gen>]");
+		if (files.size() > 1)
+			return error("tau compile: exactly one spec file is expected");
 		std::string spec_file = files.front();
 		std::string out_exe = cmd.get<std::string>("output");
-		if (out_exe.empty()) {
-			std::filesystem::path p(spec_file);
-			out_exe = (p.parent_path() / p.stem()).string();
+		std::string build_dir;
+		if (spec_file == "-") {
+			// gcc's names for an input read from stdin: a.out (a.exe on
+			// Windows) beside a.build/.
+			if (out_exe.empty()) {
+#ifdef _WIN32
+				out_exe = "a.exe";
+#else
+				out_exe = "a.out";
+#endif
+				build_dir = "a.build";
+			} else build_dir = out_exe + ".build";
+		} else {
+			if (out_exe.empty()) {
+				std::filesystem::path p(spec_file);
+				out_exe = (p.parent_path() / p.stem()).string();
+			}
+			build_dir = spec_file + ".build";
 		}
 
 		std::string src;
-		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-		if (!ifs) return error("Cannot open file: " + spec_file);
-		auto l = ifs.tellg();
-		src.resize(l); ifs.seekg(0); ifs.read(&src[0], l);
+		if (!read_spec_file(spec_file, src))
+			return error("Cannot open file: " + spec_file);
 		if (src.empty()) return error("Spec file is empty: " + spec_file);
 
-		std::string build_dir = spec_file + ".build";
+		// A spec with no extension is its own default output; never build a
+		// spec over itself.
+		if (spec_file != "-") {
+			std::error_code sec, oec;
+			auto spec_abs = std::filesystem::absolute(spec_file, sec)
+				.lexically_normal();
+			auto out_abs = std::filesystem::absolute(out_exe, oec)
+				.lexically_normal();
+			if (!sec && !oec && spec_abs == out_abs)
+				return error("tau compile: the output path is the spec "
+					"path: " + spec_file + " and " + out_exe
+					+ "; pass -o <path> to name a different output");
+		}
+
 		TAU_LOG_INFO << "tau compile: " << spec_file;
 		auto res = compile_spec<node_t>(src, out_exe, build_dir,
-			cmd.get<std::string>("cxx"));
+			cmd.get<std::string>("cxx"),
+			cmd.get<std::string>("preset"),
+			collect_compile_extra_args(args));
 		if (!res.has_value()) {
 			res.print();
 			return 1;
