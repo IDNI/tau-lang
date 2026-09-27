@@ -58,8 +58,10 @@ Resolution order:
 3. Half of detected logical CPU cores (auto)
 
 `-DTAU_BUILD_JOBS` is stripped before `cmake --preset`; the value is applied via
-the exported environment. CMake also reads `$ENV{TAU_BUILD_JOBS}` when the cache
-value is `0` (see [`CMakeLists.txt`](../CMakeLists.txt)).
+the exported environment. The typed spelling `-DTAU_BUILD_JOBS:STRING=N` is not
+stripped, so it also lands in the configure cache. CMake reads
+`$ENV{TAU_BUILD_JOBS}` when the cache value is `0`
+(see [`CMakeLists.txt`](../CMakeLists.txt)).
 
 ## Dual build directories
 
