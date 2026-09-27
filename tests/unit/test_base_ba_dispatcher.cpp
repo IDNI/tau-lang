@@ -33,7 +33,7 @@ using variant_t = std::variant<
 	idni::tau_lang::tau_ba<idni::tau_lang::bv, idni::tau_lang::sbf_ba>,
 	idni::tau_lang::bv, idni::tau_lang::sbf_ba>;
 
-std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
+result<rr<small_node>> small_get_nso_rr(const char* sample) {
 	tref spec = small_tau::get(sample).value_or(nullptr);
 	if (spec == nullptr) return {};
 	return idni::tau_lang::get_nso_rr<small_node>(spec);

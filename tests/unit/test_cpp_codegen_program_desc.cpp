@@ -117,7 +117,8 @@ std::string read_codegen_spec(const std::string& name) {
 // normalizer, falling back to the bare-formula grammar.
 tref parse_like_compile_spec(const std::string& src) {
 	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
-		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
+		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value());
+		    nso_rr.has_value())
 			if (auto applied_r = nso_rr_apply<node_t>(*nso_rr);
 			    applied_r.has_value() && applied_r.value())
 				if (auto fm_r0 = normalizer<node_t>(applied_r.value());

@@ -673,6 +673,11 @@ result<tref> api<node>::get_spec_or_term(const std::string& expression, bool sim
 		if (spec.parse(expression)) {
 			spec_r = spec.get();
 			if (spec_r.has_value()) expr = spec_r.value();
+		} else {
+			// parse() returns a plain bool, so its report channel is
+			// spec_r.
+			for (const auto& error : spec.errors())
+				spec_r.error(code::parse_error, error);
 		}
 		if (expr) {
 			return r.with_assert_check_value(expr);
@@ -680,7 +685,6 @@ result<tref> api<node>::get_spec_or_term(const std::string& expression, bool sim
 		auto term_val = r.merge_take(get_term(expression, simplified));
 		if (!term_val) {
 			r.merge(std::move(spec_r));
-			for (const auto& error : spec.errors()) r.error(code::parse_error, error);
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -1716,15 +1720,8 @@ result<interpreter<node>> api<node>::get_interpreter(
 		// io_context only once every validation step has succeeded.
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		spec.keep_warm_ups();
-		auto maybe_nso_rr = spec.get_nso_rr();
-		if (!maybe_nso_rr) {
-			for (const auto& error : spec.errors())
-				r.error(code::parse_error, error);
-			if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		TAU_TRY_OR(tref applied, nso_rr_apply<node>(maybe_nso_rr.value()),
+		TAU_TRY(auto nso_rr, spec.get_nso_rr());
+		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
 			code::internal_error, "Failed to apply definitions");
 		TAU_TRY_OR(tref normalized, normalizer<node>(applied),
 			code::internal_error, "Normalization failed");
@@ -1765,13 +1762,7 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 		// spec handed whole to the normalizer as its main formula is negated
 		// as if it were a wff by the syntactic simplifier.
 		if (tau::get(expr).is(tau::spec)) {
-			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
-				ctx, expr); mayb_nso_rr)
-					nso_rr = mayb_nso_rr.value();
-			else {
-				return r.with_assert_check_error(code::internal_error,
-					"Failed to resolve recurrence relations");
-			}
+			TAU_TRY(nso_rr, tau_lang::get_nso_rr<node>(ctx, expr));
 		} else {
 			nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
 			if (!nso_rr.main) {

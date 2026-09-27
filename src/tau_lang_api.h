@@ -70,7 +70,7 @@ namespace idni::tau_lang {
 //
 // Usage:
 //   auto nso = get_nso_rr<node_t>(tau::get("G (o1[t] = 0)."));
-//   if (nso) {
+//   if (nso.has_value()) {
 //       bool r = is_tau_formula_sat<node_t>(nso.value().main->get());
 //   }
 //
@@ -82,7 +82,7 @@ namespace idni::tau_lang {
 // Parse a tau-lang formula string and return a normalized rr<node>.
 //
 //   tref expr — a formula string wrapped with tau::get(str)
-//   Returns   — std::optional<rr<node>>, empty if parse fails
+//   Returns   — result<rr<node>>, a failed report if parse fails
 //
 // Usage:
 //   auto result = get_nso_rr<node_t>(tau::get("F (o1[t] = 0)."));

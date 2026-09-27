@@ -16,7 +16,7 @@ using small_node = idni::tau_lang::node<
 	idni::tau_lang::bv, idni::tau_lang::sbf_ba>;
 using small_tau = idni::tau_lang::tree<small_node>;
 
-std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
+result<rr<small_node>> small_get_nso_rr(const char* sample) {
 	tref spec = small_tau::get(sample).value_or(nullptr);
 	if (spec == nullptr) return {};
 	return idni::tau_lang::get_nso_rr<small_node>(spec);

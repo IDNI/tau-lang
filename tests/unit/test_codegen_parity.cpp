@@ -366,7 +366,8 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 tref parse_like_compile_spec_step1(const std::string& src) {
 	compile_detail::scoped_clean_definitions<node_t> clean_defs;
 	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
-		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
+		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value());
+		    nso_rr.has_value())
 			if (auto applied_r = nso_rr_apply<node_t>(*nso_rr);
 			    applied_r.has_value() && applied_r.value())
 				if (auto norm_r = normalizer<node_t>(applied_r.value());

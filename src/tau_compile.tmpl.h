@@ -731,10 +731,8 @@ result<codegen_result> gen_spec(
 	// Each clause keeps the warm-up it is written with.
 	TAU_TRY(spec_tree, tau_api::pin_main(spec_tree));
 	spec_tree = tree<Node>::reget(spec_tree);
-	auto nso_rr = get_nso_rr<Node>(spec_tree);
-	if (!nso_rr) return r.with_error(code::parse_error,
-		verb + ": failed to build the recurrence relation from spec");
-	TAU_TRY(tref applied, nso_rr_apply<Node>(*nso_rr));
+	TAU_TRY(auto nso_rr, get_nso_rr<Node>(spec_tree));
+	TAU_TRY(tref applied, nso_rr_apply<Node>(nso_rr));
 	TAU_TRY(tref fm, normalizer<Node>(applied));
 	// fm is checked before make_interpreter runs, so it is never a bare-reparsed atom.
 	TAU_TRY(bool has_free, has_free_vars<Node>(fm));

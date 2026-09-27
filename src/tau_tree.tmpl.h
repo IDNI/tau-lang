@@ -43,15 +43,15 @@ rewriter::rules get_rec_relations(tref r);
  * formula (an `rr`), classifying I/O variables in the main and the rule
  * bodies against @p ctx. A bare `bf`/`ref` becomes a rule-free main taken
  * verbatim; a single `rec_relation` yields rules with a null main.
- * @return nullopt when @p ref is null, no main formula is found, or an
- * I/O variable remains unclassified after resolve_io_vars (neither a
+ * @return a failed report when @p ref is null, no main formula is found,
+ * or an I/O variable remains unclassified after resolve_io_vars (neither a
  * declared stream nor named like one).
  */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
+result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
 /** @brief Overload using the global `definitions` singleton's I/O context. */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref ref);
+result<rr<node>> get_nso_rr(tref ref);
 
 /** @brief Declared for tau_spec; documented in satisfiability.h. */
 template <NodeType node>
@@ -279,30 +279,32 @@ template <NodeType node>
 bool invalid_nesting_of_temp_quants(tref fm);
 
 template <NodeType node>
-bool missing_temp_quants(tref fm);
+result<bool> missing_temp_quants(tref fm);
 
 /**
- * @brief Report (with an error log) a non-temporal quantifier in @p fm
- * whose bound variable occurs free inside a temporal quantifier in its
- * scope: a plain binding may not reach across a temporal quantifier.
+ * @brief Report a non-temporal quantifier in @p fm whose bound variable
+ * occurs free inside a temporal quantifier in its scope: a plain binding
+ * may not reach across a temporal quantifier. The answer is true when the
+ * formula has the problem; the report names the variable and the quantifier.
  */
 template <NodeType node>
-bool invalid_nesting_of_quants(tref fm);
+result<bool> invalid_nesting_of_quants(tref fm);
 
 /**
- * @brief Report (with an error log) a recurrence-relation reference in
- * @p fm carrying a negative integer offset.
+ * @brief Report a recurrence-relation reference in @p fm carrying a
+ * negative integer offset.
  */
 template <NodeType node>
-bool has_negative_offset(tref fm);
+result<bool> has_negative_offset(tref fm);
 
 /**
  * @brief Aggregate front-end validity gate: true when any of
  * invalid_nesting_of_quants, has_open_tau_fm_in_constant,
  * invalid_nesting_of_temp_quants, missing_temp_quants,
- * has_negative_offset or has_missplaced_fallback rejects @p fm; each
- * check logs its own error message. Fails when has_open_tau_fm_in_constant
- * fails.
+ * has_negative_offset or has_missplaced_fallback rejects @p fm.
+ * invalid_nesting_of_quants and missing_temp_quants name the offending
+ * part; every other check carries its own error message. Fails when
+ * has_open_tau_fm_in_constant or has_negative_offset fails.
  */
 template <NodeType node>
 result<bool> has_semantic_error(tref fm);

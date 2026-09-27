@@ -301,11 +301,9 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		spec.add(d);
 	}
 	auto maybe_nso_rr = spec.get_nso_rr();
-	if (!maybe_nso_rr) {
+	if (!maybe_nso_rr.has_value()) {
 		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
-		for (const auto& err : spec.errors()) {
-			TAU_LOG_ERROR << err;
-		}
+		maybe_nso_rr.print(err);
 		return nullptr;
 	}
 	tref main = maybe_nso_rr.value().main->get();

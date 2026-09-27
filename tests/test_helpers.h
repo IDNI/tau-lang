@@ -89,7 +89,7 @@ inline std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* samp
 	return rr<node_t>(rrs, tau::geth(main_fm));
 }
 
-inline std::optional<rr<node_t>> get_nso_rr(const char* sample)
+inline result<rr<node_t>> get_nso_rr(const char* sample)
 {
 	// DBG(TAU_LOG_TRACE << "get_nso_rr: " << sample;)
 	auto spec_r = tau::get(sample);

@@ -583,19 +583,19 @@ result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	result<typename node::constant_with_type> r;
 	// parse source
 	tau_spec<node> s;
-	std::optional<rr<node>> maybe_nso_rr;
-	if (!s.parse(src) || !(maybe_nso_rr = s.get_nso_rr())) {
+	if (!s.parse(src)) {
 		for (const auto& error : s.errors())
 			r.error(code::parse_error, error);
 		if (!r.has_error())
 			r.error(code::parse_error, "Failed to parse tau constant");
 		return r;
 	}
+	TAU_TRY(auto nso_rr, s.get_nso_rr());
 	// compute final result
 	return r.with_value(typename node::constant_with_type{
 		std::variant<tau_ba<BAs...>, BAs...>(
-			tau_ba<BAs...>(maybe_nso_rr.value().rec_relations,
-				       maybe_nso_rr.value().main)),
+			tau_ba<BAs...>(nso_rr.rec_relations,
+				       nso_rr.main)),
 		tau_type<node>() });
 }
 

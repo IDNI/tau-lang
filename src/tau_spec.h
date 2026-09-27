@@ -52,9 +52,10 @@ struct tau_spec {
 	bool add(tref expr);
 	/**
 	 * @brief Finalize and return the complete recurrence-relation structure.
-	 * @return `rr<node>` if parsing succeeded, or `std::nullopt`.
+	 * @return the `rr<node>` with its report; a failed report when parsing
+	 * or resolution fails.
 	 */
-	std::optional<rr<node>> get_nso_rr();
+	result<rr<node>> get_nso_rr();
 	/**
 	 * @brief Keep the warm-up of each clause of the main formula at its
 	 * lookback as written (pin_written_warm_ups) in what get() builds,

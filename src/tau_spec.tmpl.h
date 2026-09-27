@@ -40,7 +40,14 @@ result<tref> tau_spec<node>::get() {
 	auto fail = [&](std::string_view msg) -> result<tref> {
 		DBG(for (const auto& error : errors())
 		 	TAU_LOG_TRACE << "[tau] " << error;)
-		r.error(code::parse_error, msg);
+		for (const auto& error : errors_)
+			r.error(code::parse_error, error);
+		// Skip msg when errors_ already holds the same text.
+		const std::string m(msg);
+		if (errors_.empty()
+			|| std::find(errors_.begin(), errors_.end(), m)
+				== errors_.end())
+			r.error(code::parse_error, m);
 		return std::move(r);
 	};
 
@@ -70,6 +77,8 @@ result<tref> tau_spec<node>::get() {
 		// errors_ still gets a matching entry for tau_spec's own
 		// error surface (spec.errors()).
 		errors_.push_back("spec failed to transform to tau tree");
+		for (const auto& error : errors_)
+			r.error(code::parse_error, error);
 		return r;
 	}
 	tref spec = *parsed;
@@ -216,16 +225,16 @@ bool tau_spec<node>::add(tref expr) {
 }
 
 template <NodeType node>
-std::optional<rr<node>> tau_spec<node>::get_nso_rr() {
-	// std::optional cannot carry get()'s report; get_applied() and the
-	// REPL dispatch chain built on it (repl_evaluator.tmpl.h) read
-	// spec.errors() instead, which get() still populates on failure.
-	tref spec = get().value_or(nullptr);
-	if (!spec) return {};
+result<rr<node>> tau_spec<node>::get_nso_rr() {
+	result<rr<node>> r;
+	TAU_TRY(tref spec, get());
+	if (!spec) return r.with_error(code::parse_error,
+		"the specification could not be parsed");
 	// Resolving the io variables rebuilds each atom that holds one.
 	std::optional<use_hooks_guard<node>> hooks_off;
 	if (mode_ == build_mode::as_written) hooks_off.emplace(false);
-	return tau_lang::get_nso_rr<node>(spec);
+	TAU_TRY(auto nso_rr, tau_lang::get_nso_rr<node>(spec));
+	return r.with_value(std::move(nso_rr));
 }
 
 template <NodeType node>
@@ -363,7 +372,7 @@ result<tref> tau_spec<node>::build_parse_tree() {
 						<< "\" and \""
 						<<ptree_to_str(c) << "\"";
 					errors_.push_back(ss.str());
-					r.error(code::parse_error, "Multiple main formulas");
+					r.error(code::parse_error, ss.str());
 					return r;
 				}
 			} else defs.push_back(c);

@@ -380,8 +380,12 @@ TEST_SUITE("semantic-error predicates") {
 		trefs args = trefs{ x_eq_0_bf("x") };
 		tref bad = tau::build_rr_ref(sym, trefs{ tau::get_integer(-1) }, args);
 		tref good = tau::build_rr_ref(sym, trefs{ tau::get_integer(1) }, args);
-		CHECK(has_negative_offset<node_t>(bad));
-		CHECK(!has_negative_offset<node_t>(good));
+		auto bad_res = has_negative_offset<node_t>(bad);
+		CHECK(bad_res.has_value());
+		CHECK(bad_res.value());
+		auto good_res = has_negative_offset<node_t>(good);
+		CHECK(good_res.has_value());
+		CHECK(!good_res.value());
 	}
 
 	TEST_CASE("invalid_nesting_of_temp_quants never flags nesting: full LTL allows it") {
@@ -398,8 +402,9 @@ TEST_SUITE("semantic-error predicates") {
 	TEST_CASE("missing_temp_quants flags a part of the formula outside any temporal quantifier") {
 		tref mixed = tau::build_wff_and(
 			tau::build_wff_always(x_eq_0("x")), x_eq_0("y"));
-		CHECK(missing_temp_quants<node_t>(mixed));
-		CHECK(!missing_temp_quants<node_t>(tau::build_wff_always(x_eq_0("x"))));
+		CHECK(missing_temp_quants<node_t>(mixed).value());
+		CHECK(!missing_temp_quants<node_t>(
+			tau::build_wff_always(x_eq_0("x"))).value());
 	}
 
 	TEST_CASE("invalid_nesting_of_quants on a non-temporal quantifier wrapping a temporal one") {
@@ -416,8 +421,8 @@ TEST_SUITE("semantic-error predicates") {
 		tref bad = tau::build_wff_ex(x, tau::build_wff_always(x_eq_0("x")), false);
 		tref good = tau::build_wff_always(
 			tau::build_wff_ex(x, x_eq_0("x"), false));
-		CHECK(!invalid_nesting_of_quants<node_t>(bad));
-		CHECK(!invalid_nesting_of_quants<node_t>(good));
+		CHECK(!invalid_nesting_of_quants<node_t>(bad).value());
+		CHECK(!invalid_nesting_of_quants<node_t>(good).value());
 	}
 
 	TEST_CASE("has_semantic_error aggregates the individual predicates") {

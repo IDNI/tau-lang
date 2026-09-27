@@ -159,14 +159,15 @@ std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 }
 
 template <NodeType node>
-bool validate_rr_case_types(const rr<node>& defs) {
+result<bool> validate_rr_case_types(const rr<node>& defs) {
+	result<bool> r;
 	struct family_state {
 		std::vector<size_t> types; // 0 = unpinned/wildcard so far
 		std::vector<tref> heads;   // case head that pinned types[i]
 	};
 	std::map<rr_sig, family_state> families;
-	for (const auto& r : defs.rec_relations) {
-		tref head = unwrap_to_ref<node>(r.first->get());
+	for (const auto& rel : defs.rec_relations) {
+		tref head = unwrap_to_ref<node>(rel.first->get());
 		if (!head) continue;
 		rr_sig fam = get_rr_sig<node>(head);
 		std::vector<size_t> types =
@@ -200,16 +201,16 @@ bool validate_rr_case_types(const rr<node>& defs) {
 				continue;
 			}
 			if (fs.types[i] != types[i]) {
-				LOG_ERROR << "the cases of recurrence `"
-					<< LOG_FM(head) << "` disagree on their argument"
-					" types (`" << LOG_FM(fs.heads[i])
-					<< "` vs `" << LOG_FM(head) << "`); annotate the"
-					" argument the same way in every case";
-				return false;
+				return r.with_error(code::type_error,
+					"the cases of a recurrence disagree on their argument types; annotate the argument the same way in every case",
+					{{label::value,
+						truncate_for_message(TAU_TO_STR(head))},
+					 {label::expected, truncate_for_message(
+						TAU_TO_STR(fs.heads[i]))}});
 			}
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
 // TI-4: a call whose argument types can never match its definition's
@@ -227,15 +228,16 @@ bool validate_rr_case_types(const rr<node>& defs) {
 // reference matching no definition family is uninterpreted and stays
 // legal, as always.
 template <NodeType node>
-bool validate_rr_call_types(const rr<node>& defs) {
+result<bool> validate_rr_call_types(const rr<node>& defs) {
+	result<bool> r;
 	using tau = tree<node>;
 	struct family_state {
 		std::vector<size_t> types; // 0 = unpinned by any case so far
 		tref head = nullptr;       // one case head, for the message
 	};
 	std::map<rr_sig, family_state> families;
-	for (const auto& r : defs.rec_relations) {
-		tref head = unwrap_to_ref<node>(r.first->get());
+	for (const auto& rel : defs.rec_relations) {
+		tref head = unwrap_to_ref<node>(rel.first->get());
 		if (!head) continue;
 		auto types = collect_immediate_ref_arg_types<node>(head);
 		auto [it, inserted] = families.try_emplace(
@@ -246,7 +248,7 @@ bool validate_rr_call_types(const rr<node>& defs) {
 				if (!it->second.types[i])
 					it->second.types[i] = types[i];
 	}
-	if (families.empty()) return true;
+	if (families.empty()) return r.with_value(true);
 	auto norm = [](size_t t) {
 		return !t || t == untyped_type_id<node>()
 			? tau_type_id<node>() : t;
@@ -275,75 +277,86 @@ bool validate_rr_call_types(const rr<node>& defs) {
 			if (args.size() != fs.types.size()) continue;
 			for (size_t i = 0; i < args.size(); ++i)
 				if (norm(args[i]) != norm(fs.types[i])) {
-					LOG_ERROR << "the call `" << LOG_FM(call)
-						<< "` disagrees with the argument types"
-						" of its definition `" << LOG_FM(fs.head)
-						<< "` and can never match; type the"
-						" arguments and the definition's"
-						" parameters the same way";
+					r.error(code::type_error,
+						"the call disagrees with the argument types of its definition and can never match; type the arguments and the definition's parameters the same way",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(call))},
+						 {label::expected, truncate_for_message(
+							TAU_TO_STR(fs.head))}});
 					return false;
 				}
 		}
 		return true;
 	};
-	if (defs.main && !calls_match(defs.main->get())) return false;
-	for (const auto& r : defs.rec_relations)
-		if (!calls_match(r.second->get())) return false;
-	return true;
+	if (defs.main && !calls_match(defs.main->get())) return r;
+	for (const auto& rel : defs.rec_relations)
+		if (!calls_match(rel.second->get())) return r;
+	return r.with_value(true);
 }
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
+result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
+	result<rr<node>> r;
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	if (!r) return {};
-	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
-	const auto& t = tau::get(r).is(tau::start) ? tau::get(r)[0]
-						   : tau::get(r);
-	r = t.get();
-	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
+	if (!ref) return r.with_error(code::invalid_argument,
+		"no expression was given");
+	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(ref);)
+	const auto& t = tau::get(ref).is(tau::start) ? tau::get(ref)[0]
+						     : tau::get(ref);
+	ref = t.get();
+	if (t.is(tau::bf) || t.is(tau::ref))
+		return r.with_value(rr<node>{ {}, tau::geth(ref) });
 	if (t.is(tau::rec_relation)) {
-		auto rec_only = rr<node>(get_rec_relations<node>(ctx, r),
+		auto rec_only = rr<node>(get_rec_relations<node>(ctx, ref),
 			(htref) nullptr);
-		if (!validate_rr_case_types<node>(rec_only)) return {};
-		if (!validate_rr_call_types<node>(rec_only)) return {};
-		return { rec_only };
+		TAU_TRY(bool case_ok, validate_rr_case_types<node>(rec_only));
+		(void)case_ok;
+		TAU_TRY(bool call_ok, validate_rr_call_types<node>(rec_only));
+		(void)call_ok;
+		return r.with_value(std::move(rec_only));
 	}
-	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
+	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(ref);
 
-	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
-	if (!expression) expression = tt(r) | tau::main | tau::bf | tt::ref;
+	tref expression = tt(ref) | tau::main | tau::wff | tt::ref;
+	if (!expression) expression = tt(ref) | tau::main | tau::bf | tt::ref;
 	tref main_fm = resolve_io_vars<node>(ctx, expression);
-	if (!main_fm) return {};
+	if (!main_fm) return r.with_error(code::invalid_argument,
+		"the I/O variables of the main formula could not be resolved");
 
-	rewriter::rules rules = get_rec_relations<node>(ctx, r);
+	rewriter::rules rules = get_rec_relations<node>(ctx, ref);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
 	auto nso_rr = rr<node>(rules, tau::geth(main_fm));
-	auto check_resolved_io_vars = [](htref form) {
+	auto check_resolved_io_vars = [&r](htref form) -> tref {
 		for (tref io_var : tau::get(form).select_all(is<node, tau::io_var>)) {
 			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
 			if (tau::get(io_var).data() == 0) {
-				LOG_ERROR << "I/O variable is not defined "
-					<< TAU_TO_STR(io_var);
-				return false;
+				r.error(code::invalid_argument,
+					"the I/O variable is not defined",
+					{{label::name, get_var_name<node>(io_var)}});
+				return io_var;
 			}
 		}
-		return true;
+		return nullptr;
 	};
-	if (!check_resolved_io_vars(nso_rr.main)) return {};
+	if (tref undefined = check_resolved_io_vars(nso_rr.main); undefined)
+		return r;
 	for (const auto& rec_relation : nso_rr.rec_relations)
-		if (!check_resolved_io_vars(rec_relation.second))
-			return {};
-	if (!validate_rr_case_types<node>(nso_rr)) return {};
-	if (!validate_rr_call_types<node>(nso_rr)) return {};
+		if (tref undefined = check_resolved_io_vars(rec_relation.second);
+			undefined)
+			return r;
+	TAU_TRY(bool case_ok, validate_rr_case_types<node>(nso_rr));
+	(void)case_ok;
+	TAU_TRY(bool call_ok, validate_rr_call_types<node>(nso_rr));
+	(void)call_ok;
 	DBG(LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr);)
-	return nso_rr;
+	return r.with_value(std::move(nso_rr));
 }
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref r) {
+result<rr<node>> get_nso_rr(tref ref) {
 	return get_nso_rr<node>(
-		*definitions<node>::instance().get_io_context(), r);
+		*definitions<node>::instance().get_io_context(), ref);
 }
 
 // -----------------------------------------------------------------------------
@@ -1096,13 +1109,14 @@ bool invalid_nesting_of_temp_quants(tref /*fm*/) {
 // Only a non-glue subterm reached without first crossing a temporal
 // quantifier is a violation.
 template<NodeType node>
-bool missing_temp_quants(tref fm) {
+result<bool> missing_temp_quants(tref fm) {
+	result<bool> r;
 	using tau = tree<node>;
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
-		return false;
+		return r.with_value(false);
 	// All parts of the formula have to be under a temporal quantifier
 	trefs fms = tau::get(fm).select_top(is<node, tau::wff>);
-	if (fms.empty()) return false;
+	if (fms.empty()) return r.with_value(false);
 	auto atom = [](tref n) {
 		const tau& n_t = tau::get(n);
 		if (n_t.is(tau::wff)         || n_t.is(tau::wff_or) ||
@@ -1117,16 +1131,18 @@ bool missing_temp_quants(tref fm) {
 	for (tref f : fms) {
 		if (tref a = tau::get(f).find_top_until(atom,
 			is_temporal_quantifier<node>); a) {
-			LOG_ERROR << "The formula \"" << tau::get(a) <<
-				"\" must be scoped by a temporal quantifier" << "\n";
-			return true;
+			r.info("the formula must be scoped by a temporal quantifier",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(a))}});
+			return r.with_value(true);
 		}
 	}
-	return false;
+	return r.with_value(false);
 }
 
 template<NodeType node>
-bool invalid_nesting_of_quants(tref fm) {
+result<bool> invalid_nesting_of_quants(tref fm) {
+	result<bool> r;
 	using tau = tree<node>;
 	auto non_temp_quants = rewriter::select_all<node>(fm, is_quantifier<node>);
 	for (tref ntq : non_temp_quants) {
@@ -1136,18 +1152,22 @@ bool invalid_nesting_of_quants(tref fm) {
 		for (tref tq : temp_quants) {
 			// Check that the non-temp quantified variable doesn't appear free
 			if (subtree_vec_contains<node>(get_free_vars<node>(tq), var)) {
-				LOG_ERROR << "Variable \"" << tau::get(var) << "\" is captured outside of the temporal quantifier in \"" << tau::get(tq) << "\"\n";
-				return true;
+				r.info("the variable is captured outside of the temporal quantifier",
+					{{label::name, get_var_name<node>(var)},
+					 {label::value, truncate_for_message(
+						TAU_TO_STR(tq))}});
+				return r.with_value(true);
 			}
 		}
 	}
-	return false;
+	return r.with_value(false);
 }
 
 template<NodeType node>
-bool has_negative_offset(tref fm) {
+result<bool> has_negative_offset(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<bool> r;
 	auto refs = [](tref n) {
 		return is<node>(n, tau::ref) ||
 		       is<node>(n, tau::bf_ref) ||
@@ -1159,12 +1179,14 @@ bool has_negative_offset(tref fm) {
 		for (tref i : tau::get(offsets | tt::ref).select_top(is<node, tau::integer>)) {
 			// Check that each integer is positive
 			if (tau::get(i).get_integer() < 0) {
-				LOG_ERROR << "Index in recurrence relation is negative: " << tau::get(ref);
-				return true;
+				r.info("Index in recurrence relation is negative",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(ref))}});
+				return r.with_value(true);
 			}
 		}
 	}
-	return false;
+	return r.with_assert_check_value(false);
 }
 
 /**
@@ -1196,12 +1218,15 @@ bool has_missplaced_fallback(tref fm) {
 template<NodeType node>
 result<bool> has_semantic_error(tref fm) {
 	result<bool> r;
-	if (invalid_nesting_of_quants<node>(fm)) return r.with_assert_check_value(true);
+	TAU_TRY(bool nesting, invalid_nesting_of_quants<node>(fm));
+	if (nesting) return r.with_assert_check_value(true);
 	TAU_TRY(auto open_in_const, has_open_tau_fm_in_constant<node>(fm));
 	if (open_in_const) return r.with_assert_check_value(true);
 	if (invalid_nesting_of_temp_quants<node>(fm)) return r.with_assert_check_value(true);
-	if (missing_temp_quants<node>(fm)) return r.with_assert_check_value(true);
-	if (has_negative_offset<node>(fm)) return r.with_assert_check_value(true);
+	TAU_TRY(bool missing, missing_temp_quants<node>(fm));
+	if (missing) return r.with_assert_check_value(true);
+	TAU_TRY(auto neg_offset, has_negative_offset<node>(fm));
+	if (neg_offset) return r.with_assert_check_value(true);
 	return r.with_assert_check_value(has_missplaced_fallback<node>(fm));
 }
 
