@@ -775,9 +775,10 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
  * positions predefined by explicit initial conditions (skipped when
  * existentially/universally quantifying).
  * @param time_point Time step at which unrolling starts.
- * @return A pair `(phi, steps)`: `phi` is the formula at the fixpoint (or
- * at the point where the step cap `max_fixpoint_steps` was hit), and
- * `steps` is the number of steps taken to reach it.
+ * @return A result carrying the pair `(phi, steps)`: `phi` is the
+ * formula at the fixpoint and `steps` is the number of steps taken to
+ * reach it. A failed result means the step cap `max_fixpoint_steps` was
+ * hit before a fixpoint was reached.
  * @endinternal
  *
  * @par Example
@@ -793,10 +794,12 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
  * that stabilized formula together with the step count it took.
  */
 template <NodeType node>
-std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
-	const trefs& io_vars, const auto& initials, int_t time_point)
+result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
+	tref ctn_initials, const trefs& io_vars, const auto& initials,
+	int_t time_point)
 {
 	using tau = tree<node>;
+	result<std::pair<tref, int_t>> r;
 	tref phi_prev = fm_at_time_point<node>(base_fm, io_vars, time_point);
 	phi_prev = tau::build_wff_and(ctn_initials, phi_prev);
 	int_t step_num = 1;
@@ -836,15 +839,17 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi
 			// would decide the query with a formula that is neither
-			// the continuation nor a refutation. Surface it as
-			// nullptr (no result) so the caller reports an error
-			// instead of a verdict (--max-fixpoint-steps /
-			// `set fixpointsteps`; 0 = unlimited).
-			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
-				<< " steps without reaching a fixpoint, giving up; "
+			// the continuation nor a refutation. Surface it as an
+			// error so the caller reports it instead of a verdict
+			// (--max-fixpoint-steps / `set fixpointsteps`;
+			// 0 = unlimited).
+			return r.with_error(code::solver_error,
+				"find_fixpoint_phi: exceeded "
+				+ std::to_string(max_fixpoint_steps)
+				+ " steps without reaching a fixpoint, giving up; "
 				"raise --max-fixpoint-steps (`set fixpointsteps`, "
-				"0 = unlimited) to decide this specification";
-			return { nullptr, step_num };
+				"0 = unlimited) to decide this specification",
+				{{label::limit, max_fixpoint_steps}});
 		}
 		phi_prev = phi;
 		++step_num;
@@ -857,7 +862,7 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	}
 	LOG_DEBUG << "Unbounded continuation of Tau formula reached fixpoint"
 		<< " after " << step_num-1 << " steps: " << LOG_FM(phi_prev);
-	return std::make_pair(phi_prev, step_num - 1);
+	return r.with_value(std::make_pair(phi_prev, step_num - 1));
 }
 
 /**
@@ -1225,9 +1230,11 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
  * @param start_time Time step at which execution begins.
  * @param output When `true`, print diagnostic fixpoint information via
  * `print_fixpoint_info`.
- * @return `F` if the always-part is unsatisfiable at some initial time
- * step; otherwise the unbounded continuation formula (still wrapped in
- * `always` if the recurrence remains open-ended).
+ * @return A result carrying `F` if the always-part is unsatisfiable at
+ * some initial time step; otherwise the unbounded continuation formula
+ * (still wrapped in `always` if the recurrence remains open-ended). A
+ * failed result means the fixpoint search hit its step cap or a
+ * normalization failed.
  * @endinternal
  *
  * @par Example
@@ -1248,10 +1255,11 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
  * spec string.
  */
 template <NodeType node>
-tref always_to_unbounded_continuation(tref fm, const int_t start_time,
-	const bool output)
+result<tref> always_to_unbounded_continuation(tref fm,
+	const int_t start_time, const bool output)
 {
 	using tau = tree<node>;
+	result<tref> r;
 
 	DBG(LOG_TRACE
 		<< "always_to_unbounded_continuation begin\n"
@@ -1293,23 +1301,13 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	// Calculate unbound continuation of fm
 	lookback = get_max_shift<node>(io_vars);
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
-	auto [ubd_ctn, steps] = find_fixpoint_phi<node>(fm, flag_initials, io_vars,
-					initials, lookback + point_after_inits);
-	// A fixpoint-step give-up surfaces as nullptr: no continuation, no
-	// verdict (the caller reports an error).
-	if (!ubd_ctn) return nullptr;
+	TAU_TRY(auto ubd_ctn_steps, find_fixpoint_phi<node>(fm, flag_initials,
+		io_vars, initials, lookback + point_after_inits));
+	auto [ubd_ctn, steps] = ubd_ctn_steps;
 
 	{
-		auto normed = normalize_non_temp<node>(ubd_ctn);
-		if (!normed.has_value()) {
-			// A normalization failure (a cap violation) is not a
-			// refutation either; it used to return F, which every
-			// caller read as unsatisfiable.
-			LOG_ERROR << "always_to_unbounded_continuation: "
-				"normalization of the unbound continuation failed";
-			return nullptr;
-		}
-		ubd_ctn = normed.value();
+		TAU_TRY(auto normed, normalize_non_temp<node>(ubd_ctn));
+		ubd_ctn = normed;
 	}
 	ubd_ctn = transform_back_non_initials<node>(ubd_ctn, point_after_inits - 1);
 
@@ -1332,38 +1330,21 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		DBG(LOG_TRACE << "always_to_unbounded_continuation[run]: " << LOG_FM(run) << "\n";)
 
 		// Check if run is still sat
-		auto normed_run = normalize_non_temp<node>(run);
-		if (!normed_run.has_value()) {
-			LOG_ERROR << "always_to_unbounded_continuation: "
-				"normalization of the run failed";
-			return tau::_F();
-		}
-		run = normed_run.value();
-		auto sat = is_run_satisfiable<node>(run);
-		// An undecided run is not a refutation: nullptr is this
-		// function's "no verdict".
-		if (!sat.has_value()) {
-			LOG_ERROR << "always_to_unbounded_continuation: the "
-				"satisfiability of the run could not be decided";
-			return nullptr;
-		}
-		if (!sat.value()) {
+		TAU_TRY(auto normed_run, normalize_non_temp<node>(run));
+		run = normed_run;
+		TAU_TRY(auto sat, is_run_satisfiable<node>(run));
+		if (!sat) {
 			print_fixpoint_info(
 				"Temporal normalization of G specification reached fixpoint after "
 				+ std::to_string(steps) +
 				" steps, yielding the result: ",
 				TAU_TO_STR(tau::_F()), output);
-			return tau::_F();
+			return r.with_value(tau::_F());
 		}
 	}
-	auto normed_result = normalize_non_temp<node>(
-		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
-	if (!normed_result.has_value()) {
-		LOG_ERROR << "always_to_unbounded_continuation: "
-			"final normalization failed";
-		return tau::_F();
-	}
-	tref result = normed_result.value();
+	TAU_TRY(auto normed_result, normalize_non_temp<node>(
+		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn));
+	tref result = normed_result;
 	print_fixpoint_info(
 		"Temporal normalization of G specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",
@@ -1373,7 +1354,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	DBG(LOG_TRACE
 		<< "always_to_unbounded_continuation[result]: " << LOG_FM(result) << "\n"
 		<< "always_to_unbounded_continuation end\n";)
-	return result;
+	return r.with_value(result);
 }
 
 // Creates a guard using the names of the input streams in uninterpreted constants
@@ -1961,18 +1942,19 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		auto _s = r.open("always_continuation");
 		if (aw_fm != nullptr) {
 			// If there is an always part, replace it with its unbound continuation
-			ubd_aw_fm = always_to_unbounded_continuation<node>(
-							aw_fm, start_time, output);
-			// nullptr = a bounded give-up (max_fixpoint_steps) or a
+			auto ubd_res = r.merge_take(always_to_unbounded_continuation<node>(
+							aw_fm, start_time, output));
+			// No value = a bounded give-up (max_fixpoint_steps) or a
 			// normalization cap: no verdict, so report an error
 			// instead of deciding on a missing continuation.
-			if (!ubd_aw_fm) {
+			if (!ubd_res) {
 				return r.with_assert_check_error(code::solver_error,
 					"the temporal normalization gave up before "
 					"reaching a result (see --max-fixpoint-steps, "
 					"0 = unlimited); the specification could not "
 					"be decided");
 			}
+			ubd_aw_fm = *ubd_res;
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
 			ev_t = transform_to_eventual_variables<node>(ubd_fm,

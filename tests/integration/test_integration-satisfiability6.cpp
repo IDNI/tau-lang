@@ -804,8 +804,9 @@ TEST_SUITE("satisfiability helpers") {
 			"always (o1[t] = 0 && o1[t-1] = o1[t] && o1[t-1] != 0).");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
-		tref res = always_to_unbounded_continuation<node_t>(aw, 0, false);
-		CHECK( res == tau::_F() );
+		auto res = always_to_unbounded_continuation<node_t>(aw, 0, false);
+		REQUIRE( res.has_value() );
+		CHECK( res.value() == tau::_F() );
 	}
 
 	TEST_CASE("always_to_unbounded_continuation: satisfiable always-part is not F") {
@@ -814,9 +815,10 @@ TEST_SUITE("satisfiability helpers") {
 		tref spec = create_spec("always o1[t] = o1[t-1] && o1[t-1] = 1.");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
-		tref res = always_to_unbounded_continuation<node_t>(aw, 0, false);
-		REQUIRE( res != nullptr );
-		CHECK( !tau::get(res).equals_F() );
+		auto res = always_to_unbounded_continuation<node_t>(aw, 0, false);
+		REQUIRE( res.has_value() );
+		REQUIRE( res.value() != nullptr );
+		CHECK( !tau::get(res.value()).equals_F() );
 	}
 
 	// find_fixpoint_chi on a three-stage delay chain with the target

@@ -606,11 +606,13 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		tref name_node = key_node
 			? adt_wire_find(key_node, adt_parser::member_name) : nullptr;
 		if (!name_node) {
+			// TODO (HIGH) dropped error: the malformed member key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: malformed member key\n";
 			return std::nullopt;
 		}
 		size_t key_sid = dict(adt_parser::tree::get(name_node).get_terminals());
 		if (result.object.contains(key_sid)) {
+			// TODO (HIGH) dropped error: the duplicate wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: duplicate key '"
 				<< dict(key_sid) << "'\n";
 			return std::nullopt;
@@ -622,6 +624,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 			v.leaf = vc ? adt_parser::tree::get(vc).get_terminals() : std::string{};
 		} else {
 			if (!nested_node) {
+				// TODO (HIGH) dropped error: the malformed member value -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 				LOG_ERROR << "ADT wire: malformed member value for '"
 					<< dict(key_sid) << "'\n";
 				return std::nullopt;
@@ -639,6 +642,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	auto result = adt_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
+		// TODO (HIGH) dropped error: the wire parse failure -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: "
 			<< result.parse_error.to_str(adt_parser::error::info_lvl::INFO_BASIC)
 			<< "\n";
@@ -647,6 +651,7 @@ inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	tref shaped = result.get_shaped_tree2();
 	tref tv = adt_wire_find(shaped, adt_parser::tuple_value);
 	if (!tv) {
+		// TODO (HIGH) dropped error: the missing tuple literal -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: no tuple literal found in '" << src << "'\n";
 		return std::nullopt;
 	}
@@ -663,6 +668,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 {
 	if (shape.is_leaf) {
 		if (!wv.is_leaf) {
+			// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: expected a leaf value at '"
 				<< adt_path_str(path) << "', got a nested object\n";
 			return false;
@@ -671,6 +677,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		return true;
 	}
 	if (wv.is_leaf) {
+		// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: expected a nested object at '"
 			<< adt_path_str(path) << "', got a leaf value\n";
 		return false;
@@ -678,6 +685,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 	for (const auto& [key_sid, child_val] : wv.object) {
 		auto it = shape.children.find(key_sid);
 		if (it == shape.children.end()) {
+			// TODO (HIGH) dropped error: the unknown wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: unknown key '" << dict(key_sid)
 				<< "' at '" << adt_path_str(path) << "'\n";
 			return false;
@@ -691,6 +699,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		for (const auto& [key_sid, child_shape] : shape.children) {
 			(void)child_shape;
 			if (!wv.object.contains(key_sid)) {
+				// TODO (HIGH) dropped error: the missing wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 				LOG_ERROR << "ADT wire: missing key '" << dict(key_sid)
 					<< "' at '" << adt_path_str(path) << "'\n";
 				return false;
@@ -793,6 +802,7 @@ typename adt_tuple_reader<node>::read_status
 
 	auto line = physical->get(time_point);
 	if (!line) {
+		// TODO (HIGH) dropped error: the unreadable tuple stream -- logged instead of reported, read_time_point answers with read_status.
 		LOG_ERROR << "ADT: failed to read tuple stream at time point "
 			<< time_point << "\n";
 		memo_time_point = time_point;
@@ -864,6 +874,7 @@ std::optional<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
 	}
 	auto it = memo_leaves.find(path);
 	if (it == memo_leaves.end()) {
+		// TODO (HIGH) dropped error: the missing wire leaf -- logged instead of reported, leaf answers with optional<string>.
 		LOG_ERROR << "ADT: no leaf at '" << adt_path_str(path)
 			<< "' for time point " << time_point << "\n";
 		return std::nullopt;

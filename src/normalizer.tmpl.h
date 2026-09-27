@@ -2174,12 +2174,14 @@ bool is_well_founded(const rr<node>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
+		// TODO (HIGH) dropped error: the malformed recurrence relation -- logged instead of reported, calculate_fixed_point is a rewriter::post_order_traverser leaf returning tref.
 		LOG_ERROR << "Recurrence relation has no rules"
 			  << " other than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
+			// TODO (HIGH) dropped error: the cyclic recurrence relation -- logged instead of reported, calculate_fixed_point is a rewriter::post_order_traverser leaf returning tref.
 			LOG_ERROR << "Recurrence relation is cyclic";
 			return false;
 		}
