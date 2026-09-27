@@ -1077,6 +1077,8 @@ std::optional<tref> atomless_choose_value(
 	auto red_not = [&](tref a) {
 		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
 	};
+	// the region already excludes a value committed before
+	if (ledger.is_committed(value)) return;
 
 	// Per-call memo for red_and(a,b)==0 (containment/overlap): equals_0() is
 	// a fresh Tau-SAT call unless already in the global cache, and
