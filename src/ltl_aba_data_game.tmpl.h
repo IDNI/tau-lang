@@ -1009,6 +1009,38 @@ struct data_game_strategy {
 		state_ = view ? view->aut.initial_state : 0;
 	}
 
+	// Starts the play from `prior` instead of values of its own:
+	// prior[s][k-1] is the value of stream s k steps before the first step
+	// played. False when the initial vertex is not won from them.
+	bool start_from(const std::vector<std::vector<tref>>& prior) {
+		window win(streams.size(), std::vector<tref>(depth + 1, nullptr));
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 1; k <= depth; ++k) {
+				if (s >= prior.size() || k > prior[s].size()
+					|| !prior[s][k - 1]) return false;
+				win[s][k] = prior[s][k - 1];
+			}
+		auto won = won_from(win);
+		if (!won || !*won) return false;
+		restart_view(win);
+		before.assign(streams.size(), {});
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 1; k <= depth; ++k)
+				before[s].push_back(tau::geth(win[s][k]));
+		at = init;
+		ready = true;
+		state_ = view ? view->aut.initial_state : 0;
+		return true;
+	}
+
+	// The value of stream `s` `k` steps before the first step played,
+	// nullptr before the play has started.
+	tref value_before(size_t s, size_t k) const {
+		if (!ready || s >= before.size() || k == 0
+			|| k > before[s].size()) return nullptr;
+		return before[s][k - 1]->get();
+	}
+
 	// The state of the Mealy view, when the strategy plays one.
 	std::optional<int> state() const {
 		if (!view) return std::nullopt;
@@ -1219,6 +1251,11 @@ protected:
 	// before[s][k-1]: the value of stream s at step -k
 	std::vector<std::vector<htref>> before;
 
+	// whether the initial vertex is won from the values of `w` before the
+	// first step
+	virtual std::optional<bool> won_from(const window& w) = 0;
+	// rebuilds the Mealy view, if any, to start from the values of `w`
+	virtual void restart_view(const window& w) { (void)w; }
 	// whether the label of edge `j` of environment vertex `i` holds
 	virtual std::optional<bool> holds_label(int i, size_t j,
 		const window& w) = 0;
@@ -1271,10 +1308,28 @@ struct code_strategy : data_game_strategy<node> {
 	code_strategy(code_window win, data_bdd b)
 		: w(std::move(win)), bdd(std::move(b)) {}
 
-	bool build_mealy(size_t max_states, size_t max_edges);
+	bool build_mealy(size_t max_states, size_t max_edges,
+		const std::vector<int>* from = nullptr);
 
 protected:
 	using base::before;
+
+	std::optional<bool> won_from(const window& win) override {
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(won_init, *bits);
+	}
+
+	void restart_view(const window& win) override {
+		if (!this->view) return;
+		this->view = nullptr;
+		this->machine.clear();
+		if (auto bits = encode(win)) {
+			for (auto& b : *bits) if (b < 0) b = 0;
+			build_mealy(data_game_mealy_max_states,
+				data_game_mealy_max_edges, &*bits);
+		}
+	}
 
 	// Whether two values are equal; nullopt when undecided.
 	std::optional<bool> same(tref x, tref y) {
@@ -1553,7 +1608,8 @@ protected:
 // with `history` giving the values before step 0; false, and no view, when
 // it exceeds `max_states` or `max_edges`.
 template <NodeType node>
-bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges)
+bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
+	const std::vector<int>* from)
 {
 	using tau = tree<node>;
 	const size_t S = streams.size(), d = w.depth;
@@ -1703,9 +1759,11 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges)
 		if (fresh) states.push_back(it->first), edges.emplace_back();
 		return it->second;
 	};
-	// the start: inputs 0 before step 0, outputs as won_init allows
+	// the start: the codes `from` gives, else inputs 0 before step 0 and
+	// outputs as won_init allows
 	std::vector<int> start(w.vars(), 0);
-	for (size_t s = 0; s < S; ++s)
+	if (from) start = *from;
+	else for (size_t s = 0; s < S; ++s)
 		if (!streams[s].input)
 			for (size_t k = 1; k <= d; ++k)
 				if (kept(s, k))
@@ -2090,6 +2148,10 @@ protected:
 		if (t.equals_T()) return true;
 		if (t.equals_F()) return false;
 		return std::nullopt;
+	}
+
+	std::optional<bool> won_from(const window& win) override {
+		return truth(won_init->get(), win);
 	}
 
 	std::optional<bool> holds_label(int i, size_t j, const window& win)

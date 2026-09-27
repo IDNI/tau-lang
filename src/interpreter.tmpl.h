@@ -839,7 +839,7 @@ post_normalization:
 			if (data_strategy->view)
 				i.cached_solution = *data_strategy->view;
 			i.provider_ = std::make_shared<data_game_step_provider<node>>(
-				std::move(data_strategy));
+				std::move(data_strategy), spec);
 			i.compute_lookback_and_initial();
 			subtree_map<node, size_t> output_streams, input_streams;
 			if (!i.collect_output_streams(spec, output_streams)
@@ -1536,10 +1536,18 @@ std::optional<solution<node>> solve_step_outputs(tref fm, int_t t,
 template <NodeType node>
 struct data_game_step_provider : step_provider<node> {
 	std::shared_ptr<data_game_strategy<node>> strategy;
+	// The spec the strategy was solved for, its fixed steps absolute; a
+	// revision revises it.
+	htref spec;
+	// The absolute step the strategy's step 0 is: a revision re-solves
+	// the game from the step it is made at.
+	int_t offset = 0;
 
 	explicit data_game_step_provider(
-		std::shared_ptr<data_game_strategy<node>> s)
-		: strategy(std::move(s)) {}
+		std::shared_ptr<data_game_strategy<node>> s, tref fm = nullptr,
+		int_t start = 0)
+		: strategy(std::move(s)),
+		  spec(fm ? tree<node>::geth(fm) : nullptr), offset(start) {}
 
 	result<std::optional<solution<node>>> produce(const trefs&,
 		const assignment<node>& memory, size_t time_point, size_t) override
@@ -1548,16 +1556,59 @@ struct data_game_step_provider : step_provider<node> {
 		auto get = [&](const std::string& name, size_t tid, bool input,
 			int_t time) -> tref
 		{
-			tref key = input ? build_in_var_at_n<node>(name, time, tid)
-				: build_out_var_at_n<node>(name, time, tid);
+			tref key = input
+				? build_in_var_at_n<node>(name, time + offset, tid)
+				: build_out_var_at_n<node>(name, time + offset, tid);
 			auto it = memory.find(key);
 			return it == memory.end() ? nullptr : it->second;
 		};
 		auto solve = [this](tref fm, int_t t) {
 			return solve_step_outputs<node>(fm, t, found, ledger);
 		};
-		TAU_TRY(auto out, strategy->step(get, (int_t)time_point, solve));
-		return r.with_value(std::optional<solution<node>>(std::move(out)));
+		const int_t t = (int_t)time_point - offset;
+		TAU_TRY(auto out, strategy->step(get, t, solve));
+		if (!offset) return r.with_value(
+			std::optional<solution<node>>(std::move(out)));
+		// the strategy keys the outputs by its own steps
+		solution<node> moved;
+		for (const auto& x : strategy->streams) {
+			if (x.input) continue;
+			auto it = out.find(build_out_var_at_n<node>(x.name, t, x.tid));
+			if (it != out.end()) moved.emplace(build_out_var_at_n<node>(
+				x.name, (int_t)time_point, x.tid), it->second);
+		}
+		return r.with_value(std::optional<solution<node>>(std::move(moved)));
+	}
+
+	// The values before `time_point` a strategy `next` over the same or
+	// other streams starts from, prior[s][k-1] the value of its stream s
+	// k steps before: from memory, or, before this strategy's first step,
+	// the values it chose there. nullopt when one is not known.
+	std::optional<std::vector<std::vector<tref>>> prior_values(
+		const data_game_strategy<node>& next,
+		const assignment<node>& memory, int_t time_point) const
+	{
+		std::vector<std::vector<tref>> prior(next.streams.size());
+		for (size_t s = 0; s < next.streams.size(); ++s) {
+			const auto& x = next.streams[s];
+			for (size_t k = 1; k <= next.depth; ++k) {
+				const int_t at = time_point - (int_t)k;
+				tref v = nullptr;
+				if (at >= offset) {
+					auto it = memory.find(x.input
+						? build_in_var_at_n<node>(x.name, at, x.tid)
+						: build_out_var_at_n<node>(x.name, at, x.tid));
+					if (it != memory.end()) v = it->second;
+				} else if (auto i = strategy->index.find(x.name);
+					i != strategy->index.end()
+					&& strategy->streams[i->second].tid == x.tid)
+						v = strategy->value_before(i->second,
+							(size_t)(offset - at));
+				if (!v) return std::nullopt;
+				prior[s].push_back(v);
+			}
+		}
+		return prior;
 	}
 
 	// values chosen at earlier steps, the latest last
@@ -1577,8 +1628,10 @@ struct data_game_step_provider : step_provider<node> {
 		return strategy->state();
 	}
 	int_t lookback() const override { return (int_t)strategy->depth; }
-	void reset() override { strategy->reset(); }
-	bool revisable() const override { return false; }
+	void reset() override {
+		offset = 0;
+		strategy->reset();
+	}
 };
 
 // Prototype (minterm_solving_rework, "Lever B"): canonicalize a step's
@@ -2655,6 +2708,8 @@ result<typename interpreter<node>::update_plan>
 {
 	result<update_plan> r;
 	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
+	if (std::dynamic_pointer_cast<data_game_step_provider<node>>(provider_))
+		return plan_data_game_update(update);
 	if (provider_ && !provider_->revisable()) {
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
@@ -3000,6 +3055,147 @@ result<typename interpreter<node>::update_plan>
 }
 
 template <NodeType node>
+result<typename interpreter<node>::update_plan>
+	interpreter<node>::plan_data_game_update(tref update)
+{
+	result<update_plan> r;
+	auto dg = std::dynamic_pointer_cast<data_game_step_provider<node>>(
+		provider_);
+	if (!dg || !dg->spec) {
+		r.warning("the running strategy cannot follow a revised "
+			"specification; no update was performed");
+		return r;
+	}
+	// As in plan_update: the fixed steps of the update count from
+	// time_point, and the values in memory replace the ones it reads.
+	trefs io_vars = tau::get(update).select_top(is_child<node, tau::io_var>);
+	tref shifted_update = shift_const_io_vars_in_fm<node>(
+		update, io_vars, time_point);
+	if (tau::get(shifted_update).equals_F()) {
+		r.warning("the constant time position is below 0; no update was performed");
+		return r;
+	}
+	io_vars = tau::get(shifted_update).select_top(is_child<node, tau::io_var>);
+	if (!is_memory_access_valid(io_vars)) {
+		r.warning("an invalid memory access was found; no update was performed");
+		return r;
+	}
+	shifted_update = rewriter::replace<node>(shifted_update, memory);
+	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
+	tref running = rewriter::replace<node>(dg->spec->get(), memory);
+	std::vector<std::pair<tref, report>> failures;
+	auto revision_r = pointwise_revision(
+		htrefs{ tree<node>::geth(running) }, shifted_update, time_point);
+	const bool revised = revision_r.has_value()
+		&& revision_r.value().has_value();
+	htrefs revision;
+	if (revised) revision = std::move(*revision_r.value());
+	failures.emplace_back(running, std::move(revision_r).report());
+	// The game counts the steps from the one the revision is made at: a
+	// fixed step moves back by time_point, and one before it is refused.
+	auto rebase = [&](tref fm) -> tref {
+		subtree_map<node, tref> changes;
+		for (tref v : tau::get(fm).select_top(
+			is_child<node, tau::io_var>))
+		{
+			if (!is_io_initial<node>(v)) continue;
+			const int_t tp = get_io_time_point<node>(v)
+				- (int_t)time_point;
+			if (tp < 0) return nullptr;
+			const size_t type = tau::get(v).get_ba_type();
+			tref name = get_var_name_node<node>(v);
+			changes.emplace(v, tau::trim(tau::get(v).is_input_variable()
+				? build_in_var_at_n<node>(name, tp, type)
+				: build_out_var_at_n<node>(name, tp, type)));
+		}
+		return rewriter::replace<node>(fm, changes);
+	};
+	auto fold_failures = [&]() {
+		for (auto& [candidate, rep] : failures) {
+			auto sc = r.open("rejected candidate");
+			r.info("the update candidate was not accepted",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+	};
+	// the first alternative of the revision the data game plays from the
+	// values of the steps already played
+	for (const htref& alt_h : revision) {
+		tref alt = alt_h->get();
+		tref rebased = rebase(alt);
+		if (!rebased) {
+			r.info("the revised specification reads a fixed step "
+				"already played; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		std::shared_ptr<data_game_strategy<node>> next;
+		ltl_to_safety_formula_full<node>(rebased, &next, true);
+		if (!next) {
+			r.info("the data game does not decide the revised "
+				"specification; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		if (time_point > 0) {
+			auto prior = dg->prior_values(*next, memory,
+				(int_t)time_point);
+			if (!prior) {
+				r.info("the revised specification reads values the "
+					"run no longer keeps; the alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+			if (!next->start_from(*prior)) {
+				r.info("the data game of the revised specification is "
+					"not won from the values already played; the "
+					"alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+		}
+		subtree_map<node, size_t> out_ids, in_ids;
+		output_streams<node> new_outputs;
+		input_streams<node> new_inputs;
+		subtree_map<node, size_t> new_output_sources, new_input_sources;
+		if (!collect_output_streams(alt, out_ids)
+			|| !collect_input_streams(alt, in_ids)
+			|| !build_outputs(out_ids, this->outputs,
+				this->output_stream_sources, new_outputs,
+				new_output_sources)
+			|| !build_inputs(in_ids, this->inputs,
+				this->input_stream_sources, new_inputs,
+				new_input_sources))
+		{
+			r.info("the streams of the revised specification could "
+				"not be opened; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		fold_failures();
+		std::optional<ltl_aba_solution<node>> view;
+		if (next->view) view = *next->view;
+		auto provider = std::make_shared<data_game_step_provider<node>>(
+			std::move(next), alt, (int_t)time_point);
+		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
+		update_plan plan(std::vector<htrefs>{},
+			std::vector<std::pair<htrefs, htref>>{}, std::move(uf),
+			std::move(new_inputs), std::move(new_outputs),
+			std::move(new_input_sources), std::move(new_output_sources),
+			TAU_TO_STR(alt));
+		plan.provider = std::move(provider);
+		plan.solution = std::move(view);
+		return r.with_assert_check_value(std::move(plan));
+	}
+	fold_failures();
+	r.warning("the updated specification is unsat; no update was performed");
+	return r;
+}
+
+template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
 	result<bool> r;
@@ -3036,6 +3232,14 @@ result<bool> interpreter<node>::update(tref update) {
 	chosen_alt_.clear();
 	// The cached step spec belongs to the previous specification.
 	step_spec_time_point_ = -1;
+	// A run of the data game's strategy plays the one of the revised spec.
+	if (plan->provider) {
+		provider_ = std::move(plan->provider);
+		cached_solution = std::move(plan->solution);
+		cached_solution_stale_ = false;
+		compute_lookback_and_initial();
+		return r.with_assert_check_value(true);
+	}
 	compute_lookback_and_initial();
 	// IN-N3: the synthesised strategy (if any) described the spec
 	// before this revision; keep it for reset()'s re-seeding, but mark

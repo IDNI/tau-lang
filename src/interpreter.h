@@ -567,6 +567,11 @@ private:
 		subtree_map<node, size_t> input_sources;
 		subtree_map<node, size_t> output_sources;
 		std::string spec_str;
+		// Set by a revision of a run of the data game's strategy: the
+		// provider playing the strategy for the revised spec and its
+		// Mealy view.
+		std::shared_ptr<step_provider<node>> provider;
+		std::optional<ltl_aba_solution<node>> solution;
 		// The union-find's move constructor is explicit, so the members
 		// are direct-initialized here rather than brace-aggregated.
 		update_plan(std::vector<htrefs>&& c,
@@ -587,6 +592,12 @@ private:
 	/// @return The plan, or a structured error/warning report when no
 	///         clause does.
 	result<update_plan> plan_update(tref update);
+
+	/// @brief plan_update for a run of the data game's strategy: the
+	/// running spec is revised by @p update as in plan_update, and the
+	/// data game is solved again for the revised spec from the values of
+	/// the steps already played.
+	result<update_plan> plan_data_game_update(tref update);
 
 	/// @brief The index of the first alternative of part @p part whose
 	/// continuation is solvable at the current time point under the

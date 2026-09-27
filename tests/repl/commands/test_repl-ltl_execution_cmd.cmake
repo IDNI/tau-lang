@@ -115,3 +115,11 @@ add_ltl_run_test(fixed_steps_unrealizable_stays_unsat
 	"run 4 steps (always o2[0] = 0 && o2[0] = 1 && o2[t] = o1[t-1]).\\nq\\n"
 	"unsat"
 	":= ")
+
+# a revision of a run of the data game's strategy: the game is solved again
+# for the revised spec from the values already played, and o1 stops
+# alternating
+add_ltl_run_test(data_game_strategy_revision
+	"run (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o1[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 1\n.*o1\\[6\\] := 1"
+	"cannot follow|unsat|no strategy")
