@@ -684,6 +684,18 @@ TEST_SUITE("regression/oversized numeric literals") {
 		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
 	}
 
+	// Node data is read back as size_t. On wasm32 that has 32 bits, and
+	// 2^32 read into it wrapped to 0, so the spec parsed as `g[0](Y) := T.`
+	// On a 64-bit target 2^32 fits and the case has nothing to check.
+	TEST_CASE("a literal that does not fit size_t fails the parse"
+		* doctest::skip(sizeof(size_t) >= 8))
+	{
+		const char* sample =
+			"g[4294967296](Y) := T." // 2^32
+			"T.";
+		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
+	}
+
 	// ...while an ordinary literal must keep parsing.
 	//
 	// The exact boundary (2^54-1, the largest value node::data holds) is

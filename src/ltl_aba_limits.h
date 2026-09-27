@@ -140,7 +140,9 @@ inline int ltl_timeout_sec() {
 	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
 		char* end = nullptr;
 		errno = 0;
-		long v = std::strtol(env_sec, &end, 10);
+		// 64 bits on every target: a 32-bit long (wasm32) would read
+		// 2^32 as out of range instead of clamping it
+		long long v = std::strtoll(env_sec, &end, 10);
 		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
 			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
 				<< "' is not a non-negative number; keeping the default "
