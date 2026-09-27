@@ -265,6 +265,7 @@ constexpr count_setter count_setters[] = {
 	{ "setMaxConsistencySubsets", &tau_api::set_max_consistency_subsets },
 	{ "setCacheBound", &tau_api::set_cache_bound },
 	{ "setMaxCoverProducts", &tau_api::set_max_cover_products },
+	{ "setMaxConstantSize", &tau_api::set_max_constant_size },
 	{ "setLtlQeMaxVars", &tau_api::set_ltl_qe_max_vars },
 	{ "setLtlMaxRefinementRounds",
 		&tau_api::set_ltl_max_refinement_rounds },
@@ -317,6 +318,10 @@ EMSCRIPTEN_BINDINGS(tau) {
 		emscripten::function(s.name, s.set);
 	emscripten::function("setGcGrowthFactor",
 		&tau_api::set_gc_growth_factor);
+	// The one budget a caller reads back: the api setter writes this
+	// variable directly, and 0 means unlimited.
+	emscripten::function("getMaxConstantSize", optional_override(
+		[]() { return static_cast<double>(max_constant_size); }));
 	emscripten::function("trefCount", optional_override(
 		[]() { return static_cast<double>(tau_api::tref_count()); }));
 	emscripten::function("baOptionNames", &js_ba_option_names);
