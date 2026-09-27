@@ -822,9 +822,10 @@ post_normalization:
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
+		bool unrealizable = false;
 		std::tie(safety_spec, sol_opt, unanchored_aux) =
 			ltl_to_safety_formula_full<node>(spec, &data_strategy,
-				counter_route);
+				counter_route, &unrealizable);
 		// The data game decided the spec: its strategy chooses every
 		// step's outputs, so no spec part is solved.
 		if (data_strategy) {
@@ -865,6 +866,13 @@ post_normalization:
 			fold_rejected(safety_failures, false);
 			return r.with_assert_check_error(code::unsat,
 				"Tau specification is unsat");
+		}
+		if (!safety_spec && unrealizable) {
+			fold_rejected(safety_failures, false);
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is not executable: it is "
+				"unrealizable, no choice of output values keeps "
+				"it for all inputs");
 		}
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is not executable: no "
