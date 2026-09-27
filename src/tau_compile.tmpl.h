@@ -152,6 +152,10 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 #endif
 		"target_link_libraries(" << exe_name << " PRIVATE\n"
 		"\ttau_prebuilt tau_prebuilt_parser Boost::log ${TAU_BA_LINK_LIBS})\n"
+#ifdef TAU_CODEGEN_COVERAGE
+		// libTAU.a is instrumented; its gcov references need the runtime.
+		"target_link_options(" << exe_name << " PRIVATE --coverage)\n"
+#endif
 		"\n"
 		"# Matches the emitting build's ABI-affecting toggles (e.g.\n"
 		"# TAU_PARSER_MEASURE*) so this TU's header-only template instantiations\n"

@@ -287,6 +287,16 @@ function(tau_generate_pack_header)
 	set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
 		"${TAU_CODEGEN_ARTIFACT_PREINST_DEFINE}" PARENT_SCOPE)
 
+	# Under a Coverage build libTAU.a is instrumented, so a program `tau
+	# compile` links against it needs the gcov runtime too.
+	if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+		set(TAU_CODEGEN_COVERAGE_DEFINE "#define TAU_CODEGEN_COVERAGE 1")
+	else()
+		set(TAU_CODEGEN_COVERAGE_DEFINE "")
+	endif()
+	set(TAU_CODEGEN_COVERAGE_DEFINE
+		"${TAU_CODEGEN_COVERAGE_DEFINE}" PARENT_SCOPE)
+
 	# The carrier order reaches the fold as one macro rather than through
 	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
 	# includes tau_tree.h and so the traits themselves.
