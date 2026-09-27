@@ -144,7 +144,7 @@ node bindings/js/tests/parity.js                    # wasm vs native, 140 checks
 node bindings/js/tests/budgets.js                   # budget setters, BA options
 
 ./dev preset debug-emscripten-tests                 # tau's own suite for wasm
-ctest --test-dir build/debug-emscripten-tests -j 8  # runs each test under node
+ctest --test-dir build/debug-emscripten -j 8        # runs each test under node
 
 ./dev preset emscripten-pthread                     # tau_repl.js (needs pthreads)
 ./dev tau-repl-serve [port] [build-dir]             # serve the REPL page
@@ -177,11 +177,19 @@ Four constraints, each of which has broken a build here:
 - **Values that must agree across platforms need a fixed width.** wasm32 is the only
   32-bit target here, and `size_t` is a word size, not a width. `tau_tree.h`'s node
   word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
+  Node data is still read back as `size_t`, so a numeric literal must fit both
+  the node word and `size_t` (`tau_tree_from_parser.tmpl.h`).
 
-The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
-1493 REPL tests are not built for wasm (they would turn on `TAU_BUILD_EXECUTABLE`
-and collide with `tau.js`), so the compiled suites that natively defer to them are
-built for wasm instead.
+The suite registers **98** C++ suites: every one whose algebras are in the wasm
+pack. The REPL tests are not built for wasm (they would turn on
+`TAU_BUILD_EXECUTABLE` and collide with `tau.js`), so the compiled suites that
+natively defer to them (`TAU_SKIP_TESTS`) are built for wasm instead. A case
+that needs what wasm lacks skips itself by capability, not by platform:
+`doctest::skip(!ltlsynt_available())` for synthesis, and a probe of
+`spawn_capture` or of the fixture directory for a spawned process or a host
+file. The tests run under emsdk's node, which `cmake/emsdk-node.cmake` resolves
+at configure time (`-DNODE_EXECUTABLE`, `$EMSDK_NODE`, `NODE_JS` of the emsdk
+config); an older system node fails every test at load.
 
 ## Architecture
 

@@ -117,7 +117,8 @@ TEST_SUITE("sbf_codegen") {
 	// Reproduces tests/codegen_specs/sbf_temporal.tau's atom shape directly
 	// against the atoms table, without a full artifact build.
 	TEST_CASE("build_program_desc: an sbf ground-equality atom's constant "
-	          "emits rather than throwing") {
+	          "emits rather than throwing"
+		* doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:sbf = {X & Y}:sbf)");
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol);

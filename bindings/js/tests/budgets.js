@@ -10,7 +10,9 @@
 // through what it changes: the tree-node budget refuses a call, and the
 // fixpoint-step cap makes a query that needs more steps give up instead of
 // answering. The give-up workload is the one of the REPL test
-// test_repl-limit_effect-fixpointsteps_giveup.
+// test_repl-limit_effect-fixpointsteps_giveup. The constant size budget is
+// the exception: getMaxConstantSize reads it back, and its give-up workload
+// is the one of test_repl-run_cmd-value_past_constant_size_budget.
 //
 // Needs no native binary.
 
@@ -38,7 +40,8 @@ const COUNT_SETTERS = {
 	setMaxSimplifyRounds: 0, setGcMinSize: 256, setTrefBudget: 0,
 	setTrefBudgetSoftPercent: 75, setSpecSizeWarn: 0,
 	setMaxRevisionAlts: 0, setMaxConsistencySubsets: 4096,
-	setCacheBound: 4096, setMaxCoverProducts: 256, setLtlQeMaxVars: 0,
+	setCacheBound: 4096, setMaxCoverProducts: 256, setMaxConstantSize: 2000,
+	setLtlQeMaxVars: 0,
 	setLtlMaxRefinementRounds: 64, setBaDecisionPins: 4096,
 };
 
@@ -125,6 +128,39 @@ function runFixpointSteps(tau) {
 		`setMaxFixpointSteps(500) decides ${JSON.stringify(spec)}`);
 }
 
+// Steps the run whose values grow with every step until a step fails;
+// returns that step's diagnostic, or null when every step ran.
+function growingRun(tau, steps) {
+	const h = tau.interpreterCreate('always (o1[t] != o1[t-1] && '
+		+ 'o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t]).');
+	if (h === 0) return 'interpreterCreate: ' + tau.getLastError();
+	try {
+		for (let k = 0; k < steps; k++)
+			if (tau.interpreterStep(h, { i1: '<:a> = 0' }) === null)
+				return tau.getLastError();
+		return null;
+	} finally { tau.interpreterFree(h); }
+}
+
+function runMaxConstantSize(tau) {
+	check(tau.getMaxConstantSize() === 2000,
+		`getMaxConstantSize() -> ${tau.getMaxConstantSize()} (default 2000)`);
+	tau.setMaxConstantSize(300);
+	check(tau.getMaxConstantSize() === 300,
+		'getMaxConstantSize() reads 300 after setMaxConstantSize(300)');
+	tau.setMaxConstantSize(0);
+	check(tau.getMaxConstantSize() === 0,
+		'getMaxConstantSize() reads 0 (unlimited) after setMaxConstantSize(0)');
+	tau.setMaxConstantSize(1);
+	const capped = growingRun(tau, 3);
+	tau.setMaxConstantSize(2000);
+	check(capped !== null && capped.includes('constant size budget'),
+		'setMaxConstantSize(1) stops the growing run at the budget');
+	check(growingRun(tau, 1) === null,
+		'setMaxConstantSize(2000) runs its first step');
+	check(tau.getMaxConstantSize() === 2000, 'getMaxConstantSize() restored');
+}
+
 function runBaOptions(tau) {
 	const names = tau.baOptionNames();
 	check(Array.isArray(names) && names.length > 0,
@@ -165,6 +201,7 @@ tauModule().then((tau) => {
 		runTrefBudget(tau);
 		runColors(tau);
 		runFixpointSteps(tau);
+		runMaxConstantSize(tau);
 		runBaOptions(tau);
 	} catch (e) {
 		console.error('EXCEPTION: ' + e.stack);

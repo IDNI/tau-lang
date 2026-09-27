@@ -59,7 +59,8 @@ TEST_SUITE("qlt_codegen") {
 	// The new contract removes that structurally: the witness is an exact
 	// qlt_rational(p, q) embedded as integer literals, so it satisfies the
 	// interval by construction, not by luck of the rounding.
-	TEST_CASE("narrow interval: witness is an exact qlt_rational strictly inside it") {
+	TEST_CASE("narrow interval: witness is an exact qlt_rational strictly inside it"
+		* doctest::skip(!ltlsynt_available())) {
 		auto sol = synth(
 			"G(o1[t]:qlt > {1000001/2000000}:qlt "
 			"&& o1[t]:qlt < {1000003/2000000}:qlt)");

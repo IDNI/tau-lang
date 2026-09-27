@@ -588,7 +588,8 @@ TEST_SUITE("Tau API - tref - procedures") {
 		CHECK(unsat_f.value());
 		CHECK(!unsat_t.value());
 	}
-	TEST_CASE_FIXTURE(api_fixture, "realizable implies sat") {
+	TEST_CASE_FIXTURE(api_fixture, "realizable implies sat"
+		* doctest::skip(!ltlsynt_available())) {
 		// realizable(fm) => sat(fm), never the converse: whenever
 		// realizable finds a winning program, sat must agree the
 		// formula has a satisfying trace. Battery covers a
@@ -659,7 +660,8 @@ TEST_SUITE("Tau API - tref - procedures") {
 	}
 	// valid_spec asks about the negation of a full-LTL formula. A spec
 	// root must have its main formula negated, not the spec node itself.
-	TEST_CASE_FIXTURE(api_fixture, "valid_spec negates the main formula of a spec root") {
+	TEST_CASE_FIXTURE(api_fixture, "valid_spec negates the main formula of a spec root"
+		* doctest::skip(!ltlsynt_available())) {
 		const std::pair<const char*, bool> cases[] = {
 			{ "G (o1[t] = 0) || F (o1[t] != 0).", true },
 			{ "G (i1[t] = 0 -> i1[t] = 0).", true },

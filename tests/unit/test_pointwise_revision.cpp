@@ -819,7 +819,8 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 
 	// Case 3 generalised: a non-temporal Boolean spec side against a
 	// binary temporal update is lifted like an atom, not dropped.
-	TEST_CASE("[PWR-C-03] boolean spec vs until update is revised, not dropped") {
+	TEST_CASE("[PWR-C-03] boolean spec vs until update is revised, not dropped"
+		* doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
 		tref u = spec("(o1[t] = 0) weak_until (i1[t] = 1).");
 		REQUIRE(s != nullptr);
@@ -840,7 +841,8 @@ TEST_SUITE("Cleanup") {
 // and_distribute shapes had zero coverage.
 TEST_SUITE("[PWR-LS17: uncovered cases]") {
 
-	TEST_CASE("[PWR-LS17-01] Case 4: G spec vs R update") {
+	TEST_CASE("[PWR-LS17-01] Case 4: G spec vs R update"
+		* doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G (o1[t] = 0).");
 		tref u = spec("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(s != nullptr);
@@ -850,7 +852,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-LS17-02] Case 5: F spec vs U update") {
+	TEST_CASE("[PWR-LS17-02] Case 5: F spec vs U update"
+		* doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (o1[t] = 0).");
 		tref u = spec("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
@@ -932,11 +935,8 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 
 	TEST_CASE("[PWR-R6-01] one U-revision spawns each distinct query "
 			"once; a repeated revision spawns none under "
-			"TAU_CACHE") {
-		// Skip when ltlsynt is not on PATH (same guard as the other
-		// ltlsynt-driven suites).
-		if (std::system("command -v ltlsynt > /dev/null 2>&1") != 0)
-			return;
+			"TAU_CACHE"
+		* doctest::skip(!ltlsynt_available())) {
 		// Resolve the real binary before PATH is changed.
 		std::string real;
 		{

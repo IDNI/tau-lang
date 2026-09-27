@@ -67,7 +67,8 @@ TEST_SUITE("LTL literature benchmarks") {
 		));
 	}
 
-	TEST_CASE("LB-04 always-grant impossibility: G o1 && F !o1") {
+	TEST_CASE("LB-04 always-grant impossibility: G o1 && F !o1"
+		* doctest::skip(!ltlsynt_available())) {
 		// Classic contradiction — cannot always o1=1 AND eventually o1=0.
 		// UNREALIZABLE.
 		if (skip_benchmarks()) return;
