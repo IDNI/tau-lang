@@ -61,6 +61,8 @@ add_repl_test(set_cmd-maxsubsets
 	"set maxsubsets 7. get maxsubsets" "maxsubsets: *7")
 add_repl_test(set_cmd-cachebound
 	"set cachebound 99. get cachebound" "cachebound: *99")
+add_repl_test(set_cmd-maxconstantsize
+	"set maxconstantsize 300. get maxconstantsize" "maxconstantsize: *300")
 add_repl_test(set_cmd-maxcoverproducts
 	"set maxcoverproducts 17. get maxcoverproducts" "maxcoverproducts: *17")
 # The two pre-existing numeric options now accept 0 as "unlimited" (they

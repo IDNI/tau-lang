@@ -191,6 +191,11 @@ struct fresh_element_ledger {
 	// new region structurally contains every prior value, so rooting only
 	// the latest is enough -- no separate per-value pin needed.
 	htref fresh_region;
+
+	// Set once the region outgrew `max_constant_size`: the region is no
+	// longer tracked, so no value counts as fresh and every choice goes
+	// to the general solver.
+	bool exhausted = false;
 };
 
 /**

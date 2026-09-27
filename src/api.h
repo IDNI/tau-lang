@@ -328,6 +328,9 @@ struct api {
 	 * 256; 0 = unlimited.
 	 */
 	static void set_max_cover_products(size_t n);
+	/** @brief Set the largest region of fresh values, in tree nodes, the
+	 * solver keeps across the steps of a run (0 = unlimited). */
+	static void set_max_constant_size(size_t n);
 	/**
 	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
 	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,

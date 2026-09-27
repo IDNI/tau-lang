@@ -230,6 +230,10 @@ NB_MODULE(tau, m) {
 		{ "set_max_cover_products", &tau_api::set_max_cover_products,
 			"The ABA oracle's mixed-type coverage expansion "
 			"(--max-cover-products); default 256, 0 = unlimited." },
+		{ "set_max_constant_size", &tau_api::set_max_constant_size,
+			"Largest region of fresh values, in tree nodes, a run "
+			"keeps across steps (--max-constant-size); default 2000, "
+			"0 = unlimited." },
 		{ "set_ltl_qe_max_vars", &tau_api::set_ltl_qe_max_vars,
 			"Free-variable cap of the omcat QE fast path "
 			"(--ltl-qe-max-vars); above 2 is not sound, 0 falls "

@@ -2782,6 +2782,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
 | -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
 | -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
+| -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
@@ -3048,6 +3049,11 @@ is sound but may answer unrealizable.
 
 * `maxcoverproducts`: cap on the ABA oracle's mixed-type coverage expansion
 (`--max-cover-products`). 256 by default.
+
+* `maxconstantsize`: largest region of fresh values, in tree nodes, that a run
+keeps across steps (`--max-constant-size`). Each value a run commits shrinks
+the region, which grows with it; past the cap the run stops tracking it and
+new values come from the general solver. 2000 by default, 0 = unlimited.
 
 * `cachebound`: bound on the string-keyed synthesis caches, with FIFO eviction
 (`--cache-bound`). 4096 by default; 0 = unbounded.

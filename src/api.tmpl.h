@@ -289,14 +289,20 @@ void api<node>::set_max_cover_products(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_max_constant_size(size_t n) {
+	max_constant_size = n;
+}
+
+template <NodeType node>
 void api<node>::set_ltl_timeout_sec(long seconds) {
+	option_change_guard<node> guard;
 	ltl_timeout_sec_param = seconds < 0 ? -1
 		: std::min(seconds, ltl_timeout_sec_max);
 }
 
 template <NodeType node>
-	option_change_guard<node> guard;
 void api<node>::set_ltl_algorithm(const std::string& alg) {
+	option_change_guard<node> guard;
 	ltl_algorithm_param = alg;
 }
 
@@ -344,18 +350,17 @@ void api<node>::set_step_definitional_propagation(bool on) {
 
 template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
-	option_change_guard<node> guard;
 	pretty_printer_indenting = indenting;
 }
 
 template <NodeType node>
 void api<node>::set_ba_component_factoring(bool state) {
+	option_change_guard<node> guard;
 	pack_set_ba_component_factoring<node>(state);
 }
 
 template <NodeType node>
 void api<node>::set_ba_decision_pins(size_t n) {
-	option_change_guard<node> guard;
 	pack_set_ba_decision_pins<node>(n);
 }
 
@@ -392,12 +397,12 @@ template <NodeType node>
 result<size_t> api<node>::set_ba_option(const std::string& name,
 	size_t value)
 {
+	option_change_guard<node> guard;
 	result<size_t> r;
 	TAU_TRY(const ba_option* o, api_detail::find_ba_option<node>(name));
 	if (o->kind == ba_option_kind::flag) o->set_flag(value != 0);
 	else o->set_count(value);
 	return r.with_value(api_detail::ba_option_value(*o));
-	option_change_guard<node> guard;
 }
 
 template <NodeType node>
