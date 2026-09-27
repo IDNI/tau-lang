@@ -308,10 +308,10 @@ CMD []
 
 FROM deps AS w64-deps
 
-# The w64 packages have their own content ids (target=w64) in the same store
-# as the native ones, and oras is already installed in the parent stage. This
-# stage exists so the w64 image stays a separate, cacheable step from the
-# Linux one; configure builds a w64 package the remote does not have.
+# The w64 packages have their own content ids (target=windows-x86_64-mingw) in
+# the same store as the native ones, and oras is already installed in the parent
+# stage. This stage exists so the w64 image stays a separate, cacheable step
+# from the Linux one; configure builds a w64 package the remote does not have.
 ARG BUILD_JOBS=5
 
 

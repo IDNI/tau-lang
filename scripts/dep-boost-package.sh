@@ -8,8 +8,9 @@
 # The source is pinned to one immutable commit (Boost 1.86.0).
 #
 # Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected. The wasm variants have their own threading
-# and exception-encoding inputs, which this identity records explicitly.
+# other target or host is rejected. The wasm32-emscripten variants have their
+# own threading and exception-encoding inputs, which this identity records
+# explicitly.
 
 set -u
 
@@ -22,8 +23,9 @@ BOOST_DEFAULT_COMMIT="65c1319bb92fe7a9a4abd588eff5818d9c2bccf9"
 BOOST_TOOLSET="gcc"
 BOOST_LINK_MODE="static,shared"
 BOOST_THREADING="multi"
-# Native has no wasm exception encoding; the field exists so the wasm variants
-# can reuse this schema. The legacy .tau-eh-abi stamp covers only this option.
+# Native has no wasm32-emscripten exception encoding; the field exists so the
+# wasm variants can reuse this schema. The legacy .tau-eh-abi stamp covers only
+# this option.
 BOOST_EXCEPTION_ENCODING="none"
 BOOST_CXX_STANDARD="17"
 
@@ -142,7 +144,7 @@ _dep_boost_field_block() {
 	done
 	printf '%s\n' \
 		"dep=boost" \
-		"target=${DEP_BOOST_TARGET:-native}" \
+		"target=${DEP_BOOST_TARGET:-$(dep_host_target)}" \
 		"repo=${BOOST_REPO}" \
 		"commit=${BOOST_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
@@ -161,7 +163,7 @@ _dep_boost_field_block() {
 		"cxxflags=${DEP_BOOST_CXXFLAGS}" \
 		"compiler_id=$(_dep_boost_compiler_id)" \
 		"compiler_version=$(dep_compiler_version "$DEP_BOOST_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_BOOST_CXX" "${DEP_BOOST_TARGET:-native}")" \
+		"target_triple=$(dep_compiler_triple "$DEP_BOOST_CXX" "${DEP_BOOST_TARGET:-$(dep_host_target)}")" \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"os_release_hash=$(dep_os_release_hash)" \
@@ -229,7 +231,7 @@ _dep_boost_producer() {
 	# Bootstrap with an explicit toolset. The compiler is pinned through a
 	# user-config so the recorded toolset is not the host default.
 	local b2_bin="${work}/b2"
-	if [ "$DEP_BOOST_TARGET" = "w64" ]; then
+	if [ "$DEP_BOOST_TARGET" = "windows-x86_64-mingw" ]; then
 		cat > "${work}/user-config.jam" <<EOF
 using gcc : mingw64 : ${cxx}
         :
@@ -237,13 +239,13 @@ using gcc : mingw64 : ${cxx}
         <archiver>x86_64-w64-mingw32-ar
 ;
 EOF
-	elif [ "$DEP_BOOST_TARGET" = "win-msvc-x64" ]; then
+	elif [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
 		# b2's msvc toolset finds cl through the developer environment the
 		# runner set up; naming the compiler path here would freeze a version.
 		cat > "${work}/user-config.jam" <<EOF
 using msvc ;
 EOF
-	elif [ "$DEP_BOOST_TARGET" = "wasm" ]; then
+	elif [ "$DEP_BOOST_TARGET" = "wasm32-emscripten" ]; then
 		EMSCRIPTEN_DIR="${TAU_SHARED_PREFIX}/emsdk/upstream/emscripten"
 		cat > "${work}/user-config.jam" <<EOF
 using emscripten : : ${EMSCRIPTEN_DIR}/em++ ;
@@ -253,7 +255,7 @@ EOF
 using ${BOOST_TOOLSET} : : ${cxx} ;
 EOF
 	fi
-	if [ "$DEP_BOOST_TARGET" = "win-msvc-x64" ]; then
+	if [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
 		# bootstrap.bat + b2 in one cmd session, so both inherit the vcvars
 		# environment. Git Bash rewrites `/c`, `/d` and `--`-switches on a
 		# cmd.exe command line as filesystem paths; keeping them in a .bat
@@ -342,14 +344,14 @@ EOF
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-native}" in
-	native|w64|wasm|darwin-arm64|darwin-x86_64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	linux-x86_64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
-		echo "dep-boost: unknown target '${DEP_TARGET}'" >&2
+		echo "dep-boost: unknown target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-boost "${DEP_TARGET:-native}"
+dep_require_target_host dep-boost "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -388,7 +390,7 @@ case "$(dep_compiler_id "$DEP_BOOST_CXX")" in
 	MSVC) BOOST_TOOLSET="msvc" ;;
 	*) echo "dep-boost: unknown compiler '$DEP_BOOST_CXX'" >&2; exit 2 ;;
 esac
-DEP_BOOST_TARGET="${DEP_TARGET:-native}"
+DEP_BOOST_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_BOOST_TARGET_OS="linux"
 DEP_BOOST_B2_TOOLSET="${BOOST_TOOLSET}"
 DEP_BOOST_B2_LINK="${BOOST_LINK_MODE}"
@@ -396,7 +398,7 @@ DEP_BOOST_B2_THREADING="${BOOST_THREADING}"
 DEP_BOOST_B2_ADDRESS_MODEL="64"
 DEP_BOOST_B2_PIC=" -fPIC"
 case "$DEP_BOOST_TARGET" in
-	w64)
+	windows-x86_64-mingw)
 		DEP_BOOST_TARGET_OS="windows"
 		;;
 	darwin-arm64|darwin-x86_64)
@@ -407,7 +409,7 @@ case "$DEP_BOOST_TARGET" in
 		BOOST_LINK_MODE="static"
 		DEP_BOOST_B2_LINK="static"
 		;;
-	win-msvc-x64)
+	windows-x86_64-msvc)
 		DEP_BOOST_TARGET_OS="windows"
 		DEP_BOOST_B2_PIC=""
 		# --layout=system names the static and the shared library identically,
@@ -415,7 +417,7 @@ case "$DEP_BOOST_TARGET" in
 		BOOST_LINK_MODE="static"
 		DEP_BOOST_B2_LINK="static"
 		;;
-	wasm)
+	wasm32-emscripten)
 		# em++ rejects the -m64 that address-model=64 becomes, and needs no PIC.
 		DEP_BOOST_TARGET_OS=""
 		DEP_BOOST_B2_TOOLSET="emscripten"
@@ -441,7 +443,7 @@ _DEP_BOOST_B2_ARGS=(
 if [ -n "$DEP_BOOST_TARGET_OS" ]; then
 	_DEP_BOOST_B2_ARGS+=("target-os=${DEP_BOOST_TARGET_OS}")
 fi
-if [ "$DEP_BOOST_TARGET" = "wasm" ] || [ "$DEP_BOOST_TARGET" = "win-msvc-x64" ]; then
+if [ "$DEP_BOOST_TARGET" = "wasm32-emscripten" ] || [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
 	_DEP_BOOST_B2_ARGS+=("define=BOOST_LOG_WITHOUT_SYSLOG")
 fi
 

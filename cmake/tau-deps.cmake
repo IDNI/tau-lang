@@ -32,7 +32,8 @@ endfunction()
 # A cross-toolchain target builds the host tgf natively, because the target
 # compiler cannot produce a binary this build host can run.
 function(_tau_deps_target_is_cross_toolchain out)
-	if(TAU_DEPS_TARGET STREQUAL "w64" OR TAU_DEPS_TARGET STREQUAL "wasm")
+	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
+			OR TAU_DEPS_TARGET STREQUAL "wasm32-emscripten")
 		set(${out} TRUE PARENT_SCOPE)
 	else()
 		set(${out} FALSE PARENT_SCOPE)
@@ -170,8 +171,8 @@ function(tau_deps_resolve_curl)
 	if(NOT "CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		return()
 	endif()
-	if(NOT TAU_DEPS_TARGET STREQUAL "w64"
-			AND NOT TAU_DEPS_TARGET STREQUAL "win-msvc-x64")
+	if(NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
+			AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
 		return()
 	endif()
 	tau_deps_ensure_prefix(curl
@@ -180,7 +181,7 @@ function(tau_deps_resolve_curl)
 		add_library(CURL::libcurl STATIC IMPORTED)
 		# MSVC names its import/static library .lib; MinGW names it .a.
 		set(_curl_lib "${TAU_CURL_PREFIX}/lib/libcurl.a")
-		if(TAU_DEPS_TARGET STREQUAL "win-msvc-x64")
+		if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
 			set(_curl_lib "${TAU_CURL_PREFIX}/lib/libcurl.lib")
 		endif()
 		set_target_properties(CURL::libcurl PROPERTIES
@@ -197,12 +198,12 @@ endfunction()
 # Spot is a host tool Tau only execs (ltlsynt, autfilt, ltlfilt); nothing
 # links it. A host that already has ltlsynt on PATH -- apt, brew, conda --
 # uses that. Otherwise the store package supplies the tools, and configure
-# publishes its bin directory as TAU_SPOT_BIN. win-msvc-x64 always takes the
-# package: its MSYS2 build needs the runtime DLLs copied beside the exes, and
+# publishes its bin directory as TAU_SPOT_BIN. windows-x86_64-msvc always takes
+# the package: its MSYS2 build needs the runtime DLLs copied beside the exes, and
 # a Windows PATH ltlsynt would not carry them.
 function(tau_deps_resolve_spot)
 	find_program(TAU_HOST_LTLSYNT ltlsynt NO_CACHE)
-	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET STREQUAL "win-msvc-x64")
+	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()

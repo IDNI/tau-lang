@@ -2,13 +2,14 @@
 # Build and cache the static curl package for the Windows targets in the LOCAL
 # store.
 #
-#   ./dev dep-curl -DTAU_DEP_TARGET=w64 -DTAU_BUILD_JOBS=8
-#   ./dev dep-curl -DTAU_DEP_TARGET=win-msvc-x64 -DTAU_BUILD_JOBS=8
+#   ./dev dep-curl -DTAU_DEP_TARGET=windows-x86_64-mingw -DTAU_BUILD_JOBS=8
+#   ./dev dep-curl -DTAU_DEP_TARGET=windows-x86_64-msvc -DTAU_BUILD_JOBS=8
 #
 # A Windows target has no system curl, and nlang's HTTP oracle links
 # CURL::libcurl. curl is built static with the Windows schannel TLS backend and
 # every optional dependency off, so the archive needs only Windows system
-# libraries. Native Linux and macOS keep the system curl; wasm never needs one.
+# libraries. Native Linux and macOS keep the system curl; wasm32-emscripten
+# never needs one.
 #
 # The source is one pinned release tarball; nothing here moves a tag.
 
@@ -40,7 +41,7 @@ _dep_curl_field_block() {
 	store_hash="$(dep_sha256 "$store")" || return 1
 	printf '%s\n' \
 		"dep=curl" \
-		"target=${DEP_CURL_TARGET:-w64}" \
+		"target=${DEP_CURL_TARGET:-$(dep_host_target)}" \
 		"version=${CURL_VERSION}" \
 		"url=${CURL_URL}" \
 		"sha256=${CURL_SHA256}" \
@@ -58,7 +59,7 @@ _dep_curl_field_block() {
 		"ninja_version=$("$DEP_CURL_NINJA" --version)" \
 		"compiler_id=$(_dep_curl_compiler_id)" \
 		"compiler_version=$(dep_compiler_version "$DEP_CURL_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_CURL_CXX" "${DEP_CURL_TARGET:-w64}")" \
+		"target_triple=$(dep_compiler_triple "$DEP_CURL_CXX" "${DEP_CURL_TARGET:-$(dep_host_target)}")" \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"build_type=Release" \
@@ -167,14 +168,14 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-native}" in
-	w64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
-		echo "dep-curl: only the Windows targets are supported, got '${DEP_TARGET}'" >&2
+		echo "dep-curl: only the Windows targets are supported, got '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-curl "${DEP_TARGET:-w64}"
+dep_require_target_host dep-curl "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -185,7 +186,7 @@ case "$mode" in
 		;;
 esac
 
-DEP_CURL_TARGET="${DEP_TARGET:-w64}"
+DEP_CURL_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_CURL_JOBS="$(dep_jobs)"
 
 DEP_CURL_CMAKE="$(command -v "${CMAKE:-cmake}")" \

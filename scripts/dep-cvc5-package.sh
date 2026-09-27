@@ -9,9 +9,9 @@
 # and never checked out as a tag. Producer mode builds into a staging entry and
 # publishes it. Consumer mode only looks up an existing entry.
 #
-# The native, w64, macOS and MSVC tuples are produced. MSVC builds with Ninja,
-# the production build type and the preset's cl; GMP is the known risk and
-# CVC5_CMAKE_PREFIX can point at an MSVC-compatible one.
+# The native, windows-x86_64-mingw, macOS and MSVC tuples are produced. MSVC
+# builds with Ninja, the production build type and the preset's cl; GMP is the
+# known risk and CVC5_CMAKE_PREFIX can point at an MSVC-compatible one.
 
 set -u
 
@@ -50,7 +50,7 @@ _dep_cvc5_url_archive() {
 # Resolve the system GMP, if the host provides it, before the build. cvc5's
 # FindGMP uses the system GMP when gmp.h is on the include path and only then
 # falls back to the download, so this is the same choice the configure makes.
-# The system copy is a Linux host library, so w64 and macOS always download.
+# The system copy is a Linux host library, so windows-x86_64-mingw and macOS always download.
 # MSVC can point at an MSVC-compatible GMP with -DCVC5_CMAKE_PREFIX; without
 # one cvc5 auto-downloads (and then has to build) GMP.
 _dep_cvc5_gmp() {
@@ -59,7 +59,7 @@ _dep_cvc5_gmp() {
 		return 0
 	fi
 	if [ "$(dep_host_os)" = linux ] \
-			&& [ "${DEP_CVC5_TARGET:-native}" != "w64" ] \
+			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ] \
 			&& [ -f /usr/include/gmp.h ]; then
 		local major minor patch
 		major="$(awk '/#define __GNU_MP_VERSION /{print $3}' /usr/include/gmp.h)"
@@ -117,7 +117,7 @@ _dep_cvc5_field_block() {
 	done
 	printf '%s\n' \
 		"dep=cvc5" \
-		"target=${DEP_CVC5_TARGET:-native}" \
+		"target=${DEP_CVC5_TARGET:-$(dep_host_target)}" \
 		"repo=${CVC5_REPO}" \
 		"commit=${CVC5_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
@@ -210,7 +210,7 @@ _dep_cvc5_producer() {
 	# consumed. cl.exe has no flag-encoded path map; its install-time rewrite
 	# below covers it.
 	prefix_map=""
-	if [ "$DEP_CVC5_TARGET" != "win-msvc-x64" ]; then
+	if [ "$DEP_CVC5_TARGET" != "windows-x86_64-msvc" ]; then
 		prefix_map="-ffile-prefix-map=${staging}=staging -ffile-prefix-map=${staging_prefix}=staging -ffile-prefix-map=${work}=cvc5-src -ffile-prefix-map=${build}=cvc5-build"
 	fi
 	rm -rf "$work"
@@ -299,14 +299,14 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-native}" in
-	native|w64|darwin-arm64|darwin-x86_64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	linux-x86_64|darwin-arm64|darwin-x86_64|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
-		echo "dep-cvc5: unsupported target '${DEP_TARGET}'" >&2
+		echo "dep-cvc5: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-cvc5 "${DEP_TARGET:-native}"
+dep_require_target_host dep-cvc5 "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -330,10 +330,10 @@ if [ "${#CVC5_COMMIT}" -ne 40 ]; then
 	exit 2
 fi
 CVC5_JOBS="$(dep_jobs)"
-DEP_CVC5_TARGET="${DEP_TARGET:-native}"
+DEP_CVC5_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 CVC5_CMAKE_PREFIX="$(dep_var CVC5_CMAKE_PREFIX "")"
 DEP_CVC5_GENERATOR="Unix Makefiles"
-[ "$DEP_CVC5_TARGET" = "win-msvc-x64" ] && DEP_CVC5_GENERATOR="Ninja"
+[ "$DEP_CVC5_TARGET" = "windows-x86_64-msvc" ] && DEP_CVC5_GENERATOR="Ninja"
 
 # The system GMP, detected once, is both an identity input and the closure
 # choice the configure will make.
@@ -356,11 +356,11 @@ _DEP_CVC5_COMPILER_ENV=()
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
 DEP_CVC5_BUILD_RPATH='${ORIGIN}'
 case "$DEP_CVC5_TARGET" in
-	w64)
+	windows-x86_64-mingw)
 		# cvc5's own mingw64 toolchain picks the cross compilers; --win64 enables it.
 		_DEP_CVC5_TARGET_ARGS=(--win64)
 		;;
-	win-msvc-x64)
+	windows-x86_64-msvc)
 		# Native MSVC: Ninja + the production build type. cl comes from the
 		# preset through -DTAU_DEP_C*; CMake must not fall back to another
 		# compiler. GMP is the known risk -- point CVC5_CMAKE_PREFIX at an

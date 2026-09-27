@@ -34,6 +34,22 @@ builds in `build/<type>-bvonly` and `{release,devel,debug}-tests-nobv` in
 ./dev regen [build-dir]                # Build the parser generation target (default build/devel)
 ```
 
+Dependencies come from the local store at `~/.tau/store`. Configure resolves each one
+by content id: a store hit is reused, a miss is read from the remote store named by
+`TAU_STORE_REMOTE` (one private GHCR OCI artifact per entry, tagged `<dep>-<id>`), and
+only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published. An
+unset `TAU_STORE_REMOTE` and a failed remote read both fall through to a build.
+`TAU_STORE_KEEP` sets how many entries per dependency stay, by last use (default 3; 0
+disables eviction). Normal CI only reads the remote (`packages: read`); the trusted
+`deps-store.yml` on `devel` and `main` is the only publisher (`./dev store-publish`).
+The target in the id names the platform the package runs on: `linux-x86_64`
+(Linux x86_64), `windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
+`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (cl.exe). The
+Windows targets build their static curl from the store; Linux and macOS use the
+system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
+keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
+configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too).
+
 Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
 exist but are ONLY for gdb debugging sessions — never use them for building,
 verification, or test runs.

@@ -91,7 +91,7 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `dep-*-package` — the store producers configure runs itself (`dep-cvc5-package`,
   `dep-boost-package`, `dep-curl-package`, `dep-spot-package`); called by hand
   only to prefetch. `dep-spot-package` builds the Spot CLI Tau execs, never
-  links: MSYS2 UCRT64 g++ on `win-msvc-x64`, the preset's compiler elsewhere, and
+  links: MSYS2 UCRT64 g++ on `windows-x86_64-msvc`, the preset's compiler elsewhere, and
   a host with `ltlsynt` on `PATH` skips it entirely.
 - `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
   the parser's own script, so one install serves both repos

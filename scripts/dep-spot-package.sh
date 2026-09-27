@@ -1,17 +1,18 @@
 #!/bin/bash
 # Build and cache the Spot CLI package in the LOCAL store.
 #
-#   ./dev dep-spot-package -DTAU_DEP_TARGET=native -DTAU_DEP_CC=clang \
+#   ./dev dep-spot-package -DTAU_DEP_TARGET=linux-x86_64 -DTAU_DEP_CC=clang \
 #       -DTAU_DEP_CXX=clang++ -DTAU_BUILD_JOBS=8
-#   ./dev dep-spot-package -DTAU_DEP_TARGET=win-msvc-x64 -DTAU_BUILD_JOBS=8
+#   ./dev dep-spot-package -DTAU_DEP_TARGET=windows-x86_64-msvc -DTAU_BUILD_JOBS=8
 #
 # Tau never links Spot: it only execs ltlsynt, autfilt and ltlfilt, the way a
 # Linux install gets them from the distro `spot` package. This producer builds
 # the pinned official tarball for the host that runs those tools.
 #
-# Native and macOS use the preset's compiler. The win-msvc-x64 target is a host
-# tool (nothing links it), so it is built with MSYS2 UCRT64 g++ and the three
-# runtime DLLs are copied beside the executables; cl.exe cannot build Spot.
+# Native and macOS use the preset's compiler. The windows-x86_64-msvc target is
+# a host tool (nothing links it), so it is built with MSYS2 UCRT64 g++ and the
+# three runtime DLLs are copied beside the executables; cl.exe cannot build
+# Spot.
 # SPOT_SHA256 pins the tarball; an archive with a different digest aborts the
 # build.
 
@@ -55,7 +56,7 @@ _dep_spot_field_block() {
 	store_hash="$(dep_sha256 "$store")" || return 1
 	printf '%s\n' \
 		"dep=spot" \
-		"target=${DEP_SPOT_TARGET:-native}" \
+		"target=${DEP_SPOT_TARGET:-$(dep_host_target)}" \
 		"version=${SPOT_VERSION}" \
 		"url=${SPOT_URL}" \
 		"sha256=${DEP_SPOT_SHA256}" \
@@ -68,7 +69,7 @@ _dep_spot_field_block() {
 		"builder=${DEP_SPOT_BUILDER}" \
 		"compiler_id=$(dep_compiler_id "$DEP_SPOT_BUILDER_CXX")" \
 		"compiler_version=$(dep_compiler_version "$DEP_SPOT_BUILDER_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_SPOT_BUILDER_CXX" "${DEP_SPOT_TARGET:-native}")" \
+		"target_triple=$(dep_compiler_triple "$DEP_SPOT_BUILDER_CXX" "${DEP_SPOT_TARGET:-$(dep_host_target)}")" \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"build_type=Release" \
@@ -142,7 +143,7 @@ EOF
 	fi
 
 	local exe="ltlsynt"
-	[ "$DEP_SPOT_TARGET" = "win-msvc-x64" ] && exe="ltlsynt.exe"
+	[ "$DEP_SPOT_TARGET" = "windows-x86_64-msvc" ] && exe="ltlsynt.exe"
 	if [ ! -f "${staging_prefix}/bin/${exe}" ]; then
 		echo "dep-spot: ${staging_prefix}/bin/${exe} missing" >&2
 		rm -rf "$work"
@@ -213,14 +214,14 @@ SPOT_VERSION="$(dep_var SPOT_VERSION 2.16)"
 SPOT_URL="$(dep_var SPOT_URL \
 	"https://www.lre.epita.fr/dload/spot/spot-${SPOT_VERSION}.tar.gz")"
 
-case "${DEP_TARGET:-native}" in
-	native|darwin-arm64|darwin-x86_64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	linux-x86_64|darwin-arm64|darwin-x86_64|windows-x86_64-msvc) ;;
 	*)
-		echo "dep-spot: unsupported target '${DEP_TARGET}'" >&2
+		echo "dep-spot: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-spot "${DEP_TARGET:-native}"
+dep_require_target_host dep-spot "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -232,7 +233,7 @@ case "$mode" in
 esac
 
 DEP_SPOT_JOBS="$(dep_jobs)"
-DEP_SPOT_TARGET="${DEP_TARGET:-native}"
+DEP_SPOT_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_SPOT_SHA256="$(dep_var SPOT_SHA256 "${SPOT_SHA256}")"
 DEP_SPOT_CC="$(dep_var TAU_DEP_CC "")"
 DEP_SPOT_CXX="$(dep_var TAU_DEP_CXX "")"
@@ -243,7 +244,7 @@ fi
 
 DEP_SPOT_BUILDER="preset"
 DEP_SPOT_BUILDER_CXX="$DEP_SPOT_CXX"
-if [ "$DEP_SPOT_TARGET" = "win-msvc-x64" ]; then
+if [ "$DEP_SPOT_TARGET" = "windows-x86_64-msvc" ]; then
 	DEP_SPOT_BUILDER="msys2"
 	if ! DEP_SPOT_MSYS_ROOT="$(_dep_spot_msys_root)"; then
 		echo "dep-spot: MSYS2 UCRT64 g++ not found; install MSYS2 and" >&2

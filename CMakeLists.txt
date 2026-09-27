@@ -43,7 +43,7 @@ option(TAU_DEPS_FROM_STORE
 	"Resolve every dependency from the local store; OFF builds against the in-tree parser"
 	ON)
 if(TAU_BUILD_EMSCRIPTEN)
-	set(TAU_DEPS_TARGET "wasm")
+	set(TAU_DEPS_TARGET "wasm32-emscripten")
 elseif(APPLE)
 	# CMAKE_SYSTEM_PROCESSOR is arm64 or x86_64; a fat or unknown slice has no
 	# package and is a hard error rather than a silent native fallback.
@@ -57,11 +57,11 @@ elseif(APPLE)
 			"only arm64 and x86_64 have store packages")
 	endif()
 elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-	set(TAU_DEPS_TARGET "w64")
+	set(TAU_DEPS_TARGET "windows-x86_64-mingw")
 elseif(WIN32 AND MSVC)
-	set(TAU_DEPS_TARGET "win-msvc-x64")
+	set(TAU_DEPS_TARGET "windows-x86_64-msvc")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set(TAU_DEPS_TARGET "native")
+	set(TAU_DEPS_TARGET "linux-x86_64")
 else()
 	message(FATAL_ERROR
 		"no dependency-store target for ${CMAKE_SYSTEM_NAME}/"
