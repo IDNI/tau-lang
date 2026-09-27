@@ -61,10 +61,15 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int, std::function<bool(int)>)
 {
 	result<std::string> r;
+	// the same refusal as the POSIX path; an empty name would also be an
+	// attr value the report cannot hold
+	if (argv.empty())
+		return r.with_error(code::invalid_argument,
+			"spawn_capture requires a non-empty argv");
 	// no process model under wasm; matches the not-on-PATH contract
 	return r.with_error(code::not_found,
 		"no process model is available under this build",
-		{{label::name, argv.empty() ? std::string() : argv[0]}});
+		{{label::name, argv[0]}});
 }
 
 #else // POSIX
