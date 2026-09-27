@@ -234,6 +234,17 @@ std::optional<bool> pack_sat_status(Form form) {
 	});
 }
 
+// The BA-naming lambda must live in its own function template: MSVC
+// instantiates a lambda inside a discarded `if constexpr` branch anyway and
+// errors with C2039. Called only from the true branch, this one is
+// instantiated for the declaring BA alone.
+template <typename Node, typename Form, typename BA>
+result<Form> pack_preprocess_one(result<Form>&& out) {
+	return std::move(out).and_then([](Form f) -> result<Form> {
+		return ba_descriptor<BA, Node>::preprocess(f);
+	});
+}
+
 /**
  * @brief Run @p form through the preprocessing of every BA that offers it.
  *
@@ -248,9 +259,7 @@ result<Form> pack_preprocess(Form form) {
 	result<Form> out{form};
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_preprocess<Node, BA>)
-			out = std::move(out).and_then([](Form f) -> result<Form> {
-				return ba_descriptor<BA, Node>::preprocess(f);
-			});
+			out = pack_preprocess_one<Node, Form, BA>(std::move(out));
 	});
 	return out;
 }
@@ -288,6 +297,15 @@ Form pack_eliminate_definitional_existentials(Form form) {
 	return out;
 }
 
+// See pack_preprocess_one for why the BA-naming lambda sits in its own
+// function template.
+template <typename Node, typename Form, typename BA>
+result<Form> pack_widen_arithmetic_one(result<Form>&& out) {
+	return std::move(out).and_then([](Form f) -> result<Form> {
+		return ba_descriptor<BA, Node>::widen_arithmetic(f);
+	});
+}
+
 /**
  * @brief Elaborate @p form's arithmetic atoms through the exact-width
  * widening of every BA that offers it.
@@ -302,9 +320,8 @@ result<Form> pack_widen_arithmetic(Form form) {
 	result<Form> out{form};
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_widen_arithmetic<Node, BA>)
-			out = std::move(out).and_then([](Form f) -> result<Form> {
-				return ba_descriptor<BA, Node>::widen_arithmetic(f);
-			});
+			out = pack_widen_arithmetic_one<Node, Form, BA>(
+				std::move(out));
 	});
 	return out;
 }

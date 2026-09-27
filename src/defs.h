@@ -15,7 +15,9 @@
 #include <cstddef>
 #include <variant>
 #ifdef DEBUG
-#	include <cxxabi.h>     // unmangle symbol names for debugging
+#	if !defined(_MSC_VER)
+#		include <cxxabi.h>     // unmangle symbol names for debugging
+#	endif
 #endif
 
 //-----------------------------------------------------------------------------

@@ -200,6 +200,41 @@ static size_t nt_name_hash(size_t nt) {
 	return cache[nt] = nt_hash_of_name(node<BAs...>::name(nt));
 }
 
+// One table entry per variant alternative: the BA's own content hash when it
+// declares one, else std::hash.
+template <typename Node, std::size_t I>
+struct ba_constant_hasher {
+	static size_t hash(const typename Node::constant& c) {
+		using BA = std::variant_alternative_t<I, typename Node::constant>;
+		if constexpr (ba_has_hash_constant_v<Node, BA>)
+			return ba_descriptor<BA, Node>::hash_constant(std::get<I>(c));
+		else return std::hash<BA>{}(std::get<I>(c));
+	}
+};
+
+template <typename Node, std::size_t... Is>
+constexpr auto ba_constant_hasher_table(std::index_sequence<Is...>) {
+	return std::array<size_t (*)(const typename Node::constant&),
+		sizeof...(Is)>{ &ba_constant_hasher<Node, Is>::hash... };
+}
+
+// Hash one pooled BA constant into seed. The table form keeps the variant
+// dispatch out of hashit(), where MSVC 19.44 crashes with C1001.
+template <typename... BAs>
+void hash_ba_constant_data(std::uint64_t& seed, size_t data) {
+	using node_t = node<BAs...>;
+	// A free function sees node_t as dependent, so the variant needs a name
+	// before it can be default-constructed in an expression.
+	using constant_t = typename node_t::constant;
+	static constexpr auto table = ba_constant_hasher_table<node_t>(
+		std::make_index_sequence<std::variant_size_v<constant_t>>{});
+	// Advisory drop: the constructor is noexcept and has no report channel;
+	// a miss folds to alternative 0, and node equality compares raw data.
+	const auto c = tau_lang::ba_constants<node_t>::get(data)
+		.value_or(constant_t{});
+	hash_combine(seed, c.index(), table[c.index()](c));
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 uint64_t node<BAs...>::hashit() const {
@@ -219,18 +254,8 @@ uint64_t node<BAs...>::hashit() const {
 	// on process history (GitHub #89). A BA whose std::hash isn't already
 	// content-derived says so with hash_constant on its descriptor (see
 	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
-	if (nt == type::ba_constant && data != 0) {
-		// Advisory drop: the constructor is noexcept and has no report channel;
-		// a miss folds to alternative 0, and node equality compares raw data.
-		const auto c = tau_lang::ba_constants<node>::get(data)
-			.value_or(node<BAs...>::constant{});
-		hash_combine(seed, c.index(), std::visit([](const auto& v) {
-			using BA = std::decay_t<decltype(v)>;
-			if constexpr (ba_has_hash_constant_v<node, BA>)
-				return ba_descriptor<BA, node>::hash_constant(v);
-			else return std::hash<BA>{}(v);
-		}, c));
-	}
+	if (nt == type::ba_constant && data != 0)
+		hash_ba_constant_data<BAs...>(seed, data);
 	// Get string from pool
 	else if (tree<node>::is_string_nt(nt))
 		hash_combine(seed, dict(data));
