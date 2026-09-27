@@ -486,6 +486,14 @@ jobs:
           merge-multiple: true
           path: packages
 
+      # The macOS job uploads under its own name, so the packages-* pattern
+      # does not reach it.
+      - name: Download macOS packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages-macos
+          path: packages
+
       - name: Read version and date
         run: |
           echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV

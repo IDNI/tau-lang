@@ -6,8 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
   packages: read
 
 env:
@@ -45,6 +44,11 @@ jobs:
     runs-on: ubuntu-24.04
     name: Require a green test run
     timeout-minutes: 90
+    # Dispatching a missing Test Release run needs actions: write; every build
+    # job keeps the workflow-level read-only token.
+    permissions:
+      contents: read
+      actions: write
     steps:
       # Package only a commit whose own Test Release run passed. A commit with
       # no completed run gets one dispatched and waited on: the packages
@@ -583,6 +587,10 @@ jobs:
     needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
       macos, macos-wheel, windows-msvc-wheel ]
     runs-on: ubuntu-24.04
+    # Creating the release needs contents: write; the build jobs keep the
+    # workflow-level read-only token.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -592,6 +600,14 @@ jobs:
         with:
           pattern: packages-*
           merge-multiple: true
+          path: packages
+
+      # The macOS job uploads under its own name, so the packages-* pattern
+      # does not reach it.
+      - name: Download macOS packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages-macos
           path: packages
 
       - name: Read version and date
