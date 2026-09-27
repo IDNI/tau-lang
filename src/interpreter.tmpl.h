@@ -1441,6 +1441,20 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 				value = other;
 			} else sys.insert(g);
 		}
+		// A variable of an ordered type that is no Boolean algebra
+		// takes a point of the order, which the owner's solver picks.
+		const bool point = pack_type_is_non_aba_omcat<node>(tid);
+		if (!value && !sys.empty() && point) {
+			solver_options opts;
+			opts.type_id = tid;
+			auto got = omcat_solve_verified<node>(sys, opts);
+			if (!got) return std::nullopt;
+			for (const auto& [k, kv] : *got)
+				if (tau::subtree_equals(tau::get(k).child_is(
+					tau::variable) ? tau::get(k).first() : k, var))
+						value = kv;
+			if (!value) return std::nullopt;
+		}
 		// first a value found at an earlier step, the type's splitter
 		// of 1 and its complement, or the complement of an excluded
 		// value, which a Boolean algebra always has
@@ -1488,6 +1502,7 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 				if (tau::subtree_equals(kvar, var)) value = kv;
 			}
 		}
+		if (!value && point) value = pack_zero_constant<node>(tid);
 		if (!value) value = build_bf_f_type<node>(tid);
 		sol.emplace(tau::get(tau::bf, var), value);
 	}

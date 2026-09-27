@@ -1711,6 +1711,23 @@ static std::optional<solution<Node>> pack_omcat_solve(size_t ba_type_id,
 		});
 }
 
+// The owning BA's model of an ordering system, kept only when every atom
+// holds under it.
+template <NodeType node>
+static std::optional<solution<node>> omcat_solve_verified(
+	const inequality_system<node>& sys, const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto s = pack_omcat_solve<node>(options.type_id, sys, options);
+	if (!s) return {};
+	for (tref atom : sys)
+		if (!tau::get(tt(rewriter::replace<node>(atom, s.value()))
+			| bf_reduce_canonical<node>() | tt::ref).equals_T())
+			return {};
+	return s;
+}
+
 template <NodeType node>
 std::optional<solution<node>> solve(const equations<node>& eqs,
 					const solver_options& options)
@@ -1760,18 +1777,9 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 		// disequalities it cannot read and relies on this. A model that
 		// does not verify falls through like a decline.
 		if (dlo_compatible)
-			if (auto s = pack_omcat_solve<node>(options.type_id,
-					system.second, options); s)
-			{
-				bool holds = true;
-				for (tref neq : system.second)
-					if (!tau::get(tt(rewriter::replace<node>(
-						neq, s.value()))
-						| bf_reduce_canonical<node>()
-						| tt::ref).equals_T())
-					{ holds = false; break; }
-				if (holds) return s;
-			}
+			if (auto s = omcat_solve_verified<node>(system.second,
+					options); s)
+				return s;
 	}
 	// SO-1: a system that still contains an ordering atom cannot be handed
 	// to solve_system as-is: check_extreme_solution only rejects on
@@ -2049,6 +2057,9 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
+		// the atoms of an ordered type as the path states them, before
+		// the Boolean-algebra rewriting below
+		std::map<size_t, subtree_set<node>> order_atoms;
 		std::optional<size_t> bv_partition_key;
 		// Partition types
 		bool path_sat = false;
@@ -2092,6 +2103,8 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				clause_error = true;
 				break;
 			}
+			if (pack_type_is_non_aba_omcat<node>(type))
+				order_atoms[type].insert(conj);
 			if (!pack_type_has_arith_ops<node>(type)) {
 				conj = norm_equation<node>(conj);
 				conj = apply_all_xor_def<node>(conj);
@@ -2221,7 +2234,21 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				} else skip = true;
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);
-				if (auto solution = solve<node>(conjs, op); solution.has_value()) {
+				// A variable of an ordered type that is no Boolean
+				// algebra stands for one point of the order, so its
+				// model comes from the owner's point solver. The
+				// Boolean-algebra solve below answers with elements
+				// (top, bot, intervals) that are no points; a minimum
+				// or maximum is asked of it only in those elements.
+				std::optional<solution<node>> points;
+				if (options.mode == solver_mode::general
+					&& pack_type_is_non_aba_omcat<node>(type))
+					points = omcat_solve_verified<node>(
+						order_atoms[type], op);
+				if (points) {
+					for (const auto& [var, value]: points.value())
+						clause_solution[var] = value;
+				} else if (auto solution = solve<node>(conjs, op); solution.has_value()) {
 					for (const auto& [var, value]: solution.value()) {
 						clause_solution[var] = value;
 					}
@@ -2242,6 +2269,15 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					fv = tau::get(tau::bf, fv);
 					// Skip already solved variables
 					if (clause_solution.contains(fv)) continue;
+					const size_t fv_type = find_ba_type<node>(fv);
+					if (options.mode == solver_mode::general
+						&& pack_type_is_non_aba_omcat<node>(fv_type))
+						if (tref pt = pack_zero_constant<node>(
+							fv_type); pt)
+						{
+							clause_solution.emplace(fv, pt);
+							continue;
+						}
 					if (options.mode == minimum)
 						clause_solution.emplace(fv, tau::_0(
 							find_ba_type<node>(fv)));
