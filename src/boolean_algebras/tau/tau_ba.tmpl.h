@@ -2,7 +2,6 @@
 
 #include "boolean_algebras/tau/tau_ba.h"
 
-#include <mutex>
 #include <unordered_map>
 
 #include "tau_spec.h"
@@ -19,32 +18,19 @@ namespace idni::tau_lang {
 
 namespace detail {
 
-// Process-lifetime memo for nested Tau-SAT decisions on immutable tau
-// constants: is_zero/is_one/normalize_tau each run a full nested Tau-SAT
-// decision on the constant's `nso_rr`, and trees are hash-consed so caching
-// by rr<node> identity turns a repeat decision into a lookup. Tau formulas
-// are immutable, so no invalidation is needed; guarded by a mutex since
-// concurrent solve/interpreter use isn't ruled out.
+// Memos for the normalize passes on immutable tau constants: trees are
+// hash-consed, so keying by the constant's main tref turns a repeat pass
+// into a lookup, and a row lives as long as its key tree.
 template <typename node>
 struct tau_decision_cache {
-	static std::mutex& mtx() {
-		static std::mutex m;
+	static auto& normalize_memo() {
+		using cache_t = subtree_unordered_map<node, tref>;
+		static cache_t& m = tree<node>::template create_cache<cache_t>();
 		return m;
 	}
-	static std::unordered_map<rr<node>, bool>& is_zero_memo() {
-		static std::unordered_map<rr<node>, bool> m;
-		return m;
-	}
-	static std::unordered_map<rr<node>, bool>& is_one_memo() {
-		static std::unordered_map<rr<node>, bool> m;
-		return m;
-	}
-	static std::unordered_map<rr<node>, rr<node>>& normalize_memo() {
-		static std::unordered_map<rr<node>, rr<node>> m;
-		return m;
-	}
-	static std::unordered_map<rr<node>, tref>& splitter_normalize_memo() {
-		static std::unordered_map<rr<node>, tref> m;
+	static auto& splitter_normalize_memo() {
+		using cache_t = subtree_unordered_map<node, tref>;
+		static cache_t& m = tree<node>::template create_cache<cache_t>();
 		return m;
 	}
 };
@@ -484,20 +470,22 @@ requires BAsPack<BAs...>
 result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
 	using cache = detail::tau_decision_cache<node>;
-	{
-		std::lock_guard<std::mutex> lock(cache::mtx());
-		auto& memo = cache::normalize_memo();
-		if (auto it = memo.find(fm.nso_rr); it != memo.end())
-			return result<tau_ba<BAs...>>{tau_ba<BAs...>(
-				it->second.rec_relations, it->second.main)};
+	// The main tref identifies the constant only when it carries no rec
+	// relations, so only that case may use the memo.
+	bool memoize = fm.nso_rr.rec_relations.empty();
+	auto& memo = cache::normalize_memo();
+	tref key = fm.nso_rr.main->get();
+	if (memoize) {
+		if (auto it = memo.find(key); it != memo.end())
+			return result<tau_ba<BAs...>>{
+				tau_ba<BAs...>(tree<node>::geth(it->second))};
 	}
 	result<tau_ba<BAs...>> r;
 	TAU_TRY(tref applied, nso_rr_apply<node>(fm.nso_rr));
 	TAU_TRY(tref simplified, simp_tau_unsat_valid<node>(applied));
 	tau_ba<BAs...> out(tree<node>::geth(simplified));
-	std::lock_guard<std::mutex> lock(cache::mtx());
-	if (!bdd_node_table_exhausted)
-		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
+	if (memoize && !bdd_node_table_exhausted)
+		memo.insert_or_assign(key, out.nso_rr.main->get());
 	return r.with_value(std::move(out));
 }
 
@@ -510,10 +498,13 @@ result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 template <typename node>
 result<tref> normalize_for_splitter(const rr<node>& nso_rr) {
 	using cache = detail::tau_decision_cache<node>;
-	{
-		std::lock_guard<std::mutex> lock(cache::mtx());
-		auto& memo = cache::splitter_normalize_memo();
-		if (auto it = memo.find(nso_rr); it != memo.end())
+	// The main tref identifies the rr only when it carries no rec
+	// relations, so only that case may use the memo.
+	bool memoize = nso_rr.rec_relations.empty();
+	auto& memo = cache::splitter_normalize_memo();
+	tref key = nso_rr.main->get();
+	if (memoize) {
+		if (auto it = memo.find(key); it != memo.end())
 			return result<tref>{it->second};
 	}
 	result<tref> r;
@@ -523,9 +514,8 @@ result<tref> normalize_for_splitter(const rr<node>& nso_rr) {
 	if (!normalized)
 		return r.with_error(code::runtime_error,
 			"normalizer returned a null formula");
-	std::lock_guard<std::mutex> lock(cache::mtx());
-	if (!bdd_node_table_exhausted)
-		cache::splitter_normalize_memo().emplace(nso_rr, normalized);
+	if (memoize && !bdd_node_table_exhausted)
+		memo.insert_or_assign(key, normalized);
 	return r.with_value(normalized);
 }
 

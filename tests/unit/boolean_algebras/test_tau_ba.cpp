@@ -26,6 +26,13 @@ static void do_gc() {
 }
 struct gc_fixture { gc_fixture() { do_gc(); } };
 
+// A case below names its variables with more than one character; the default
+// grammar reads those as a product of single-character variables.
+struct multi_char_vars {
+	multi_char_vars() { api<node_t>::set_charvar(false); }
+	~multi_char_vars() { api<node_t>::set_charvar(true); }
+};
+
 // Wrap the canonical T tree as a tau_ba (one)
 static test_ba tau_one() { return test_ba(tau::geth(tau::_T())); }
 // Wrap the canonical F tree as a tau_ba (zero)
@@ -978,29 +985,29 @@ static test_ba unsat_constant(const char* v, const char* w) {
 TEST_CASE("normalize_tau memoizes nothing while the flag is up") {
 	auto a = unsat_constant("k1", "k2");
 	auto& memo = decision_cache::normalize_memo();
-	REQUIRE( memo.find(a.nso_rr) == memo.end() );
+	REQUIRE( memo.find(a.nso_rr.main->get()) == memo.end() );
 	bdd_node_table_exhausted = true;
 	(void) normalize_tau(a);
-	CHECK( memo.find(a.nso_rr) == memo.end() );
+	CHECK( memo.find(a.nso_rr.main->get()) == memo.end() );
 	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
 	auto r = normalize_tau(a);
 	REQUIRE( r.has_value() );
 	CHECK( is_tau_syntactic_zero(r.value()) );
-	CHECK( memo.find(a.nso_rr) != memo.end() );
+	CHECK( memo.find(a.nso_rr.main->get()) != memo.end() );
 }
 
 TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
 	auto a = unsat_constant("k3", "k4");
 	auto& memo = decision_cache::splitter_normalize_memo();
-	REQUIRE( memo.find(a.nso_rr) == memo.end() );
+	REQUIRE( memo.find(a.nso_rr.main->get()) == memo.end() );
 	bdd_node_table_exhausted = true;
 	(void) normalize_for_splitter<typename test_ba::node>(a.nso_rr);
-	CHECK( memo.find(a.nso_rr) == memo.end() );
+	CHECK( memo.find(a.nso_rr.main->get()) == memo.end() );
 	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
 	auto r = normalize_for_splitter<typename test_ba::node>(a.nso_rr);
 	REQUIRE( r.has_value() );
 	CHECK( r.value() != nullptr );
-	CHECK( memo.find(a.nso_rr) != memo.end() );
+	CHECK( memo.find(a.nso_rr.main->get()) != memo.end() );
 }
 
 } // TEST_SUITE no memo on a full bdd node table
@@ -1107,6 +1114,115 @@ TEST_CASE("a valid DNF of minterms is one") {
 }
 
 } // TEST_SUITE simplified normal forms
+
+// The splitter and normalize memos of detail::tau_decision_cache are GC
+// caches keyed by the constant's main tref: a row whose key tree nothing
+// holds is dropped at the next collect, and a row pinned by a handle
+// survives with its value tree. These cases drive a real sweep (do_gc()
+// keeps nothing) for each.
+TEST_SUITE("tau_ba — normalize memos drop with their keys") {
+// ============================================================================
+
+// The row key a constant maps to in the memos.
+static tref key_of(const test_ba& a) {
+	return a.nso_rr.main->get();
+}
+
+TEST_CASE("a dead splitter normalize row is dropped by a collect") {
+	multi_char_vars vars;
+	auto& memo = detail::tau_decision_cache<node_t>::splitter_normalize_memo();
+	{
+		tref fm = tau::get("(gm98_dx:sbf = 0) && (gm98_dy:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		auto normed = normalize_for_splitter<node_t>(a.nso_rr);
+		REQUIRE( normed.has_value() );
+		CHECK( memo.count(key_of(a)) == 1 );
+	}
+	do_gc();
+	{
+		tref fm = tau::get("(gm98_dx:sbf = 0) && (gm98_dy:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba probe(fm);
+		CHECK( memo.count(key_of(probe)) == 0 );
+	}
+}
+
+TEST_CASE("a live splitter normalize row survives a collect") {
+	multi_char_vars vars;
+	auto& memo = detail::tau_decision_cache<node_t>::splitter_normalize_memo();
+	htref hold;
+	tref first = nullptr;
+	{
+		tref fm = tau::get("(gm98_lx:sbf = 0) && (gm98_ly:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		hold = a.nso_rr.main;
+		auto normed = normalize_for_splitter<node_t>(a.nso_rr);
+		REQUIRE( normed.has_value() );
+		first = normed.value();
+		REQUIRE( first != nullptr );
+		CHECK( memo.count(key_of(a)) == 1 );
+	}
+	do_gc();
+	test_ba b(hold);
+	CHECK( memo.count(key_of(b)) == 1 );
+	auto again = normalize_for_splitter<node_t>(b.nso_rr);
+	REQUIRE( again.has_value() );
+	CHECK( again.value() == first );
+}
+
+TEST_CASE("a dead normalize_tau row is dropped by a collect") {
+	multi_char_vars vars;
+	auto& memo = detail::tau_decision_cache<node_t>::normalize_memo();
+	{
+		tref fm = tau::get("(gm98_nx:sbf = 0) && (gm98_ny:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		auto normed = normalize_tau(a);
+		REQUIRE( normed.has_value() );
+		CHECK( memo.count(key_of(a)) == 1 );
+	}
+	do_gc();
+	{
+		tref fm = tau::get("(gm98_nx:sbf = 0) && (gm98_ny:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba probe(fm);
+		CHECK( memo.count(key_of(probe)) == 0 );
+	}
+}
+
+TEST_CASE("a live normalize_tau row survives a collect") {
+	multi_char_vars vars;
+	auto& memo = detail::tau_decision_cache<node_t>::normalize_memo();
+	htref hold;
+	tref first = nullptr;
+	{
+		tref fm = tau::get("(gm98_mx:sbf = 0) && (gm98_my:sbf = 1)",
+			parse_wff()).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		hold = a.nso_rr.main;
+		auto normed = normalize_tau(a);
+		REQUIRE( normed.has_value() );
+		first = normed.value().nso_rr.main->get();
+		REQUIRE( first != nullptr );
+		CHECK( memo.count(key_of(a)) == 1 );
+	}
+	do_gc();
+	test_ba b(hold);
+	CHECK( memo.count(key_of(b)) == 1 );
+	auto again = normalize_tau(b);
+	REQUIRE( again.has_value() );
+	CHECK( again.value().nso_rr.main->get() == first );
+}
+
+} // TEST_SUITE normalize memos drop with their keys
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
