@@ -104,15 +104,15 @@ struct adt_registry {
 	 * how the caller fed text in, not a distinction in what the user meant,
 	 * so both are handled through the one path.
 	 *
-	 * @return The built registry, or `std::nullopt` after `LOG_ERROR` on: a
-	 * duplicate member (including one introduced via inheritance), a cycle
-	 * (through members, aliases, or parents), a type inheriting from
-	 * something that does not resolve to a tuple, or a `type_parents` entry
-	 * naming an unregistered type. An unregistered type name in a *member*
-	 * position is not an error: it is treated as a base (non-ADT) type and
-	 * passed through unchanged.
+	 * @return The built registry as the report's value, or a report carrying
+	 * an error on: a duplicate member (including one introduced via
+	 * inheritance), a cycle (through members, aliases, or parents), a type
+	 * inheriting from something that does not resolve to a tuple, or a
+	 * `type_parents` entry naming an unregistered type. An unregistered
+	 * type name in a *member* position is not an error: it is treated as a
+	 * base (non-ADT) type and passed through unchanged.
 	 */
-	static std::optional<adt_registry> build(tref spec,
+	static result<adt_registry> build(tref spec,
 		const std::vector<htref>* session_type_defs = nullptr);
 
 	/** @brief Return `true` if @p name_sid has a `type_def` in this registry. */

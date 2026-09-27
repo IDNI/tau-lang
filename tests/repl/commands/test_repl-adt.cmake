@@ -79,7 +79,7 @@ add_repl_test(adt-solve
 # unknown member access on a registered ADT type is rejected.
 add_repl_test(adt-unknown_member
 	"type Point = {a: sbf, b: sbf}. n ex x:Point (x.c = 0)"
-	"ADT" NO_FAIL_REGEX)
+	"unknown member in a tuple type" NO_FAIL_REGEX)
 
 # --- session-stored types reaching a later, separately parsed line ---------
 # Session-stored types now reach later lines: the tuple equality expands

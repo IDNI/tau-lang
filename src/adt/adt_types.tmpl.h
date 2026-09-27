@@ -32,17 +32,18 @@ namespace idni::tau_lang {
 // `get_ba_type_id` -- no separate extraction step is needed.
 
 template <NodeType node>
-std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
+result<adt_registry<node>> adt_registry<node>::build(tref spec,
 	const std::vector<htref>* session_type_defs) {
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
+	result<adt_registry<node>> r;
 
 	// 1. Collect every type_def: session_type_defs (an earlier, separate
 	// parse's declarations) first, then spec's own, both in declaration
 	// order, through one path -- a spec is parsed in parts, so whether two
 	// declarations for one name land in the same parse or in two separate
 	// ones is an artifact of input plumbing, not user intent. A repeated
-	// name always replaces the earlier definition, after a LOG_WARNING
+	// name always replaces the earlier definition, after a warning
 	// names the type.
 	std::unordered_map<size_t, tref> defs;
 	std::vector<size_t> order; // declaration order (for a stable resolution pass)
@@ -50,9 +51,9 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 	auto declare = [&](tref td) {
 		size_t name_sid = name_of(td);
 		if (auto it = defs.find(name_sid); it != defs.end()) {
-			LOG_WARNING << "ADT: type '" << dict(name_sid)
-				<< "' redeclared, replacing the earlier"
-				" definition\n";
+			r.warning("type '" + dict(name_sid)
+				+ "' redeclared, replacing the earlier definition",
+				{{label::name, dict(name_sid)}});
 			it->second = td;
 		} else {
 			defs.emplace(name_sid, td);
@@ -69,7 +70,7 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 
 	adt_registry<node> reg;
 	reg.declares_locally_ = declares_locally;
-	if (defs.empty()) return reg;
+	if (defs.empty()) return r.with_value(std::move(reg));
 
 	// 2. Resolve every collected name eagerly (order-independent: a
 	// definition may reference a type declared later in the spec), via DFS
@@ -80,8 +81,8 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 	std::function<bool(size_t)> resolve = [&](size_t name_sid) -> bool {
 		if (reg.resolved_.contains(name_sid)) return true;
 		if (visiting.contains(name_sid)) {
-			LOG_ERROR << "ADT: cyclic type definition involving '"
-				<< dict(name_sid) << "'\n";
+			r.error(code::type_error, "cyclic type definition",
+				{{label::name, dict(name_sid)}});
 			return false;
 		}
 		visiting.insert(name_sid);
@@ -102,9 +103,10 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 			for (const auto& m : group) names.insert(m.name);
 			for (size_t n : names) {
 				if (claimed.contains(n)) {
-					LOG_ERROR << "ADT: duplicate member '"
-						<< dict(n) << "' in type '"
-						<< dict(name_sid) << "'\n";
+					r.error(code::type_error,
+						"duplicate member in type",
+						{{label::name, dict(name_sid)},
+						 {label::value, dict(n)}});
 					return false;
 				}
 			}
@@ -124,16 +126,18 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 				for (tref pn : (tt(parents) || tau::type_name).values()) {
 					size_t pname = tau::get(pn).data();
 					if (!defs.contains(pname)) {
-						LOG_ERROR << "ADT: type '" << dict(name_sid)
-							<< "' inherits from unknown type '"
-							<< dict(pname) << "'\n";
+						r.error(code::type_error,
+							"type inherits from an unknown type",
+							{{label::name, dict(name_sid)},
+							 {label::value, dict(pname)}});
 						return false;
 					}
 					if (!resolve(pname)) return false;
 					if (!reg.resolved_.at(pname).is_tuple) {
-						LOG_ERROR << "ADT: type '" << dict(name_sid)
-							<< "' inherits from non-tuple type '"
-							<< dict(pname) << "'\n";
+						r.error(code::type_error,
+							"type inherits from a non-tuple type",
+							{{label::name, dict(name_sid)},
+							 {label::value, dict(pname)}});
 						return false;
 					}
 					if (!claim(reg.resolved_.at(pname).level_members))
@@ -218,9 +222,9 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 	};
 
 	for (size_t name_sid : order)
-		if (!resolve(name_sid)) return std::nullopt;
+		if (!resolve(name_sid)) return r;
 
-	return reg;
+	return r.with_value(std::move(reg));
 }
 
 template <NodeType node>
