@@ -1550,9 +1550,11 @@ std::optional<std::string> option_name_str(
 }
 
 // Maps an option name (short or long alias) to its repl_option. Empty
-// input yields none_opt; an unrecognized name logs an error and yields
+// input yields none_opt; an unrecognized name prints an error and yields
 // invalid_opt, so callers can tell "no option given" from a typo.
-inline repl_option get_opt(const std::string& x) {
+// @p err receives that message; it is a direct echo of the user's text, not
+// a report.
+inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	if (x.empty())                       return none_opt;
 	if (x == "S" || x == "severity"
 		|| x == "sev")               return severity_opt;
@@ -1628,31 +1630,33 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "ltlguardmaxcubes")         return ltl_guard_max_cubes_opt;
 	if (x == "ltlrefinementrounds")      return ltl_refinement_rounds_opt;
 	if (x == "ltlwindowmaxpaths")        return ltl_window_max_paths_opt;
-	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
+	err << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
 
 // Reads the option_name child of a get/set command tree and resolves it
 // via get_opt(string); none_opt when the command names no option.
 template <NodeType node>
-repl_option get_opt(const typename tree<node>::traverser& n) {
+repl_option get_opt(const typename tree<node>::traverser& n,
+	std::ostream& err)
+{
 	auto o = n | tau_parser::option_name;
 	if (!o) return none_opt;
-	return get_opt(o | tree<node>::traverser::string);
+	return get_opt(o | tree<node>::traverser::string, err);
 }
 
 // Parses a severity option value ("e"/"error", "d"/"debug", "t"/"trace",
-// "i"/"info") into a boost severity level; anything else logs an error
-// and yields nullopt.
+// "i"/"info") into a boost severity level; anything else prints a direct
+// echo of the value to @p err and yields nullopt.
 inline std::optional<boost::log::trivial::severity_level>
-	str2severity(const std::string& v)
+	str2severity(const std::string& v, std::ostream& err)
 {
 	// TODO (LOW) should we add also warning? and what about fatal?
 	if (v == "e" || v == "error") return { boost::log::trivial::error };
 	if (v == "d" || v == "debug") return { boost::log::trivial::debug };
 	if (v == "t" || v == "trace") return { boost::log::trivial::trace };
 	if (v == "i" || v == "info")  return { boost::log::trivial::info };
-	TAU_LOG_ERROR << "Invalid severity value: " << v
+	err << "Invalid severity value: " << v
 		<< " (only error, info, debug or trace are allowed)\n";
 	return {};
 }
@@ -1663,7 +1667,7 @@ void repl_evaluator<BAs...>::get_cmd(const tt& n) {
 	if (auto raw = option_name_str<node>(n);
 		raw && raw->find('-') != std::string::npos)
 			return get_cmd_ba_option(*raw);
-	return get_cmd(get_opt<node>(n));
+	return get_cmd(get_opt<node>(n, err));
 }
 
 template <typename... BAs>
@@ -1820,14 +1824,14 @@ void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 		raw && raw->find('-') != std::string::npos)
 	{
 		auto ov = n | tau::option_value;
-		if (!ov) { TAU_LOG_ERROR << "Invalid value\n"; return; }
+		if (!ov) { err << "Invalid value\n"; return; }
 		set_cmd_ba_option(*raw, ov | tt::string);
 		get_cmd_ba_option(*raw);
 		return;
 	}
-	repl_option o = get_opt<node>(n);
+	repl_option o = get_opt<node>(n, err);
 	auto ov = n | tau::option_value;
-	if (!ov) { TAU_LOG_ERROR << "Invalid value\n"; return; }
+	if (!ov) { err << "Invalid value\n"; return; }
 	set_cmd(o, ov | tt::string);
 	get_cmd(n);
 }
@@ -1841,20 +1845,19 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	// RE-2: a warning, not an error -- the command was understood, it just
 	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_WARNING << "Debug option not available in release build\n";
+		print_warning("Debug option not available in release build");
 		return;
 	}
 #endif // DEBUG
 	// A count. Zero is accepted and means "unlimited" (specsizewarn: off)
 	// by the unified limit-option convention -- the api setters translate
 	// it to each knob's internal representation.
-	auto str2count = [&v](void) -> std::optional<size_t> {
+	auto str2count = [&v, this](void) -> std::optional<size_t> {
 		size_t n = 0;
-		if (v.empty()) { TAU_LOG_ERROR << "Invalid value\n"; return {}; }
+		if (v.empty()) { err << "Invalid value\n"; return {}; }
 		for (char c : v) {
 			if (c < '0' || c > '9') {
-				TAU_LOG_ERROR << "Invalid value: expected a "
-					"count\n";
+				err << "Invalid value: expected a count\n";
 				return {};
 			}
 			n = n * 10 + static_cast<size_t>(c - '0');
@@ -1862,26 +1865,26 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		return n;
 	};
 	// A decimal number (gcgrowth); the grammar admits digits and '.'.
-	auto str2double = [&v](void) -> std::optional<double> {
+	auto str2double = [&v, this](void) -> std::optional<double> {
 		try {
 			size_t pos = 0;
 			double d = std::stod(v, &pos);
 			if (pos != v.size()) {
-				TAU_LOG_ERROR << "Invalid value: expected a number\n";
+				err << "Invalid value: expected a number\n";
 				return {};
 			}
 			return d;
 		} catch (const std::exception&) {
-			TAU_LOG_ERROR << "Invalid value: expected a number\n";
+			err << "Invalid value: expected a number\n";
 			return {};
 		}
 	};
-	auto update_bool_value = [&v](bool& opt) {
+	auto update_bool_value = [&v, this](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
 		else if (v == "f" || v == "false" || v == "off" || v == "0"
 			|| v == "n" || v == "no") opt = false;
-		else TAU_LOG_ERROR << "Invalid value\n";
+		else err << "Invalid value\n";
 		return opt;
 	};
 	// Not static: the lambdas below capture `this`, `v` and the local
@@ -1917,7 +1920,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ print_benchmarks_opt, [&]() {
 		update_bool_value(opt.print_benchmarks); } },
 	{ severity_opt, [&]() {
-		auto sev = str2severity(v);
+		auto sev = str2severity(v, err);
 		if (!sev.has_value()) return;
 		opt.severity = sev.value();
 		logging::set_filter(opt.severity);
@@ -1973,8 +1976,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		std::string a = v;
 		for (auto& c : a) c = (char) std::toupper((unsigned char) c);
 		if (a != "A" && a != "B" && a != "D" && a != "AUTO") {
-			TAU_LOG_ERROR << "Invalid value: expected A, B, D or "
-				"auto\n";
+			err << "Invalid value: expected A, B, D or auto\n";
 			return;
 		}
 		api<node>::set_ltl_algorithm(a); } },
@@ -2007,7 +2009,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 		if (!error) get_cmd_ba_option(*raw);
 		return;
 	}
-	auto o = get_opt<node>(n);
+	auto o = get_opt<node>(n, err);
 	update_bool_opt_cmd(o, update_fn);
 	if (!error) get_cmd(n);
 }
@@ -2022,7 +2024,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	// RE-2: a warning, not an error -- the command was understood, it just
 	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_WARNING << "Debug option not available in release build\n";
+		print_warning("Debug option not available in release build");
 		return;
 	}
 #endif // DEBUG
@@ -2067,10 +2069,15 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case cover_products_opt:
 	case constant_size_opt:
 	case lgrs_max_vars_opt:
-		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
-			"`set <option> <n>`\n", error = true;
+		print_error(code::invalid_argument,
+			"This option takes a count, not a flag: use "
+			"`set <option> <n>`");
+		error = true;
 		return;
-	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
+	default:
+		print_error(code::invalid_argument, "Invalid option");
+		error = true;
+		return;
 	}
 }
 
@@ -2082,12 +2089,14 @@ const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
 	auto res = pack_find_ba_option<node>(family, name);
 	switch (res.status) {
 	case ba_option_lookup_status::no_such_family:
-		TAU_LOG_ERROR << "No BA named '" << family << "' in this pack ("
-			<< node::ba::types_joined() << ")\n";
+		print_error(code::invalid_argument,
+			"No BA named in this pack ("
+				+ std::string(node::ba::types_joined()) + ")",
+			{{label::name, family}});
 		return nullptr;
 	case ba_option_lookup_status::no_such_option:
-		TAU_LOG_ERROR << "BA '" << family << "' has no option '" << name
-			<< "'\n";
+		print_error(code::invalid_argument, "BA has no option",
+			{{label::name, family}, {label::value, name}});
 		return nullptr;
 	case ba_option_lookup_status::found: return res.option;
 	}
@@ -2118,9 +2127,9 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	option_change_guard<node> guard;
 	if (o->kind == ba_option_kind::flag) {
 		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
-		else TAU_LOG_ERROR << "Invalid value\n";
+		else err << "Invalid value\n";
 	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
-	else TAU_LOG_ERROR << "Invalid value: expected a count\n";
+	else err << "Invalid value: expected a count\n";
 }
 
 template <typename... BAs>
@@ -2135,8 +2144,9 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 		// Same "wrong command shape" error as the core numeric options
 		// (block_max_splits_opt and friends, above), just addressed with
 		// this option's qualified name instead of a bare one.
-		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
-			"`set " << family << "-" << name << " <n>`\n";
+		print_error(code::invalid_argument,
+			"This option takes a count, not a flag",
+			{{label::name, dotted}});
 		error = true;
 		return;
 	}

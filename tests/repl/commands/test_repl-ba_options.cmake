@@ -4,9 +4,9 @@ include(add_repl_test)
 # own message (repl_evaluator.tmpl.h resolve_ba_option). A case naming an
 # algebra outside the configured pack is skipped by add_repl_test itself.
 add_repl_test(ba_options-no_such_family "set nope-blasting on"
-	"No BA named 'nope' in this pack" NO_FAIL_REGEX)
+	"No BA named in this pack.*name=nope" NO_FAIL_REGEX)
 add_repl_test(ba_options-no_such_option "set bv-nosuch on"
-	"BA 'bv' has no option 'nosuch'" NO_FAIL_REGEX)
+	"BA has no option.*name=bv.*value=nosuch" NO_FAIL_REGEX)
 add_repl_test(ba_options-found "set bv-blasting off. get bv-blasting"
 	"bv-blasting: off")
 
