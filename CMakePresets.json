@@ -621,6 +621,18 @@
 			"inherits": ["devel-msvc", "_build-tests"]
 		},
 		{
+			"name": "release-msvc-binding-python",
+			"inherits": ["release-msvc", "_build-binding-python"]
+		},
+		{
+			"name": "debug-msvc-binding-python",
+			"inherits": ["debug-msvc", "_build-binding-python"]
+		},
+		{
+			"name": "devel-msvc-binding-python",
+			"inherits": ["devel-msvc", "_build-binding-python"]
+		},
+		{
 			"name": "release-msvc-all",
 			"displayName": "Release tests + tau (MSVC)",
 			"inherits": ["release-msvc", "_build-msvc-all"]
@@ -1489,6 +1501,18 @@
 		{
 			"name": "devel-msvc-tau",
 			"configurePreset": "devel-msvc-tau"
+		},
+		{
+			"name": "release-msvc-binding-python",
+			"configurePreset": "release-msvc-binding-python"
+		},
+		{
+			"name": "debug-msvc-binding-python",
+			"configurePreset": "debug-msvc-binding-python"
+		},
+		{
+			"name": "devel-msvc-binding-python",
+			"configurePreset": "devel-msvc-binding-python"
 		},
 		{
 			"name": "release-msvc-tests",

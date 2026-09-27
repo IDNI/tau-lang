@@ -3702,7 +3702,9 @@ each of them in use.
 
 On Linux arm64 the binding builds and tests both natively and by cross
 compilation with `./dev preset release-arm64-all`, which runs its tests under
-`qemu-aarch64`.
+`qemu-aarch64`. The `tau_wheel` target packs the same module into a wheel for
+every package platform: Linux x86_64 and arm64, macOS arm64, and Windows x86_64
+(MSVC).
 
 # **The Theory behind the Tau Language**
 
