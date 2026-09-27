@@ -239,7 +239,8 @@ cli::commands tau_commands() {
 			"file path without extension)"));
 	compile.add_option(cli::option("cxx", 'c', "")
 		.set_description("C++ compiler for the emitted project (default: "
-			"TAU_CXX, else clang++ when on PATH, else cmake's default)"));
+			"TAU_CXX, else the compiler Tau was built with, else "
+			"clang++ when on PATH, else cmake's default)"));
 	cs[compile.name()] = compile;
 	return cs;
 }

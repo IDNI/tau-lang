@@ -113,8 +113,9 @@ To compile the source code you need a C++ compiler supporting C++23: GCC 13.3
 or newer, or Clang 19 or newer (Clang 18 crashes while instantiating the tree
 pack in `src/instantiate_pack.cpp`). You also need at least cmake version 3.22.1
 installed in your system. `tau compile` builds the emitted project with the
-compiler given by `--cxx` or `TAU_CXX`, else with `clang++` when it is on
-PATH, else with cmake's default.
+compiler given by `--cxx` or `TAU_CXX`, else with the compiler Tau was built
+with when it is installed, else with `clang++` when it is on PATH, else with
+cmake's default.
 The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
 libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
@@ -291,7 +292,7 @@ tau compile spec.tau -o sim
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | executable path (default: the spec file path without extension) |
-| `-c, --cxx <compiler>` | C++ compiler for the emitted project (default: `TAU_CXX`, else `clang++` when on PATH, else cmake's default) |
+| `-c, --cxx <compiler>` | C++ compiler for the emitted project (default: `TAU_CXX`, else the compiler Tau was built with, else `clang++` when on PATH, else cmake's default) |
 
 The exit code is `0` when the program was built and `1` on any failure; the
 reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
