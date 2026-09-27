@@ -44,7 +44,9 @@ static tref revise(const char* spec_src, const char* update_src) {
 	tref spec = parse_spec(spec_src);
 	tref update = parse_spec(update_src);
 	if (!spec || !update) return nullptr;
-	return pointwise_revision_temporal<node_t>(spec, update, 0);
+	auto r = pointwise_revision_temporal<node_t>(spec, update, 0);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 static std::optional<std::string> emit_revised_cpp(

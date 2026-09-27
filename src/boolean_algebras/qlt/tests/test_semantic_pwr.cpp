@@ -42,6 +42,14 @@ static bool is_realizable(tref fm) {
 	return sat.has_value() && sat.value();
 }
 
+// Every case needs the revision's value; a failed revision is a failure of
+// the case, so the helper unwraps the result here.
+static tref revision_value(tref s, tref u) {
+	auto rr = pointwise_revision_temporal<node_t>(s, u, 0);
+	REQUIRE(rr.has_value());
+	return rr.value();
+}
+
 // ============================================================================
 // SPWR-S: Safety regression — optimal mode should not break fast mode
 // ============================================================================
@@ -53,7 +61,7 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -63,7 +71,7 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -73,7 +81,7 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -83,7 +91,7 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -101,7 +109,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -111,7 +119,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -121,7 +129,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -137,7 +145,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 	TEST_CASE("[SPWR-I-01] Safety idempotence") {
 		tref s = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, s, 0);
+		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -145,7 +153,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 	TEST_CASE("[SPWR-I-02] Eventually idempotence" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, s, 0);
+		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -153,7 +161,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 	TEST_CASE("[SPWR-I-03] Multi-clause idempotence") {
 		tref s = spec("G (o1[t] = 0) && G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, s, 0);
+		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -171,7 +179,7 @@ TEST_SUITE("[SPWR-F: Fallback chain]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -181,7 +189,7 @@ TEST_SUITE("[SPWR-F: Fallback chain]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -191,7 +199,7 @@ TEST_SUITE("[SPWR-F: Fallback chain]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}

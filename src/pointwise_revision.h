@@ -313,26 +313,34 @@ using pwr_sat_memo = std::map<std::pair<tref, int_t>, bool>;
 /**
  * @brief Memoised `is_tau_formula_sat` for one revision.
  *
- * An undecided (error) verdict from `is_tau_formula_sat` is read as
- * unsatisfiable and memoised as such.
+ * A memo hit answers with the memoised verdict and an empty report, which is
+ * what the ltlsynt call count measures. A solver failure is an error in the
+ * result and is not memoised.
  * @tparam node Tree node type.
  * @param fm Formula to decide.
  * @param start_time Start time passed through to `is_tau_formula_sat`.
  * @param memo Memo to consult and fill; a null pointer disables memoisation.
- * @return The (possibly cached) satisfiability verdict.
+ * @return The (possibly cached) satisfiability verdict, with
+ * `is_tau_formula_sat`'s report merged on a computed verdict.
  */
 template <NodeType node>
-bool pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo) {
-	auto compute = [&] {
-		auto sat = is_tau_formula_sat<node>(fm, start_time);
-		return sat.has_value() && sat.value();
+result<bool> pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo)
+{
+	auto compute = [&]() -> result<bool> {
+		result<bool> r;
+		TAU_TRY(bool sat, is_tau_formula_sat<node>(fm, start_time));
+		return r.with_value(sat);
 	};
 	if (!memo) return compute();
 	const auto key = std::make_pair(fm, start_time);
-	if (auto it = memo->find(key); it != memo->end()) return it->second;
-	const bool r = compute();
-	(*memo)[key] = r;
-	return r;
+	if (auto it = memo->find(key); it != memo->end()) {
+		result<bool> r;
+		return r.with_value(it->second);
+	}
+	auto sat_r = compute();
+	if (!sat_r.has_value()) return sat_r;
+	(*memo)[key] = sat_r.value();
+	return sat_r;
 }
 
 /**
@@ -351,24 +359,25 @@ bool pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo) {
  * @param psi_f Full update formula.
  * @param start_time Start time for the realizability checks.
  * @param memo Optional per-revision memo (see `pwr_sat_memo`).
- * @return The revised subtree.
+ * @return The revised subtree, with the realizability queries' reports.
  */
 
 template <NodeType node>
-tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
+result<tref> revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	pwr_sat_memo* memo = nullptr)
 {
 	using tau = tree<node>;
+	result<tref> r;
 
 	// Early exit: if REAL(φ ∧ ψ_f), keep spec unchanged
 	tref conj = build_wff_and<node>(phi, psi_f);
-	if (pwr_memo_sat<node>(conj, start_time, memo))
-		return phi;
+	TAU_TRY(bool real, pwr_memo_sat<node>(conj, start_time, memo));
+	if (real) return r.with_value(phi);
 
 	// Case 1: Both non-temporal (atoms or Boolean combinations of atoms,
 	// PW-N2) → semantic per-step formula over the whole subformulas.
 	if (is_non_temporal_fm<node>(phi) && is_non_temporal_fm<node>(psi))
-		return semantic_revise_atoms<node>(phi, psi);
+		return r.with_value(semantic_revise_atoms<node>(phi, psi));
 
 	temporal_op op_phi = get_temporal_op<node>(phi);
 	temporal_op op_psi = get_temporal_op<node>(psi);
@@ -379,17 +388,18 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 		auto [inv_psi, commit_psi] = decompose_roles<node>(psi);
 
 		// Recurse on invariant sides
-		tref r_inv = revise<node>(inv_phi, inv_psi, psi_f, start_time,
-			memo);
+		TAU_TRY(tref r_inv, revise<node>(inv_phi, inv_psi, psi_f,
+			start_time, memo));
 
 		// Try keeping spec's commitment side
 		tref candidate = rebuild_from_roles<node>(op_phi, r_inv, commit_phi);
 		tref check = build_wff_and<node>(candidate, psi_f);
-		if (pwr_memo_sat<node>(check, start_time, memo))
-			return candidate;
+		TAU_TRY(bool keep, pwr_memo_sat<node>(check, start_time, memo));
+		if (keep) return r.with_value(candidate);
 
 		// Fall back to update's commitment side
-		return rebuild_from_roles<node>(op_phi, r_inv, commit_psi);
+		return r.with_value(
+			rebuild_from_roles<node>(op_phi, r_inv, commit_psi));
 	}
 
 	// Case 2b: Same unary temporal operator (G/sometimes).
@@ -398,12 +408,12 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	    && op_phi != temporal_op::NONE) {
 		tref inner_phi = tau::get(phi)[0].first();
 		tref inner_psi = tau::get(psi)[0].first();
-		tref r_inner = revise<node>(inner_phi, inner_psi, psi_f,
-			start_time, memo);
+		TAU_TRY(tref r_inner, revise<node>(inner_phi, inner_psi, psi_f,
+			start_time, memo));
 		if (op_phi == temporal_op::ALWAYS)
-			return tau::build_wff_always(r_inner);
+			return r.with_value(tau::build_wff_always(r_inner));
 		if (op_phi == temporal_op::SOMETIMES)
-			return build_wff_sometimes<node>(r_inner);
+			return r.with_value(build_wff_sometimes<node>(r_inner));
 		// unreachable -- the guard admits only ALWAYS/SOMETIMES,
 		// each handled above.
 	}
@@ -413,11 +423,15 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	// formula, not only an atom leaf)
 	if (is_non_temporal_fm<node>(phi) && is_binary_temporal(op_psi)) {
 		tref lifted = rebuild_from_roles<node>(op_psi, phi, phi);
-		return revise<node>(lifted, psi, psi_f, start_time, memo);
+		TAU_TRY(tref lifted_rev, revise<node>(lifted, psi, psi_f,
+			start_time, memo));
+		return r.with_value(lifted_rev);
 	}
 	if (is_binary_temporal(op_phi) && is_non_temporal_fm<node>(psi)) {
 		tref lifted = rebuild_from_roles<node>(op_phi, psi, psi);
-		return revise<node>(phi, lifted, psi_f, start_time, memo);
+		TAU_TRY(tref lifted_rev, revise<node>(phi, lifted, psi_f,
+			start_time, memo));
+		return r.with_value(lifted_rev);
 	}
 
 	// Case 4: G vs binary temporal — unwrap G(α) as invariant
@@ -426,21 +440,22 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	    || op_psi == temporal_op::T)) {
 		tref inner_phi = tau::get(phi)[0].first();
 		auto [inv_psi, commit_psi] = decompose_roles<node>(psi);
-		tref r_inv = revise<node>(inner_phi, inv_psi, psi_f, start_time,
-			memo);
-		return rebuild_from_roles<node>(op_psi, r_inv, commit_psi);
+		TAU_TRY(tref r_inv, revise<node>(inner_phi, inv_psi, psi_f,
+			start_time, memo));
+		return r.with_value(
+			rebuild_from_roles<node>(op_psi, r_inv, commit_psi));
 	}
 	if ((op_phi == temporal_op::R || op_phi == temporal_op::T)
 	    && op_psi == temporal_op::ALWAYS) {
 		auto [inv_phi, commit_phi] = decompose_roles<node>(phi);
 		tref inner_psi = tau::get(psi)[0].first();
-		tref r_inv = revise<node>(inv_phi, inner_psi, psi_f, start_time,
-			memo);
+		TAU_TRY(tref r_inv, revise<node>(inv_phi, inner_psi, psi_f,
+			start_time, memo));
 		tref candidate = rebuild_from_roles<node>(op_phi, r_inv, commit_phi);
 		tref check = build_wff_and<node>(candidate, psi_f);
-		if (pwr_memo_sat<node>(check, start_time, memo))
-			return candidate;
-		return tau::build_wff_always(r_inv);
+		TAU_TRY(bool keep, pwr_memo_sat<node>(check, start_time, memo));
+		if (keep) return r.with_value(candidate);
+		return r.with_value(tau::build_wff_always(r_inv));
 	}
 
 	// Case 5: sometimes vs U/W — unwrap sometimes(α) as commitment
@@ -449,13 +464,14 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	    || op_psi == temporal_op::W)) {
 		tref inner_phi = tau::get(phi)[0].first();
 		auto [inv_psi, commit_psi] = decompose_roles<node>(psi);
-		tref r_commit = revise<node>(inner_phi, commit_psi, psi_f,
-			start_time, memo);
-		return rebuild_from_roles<node>(op_psi, inv_psi, r_commit);
+		TAU_TRY(tref r_commit, revise<node>(inner_phi, commit_psi, psi_f,
+			start_time, memo));
+		return r.with_value(
+			rebuild_from_roles<node>(op_psi, inv_psi, r_commit));
 	}
 
 	// Case 6: Operator mismatch — update wins
-	return psi;
+	return r.with_value(psi);
 }
 
 /**
@@ -582,14 +598,16 @@ tref and_distribute(tref fm) {
  * @param spec Current (normalized) specification.
  * @param update Normalized update formula.
  * @param start_time Start time for the realizability checks.
- * @return The revised specification.
+ * @return The revised specification, with the satisfiability queries'
+ * reports (they carry the ltlsynt call count).
  */
 
 template <NodeType node>
-tref pointwise_revision_temporal(
+result<tref> pointwise_revision_temporal(
 	tref spec, tref update, const int_t start_time)
 {
 	using tau = tree<node>;
+	result<tref> r;
 
 	// NOTE: We do NOT call normalizer<node>() here.
 	// The interpreter (make_interpreter / step) has already normalized
@@ -598,8 +616,8 @@ tref pointwise_revision_temporal(
 	// in always_conjunction → build_wff_and (pre-existing codebase bug).
 
 	// Trivial cases
-	if (tau::get(update).equals_T()) return spec;
-	if (tau::get(spec).equals_T())   return update;
+	if (tau::get(update).equals_T()) return r.with_value(spec);
+	if (tau::get(spec).equals_T())   return r.with_value(update);
 
 	// PW-R6: one memo for the whole revision — Step 1/Step 2/early-exit
 	// conjunctions are often the same hash-consed tref, and each repeat
@@ -617,8 +635,9 @@ tref pointwise_revision_temporal(
 
 	// Step 1: Global vacuity
 	tref global_conj = build_wff_and<node>(spec, update);
-	if (pwr_memo_sat<node>(global_conj, start_time, &memo))
-		return global_conj;
+	TAU_TRY(bool globally_real,
+		pwr_memo_sat<node>(global_conj, start_time, &memo));
+	if (globally_real) return r.with_value(global_conj);
 
 	// Step 2-3: Per-clause revision
 	std::vector<tref> revised;
@@ -627,7 +646,9 @@ tref pointwise_revision_temporal(
 	for (tref sc : spec_clauses) {
 		// Step 2: Per-clause vacuity
 		tref clause_conj = build_wff_and<node>(sc, update);
-		if (pwr_memo_sat<node>(clause_conj, start_time, &memo)) {
+		TAU_TRY(bool clause_real,
+			pwr_memo_sat<node>(clause_conj, start_time, &memo));
+		if (clause_real) {
 			revised.push_back(sc);
 			continue;
 		}
@@ -647,8 +668,8 @@ tref pointwise_revision_temporal(
 			best = update_clauses[0];
 
 		if (best) {
-			tref r = revise<node>(sc, best, update, start_time,
-				&memo);
+			TAU_TRY(tref rev_clause, revise<node>(sc, best, update,
+				start_time, &memo));
 
 			// Optimal mode fallback: if fast mode
 			// returned the update clause unchanged (dropped the spec
@@ -661,16 +682,16 @@ tref pointwise_revision_temporal(
 			// under-correct (AL-R1), and it is the one production
 			// route to that solver.
 			if (pwr_semantic_fallback
-				&& (tau::subtree_equals(r, best)
-					|| tau::subtree_equals(r, update))) {
+				&& (tau::subtree_equals(rev_clause, best)
+					|| tau::subtree_equals(rev_clause, update))) {
 				tref opt = pack_semantic_pwr_optimal<node>(
 					sc, update);
 				// A revision only helps if it is realizable.
 				if (opt) {
-					auto sat = is_tau_formula_sat<node>(
-						opt, start_time);
-					if (!(sat.has_value() && sat.value()))
-						opt = nullptr;
+					TAU_TRY(bool opt_real,
+						is_tau_formula_sat<node>(opt,
+							start_time));
+					if (!opt_real) opt = nullptr;
 				}
 				if (opt) {
 					revised.push_back(opt);
@@ -678,7 +699,7 @@ tref pointwise_revision_temporal(
 				}
 			}
 
-			revised.push_back(r);
+			revised.push_back(rev_clause);
 		}
 	}
 
@@ -690,14 +711,15 @@ tref pointwise_revision_temporal(
 	// and semantic_pwr_optimal's θ-carries-update contract is load-bearing
 	// (see test_semantic_pwr.cpp LS-2/LS-16 suite).
 	tref assembly = update;
-	for (tref r : revised)
-		assembly = build_wff_and<node>(assembly, r);
+	for (tref rc : revised)
+		assembly = build_wff_and<node>(assembly, rc);
 
-	if (pwr_memo_sat<node>(assembly, start_time, &memo))
-		return assembly;
+	TAU_TRY(bool assembly_real,
+		pwr_memo_sat<node>(assembly, start_time, &memo));
+	if (assembly_real) return r.with_value(assembly);
 
 	// Fallback: return update
-	return update;
+	return r.with_value(update);
 }
 
 } // namespace idni::tau_lang

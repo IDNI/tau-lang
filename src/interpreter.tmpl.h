@@ -3427,17 +3427,13 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 			trefs out;
 			size_t failed = 0;
 			for (const htref& h : alts_in) {
-				tref rev = pointwise_revision_temporal<node>(
-					h->get(), update, start_time);
+				TAU_TRY(tref rev, pointwise_revision_temporal<node>(
+					h->get(), update, start_time));
 				// IN-M6: nullptr (the revision could not be
 				// built) and F (the alternative is gone) are
 				// different outcomes; say which.
 				if (!rev) {
 					++failed;
-					LOG_WARNING << "Pointwise revision of a "
-						"nested-temporal alternative could not "
-						"be built: " << TAU_TO_STR(h->get())
-						<< "\n";
 					continue;
 				}
 				if (tau::get(rev).equals_F()) {
@@ -3503,7 +3499,9 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
-		if (!pwr_memo_sat<node>(clause, start_time, &memo))
+		TAU_TRY(bool clause_sat, pwr_memo_sat<node>(clause,
+			start_time, &memo));
+		if (!clause_sat)
 			continue;
 
 		// An update already implied by the running spec is a no-op;
@@ -3550,12 +3548,15 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 		// remain sat with it; drop them otherwise (the accumulated
 		// spec's eventualities give way to the update, matching the
 		// previous single-formula behavior).
-		auto with_spec_sometimes = [&](tref base, const trefs& sts) {
-			if (sts.empty()) return base;
+		auto with_spec_sometimes = [&](tref base,
+			const trefs& sts) -> result<tref> {
+			result<tref> r;
+			if (sts.empty()) return r.with_value(base);
 			tref with = build_wff_and<node>(base,
 				build_wff_and<node>(sts));
-			return pwr_memo_sat<node>(with, start_time, &memo)
-				? with : base;
+			TAU_TRY(bool sat, pwr_memo_sat<node>(with,
+				start_time, &memo));
+			return r.with_value(sat ? with : base);
 		};
 
 		trefs new_alts;
@@ -3564,9 +3565,11 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 			// clause replaces the always-free spec, keeping each
 			// alternative's sometimes clauses where possible.
 			if (n == 0) new_alts.push_back(clause);
-			for (size_t i = 0; i < n; ++i)
-				new_alts.push_back(with_spec_sometimes(
+			for (size_t i = 0; i < n; ++i) {
+				TAU_TRY(tref alt, with_spec_sometimes(
 					clause, alt_sometimes[i]));
+				new_alts.push_back(alt);
+			}
 		} else {
 			// B2a: align every alternative's always body (and the
 			// update body) to the common lookback frame ONCE and
@@ -3628,8 +3631,8 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 				tau::build_wff_or(live_bodies)),
 				build_wff_and<node>(upd_sometime));
 			LOG_TRACE << "pwr/gate: " << LOG_FM(gate) << "\n";
-			const bool plain_ok =
-				pwr_memo_sat<node>(gate, start_time, &memo);
+			TAU_TRY(bool plain_ok, pwr_memo_sat<node>(gate,
+				start_time, &memo));
 			if (!plain_ok && !upd_always) {
 				// Without an always part in the update there
 				// is no weaker always to fall back on; the
@@ -3654,9 +3657,10 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 				// conjoined body; the clause itself takes its
 				// place.
 				if (!bodies[i]) {
-					new_alts.push_back(
+					TAU_TRY(tref alt,
 						with_spec_sometimes(clause,
 							alt_sometimes[i]));
+					new_alts.push_back(alt);
 					continue;
 				}
 				// Dead alternative: the conjunction with the
@@ -3681,8 +3685,9 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 						<< LOG_FM(alt) << "\n";
 					continue;
 				}
-				new_alts.push_back(with_spec_sometimes(
-					alt, alt_sometimes[i]));
+				TAU_TRY(tref alt_kept,
+					with_spec_sometimes(alt, alt_sometimes[i]));
+				new_alts.push_back(alt_kept);
 			}
 			if (!plain_ok) {
 				// I1: instead of embedding the guarded

@@ -2642,7 +2642,11 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; satisfiability could not be decided");
 		}
-		memoize(realizable.value());
+		// Keep the decision's report on the success path too: it carries
+		// the ltlsynt call count, which PWR-R6-01 measures.
+		const bool value = realizable.value();
+		r.merge(std::move(realizable));
+		memoize(value);
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}

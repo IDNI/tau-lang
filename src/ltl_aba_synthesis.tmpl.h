@@ -92,6 +92,10 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	result<std::pair<bool, std::string>> r;
 	int timeout_sec = ltl_timeout_sec();
 
+	// One ltlsynt process per call. The count rides the report, so a caller
+	// that memoises queries (pointwise revision) can measure how many ran.
+	r.report().count("ltlsynt_calls", (size_t) 1);
+
 	// LT-7: a backend failure (not on PATH, timeout watchdog,
 	// usage error, no recognized verdict line) is forwarded as an error
 	// here, never read as a decided UNREALIZABLE.

@@ -31,6 +31,14 @@ static tref spec(const char* s) {
 	return nso_rr.value().main->get();
 }
 
+// Every case needs the revision's value; a failed revision is a failure of
+// the case, so the helper unwraps the result here.
+static tref revision_value(tref s, tref u) {
+	auto rr = pointwise_revision_temporal<node_t>(s, u, 0);
+	REQUIRE(rr.has_value());
+	return rr.value();
+}
+
 // Check if a formula is realizable (REAL oracle).
 static bool is_realizable(tref fm) {
 	if (!fm) return false;
@@ -62,7 +70,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -72,7 +80,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		// Update must be satisfiable in result (AGM success)
 		CHECK(is_realizable(result));
@@ -84,7 +92,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -94,7 +102,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -104,7 +112,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("T.");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -114,7 +122,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (!(o1[t] = 0)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -124,7 +132,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -134,7 +142,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -144,7 +152,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -154,7 +162,7 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 		tref u = spec("G ((o1[t] = 0) && (o2[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -171,7 +179,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -181,7 +189,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 1) until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -191,7 +199,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 1) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -201,7 +209,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -211,7 +219,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -221,7 +229,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 0) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -231,7 +239,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 0) until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -241,17 +249,17 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-T-09] Safety and liveness mix: G && F") {
+	TEST_CASE("[PWR-T-09] Safety and liveness mix: G && F" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G (o1[t] = 0) && F (o1[t] = 1).");
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -261,7 +269,7 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 		tref u = spec("(o1[t] = 0) weak_until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -279,7 +287,7 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -290,18 +298,18 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 		tref u = spec("G ((o1[t] = 0) && (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		// Update o1=0 && o1=1 is contradictory — revision inherits unrealizability
 		CHECK_FALSE(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-V-03] Spec is F: always realizable") {
+	TEST_CASE("[PWR-V-03] Spec is F: always realizable" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (0 = 1).");
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -311,7 +319,7 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 		tref u = spec("G ((o2[t] = 0) && (o2[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		// Both spec and update are contradictory — result is unrealizable
 		CHECK_FALSE(is_realizable(result));
@@ -330,7 +338,7 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -341,7 +349,7 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -352,7 +360,7 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -363,7 +371,7 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -374,7 +382,7 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -393,7 +401,7 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -405,17 +413,17 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-M-03] Safety and liveness clauses") {
+	TEST_CASE("[PWR-M-03] Safety and liveness clauses" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G (o1[t] = 0) && F (o2[t] = 0).");
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -425,7 +433,7 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 		tref u = spec("F (o1[t] = 1) && F (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -442,7 +450,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("T.");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -452,7 +460,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -462,7 +470,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -472,7 +480,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("G (!(o1[t] = 0)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -482,7 +490,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -493,17 +501,17 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref u = spec("(o1[t] = 0) until (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-E-07] G(F) liveness combination") {
+	TEST_CASE("[PWR-E-07] G(F) liveness combination" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G (F (o1[t] = 1)).");
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -520,7 +528,7 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		// Result should be realizable (update is realizable)
 		CHECK(is_realizable(result));
@@ -531,7 +539,7 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref u = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -542,7 +550,7 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref u = spec("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -553,7 +561,7 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref u = spec(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -570,7 +578,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -580,7 +588,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 1) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -590,7 +598,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (o1[t] = 1) && F (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -600,7 +608,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 1) until (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -611,7 +619,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -621,7 +629,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("F (o1[t] = 1) && G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -631,7 +639,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 0) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -641,7 +649,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -651,7 +659,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -661,7 +669,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -671,17 +679,17 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 0) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-D-12] W (weak until) operator") {
+	TEST_CASE("[PWR-D-12] W (weak until) operator" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -691,17 +699,17 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-D-14] F and G on different outputs") {
+	TEST_CASE("[PWR-D-14] F and G on different outputs" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (o1[t] = 0).");
 		tref u = spec("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -711,7 +719,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -721,7 +729,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -731,7 +739,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -741,7 +749,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -751,17 +759,17 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-D-20] F(o1=0 && o2=1) with conflicting G update") {
+	TEST_CASE("[PWR-D-20] F(o1=0 && o2=1) with conflicting G update" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F ((o1[t] = 0) && (o2[t] = 1)).");
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -782,7 +790,7 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 		tref u = spec("G(o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref r = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref r = revision_value(s, u);
 		REQUIRE(r != nullptr);
 		CHECK(is_realizable(r));
 		// AGM success: the update holds
@@ -802,9 +810,9 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 		REQUIRE(s != nullptr);
 		REQUIRE(u1 != nullptr);
 		REQUIRE(u2 != nullptr);
-		tref r1 = pointwise_revision_temporal<node_t>(s, u1, 0);
+		tref r1 = revision_value(s, u1);
 		REQUIRE(r1 != nullptr);
-		tref r2 = pointwise_revision_temporal<node_t>(r1, u2, 0);
+		tref r2 = revision_value(r1, u2);
 		REQUIRE(r2 != nullptr);
 		CHECK(is_realizable(r2));
 		CHECK(entails(r2, u2));
@@ -825,7 +833,7 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 		tref u = spec("(o1[t] = 0) weak_until (i1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref r = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref r = revision_value(s, u);
 		REQUIRE(r != nullptr);
 		CHECK(is_realizable(r));
 		CHECK(entails(r, u));
@@ -847,7 +855,7 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 		tref u = spec("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -858,39 +866,39 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 		tref u = spec("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
 	TEST_CASE("[PWR-LS17-03] F spec vs sometimes update revises "
-			"(LS-3: same eventually operator)") {
+			"(LS-3: same eventually operator)" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (o1[t] = 0).");
 		tref u = spec("sometimes (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[PWR-LS17-04] S past-operator spec survives revision") {
+	TEST_CASE("[PWR-LS17-04] S past-operator spec survives revision" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("(o1[t] = 1) since (o1[t] = 0).");
 		tref u = spec("G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
 
 	TEST_CASE("[PWR-LS17-05] binary-lhs conjunction distributes: "
-			"(a && b) U c") {
+			"(a && b) U c" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("((o1[t] = 1) && (o2[t] = 1)) until (o3[t] = 1).");
 		tref u = spec("G (o4[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
-		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
 	}
@@ -908,24 +916,23 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 // in every build; under TAU_CACHE (Release) the global result cache also
 // answers repeats across revisions.
 //
-// Counted through a stub `ltlsynt` prepended to PATH that appends one line
-// per invocation to a file, then execs the real binary — behavior is
-// unchanged, only observed.
+// Counted from the library: call_ltlsynt records one info_count per process
+// it starts, and the report-returning revision entry hands that report back.
 // ============================================================================
 
 #include <cstdio>
 #include <cstdlib>
-#include <fstream>
-#include <sys/stat.h>
-#include <unistd.h>
 
 namespace {
 
-int count_lines(const std::string& path) {
-	std::ifstream in(path);
+// Total of the "ltlsynt_calls" counters a revision's report carries: one
+// info_count node per non-memoised is_tau_formula_sat query.
+int count_ltlsynt_calls(const report& rep) {
 	int n = 0;
-	std::string line;
-	while (std::getline(in, line)) ++n;
+	for (const auto& node : rep.nodes())
+		if (node.tag == code::info_count
+			&& rep.str(node.key) == "ltlsynt_calls")
+			n += (int)node.value;
 	return n;
 }
 
@@ -935,42 +942,7 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 
 	TEST_CASE("[PWR-R6-01] one U-revision spawns each distinct query "
 			"once; a repeated revision spawns none under "
-			"TAU_CACHE"
-		* doctest::skip(!ltlsynt_available())) {
-		// Resolve the real binary before PATH is changed.
-		std::string real;
-		{
-			FILE* p = popen("command -v ltlsynt", "r");
-			REQUIRE(p != nullptr);
-			char buf[4096];
-			if (fgets(buf, sizeof(buf), p)) real = buf;
-			pclose(p);
-			while (!real.empty() && (real.back() == '\n'
-				|| real.back() == '\r')) real.pop_back();
-		}
-		REQUIRE(!real.empty());
-
-		char tmpl[] = "/tmp/tau_pwr_r6_XXXXXX";
-		char* dir = mkdtemp(tmpl);
-		REQUIRE(dir != nullptr);
-		const std::string stub  = std::string(dir) + "/ltlsynt";
-		const std::string count = std::string(dir) + "/count";
-		{
-			std::ofstream s(stub);
-			s << "#!/bin/sh\n"
-			     "echo x >> \"$TAU_TEST_LTLSYNT_COUNT\"\n"
-			     "exec \"$TAU_TEST_LTLSYNT_REAL\" \"$@\"\n";
-		}
-		chmod(stub.c_str(), 0755);
-
-		const char* old_path = std::getenv("PATH");
-		REQUIRE(old_path != nullptr);
-		const std::string saved_path = old_path;
-		setenv("TAU_TEST_LTLSYNT_COUNT", count.c_str(), 1);
-		setenv("TAU_TEST_LTLSYNT_REAL", real.c_str(), 1);
-		setenv("PATH",
-			(std::string(dir) + ":" + saved_path).c_str(), 1);
-
+			"TAU_CACHE" * doctest::skip(!ltlsynt_available())) {
 		// s ∧ u is UNSAT at every discharge combination (invariants
 		// o1=0 vs o1=1 conflict, commitments force o1 both ways), so
 		// the revision runs the full recursion instead of returning
@@ -980,17 +952,15 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 
-		std::ofstream(count, std::ios::trunc).flush();
-		tref r1 = pointwise_revision_temporal<node_t>(s, u, 0);
-		const int n1 = count_lines(count);
+		auto rr1 = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(rr1.has_value());
+		tref r1 = rr1.value();
+		const int n1 = count_ltlsynt_calls(rr1.report());
 
-		std::ofstream(count, std::ios::trunc).flush();
-		tref r2 = pointwise_revision_temporal<node_t>(s, u, 0);
-		const int n2 = count_lines(count);
-
-		setenv("PATH", saved_path.c_str(), 1);
-		unsetenv("TAU_TEST_LTLSYNT_COUNT");
-		unsetenv("TAU_TEST_LTLSYNT_REAL");
+		auto rr2 = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(rr2.has_value());
+		tref r2 = rr2.value();
+		const int n2 = count_ltlsynt_calls(rr2.report());
 
 		REQUIRE(r1 != nullptr);
 		CHECK(r2 == r1);
