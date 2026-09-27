@@ -38,6 +38,13 @@ extern char** environ;
 
 namespace idni::tau_lang {
 
+// A report text label needs text: the parser's report cannot hold an empty
+// string under one, so a silent child says so instead.
+inline std::string spawn_output_text(const std::string& out) {
+	return out.empty() ? std::string("(no output)")
+		: truncate_for_message(out);
+}
+
 // ── argv / CSV helpers ───────────────────────────────────────────────────
 
 // ltlsynt's --ins=/--outs= take a single comma-joined argument; this is the
@@ -282,11 +289,13 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 		return r.with_error(code::runtime_error,
 			"the command was killed by the timeout watchdog",
 			{{label::exit_code, exit_code},
-			 {label::timeout, timeout_sec}});
+			 {label::timeout, timeout_sec},
+			 {label::value, spawn_output_text(out)}});
 	if (!exit_ok(exit_code))
 		return r.with_error(code::runtime_error,
 			"the command exited with an unexpected code",
-			{{label::exit_code, exit_code}});
+			{{label::exit_code, exit_code},
+			 {label::value, spawn_output_text(out)}});
 	return r.with_value(std::move(out));
 }
 
@@ -410,16 +419,19 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			return r.with_error(code::runtime_error,
 				"the command was killed by the timeout watchdog",
 				{{label::exit_code, exit_code},
-				 {label::timeout, timeout_sec}});
+				 {label::timeout, timeout_sec},
+				 {label::value, spawn_output_text(out)}});
 		return r.with_error(code::runtime_error,
 			"the command was killed by a signal",
-			{{label::exit_code, exit_code}});
+			{{label::exit_code, exit_code},
+			 {label::value, spawn_output_text(out)}});
 	}
 	int exit_code = WEXITSTATUS(status);
 	if (!exit_ok(exit_code))
 		return r.with_error(code::runtime_error,
 			"the command exited with an unexpected code",
-			{{label::exit_code, exit_code}});
+			{{label::exit_code, exit_code},
+			 {label::value, spawn_output_text(out)}});
 	return r.with_value(std::move(out));
 }
 

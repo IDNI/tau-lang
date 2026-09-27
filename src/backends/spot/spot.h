@@ -86,7 +86,8 @@ struct spawn_options {
 /// `exit_ok` names which exit codes count as success for the tool being
 /// spawned (ltlsynt: 0 realizable or 1 unrealizable; autfilt/ltlfilt: 0).
 /// `timeout_sec <= 0` disables the SIGTERM watchdog; a fired watchdog is
-/// reported as a signal death with `label::timeout` attached.
+/// reported as a signal death with `label::timeout` attached. A failed
+/// report carries the captured output as `label::value`.
 result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int timeout_sec = 0,
 	std::function<bool(int)> exit_ok = [](int c) { return c == 0; },
