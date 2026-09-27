@@ -242,7 +242,7 @@ tref widen_term(tref bf_node, size_t base_w, size_t W) {
 
 	if (W == base_w) return bf_node;
 	const tau& op = tau::get(bf_node)[0];
-	const size_t wide_tid = bv_type_id<node>(W);
+	const size_t wide_tid = bv_type_id<node>(static_cast<unsigned short>(W));
 	switch (op.value.nt) {
 	// Leaves and user-cast boundaries: wrap the *whole* incoming bf_node
 	// (cast included, for bf_cast -- its own operand is left untouched and
@@ -567,7 +567,7 @@ result<tref> widen_atom(tref atom) {
 			const size_t other_i = bare0 ? 1 : 0;
 			tref wide_other = widen_term<node>(sides[other_i], base_w, W);
 			tref truncated = build_bf_cast<node>(wide_other,
-				bv_type_id<node>(base_w));
+				bv_type_id<node>(static_cast<unsigned short>(base_w)));
 			tref l = bare0 ? sides[0] : truncated;
 			tref rhs = bare0 ? truncated : sides[1];
 			return r.with_value(tau::get(n.get_type(), l, rhs));

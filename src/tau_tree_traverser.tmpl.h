@@ -116,10 +116,10 @@ const typename tree<node>::template extractor<int_t>
 			});
 
 template <NodeType node>
-const typename tree<node>::template extractor<size_t>
+const typename tree<node>::template extractor<uint64_t>
 	tree<node>::traverser::num =
-		typename tree<node>::template extractor<size_t>(
-			[](const traverser& t) -> size_t {
+		typename tree<node>::template extractor<uint64_t>(
+			[](const traverser& t) -> uint64_t {
 				if (!t) return 0;
 				return t.value_tree().get_num();
 			});
@@ -130,7 +130,8 @@ const typename tree<node>::template extractor<size_t>
 		typename tree<node>::template extractor<size_t>(
 			[](const traverser& t) -> size_t {
 				if (!t) return 0;
-				return t.value_tree().data();
+				// The pool index is handed back as the extractor's size_t.
+				return static_cast<size_t>(t.value_tree().data());
 			});
 
 template <NodeType node>

@@ -2857,7 +2857,7 @@ static tref compile_since_trigger_rec(
 	if (!t.has_child()) return fm;
 
 	const bool is_outer = (spine_pol > 0);
-	auto nt = t[0].value.nt;
+	size_t nt = t[0].value.get_nt();
 
 	// wff_trigger: φ T ψ = ¬(¬φ S ¬ψ)
 	//

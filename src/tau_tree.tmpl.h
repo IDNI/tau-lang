@@ -219,6 +219,13 @@ int_t get_io_time_point(tref io_var);
 template <NodeType node>
 int_t get_io_shift(tref io_var);
 /**
+ * @brief Read a node's inline payload as `int_t`.
+ * The shift, time-point and capture-name payloads it reads are small
+ * non-negative values, so one past `int_t`'s range is a caller bug.
+ */
+template <NodeType node>
+int_t get_payload_int(const tree<node>& n);
+/**
  * @brief Return the lookback N for an offset of the form t-N, and 0 for
  * any other offset form (current step or absolute time point).
  */
@@ -601,7 +608,7 @@ tref tree<node>::get_typed(const typename node::type& nt,
 // terminals
 
 template <NodeType node>
-tref tree<node>::get_num(size_t n) {
+tref tree<node>::get_num(uint64_t n) {
 	return get(node(tree<node>::num, n));
 }
 
@@ -891,10 +898,14 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 // fast access helpers
 
 template <NodeType node>
-size_t tree<node>::data() const { return this->value.data; }
+uint64_t tree<node>::data() const {
+	return this->value.get_data();
+}
 
 template <NodeType node>
-size_t tree<node>::child_data() const { return first_tree().value.data; }
+uint64_t tree<node>::child_data() const {
+	return first_tree().value.get_data();
+}
 
 template <NodeType node>
 bool tree<node>::is(size_t nt) const {
@@ -971,7 +982,9 @@ const std::string& tree<node>::get_type_name() const {
 template <NodeType node>
 const std::string& tree<node>::get_string() const {
 	DBG(assert(is_string());)
-	return dict(this->value.data);
+	// dict indexes the string pool with size_t.
+	const size_t sid = static_cast<size_t>(this->data());
+	return dict(sid);
 }
 
 template <NodeType node>
@@ -981,23 +994,27 @@ int_t tree<node>::get_integer() const {
 }
 
 template <NodeType node>
-size_t tree<node>::get_num() const {
+uint64_t tree<node>::get_num() const {
 	DBG(assert(is_num());)
-	return this->value.data;
+	return this->value.get_data();
 }
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
 	DBG(LOG_TRACE << LOG_FM_TREE(get()));
 	DBG(assert(is_ba_constant());)
-	return this->value.data;
+	// ba_constants indexes its pool with size_t.
+	const size_t id = static_cast<size_t>(this->data());
+	return id;
 }
 
 template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
 	// Advisory drop: plain-value accessor contract.
-	return ba_constants<node>::get(data()).value_or(constant{});
+	// ba_constants indexes its pool with size_t.
+	const size_t id = static_cast<size_t>(this->data());
+	return ba_constants<node>::get(id).value_or(constant{});
 }
 
 template <NodeType node>
@@ -1079,5 +1096,6 @@ tref substitute(tref formula, const auto& changes) {
 template<typename... BAs> requires idni::tau_lang::BAsPack<BAs...>
 size_t std::hash<idni::tau_lang::node<BAs...>>::operator()(
 	const idni::tau_lang::node<BAs...>& n) const noexcept {
-	return n.hash;
+	// A 64-bit hash mixed into a size_t bucket loses bits on purpose.
+	return static_cast<size_t>(n.hash);
 }

@@ -47,7 +47,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 		if (t.equals_F()) { acc = qlt::bottom(); return; }
 		if (!t.is(tau::wff)) { undetermined = true; return; }
 		if (!t.has_child()) return;
-		auto op = t[0].value.nt;
+		size_t op = t[0].value.get_nt();
 		if (op == tau::wff_and) {
 			collect(t[0].first());
 			collect(t[0].second());
@@ -202,7 +202,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			if (!ti.is(tau::wff) || !ti.has_child()) {
 				undetermined = true; return;
 			}
-			auto iop = ti[0].value.nt;
+			size_t iop = ti[0].value.get_nt();
 			// Normalize NNF negated-comparison variants (bf_nXxx → positive)
 			if      (iop == tau::bf_ngt)   iop = tau::bf_lteq;
 			else if (iop == tau::bf_nlt)   iop = tau::bf_gteq;

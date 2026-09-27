@@ -706,7 +706,9 @@ template <NodeType node>
 size_t get_var_name_sid(tref var) {
 	tref vn = get_var_name_node<node>(var);
 	if (!vn) return 0;
-	return tree<node>::get(vn).data();
+	// The name id is a pool index, handed back as the caller's size_t.
+	const uint64_t sid = tree<node>::get(vn).data();
+	return static_cast<size_t>(sid);
 }
 
 // -----------------------------------------------------------------------------
@@ -746,8 +748,17 @@ int_t get_io_time_point(tref io_var) {
 }
 
 template <NodeType node>
+int_t get_payload_int(const tree<node>& n) {
+	const uint64_t payload = n.data();
+	DBG(assert(payload <= static_cast<uint64_t>(
+		std::numeric_limits<int_t>::max()));)
+	return static_cast<int_t>(payload);
+}
+
+template <NodeType node>
 int_t get_io_shift(tref io_var) {
-	return tree<node>::get(io_var_node<node>(io_var))[1][0][1].get_num();
+	return get_payload_int<node>(
+		tree<node>::get(io_var_node<node>(io_var))[1][0][1]);
 }
 
 template <NodeType node>

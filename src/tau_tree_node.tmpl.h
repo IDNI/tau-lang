@@ -87,7 +87,8 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
-	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data), ba_type(ba_type),
+	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data),
+		ba_type(static_cast<uint32_t>(ba_type)),
 		hash(hashit())
 {
 	static_assert(sizeof...(BAs) > 0,
@@ -115,7 +116,20 @@ const std::string& node<BAs...>::name(size_t nt) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+size_t node<BAs...>::get_nt() const {
+	DBG(assert(nt <= std::numeric_limits<size_t>::max());)
+	return static_cast<size_t>(nt);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+uint64_t node<BAs...>::get_data() const {
+	return data;
+}
 
 // (TT1-11: nnull() and the extension() pack/unpack pair deleted -- zero
 // callers, and the packing lost nt's MSB; see the note in tau_tree.h.)
@@ -144,7 +158,12 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// ordered variant comparison is ill-formed there. Raw data is the
 	// only option left for ba_constant. This is a determinism fix, not a
 	// hash-primitive choice, so it applies under every policy.
-	if (tree<node>::is_string_nt(nt)) return dict(data) <=> dict(that.data);
+	if (tree<node>::is_string_nt(nt)) {
+		// dict indexes the string pool with size_t.
+		const size_t lhs = static_cast<size_t>(get_data());
+		const size_t rhs = static_cast<size_t>(that.get_data());
+		return dict(lhs) <=> dict(rhs);
+	}
 	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
 #undef NODE_CAST
@@ -254,11 +273,17 @@ uint64_t node<BAs...>::hashit() const {
 	// on process history (GitHub #89). A BA whose std::hash isn't already
 	// content-derived says so with hash_constant on its descriptor (see
 	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
-	if (nt == type::ba_constant && data != 0)
-		hash_ba_constant_data<BAs...>(seed, data);
+	if (nt == type::ba_constant && data != 0) {
+		// A ba_constant payload is a pool index; ba_constants uses size_t.
+		const size_t id = static_cast<size_t>(get_data());
+		hash_ba_constant_data<BAs...>(seed, id);
+	}
 	// Get string from pool
-	else if (tree<node>::is_string_nt(nt))
-		hash_combine(seed, dict(data));
+	else if (tree<node>::is_string_nt(nt)) {
+		// dict indexes the string pool with size_t.
+		const size_t sid = static_cast<size_t>(get_data());
+		hash_combine(seed, dict(sid));
+	}
 	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;
 }

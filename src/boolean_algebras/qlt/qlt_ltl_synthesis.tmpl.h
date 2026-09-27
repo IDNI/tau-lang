@@ -153,7 +153,7 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 	using tau = tree<node>;
 	const auto& t = tau::get(atom);
 	if (!t.has_child()) return std::nullopt;
-	auto op = t[0].value.nt;
+	size_t op = t[0].value.get_nt();
 	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
 	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
 	else if (op == tau::bf_ngteq) op = tau::bf_lt;
@@ -312,7 +312,7 @@ static std::optional<bool> eval_pure_output_atom_at(
 	if (atom_has_any_input<node>(atom)) return std::nullopt;
 	const auto& t = tau::get(atom);
 	if (!t.has_child()) return std::nullopt;
-	auto op = t[0].value.nt;
+	size_t op = t[0].value.get_nt();
 	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
 	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
 	else if (op == tau::bf_ngteq) op = tau::bf_lt;

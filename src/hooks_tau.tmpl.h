@@ -748,14 +748,14 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	int_t left = -1;
 	const auto& c0 = tau::get(ch[0]);
 	if (c0.is(tau::integer)) left = c0.get_integer();
-	else if (c0.is(tau::num)) left = (int_t)(c0.get_num());
+	else if (c0.is(tau::num)) left = get_payload_int<node>(c0);
 	if (left < 0) {
 		DBG(assert(c0.is(tau::variable) || c0.is(tau::capture));)
 		return tau::get_raw(v, ch, len, r);
 	}
 	int_t right = -1;
 	if (tau::get(ch[1]).is(tau::num))
-		right = (int_t)(tau::get(ch[1]).get_num());
+		right = get_payload_int<node>(tau::get(ch[1]));
 	DBG(assert(right >= 0);)
 	if (left >= right) return tau::get(tau::get_integer(left - right), r);
 	return nullptr; // Return error

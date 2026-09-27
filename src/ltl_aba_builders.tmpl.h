@@ -1488,7 +1488,7 @@ static result<tref> translate_ctl_star(tref fm,
 	const auto& t = tau::get(fm);
 	if (!t.has_child()) { return r.with_value(fm); }
 
-	auto nt = t[0].value.nt;
+	size_t nt = t[0].value.get_nt();
 
 	// Handle E χ: introduce witness output
 	if (nt == tau::wff_E) {

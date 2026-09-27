@@ -1297,7 +1297,7 @@ template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args) {
 	using tau = tree<node>;
 
-	auto int_node = tau::get_integer(offset);
+	auto int_node = tau::get_integer(static_cast<int_t>(offset));
 	return build_rr_ref<node>(build_sym<node>(sym_name), {int_node}, args);
 }
 

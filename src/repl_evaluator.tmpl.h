@@ -40,7 +40,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	auto is_relative = (mem_type == tau::rel_history);
 	auto mem_id = n | mem_type | tau::history_id;
 	size_t idx = 0;
-	if (mem_id) idx = mem_id | tt::num;
+	if (mem_id) idx = mem_id.value_tree().get_num();
 	// TAU_LOG_TRACE << "get_history_index idx: " << idx
 	// 	<< "       relative? " << is_relative << "    "
 	// 	<< TAU_LOG_FM(n.value());
@@ -1311,7 +1311,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
-	auto i = num | tt::num;
+	size_t i = num.value_tree().get_num();
 	if (i && i <= rr_defs.size()) {
 		out << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;

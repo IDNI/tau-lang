@@ -54,13 +54,22 @@ result<size_t> get_bv_width(tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	size_t num = tt(t) | tau::type | tau::subtype | tau::num | tt::num;
+	tref num = tt(t) | tau::type | tau::subtype | tau::num | tt::ref;
 	if (!num) {
 		result<size_t> r;
 		return r.with_assert_check_error(code::type_error,
 			"get_bv_width: bv type has no explicit bitwidth");
 	}
-	return result<size_t>{num};
+	// Check after reading the full payload: narrowing first would turn an
+	// out-of-range width into a plausible in-range one.
+	const uint64_t width = tau::get(num).get_num();
+	if (width < 1 || width > 0xffff) {
+		result<size_t> r;
+		return r.with_error(code::invalid_argument,
+			"get_bv_width: bitvector width is out of range",
+			{{label::size, static_cast<int_t>(width)}});
+	}
+	return result<size_t>{static_cast<size_t>(width)};
 }
 
 template <NodeType node>

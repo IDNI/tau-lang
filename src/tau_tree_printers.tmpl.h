@@ -96,15 +96,15 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
 		if (n.data == 0)
 			os << " { UNPARSED } : " << type_name;
-		else if (auto c = ba_constants<node>::get(n.data); c.has_value())
+		else if (auto c = ba_constants<node>::get(n.get_data()); c.has_value())
 			os << " { " << c.value() << " } : " << type_name;
 		// Advisory drop: the printer contract cannot abort a line.
 		else os << " { INVALID } : " << type_name;
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
-		os << "<" << dict(n.data) << ">";
+		os << "<" << dict(n.get_data()) << ">";
 	else if (tau::is_string_nt(n.nt))
-		os << " { \"" << dict(n.data) << "\" }";
+		os << " { \"" << dict(n.get_data()) << "\" }";
  	// else if (n.ext) os << "{EXT}";
 	if (n.nt == tau::io_var) {
 		if (n.data == 1) os << " IN";

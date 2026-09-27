@@ -597,7 +597,8 @@ inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
 		guard[k] = cube_lit_at(cube, in_ap_idx[k]);
 	for (size_t k = 0; k < flag_out_ap_idx.size(); ++k) {
 		std::int8_t g = cube_lit_at(cube, flag_out_ap_idx[k]);
-		if (k < flag_out_negated.size() && flag_out_negated[k]) g = -g;
+		if (k < flag_out_negated.size() && flag_out_negated[k])
+			g = static_cast<std::int8_t>(-g);
 		guard[in_ap_idx.size() + k] = g;
 	}
 	return guard;

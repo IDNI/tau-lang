@@ -63,7 +63,7 @@
 // looking for stale `tref`s.  bounded_cache is iterable (begin/end
 // over the map) and supports erase() — both behaviours are what the
 // gc_callback uses, so the pruning code in
-// external/parser/src/utility/tree.tmpl.h:255-294 needs zero changes
+// the parser's tree template needs zero changes
 // to interoperate.
 
 #ifndef __IDNI__TAU__BOUNDED_CACHE_H__

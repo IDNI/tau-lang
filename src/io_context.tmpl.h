@@ -554,7 +554,7 @@ inline tref adt_wire_find(tref n, size_t nt) {
 // its member_values: the grammar's own repetition wrapper nonterminals
 // (__E_tuple_value_0/1, spelled out in adt.tgf's generated productions)
 // never actually survive shaping -- node_to_inline
-// (external/parser/src/parser_result.tmpl.h) unconditionally inlines any
+// (the parser's parser_result template) unconditionally inlines any
 // node whose name contains "__E_" (its EBNF-desugaring prefix), regardless
 // of adt.tgf's own shaping_options -- so the real post-shaping structure is
 // flatter than the raw grammar suggests (member_values end up interspersed
@@ -580,7 +580,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		// scan, not adt_wire_find's "first match anywhere" pre-order search:
 		// the parser framework unconditionally auto-inlines every node whose
 		// name contains "__E_" (its EBNF-desugaring prefix -- see
-		// node_to_inline, external/parser/src/parser_result.tmpl.h --
+		// node_to_inline, the parser's parser_result template --
 		// regardless of the shaping_options.to_inline/inline_char_classes
 		// settings adt.tgf's own grammar_options configure), so
 		// __E_member_value_2 (member_value's grammar-level `leaf_value |

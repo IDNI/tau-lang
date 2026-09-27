@@ -510,7 +510,6 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 		}
-
 		// Build inputs for the step
 		DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
 		subtree_map<node, stream_at> step_input_map;
@@ -530,7 +529,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 			}
 			DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 			step_inputs.emplace_back(
-				build_in_var_at_n<node>(in.name, in.time_point,
+				build_in_var_at_n<node>(in.name, static_cast<int_t>(in.time_point),
 					i.ctx.type_of(it->first->get())));
 			step_input_map[step_inputs.back()] = in;
 			DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)

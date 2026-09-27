@@ -310,8 +310,8 @@ static bool parse_yes_no(const std::string& ans) {
 	};
 	for (char c : ans) {
 		if (std::isalpha(static_cast<unsigned char>(c)))
-			word.push_back(std::tolower(
-				static_cast<unsigned char>(c)));
+			word.push_back(static_cast<char>(std::tolower(
+				static_cast<unsigned char>(c))));
 		else if (!word.empty())
 			if (auto r = flush(); r) return *r;
 	}

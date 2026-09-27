@@ -109,7 +109,7 @@ bool sat_has_ltl_operators(tref fm) {
 	bool result = tau::get(fm).find_top([](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
+		size_t nt = t[0].value.get_nt();
 		if (sat_needs_ltl_pipeline(nt)) return true;
 		// A nested sometimes, or an always with any temporal operator
 		// inside its body, is beyond the safety pipeline's clause
@@ -141,7 +141,7 @@ bool realizability_has_game_operators(tref fm) {
 	bool result = tau::get(fm).find_top([](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
+		auto nt = t[0].value.get_nt();
 		if (realizability_needs_game(nt)) return true;
 		return nt == tau::wff_always
 		    && always_body_nests<node>(t[0].first());
@@ -704,7 +704,7 @@ static result<std::string> skeleton_wff_with_testers(
 			// proposition stands for it, and a constant would decide it
 			return r.with_error(code::unsupported_operation,
 				std::string("the LTL skeleton has no proposition for a ")
-				+ node::name(nt) + " over streams under a temporal "
+				+ node::name(static_cast<size_t>(nt)) + " over streams under a temporal "
 				"operator; realizability could not be decided");
 		}
 		auto normalized = normalize_non_temp<node>(n);

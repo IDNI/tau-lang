@@ -121,7 +121,7 @@ template <NodeType node>
 size_t io_var_direction(tref n) {
 	const auto& t = tree<node>::get(n);
 	if (!t.is(node::type::io_var)) return 0;
-	size_t dir = t.value.data;
+	size_t dir = t.data();
 	if (dir == 1 || dir == 2) return dir;
 	const std::string& nm = get_var_name<node>(n);
 	if (nm.empty()) return 0;

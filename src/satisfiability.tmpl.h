@@ -325,8 +325,8 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	};
 
 	if (ctn[0][0].is(tau::num))
-		is_left = true,  condition = ctn[0][0].get_num();
-	else    is_left = false, condition = ctn[0][1].get_num();
+		is_left = true,  condition = get_payload_int<node>(ctn[0][0]);
+	else    is_left = false, condition = get_payload_int<node>(ctn[0][1]);
 
 	if (t | tau::ctn_neq) return to_ba(condition != time_point);
 	if (t | tau::ctn_eq)  return to_ba(condition == time_point);
@@ -374,8 +374,9 @@ template <NodeType node>
 bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	using tau = tree<node>;
 	const auto& ctn = tau::get(constraint);
-	const int_t condition = ctn[0][0].is(tau::num) ? ctn[0][0].get_num()
-						 : ctn[0][1].get_num();
+	const int_t condition = ctn[0][0].is(tau::num)
+		? get_payload_int<node>(ctn[0][0])
+		: get_payload_int<node>(ctn[0][1]);
 
 	// At this point the equality and inequality constraints should have been converted
 	auto t = ctn();
@@ -1514,7 +1515,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		if (inputs == sometimes_inputs::guarded) {
 			st_io_vars = tau::get(shifted_sometimes)
 					.select_top(is_child<node, tau::io_var>);
-			tref guard = create_guard<node>(st_io_vars, n);
+			tref guard = create_guard<node>(st_io_vars, static_cast<int_t>(n));
 			shifted_sometimes = tau::build_wff_imply(
 							guard, shifted_sometimes);
 		}

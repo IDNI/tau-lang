@@ -374,7 +374,7 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 			for (size_t t = 0; t < 12; ++t) {
 				in.clear();
 				const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
-				in[build_in_var_at_n<node_t>("i1", t, tid)]
+				in[build_in_var_at_n<node_t>("i1", static_cast<int_t>(t), tid)]
 					= t % 2 ? tau::_1(tid) : tau::_0(tid);
 				auto sr = i->step(in);
 				REQUIRE(sr.has_value());
@@ -409,7 +409,7 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		for (size_t t = 0; t < 40; ++t) {
 			in.clear();
 			const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
-			in[build_in_var_at_n<node_t>("i1", t, tid)]
+			in[build_in_var_at_n<node_t>("i1", static_cast<int_t>(t), tid)]
 				= t % 3 ? tau::_1(tid) : tau::_0(tid);
 			auto sr = i->step(in);
 			REQUIRE(sr.has_value());

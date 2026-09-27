@@ -79,8 +79,8 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
 	rewriter::rules rules;
 
@@ -146,8 +146,8 @@ static result<rewriter::rule> bvlt_rule(size_t bitwidth) {
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
 	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
 	auto rules = bvlt_rules<node>(bitwidth);
@@ -254,8 +254,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
 	rewriter::rules rules;
 
@@ -320,10 +320,10 @@ static result<rewriter::rule> bvgt_rule(size_t bitwidth) {
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
-	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
+	auto call = make_bvgt_call_from_index<node>(left, right, static_cast<int_t>(bitwidth - 1));
 	auto rules = bvgt_rules<node>(bitwidth);
 	auto bits = bit_rules<node>(bitwidth);
 	auto bit_zeros = is_bit_zero_rules<node>(bitwidth);
@@ -351,7 +351,7 @@ result<tref> bvgt(tref left, tref right) {
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(left));
 	TAU_TRY(auto rule, bvgt_rule<node>(bitwidth));
-	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
+	auto call = make_bvgt_call_from_index<node>(left, right, static_cast<int_t>(bitwidth - 1));
 	auto rr = make_rr<node>({ rule }, call);
 	TAU_TRY(auto body, nso_rr_apply(rr));
 	return r.with_value(body);
@@ -432,8 +432,8 @@ static rewriter::rules bvneq_rules(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
 	rewriter::rules rules;
 
@@ -502,8 +502,8 @@ static result<rewriter::rule> bvneq_rule(size_t bitwidth) {
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto right = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
 
 	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth - 1);
 	auto rules = bvneq_rules<node>(bitwidth);

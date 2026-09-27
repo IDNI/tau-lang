@@ -945,7 +945,7 @@ post_normalization:
 				sv_names.push_back(
 					"o__ltl_ms" + std::to_string(j) + "__");
 			if (tref warmup = encode_mealy_warmup<node>(*ltl_sol,
-				sv_names, i.formula_time_point))
+				sv_names, static_cast<int_t>(i.formula_time_point)))
 			{
 				// IN-N11: every ubt_ctn part needs its original_spec
 				// entry; the warm-up part is never revised, so it has
@@ -1303,7 +1303,7 @@ struct solve_step_provider : step_provider<node> {
 			// path count by the absolute run prefix that memory already
 			// decides (GitHub #115).
 			tref part_at_t = update_to_time_point<node>(spec_part,
-				formula_time_point);
+				static_cast<int_t>(formula_time_point));
 			part_at_t = syntactic_formula_simplification<node>(
 				rewriter::replace<node>(part_at_t, local_memory));
 			// A state part is left to the solver as a constraint (above).
@@ -1814,7 +1814,7 @@ interpreter<node>::step(const assignment<node>& values)
 				<< "could not pack the executed spec for `this`";
 			else {
 				tref current_this_stream = build_in_var_at_n<node>(
-					"this", time_point,
+					"this", static_cast<int_t>(time_point),
 					get_ba_type_id<node>(tau_type<node>()));
 				memory[current_this_stream] =
 					build_bf_ba_constant<node>(*packed,
@@ -1891,7 +1891,7 @@ interpreter<node>::step(const assignment<node>& values)
 	trefs missing_outputs;
 	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
-		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
+		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), static_cast<int_t>(time_point), ctype);
 		if (!global.contains(ot)) missing_outputs.push_back(ot);
 	}
 	// Automaton-driven specs thread their one-hot state choice through
@@ -1986,7 +1986,7 @@ interpreter<node>::step(const assignment<node>& values)
 	auto sc = r.open("zero_default_outputs");
 	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
-		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
+		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), static_cast<int_t>(time_point), ctype);
 		if (auto it = global.find(ot); it == global.end()) {
 			tref zero_term = pack_zero_constant<node>(ctype);
 			if (!zero_term) zero_term = tau::_0(ctype);
@@ -2383,7 +2383,7 @@ result<bool> interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_spec[time_point]: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
-		TAU_TRY(step_spec, get_ubt_ctn_at(time_point));
+		TAU_TRY(step_spec, get_ubt_ctn_at(static_cast<int_t>(time_point)));
 		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
 		// The continuation is used verbatim from here on. Its constant
@@ -2438,7 +2438,7 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 			}
 		}
 		step_inputs.emplace_back(build_in_var_at_n<node>(
-			get_var_name_node<node>(var), t, ctx.type_of(var)));
+			get_var_name_node<node>(var), static_cast<int_t>(t), ctx.type_of(var)));
 		DBG(LOG_TRACE << "build_inputs_for_step[step_input]: " << LOG_FM_DUMP(step_inputs.back());)
 	}
 	LOG_TRACE << "build_inputs_for_step end (step_inputs size: " << step_inputs.size() << ")";
@@ -2485,7 +2485,7 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 {
 	using tau = tree<node>;
 	result<bool> r;
-	tref updated = update_to_time_point<node>(atom_ref, formula_time_point);
+	tref updated = update_to_time_point<node>(atom_ref, static_cast<int_t>(formula_time_point));
 	tref current = rewriter::replace<node>(updated, memory);
 	auto normalized = normalize_non_temp<node>(current);
 	// A normalization failure means the atom's truth could not be
@@ -2550,7 +2550,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	{
 		auto sc = r.open("transform_to_execution");
 		TAU_TRY_OR(executable,
-			transform_to_execution<node>(clause, start_time, true),
+			transform_to_execution<node>(clause, static_cast<int_t>(start_time), true),
 			code::unsat, "Specification part could not be "
 			"transformed to an executable form");
 	}
@@ -2571,7 +2571,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	}
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
-		executable, io_vars, start_time);
+		executable, io_vars, static_cast<int_t>(start_time));
 	if (!constraints) {
 		return r.with_assert_check_error(code::unsat,
 			"Uninterpreted-constant constraints failed to normalize");
@@ -2758,7 +2758,7 @@ result<typename interpreter<node>::update_plan>
 	// the constant time positions in update are seen relative to
 	// time_point, i.e. time point 0 is shifted to time_point
 	tref shifted_update = shift_const_io_vars_in_fm<node>(
-						update, io_vars, time_point);
+						update, io_vars, static_cast<int_t>(time_point));
 	if (tau::get(shifted_update).equals_F()) {
 		r.warning("the constant time position is below 0; no update was performed");
 		return r;
@@ -2912,7 +2912,7 @@ result<typename interpreter<node>::update_plan>
 			if (!tau::get(collected_updates[i]).equals_T()) {
 				auto revision_r = pointwise_revision(
 					current_spec[i].first,
-					collected_updates[i], time_point);
+					collected_updates[i], static_cast<int_t>(time_point));
 				// nullopt when no update clause yields a sat
 				// revision or the definitions in a clause do
 				// not settle; without a revised part the
@@ -3731,7 +3731,7 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 		// path count by the absolute run prefix that memory already
 		// decides (GitHub #115).
 		tref alt_at_t = update_to_time_point(part_alts[alt_idx],
-			formula_time_point);
+			static_cast<int_t>(formula_time_point));
 		alt_at_t = syntactic_formula_simplification<node>(
 			rewriter::replace<node>(alt_at_t, memory));
 		if (!mentions_ltl_state_var<node>(alt_at_t)) {
@@ -3910,7 +3910,7 @@ void interpreter<node>::seed_aux_lookback_bits(
 		// matches first), which let a step-0 solution override the
 		// seeds with zeros.
 		tref mem_key = tau::get(tau::bf, {transform_io_var<node>(
-			it->second, formula_time_point)});
+			it->second, static_cast<int_t>(formula_time_point))});
 		memory.emplace(mem_key, bit ? bv_one_val : bv_zero_val);
 	}
 }
@@ -4052,7 +4052,7 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			}
 		}
 		if (!part) part = tau::build_wff_or(part_alts);
-		tref updated = update_to_time_point(part, formula_time_point);
+		tref updated = update_to_time_point(part, static_cast<int_t>(formula_time_point));
 		updated = rewriter::replace<node>(updated, memory);
 		auto normalized = normalize_non_temp<node>(updated);
 		if (normalized.has_value()) updated = normalized.value();
@@ -4355,7 +4355,7 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 		.splitter_one = node::ba::splitter_one(tau_type<node>()),
 		.mode = solver_mode::general
 	};
-	tref u = build_out_var_at_n<node>("u", time_point,
+	tref u = build_out_var_at_n<node>("u", static_cast<int_t>(time_point),
 		tau_type_id<node>());
 	auto is_u_stream = [&u](const auto& n) {
 		return n == u;
@@ -4439,7 +4439,7 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	if (vars.empty()) return appeared;
 	auto check = [&](tref fm, size_t t) {
 		tref step_ubt_ctn = update_to_time_point(fm,
-			t < formula_time_point ? formula_time_point : t);
+			static_cast<int_t>(t < formula_time_point ? formula_time_point : t));
 		// Exact: memory's values were committed before this step and
 		// hold none of its inputs, and the simplification only recombines
 		// existing subterms, so a var absent here cannot appear below.
@@ -4532,7 +4532,7 @@ void warn_if_update_dropped(interpreter<node>& i,
 	const assignment<node>& output)
 {
 	using tau = tree<node>;
-	tref update_stream = build_out_var_at_n<node>("u", i.time_point - 1,
+	tref update_stream = build_out_var_at_n<node>("u", static_cast<int_t>(i.time_point - 1),
 		get_ba_type_id<node>(tau_type<node>()));
 	if (size_t t = i.ctx.type_of(update_stream);
 		t == 0 || t != get_ba_type_id<node>(tau_type<node>()))
@@ -4688,7 +4688,7 @@ result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 
 		// Update interpreter in case the output stream u is present and unequal to 0
 		auto update_stream = build_out_var_at_n<node>(
-			"u", intrprtr.time_point - 1, get_ba_type_id<node>(tau_type<node>()));
+			"u", static_cast<int_t>(intrprtr.time_point - 1), get_ba_type_id<node>(tau_type<node>()));
 		// Update only if u is of type tau
 		if (size_t t = intrprtr.ctx.type_of(update_stream);
 			t != 0 && t == get_ba_type_id<node>(tau_type<node>()))

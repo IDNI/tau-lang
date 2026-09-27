@@ -120,7 +120,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			if (!bv_size.has_value()) return std::nullopt;
 			// no builder wrapper for mkConst yet, unlike mkVar
 			auto x = cvc5_term_manager.mkConst(
-				cvc5_term_manager.mkBitVectorSort(bv_size.value()),
+				cvc5_term_manager.mkBitVectorSort(static_cast<uint32_t>(bv_size.value())),
 				vn.c_str());
 			free_vars.emplace(n, x);
 			return std::optional<bv>(x);
@@ -292,7 +292,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		auto bv_size = get_bv_size<node>(type_tree.value());
 		if (!bv_size.has_value()) return true;
 		bv x = make_bitvector_var(
-			cvc5_term_manager.mkBitVectorSort(bv_size.value()),
+			cvc5_term_manager.mkBitVectorSort(static_cast<uint32_t>(bv_size.value())),
 			tau::get(v).to_str());
 		// vars is shared, so an outer binding of the same tref (nested
 		// quantifiers sharing a variable tref through caching) is saved
@@ -780,7 +780,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 			bv cte = solver.getValue(bv_var);
 			s.emplace(tau::get(tau::bf, tau_var),
 				tau::get(tau::bf, tau::get_ba_constant(cte,
-					bv_type<node>(cte.getSort().getBitVectorSize()))));
+					bv_type<node>(static_cast<unsigned short>(cte.getSort().getBitVectorSize())))));
 		}
 		return s;
 	}

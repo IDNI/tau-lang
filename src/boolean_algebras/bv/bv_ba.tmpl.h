@@ -14,17 +14,12 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+// get_bv_size and get_bv_width read the same subtype node for the width, so
+// this is the one implementation; the traversal filters for the num child
+// instead of trusting the first child.
 template<NodeType node>
 result<size_t> get_bv_size(const tref t) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	auto subtype = tt(t) | tau::type | tau::subtype | tt::ref;
-	if (!subtype) {
-		result<size_t> r;
-		return r.with_assert_check_error(code::type_error,
-			"get_bv_size: bv type has no explicit bitwidth");
-	}
-	return result<size_t>{tau::get(subtype)[0].get_num()};
+	return get_bv_width<node>(t);
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
@@ -72,7 +67,7 @@ result<typename node<BAs...>::constant_with_type> parse_bv(const std::string& sr
 	if (normalized.size() >= 2 && normalized[0] == '0'
 			&& (normalized[1] == 'x' || normalized[1] == 'X'
 			 || normalized[1] == 'b' || normalized[1] == 'B'))
-		normalized[0] = '#', normalized[1] = std::tolower(normalized[1]);
+		normalized[0] = '#', normalized[1] = static_cast<char>(std::tolower(normalized[1]));
 
 	auto parsed = bitvector_parser::instance().parse(normalized.c_str(), normalized.size());
 	if (!parsed.found) {

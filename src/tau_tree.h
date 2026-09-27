@@ -18,6 +18,8 @@
 #define __IDNI__TAU__TAU_TREE_H__
 
 #include <concepts>
+#include <cstdint>
+#include <limits>
 #include <string>
 #include <initializer_list>
 #include <tuple>
@@ -188,8 +190,14 @@ struct node {
 	/** @brief Return the string name of this node's nonterminal. */
 	const std::string& name() const;
 
+	/** @brief Return this node's nonterminal id narrowed to `size_t`. */
+	size_t get_nt() const;
+
 	/** @brief Reinterpret the inline `data` field as `int_t`. */
 	int_t as_int() const;
+
+	/** @brief Return the full 64-bit payload. */
+	uint64_t get_data() const;
 
 	// TT1-11: node::retype(new_nt), nnull() and the extension()
 	// pack/unpack pair were deleted: zero callers, and the extension
@@ -354,7 +362,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref get_typed(const node::type& nt, const std::string& str, size_t ba_type_id);
 
 	/** @brief Create a `num` literal node from @p n. */
-	static tref get_num(size_t n);
+	static tref get_num(uint64_t n);
 	/** @brief Create an `integer` literal node from @p i. */
 	static tref get_integer(int_t i);
 
@@ -460,10 +468,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	// -----------------------------------------------------------------------
 	// Fast access helpers
 	// -----------------------------------------------------------------------
-	/** @brief Return the inline `data` field of this node. */
-	size_t data() const;
-	/** @brief Return the inline `data` field of the first child. */
-	size_t child_data() const;
+	/** @brief Return the full 64-bit payload. */
+	uint64_t data() const;
+	/** @brief Return the full 64-bit payload of the first child. */
+	uint64_t child_data() const;
 
 	/** @brief Return `true` if this node's nonterminal id equals @p nt. */
 	bool is(size_t nt) const;
@@ -502,8 +510,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	const std::string& get_string() const;
 	/** @brief Return the integer stored in this terminal node. */
 	int_t get_integer() const;
-	/** @brief Return the num literal stored in this terminal node. */
-	size_t get_num() const;
+	/** @brief Return the full 64-bit payload of this num literal. */
+	uint64_t get_num() const;
 	/** @brief Return the BA-constant registry id for this node. */
 	size_t get_ba_constant_id() const;
 	/** @brief Return the BA constant value for this node. */
@@ -651,7 +659,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		static const extractor<type>                nt;             ///< Extract the nonterminal type.
 		static const extractor<std::string>         string;         ///< Extract stored string.
 		static const extractor<int_t>               integer;        ///< Extract stored integer.
-		static const extractor<size_t>              num;            ///< Extract stored num.
+		static const extractor<uint64_t>            num;            ///< Extract stored num.
 		static const extractor<size_t>              data;           ///< Extract inline data.
 		static const extractor<size_t>              ba_constant_id; ///< Extract BA-constant id.
 		static const extractor<size_t>              ba_type;        ///< Extract BA type id.

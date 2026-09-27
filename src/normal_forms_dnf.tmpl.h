@@ -31,7 +31,7 @@ inline bool reduce_paths(std::vector<int_t>& i,
 			if (i[k] == paths[j][k]) continue;
 			else if (dist == 2) break;
 			else if (i[k] == 2 || paths[j][k] == 2) { dist = 2; break; }
-			else dist += 1, pos = k;
+			else dist += 1, pos = static_cast<int_t>(k);
 		}
 		if (dist == 1) {
 			// Remove i from paths if recursion depth is greater 0
@@ -97,7 +97,7 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 					}
 				}
 			}
-			else dist += 1, pos = k;
+			else dist += 1, pos = static_cast<int_t>(k);
 		}
 		if (subset_check && dist == 1) {
 			if (is_i_subset_of_j) {
@@ -478,7 +478,7 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 		if (std::ranges::all_of(i, [](const auto el) {return el == 2;}))
 			return {};
 		if (all_reductions) {
-			if (!reduce_paths(i, paths, vars.size()))
+			if (!reduce_paths(i, paths, static_cast<int_t>(vars.size())))
 				paths.emplace_back(std::move(i));
 			else {
 				std::erase_if(paths,

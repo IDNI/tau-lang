@@ -157,11 +157,12 @@ std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	DBG(assert(tau::get(func).is(tau::ref)));
 
 	const tau& ref_head = tau::get(func);
-	size_t sym = ref_head[0].value.data;
+	size_t sym = ref_head[0].data();
 	int_t offset_args = 0;
 	if (auto o = tt(ref_head) | tau::offsets; o)
-		offset_args = tau::get(o | tt::ref).children_size();
-	int_t params = tau::get(tt(ref_head) | tau::ref_args | tt::ref).children_size();
+		offset_args = static_cast<int_t>(tau::get(o | tt::ref).children_size());
+	int_t params = static_cast<int_t>(
+		tau::get(tt(ref_head) | tau::ref_args | tt::ref).children_size());
 
 	return std::make_tuple(sym, offset_args, params);
 }
@@ -576,7 +577,8 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		if (tau::get(n).data() == 0) {
 			auto saved_hooks = tau::use_hooks;
 			tau::use_hooks = true;
-			auto parsed = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
+			auto parsed = tau::get_ba_constant_from_source(
+				tau::get(n).child_data(), type.value());
 			tau::use_hooks = saved_hooks;
 			// Advisory drop: std::variant<tref, inference_error, parse_error> has no channel for the parse report.
 			if (!parsed.has_value() || parsed.value() == nullptr) return parse_error{canonized, type.value()};

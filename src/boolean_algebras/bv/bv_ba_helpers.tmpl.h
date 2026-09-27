@@ -53,15 +53,15 @@ result<size_t> get_bv_type_bitwidth(tref t) {
 // its base-2 string. Precondition: `t` is a BA constant holding a `bv`
 // (std::get throws otherwise; not DBG-asserted here). Returns nullopt if
 // the term is not a concrete bitvector value or the value does not fit
-// in size_t (the stoull failure is logged).
+// in 64 bits (the stoull failure is logged).
 template<NodeType node>
-std::optional<size_t> get_bv_constant_value(tref t) {
+std::optional<uint64_t> get_bv_constant_value(tref t) {
 	auto constant = tree<node>::get(t).get_ba_constant();
 	auto cte = std::get<bv>(constant);
 	if (cte.isBitVectorValue()) {
 		auto value_str = cte.getBitVectorValue();
 		try {
-			size_t value = std::stoull(value_str, nullptr, 2);
+			uint64_t value = std::stoull(value_str, nullptr, 2);
 			return value;
 		} catch (const std::exception& e) {
 			LOG_ERROR << "Failed to parse bitvector constant value: " << e.what();

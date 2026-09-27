@@ -649,7 +649,7 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 		const auto& t = offset[0];
 		int_t d = 0;
 		if (t.is_integer()) d = t.get_integer();
-		else if (t.get_type() == tau::capture) d = t.data();
+		else if (t.get_type() == tau::capture) d = get_payload_int<node>(t);
 		ret.second.emplace_back(t.get_type(), d);
 		break; // consider only first offset for now
 		// TODO (LOW) support multiindex offsets
@@ -1971,7 +1971,7 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 		<< " step: " << i << " offset arity: " << offset_arity;
 	subtree_map<node, tref> changes;
 	trefs ofs; // create offsets node
-	ofs.push_back(tau::get(tau::offset, tau::get_integer(i)));
+	ofs.push_back(tau::get(tau::offset, tau::get_integer(static_cast<int_t>(i))));
 	for (size_t o = 1; o < offset_arity; ++o)
 		ofs.push_back(tau::get(tau::offset, tau::get_integer(0)));
 
@@ -2003,8 +2003,11 @@ tref get_unbindable_relative_offset(tref head, tref body) {
 	auto offset_vars = [](tref n, std::set<size_t>& out) {
 		for (tref offsets : tau::get(n).select_all(is<node, tau::offsets>))
 			for (tref v : tau::get(offsets).select_all(
-				is<node>({ tau::var_name, tau::capture })))
-					out.insert(tau::get(v).value.data);
+				is<node>({ tau::var_name, tau::capture }))) {
+				// The name id is a pool index, stored as size_t.
+				const uint64_t sid = tau::get(v).data();
+				out.insert(static_cast<size_t>(sid));
+			}
 	};
 	std::set<size_t> bound;
 	offset_vars(head, bound);

@@ -44,7 +44,7 @@ void tau_init() {
 template <NodeType node>
 tref get_update(interpreter<node>& i, const assignment<node>& output) {
 	auto update_stream = build_out_var_at_n<node>(
-		"u", i.time_point - 1, get_ba_type_id<node>(tau_type<node>()));
+		"u", static_cast<int_t>(i.time_point - 1), get_ba_type_id<node>(tau_type<node>()));
 	// Update only if u is of type tau
 	if (size_t t = i.ctx.type_of(update_stream);
 		t != 0 && t == get_ba_type_id<node>(tau_type<node>()))
@@ -455,7 +455,7 @@ void api<node>::set_severity(boost::log::trivial::severity_level level) {
 template <NodeType node>
 inline typename tree<node>::get_options get_options(typename node::type start, bool simplified) {
 	typename tree<node>::get_options options;
-	options.parse = { .start = start };
+	options.parse.start = static_cast<size_t>(start);
 	options.use_default_types = false;
 	if (!simplified) {
 		options.infer_ba_types = false;

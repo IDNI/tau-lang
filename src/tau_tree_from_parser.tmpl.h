@@ -108,7 +108,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 			return get(n, ch);
 		};
 		// helper to create a new node with current node type and provided data
-		auto getx_data = [&nt, &is_term, &ba_type](size_t data) -> tref{
+		auto getx_data = [&nt, &is_term, &ba_type](uint64_t data) -> tref{
 			return get(node(nt, data, is_term, ba_type));
 		};
 
@@ -188,7 +188,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				// size_t, the type node data is read back as:
 				// on wasm32 size_t has 32 bits.
 				const std::string ds = ptr.get_terminals();
-				unsigned long long value = 0;
+				uint64_t value = 0;
 				bool fits = true;
 				try {
 					size_t pos = 0;

@@ -130,7 +130,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	var = tau::get(tau::bf, var);
 	atomic_fm = gt_gteq_to_lt_lteq<node>(atomic_fm);
 	atomic_fm = norm_equation<node>(atomic_fm);
-	auto atm_type = tau::get(atomic_fm)[0].value.nt;
+	size_t atm_type = tau::get(atomic_fm)[0].value.get_nt();
 	tref func1 = tau::get(atomic_fm)[0].first();
 	tref func2 = tau::get(atomic_fm)[0].second();
 	// The reduced DNF of a cofactor can be exponential (x1 ^ ... ^ xn), so
@@ -513,7 +513,7 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "Start syntactic_atomic_formula_simplification: "
 		<< tau::get(atomic_formula) << "\n";)
-	auto atm_type = tau::get(atomic_formula)[0].value.nt;
+	size_t atm_type = tau::get(atomic_formula)[0].value.get_nt();
 	// Bring an equation to !(=) 0
 	atomic_formula = norm_equation<node>(atomic_formula);
 	if (tau::get(atomic_formula).equals_T() ||
