@@ -122,7 +122,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// which those fast paths do not have, so they are not offered the formula.
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
-	if (!has_past && collect_step_guards<node>(fm).empty()) {
+	if (ltl_propositional_synthesis && !has_past
+		&& collect_step_guards<node>(fm).empty())
+	{
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
 			fm, sol.atoms));
 		if (claim) {
@@ -921,6 +923,18 @@ ltl_to_safety_formula_full(tref fm,
 		fm = wrap_always(fm);
 	ltl_aba_solution<node> partial;
 	auto maybe_r = solve_ltl_aba<node>(fm, &partial);
+	// A strategy over bookkeeping bits cannot be played: solve again by
+	// the default path, whose abstraction and data game give strategies
+	// over the data.
+	if (maybe_r.has_value() && maybe_r.value()
+		&& !maybe_r.value()->executable)
+	{
+		ltl_propositional_synthesis = false;
+		partial = {};
+		auto again = solve_ltl_aba<node>(fm, &partial);
+		ltl_propositional_synthesis = true;
+		if (again.has_value()) maybe_r = std::move(again);
+	}
 	if (!maybe_r.has_value()) {
 		// This function's tuple return has no report channel of its
 		// own, and every other internal failure below already answers
