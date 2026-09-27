@@ -14,6 +14,7 @@ set(TAU_SHARED_HELPER_PROVENANCE
 	"tau-shared-version-license.cmake|cmake/version_license.cmake|feb5407b9cd874f5ec786145d9c7af3d361f221be6576e77f9e9e03b7fa12ab2|warn"
 	"tau-shared-ctest-build-tree.cmake|cmake/ctest-build-tree.cmake|714a581f7e63588c1626ca05fab4260cb543072a011cceb0fa1ecb8b3b20481e|warn"
 	"cmake/toolchains/mingw-w64-x86_64.cmake|cmake/mingw-w64-x86_64.cmake|a61fe1d3ffbf2d259844da1b5cff716bada0cd1066655b11ee4889bc4168a0af|warn"
+	"cmake/toolchains/aarch64-linux-gnu.cmake|cmake/aarch64-linux-gnu.cmake|d8ce21f137273a24b1a710049c32793148dad3a31bcfafce81a3bbd1c6070e62|warn"
 )
 
 # Files that choose which helper library a producer loads. A strict content

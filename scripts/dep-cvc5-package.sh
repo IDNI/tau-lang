@@ -62,7 +62,8 @@ _dep_cvc5_gmp_version() {
 # FindGMP picks the Homebrew copy when its prefix search reaches it.
 _dep_cvc5_gmp_header() {
 	if [ "$(dep_host_os)" = linux ] \
-			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ]; then
+			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ] \
+			&& ! dep_target_is_cross "${DEP_CVC5_TARGET:-$(dep_host_target)}"; then
 		[ -f /usr/include/gmp.h ] && printf '%s' /usr/include/gmp.h
 		return 0
 	fi
@@ -325,7 +326,7 @@ PY
 dep_entry "$@"
 
 case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|darwin-arm64|darwin-x86_64|windows-x86_64-mingw|windows-x86_64-msvc) ;;
+	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-cvc5: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
@@ -376,6 +377,7 @@ if [ -z "$DEP_CVC5_CC" ] || [ -z "$DEP_CVC5_CXX" ]; then
 fi
 DEP_CVC5_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
 DEP_CVC5_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
+DEP_CVC5_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_CVC5_TARGET_ARGS=()
 _DEP_CVC5_COMPILER_ENV=()
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
@@ -400,6 +402,19 @@ case "$DEP_CVC5_TARGET" in
 		fi
 		if [ -n "$CVC5_CMAKE_PREFIX" ]; then
 			_DEP_CVC5_TARGET_ARGS+=("-DCMAKE_PREFIX_PATH=$CVC5_CMAKE_PREFIX")
+		fi
+		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
+		;;
+	linux-arm64)
+		# A cross build from x86 configures with the aarch64 toolchain file,
+		# whose find-root-path modes keep cvc5 off the host's x86 GMP.
+		if dep_target_is_cross linux-arm64; then
+			if [ -z "$DEP_CVC5_TOOLCHAIN" ]; then
+				echo "dep-cvc5: linux-arm64 needs -DTAU_DEP_TOOLCHAIN" >&2
+				exit 2
+			fi
+			_DEP_CVC5_TARGET_ARGS+=(
+				-DCMAKE_TOOLCHAIN_FILE="$DEP_CVC5_TOOLCHAIN")
 		fi
 		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
 		;;

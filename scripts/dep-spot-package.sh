@@ -130,6 +130,7 @@ EOF
 	else
 		( cd "$src" && env -u CPPFLAGS -u LDFLAGS \
 			CC="$DEP_SPOT_CC" CXX="$DEP_SPOT_CXX" \
+			"${_DEP_SPOT_CROSS_ENV[@]}" \
 			./configure --prefix="$staging_prefix" --disable-python \
 				--disable-shared --disable-devel ) \
 			> "${work}/configure.log" 2>&1 \
@@ -215,7 +216,7 @@ SPOT_URL="$(dep_var SPOT_URL \
 	"https://www.lre.epita.fr/dload/spot/spot-${SPOT_VERSION}.tar.gz")"
 
 case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|darwin-arm64|darwin-x86_64|windows-x86_64-msvc) ;;
+	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-spot: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
@@ -240,6 +241,14 @@ DEP_SPOT_CXX="$(dep_var TAU_DEP_CXX "")"
 if [ -z "$DEP_SPOT_CC" ] || [ -z "$DEP_SPOT_CXX" ]; then
 	echo "dep-spot: no compiler; pass -DTAU_DEP_CC and -DTAU_DEP_CXX" >&2
 	exit 2
+fi
+# Spot has no CMake configure to take the toolchain's target flag, so a cross
+# build reaches it through the flags instead.
+_DEP_SPOT_CROSS_ENV=()
+if [ "$DEP_SPOT_TARGET" = "linux-arm64" ] \
+		&& dep_target_is_cross "$DEP_SPOT_TARGET"; then
+	_DEP_SPOT_CROSS_ENV=(CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
+		CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")")
 fi
 
 DEP_SPOT_BUILDER="preset"

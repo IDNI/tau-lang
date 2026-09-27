@@ -480,3 +480,6 @@ endif ()
 # FIXTURES_REQUIRED to the tests registered in this directory scope.
 include(tau-shared-ctest-build-tree)
 tau_require_build_tree()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

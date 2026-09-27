@@ -113,6 +113,42 @@
 			}
 		},
 		{
+			"name": "release-arm64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-arm64"
+			}
+		},
+		{
+			"name": "devel-arm64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-arm64"
+			}
+		},
+		{
+			"name": "debug-arm64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-arm64"
+			}
+		},
+		{
 			"name": "release-msvc",
 			"inherits": [
 				"_generator-ninja",

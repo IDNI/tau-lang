@@ -42,3 +42,6 @@ endforeach()
 
 add_valgrind_command_test(luccas_example "n ex a ex b ex c ex d ex f ex e (ax + bx' = cy + dy' || ax + bx' != ey + fy') <-> (ax + bx' = cy + gy')")
 add_valgrind_command_test(ohads_example "n all a all b all c all d all p all q all r all s all m all j all k all l (all x ex y f(x,y)=0 || (g(x,y)=0 && h(x,y)!=0)) && !(all y0 all y1 all z0 all z1 ex x f(x,y1x+y0'x)=0 && (g(x,y1x+y0'x)!=0 && h(x,y1x+y0'x)=0))")
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

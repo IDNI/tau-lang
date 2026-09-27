@@ -17,3 +17,6 @@ foreach(X IN LISTS TESTS)
 	set_tests_properties("test_integration-solver-${X}" PROPERTIES
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
 endforeach()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

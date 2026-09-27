@@ -70,3 +70,6 @@ add_subdirectory(solver)
 # reproducers with a ctest TIMEOUT (see
 # tests/repl/commands/test_repl-definition_cmd.cmake).
 set_tests_properties(test_integration-nso_rr_fixed_point PROPERTIES TIMEOUT 60)
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

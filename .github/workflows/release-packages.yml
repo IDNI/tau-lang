@@ -50,6 +50,41 @@ jobs:
           name: packages-linux
           path: ${{ env.PKG_DIR }}
 
+  # The native arm64 packages are built on an arm host, in the same container
+  # their consumers use.
+  linux-arm64:
+    name: Linux arm64 packages
+    runs-on: ubuntu-24.04-arm
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: crazy-max/ghaction-github-runtime@v3
+
+      - name: Build image with release packages
+        run: |
+          ./dev docker packages --load \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate Linux arm64 packages
+        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload Linux arm64 packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-arm64
+          path: ${{ env.PKG_DIR }}
+
   macos:
     name: macOS packages
     runs-on: macos-15

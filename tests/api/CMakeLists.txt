@@ -14,3 +14,6 @@ set(TESTS
 foreach(TEST IN LISTS TESTS)
 	add("test_api-${TEST}")
 endforeach()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

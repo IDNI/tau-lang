@@ -61,7 +61,13 @@ elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
 elseif(WIN32 AND MSVC)
 	set(TAU_DEPS_TARGET "windows-x86_64-msvc")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set(TAU_DEPS_TARGET "linux-x86_64")
+	# The target names the machine arch the package runs on, so a cross build
+	# from x86 and a native arm64 build share one target.
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+		set(TAU_DEPS_TARGET "linux-arm64")
+	else()
+		set(TAU_DEPS_TARGET "linux-x86_64")
+	endif()
 else()
 	message(FATAL_ERROR
 		"no dependency-store target for ${CMAKE_SYSTEM_NAME}/"
@@ -820,6 +826,15 @@ elseif (TAU_MACOS_PACKAGE)
 	set(TAU_PKG_DOCS_DESTINATION ".")
 endif()
 
+# The machine arch a native deb/rpm package runs on. A cross SDK box is
+# machine-independent and overrides this with `all`/`noarch` below.
+set(TAU_PACKAGE_DEB_ARCH "amd64")
+set(TAU_PACKAGE_RPM_ARCH "x86_64")
+if(TAU_DEPS_TARGET STREQUAL "linux-arm64")
+	set(TAU_PACKAGE_DEB_ARCH "arm64")
+	set(TAU_PACKAGE_RPM_ARCH "aarch64")
+endif()
+
 # Install executable and documentation
 if (TAU_BUILD_EXECUTABLE)
 	install(TARGETS ${TAU_EXECUTABLE_NAME}
@@ -891,7 +906,7 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
 	set(CPACK_GENERATOR "RPM")
 	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")
 	set(CPACK_RPM_PACKAGE_AUTOREQ " no")
-	set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_RPM_ARCH}")
 	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
 	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 	# cvc5 dependencies: glibc, gmp, libstdc++
@@ -905,7 +920,7 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_DEB_PACKAGE)
 	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6
 	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
 	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
-	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
+	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_DEB_ARCH}")
 endif()
 
 # Include the CPack module

@@ -13,3 +13,6 @@ foreach(X IN LISTS TESTS)
 	# test_tau_helpers.h, …) live one level higher in tests/, so add that too.
 	target_include_directories("test_${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 endforeach()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

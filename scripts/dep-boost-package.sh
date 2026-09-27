@@ -345,7 +345,7 @@ EOF
 dep_entry "$@"
 
 case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
+	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-boost: unknown target '${DEP_TARGET:-$(dep_host_target)}'" >&2
 		exit 2
@@ -397,9 +397,17 @@ DEP_BOOST_B2_LINK="${BOOST_LINK_MODE}"
 DEP_BOOST_B2_THREADING="${BOOST_THREADING}"
 DEP_BOOST_B2_ADDRESS_MODEL="64"
 DEP_BOOST_B2_PIC=" -fPIC"
+DEP_BOOST_B2_ARCH=""
 case "$DEP_BOOST_TARGET" in
 	windows-x86_64-mingw)
 		DEP_BOOST_TARGET_OS="windows"
+		;;
+	linux-arm64)
+		# A native arm64 host lets b2 read the arch itself; a cross build from
+		# x86 must name it or b2 adds the host's x86 flags.
+		if dep_target_is_cross linux-arm64; then
+			DEP_BOOST_B2_ARCH="arm"
+		fi
 		;;
 	darwin-arm64|darwin-x86_64)
 		# b2 names the macOS variant clang-darwin from the toolset plus this.
@@ -440,6 +448,9 @@ _DEP_BOOST_B2_ARGS=(
 	"cflags=${DEP_BOOST_CFLAGS}${DEP_BOOST_B2_PIC}"
 	"cxxflags=${DEP_BOOST_CXXFLAGS}${DEP_BOOST_B2_PIC}"
 )
+if [ -n "$DEP_BOOST_B2_ARCH" ]; then
+	_DEP_BOOST_B2_ARGS+=("architecture=${DEP_BOOST_B2_ARCH}")
+fi
 if [ -n "$DEP_BOOST_TARGET_OS" ]; then
 	_DEP_BOOST_B2_ARGS+=("target-os=${DEP_BOOST_TARGET_OS}")
 fi

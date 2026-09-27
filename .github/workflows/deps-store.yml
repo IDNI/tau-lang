@@ -85,6 +85,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The arm64 packages are built on an arm host: the linux-arm64 target names
+  # the machine arch, and the arm container is the compiler their consumers
+  # use.
+  publish-linux-arm64:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
+    runs-on: ubuntu-24.04-arm
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Resolve and publish the Linux arm64 store packages
+        run: |
+          ./dev docker build-release \
+            --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=ON \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # The macOS packages are AppleClang-built and cannot come from the Linux job.
   publish-macos:
     if: >-

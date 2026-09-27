@@ -88,7 +88,8 @@ All features discussed below in this readme are available but can have performan
 
 ## **Linux**
 
-Currently, we automatically build the following binaries packages (AMD64 architecture):
+Currently, we automatically build the following binaries packages (AMD64 and
+ARM64 architectures):
 
 * deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
 * rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
@@ -3685,6 +3686,10 @@ The WebAssembly build cannot run `ltlsynt`, so the options of that route
 `set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`) have no counterpart
 there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
+
+On Linux arm64 the binding builds and tests both natively and by cross
+compilation with `./dev preset release-arm64-all`, which runs its tests under
+`qemu-aarch64`.
 
 # **The Theory behind the Tau Language**
 

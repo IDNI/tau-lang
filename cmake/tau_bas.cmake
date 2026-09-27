@@ -19,7 +19,7 @@ endif()
 
 # The store targets a manifest may name in TAU_BA_UNSUPPORTED_TARGETS.
 set(TAU_BA_KNOWN_TARGETS
-	linux-x86_64 darwin-arm64 darwin-x86_64
+	linux-x86_64 linux-arm64 darwin-arm64 darwin-x86_64
 	windows-x86_64-mingw windows-x86_64-msvc wasm32-emscripten)
 
 # Ordered preference for the Boolean carrier — the BA whose type core builds a
@@ -434,6 +434,8 @@ function(tau_generate_pack_header)
 		TAU_PLATFORMS_JSON)
 	file(READ "${TAU_BAS_CMAKE_DIR}/toolchains/mingw-w64-x86_64.cmake"
 		TAU_MINGW_TOOLCHAIN)
+	file(READ "${TAU_BAS_CMAKE_DIR}/toolchains/aarch64-linux-gnu.cmake"
+		TAU_AARCH64_TOOLCHAIN)
 
 	# The same map an SDK writes into cmake/tau-platforms.cmake, compiled into
 	# tau so `tau compile --preset X` maps X before any SDK lookup and an

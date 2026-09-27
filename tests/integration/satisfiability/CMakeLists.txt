@@ -19,3 +19,6 @@ foreach(X IN LISTS TESTS)
 		${CMAKE_CURRENT_SOURCE_DIR}
 		${CMAKE_CURRENT_SOURCE_DIR}/..)
 endforeach()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

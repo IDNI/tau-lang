@@ -17,10 +17,23 @@ else()
 	set(DEV_MODULE Development.Module)
 endif()
 
+# FindPython runs the target interpreter through CMAKE_CROSSCOMPILING_EMULATOR
+# only under CMP0190 NEW; the project floor is 3.22, so raise it here.
+if(POLICY CMP0190)
+	cmake_policy(SET CMP0190 NEW)
+endif()
+
 find_package(Python 3.9 COMPONENTS Interpreter ${DEV_MODULE} REQUIRED)
 
+# A cross build runs the target interpreter under the emulator; FindPython does
+# this for its own queries, and the nanobind lookup and the tests must too.
+set(TAU_PYTHON_EMULATOR "")
+if(CMAKE_CROSSCOMPILING AND CMAKE_CROSSCOMPILING_EMULATOR)
+	set(TAU_PYTHON_EMULATOR ${CMAKE_CROSSCOMPILING_EMULATOR})
+endif()
+
 execute_process(
-	COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+	COMMAND ${TAU_PYTHON_EMULATOR} "${Python_EXECUTABLE}" -m nanobind --cmake_dir
 	OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
 find_package(nanobind CONFIG REQUIRED)
 
@@ -57,8 +70,11 @@ if(BUILD_TESTING)
 	foreach(test_script ${TAU_PYTHON_BINDING_TEST_SCRIPTS})
 		get_filename_component(test_stem "${test_script}" NAME_WE)
 		add_test(NAME "binding-python-${test_stem}"
-			COMMAND ${Python_EXECUTABLE} "${test_script}")
+			COMMAND ${TAU_PYTHON_EMULATOR} ${Python_EXECUTABLE} "${test_script}")
 		set_tests_properties("binding-python-${test_stem}" PROPERTIES
 			ENVIRONMENT "TAU_PYTHON_MODULE_DIR=$<TARGET_FILE_DIR:${TAU_PYTHON_BINDING_MODULE}>")
 	endforeach()
 endif()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

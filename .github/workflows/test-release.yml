@@ -125,6 +125,113 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The native arm64 gate. It builds its own deps layer in the arm container,
+  # so it does not depend on the x86 `deps` job or its cache scope.
+  linux-arm64:
+    name: Linux arm64 release tests (${{ matrix.name }})
+    needs: probe
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
+    env:
+      # ubuntu-24.04-arm runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-ubuntu-24.04-arm-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-24.04-arm-${{ matrix.name }}-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      - name: Build release tests and run them
+        run: |
+          ./dev docker build-release \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-release-arm-${{ matrix.name }},mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The cross gate builds the same preset on x86 and runs it under qemu. The
+  # host spot keeps ltlsynt off the arm64 store package, which this host cannot
+  # execute. It builds and runs the Python binding too, so the arm64 Python
+  # comes from the multiarch layout.
+  linux-arm64-cross:
+    name: Linux arm64 cross tests
+    needs: probe
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A test that starts an arm64 child reaches binfmt, and QEMU_LD_PREFIX
+      # is set for those children, so the handler must be registered before
+      # anything runs an arm64 binary. The action registers it with the
+      # fix-binary flag, which does not need systemd-binfmt on the runner.
+      - name: Register qemu for the arm64 binaries
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # The default archive serves amd64 only, so the arm64 packages come from
+      # the ports archive and the default sources are pinned to amd64.
+      - name: Enable the arm64 multiarch sources
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo sed -i -E 's/^Types: (deb|deb-src)$/&\nArchitectures: amd64/' \
+            /etc/apt/sources.list.d/ubuntu.sources
+          sudo tee /etc/apt/sources.list.d/ubuntu-ports.sources >/dev/null <<'EOF'
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports/
+          Suites: noble noble-updates noble-backports noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: arm64
+          EOF
+          sudo apt-get update
+
+      - name: Install the cross toolchain and the arm64 Python
+        run: |
+          ./dev setup-ubuntu-ci-deps.sh
+          # python3-dev, nanobind-dev and auditwheel are what the x86 job's
+          # image installs for the binding; auditwheel stays host-only, the rest
+          # is the arm64 twin. python3:arm64 is the interpreter the tests run
+          # under qemu.
+          sudo apt-get install -y --no-install-recommends \
+            clang g++-aarch64-linux-gnu qemu-user python3-auditwheel \
+            libpython3-dev:arm64 python3:arm64 nanobind-dev:arm64
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build the arm64 tests and the binding, run them under qemu
+        run: ./dev preset release-arm64-all run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
   testnet:
     name: tau-testnet suite
     needs: linux

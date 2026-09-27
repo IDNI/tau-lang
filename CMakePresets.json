@@ -105,6 +105,21 @@
 			"binaryDir": "${sourceDir}/build/devel-w64"
 		},
 		{
+			"name": "_build_dir-release-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-arm64"
+		},
+		{
+			"name": "_build_dir-debug-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-arm64"
+		},
+		{
+			"name": "_build_dir-devel-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-arm64"
+		},
+		{
 			"name": "_build_dir-release-msvc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-msvc"
@@ -197,6 +212,16 @@
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
 				"TAU_BUILD_EXECUTABLE": "ON"
+			}
+		},
+		{
+			"name": "_build-arm64-all",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_TESTS": "ON",
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_BINDING_PYTHON_NANOBIND": "ON",
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "OFF"
 			}
 		},
 		{
@@ -441,6 +466,72 @@
 				"_toolchain-mingw",
 				"_build-type-devel"
 			]
+		},
+		{
+			"name": "release-arm64",
+			"displayName": "Release Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-release-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "devel-arm64",
+			"displayName": "Devel Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-devel-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "debug-arm64",
+			"displayName": "Debug Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-debug-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-arm64-tests",
+			"displayName": "Release Linux arm64 tests (cross from x86)",
+			"inherits": ["release-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-arm64-tests",
+			"displayName": "Devel Linux arm64 tests (cross from x86)",
+			"inherits": ["devel-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-arm64-tests",
+			"displayName": "Debug Linux arm64 tests (cross from x86)",
+			"inherits": ["debug-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-arm64-all",
+			"displayName": "Release Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["release-arm64", "_build-arm64-all"]
+		},
+		{
+			"name": "devel-arm64-all",
+			"displayName": "Devel Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["devel-arm64", "_build-arm64-all"]
+		},
+		{
+			"name": "debug-arm64-all",
+			"displayName": "Debug Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["debug-arm64", "_build-arm64-all"]
 		},
 		{
 			"name": "release-msvc",
@@ -1280,6 +1371,42 @@
 			"configurePreset": "devel-w64"
 		},
 		{
+			"name": "release-arm64",
+			"configurePreset": "release-arm64"
+		},
+		{
+			"name": "devel-arm64",
+			"configurePreset": "devel-arm64"
+		},
+		{
+			"name": "debug-arm64",
+			"configurePreset": "debug-arm64"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "release-arm64-all",
+			"configurePreset": "release-arm64-all"
+		},
+		{
+			"name": "devel-arm64-all",
+			"configurePreset": "devel-arm64-all"
+		},
+		{
+			"name": "debug-arm64-all",
+			"configurePreset": "debug-arm64-all"
+		},
+		{
 			"name": "release-msvc",
 			"configurePreset": "release-msvc"
 		},
@@ -1747,6 +1874,30 @@
 		{
 			"name": "relwithdebinfo-all",
 			"configurePreset": "relwithdebinfo-all"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "release-arm64-all",
+			"configurePreset": "release-arm64-all"
+		},
+		{
+			"name": "devel-arm64-all",
+			"configurePreset": "devel-arm64-all"
+		},
+		{
+			"name": "debug-arm64-all",
+			"configurePreset": "debug-arm64-all"
 		},
 		{
 			"name": "release-msvc-tests",

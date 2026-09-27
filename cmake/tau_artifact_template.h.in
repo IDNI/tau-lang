@@ -23,6 +23,7 @@ inline constexpr std::string_view tau_artifact_presets_json = R"TAU_TMPL(@TAU_AR
 // presets so the artifact's own CMakePresets.json resolves them.
 inline constexpr std::string_view tau_platforms_json = R"TAU_TMPL(@TAU_PLATFORMS_JSON@)TAU_TMPL";
 inline constexpr std::string_view tau_mingw_toolchain = R"TAU_TMPL(@TAU_MINGW_TOOLCHAIN@)TAU_TMPL";
+inline constexpr std::string_view tau_aarch64_toolchain = R"TAU_TMPL(@TAU_AARCH64_TOOLCHAIN@)TAU_TMPL";
 
 // The map from a `./dev preset` name to the platform it builds in, and the
 // platform names. `tau compile --preset X` maps X here before any SDK lookup,

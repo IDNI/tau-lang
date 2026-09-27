@@ -13,7 +13,7 @@ Tau is an expressive, decidable, and executable formal software specification la
 Prefer building via `./dev preset` from the project root. It configures (fresh),
 builds, and optionally tests/runs using `CMakePresets.json`. Build output goes
 to `build/<build type>` (e.g. `build/debug`, `build/release`); a non-default
-toolchain adds a suffix (`-gcc`, `-w64`, `-msvc`, `-msvc-clang-cl`), the wasm
+toolchain adds a suffix (`-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-clang-cl`), the wasm
 family adds `-wasm[-nothreads|-repl-browser]`, and the generator never splits a
 folder. The bv-only and no-bv packs are the one exception: they configure the
 same sources with a different pack, so `{release,devel,debug}-tests-bvonly`
@@ -43,7 +43,8 @@ unset `TAU_STORE_REMOTE` and a failed remote read both fall through to a build.
 disables eviction). Normal CI only reads the remote (`packages: read`); the trusted
 `deps-store.yml` on `devel` and `main` is the only publisher (`./dev store-publish`).
 The target in the id names the platform the package runs on: `linux-x86_64`
-(Linux x86_64), `windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
+(Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),
+`windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
 `darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (cl.exe). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
@@ -63,6 +64,7 @@ fires there. The `debug` family adds `-ggdb3` for a gdb session.
 Other presets: `{release,devel,debug}-{tests,tau,all}`, `relwithdebinfo-{tests,tau,all}`,
 `coverage`, `release-packages-{deb,rpm,macos}` (the package presets stay release
 only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-packages-zip`,
+`{release,devel,debug}-arm64-{tests,all}`,
 `{release,devel,debug}-msvc-{tau,tests,all}`, `{release,devel,debug}-msvc-all-clang-cl`,
 `{release,devel,debug}-binding-python`,
 `{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
@@ -422,7 +424,7 @@ Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas a
 - `cpp_codegen.h` / `cpp_codegen.tmpl.h`, `codegen_strategy.h` and the per-BA `<id>_codegen.tmpl.h` files — emit a synthesized strategy as a standalone C++17 program.
 - `pointwise_revision.h`, `preferences.h` — pointwise revision of a running specification and its preference order.
 - `parse_error_hint.h` — actionable hints for parse errors.
-- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`).
+- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`); the `-arm64-all` presets build and test it too, taking the aarch64 Python from the multiarch layout (`cmake/toolchains/aarch64-linux-gnu.cmake`) and running its tests under qemu.
 
 ### Heuristics (`src/heuristics/`)
 

@@ -129,5 +129,8 @@ if(TAU_SPOT_BIN)
 	endforeach()
 endif()
 
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()
+
 # sample for comparing output with a file
 #add_test(NAME test_name COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> | diff - test_name.dump")

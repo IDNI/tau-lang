@@ -30,9 +30,11 @@ function(_tau_deps_toolchain_args out)
 endfunction()
 
 # A cross-toolchain target builds the host tgf natively, because the target
-# compiler cannot produce a binary this build host can run.
+# compiler cannot produce a binary this build host can run. A native arm64
+# build is not cross and keeps the target compiler.
 function(_tau_deps_target_is_cross_toolchain out)
-	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
+	if(CMAKE_CROSSCOMPILING
+			OR TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
 			OR TAU_DEPS_TARGET STREQUAL "wasm32-emscripten")
 		set(${out} TRUE PARENT_SCOPE)
 	else()

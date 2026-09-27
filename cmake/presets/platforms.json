@@ -33,6 +33,11 @@
 			"toolchainFile": "${fileDir}/cmake/toolchains/mingw-w64-x86_64.cmake"
 		},
 		{
+			"name": "_toolchain-arm64",
+			"hidden": true,
+			"toolchainFile": "${fileDir}/cmake/toolchains/aarch64-linux-gnu.cmake"
+		},
+		{
 			"name": "_toolchain-wasm",
 			"hidden": true,
 			"cacheVariables": {

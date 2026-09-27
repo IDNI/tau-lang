@@ -122,3 +122,6 @@ exclude(tau_eval)
 # add unit tests for the parser
 add_subdirectory(boolean_algebras)
 add_subdirectory(parser)
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()
