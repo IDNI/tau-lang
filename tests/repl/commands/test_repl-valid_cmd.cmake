@@ -63,7 +63,7 @@ add_repl_test(valid_cmd-hooks_wff_lt_lteq-02_lteq_expansion          "valid (x <
 # is_tau_impl call instead of is_tau_formula_sat. `valid` reports the
 # structured error instead of deciding a verdict.
 add_repl_test(valid_cmd-oscillating_definition
-	"f(x) := f(x)'. valid f(1) = 0" "Definition expansion oscillates" NO_FAIL_REGEX)
+	"f(x) := f(x)'. valid f(1) = 0" "definition expansion oscillates" NO_FAIL_REGEX)
 
 # issue #132: `valid` takes a formula; a term is rejected instead of aborting
 # on a cvc5 exception

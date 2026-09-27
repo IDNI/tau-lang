@@ -55,7 +55,7 @@ extern template result<tref> normalizer       <bool_node_t>(tref);
 extern template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, const tref&);
 extern template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
 extern template result<tref> nso_rr_apply     <bool_node_t>(const rr<bool_node_t>&);
-extern template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+extern template result<tref> calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
 
 #ifdef TAU_PACK_HAS_BA_BV
 

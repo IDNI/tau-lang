@@ -53,7 +53,7 @@ add_repl_test(limit_effect-fixpointsteps_via_set
 # Definition expansion: g needs one pass per nesting level forever.
 add_repl_test(limit_effect-defpasses_giveup
 	"g(x) := h(g(x)). h(x) := x'. normalize g(0)"
-	"Definition expansion did not settle after 1 passes" NO_FAIL_REGEX NO_TRACE
+	"definition expansion did not settle within the pass cap.*limit=1" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-def-passes 1)
 
 # Fixed-point enumeration: the recurrence converges, but not within 1 step.

@@ -65,7 +65,7 @@ template result<tref> normalizer       <bool_node_t>(tref);
 template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, const tref&);
 template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
 template result<tref> nso_rr_apply     <bool_node_t>(const rr<bool_node_t>&);
-template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+template result<tref> calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
 
 // The hardcoded fixtures of tests/test_Bool_helpers.h,
 // tests/test_sbf_ba_helpers.h and tests/test_sbf_only_helpers.h, which name

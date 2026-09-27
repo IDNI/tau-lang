@@ -62,7 +62,7 @@ add_repl_test(sat_cmd-tc-g_xor_g_negated_arg_sat "sat (G (o1[t] = 0)) ^^ (G (o1[
 # verdict, so no ": T"/": F" line is printed.
 # The diagnostic contains "Error", so the case needs NO_FAIL_REGEX.
 add_repl_test(sat_cmd-oscillating_definition
-	"f(x) := f(x)'. sat f(1) = 0" "Definition expansion oscillates" NO_FAIL_REGEX)
+	"f(x) := f(x)'. sat f(1) = 0" "definition expansion oscillates" NO_FAIL_REGEX)
 # GitHub #72: a conjunction of N clauses with pairwise disjoint variable
 # support used to be decided by a single Boole decomposition over the whole
 # formula -- a 2^N Shannon expansion, since no branch ever simplified a

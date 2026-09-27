@@ -9,9 +9,10 @@ bool bf_normalize_and_check(const char* sample_, typename node_t::type nt) {
 	if (!formula) return false;
 	auto nso_rr = get_nso_rr<node_t>(formula);
 	if (!nso_rr.has_value()) return false;
-	tref result = bf_normalizer_without_rec_relation<node_t>(
+	auto result = bf_normalizer_without_rec_relation<node_t>(
 						nso_rr.value().main->get());
-	return tau::get(result).child_is(nt);
+	if (!result.has_value()) return false;
+	return tau::get(result.value()).child_is(nt);
 }
 
 TEST_SUITE("Normalize Boolean function without recurrence relation | simple cases") {
@@ -99,8 +100,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-		CHECK( tau::get(result).child_is(tau::bf_t) );
+		auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		REQUIRE( result.has_value() );
+		CHECK( tau::get(result.value()).child_is(tau::bf_t) );
 	}
 
 	TEST_CASE("Simple case (y2)") {
@@ -110,8 +112,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-		CHECK( tau::get(result).child_is(tau::variable) );
+		auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		REQUIRE( result.has_value() );
+		CHECK( tau::get(result.value()).child_is(tau::variable) );
 	}
 
 	TEST_CASE("Simple case (y3)") {
@@ -121,8 +124,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-		CHECK( tau::get(result).child_is(tau::bf_or) );
+		auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		REQUIRE( result.has_value() );
+		CHECK( tau::get(result.value()).child_is(tau::bf_or) );
 	}
 
 	TEST_CASE("Alternating negation") {
@@ -133,8 +137,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-		CHECK( tau::get(result).child_is(tau::variable) );
+		auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		REQUIRE( result.has_value() );
+		CHECK( tau::get(result.value()).child_is(tau::variable) );
 	}
 
 	TEST_CASE("Dependend recurrence relations") {
@@ -147,8 +152,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-		CHECK( tau::get(result).child_is(tau::variable) );
+		auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		REQUIRE( result.has_value() );
+		CHECK( tau::get(result.value()).child_is(tau::variable) );
 	 }
 }
 

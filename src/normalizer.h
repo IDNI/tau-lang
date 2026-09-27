@@ -380,17 +380,17 @@ result<tref> normalize_with_temp_simp(tref fm);
  * auto pbf = parse_bf();
  * tref fm1 = tau::get("1 & 0", pbf);
  * auto nso_rr1 = get_nso_rr<node_t>(fm1).value();
- * tref res1 = bf_normalizer_without_rec_relation<node_t>(nso_rr1.main->get());
+ * tref res1 = bf_normalizer_without_rec_relation<node_t>(nso_rr1.main->get()).value();
  * CHECK( tau::get(res1).child_is(tau::bf_f) );
  *
  * tref fm2 = tau::get("X | X'", pbf);
  * auto nso_rr2 = get_nso_rr<node_t>(fm2).value();
- * tref res2 = bf_normalizer_without_rec_relation<node_t>(nso_rr2.main->get());
+ * tref res2 = bf_normalizer_without_rec_relation<node_t>(nso_rr2.main->get()).value();
  * CHECK( tau::get(res2).child_is(tau::bf_t) );
  * @endcode
  */
 template <NodeType node>
-tref bf_normalizer_without_rec_relation(tref bf);
+result<tref> bf_normalizer_without_rec_relation(tref bf);
 
 /**
  * @brief Normalize a Boolean function that includes recurrence relations.
@@ -407,12 +407,12 @@ tref bf_normalizer_without_rec_relation(tref bf);
  * // h(X):tau := 1., query h(Y): unfolds the recurrence to just "1"
  * // (see tests/integration/test_integration-bf_normalization.cpp:88-96, "Simple case (y1)").
  * auto nso_rr = get_bf_nso_rr("h(X):tau := 1.", "h(Y)").value();
- * tref res = bf_normalizer_with_rec_relation<node_t>(nso_rr);
+ * tref res = bf_normalizer_with_rec_relation<node_t>(nso_rr).value();
  * CHECK( tau::get(res).child_is(tau::bf_t) );
  * @endcode
  */
 template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr<node> &bf);
+result<tref> bf_normalizer_with_rec_relation(const rr<node> &bf);
 
 /**
  * @brief Full normalizer for a recurrence relation.

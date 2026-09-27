@@ -428,7 +428,10 @@ tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value) {
 		constexpr size_t bf_type = 0;
-		r = anf<node, bf_type>(value);
+		auto res = anf<node, bf_type>(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
 	}
 	return r;
 }

@@ -83,7 +83,7 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr);
 /** @brief Replace every fp-calculation ref in @p nso_rr's main with its
  * computed fixed point (RR-9: previously defined only in the tmpl). */
 template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& nso_rr);
+result<tref> calculate_all_fixed_points(const rr<node>& nso_rr);
 
 /** @brief Return @p nso_rr with each rec-relation head's ref args turned
  * into capture patterns (RR-9). */

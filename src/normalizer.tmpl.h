@@ -1307,32 +1307,32 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
  * definitions<node_t>::instance().clear();
  * api<node_t>::get_function_def("f(x) := x + 1");
  * tref expr = api<node_t>::get_term("f(t)", false);
- * tref res = apply_defs_to_spec<node_t>(expr);
- * // tau::get(res).to_str() == "t+1"
- * CHECK( !tau::get(res).find_top(is<node_t, tau::ref>) );
+ * result<tref> res = apply_defs_to_spec<node_t>(expr);
+ * // tau::get(res.value()).to_str() == "t+1"
+ * CHECK( !tau::get(res.value()).find_top(is<node_t, tau::ref>) );
  * @endcode
  * @endinternal
  */
-// Stays tref: called from the raw tref(tref) pipeline in
-// expand_defs_until_settled, which needs the same raw contract as its
-// bf_normalizer_without_rec_relation sibling.
 template <NodeType node>
-tref apply_defs_to_spec (tref spec) {
+result<tref> apply_defs_to_spec (tref spec) {
 	using tau = tree<node>;
+	result<tref> r;
 	rr<node> spec_with_defs {tau::geth(spec)};
 	if (tau::get(spec).find_top(is<node, tau::ref>)) {
 		const auto& defs = definitions<node>::instance().get_sym_defs();
 		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
 		       defs.begin(), defs.end());
-		auto applied = nso_rr_apply<node>(spec_with_defs);
-		if (!applied.has_value()) {
-			LOG_ERROR << "apply_defs_to_spec: failed to apply "
-				"recurrence relations to " << LOG_FM(spec);
-			return nullptr;
+		auto applied = r.merge_take(nso_rr_apply<node>(spec_with_defs));
+		if (!applied) {
+			r.error(code::internal_error,
+				"failed to apply recurrence relations to the spec",
+				{{label::value,
+					truncate_for_message(TAU_TO_STR(spec))}});
+			return r;
 		}
-		return applied.value();
+		return r.with_value(*applied);
 	}
-	return spec;
+	return r.with_value(spec);
 }
 
 /**
@@ -1356,39 +1356,45 @@ tref apply_defs_to_spec (tref spec) {
  * @param fm Formula whose references are to be expanded.
  * @param pre Simplification applied before each unfolding.
  * @param post Simplification applied after an unfolding that changed @p fm.
- * @return The expanded formula, or `nullptr` if the expansion never settles.
+ * @return The expanded formula, or an error report if the expansion never
+ * settles.
  * @endinternal
  */
 template <NodeType node>
-tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
+result<tref> expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Pass cap: the global max_def_passes, 0 = unlimited (see its doc).
 	std::unordered_set<tref> visited;
 	for (size_t pass = 0; !max_def_passes || pass != max_def_passes;
 		++pass) {
 		// Unresolved symbol is still present
-		if (!tau::get(fm).find_top(is<node, tau::ref>)) return fm;
-		fm = pre(fm);
-		if (!fm) return nullptr;
-		tref expanded = apply_defs_to_spec<node>(fm);
-		if (!expanded) return nullptr;
+		if (!tau::get(fm).find_top(is<node, tau::ref>))
+			return r.with_value(fm);
+		TAU_TRY(tref pre_fm, pre(fm));
+		fm = pre_fm;
+		TAU_TRY(tref expanded, apply_defs_to_spec<node>(fm));
 		// Structural comparison: unfolding may rebuild equal nodes.
-		if (tau::get(expanded) == tau::get(fm)) return fm;
-		fm = post(expanded);
-		if (!fm) return nullptr;
+		if (tau::get(expanded) == tau::get(fm))
+			return r.with_value(fm);
+		TAU_TRY(tref post_fm, post(expanded));
+		fm = post_fm;
 		if (!visited.insert(fm).second) {
-			LOG_ERROR << "Definition expansion oscillates without "
+			return r.with_error(code::solver_error,
+				"definition expansion oscillates without "
 				"reaching a normal form; the definitions in use "
 				"are most likely non-terminating for this "
-				"argument";
-			return nullptr;
+				"argument",
+				{{label::value,
+					truncate_for_message(TAU_TO_STR(fm))}});
 		}
 	}
-	LOG_ERROR << "Definition expansion did not settle after "
-		<< max_def_passes << " passes (max-def-passes); the "
-		"definitions in use are most likely non-terminating for this "
-		"argument";
-	return nullptr;
+	return r.with_error(code::solver_error,
+		"definition expansion did not settle within the pass cap; "
+		"the definitions in use are most likely non-terminating "
+		"for this argument",
+		{{label::limit, max_def_passes},
+		 {label::value, truncate_for_message(TAU_TO_STR(fm))}});
 }
 
 // Folds constants out of quantifiers, negations and the binary connectives:
@@ -1758,25 +1764,17 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		}
 	}
 	// Apply present function/predicate definitions
-	tref expanded_fm;
 	{
 		auto sg = r.open("expand_definitions");
-		expanded_fm = expand_defs_until_settled<node>(fm,
-			[](tref n) { return n; },
-			[](tref n) -> tref {
-				auto nres = normalize<node>(n);
-				if (nres.has_value()) return nres.value();
-				LOG_ERROR << "normalize_with_temp_simp: "
-					"normalization failed while expanding "
-					"definitions";
-				return nullptr;
-			});
+		TAU_TRY(tref expanded_fm, expand_defs_until_settled<node>(fm,
+			[](tref n) -> result<tref> {
+				return result<tref>(n);
+			},
+			[](tref n) -> result<tref> {
+				return normalize<node>(n);
+			}));
+		fm = expanded_fm;
 	}
-	if (!expanded_fm) {
-		return r.with_assert_check_error(code::internal_error,
-			"definition expansion did not settle");
-	}
-	fm = expanded_fm;
 
 	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F()) {
@@ -2028,7 +2026,8 @@ tref get_unbindable_relative_offset(tref head, tref body) {
  *  future states.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to validate.
- * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ * @return `true` if all validity conditions are satisfied, or an error report
+ * that names the first violation.
  *
  * @par Example
  * @code{.cpp}
@@ -2038,48 +2037,50 @@ tref get_unbindable_relative_offset(tref head, tref body) {
  *     "h[n](X):tau := h[n - 1](X)'."
  *     "h[0](X):tau := X.", "h[8](Y)").value();
  * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
- * CHECK( is_valid<node_t>(rr_captures) );
+ * CHECK( is_valid<node_t>(rr_captures).has_value() );
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-bool is_valid(const rr<node>& nso_rr) {
+result<bool> is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
+	result<bool> r;
 	LOG_TRACE << "-- is_valid: " << LOG_RR(nso_rr);
-	for (const auto& r : nso_rr.rec_relations)
+	for (const auto& rel : nso_rr.rec_relations)
 		if (tref ref = get_unbindable_relative_offset<node>(
-			r.first->get(), r.second->get()); ref)
+			rel.first->get(), rel.second->get()); ref)
 	{
-		LOG_ERROR << "Recurrence relation "
-			<< TAU_TO_STR(r.first->get()) << " cannot use the "
-			"relative offset of " << TAU_TO_STR(ref)
-			<< ": its head declares no offset to bind it";
-		return false;
+		return r.with_error(code::type_error,
+			"a recurrence relation uses the relative offset of a "
+			"term its head does not bind",
+			{{label::value,
+				truncate_for_message(TAU_TO_STR(ref))}});
 	}
 	for (tref main_offsets : tau::get(nso_rr.main)
 		.select_all(is<node,tau::offsets>)) if (tau::get(main_offsets)
 			.find_top(is<node, tau::capture>))
 	{
-		LOG_ERROR << "Main " << TAU_TO_STR(nso_rr.main->get())
-			<< " cannot contain a relative offset "
-			<< TAU_TO_STR(main_offsets);
-		return false; // capture in main's offset
+		return r.with_error(code::type_error,
+			"the main formula contains a relative offset",
+			{{label::value,
+				truncate_for_message(TAU_TO_STR(main_offsets))}});
 	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
-		const auto& r = nso_rr.rec_relations[ri];
-		auto left = get_ref_info<node>(get_ref<node>(r.first->get()));
+		const auto& rel = nso_rr.rec_relations[ri];
+		auto left = get_ref_info<node>(get_ref<node>(rel.first->get()));
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau::shift) {
-				LOG_ERROR << "Recurrence relation "
-					<< r.first->get() << " cannot contain "
-					<< "an offset shift";
-				return false; // head ref cannot have shift
+				return r.with_error(code::type_error,
+					"a recurrence relation head contains an "
+					"offset shift",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(rel.first->get()))}});
 			}
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
 		LOG_TRACE << "head offset " << LOG_NT(ho.first) << " / " << ho.second;
-		for (tref ref : tau::get(r.second)
+		for (tref ref : tau::get(rel.second)
 			.select_all(is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
@@ -2088,26 +2089,26 @@ bool is_valid(const rr<node>& nso_rr) {
 			LOG_TRACE << "body offset " << LOG_NT(bo.first) << " / " << bo.second;
 			if (ho.first == tau::integer) {
 				if (bo.first == tau::capture) {
-					LOG_ERROR << "Recurrence relation "
-						<< r.first << " (having a fixed"
-						" offset) cannot depend on a "
-						"relative offset " << r.second;
-					return false; // left num right capture
+					return r.with_error(code::type_error,
+						"a recurrence relation with a fixed "
+						"offset depends on a relative offset",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(rel.second->get()))}});
 				}
 				if (bo.first == tau::integer
 					&& ho.second < bo.second)
 				{
-					LOG_ERROR << "Recurrence relation "
-						<< r.first << " cannot depend "
-						<< "on a future state "
-						<< r.second;
-					return false; // l num < r num
+					return r.with_error(code::type_error,
+						"a recurrence relation depends on a "
+						"future state",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(rel.second->get()))}});
 				}
 			}
 		}
 	}
 	LOG_TRACE << "-- Recurrence relation is valid";
-	return true;
+	return r.with_value(true);
 }
 
 /**
@@ -2552,39 +2553,38 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 // Normalizes a Boolean function having no recurrence relation
 /** @internal @copydoc bf_normalizer_without_rec_relation @endinternal */
 template <NodeType node>
-tref bf_normalizer_without_rec_relation(tref bf) {
+result<tref> bf_normalizer_without_rec_relation(tref bf) {
+	result<tref> r;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
 	bf = syntactic_path_simplification<node>(bf);
-	tref result = bf_reduced_dnf<node>(bf);
+	tref reduced = bf_reduced_dnf<node>(bf);
 	// Apply present function/predicate definitions
-	result = expand_defs_until_settled<node>(result,
-		[](tref n) { return syntactic_path_simplification<node>(n); },
-		[](tref n) { return bf_reduced_dnf<node>(n); });
+	TAU_TRY(tref expanded, expand_defs_until_settled<node>(reduced,
+		[](tref n) -> result<tref> {
+			return result<tref>(syntactic_path_simplification<node>(n));
+		},
+		[](tref n) -> result<tref> {
+			return result<tref>(bf_reduced_dnf<node>(n));
+		}));
 
 	LOG_DEBUG << "End Boolean function normalizer";
 
-	return result;
+	return r.with_value(expanded);
 }
 
 // Normalizes a Boolean function in which recurrence relations are present.
-// Stays tref: api::normalize_term and its own tests consume it the same raw
-// way as its bf_normalizer_without_rec_relation sibling.
 /** @internal @copydoc bf_normalizer_with_rec_relation @endinternal */
 template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
-	auto applied = nso_rr_apply<node>(bf);
-	if (!applied.has_value()) {
-		LOG_ERROR << "bf_normalizer_with_rec_relation: failed to "
-			"apply recurrence relations";
-		return nullptr;
-	}
+result<tref> bf_normalizer_with_rec_relation(const rr<node> &bf) {
+	result<tref> r;
+	TAU_TRY(tref applied, nso_rr_apply<node>(bf));
 
 	LOG_DEBUG << "Begin Boolean function normalizer";
-	auto result = bf_normalizer_without_rec_relation<node>(applied.value());
+	TAU_TRY(tref result, bf_normalizer_without_rec_relation<node>(applied));
 	LOG_DEBUG << "End Boolean function normalizer";
 
-	return result;
+	return r.with_value(result);
 }
 
 // REVIEW (HIGH) review overall execution

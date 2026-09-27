@@ -574,24 +574,26 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 
 
 template <NodeType node, size_t type>
-tref anf(tref n) {
+result<tref> anf(tref) {
 	// ANF (Algebraic Normal Form / Zhegalkin polynomial):
 	// XOR-of-AND representation. For BF: rewrite using p|q = p^q^(p&q)
 	// and eliminate double negations.
 	// TODO (MEDIUM) implement full ANF conversion
-	LOG_ERROR << "ANF (Algebraic Normal Form) conversion is not yet "
-		"implemented. Use 'dnf' or 'cnf' as an alternative.";
-	return n;
+	result<tref> r;
+	return r.with_error(code::unsupported_operation,
+		"ANF (Algebraic Normal Form) conversion is not implemented; "
+		"use 'dnf' or 'cnf' as an alternative");
 }
 
 template <NodeType node>
-tref pnf(tref n) {
+result<tref> pnf(tref) {
 	// PNF (Prenex Normal Form): pull all quantifiers (all/ex) to the
 	// outermost scope. Requires renaming bound variables to avoid capture.
 	// TODO (MEDIUM) implement full PNF conversion
-	LOG_ERROR << "PNF (Prenex Normal Form) conversion is not yet "
-		"implemented. Use 'nnf' or 'qelim' as an alternative.";
-	return n;
+	result<tref> r;
+	return r.with_error(code::unsupported_operation,
+		"PNF (Prenex Normal Form) conversion is not implemented; "
+		"use 'nnf' or 'qelim' as an alternative");
 }
 
 } // namespace idni::tau_lang

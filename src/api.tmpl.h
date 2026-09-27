@@ -976,9 +976,8 @@ result<tref> api<node>::pnf(tref expr) {
 		result<tref> r;
 		TAU_TRY(auto simplified, simplify(expr));
 		TAU_TRY(tref a, apply_all_defs(simplified));
-		tref p = tau_lang::pnf<node>(a);
-		if (!p) r.error(code::internal_error, "PNF conversion failed");
-		else    r = p;
+		TAU_TRY(tref p, tau_lang::pnf<node>(a));
+		r = p;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});
@@ -1083,11 +1082,10 @@ result<tref> api<node>::normalize_term(tref term) {
 		if (!main || !tau::get(main).is(tau::bf)) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		tref n = contains(main, tau::ref)
+		TAU_TRY(tref n, contains(main, tau::ref)
 			? bf_normalizer_with_rec_relation<node>(nso_rr)
-			: bf_normalizer_without_rec_relation<node>(main);
-		if (!n) r.error(code::internal_error, "Normalization failed");
-		else    r = n;
+			: bf_normalizer_without_rec_relation<node>(main));
+		r = n;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});

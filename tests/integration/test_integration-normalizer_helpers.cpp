@@ -289,7 +289,7 @@ TEST_SUITE("recurrence relation validity") {
 			"h[n](X):tau := h[n - 1](X)'."
 			"h[0](X):tau := X.", "h[8](Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
-		CHECK( is_valid<node_t>(rr_captures) );
+		CHECK( is_valid<node_t>(rr_captures).value() );
 	}
 
 	TEST_CASE("is_valid rejects a relative offset in main") {
@@ -299,7 +299,7 @@ TEST_SUITE("recurrence relation validity") {
 			"h[n](X):tau := h[n - 1](X)'."
 			"h[0](X):tau := X.", "h[n](Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
-		CHECK( !is_valid<node_t>(rr_captures) );
+		CHECK( is_valid<node_t>(rr_captures).has_error() );
 	}
 
 	TEST_CASE("is_well_founded accepts the same recurrence") {

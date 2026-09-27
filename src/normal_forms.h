@@ -501,14 +501,14 @@ result<tref> term_boole_normal_form(tref formula);
  * @tparam node Tree node type.
  * @tparam type BA type identifier.
  * @param n Formula to convert.
- * @return Formula in ANF.
+ * @return Formula in ANF, or an error report when the conversion is not
+ * available.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
- * error on the "normal_forms" channel and returns @p n unchanged. No worked
- * example is given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body reports
+ * an unsupported-operation error.
  */
 template <NodeType node, size_t type>
-tref anf(tref n);
+result<tref> anf(tref n);
 
 /**
  * @brief Convert a formula to Prenex Normal Form (PNF).
@@ -517,14 +517,14 @@ tref anf(tref n);
  * form `Q1 x1. Q2 x2. ... Qn xn. matrix` where the matrix is quantifier-free.
  * @tparam node Tree node type.
  * @param n Formula to convert.
- * @return Formula in PNF.
+ * @return Formula in PNF, or an error report when the conversion is not
+ * available.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
- * error on the "normal_forms" channel and returns @p n unchanged. No worked
- * example is given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body reports
+ * an unsupported-operation error.
  */
 template <NodeType node>
-tref pnf(tref n);
+result<tref> pnf(tref n);
 
 } // namespace idni::tau_lang
 

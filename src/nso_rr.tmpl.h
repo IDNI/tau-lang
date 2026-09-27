@@ -261,24 +261,30 @@ struct fixed_point_transformer {
 
 // Replaces every fixpoint call in @p nso_rr's main formula by its
 // calculated fixpoint (or fallback) value, leaving the rest of the
-// formula unchanged. Returns the rewritten main, or nullptr when the
-// spec is invalid or any fixpoint calculation fails (multi-index call,
-// non-well-founded definitions, exhausted enumeration budget, or rules
-// that never apply to the call).
+// formula unchanged. Reports an error when the spec is invalid or any
+// fixpoint calculation fails (multi-index call, non-well-founded
+// definitions, exhausted enumeration budget, or rules that never apply to
+// the call).
 template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& nso_rr) {
-	if (!is_valid<node>(nso_rr)) return nullptr;
+result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
+	result<tref> r;
+	TAU_TRY(bool valid, is_valid<node>(nso_rr));
+	if (!valid)
+		return r.with_error(code::type_error,
+			"the recurrence relation is not valid");
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<node> fpt(nso_rr);
 	tref new_main = rewriter::post_order_traverser<node, decltype(fpt),
 		decltype(all)>(fpt, all)(nso_rr.main->get());
-	if (!new_main) return nullptr;
+	if (!new_main)
+		return r.with_error(code::internal_error,
+			"fixed point calculation did not reach a fixed point");
 	if (fpt.changes.size()) {
 		new_main = rewriter::replace<node>(new_main, fpt.changes);
 		LOG_DEBUG << "Calculated fixed points.";
 		LOG_DEBUG << "New main: " << LOG_FM(new_main);
 	}
-	return new_main;
+	return r.with_value(new_main);
 }
 
 // Turns @p nso_rr's definitions into applicable rewrite rules: variables
@@ -378,13 +384,9 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	LOG_DEBUG << "Start nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
-	tref main = r.measure("calculate_fixed_points", [&] {
+	TAU_TRY(tref main, r.measure("calculate_fixed_points", [&] {
 		return calculate_all_fixed_points<node>(rr_);
-	});
-	if (!main) {
-		return r.with_assert_check_error(code::internal_error,
-			"fixed point calculation did not terminate");
-	}
+	}));
 	// Substitute function and recurrence relation definitions. Called
 	// directly rather than through the traverser pipe so that the
 	// non-termination signal (nullptr) is checked instead of being fed to

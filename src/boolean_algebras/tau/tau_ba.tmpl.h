@@ -561,12 +561,7 @@ result<bool> is_tau_closed(const tau_ba<BAs...>& fm) {
 	result<bool> r;
 	auto applied = r.merge_take(nso_rr_apply<node>(fm.nso_rr));
 	if (!applied) return r;
-	tref simp_fm = apply_defs_to_spec<node>(*applied);
-	// apply_defs_to_spec carries no report of its own (normalizer.tmpl.h);
-	// its only failure signal is the null tree.
-	if (!simp_fm)
-		return r.with_error(code::internal_error,
-			"Failed to apply definitions to spec");
+	TAU_TRY(tref simp_fm, apply_defs_to_spec<node>(*applied));
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return r.with_value(false);
 	const trefs& vars = get_free_vars<node>(simp_fm);
