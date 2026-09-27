@@ -252,9 +252,8 @@ std::vector<ground_assignment> stdin_tape_trace(const trefs& io_vars,
 // assignment in output_trace (the side's printed values) and stdin_tape
 // (the input fed to both sides), each value parsed back through its io
 // var's own BA (ba_constants::get, the same string->constant path
-// interpreter<node>::read uses)? std::nullopt when the spec or a value
-// can't be resolved/parsed, or the solver can't decide -- callers must
-// treat that as "can't decide", never as a pass.
+// interpreter<node>::read uses)? The value is the answer; an error means
+// the check could not answer, and the report says why.
 //
 // Inputs are grounded by substitution rather than conjoined as equalities:
 // is_tau_formula_sat universally quantifies input streams still present in
@@ -266,96 +265,92 @@ std::vector<ground_assignment> stdin_tape_trace(const trefs& io_vars,
 // absolute-time node only matches an input occurrence already at a
 // constant time point -- a relative ("t"/"t-k") occurrence inside a
 // temporal formula is left unconstrained rather than grounded.
-std::optional<bool> trace_is_admissible(const std::string& spec_src,
+result<bool> trace_is_admissible(const std::string& spec_src,
 	const std::vector<ground_assignment>& output_trace,
 	const std::string& stdin_tape = "")
 {
 	using tau = tree<node_t>;
-	try {
-		// compile_spec's own isolation (tau_compile.tmpl.h): a spec's
-		// parse+type stage must start from and leave behind a clean
-		// process-wide type scope, or one fixture's io_var types leak
-		// into the next (see "parse+infer starts from a clean type
-		// scope..." above) -- this runs mid-loop over the same corpus.
-		compile_detail::scoped_clean_definitions<node_t> clean_defs;
-		auto spec_tree_r = api<node_t>::get_spec(spec_src);
-		if (!spec_tree_r.has_value()) return std::nullopt;
-		tref spec_tree = spec_tree_r.value();
-		auto nso_rr = get_nso_rr<node_t>(spec_tree);
-		if (!nso_rr.has_value()) return std::nullopt;
-		tref spec_fm = nso_rr.value().main->get();
-		if (!spec_fm) return std::nullopt;
+	result<bool> r;
+	// compile_spec's own isolation (tau_compile.tmpl.h): a spec's
+	// parse+type stage must start from and leave behind a clean
+	// process-wide type scope, or one fixture's io_var types leak
+	// into the next (see "parse+infer starts from a clean type
+	// scope..." above) -- this runs mid-loop over the same corpus.
+	compile_detail::scoped_clean_definitions<node_t> clean_defs;
+	TAU_TRY(auto spec_tree, api<node_t>::get_spec(spec_src));
+	TAU_TRY(auto nso_rr, get_nso_rr<node_t>(spec_tree));
+	tref spec_fm = nso_rr.main ? nso_rr.main->get() : nullptr;
+	if (!spec_fm) return r.with_error(code::internal_error,
+		"the spec has no main formula");
 
-		trefs io_vars = tau::get(spec_fm)
-			.select_top(is_child<node_t, tau::io_var>);
+	trefs io_vars = tau::get(spec_fm)
+		.select_top(is_child<node_t, tau::io_var>);
 
-		// is_tau_formula_sat is only sound on the G/F-shaped safety
-		// formulas the solver actually supports; a raw full-LTL shape
-		// (nested U/S/R/T, e.g. ltl_past_since_trigger) silently
-		// produces a WRONG bool rather than throwing, so it must
-		// never reach is_tau_formula_sat un-desugared. Mirror
-		// interpreter.tmpl.h's own routing: realizability_has_game_
-		// operators is checked before any normalization, and a
-		// full-LTL spec is run through ltl_to_safety_formula_full --
-		// the exact desugaring compile_spec/the interpreter use to
-		// build both sides under comparison -- before being
-		// normalized and handed to the solver. Unrealizable, or any
-		// desugaring failure, is "can't decide" (std::nullopt), never
-		// a verdict.
-		if (realizability_has_game_operators<node_t>(spec_fm)) {
-			auto [safety_spec, ltl_sol, _aux] =
-				ltl_to_safety_formula_full<node_t>(spec_fm);
-			(void)ltl_sol;
-			if (!safety_spec) return std::nullopt;
-			auto normalized = normalizer<node_t>(safety_spec);
-			if (!normalized.has_value()) return std::nullopt;
-			spec_fm = normalized.value();
-			if (!spec_fm) return std::nullopt;
-		}
-
-		std::vector<ground_assignment> trace = output_trace;
-		auto input_trace = stdin_tape_trace(io_vars, stdin_tape);
-		trace.insert(trace.end(), input_trace.begin(), input_trace.end());
-
-		assignment<node_t> input_subs;
-		std::vector<std::pair<tref, tref>> output_eqs;
-		for (const auto& a : trace) {
-			tref found = nullptr;
-			for (tref v : io_vars)
-				if (get_var_name<node_t>(v) == a.name) {
-					found = v;
-					break;
-				}
-			if (!found) return std::nullopt;
-			size_t type_id = tau::get(found).get_ba_type();
-			if (type_id == 0) return std::nullopt;
-			auto type_tree_r = tau::get(found).get_ba_type_tree();
-			if (!type_tree_r.has_value()) return std::nullopt;
-			auto cnst = ba_constants<node_t>::get(a.value, type_tree_r.value());
-			if (!cnst.has_value()) return std::nullopt;
-			tref const_bf = build_bf_ba_constant<node_t>(
-				cnst.value().first, type_id);
-			if (is_input_var<node_t>(found)) {
-				tref var_bf = build_in_var_at_n<node_t>(
-					a.name, a.t, type_id);
-				input_subs[var_bf] = const_bf;
-			} else {
-				tref var_bf = build_out_var_at_n<node_t>(
-					a.name, a.t, type_id);
-				output_eqs.emplace_back(var_bf, const_bf);
-			}
-		}
-		tref conj = input_subs.empty() ? spec_fm
-			: rewriter::replace<node_t>(spec_fm, input_subs);
-		for (auto& [var_bf, const_bf] : output_eqs)
-			conj = build_wff_and<node_t>(conj,
-				build_bf_eq<node_t>(var_bf, const_bf));
-		auto sat_r = is_tau_formula_sat<node_t>(conj);
-		if (!sat_r.has_value()) return std::nullopt;
-		return sat_r.value();
-	} catch (...) {
-		return std::nullopt;
+	// is_tau_formula_sat is only sound on the G/F-shaped safety
+	// formulas the solver actually supports; a raw full-LTL shape
+	// (nested U/S/R/T, e.g. ltl_past_since_trigger) silently
+	// produces a WRONG bool rather than throwing, so it must
+	// never reach is_tau_formula_sat un-desugared. Mirror
+	// interpreter.tmpl.h's own routing: realizability_has_game_
+	// operators is checked before any normalization, and a
+	// full-LTL spec is run through ltl_to_safety_formula_full --
+	// the exact desugaring compile_spec/the interpreter use to
+	// build both sides under comparison -- before being
+	// normalized and handed to the solver.
+	if (realizability_has_game_operators<node_t>(spec_fm)) {
+		TAU_TRY(auto full, ltl_to_safety_formula_full<node_t>(spec_fm));
+		auto& [safety_spec, ltl_sol, _aux] = full;
+		(void)ltl_sol;
+		(void)_aux;
+		if (!safety_spec) return r.with_error(code::internal_error,
+			"the synthesis produced no safety formula");
+		TAU_TRY(auto normalized, normalizer<node_t>(safety_spec));
+		spec_fm = normalized;
+		if (!spec_fm) return r.with_error(code::internal_error,
+			"the normalized safety formula is empty");
 	}
+
+	std::vector<ground_assignment> trace = output_trace;
+	auto input_trace = stdin_tape_trace(io_vars, stdin_tape);
+	trace.insert(trace.end(), input_trace.begin(), input_trace.end());
+
+	assignment<node_t> input_subs;
+	std::vector<std::pair<tref, tref>> output_eqs;
+	for (const auto& a : trace) {
+		tref found = nullptr;
+		for (tref v : io_vars)
+			if (get_var_name<node_t>(v) == a.name) {
+				found = v;
+				break;
+			}
+		if (!found) return r.with_error(code::invalid_argument,
+			"the trace names a stream the spec does not declare",
+			{{label::name, a.name}});
+		size_t type_id = tau::get(found).get_ba_type();
+		if (type_id == 0) return r.with_error(
+			code::missing_type_information,
+			"the stream has no resolved BA type",
+			{{label::name, a.name}});
+		TAU_TRY(auto type_tree, tau::get(found).get_ba_type_tree());
+		TAU_TRY(auto cnst, ba_constants<node_t>::get(a.value, type_tree));
+		tref const_bf = build_bf_ba_constant<node_t>(cnst.first, type_id);
+		if (is_input_var<node_t>(found)) {
+			tref var_bf = build_in_var_at_n<node_t>(
+				a.name, a.t, type_id);
+			input_subs[var_bf] = const_bf;
+		} else {
+			tref var_bf = build_out_var_at_n<node_t>(
+				a.name, a.t, type_id);
+			output_eqs.emplace_back(var_bf, const_bf);
+		}
+	}
+	tref conj = input_subs.empty() ? spec_fm
+		: rewriter::replace<node_t>(spec_fm, input_subs);
+	for (auto& [var_bf, const_bf] : output_eqs)
+		conj = build_wff_and<node_t>(conj,
+			build_bf_eq<node_t>(var_bf, const_bf));
+	TAU_TRY(bool sat, is_tau_formula_sat<node_t>(conj));
+	return r.with_value(sat);
 }
 
 // gen_spec<Node>'s step 1 (tau_compile.tmpl.h) under the same
@@ -473,34 +468,34 @@ TEST_SUITE("codegen_parity") {
 		// CLI's rendering of the witness: o1 prints as "0".
 		auto cli_trace = trace_is_admissible(spec_src,
 			{ {"o1", 0, "0"}, {"o2", 0, "0"} });
-		REQUIRE_MESSAGE(cli_trace.has_value(),
-			"admissibility check could not decide the CLI-style trace");
-		CHECK_MESSAGE(*cli_trace,
+		INFO(cli_trace.report());
+		REQUIRE(cli_trace.has_value());
+		CHECK_MESSAGE(cli_trace.value(),
 			"CLI-style trace (o1=0, o2=0) should be admissible");
 
 		// "bot" is the order's lower end, not a point a stream can hold.
 		auto end_trace = trace_is_admissible(spec_src,
 			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
-		REQUIRE_MESSAGE(end_trace.has_value(),
-			"admissibility check could not decide the end-valued trace");
-		CHECK_MESSAGE(!*end_trace,
+		INFO(end_trace.report());
+		REQUIRE(end_trace.has_value());
+		CHECK_MESSAGE(!end_trace.value(),
 			"trace (o1=bot, o2=0) puts a qlt stream at the order's end "
 			"and must be inadmissible");
 
 		// artifact's rendering of the same witness: o1 prints as "-1/2".
 		auto artifact_trace = trace_is_admissible(spec_src,
 			{ {"o1", 0, "-1/2"}, {"o2", 0, "42"} });
-		REQUIRE_MESSAGE(artifact_trace.has_value(),
-			"admissibility check could not decide the artifact-style trace");
-		CHECK_MESSAGE(*artifact_trace,
+		INFO(artifact_trace.report());
+		REQUIRE(artifact_trace.has_value());
+		CHECK_MESSAGE(artifact_trace.value(),
 			"artifact-style trace (o1=-1/2, o2=42) should be admissible");
 
 		// violating trace: o1=1 > 1/2 forces o2=42, but o2=7.
 		auto violating_trace = trace_is_admissible(spec_src,
 			{ {"o1", 0, "1"}, {"o2", 0, "7"} });
-		REQUIRE_MESSAGE(violating_trace.has_value(),
-			"admissibility check could not decide the violating trace");
-		CHECK_MESSAGE(!*violating_trace,
+		INFO(violating_trace.report());
+		REQUIRE(violating_trace.has_value());
+		CHECK_MESSAGE(!violating_trace.value(),
 			"trace (o1=1, o2=7) violates the spec and must be inadmissible");
 	}
 
@@ -515,17 +510,17 @@ TEST_SUITE("codegen_parity") {
 	TEST_CASE("trace_is_admissible: always_one rejects a wrong output value") {
 		auto correct_trace = trace_is_admissible(always_one_src,
 			{ {"o1", 0, "1"} });
-		REQUIRE_MESSAGE(correct_trace.has_value(),
-			"admissibility check could not decide the correct trace");
-		CHECK_MESSAGE(*correct_trace,
+		INFO(correct_trace.report());
+		REQUIRE(correct_trace.has_value());
+		CHECK_MESSAGE(correct_trace.value(),
 			"trace (o1[0]=1) matches the spec's constant and must be "
 			"admissible");
 
 		auto wrong_trace = trace_is_admissible(always_one_src,
 			{ {"o1", 0, "0"} });
-		REQUIRE_MESSAGE(wrong_trace.has_value(),
-			"admissibility check could not decide the violating trace");
-		CHECK_MESSAGE(!*wrong_trace,
+		INFO(wrong_trace.report());
+		REQUIRE(wrong_trace.has_value());
+		CHECK_MESSAGE(!wrong_trace.value(),
 			"trace (o1[0]=0) contradicts G(o1[t] = 1) and must be "
 			"inadmissible");
 	}
@@ -626,31 +621,35 @@ TEST_SUITE("codegen_parity") {
 				// witness differently).
 				stdfs::path in_path = spec_path;
 				in_path.replace_extension(".in");
+				// The checker could not decide admissibility of one or
+				// both traces (unsupported formula class, parse failure,
+				// or the solver itself couldn't decide): an error, not a
+				// verdict, so it fails the fixture.
 				auto cli_ok = trace_is_admissible(src,
 					extract_output_trace(cli_body), tape);
 				auto artifact_ok = trace_is_admissible(src,
 					extract_output_trace(artifact_body), tape);
 				if (!cli_ok.has_value() || !artifact_ok.has_value()) {
-					// Soft pass: the checker could not resolve
-					// admissibility (unsupported formula class, parse
-					// failure, or the solver itself couldn't decide) --
-					// that is not evidence of a violation, so it must
-					// never hard-fail the fixture.
-					MESSAGE(name, ": stdout mismatch, admissibility "
-						"undecided (not a proven violation)\n"
-						"--- tau body ---\n", cli_body,
-						"\n--- artifact body ---\n", artifact_body);
-				} else if (*cli_ok && *artifact_ok) {
+					std::ostringstream why;
+					if (!cli_ok.has_value()) cli_ok.print(why);
+					if (!artifact_ok.has_value()) artifact_ok.print(why);
+					CHECK_MESSAGE(false,
+						name << ": admissibility undecided\n"
+						<< why.str()
+						<< "\n--- tau body ---\n" << cli_body
+						<< "\n--- artifact body ---\n"
+						<< artifact_body);
+				} else if (cli_ok.value() && artifact_ok.value()) {
 					MESSAGE(name, ": pass (containment) -- stdout "
 						"differs but both traces are admissible under "
 						"the spec\n--- tau body ---\n", cli_body,
 						"\n--- artifact body ---\n", artifact_body);
-				} else if (*cli_ok && !*artifact_ok) {
+				} else if (cli_ok.value() && !artifact_ok.value()) {
 					CHECK_MESSAGE(false,
 						name << ": artifact trace is inadmissible under "
 						"the spec (proven spec violation)\n"
 						"--- artifact body ---\n" << artifact_body);
-				} else if (!*cli_ok && *artifact_ok) {
+				} else if (!cli_ok.value() && artifact_ok.value()) {
 					CHECK_MESSAGE(false,
 						name << ": CLI trace is inadmissible under the "
 						"spec (proven spec violation)\n"

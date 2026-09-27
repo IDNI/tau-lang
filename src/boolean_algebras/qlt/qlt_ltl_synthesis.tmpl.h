@@ -964,9 +964,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 				} else {
 					// Fail-safe: keep the sound verdict but
 					// fall back to the pre-LA-10 refusal.
-					LOG_WARNING << "[ltl_aba] constant-output "
+					r.warning("[ltl_aba] constant-output "
 						"witness could not be built; the "
-						"strategy stays non-executable\n";
+						"strategy stays non-executable");
 					trivial.const_outputs.clear();
 					trivial.executable = false;
 				}

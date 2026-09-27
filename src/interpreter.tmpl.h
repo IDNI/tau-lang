@@ -849,9 +849,10 @@ post_normalization:
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		bool unrealizable = false;
-		std::tie(safety_spec, sol_opt, unanchored_aux) =
+		TAU_TRY(auto full,
 			ltl_to_safety_formula_full<node>(spec, &data_strategy,
-				counter_route, &unrealizable);
+				counter_route, &unrealizable));
+		std::tie(safety_spec, sol_opt, unanchored_aux) = std::move(full);
 		// The data game decided the spec: its strategy chooses every
 		// step's outputs, so no spec part is solved.
 		if (data_strategy) {
@@ -3219,8 +3220,9 @@ result<typename interpreter<node>::update_plan>
 			continue;
 		}
 		std::shared_ptr<data_game_strategy<node>> next;
-		ltl_to_safety_formula_full<node>(rebased, &next, true);
-		if (!next) {
+		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true);
+		if (!full.has_value() || !next) {
+			failures.emplace_back(alt, std::move(full).report());
 			r.info("the data game does not decide the revised "
 				"specification; the alternative is skipped",
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});

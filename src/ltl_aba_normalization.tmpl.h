@@ -2843,7 +2843,7 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 // context is carried by the compiled formula that
 // `ltl_to_safety_formula_full` now conjoins (it used to discard it).
 template <NodeType node>
-static tref compile_since_trigger_rec(
+static result<tref> compile_since_trigger_rec(
     tref fm,
     int& counter,
     std::vector<std::pair<tref,tref>>& aux_pairs,
@@ -2853,8 +2853,9 @@ static tref compile_since_trigger_rec(
     int spine_pol = 1)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	const auto& t = tau::get(fm);
-	if (!t.has_child()) return fm;
+	if (!t.has_child()) return r.with_value(fm);
 
 	const bool is_outer = (spine_pol > 0);
 	size_t nt = t[0].value.get_nt();
@@ -2872,8 +2873,8 @@ static tref compile_since_trigger_rec(
 		// Compile nested S/T inside the operands first (always inner), so
 		// that the ψ used for the t=0 initial condition below is the
 		// compiled one, matching what goes into the rewritten S.
-		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
+		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
@@ -2886,7 +2887,7 @@ static tref compile_since_trigger_rec(
 		// With is_outer=false the S contributes only its tracking
 		// invariant G(curr ↔ rhs), and the obligation is encoded below
 		// from the negated compiled formula.
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(tref s_rewr, compile_since_trigger_rec<node>(s_node, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 		tref compiled = tau::build_wff_neg(s_rewr);
 
 		if (is_outer) {
@@ -2901,15 +2902,12 @@ static tref compile_since_trigger_rec(
 			// branch does, so the interpreter's fixpoint pipeline never
 			// has to reason about aux[t-1] at time 0.
 			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			// TODO (HIGH) dropped error: fm_at_time_point's report --
-			// this compile-away pass returns a formula, which cannot
-			// carry it.
-			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0)
-					.value_or(nullptr);
+			TAU_TRY(tref psi_at_0,
+				fm_at_time_point<node>(psi, psi_io_vars, 0));
 			init_conds.push_back(psi_at_0);
 		}
 
-		return compiled;
+		return r.with_value(compiled);
 	}
 
 	// wff_since: φ S ψ
@@ -2921,18 +2919,15 @@ static tref compile_since_trigger_rec(
 		// Any S inside phi or psi is by definition inner (nested), so
 		// pass is_outer=false to suppress the always-true requirement
 		// and the psi-at-0 initial condition for those sub-operators.
-		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
+		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
 
 		// Atoms: aux[t]=1  and  aux[t-1]=1
-		// build_carrier_eq_aux's report cannot travel further: this
-		// function feeds ltl_to_safety_formula_full, called from
-		// interpreter.tmpl.h, outside this pass's edit boundary.
-		tref curr = build_carrier_eq_aux<node>(aux_name, 0,  1).value_or(nullptr);
-		tref prev = build_carrier_eq_aux<node>(aux_name, -1, 1).value_or(nullptr);
+		TAU_TRY(tref curr, build_carrier_eq_aux<node>(aux_name, 0,  1));
+		TAU_TRY(tref prev, build_carrier_eq_aux<node>(aux_name, -1, 1));
 
 		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).  It is pushed into
 		// `safety_invs` below (in one of two forms, depending on the spine
@@ -2969,11 +2964,8 @@ static tref compile_since_trigger_rec(
 			// the interpreter's fixpoint pipeline would mis-treat as a
 			// G-unrolled seed.
 			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			// TODO (HIGH) dropped error: fm_at_time_point's report --
-			// this compile-away pass returns a formula, which cannot
-			// carry it.
-			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0)
-					.value_or(nullptr);
+			TAU_TRY(tref psi_at_0,
+				fm_at_time_point<node>(psi, psi_io_vars, 0));
 			init_conds.push_back(psi_at_0);
 
 			// Outermost S safety invariant: G(curr && rhs).
@@ -3008,7 +3000,7 @@ static tref compile_since_trigger_rec(
 		aux_pairs.emplace_back(curr, prev);
 
 		// Replace φ S ψ with curr ("since holds now").
-		return curr;
+		return r.with_value(curr);
 	}
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
@@ -3025,7 +3017,7 @@ static tref compile_since_trigger_rec(
 	//            drops off the spine entirely.
 	const auto& op = t[0];
 	size_t nc = op.children_size();
-	if (nc == 0) return fm;
+	if (nc == 0) return r.with_value(fm);
 
 	int child_pol = 0;
 	if      (nt == tau::wff_neg) child_pol = -spine_pol;
@@ -3033,28 +3025,28 @@ static tref compile_since_trigger_rec(
 	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
 
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		if (new_c == op.first()) return fm;
-		return tau::get(tau::wff, tau::get(nt, new_c));
+		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.first(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		if (new_c == op.first()) return r.with_value(fm);
+		return r.with_value(tau::get(tau::wff, tau::get(nt, new_c)));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		if (new_l == op.first() && new_r == op.second()) return fm;
-		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
+		TAU_TRY(tref new_l, compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_r, compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		if (new_l == op.first() && new_r == op.second()) return r.with_value(fm);
+		return r.with_value(tau::get(tau::wff, tau::get(nt, new_l, new_r)));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
+		TAU_TRY(tref new_a, compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_b, compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.third(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
-			return fm;
+			return r.with_value(fm);
 		// 3-child case: use build_wff_conditional for wff_conditional,
 		// otherwise fall back to initializer_list get.
 		if (nt == tau::wff_conditional)
-			return tau::build_wff_conditional(new_a, new_b, new_c);
+			return r.with_value(tau::build_wff_conditional(new_a, new_b, new_c));
 		tref ch3[3] = { new_a, new_b, new_c };
-		return tau::get(tau::wff, tau::get(nt, ch3, 3));
+		return r.with_value(tau::get(tau::wff, tau::get(nt, ch3, 3)));
 	}
 	// Arity > 3.  This used to `return fm` unchanged, silently leaving any
 	// S/T below a wider node uncompiled — the pure-past fast path then just
@@ -3069,12 +3061,12 @@ static tref compile_since_trigger_rec(
 	new_kids.reserve(nc);
 	bool changed = false;
 	for (tref c : kids) {
-		tref nc_ = compile_since_trigger_rec<node>(c, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		if (nc_ != c) changed = true;
-		new_kids.push_back(nc_);
+		TAU_TRY(tref nc_rec, compile_since_trigger_rec<node>(c, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol));
+		if (nc_rec != c) changed = true;
+		new_kids.push_back(nc_rec);
 	}
-	if (!changed) return fm;
-	return tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size()));
+	if (!changed) return r.with_value(fm);
+	return r.with_value(tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size())));
 }
 
 // Top-level S/T compilation pass.
@@ -3102,21 +3094,24 @@ static tref compile_since_trigger_rec(
 //   The interpreter seeds each to bv-0 at t = formula_time_point - 1
 //   (seed_since_aux_bits), encoding S(-1) = false / T(-1) = true.
 template <NodeType node>
-static std::tuple<tref, tref, tref, std::vector<std::pair<tref,tref>>,
-                  std::vector<std::string>>
+static result<std::tuple<tref, tref, tref, std::vector<std::pair<tref,tref>>,
+                         std::vector<std::string>>>
 compile_since_trigger(tref fm) {
 	using tau = tree<node>;
+	using since_t = std::tuple<tref, tref, tref,
+		std::vector<std::pair<tref,tref>>, std::vector<std::string>>;
+	result<since_t> r;
 	// LT-16(b): has_since_trigger was a verbatim duplicate of
 	// has_past_operators (ltl_aba_helpers.tmpl.h); one predicate now.
 	if (!has_past_operators<node>(fm))
-		return {fm, tau::_T(), tau::_T(), {}, {}};
+		return r.with_value(since_t{fm, tau::_T(), tau::_T(), {}, {}});
 
 	std::vector<std::pair<tref,tref>> aux_pairs;
 	std::vector<tref> safety_invs;
 	std::vector<tref> init_conds;
 	std::vector<std::string> unanchored_aux;
 	int counter = 0;
-	tref compiled = compile_since_trigger_rec<node>(fm, counter, aux_pairs, safety_invs, init_conds, unanchored_aux);
+	TAU_TRY(tref compiled, compile_since_trigger_rec<node>(fm, counter, aux_pairs, safety_invs, init_conds, unanchored_aux));
 
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
@@ -3128,8 +3123,8 @@ compile_since_trigger(tref fm) {
 
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
 	          << counter << " auxiliary variable(s) introduced";
-	return {compiled, safety_fm, init_fm, std::move(aux_pairs),
-	        std::move(unanchored_aux)};
+	return r.with_value(since_t{compiled, safety_fm, init_fm,
+		std::move(aux_pairs), std::move(unanchored_aux)});
 }
 
 } // namespace idni::tau_lang

@@ -594,7 +594,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("F(output = 0) converts to always(output = 0)") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// Must be wff_always wrapping an ABA formula
 		CHECK(tau::get(safety)[0].is(tau::wff_always));
@@ -603,7 +605,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("F(output = 0) safety formula is realizable") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// The derived safety formula must itself be realizable
 		CHECK(sat(safety));
@@ -612,7 +616,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("G(F(output = 0)) converts to always formula") {
 		tref fm = spec("G (F (o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		CHECK(tau::get(safety)[0].is(tau::wff_always));
 	}
@@ -620,7 +626,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("(o=1) R (o=0) converts to always formula") {
 		tref fm = spec("(o1[t] = 1) release (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		CHECK(tau::get(safety)[0].is(tau::wff_always));
 	}
@@ -629,7 +637,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// The system cannot force inputs; the formula is unrealizable.
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		CHECK(safety == nullptr);
 	}
 
@@ -637,7 +647,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// always(o=0) |= F(o=0), so the derived safety formula is consistent.
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// safety formula should be realizable by the safety pipeline
 		CHECK(sat(safety));
@@ -646,7 +658,9 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("W operator safety formula is realizable") {
 		tref fm = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		CHECK(tau::get(safety)[0].is(tau::wff_always));
 		CHECK(sat(safety));
@@ -982,7 +996,9 @@ TEST_SUITE("Multi-state Mealy strategy") {
 		// Must be realizable
 		CHECK(sat(fm));
 		// ltl_to_safety_formula must succeed (multi-state encoding)
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		CHECK(tau::get(safety)[0].is(tau::wff_always));
 	}
@@ -990,7 +1006,9 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("G(F(o=0)) && G(F(o!=0)) safety formula is realizable") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// The derived safety formula must be realizable by the safety pipeline
 		CHECK(sat(safety));
@@ -999,7 +1017,9 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("multi-state safety formula has auxiliary state vars") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// The formula should contain auxiliary state variables
 		std::string s = tau::get(safety).to_str();
@@ -1014,7 +1034,9 @@ TEST_SUITE("Multi-state Mealy strategy") {
 		// Regression: verify single-state path unchanged after multi-state addition
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		tref safety = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		REQUIRE(safety_r.has_value());
+		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
 		// Single-state: no auxiliary state variables in the output
 		std::string s = tau::get(safety).to_str();
@@ -4632,8 +4654,9 @@ TEST_SUITE("Data game strategy") {
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
 		std::shared_ptr<data_game_strategy<node_t>> data;
-		auto [safety, sol, aux] =
-			ltl_to_safety_formula_full<node_t>(fm, &data);
+		auto full = ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(full.has_value());
+		auto& [safety, sol, aux] = full.value();
 		CHECK(safety == nullptr);
 		REQUIRE(data != nullptr);
 		CHECK(data->depth == 1);
@@ -4755,7 +4778,8 @@ TEST_SUITE("Data game strategy") {
 			"&& (always o2[t]:bv[1] = i2[t]:bv[1]).");
 		REQUIRE(fm != nullptr);
 		std::shared_ptr<data_game_strategy<node_t>> data;
-		ltl_to_safety_formula_full<node_t>(fm, &data);
+		auto full = ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(full.has_value());
 		REQUIRE(data != nullptr);
 		REQUIRE(data->view != nullptr);
 		auto first = data->reads();
@@ -4924,7 +4948,9 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		// The step-counter guard is a top-level positive conjunct here, so
 		// this is legal scope (see enforce_positional_conjunctive_scope);
 		// solving must not throw and must produce a real Mealy strategy.
-		auto [safety, sol, _aux] = ltl_to_safety_formula_full<node_t>(fm);
+		auto full = ltl_to_safety_formula_full<node_t>(fm);
+		REQUIRE(full.has_value());
+		auto& [safety, sol, _aux] = full.value();
 		REQUIRE(safety != nullptr);
 		REQUIRE(sol.has_value());
 		CHECK(sol->aut.num_states > 0);
@@ -4954,7 +4980,9 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
 		REQUIRE(fm != nullptr);
 
-		auto [safety, sol, _aux] = ltl_to_safety_formula_full<node_t>(fm);
+		auto full = ltl_to_safety_formula_full<node_t>(fm);
+		REQUIRE(full.has_value());
+		auto& [safety, sol, _aux] = full.value();
 		REQUIRE(safety != nullptr);
 		REQUIRE(sol.has_value());
 		CHECK(sol->atoms.size() == 1); // the duplicate merged away

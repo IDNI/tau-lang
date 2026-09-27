@@ -538,7 +538,7 @@ static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
  * @return The safety formula `always(phi)`.
  */
 template <NodeType node>
-static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
+static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
 
 /**
  * @brief Fixed-time constraints for the warm-up steps of a multi-state Mealy
@@ -577,7 +577,7 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
  * @return The safety formula, or nullptr if not realizable.
  */
 template <NodeType node>
-tref ltl_to_safety_formula(tref fm);
+result<tref> ltl_to_safety_formula(tref fm);
 
 /**
  * @brief Variant of `ltl_to_safety_formula` that ALSO returns the
@@ -615,7 +615,8 @@ tref ltl_to_safety_formula(tref fm);
  * auxiliary output names}.
  */
 template <NodeType node>
-std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
+result<std::tuple<tref, std::optional<ltl_aba_solution<node>>,
+                  std::vector<std::string>>>
 ltl_to_safety_formula_full(tref fm,
 	std::shared_ptr<data_game_strategy<node>>* data_strategy = nullptr,
 	bool synthesize = false, bool* unrealizable = nullptr);

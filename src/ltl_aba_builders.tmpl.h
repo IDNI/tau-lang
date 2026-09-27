@@ -722,9 +722,10 @@ static tref mealy_one_hot(const std::vector<std::string>& sv) {
 }
 
 template <NodeType node>
-static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
+static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	const auto& aut = sol.aut;
 	int k = aut.num_states;
 
@@ -746,9 +747,13 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 		tref edges_disj = tau::_F();
 		for (const auto& e : aut.edges[s]) {
 			if (e.dst < 0 || e.dst >= k) {
-				LOG_ERROR << "[ltl_aba] HOA edge dst " << e.dst
-				          << " out of range [0," << k << "), skipping";
-				continue;
+				return r.with_error(code::internal_error,
+					"[ltl_aba] HOA edge dst "
+					+ std::to_string(e.dst)
+					+ " out of range [0,"
+					+ std::to_string(k) + ")",
+					{{label::actual, e.dst},
+					 {label::limit, k}});
 			}
 			tref guard_fm = guard_to_aba<node>(
 			    e.guard_label, aut.aps, sol.atoms);
@@ -770,14 +775,10 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 		}
 	}
 
-	auto body_r = normalize_non_temp<node>(tau::build_wff_and(one_hot, trans));
-	if (!body_r.has_value()) {
-		LOG_ERROR << "[ltl_aba] encode_mealy_as_safety: normalization failed";
-		return nullptr;
-	}
-	tref body = body_r.value();
+	TAU_TRY(tref body,
+		normalize_non_temp<node>(tau::build_wff_and(one_hot, trans)));
 	LOG_DEBUG << "[ltl_aba] multi-state safety body: " << LOG_FM(body);
-	return tau::build_wff_always(body);
+	return r.with_value(tau::build_wff_always(body));
 }
 
 // Fixed-time constraints for the steps 0 .. warmup-1, which run before the
@@ -842,12 +843,16 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 // preserve the existing single-return API for callers that don't need it.
 
 template <NodeType node>
-std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
+result<std::tuple<tref, std::optional<ltl_aba_solution<node>>,
+                  std::vector<std::string>>>
 ltl_to_safety_formula_full(tref fm,
 	std::shared_ptr<data_game_strategy<node>>* data_strategy, bool synthesize,
 	bool* unrealizable)
 {
 	using tau = tree<node>;
+	using full_t = std::tuple<tref, std::optional<ltl_aba_solution<node>>,
+		std::vector<std::string>>;
+	result<full_t> r;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
 
 	// Fast path: if all LTL operators are past (S/T), compile them away and
@@ -883,8 +888,9 @@ ltl_to_safety_formula_full(tref fm,
 	};
 
 	{
-		auto [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
-			compile_since_trigger<node>(fm);
+		TAU_TRY(auto past_compiled, compile_since_trigger<node>(fm));
+		auto& [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
+			past_compiled;
 		// The compiled invariants read their auxiliaries at t-1, which
 		// makes step 0 a warm-up step the interpreter does not enforce.
 		// That matches the spec only when it has a lookback of its own;
@@ -915,14 +921,16 @@ ltl_to_safety_formula_full(tref fm,
 			           tau::build_wff_and(safety_fm, init_fm));
 			// LA-N3: hand the inner-S auxiliaries to the caller so the
 			// interpreter can seed their t=0 anchor (S(-1) = false).
-			return {out, std::nullopt, std::move(unanchored_aux)};
+			return r.with_value(full_t{out, std::nullopt,
+				std::move(unanchored_aux)});
 		}
 	}
 
 	// A pure-past spec rerouted here (no lookback of its own) is an
 	// invariant, as on the fast path: every step, not only step 0.
+	TAU_TRY(auto past_compiled, compile_since_trigger<node>(fm));
 	if (!realizability_has_game_operators<node>(
-		std::get<0>(compile_since_trigger<node>(fm))))
+		std::get<0>(past_compiled)))
 		fm = wrap_always(fm);
 	ltl_aba_solution<node> partial;
 	auto maybe_r = solve_ltl_aba<node>(fm, &partial);
@@ -939,12 +947,8 @@ ltl_to_safety_formula_full(tref fm,
 		if (again.has_value()) maybe_r = std::move(again);
 	}
 	if (!maybe_r.has_value()) {
-		// This function's tuple return has no report channel of its
-		// own, and every other internal failure below already answers
-		// with the same {nullptr, nullopt, {}} shape -- print so the
-		// undecided reason is not silently dropped.
-		maybe_r.print();
-		return {nullptr, std::nullopt, {}};
+		r.merge(std::move(maybe_r));
+		return r;
 	}
 	auto& maybe = maybe_r.value();
 	// With `data_strategy`, execution plays the strategy of the data game
@@ -966,13 +970,12 @@ ltl_to_safety_formula_full(tref fm,
 				*unrealizable = true;
 		return *data_strategy != nullptr;
 	};
-	using full_t = std::tuple<tref, std::optional<ltl_aba_solution<node>>,
-		std::vector<std::string>>;
 	auto none = [&]() -> full_t {
 		on_data(true);
 		return {nullptr, std::nullopt, {}};
 	};
-	if (on_data(false)) return {nullptr, std::nullopt, {}};
+	if (on_data(false))
+		return r.with_value(full_t{nullptr, std::nullopt, {}});
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
 		// only the default path has a game skeleton; the others decide
@@ -981,7 +984,7 @@ ltl_to_safety_formula_full(tref fm,
 		if (unrealizable && game_source.game_skeleton.empty()
 			&& !ltl_verdict_incomplete)
 				*unrealizable = true;
-		return none();
+		return r.with_value(none());
 	}
 
 	auto& sol = *maybe;
@@ -992,10 +995,12 @@ ltl_to_safety_formula_full(tref fm,
 		if (!refined.has_value() || !refined.value()) {
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "
 				"survives the ABA refinement";
-			auto r = none();
+			auto out = none();
+			// the data game is the other candidate; when it decided,
+			// this refusal is only the losing candidate
 			if (!refined.has_value() && !(data_strategy && *data_strategy))
-				refined.print();
-			return r;
+				r.merge(std::move(refined));
+			return r.with_value(std::move(out));
 		}
 	}
 
@@ -1014,33 +1019,35 @@ ltl_to_safety_formula_full(tref fm,
 	// materialises its witness — see `const_formula` below.)
 	if (!sol.executable) {
 		if (none(); data_strategy && *data_strategy)
-			return {nullptr, std::nullopt, {}};
-		LOG_ERROR << "[ltl_aba] specification is REALIZABLE but the "
-		             "synthesised strategy cannot be encoded as a safety "
-		             "formula (Algorithm B strategy over bookkeeping "
-		             "bits) — it is not executable\n";
-		return {nullptr, std::nullopt, {}};
+			return r.with_value(full_t{nullptr, std::nullopt, {}});
+		return r.with_error(code::solver_error,
+			"[ltl_aba] specification is REALIZABLE but the "
+			"synthesised strategy cannot be encoded as a safety "
+			"formula (Algorithm B strategy over bookkeeping "
+			"bits) — it is not executable");
 	}
 
 	// LA-10: constant-output strategy — the executable form is the
 	// materialised `always(⋀ o_k = c_k)` witness, not `always T`.
 	if (sol.const_formula)
-		return {sol.const_formula, std::move(sol), {}};
+		return r.with_value(full_t{sol.const_formula, std::move(sol), {}});
 
 	// Purely propositional: realizable but no data constraints to encode.
-	if (sol.atoms.empty()) return {tau::_T(), std::move(sol), {}};
+	if (sol.atoms.empty())
+		return r.with_value(full_t{tau::_T(), std::move(sol), {}});
 
 	const auto& aut = sol.aut;
 
 	// Trivially realizable: empty automaton.
-	if (aut.num_states == 0) return {tau::_T(), std::move(sol), {}};
+	if (aut.num_states == 0)
+		return r.with_value(full_t{tau::_T(), std::move(sol), {}});
 
 	if (aut.num_states > 1) {
 		LOG_INFO << "[ltl_aba] Multi-state strategy ("
 		         << aut.num_states
 		         << " states) — encoding with auxiliary one-hot state bits";
-		tref encoded = encode_mealy_as_safety<node>(sol);
-		return {encoded, std::move(sol), {}};
+		TAU_TRY(tref encoded, encode_mealy_as_safety<node>(sol));
+		return r.with_value(full_t{encoded, std::move(sol), {}});
 	}
 
 	// Single-state strategy: the self-loop guard is the perpetual output
@@ -1050,11 +1057,11 @@ ltl_to_safety_formula_full(tref fm,
 	// analogue of LT-28). Not executable.
 	if (aut.edges.empty() || aut.edges[0].empty()) {
 		if (none(); data_strategy && *data_strategy)
-			return {nullptr, std::nullopt, {}};
-		LOG_ERROR << "[ltl_aba] single-state strategy has no outgoing "
-		             "edge; the automaton is degraded and cannot be "
-		             "executed\n";
-		return {nullptr, std::nullopt, {}};
+			return r.with_value(full_t{nullptr, std::nullopt, {}});
+		return r.with_error(code::internal_error,
+			"[ltl_aba] single-state strategy has no outgoing "
+			"edge; the automaton is degraded and cannot be "
+			"executed");
 	}
 
 	// Build the disjunction of ABA guard formulas over all edges from state 0.
@@ -1063,28 +1070,32 @@ ltl_to_safety_formula_full(tref fm,
 		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
 		auto norm_guard_r = normalize_non_temp<node>(guard_fm);
 		if (!norm_guard_r.has_value()) {
-			LOG_ERROR << "[ltl_aba] ltl_to_safety_formula_full: "
-				"normalization of a guard formula failed";
-			return {nullptr, std::nullopt, {}};
+			r.merge(std::move(norm_guard_r));
+			return r.with_error(code::internal_error,
+				"[ltl_aba] ltl_to_safety_formula_full: "
+				"normalization of a guard formula failed");
 		}
 		combined = tau::build_wff_or(combined, norm_guard_r.value());
 	}
 	auto simplified_r = normalize_non_temp<node>(combined);
 	if (!simplified_r.has_value()) {
-		LOG_ERROR << "[ltl_aba] ltl_to_safety_formula_full: "
-			"final normalization failed";
-		return {nullptr, std::nullopt, {}};
+		r.merge(std::move(simplified_r));
+		return r.with_error(code::internal_error,
+			"[ltl_aba] ltl_to_safety_formula_full: "
+			"final normalization failed");
 	}
 	tref simplified = simplified_r.value();
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
 	          << LOG_FM(simplified) << ")";
-	return {tau::build_wff_always(simplified), std::move(sol), {}};
+	return r.with_value(full_t{tau::build_wff_always(simplified),
+		std::move(sol), {}});
 }
 
 template <NodeType node>
-tref ltl_to_safety_formula(tref fm) {
-	auto [safety, _sol, _aux] = ltl_to_safety_formula_full<node>(fm);
-	return safety;
+result<tref> ltl_to_safety_formula(tref fm) {
+	result<tref> r;
+	TAU_TRY(auto full, ltl_to_safety_formula_full<node>(fm));
+	return r.with_value(std::get<0>(full));
 }
 
 // ── ltl_explain ───────────────────────────────────────────────────────────────
@@ -1183,13 +1194,26 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		// what `run` executes
 		if (real.value()) {
 			std::shared_ptr<data_game_strategy<node>> data;
-			auto [safety, _sol, _aux] =
+			auto full =
 				ltl_to_safety_formula_full<node>(fm, &data);
-			if (data) out << "\nExecution plays the strategy of the "
-				"data game\n";
-			else if (safety) out << "\nSafety formula: "
-				<< tau::get(safety).to_str() << "\n";
-			else out << "\nThe strategy is not executable\n";
+			if (!full.has_value()) {
+				// The verdict is already decided; the safety formula
+				// only describes how `run` executes it, so a formula the
+				// encoding does not cover cannot turn it into an error.
+				auto sc = r.open("execution strategy not built");
+				report cand = std::move(full).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+				out << "\nThe strategy is not executable\n";
+			} else {
+				tref safety = std::get<0>(full.value());
+				r.merge(std::move(full));
+				if (data) out << "\nExecution plays the strategy of the "
+					"data game\n";
+				else if (safety) out << "\nSafety formula: "
+					<< tau::get(safety).to_str() << "\n";
+				else out << "\nThe strategy is not executable\n";
+			}
 		}
 		out << "\n" << (real.value() ? "REALIZABLE" : "UNREALIZABLE")
 			<< "\n";
@@ -1659,7 +1683,7 @@ static result<tref> translate_ctl_star(tref fm,
 		case tau::wff_neg:       return r.with_value(tau::build_wff_neg(new_children[0]));
 		case tau::wff_sometimes: return r.with_value(tau::build_wff_sometimes(new_children[0]));
 		case tau::wff_always:    return r.with_value(tau::build_wff_always(new_children[0]));
-		default:                 break; // falls to the LT-13 LOG_ERROR
+		default:                 break; // falls to the error below
 		}
 	} else if (nch == 2) {
 		// Binary operators
