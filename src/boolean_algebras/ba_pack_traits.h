@@ -593,6 +593,22 @@ std::optional<int> pack_dense_order_compare(size_t ba_type, tref a, tref b) {
 }
 
 /**
+ * @brief A point of the dense-order type @p ba_type above @p lo and below
+ * @p hi (nullptr for no bound); nullptr when a bound is not a point or the
+ * type is not a dense order.
+ */
+template <typename Node>
+tref pack_dense_order_between(size_t ba_type, tref lo, tref hi) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<tref> {
+			if constexpr (ba_has_dense_order<Node, BA>)
+				return ba_descriptor<BA, Node>::dense_order_between(
+					ba_type, lo, hi);
+			return std::nullopt;
+		}).value_or(nullptr);
+}
+
+/**
  * @brief `true` when the BA owning @p ba_type is a non-aba omega-categorical BA.
  *
  * Reads the descriptor flag rather than asking whether the pack contains a

@@ -233,12 +233,16 @@ concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
 
 // The type's values, read by = and the order comparisons, form a dense
 // linear order without endpoints; dense_order_compare orders two constants
-// (-1, 0, 1), nullopt when either is not a point of the order.
+// (-1, 0, 1), nullopt when either is not a point of the order, and
+// dense_order_between gives a point above `lo` and below `hi` (either
+// nullptr for no bound), nullptr when a bound is not a point.
 template <typename Node, typename BA>
 concept ba_has_dense_order = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, tref a, tref b) {
 		{ ba_descriptor<BA, Node>::dense_order_compare(t, a, b) }
-			-> std::convertible_to<std::optional<int>>; };
+			-> std::convertible_to<std::optional<int>>;
+		{ ba_descriptor<BA, Node>::dense_order_between(t, a, b) }
+			-> std::convertible_to<tref>; };
 
 template <typename Node, typename BA>
 concept ba_has_bool_carrier_type = ba_has_descriptor_v<Node, BA>

@@ -2010,26 +2010,30 @@ protected:
 		return bits;
 	}
 
-	// The relations that extend the order of the points known in `bits`
-	// to the order slots of `slots`, with them as weak orders.
+	// The relations that extend the order of the points `win` knows to the
+	// order slots of `slots`, with them as weak orders. A point of neither
+	// stays out: the relations to it would only grow the BDD.
 	data_bdd::id order_extensions(const std::vector<int>& bits,
+		const window& win,
 		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
 	{
 		data_bdd::id r = data_bdd::T;
 		std::map<size_t, std::vector<size_t>> by_type;
-		for (size_t p = 0; p < w.points.size(); ++p)
-			by_type[w.points[p].tid].push_back(p);
-		for (auto& [_, pts] : by_type) {
-			std::vector<bool> in_x;
-			bool any = false;
-			for (size_t p : pts) {
-				const auto& x = w.points[p];
-				in_x.push_back(x.slot() && std::any_of(slots.begin(),
-					slots.end(), [&](const auto& sl) {
-						return std::get<0>(sl) == x.s
-							&& std::get<1>(sl) == x.k; }));
-				any |= in_x.back();
-			}
+		std::map<size_t, std::vector<bool>> flagged;
+		for (size_t p = 0; p < w.points.size(); ++p) {
+			const auto& x = w.points[p];
+			const bool mine = x.slot() && std::any_of(slots.begin(),
+				slots.end(), [&](const auto& sl) {
+					return std::get<0>(sl) == x.s
+						&& std::get<1>(sl) == x.k; });
+			if (!mine && !point_value(p, win)) continue;
+			by_type[x.tid].push_back(p);
+			flagged[x.tid].push_back(mine);
+		}
+		for (auto& [tid, pts] : by_type) {
+			const std::vector<bool>& in_x = flagged[tid];
+			const bool any = std::find(in_x.begin(), in_x.end(), true)
+				!= in_x.end();
 			if (any) r = bdd.conj(r, order_consistent(w, bdd, pts, in_x,
 				&bits));
 		}
@@ -2081,6 +2085,8 @@ protected:
 		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
 	{
 		tref f = tau::_T();
+		// the value decoded for each slot of an order stream
+		std::vector<tref> placed(slots.size(), nullptr);
 		for (size_t i = 0; i < slots.size(); ++i) {
 			auto [s, k, x] = slots[i];
 			const size_t tid = streams[s].tid;
@@ -2094,24 +2100,35 @@ protected:
 				return ws.orbit && side != other ? complement(y) : y;
 			};
 			if (ws.order) {
-				// the relation to every known point and earlier slot
+				// the point the relations to every known point and earlier
+				// slot place it at: equal to one, else between the
+				// greatest below it and the least above it
 				const size_t me = w.slot_point(s, k);
+				auto cmp = [&](tref a, tref b) {
+					return pack_dense_order_compare<node>(tid, a, b)
+						.value_or(0);
+				};
+				tref same = nullptr, lo = nullptr, hi = nullptr;
 				for (size_t p = 0; p < w.points.size(); ++p) {
 					if (p == me || w.points[p].tid != tid) continue;
 					tref y = point_value(p, win);
 					for (size_t i2 = 0; i2 < i && !y; ++i2)
 						if (w.slot_point(std::get<0>(slots[i2]),
 							std::get<1>(slots[i2])) == p)
-								y = std::get<2>(slots[i2]);
+								y = placed[i2];
 					auto rel = w.relation(me, p);
 					if (!y || !rel) continue;
 					auto [v, flip] = *rel;
 					int r = bits[v] > 0 ? -1 : bits[v + 1] > 0 ? 0 : 1;
 					if (flip) r = -r;
-					f = tau::build_wff_and(f, r < 0 ? tau::build_bf_lt(x, y)
-						: r > 0 ? tau::build_bf_lt(y, x)
-						: tau::build_bf_eq(x, y));
+					if (r == 0) same = y;
+					else if (r < 0) { if (!hi || cmp(y, hi) < 0) hi = y; }
+					else if (!lo || cmp(y, lo) > 0) lo = y;
 				}
+				placed[i] = same ? same
+					: pack_dense_order_between<node>(tid, lo, hi);
+				f = tau::build_wff_and(f, placed[i]
+					? tau::build_bf_eq(x, placed[i]) : tau::_F());
 				continue;
 			}
 			if (ws.modular) {
@@ -2207,7 +2224,7 @@ protected:
 					streams[s].name, t, streams[s].tid));
 		data_bdd::id any = data_bdd::F;
 		for (auto m : moves[i]) any = bdd.disj(any, m);
-		any = bdd.conj(any, order_extensions(*bits, slots));
+		any = bdd.conj(any, order_extensions(*bits, win, slots));
 		if (bdd.full || !pick(any, *bits))
 			return r.with_error(code::internal_error,
 				"the data game strategy has no move from the history");
@@ -2238,8 +2255,8 @@ protected:
 		if (!known) return r.with_error(code::solver_error,
 			"the data game strategy cannot compare the values");
 		std::vector<int> bits = std::move(*known);
-		if (!pick(bdd.conj(won_init, order_extensions(bits, slots)), bits))
-			return r.with_value(false);
+		if (!pick(bdd.conj(won_init, order_extensions(bits, win, slots)),
+			bits)) return r.with_value(false);
 		values sol;
 		if (!slots.empty()) {
 			auto got = solve(decode(bits, win, slots), 0);
