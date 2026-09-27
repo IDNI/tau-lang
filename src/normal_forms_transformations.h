@@ -161,12 +161,12 @@ tref push_negation_in(tref fm);
  * @return Simplified formula.
  */
 template <NodeType node>
-tref syntactic_formula_simplification(tref formula);
+result<tref> syntactic_formula_simplification(tref formula);
 
 // Forward declarations needed by .tmpl.h bodies.
 // Full declarations/definitions come from their respective heuristic headers.
 template <NodeType node>
-tref simplify_using_equality(tref fm);
+result<tref> simplify_using_equality(tref fm);
 
 template <NodeType node>
 tref syntactic_path_simplification(tref fm);

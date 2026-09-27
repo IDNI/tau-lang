@@ -155,10 +155,11 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
-bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
+result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	auto& dnf, const auto& is_var, int_t p, bool is_wff)
 {
 	using tau = tree<node>;
+	result<bool> r;
 #ifdef DEBUG
 	LOG_TRACE << "Begin assign_and_reduce [" << LOG_NT_COLOR
 		<< (is_wff ? "wff" : "bf") << TC.CLEAR() << "]: "
@@ -166,10 +167,10 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	for (auto v : vars) LOG_TRACE << "v: " << TAU_TO_STR(v);
 	LOG_TRACE << "p: " << p;
 #endif // DEBUG
-	auto report = [&](bool result) {
-		DBG(LOG_TRACE << (result ? "result is ok" : "no result")
+	auto report = [&](bool v) -> result<bool> {
+		DBG(LOG_TRACE << (v ? "result is ok" : "no result")
 				<< " for input: " << LOG_FM(fm);)
-		return result;
+		return r.with_value(v);
 	};
 
 	// Check if all variables are assigned
@@ -178,50 +179,50 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 		if (!is_wff) {
 			// Do not add to dnf if the coefficient is 0
 			if (tau::get(fm).equals_0()) return report(false);
-			// fm is a Boolean function
-			// Normalize tau subformulas
-			// TODO (HIGH) assign_and_reduce returns a bool with no report channel: the normalize_ba report stops here.
-			auto nr = normalize_ba<node>(fm);
-			fm_simp = nr.has_value() ? nr.value() : fm;
+			TAU_TRY(fm_simp, normalize_ba<node>(fm));
 			DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
-			fm_simp = to_dnf<node, false>(fm_simp);
+			TAU_TRY(fm_simp, (to_dnf<node, false>(fm_simp)));
 			DBG(LOG_TRACE << "to_dnf result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
-			fm_simp = reduce<node>(fm_simp);
+			TAU_TRY(fm_simp, reduce<node>(fm_simp));
 			DBG(LOG_TRACE << "reduce result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
 		} else {
 			if (tau::get(fm).equals_F()) return report(false);
 			// fm is a Tau formula
-			fm_simp = to_dnf<node, false>(fm);
+			TAU_TRY(fm_simp, (to_dnf<node, false>(fm)));
 			DBG(LOG_TRACE << "to_dnf result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_F()) return report(false);
-			fm_simp = reduce<node>(fm_simp);
+			TAU_TRY(fm_simp, reduce<node>(fm_simp));
 			DBG(LOG_TRACE << "reduce result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_F()) return report(false);
 		}
 		if (std::ranges::all_of(i, [](const auto el){return el == 2;})){
 			//bool t = is<node>(fm->child[0], tau::bf_t);
-			return dnf.emplace(fm_simp, std::vector(0, i)), true;
+			dnf.emplace(fm_simp, std::vector(0, i));
+			return r.with_value(true);
 		}
 
 		auto it = dnf.find(fm_simp);
 		// NF-14: p != 0 always here (the p == 0 arm returned above), so
 		// the vector size is simply 1.
-		if (it == dnf.end()) return dnf.emplace(fm_simp,
-				std::vector(1, i)), report(false);
+		if (it == dnf.end()) {
+			dnf.emplace(fm_simp, std::vector(1, i));
+			return report(false);
+		}
 		else if (!reduce_paths(i, it->second, p)) {
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);
 		} else std::erase_if(it->second,
 				[](const auto& v) { return v.empty(); });
-		return it->second.empty();
+		return r.with_value(it->second.empty());
 	}
 	// variable was already eliminated
 	if (i[p] == 2) {
-		if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, p + 1,
-						is_wff)) return report(true);
+		TAU_TRY(auto sub, assign_and_reduce<node>(fm, vars, i, dnf, is_var,
+						p + 1, is_wff));
+		if (sub) return report(true);
 		i[p] = 0;
 		return report(false);
 	}
@@ -235,18 +236,21 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	elim_vars_in_assignment<node>(fm_v1, vars, i, p, is_var);
 	if (tau::get(fm_v1) == tau::get(fm_v0)) {
 		i[p] = 2;
-		if (assign_and_reduce<node>(fm_v1, vars, i, dnf, is_var, p + 1,
-						is_wff)) return report(true);
+		TAU_TRY(auto sub, assign_and_reduce<node>(fm_v1, vars, i, dnf, is_var,
+						p + 1, is_wff));
+		if (sub) return report(true);
 		i[p] = 0;
 	} else {
 		i[p] = 1;
-		if (assign_and_reduce<node>(fm_v1, vars, i, dnf, is_var, p + 1,
-						is_wff)) return report(true);
+		TAU_TRY(auto sub_v1, assign_and_reduce<node>(fm_v1, vars, i, dnf, is_var,
+						p + 1, is_wff));
+		if (sub_v1) return report(true);
 		i[p] = 0;
 		elim_vars_in_assignment<node>(fm_v0, vars, i, p, is_var);
 		i[p] = -1;
-		if (assign_and_reduce<node>(fm_v0, vars, i, dnf, is_var, p + 1,
-						is_wff)) return report(true);
+		TAU_TRY(auto sub_v0, assign_and_reduce<node>(fm_v0, vars, i, dnf, is_var,
+						p + 1, is_wff));
+		if (sub_v0) return report(true);
 		i[p] = 0;
 	}
 	return report(false);
@@ -255,8 +259,9 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the paths to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
-tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
+result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
+	result<tref> r;
 	LOG_TRACE << "bf_boole_normal_form: " << LOG_FM(fm);
 	// NF-13: not static -- a static [&] lambda dangles on later calls.
 	auto trace = [&](tref fm) {
@@ -265,7 +270,7 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	};
 	// We do not treat terms that contain a non-Boolean operation
 	if (rewriter::find_top<node>(fm, is_non_boolean_term<node>))
-		return fm;
+		return r.with_value(fm);
 	fm = apply_all_xor_def<node>(fm);
 	// Function can only be applied to a BF
 	const auto& t = tau::get(fm);
@@ -275,7 +280,7 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 				subtree_pair_less<node, bool>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(fm, make_paths_disjoint));
-		it != cache.end()) return trace(it->second);
+		it != cache.end()) return r.with_value(trace(it->second));
 #endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
@@ -294,18 +299,21 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	// unordered_tau_map<std::vector<std::vector<int_t>>, BAs...> dnf;
 	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 
-	if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0, false)) {
+	TAU_TRY(auto assigned,
+		assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0, false));
+	if (assigned) {
 		// A fully reduced formula has exactly one coefficient. Anything
-		// else is an upstream bug; with assertions compiled out the old
-		// `dnf.begin()->first` would dereference an empty map, so fall
-		// through to the general construction below instead.
+		// else is an upstream bug, so the reduction fails rather than
+		// returning a DNF built from a corrupt coefficient map.
 		DBG(assert(dnf.size() == 1);)
-		if (dnf.size() == 1) return trace(dnf.begin()->first);
-		LOG_ERROR << "bf_boole_normal_form: a reduced formula yielded "
-			<< dnf.size() << " coefficients instead of one; building "
-			"the normal form from all of them";
+		if (dnf.size() == 1) return r.with_value(trace(dnf.begin()->first));
+		return r.with_error(code::internal_error,
+			"bf_boole_normal_form: a reduced formula yielded "
+			+ std::to_string(dnf.size())
+			+ " coefficients instead of one",
+			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
 	}
-	if (dnf.empty()) return trace(_0<node>(find_ba_type<node>(fm)));
+	if (dnf.empty()) return r.with_value(trace(_0<node>(find_ba_type<node>(fm))));
 	if (!make_paths_disjoint)
 		for (auto& [coeff, paths] : dnf) join_paths(paths);
 
@@ -348,13 +356,15 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	cache.emplace(std::make_pair(reduced_dnf, make_paths_disjoint),
 								reduced_dnf);
 #endif //TAU_CACHE
-	return trace(reduced_dnf);
+	return r.with_value(trace(reduced_dnf));
 }
 
 // The needed class in order to make bf_reduced_dnf work with rule applying process
 template <NodeType node>
 tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
+	// TODO (HIGH) dropped error: bf_reduced_dnf's report -- this traverser
+	// functor is fixed to tref by the operator| pipeline.
 	const auto& t = tau::get(fm);
 	LOG_TRACE << "bf reduce canonical: " << LOG_FM(fm);
 	subtree_map<node, tref> changes = {};
@@ -366,12 +376,16 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 			// itself, never for wff callers.
 			for (tref arg : tau::get(bf)[0]
 					.select_top(is<node, tau::bf>)) {
-				tref dnf = bf_reduced_dnf<node>(arg);
+				auto dnf_r = bf_reduced_dnf<node>(arg);
+				if (!dnf_r.has_value()) return nullptr;
+				tref dnf = dnf_r.value();
 				if (tau::get(dnf) != tau::get(arg))
 					changes.emplace(arg, dnf);
 			}
 		}
-		tref dnf = bf_reduced_dnf<node>(bf);
+		auto dnf_r = bf_reduced_dnf<node>(bf);
+		if (!dnf_r.has_value()) return nullptr;
+		tref dnf = dnf_r.value();
 		if (tau::get(dnf) != tau::get(bf)) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
@@ -396,10 +410,11 @@ typename tree<node>::traverser operator|(
 
 
 template <NodeType node>
-std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
+result<std::pair<std::vector<int_t>, bool>> clause_to_vector(tref clause,
 	const auto& var_pos, const bool wff, const bool is_cnf)
 {
 	using tau = tree<node>;
+	result<std::pair<std::vector<int_t>, bool>> r;
 	std::vector<int_t> i(var_pos.size());
 	for (size_t k = 0; k < var_pos.size(); ++k) i[k] = 2;
 	bool clause_is_decided = false;
@@ -428,12 +443,14 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 			// Every literal of the clause was collected into var_pos
 			// by the caller; a miss is an upstream bug. Without the
 			// assertion (release) `i[it->second]` would read through
-			// end(), so log and skip the literal instead.
+			// end(), so the clause is refused instead.
 			DBG(assert(it != var_pos.end());)
 			if (it == var_pos.end()) {
-				LOG_ERROR << "get_assignment: negated literal missing "
-					"from the clause's variable positions; ignoring "
-					"it";
+				r.error(code::internal_error,
+					"get_assignment: negated literal missing "
+					"from the clause's variable positions",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(clause))}});
 				return false;
 			}
 			if (i[it->second] == 1) {
@@ -456,14 +473,16 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 		else return true;
 	};
 	pre_order<node>(clause).visit_unique(var_assigner);
-	return std::make_pair(std::move(i), clause_is_decided);
+	if (r.has_error()) return r;
+	return r.with_value(std::make_pair(std::move(i), clause_is_decided));
 }
 
 template <NodeType node>
-std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
+result<std::vector<std::vector<int_t>>> collect_paths(tref new_fm, bool wff,
 	const auto& vars, bool& decided, bool is_cnf, bool all_reductions)
 {
 	using tau = tree<node>;
+	result<std::vector<std::vector<int_t>>> r;
 	std::vector<std::vector<int_t>> paths;
 	// unordered_tau_map<int_t, BAs...> var_pos;
 	subtree_map<node, int_t> var_pos;
@@ -472,24 +491,27 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 	for (tref clause : get_leaves<node>(new_fm, is_cnf
 					? (wff ? tau::wff_and : tau::bf_and)
 					: (wff ? tau::wff_or  : tau::bf_or))) {
-		auto [i, clause_is_decided] =
-			clause_to_vector<node>(clause, var_pos, wff, is_cnf);
+		TAU_TRY(auto cv,
+			clause_to_vector<node>(clause, var_pos, wff, is_cnf));
+		auto [i, clause_is_decided] = std::move(cv);
 		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
 		decided = false;
 		if (std::ranges::all_of(i, [](const auto el) {return el == 2;}))
-			return {};
+			return r.with_value(std::vector<std::vector<int_t>>{});
 		if (all_reductions) {
 			if (!reduce_paths(i, paths, static_cast<int_t>(vars.size())))
 				paths.emplace_back(std::move(i));
 			else {
 				std::erase_if(paths,
 					[](const auto& v){return v.empty();});
-				if (paths.empty()) return {};
+				if (paths.empty())
+					return r.with_value(
+						std::vector<std::vector<int_t>>{});
 			}
 		} else paths.emplace_back(std::move(i));
 	}
-	return paths;
+	return r.with_value(std::move(paths));
 }
 
 template <NodeType node>
@@ -549,14 +571,20 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 
 //TODO: decide if to treat xor in bf case
 template<NodeType node>
-std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
-	bool is_cnf) {
+result<std::pair<std::vector<std::vector<int_t>>, trefs>>
+dnf_cnf_to_reduced(tref fm, bool is_cnf) {
 	using tau = tree<node>;
-	auto smt_replace = [](tref n) {
+	result<std::pair<std::vector<std::vector<int_t>>, trefs>> r;
+	auto smt_replace = [&](tref n) -> tref {
 		if (is_child<node>(n, tau::wff_sometimes)) {
 			n = tau::trim2(n); // Remove quantifier
 			n = tau::build_wff_neg(n);
-			n = syntactic_formula_simplification<node>(n);
+			auto simp = syntactic_formula_simplification<node>(n);
+			if (!simp.has_value()) {
+				r.merge(std::move(simp));
+				return nullptr;
+			}
+			n = simp.value();
 			n = tau::build_wff_neg(tau::build_wff_always(n));
 			return n;
 		} else return n;
@@ -569,6 +597,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 	if (is_wff) {
 		// Substitute all sometimes by !always! and push inner equality in
 		fm = pre_order<node>(fm).apply_unique(smt_replace);
+		if (r.has_error()) return r;
 		fm = unequal_to_not_equal<node>(fm);
 		fm = order_atoms_to_literals<node>(fm);
 	} else fm = apply_all_xor_def<node>(fm); // term case
@@ -577,26 +606,31 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 	LOG_TRACE << "dnf_cnf_to_reduced / vars.size(): " << vars.size();
 	if (vars.empty()) {
 		if (tau::get(fm).equals_T() || tau::get(fm).equals_1()) {
-			if (is_cnf) return {};
+			if (is_cnf)
+				return r.with_value(
+					std::pair<std::vector<std::vector<int_t>>,
+						trefs>{});
 			std::vector<std::vector<int_t>> paths;
 			paths.emplace_back();
-			return std::make_pair(std::move(paths), std::move(vars));
+			return r.with_value(std::make_pair(std::move(paths),
+				std::move(vars)));
 		} else {
 			if (is_cnf) {
 				std::vector<std::vector<int_t>> paths;
 				paths.emplace_back();
-				return std::make_pair(std::move(paths),
-						      std::move(vars));
+				return r.with_value(std::make_pair(std::move(paths),
+							      std::move(vars)));
 			}
-			return {};
+			return r.with_value(
+				std::pair<std::vector<std::vector<int_t>>, trefs>{});
 		}
 	}
 	bool decided = true;
-	auto paths = collect_paths<node>(fm, is_wff, vars, decided, is_cnf,
-					true);
+	TAU_TRY(auto paths, collect_paths<node>(fm, is_wff, vars, decided,
+					is_cnf, true));
 	join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
-	return std::make_pair(std::move(paths), std::move(vars));
+	return r.with_value(std::make_pair(std::move(paths), std::move(vars)));
 }
 
 // (NF-7: group_dnf_expression deleted -- zero callers.)
@@ -604,14 +638,16 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
 template<NodeType node, bool is_cnf>
-tref reduce(tref fm) {
+result<tref> reduce(tref fm) {
 	using tau = tree<node>;
+	result<tref> r;
 	bool is_wff = !tau::get(fm).is_term();
 	size_t type_id = is_wff ? 0 : find_ba_type<node>(fm);
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != end(cache)) return it->second;
+	if (auto it = cache.find(fm); it != end(cache))
+		return r.with_value(it->second);
 #endif // TAU_CACHE
 	DBG(LOG_TRACE << "Begin reduce with is_cnf set to " << is_cnf;)
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
@@ -623,27 +659,28 @@ tref reduce(tref fm) {
 			// tau-constant terms would otherwise be re-simplified on
 			// every call.
 #ifdef TAU_CACHE
-			return cache.emplace(fm, res).first->second;
+			return r.with_value(cache.emplace(fm, res).first->second);
 #endif // TAU_CACHE
-			return res;
+			return r.with_value(res);
 		}
 	}
-	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
+	TAU_TRY(auto reduced, dnf_cnf_to_reduced<node>(fm, is_cnf));
+	auto [paths, vars] = std::move(reduced);
 	if (paths.empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_T() : tau::_1(type_id))
 				  : (is_wff ? tau::_F() : tau::_0(type_id));
 #ifdef TAU_CACHE
-		return cache.emplace(fm, res).first->second;
+		return r.with_value(cache.emplace(fm, res).first->second);
 #endif // TAU_CACHE
-		return res;
+		return r.with_value(res);
 	}
 	if (paths.size() == 1 && paths[0].empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_F() : tau::_0(type_id))
 				  : (is_wff ? tau::_T() : tau::_1(type_id));
 #ifdef TAU_CACHE
-		return cache.emplace(fm, res).first->second;
+		return r.with_value(cache.emplace(fm, res).first->second);
 #endif // TAU_CACHE
-		return res;
+		return r.with_value(res);
 	}
 	auto reduced_fm = build_reduced_formula<node>(paths, vars, is_cnf, is_wff, type_id);
 	if (is_wff) reduced_fm = push_negation_in<node>(reduced_fm);
@@ -651,9 +688,9 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "End reduce";)
 	DBG(LOG_TRACE << "Reduced formula: " << LOG_FM(reduced_fm);)
 #ifdef TAU_CACHE
-	return cache.emplace(fm, reduced_fm).first->second;
+	return r.with_value(cache.emplace(fm, reduced_fm).first->second);
 #endif // TAU_CACHE
-	return reduced_fm;
+	return r.with_value(reduced_fm);
 }
 
 template<NodeType node>
@@ -688,12 +725,18 @@ int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 
 template <NodeType node>
 tref wff_reduce_dnf<node>::operator() (tref fm) const {
-	return reduce<node>(fm);
+	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
+	// is fixed to tref by the operator| pipeline.
+	auto r = reduce<node>(fm);
+	return r.has_value() ? r.value() : nullptr;
 }
 
 template <NodeType node>
 tref wff_reduce_cnf<node>::operator() (tref fm) const {
-	return reduce<node, true>(fm);
+	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
+	// is fixed to tref by the operator| pipeline.
+	auto r = reduce<node, true>(fm);
+	return r.has_value() ? r.value() : nullptr;
 }
 
 template <NodeType node>

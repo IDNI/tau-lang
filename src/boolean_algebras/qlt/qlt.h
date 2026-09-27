@@ -274,7 +274,7 @@ std::ostream& operator<<(std::ostream& os, const qlt& q);
 // --- parsing helpers (called from templates in qlt.tmpl.h) ---
 std::optional<qlt> qlt_eval_interval(
 	const qlt_parser::tree::traverser& interval_node);
-std::optional<qlt> qlt_eval_parse_tree(
+result<qlt> qlt_eval_parse_tree(
 	const qlt_parser::tree::traverser& t);
 
 // --- free functions expected by the dispatcher ---

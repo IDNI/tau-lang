@@ -34,14 +34,14 @@ namespace idni::tau_lang {
  * // the reoriented "xy|zx=0" clause (see
  * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:323-333).
  * tref fm = get_nso_rr("xy|zx = 0 && xy = 0.").value().main->get();
- * tref res = simplify_using_equality<node_t>(fm);
- * // tau::get(res).to_str() matches one of "yx|xz = 0", "xy|xz = 0",
+ * auto res = simplify_using_equality<node_t>(fm);
+ * // tau::get(res.value()).to_str() matches one of "yx|xz = 0", "xy|xz = 0",
  * // "yx|zx = 0", "xy|zx = 0" (term-ordering / xz-vs-zx are not canonical
  * // across builds; see matches_to_str_to_any_of in the cited test)
  * @endcode
  */
 template <NodeType node>
-tref simplify_using_equality(tref fm);
+result<tref> simplify_using_equality(tref fm);
 
 } // namespace idni::tau_lang
 

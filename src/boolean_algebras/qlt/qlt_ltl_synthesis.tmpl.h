@@ -143,16 +143,18 @@ static bool is_algorithm_a_applicable(
 	return true;
 }
 
-// Returns true/false if the qlt comparison atom holds in T3, nullopt if unsupported.
+// Returns true/false if the qlt comparison atom holds in T3, an empty optional
+// if unsupported.
 template <NodeType node>
-static std::optional<bool> qlt_atom_holds_in_type3(
+static result<std::optional<bool>> qlt_atom_holds_in_type3(
 	tref atom,
 	const omcat::qlt_type3& T3,
 	const std::vector<omcat::rational>& constants)
 {
 	using tau = tree<node>;
+	result<std::optional<bool>> r;
 	const auto& t = tau::get(atom);
-	if (!t.has_child()) return std::nullopt;
+	if (!t.has_child()) return r.with_value(std::nullopt);
 	size_t op = t[0].value.get_nt();
 	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
 	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
@@ -160,7 +162,7 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 	else if (op == tau::bf_nlteq) op = tau::bf_gt;
 	if (op != tau::bf_lt  && op != tau::bf_lteq && op != tau::bf_gt &&
 	    op != tau::bf_gteq && op != tau::bf_eq  && op != tau::bf_neq)
-		return std::nullopt;
+		return r.with_value(std::nullopt);
 
 	tref lhs = t[0].first();
 	tref rhs = t[0].second();
@@ -188,7 +190,7 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 	if (lhs_io && rhs_io) {
 		auto rl = t3_role_of<node>(lhs_io);
 		auto rr = t3_role_of<node>(rhs_io);
-		if (!rl || !rr) return std::nullopt;
+		if (!rl || !rr) return r.with_value(std::nullopt);
 		omcat::relation rel;
 		auto p = std::make_pair(*rl, *rr);
 		using R = t3_var_role;
@@ -198,8 +200,8 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 		else if (p == std::make_pair(R::Y, R::M)) rel = flip_rel(T3.rel_my);
 		else if (p == std::make_pair(R::X, R::Y)) rel = T3.rel_xy;
 		else if (p == std::make_pair(R::Y, R::X)) rel = flip_rel(T3.rel_xy);
-		else return std::nullopt; // same role (e.g. y vs y)
-		return rel_holds(rel, op);
+		else return r.with_value(std::nullopt); // same role (e.g. y vs y)
+		return r.with_value(rel_holds(rel, op));
 	}
 
 	if (lhs_io || rhs_io) {
@@ -207,17 +209,18 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 		tref const_side = lhs_io ? rhs : lhs;
 		bool io_is_lhs = (lhs_io != nullptr);
 		auto role = t3_role_of<node>(io_var);
-		if (!role) return std::nullopt;
+		if (!role) return r.with_value(std::nullopt);
 		omcat::qlt_type1 t1;
 		if      (*role == t3_var_role::M) t1 = T3.restrict_m();
 		else if (*role == t3_var_role::X) t1 = T3.restrict_x();
 		else                            t1 = T3.restrict_y();
-		auto cs = omcat::collect_qlt_constants<node>(const_side);
-		if (cs.size() != 1) return std::nullopt;
+		TAU_TRY(auto cs,
+			omcat::collect_qlt_constants<node>(const_side));
+		if (cs.size() != 1) return r.with_value(std::nullopt);
 		int j = -1;
 		for (int k = 0; k < (int)constants.size(); ++k)
 			if (omcat::cmp(constants[k], cs[0]) == 0) { j = k; break; }
-		if (j < 0) return std::nullopt;
+		if (j < 0) return r.with_value(std::nullopt);
 		auto eff = op;
 		if (!io_is_lhs) {
 			if      (eff == tau::bf_lt)   eff = tau::bf_gt;
@@ -225,15 +228,15 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 			else if (eff == tau::bf_lteq) eff = tau::bf_gteq;
 			else if (eff == tau::bf_gteq) eff = tau::bf_lteq;
 		}
-		if (eff == tau::bf_lt)   return t1.less_than(j);
-		if (eff == tau::bf_lteq) return t1.less_than(j) || t1.equal_to(j);
-		if (eff == tau::bf_gt)   return t1.greater_than(j);
-		if (eff == tau::bf_gteq) return t1.greater_than(j) || t1.equal_to(j);
-		if (eff == tau::bf_eq)   return t1.equal_to(j);
-		if (eff == tau::bf_neq)  return !t1.equal_to(j);
-		return std::nullopt;
+		if (eff == tau::bf_lt)   return r.with_value(t1.less_than(j));
+		if (eff == tau::bf_lteq) return r.with_value(t1.less_than(j) || t1.equal_to(j));
+		if (eff == tau::bf_gt)   return r.with_value(t1.greater_than(j));
+		if (eff == tau::bf_gteq) return r.with_value(t1.greater_than(j) || t1.equal_to(j));
+		if (eff == tau::bf_eq)   return r.with_value(t1.equal_to(j));
+		if (eff == tau::bf_neq)  return r.with_value(!t1.equal_to(j));
+		return r.with_value(std::nullopt);
 	}
-	return std::nullopt;
+	return r.with_value(std::nullopt);
 }
 
 // ── Algorithm A/B soundness guards (shared with semantic_pwr_optimal) ────────
@@ -251,21 +254,23 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 // strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
 // for direct contradictions like `F(o1={top}) && G(o1!={top})`.
 template <NodeType node>
-static bool alg_a_can_classify(
+static result<bool> alg_a_can_classify(
     tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
-	auto a_constants = omcat::collect_qlt_constants<node>(fm);
+	result<bool> r;
+	TAU_TRY(auto a_constants, omcat::collect_qlt_constants<node>(fm));
 	auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
-	if (a_T3.empty()) return false;
+	if (a_T3.empty()) return r.with_value(false);
 	for (auto& [f, _] : atoms) {
 		bool any_determined = false;
-		for (auto& t : a_T3)
-			if (qlt_atom_holds_in_type3<node>(f, t, a_constants)
-			        .has_value())
-				{ any_determined = true; break; }
-		if (!any_determined) return false;
+		for (auto& t : a_T3) {
+			TAU_TRY(auto h,
+				qlt_atom_holds_in_type3<node>(f, t, a_constants));
+			if (h.has_value()) { any_determined = true; break; }
+		}
+		if (!any_determined) return r.with_value(false);
 	}
-	return true;
+	return r.with_value(true);
 }
 
 // Algorithm A's T_3 encoding has a SINGLE current-output slot (Y) and a SINGLE
@@ -303,15 +308,16 @@ static size_t count_distinct_output_vars(
 // shift) as aliasing to o_k, since the strategy is constant over time.
 // Returns nullopt if the atom involves an input variable or can't be evaluated.
 template <NodeType node>
-static std::optional<bool> eval_pure_output_atom_at(
+static result<std::optional<bool>> eval_pure_output_atom_at(
 	tref atom,
 	const std::map<std::string, int>& var_pos,
 	const std::vector<omcat::rational>& constants)
 {
 	using tau = tree<node>;
-	if (atom_has_any_input<node>(atom)) return std::nullopt;
+	result<std::optional<bool>> r;
+	if (atom_has_any_input<node>(atom)) return r.with_value(std::nullopt);
 	const auto& t = tau::get(atom);
-	if (!t.has_child()) return std::nullopt;
+	if (!t.has_child()) return r.with_value(std::nullopt);
 	size_t op = t[0].value.get_nt();
 	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
 	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
@@ -319,7 +325,7 @@ static std::optional<bool> eval_pure_output_atom_at(
 	else if (op == tau::bf_nlteq) op = tau::bf_gt;
 	if (op != tau::bf_lt  && op != tau::bf_lteq && op != tau::bf_gt &&
 	    op != tau::bf_gteq && op != tau::bf_eq  && op != tau::bf_neq)
-		return std::nullopt;
+		return r.with_value(std::nullopt);
 
 	tref lhs = t[0].first();
 	tref rhs = t[0].second();
@@ -348,7 +354,7 @@ static std::optional<bool> eval_pure_output_atom_at(
 	if (lhs_io && rhs_io) {
 		auto p1 = lookup(lhs_io);
 		auto p2 = lookup(rhs_io);
-		if (!p1 || !p2) return std::nullopt;
+		if (!p1 || !p2) return r.with_value(std::nullopt);
 		omcat::qlt_type1 t1a{*p1, constants};
 		omcat::qlt_type1 t1b{*p2, constants};
 		omcat::relation rel;
@@ -361,15 +367,16 @@ static std::optional<bool> eval_pure_output_atom_at(
 			int c = omcat::cmp(va, vb);
 			rel = c < 0 ? omcat::relation::LT : (c == 0 ? omcat::relation::EQ : omcat::relation::GT);
 		}
-		return rel_holds(rel, op);
+		return r.with_value(rel_holds(rel, op));
 	}
 	if (lhs_io || rhs_io) {
 		tref io = lhs_io ? lhs_io : rhs_io;
 		bool io_is_lhs = (lhs_io != nullptr);
 		auto p = lookup(io);
-		if (!p) return std::nullopt;
+		if (!p) return r.with_value(std::nullopt);
 		omcat::qlt_type1 t1{*p, constants};
-		auto cs = omcat::collect_qlt_constants<node>(io_is_lhs ? rhs : lhs);
+		TAU_TRY(auto cs,
+			omcat::collect_qlt_constants<node>(io_is_lhs ? rhs : lhs));
 		// Range constant handling: {[a,b]} collects two endpoints.
 		// Interpret `io_var = {[a,b]}` as closed-interval membership,
 		// `!=` as non-membership.
@@ -381,7 +388,7 @@ static std::optional<bool> eval_pure_output_atom_at(
 				if (omcat::cmp(constants[k], a) == 0) ja = k;
 				if (omcat::cmp(constants[k], b) == 0) jb = k;
 			}
-			if (ja < 0 || jb < 0) return std::nullopt;
+			if (ja < 0 || jb < 0) return r.with_value(std::nullopt);
 			// Membership: pos_y ∈ [2*ja+1, 2*jb+1] (point-at-a through point-at-b).
 			long lo_pos = 2L * ja + 1;
 			long hi_pos = 2L * jb + 1;
@@ -394,13 +401,13 @@ static std::optional<bool> eval_pure_output_atom_at(
 #if defined(__GNUC__)
 			#pragma GCC diagnostic pop
 #endif
-			return (op == tau::bf_eq) ? in_range : !in_range;
+			return r.with_value((op == tau::bf_eq) ? in_range : !in_range);
 		}
-		if (cs.size() != 1) return std::nullopt;
+		if (cs.size() != 1) return r.with_value(std::nullopt);
 		int j = -1;
 		for (int k = 0; k < (int)constants.size(); ++k)
 			if (omcat::cmp(constants[k], cs[0]) == 0) { j = k; break; }
-		if (j < 0) return std::nullopt;
+		if (j < 0) return r.with_value(std::nullopt);
 		auto eff = op;
 		if (!io_is_lhs) {
 			if      (eff == tau::bf_lt)   eff = tau::bf_gt;
@@ -408,14 +415,14 @@ static std::optional<bool> eval_pure_output_atom_at(
 			else if (eff == tau::bf_lteq) eff = tau::bf_gteq;
 			else if (eff == tau::bf_gteq) eff = tau::bf_lteq;
 		}
-		if (eff == tau::bf_lt)   return t1.less_than(j);
-		if (eff == tau::bf_lteq) return t1.less_than(j) || t1.equal_to(j);
-		if (eff == tau::bf_gt)   return t1.greater_than(j);
-		if (eff == tau::bf_gteq) return t1.greater_than(j) || t1.equal_to(j);
-		if (eff == tau::bf_eq)   return t1.equal_to(j);
-		if (eff == tau::bf_neq)  return !t1.equal_to(j);
+		if (eff == tau::bf_lt)   return r.with_value(t1.less_than(j));
+		if (eff == tau::bf_lteq) return r.with_value(t1.less_than(j) || t1.equal_to(j));
+		if (eff == tau::bf_gt)   return r.with_value(t1.greater_than(j));
+		if (eff == tau::bf_gteq) return r.with_value(t1.greater_than(j) || t1.equal_to(j));
+		if (eff == tau::bf_eq)   return r.with_value(t1.equal_to(j));
+		if (eff == tau::bf_neq)  return r.with_value(!t1.equal_to(j));
 	}
-	return std::nullopt;
+	return r.with_value(std::nullopt);
 }
 
 // Pre-check: is the formula REALIZABLE via a constant-output strategy?
@@ -429,11 +436,12 @@ template <NodeType node>
 // T1 position of its constant value) instead of a bare true — the caller
 // materialises it as `always(⋀ o_k = c_k)` so the strategy survives into
 // execution and codegen instead of being discarded.
-static std::optional<std::map<std::string, int>> constant_output_realizable(
+static result<std::optional<std::map<std::string, int>>> constant_output_realizable(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	using tau = tree<node>;
+	result<std::optional<std::map<std::string, int>>> r;
 	std::set<std::string> out_names;
 	for (auto& [f, _] : atoms) {
 		auto ios = tau::get(f).select_top(is_child<node, tau::io_var>);
@@ -442,11 +450,11 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 			if (!nm.empty() && nm[0] == 'o') out_names.insert(nm);
 		}
 	}
-	if (out_names.empty()) return std::nullopt;
+	if (out_names.empty()) return r.with_value(std::nullopt);
 
-	auto constants = omcat::collect_qlt_constants<node>(fm);
+	TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 	int T1_size = 2 * (int)constants.size() + 1;
-	if (T1_size <= 0) return std::nullopt;
+	if (T1_size <= 0) return r.with_value(std::nullopt);
 
 	std::vector<std::string> out_vec(out_names.begin(), out_names.end());
 	int n_out = (int)out_vec.size();
@@ -459,10 +467,10 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 		? (unsigned long long) const_output_max
 		: std::numeric_limits<unsigned long long>::max() / 2;
 	for (int i = 0; i < n_out; ++i) {
-		if (total_u > CAP) return std::nullopt;
-		if (total_u > CAP / (unsigned long long) T1_size) return std::nullopt;
+		if (total_u > CAP) return r.with_value(std::nullopt);
+		if (total_u > CAP / (unsigned long long) T1_size) return r.with_value(std::nullopt);
 		total_u *= (unsigned long long)T1_size;
-		if (total_u > CAP) return std::nullopt;
+		if (total_u > CAP) return r.with_value(std::nullopt);
 	}
 	long long total = (long long)total_u;
 
@@ -470,7 +478,7 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 	// A CTL* node with no sound propositional encoding reached the skeleton
 	// walk: decline, since the caller always runs Algorithm B on the same
 	// fm/atoms next, which rebuilds this skeleton and reports the refusal.
-	if (!phi_star_base_r.has_value()) return std::nullopt;
+	if (!phi_star_base_r.has_value()) return r.with_value(std::nullopt);
 	std::string phi_star_base = std::move(phi_star_base_r.value());
 
 	for (long long combo = 0; combo < total; ++combo) {
@@ -483,8 +491,8 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 
 		std::string phi = phi_star_base;
 		for (int i = (int)atoms.size(); i-- > 0; ) {
-			auto val = eval_pure_output_atom_at<node>(
-				atoms[i].first, var_pos, constants);
+			TAU_TRY(auto val, eval_pure_output_atom_at<node>(
+				atoms[i].first, var_pos, constants));
 			if (!val) continue;
 			std::string fp = "p" + std::to_string(i);
 			std::string rep = *val ? "true" : "false";
@@ -527,10 +535,10 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 		if (taut.has_value() && taut.value()) {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
 			          << "(combo=" << combo << ")";
-			return var_pos;
+			return r.with_value(std::move(var_pos));
 		}
 	}
-	return std::nullopt;
+	return r.with_value(std::nullopt);
 }
 
 // LS-12: shared between solve_ltl_aba_algorithm_a and semantic_pwr_optimal
@@ -539,19 +547,20 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 // Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
 // undetermined) in T3 type t.
 template <NodeType node>
-static std::vector<int> qlt_type_A_bitmasks(
+static result<std::vector<int>> qlt_type_A_bitmasks(
 	const std::vector<std::pair<tref, std::string>>& atoms,
 	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<omcat::rational>& constants)
 {
+	result<std::vector<int>> r;
 	std::vector<int> type_A(T3.size(), 0);
 	for (int i = 0; i < (int)atoms.size(); ++i)
 		for (int t = 0; t < (int)T3.size(); ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(
-				atoms[i].first, T3[t], constants);
+			TAU_TRY(auto h, qlt_atom_holds_in_type3<node>(
+				atoms[i].first, T3[t], constants));
 			if (h != false) type_A[t] |= (1 << i);
 		}
-	return type_A;
+	return r.with_value(std::move(type_A));
 }
 
 // Rename the skeleton's p_i propositions to d_i on word boundaries,
@@ -588,7 +597,7 @@ solve_ltl_aba_algorithm_a(
 {
 	result<std::optional<ltl_aba_solution<node>>> r;
 
-	auto constants = omcat::collect_qlt_constants<node>(fm);
+	TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int n_types = (int)T3.size();
 	LOG_DEBUG << "[ltl_aba:algA] T3 count=" << n_types
@@ -597,7 +606,7 @@ solve_ltl_aba_algorithm_a(
 
 	int K = (int)atoms.size();
 	// Per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
-	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	TAU_TRY(auto type_A, qlt_type_A_bitmasks<node>(atoms, T3, constants));
 
 	int T1_size = 2 * (int)constants.size() + 1;
 	std::vector<std::tuple<int,int,int>> feasible_set;
@@ -658,7 +667,7 @@ solve_ltl_aba_algorithm_b(
 {
 	result<std::optional<ltl_aba_solution<node>>> r;
 
-	auto constants = omcat::collect_qlt_constants<node>(fm);
+	TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 	auto T2 = omcat::enumerate_qlt_T2(constants);
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int T2_size = (int)T2.size();
@@ -670,7 +679,7 @@ solve_ltl_aba_algorithm_b(
 
 	// D-bitmask per T₃ type: the one helper Algorithm A and the semantic
 	// PWR use (LS-12); B kept an inline copy until 2026-09-17.
-	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	TAU_TRY(auto type_A, qlt_type_A_bitmasks<node>(atoms, T3, constants));
 
 	// Build T₂ lookup: (pos_m, pos_x, rel_mx) → T₂ index.
 	std::map<std::tuple<int,int,int>, int> t2_lookup;
@@ -738,13 +747,14 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		if (atom_has_any_input<node>(f)) { alg_d_has_input = true; break; }
 	if (alg_d_mode && !alg_d_has_input
 	    && is_algorithm_a_applicable<node>(sol.atoms)) {
-		auto constants = omcat::collect_qlt_constants<node>(fm);
+		TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 		auto T3 = omcat::enumerate_qlt_T3(constants);
 		int K = (int)sol.atoms.size();
 		int T1_size = 2 * (int)constants.size() + 1;
 
 		// Compute D-bitmask for each T3 type.
-		std::vector<int> type_A = qlt_type_A_bitmasks<node>(sol.atoms, T3, constants);
+		TAU_TRY(auto type_A,
+			qlt_type_A_bitmasks<node>(sol.atoms, T3, constants));
 
 		// Build φ*(D_i) (LT-16: shared rename helper).
 		TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, sol.atoms));
@@ -830,8 +840,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		// `F(o1={top}) && G(o1!={top})`.  Falling through to
 		// the default add_consistency_constraints + ABA-oracle
 		// path catches these correctly.
-		bool alg_a_can_classify_ok =
-			alg_a_can_classify<node>(fm, sol.atoms);
+		bool alg_a_can_classify_ok = false;
+		TAU_TRY(alg_a_can_classify_ok,
+			alg_a_can_classify<node>(fm, sol.atoms));
 		if (!alg_a_can_classify_ok)
 			LOG_DEBUG << "[ltl_aba] atom outside T_3 "
 			             "(top/bot qlt constant?) — "
@@ -884,8 +895,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			// Catches trivially-satisfiable U/W/R right-sides that
 			// Algorithm B's large P_σ-encoded formula would make
 			// ltlsynt time out on.
-			if (auto win = constant_output_realizable<node>(
-				fm, sol.atoms); win) {
+			TAU_TRY(auto win, constant_output_realizable<node>(
+				fm, sol.atoms));
+			if (win) {
 				// LA-10: materialise the winning constant
 				// combination as `always(⋀ o_k = c_k)` so the
 				// strategy survives into execution and codegen
@@ -896,8 +908,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 				// qlt_type1::realize() picks one (the constant
 				// for a point type, the mediant / ±1 for an
 				// interval).
-				auto constants =
-					omcat::collect_qlt_constants<node>(fm);
+				TAU_TRY(auto constants,
+					omcat::collect_qlt_constants<node>(fm));
 				ltl_aba_solution<node> trivial;
 				trivial.atoms = sol.atoms;
 				// Classify props so the codegen data emitter

@@ -619,58 +619,61 @@ std::optional<qlt> qlt_eval_interval(
 	return qlt{{ { qlt_endpoint{lo_r, lo_b}, qlt_endpoint{hi_r, hi_b} } }};
 }
 
-std::optional<qlt> qlt_eval_parse_tree(
+result<qlt> qlt_eval_parse_tree(
 	const qlt_parser::tree::traverser& t)
 {
 	using tt = qlt_parser::tree::traverser;
 	using type = qlt_parser::nonterminal;
 
+	result<qlt> r;
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 
 	switch (nt) {
 	case type::qlt_top:
-		return qlt::top();
+		return r.with_value(qlt::top());
 
 	case type::qlt_bot:
-		return qlt::bottom();
+		return r.with_value(qlt::bottom());
 
 	case type::qlt_singleton: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return std::nullopt;
+		if (children.empty()) return r;
 		auto s = children[0] | tt::terminals;
 		qlt_rational val;
-		if (!qlt_rational::parse(s, val)) return std::nullopt;
-		if (val.is_pos_inf() || val.is_neg_inf()) return std::nullopt;
-		return qlt{{ {
+		if (!qlt_rational::parse(s, val)) return r;
+		if (val.is_pos_inf() || val.is_neg_inf()) return r;
+		return r.with_value(qlt{{ {
 			qlt_endpoint{val, qlt_bound::CLOSED},
 			qlt_endpoint{val, qlt_bound::CLOSED}
-		}}};
+		}}});
 	}
 
 	case type::qlt_single: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return std::nullopt;
-		return qlt_eval_interval(children[0]);
+		if (children.empty()) return r;
+		auto interval = qlt_eval_interval(children[0]);
+		if (!interval) return r;
+		return r.with_value(*interval);
 	}
 
 	case type::qlt_union: {
 		// qlt_union children = [interval, qlt] (after __E_qlt_0 inlining)
 		auto children = (n | tt::children)();
-		if (children.size() < 2) return std::nullopt;
+		if (children.size() < 2) return r;
 
 		auto left = qlt_eval_interval(children[0]);
-		if (!left) return std::nullopt;
+		if (!left) return r;
 
-		auto right = qlt_eval_parse_tree(children[1]);
-		if (!right) return std::nullopt;
+		TAU_TRY(auto right, qlt_eval_parse_tree(children[1]));
 
-		return *left | *right;
+		return r.with_value(*left | right);
 	}
 
 	default:
-		LOG_ERROR << "Unknown qlt node type\n";
-		return std::nullopt;
+		return r.with_error(code::internal_error,
+			"Unknown qlt node type",
+			{{label::value, qlt_parser::instance().name(nt)}});
 	}
 }
 

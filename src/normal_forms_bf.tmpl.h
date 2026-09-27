@@ -223,9 +223,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
  * elsewhere in the pipeline must not assume this step leaves it alone.
  */
 template<NodeType node>
-tref syntactic_formula_simplification(tref formula) {
-	formula = simplify_using_equality<node>(formula);
-	return syntactic_path_simplification<node>(formula);
+result<tref> syntactic_formula_simplification(tref formula) {
+	result<tref> r;
+	TAU_TRY(formula, simplify_using_equality<node>(formula));
+	return r.with_value(syntactic_path_simplification<node>(formula));
 }
 
 /**

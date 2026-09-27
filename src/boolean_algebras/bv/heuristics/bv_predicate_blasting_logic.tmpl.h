@@ -577,7 +577,12 @@ static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 	static std::map<std::pair<size_t, uint64_t>, rewriter::rule> cache;
 	result<rewriter::rule> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(count));
-	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	TAU_TRY(auto offset_value,
+		get_bv_constant_value<node>(tau::trim(count)));
+	if (!offset_value) return r.with_error(code::invalid_argument,
+		"bvshl_rule: the shift count has no concrete value",
+		{{label::value, truncate_for_message(TAU_TO_STR(count))}});
+	auto offset = *offset_value;
 	auto key = std::make_pair(bitwidth, offset);
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
@@ -638,9 +643,11 @@ result<tref> bvshl(tref base, tref count, tref shifted) {
 	result<tref> r;
 	// The shift amount must be a constant whose value is extractable
 	if (!tau::get(tau::trim(count)).is_ba_constant()
-		|| !is_bv_constant<node>(tau::trim(count))
-		|| !get_bv_constant_value<node>(tau::trim(count)))
+		|| !is_bv_constant<node>(tau::trim(count)))
 		return r.with_value(nullptr);
+	TAU_TRY(auto count_value,
+		get_bv_constant_value<node>(tau::trim(count)));
+	if (!count_value) return r.with_value(nullptr);
 	TAU_TRY(auto rule, bvshl_rule<node>(count));
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
@@ -688,7 +695,12 @@ static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 	static std::map<std::pair<size_t, uint64_t>, rewriter::rule> cache;
 	result<rewriter::rule> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(count));
-	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	TAU_TRY(auto offset_value,
+		get_bv_constant_value<node>(tau::trim(count)));
+	if (!offset_value) return r.with_error(code::invalid_argument,
+		"bvshr_rule: the shift count has no concrete value",
+		{{label::value, truncate_for_message(TAU_TO_STR(count))}});
+	auto offset = *offset_value;
 	auto key = std::make_pair(bitwidth, offset);
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
@@ -750,9 +762,11 @@ result<tref> bvshr(tref base, tref count, tref shifted) {
 	result<tref> r;
 	// The shift amount must be a constant whose value is extractable
 	if (!tau::get(tau::trim(count)).is_ba_constant()
-		|| !is_bv_constant<node>(tau::trim(count))
-		|| !get_bv_constant_value<node>(tau::trim(count)))
+		|| !is_bv_constant<node>(tau::trim(count)))
 		return r.with_value(nullptr);
+	TAU_TRY(auto count_value,
+		get_bv_constant_value<node>(tau::trim(count)));
+	if (!count_value) return r.with_value(nullptr);
 	TAU_TRY(auto rule, bvshr_rule<node>(count));
 	auto call = make_bvshr_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);

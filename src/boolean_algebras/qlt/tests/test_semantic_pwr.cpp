@@ -554,7 +554,9 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		tref theta = qlt_semantic_pwr_optimal<node_t>(c, u);
+		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
+		REQUIRE(theta_r.has_value());
+		tref theta = theta_r.value();
 		// qlt_semantic_pwr_optimal itself no longer checks realizability —
 		// that gate moved to the caller (pointwise_revision.h), since it is
 		// an ordinary sat question and not (Q,<) theory.  Mirror the caller
@@ -628,7 +630,9 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("F (o1[t]:qlt = {top}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
+		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
+		REQUIRE(theta_r.has_value());
+		CHECK(theta_r.value() == nullptr);
 	}
 
 	// LS-2 (b): two distinct output variables share the single Y slot, so
@@ -639,7 +643,9 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
+		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
+		REQUIRE(theta_r.has_value());
+		CHECK(theta_r.value() == nullptr);
 	}
 
 	// The gate itself must keep rejecting non-omcat atoms.
@@ -649,7 +655,9 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
+		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
+		REQUIRE(theta_r.has_value());
+		CHECK(theta_r.value() == nullptr);
 	}
 
 }

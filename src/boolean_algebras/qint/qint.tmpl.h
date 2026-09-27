@@ -26,10 +26,9 @@ result<qint> parse_qint_grammar(const std::string& src) {
 		return r;
 	}
 
-	if (auto qval = qint_eval_parse_tree(t); qval)
-		return r.with_value(*qval);
-	r.error(code::parse_error, "Not a valid qint literal");
-	return r;
+	TAU_TRY_OR(auto qval, qint_eval_parse_tree(t),
+		code::parse_error, "Not a valid qint literal");
+	return r.with_value(qval);
 }
 
 template <typename... BAs>

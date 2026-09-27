@@ -896,8 +896,16 @@ result<tref> api<node>::dnf(tref expr) {
 		tref d = nullptr;
 		// Dispatch to bf-level or wff-level DNF depending on root type
 		switch (tau::get(a).get_type()) {
-		case tau::bf:  d = reduce<node>(to_dnf<node, false>(a)); break;
-		case tau::wff: d = reduce<node>(to_dnf<node>(a)); break;
+		case tau::bf: {
+			TAU_TRY(auto dn, (to_dnf<node, false>(a)));
+			TAU_TRY(d, reduce<node>(dn));
+			break;
+		}
+		case tau::wff: {
+			TAU_TRY(auto dn, to_dnf<node>(a));
+			TAU_TRY(d, reduce<node>(dn));
+			break;
+		}
 		default: r.error(code::invalid_argument, messages::invalid_arguments);
 			DBG(assert(r.is_well_formed());)
 			return r;
@@ -918,8 +926,16 @@ result<tref> api<node>::cnf(tref expr) {
 		tref c = nullptr;
 		// Dispatch to wff-level or bf-level CNF depending on root type
 		switch (tau::get(a).get_type()) {
-		case tau::wff: c = reduce<node, true>(to_cnf<node>(a)); break;
-		case tau::bf:  c = reduce<node, true>(to_cnf<node, false>(a)); break;
+		case tau::wff: {
+			TAU_TRY(auto cn, to_cnf<node>(a));
+			TAU_TRY(c, (reduce<node, true>(cn)));
+			break;
+		}
+		case tau::bf: {
+			TAU_TRY(auto cn, (to_cnf<node, false>(a)));
+			TAU_TRY(c, (reduce<node, true>(cn)));
+			break;
+		}
 		default: r.error(code::invalid_argument, messages::invalid_arguments);
 			DBG(assert(r.is_well_formed());)
 			return r;
@@ -966,9 +982,8 @@ result<tref> api<node>::onf(tref expr, tref var) {
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
-		tref o = tau_lang::onf<node>(a, var);
-		if (!o) r.error(code::internal_error, "ONF conversion failed");
-		else    r = o;
+		TAU_TRY(tref o, tau_lang::onf<node>(a, var));
+		r = o;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});
@@ -996,9 +1011,18 @@ result<tref> api<node>::mnf(tref expr) {
 		tref m = nullptr;
 		// Dispatch to wff-level or bf-level MNF depending on root type
 		switch (tau::get(a).get_type()) {
-		case tau::wff: m = unequal_to_not_equal<node>(reduce<node>(
-				to_dnf<node>(bf_reduce_canonical<node>()(a)))); break;
-		case tau::bf:  m = bf_reduced_dnf<node>(a); break;
+		case tau::wff: {
+			TAU_TRY(auto dn, to_dnf<node>(
+				bf_reduce_canonical<node>()(a)));
+			TAU_TRY(auto red, reduce<node>(dn));
+			m = unequal_to_not_equal<node>(red);
+			break;
+		}
+		case tau::bf: {
+			TAU_TRY(auto dn, bf_reduced_dnf<node>(a));
+			m = dn;
+			break;
+		}
 		default: r.error(code::invalid_argument, messages::invalid_arguments);
 			DBG(assert(r.is_well_formed());)
 			return r;
@@ -1031,7 +1055,8 @@ result<tref> api<node>::syntactic_formula_simplification(tref fm) {
 	return with_budget<node>([&] {
 		result<tref> r;
 		TAU_TRY(auto simplified, simplify(fm));
-		tref s = tau_lang::syntactic_formula_simplification<node>(simplified);
+		TAU_TRY(tref s,
+			tau_lang::syntactic_formula_simplification<node>(simplified));
 		if (!s) r.error(code::internal_error, "Syntactic formula simplification failed");
 		else    r = s;
 		DBG(assert(r.is_well_formed());)

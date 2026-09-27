@@ -159,11 +159,12 @@ tref push_negation_in(tref fm) {
 
 // Conversion to dnf while applying reductions during the process
 template <NodeType node, bool is_wff>
-tref to_dnf(tref fm) {
+result<tref> to_dnf(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<tref> r;
 	LOG_TRACE << "to_dnf: " << LOG_FM(fm);
-	auto layer_to_dnf = [](tref n) {
+	auto layer_to_dnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if constexpr (is_wff) if (t.is(tau::wff)) {
 			if (t.child_is(tau::wff_and)) {
@@ -181,8 +182,14 @@ tref to_dnf(tref fm) {
 					t[0].first(), t[0].second());
 				// Perform simplification. Structural comparison, as in the
 				// wff branch above (see to_cnf for the rationale).
-				if (tau::get(conj) != tau::get(n))
-					return reduce<node>(conj);
+				if (tau::get(conj) != tau::get(n)) {
+					auto red = reduce<node>(conj);
+					if (!red.has_value()) {
+						r.merge(std::move(red));
+						return nullptr;
+					}
+					return red.value();
+				}
 				else return n;
 			}
 		}
@@ -197,29 +204,36 @@ tref to_dnf(tref fm) {
 		if constexpr (!is_wff) r = apply_xor_def<node>(r);
 		return r;
 	};
-	tref r;
-	if constexpr (is_wff) r = pre_order<node>(fm)
+	tref out;
+	if constexpr (is_wff) out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, visit_wff<node>, layer_to_dnf);
-	else r = pre_order<node>(fm)
+	else out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
-	LOG_TRACE << "to_dnf result: " << LOG_FM(r);
-	return r;
+	LOG_TRACE << "to_dnf result: " << LOG_FM(out);
+	return r.with_value(out);
 }
 
 // Conversion of temporal layer to dnf
 template <NodeType node>
-tref temporal_layer_to_dnf(tref fm) {
+result<tref> temporal_layer_to_dnf(tref fm) {
 	using tau = tree<node>;
-	auto layer_to_dnf = [](tref n) {
+	result<tref> r;
+	auto layer_to_dnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.child_is(tau::wff_and)) {
 			auto conj = conjunct_dnfs_to_dnf<node>(
 				t[0].first(), t[0].second());
 			// Perform simplification
-			if (tau::get(conj) != tau::get(n))
-				return reduce<node>(conj);
+			if (tau::get(conj) != tau::get(n)) {
+				auto red = reduce<node>(conj);
+				if (!red.has_value()) {
+					r.merge(std::move(red));
+					return nullptr;
+				}
+				return red.value();
+			}
 			else return n;
 		}
 		return n;
@@ -231,15 +245,17 @@ tref temporal_layer_to_dnf(tref fm) {
 		if (is_temporal_quantifier<node>(n)) return false;
 		return true;
 	};
-	return pre_order<node>(fm).apply_unique(pn, visit, layer_to_dnf);
+	tref out = pre_order<node>(fm).apply_unique(pn, visit, layer_to_dnf);
+	return r.with_value(out);
 }
 
 // Conversion to cnf while applying reductions during the process
 template <NodeType node, bool is_wff>
-tref to_cnf(tref fm) {
+result<tref> to_cnf(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto layer_to_cnf = [](tref n) {
+	result<tref> r;
+	auto layer_to_cnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if constexpr (is_wff) if (t.is(tau::wff)) {
 			if (t.child_is(tau::wff_or)) {
@@ -259,8 +275,14 @@ tref to_cnf(tref fm) {
 				// right sibling while `n` generally has one, so a raw tref
 				// comparison reports "changed" even for a no-op
 				// distribution and pays a full reduce for nothing.
-				if (tau::get(dis) != tau::get(n))
-					return reduce<node, true>(dis);
+				if (tau::get(dis) != tau::get(n)) {
+					auto red = reduce<node, true>(dis);
+					if (!red.has_value()) {
+						r.merge(std::move(red));
+						return nullptr;
+					}
+					return red.value();
+				}
 				else return n;
 			}
 		return n;
@@ -272,12 +294,14 @@ tref to_cnf(tref fm) {
 		if constexpr (!is_wff) r = apply_xor_def_cnf<node>(r);
 		return r;
 	};
-	if constexpr (is_wff) return pre_order<node>(fm)
+	tref out;
+	if constexpr (is_wff) out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, visit_wff<node>, layer_to_cnf);
-	else return pre_order<node>(fm)
+	else out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
+	return r.with_value(out);
 }
 
 // Shift the lookback in a formula

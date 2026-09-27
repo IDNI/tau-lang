@@ -335,7 +335,7 @@ result<tref> boole_normal_form(tref formula) {
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return r.with_value(formula);
 	// Step 1: Syntactically simplify formula
-	tref bnf = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(tref bnf, syntactic_formula_simplification<node>(formula));
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Squeeze and absorb for additional simplifications during term
 	// normalization. NF-16: kept deliberately -- an older note warned of
@@ -367,7 +367,7 @@ result<tref> boole_normal_form(tref formula) {
 	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
-	bnf = syntactic_formula_simplification<node>(bnf);
+	TAU_TRY(bnf, syntactic_formula_simplification<node>(bnf));
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
@@ -390,7 +390,7 @@ result<tref> boole_normal_form(tref formula) {
 	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
 	// Convert !(=) to != again
 	eq_bnf = to_nnf<node>(eq_bnf);
-	eq_bnf = simplify_using_equality<node>(eq_bnf);
+	TAU_TRY(eq_bnf, simplify_using_equality<node>(eq_bnf));
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(eq_bnf, eq_bnf);
@@ -420,7 +420,7 @@ result<tref> term_boole_normal_form(tref formula) {
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return r.with_value(formula);
 	// Step 1: Syntactically simplify formula
-	tref tbnf = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(tref tbnf, syntactic_formula_simplification<node>(formula));
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
 	auto simp_eqs = [&r](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
@@ -445,7 +445,7 @@ result<tref> term_boole_normal_form(tref formula) {
 	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
-	tbnf = syntactic_formula_simplification<node>(tbnf);
+	TAU_TRY(tbnf, syntactic_formula_simplification<node>(tbnf));
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(tbnf, tbnf);
@@ -509,9 +509,9 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 			// By assumption, all temporal variables are explicitly
 			// quantified by temporal quantifier without nesting.
 			// DNF conversion is only done on temporal level
-			fm = temporal_layer_to_dnf<node>(fm);
+			TAU_TRY(fm, temporal_layer_to_dnf<node>(fm));
 			// Simplify temporal layer
-			fm = reduce<node>(fm);
+			TAU_TRY(fm, reduce<node>(fm));
 			trefs clauses = get_dnf_wff_clauses<node>(fm);
 			tref non_temp_clauses = tau::_F();
 			tref res = tau::_F();

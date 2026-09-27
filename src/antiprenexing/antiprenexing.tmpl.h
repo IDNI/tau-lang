@@ -1138,9 +1138,14 @@ result<tref> complete_quantifier_elimination(tref formula) {
 			// without this every clause carrying a negated atom was
 			// declined and re-wrapped whenever the scope actually needed
 			// distributing.
+			auto dnf_b = to_dnf<node, true>(b);
+			if (!dnf_b.has_value()) {
+				r.merge(std::move(dnf_b));
+				return std::nullopt;
+			}
 			for (tref clause : get_dnf_wff_clauses<node>(
 					normalize_atomic_formula_operators<node>(
-						to_dnf<node, true>(b)))) {
+						dnf_b.value()))) {
 				result<tref> br = eliminate_block_over_clause<node>(
 					clause, {var}, trivial_elim, empty_order);
 				if (!br.has_value()) {
@@ -1908,13 +1913,13 @@ result<tref> anti_prenex(tref formula, const eliminability<node>& el) {
 
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 
 	// Step 2: Substitution-based elimination (innermost first via post_order).
 	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
 	// conjunctive scope.
 	formula = ex_subs_based_elimination<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
 	// bf_nlteq → bf_lt, etc.) so the block core's conjunct classification
@@ -1959,7 +1964,7 @@ result<tref> anti_prenex(tref formula, const eliminability<node>& el) {
 			return scoped;
 		return n;
 	};
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 	formula = post_order<node>(formula).apply_unique(fold_vacuous_quant);
 	return r.with_value(canonize_quantifier_ids<node>(formula));
 }

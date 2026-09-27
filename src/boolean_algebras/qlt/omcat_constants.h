@@ -28,20 +28,24 @@
 namespace idni::tau_lang::omcat {
 
 // Parse a rational-literal source string like "1/4", "-3/7", "0.25" into
-// a rational.  Returns {0, 0} if it doesn't look like a valid rational (the
-// caller should check).
-inline rational parse_rat_literal(const std::string& src) {
+// a rational.  Anything that is not an exact rational literal is an error.
+inline result<rational> parse_rat_literal(const std::string& src) {
+	result<rational> r;
 	// Try "p/q" first.
 	auto slash = src.find('/');
 	if (slash != std::string::npos) {
 		try {
 			long long p = std::stoll(src.substr(0, slash));
 			long long q = std::stoll(src.substr(slash + 1));
-			if (q == 0) return rational(0, 0);
-			return rational(p, q);
+			if (q == 0)
+				return r.with_error(code::invalid_argument,
+					"rational parse failed for 'p/q', returning sentinel",
+					{{label::value, src}});
+			return r.with_value(rational(p, q));
 		} catch (...) {
-			LOG_WARNING << "rational parse failed for 'p/q', returning sentinel";
-			return rational(0, 0);
+			return r.with_error(code::invalid_argument,
+				"rational parse failed for 'p/q', returning sentinel",
+				{{label::value, src}});
 		}
 	}
 	// Try decimal "<int>.<frac>".
@@ -53,13 +57,13 @@ inline rational parse_rat_literal(const std::string& src) {
 			// 10^k must stay within long long: 19 or more fractional
 			// digits used to overflow `denom` silently (signed overflow,
 			// no exception) and yield a garbage rational.
-			if (fpart.size() > 18) {
-				LOG_WARNING << "rational parse: '" << src << "' has "
-					<< fpart.size() << " fractional digits, more than "
-					"the 18 an exact rational literal supports; "
-					"returning sentinel";
-				return rational(0, 0);
-			}
+			if (fpart.size() > 18)
+				return r.with_error(code::invalid_argument,
+					"rational parse: '" + src + "' has "
+					+ std::to_string(fpart.size()) + " fractional digits, "
+					"more than the 18 an exact rational literal supports; "
+					"returning sentinel",
+					{{label::value, src}});
 			long long ival = ipart.empty() ? 0 : std::stoll(ipart);
 			long long fval = fpart.empty() ? 0 : std::stoll(fpart);
 			long long denom = 1;
@@ -72,12 +76,11 @@ inline rational parse_rat_literal(const std::string& src) {
 				(omcat_int128_) std::abs(ival) * denom;
 			omcat_int128_ num128 = scaled128 + fval;
 			num128 *= sign;
-			if (num128 > LLONG_MAX || num128 < LLONG_MIN) {
-				LOG_WARNING << "rational parse: '" << src
-					<< "' does not fit an exact rational literal; "
-					"returning sentinel";
-				return rational(0, 0);
-			}
+			if (num128 > LLONG_MAX || num128 < LLONG_MIN)
+				return r.with_error(code::invalid_argument,
+					"rational parse: '" + src + "' does not fit an "
+					"exact rational literal; returning sentinel",
+					{{label::value, src}});
 			num = (long long) num128;
 			(void)scaled;
 #else
@@ -85,35 +88,38 @@ inline rational parse_rat_literal(const std::string& src) {
 				|| __builtin_add_overflow(scaled, fval, &num)
 				|| __builtin_mul_overflow(num, sign, &num))
 			{
-				LOG_WARNING << "rational parse: '" << src
-					<< "' does not fit an exact rational literal; "
-					"returning sentinel";
-				return rational(0, 0);
+				return r.with_error(code::invalid_argument,
+					"rational parse: '" + src + "' does not fit an "
+					"exact rational literal; returning sentinel",
+					{{label::value, src}});
 			}
 #endif
-			return rational(num, denom);
+			return r.with_value(rational(num, denom));
 		} catch (...) {
-			LOG_WARNING << "rational parse failed for decimal, returning sentinel";
-			return rational(0, 0);
+			return r.with_error(code::invalid_argument,
+				"rational parse failed for decimal, returning sentinel",
+				{{label::value, src}});
 		}
 	}
 	// Plain integer.
 	try {
-		return rational(std::stoll(src), 1);
+		return r.with_value(rational(std::stoll(src), 1));
 	} catch (...) {
-		LOG_WARNING << "rational parse failed for integer, returning sentinel";
-		return rational(0, 0);
+		return r.with_error(code::invalid_argument,
+			"rational parse failed for integer, returning sentinel",
+			{{label::value, src}});
 	}
 }
 
 // Walk the formula AST and gather every qlt-constant literal we find,
 // returned sorted and deduplicated.
 template <NodeType node>
-inline std::vector<rational> collect_qlt_constants(tref fm) {
+inline result<std::vector<rational>> collect_qlt_constants(tref fm) {
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
+	result<std::vector<rational>> r;
 	std::vector<rational> out;
-	if (!fm) return out;
+	if (!fm) return r.with_value(std::move(out));
 
 	for (tref c : tau::get(fm).select_all(is<node, tau::ba_constant>)) {
 		const tau& t = tau::get(c);
@@ -134,8 +140,9 @@ inline std::vector<rational> collect_qlt_constants(tref fm) {
 		}
 		// Fall back to source-string for uncompiled parse-time constants.
 		if (tref src = tt(c) | tau::source | tt::ref; src) {
-			rational r = parse_rat_literal(tau::get(src).get_string());
-			if (r.q != 0) out.push_back(r);
+			TAU_TRY(rational val,
+				parse_rat_literal(tau::get(src).get_string()));
+			out.push_back(val);
 		}
 	}
 
@@ -145,7 +152,7 @@ inline std::vector<rational> collect_qlt_constants(tref fm) {
 	out.erase(std::unique(out.begin(), out.end(),
 	    [](const rational& a, const rational& b) { return cmp(a, b) == 0; }),
 	    out.end());
-	return out;
+	return r.with_value(std::move(out));
 }
 
 } // namespace idni::tau_lang::omcat

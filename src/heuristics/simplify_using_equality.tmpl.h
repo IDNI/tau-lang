@@ -434,12 +434,12 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 template <NodeType node>
-tref simplify_using_equality(tref fm) {
+result<tref> simplify_using_equality(tref fm) {
 	using tau = tree<node>;
-	const tref original_fm = fm;
+	result<tref> r;
 	fm = to_nnf<node>(fm);
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
-		return fm;
+		return r.with_value(fm);
 	DBG(LOG_DEBUG << "simplify_using_equality on " << LOG_FM(fm) << "\n";)
 	auto uf = union_find_with_sets<decltype(simplify_using_equality_term_comp<node>), node>(
 		simplify_using_equality_term_comp<node>);
@@ -487,13 +487,15 @@ tref simplify_using_equality(tref fm) {
 			return n;
 		} else return n;
 	};
-	auto up = [&uf_stack, &mark, &uf_stack_imbalance](tref n, tref parent) {
+	auto up = [&](tref n, tref parent) {
 		if (!is<node>(n, tau::wff)) return n;
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			auto pop_scope = [&]() {
 				if (uf_stack.size() <= 1) {
 					uf_stack_imbalance = true;
-					LOG_ERROR << "UF scope stack underflow in simplify_using_equality\n";
+					r.error(code::internal_error,
+						"UF scope stack underflow in "
+						"simplify_using_equality");
 					return;
 				}
 				uf_stack.pop_back();
@@ -536,13 +538,12 @@ tref simplify_using_equality(tref fm) {
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
 	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)
-	if (uf_stack_imbalance || uf_stack.size() != 1) {
-		LOG_ERROR << "simplify_using_equality: union-find stack imbalance ("
-			<< uf_stack.size() << " active scopes remain)\n";
-		return original_fm;
-	}
+	if (uf_stack_imbalance || uf_stack.size() != 1)
+		return r.with_error(code::internal_error,
+			"simplify_using_equality: union-find stack imbalance",
+			{{label::size, uf_stack.size()}});
 	DBG(assert(uf_stack.size() == 1);)
-	return fm;
+	return r.with_value(fm);
 }
 
 } // namespace idni::tau_lang

@@ -120,7 +120,7 @@ qint qint_splitter_one();
 std::optional<qint> qint_eval_interval(
 	const qint_parser::tree::traverser& interval_node);
 
-std::optional<qint> qint_eval_parse_tree(
+result<qint> qint_eval_parse_tree(
 	const qint_parser::tree::traverser& t);
 
 } // namespace idni::tau_lang

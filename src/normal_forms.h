@@ -30,7 +30,7 @@ template <NodeType node>
 struct bf_reduce_canonical;
 
 template <NodeType node>
-tref syntactic_formula_simplification(tref formula);
+result<tref> syntactic_formula_simplification(tref formula);
 
 template <NodeType node, bool is_wff = true>
 tref push_negation_one_in(tref fm);
@@ -232,7 +232,7 @@ typename tree<node>::traverser operator|(
  * @endcode
  */
 template <NodeType node>
-tref onf(tref n, tref var);
+result<tref> onf(tref n, tref var);
 
 /**
  * @brief Reduce a DNF or CNF formula by removing redundant clauses.
@@ -255,7 +255,7 @@ tref onf(tref n, tref var);
  * @endcode
  */
 template <NodeType node, bool is_cnf = false>
-tref reduce(tref fm);
+result<tref> reduce(tref fm);
 
 /**
  * @brief Compute the reduced DNF of a Boolean function.
@@ -283,7 +283,7 @@ tref reduce(tref fm);
  * @endcode
  */
 template <NodeType node>
-tref bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
+result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
 
 /**
  * @brief Functor adapter that applies `bf_reduced_dnf` to every `bf` sub-tree.
@@ -395,7 +395,7 @@ typename tree<node>::traverser operator|(
  * @endcode
  */
 template <NodeType node, bool is_wff = true>
-tref to_dnf(tref fm);
+result<tref> to_dnf(tref fm);
 
 /**
  * @brief Convert a formula to Conjunctive Normal Form (CNF).
@@ -417,7 +417,7 @@ tref to_dnf(tref fm);
  * @endcode
  */
 template <NodeType node, bool is_wff = true>
-tref to_cnf(tref fm);
+result<tref> to_cnf(tref fm);
 
 /**
  * @brief Convert a formula to Negation Normal Form (NNF).

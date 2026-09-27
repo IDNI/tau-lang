@@ -1436,12 +1436,14 @@ result<std::optional<solution<node>>> solve_inequality_system_atomless(
 		if (fast) return r.with_value(std::move(fast));
 	}
 
-	for (tref g : gs)
-		if (tau::get(bf_reduced_dnf<node>(g)).equals_0()) {
+	for (tref g : gs) {
+		TAU_TRY(auto g_dnf, bf_reduced_dnf<node>(g));
+		if (tau::get(g_dnf).equals_0()) {
 			DBG(LOG_TRACE << "solve_inequality_system_atomless"
 				<< "/unsat[identically_zero]: " << LOG_FM(g);)
 			return r.with_value(std::nullopt);
 		}
+	}
 
 	TAU_TRY(auto sol, atomless_witness<node>(gs, vars, options));
 
@@ -2312,7 +2314,7 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 						find_ba_type<node>(fv)));
 				}
 				a = rewriter::replace<node>(a, clause_solution);
-				a = bf_reduced_dnf<node>(a);
+				TAU_TRY(a, bf_reduced_dnf<node>(a));
 				clause_solution.emplace(v, a);
 			}
 			return r.with_assert_check_value(std::move(clause_solution));

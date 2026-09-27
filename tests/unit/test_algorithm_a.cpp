@@ -178,27 +178,40 @@ TEST_SUITE("alg_a helpers and rational literals") {
 
 	TEST_CASE("parse_rat_literal accepts p/q, decimals and integers") {
 		auto r = parse_rat_literal("3/4");
-		CHECK(r.p == 3); CHECK(r.q == 4);
+		REQUIRE(r.has_value());
+		CHECK(r.value().p == 3); CHECK(r.value().q == 4);
 		r = parse_rat_literal("0.25");
-		CHECK(r.p == 25); CHECK(r.q == 100);
+		REQUIRE(r.has_value());
+		CHECK(r.value().p == 25); CHECK(r.value().q == 100);
 		r = parse_rat_literal("-1.5");
-		CHECK(r.p == -15); CHECK(r.q == 10);
+		REQUIRE(r.has_value());
+		CHECK(r.value().p == -15); CHECK(r.value().q == 10);
 		r = parse_rat_literal("7");
-		CHECK(r.p == 7); CHECK(r.q == 1);
+		REQUIRE(r.has_value());
+		CHECK(r.value().p == 7); CHECK(r.value().q == 1);
 	}
 
 	TEST_CASE("parse_rat_literal refuses what it cannot represent exactly") {
-		// A zero denominator and garbage yield the {0, 0} sentinel.
-		CHECK(parse_rat_literal("1/0").q == 0);
-		CHECK(parse_rat_literal("abc").q == 0);
+		// A zero denominator and garbage are invalid arguments.
+		auto bad = parse_rat_literal("1/0");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::invalid_argument));
+		bad = parse_rat_literal("abc");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::invalid_argument));
 		// 19 fractional digits overflowed `denom *= 10` silently; now the
-		// sentinel is returned instead of a garbage rational.
-		CHECK(parse_rat_literal("0.1234567890123456789").q == 0);
+		// literal is refused instead of yielding a garbage rational.
+		bad = parse_rat_literal("0.1234567890123456789");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::invalid_argument));
 		// 18 digits are still exact.
 		auto r = parse_rat_literal("0.123456789012345678");
-		CHECK(r.q == 1000000000000000000LL);
-		CHECK(r.p == 123456789012345678LL);
+		REQUIRE(r.has_value());
+		CHECK(r.value().q == 1000000000000000000LL);
+		CHECK(r.value().p == 123456789012345678LL);
 		// An integer part too large to scale is refused as well.
-		CHECK(parse_rat_literal("9223372036854775807.5").q == 0);
+		bad = parse_rat_literal("9223372036854775807.5");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::invalid_argument));
 	}
 }

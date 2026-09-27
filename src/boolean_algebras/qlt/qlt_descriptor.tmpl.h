@@ -43,7 +43,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	tref fm, const std::vector<std::pair<tref, std::string>>& atoms);
 
 template <NodeType node>
-tref qlt_semantic_pwr_optimal(tref clause, tref update);
+result<tref> qlt_semantic_pwr_optimal(tref clause, tref update);
 
 template <NodeType node>
 static std::optional<int> qlt_singleton_cmp(
@@ -285,7 +285,10 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 	/** @brief Revise @p clause by the winning region of its product game. */
 	static tref semantic_pwr_optimal(tref clause, tref update) {
-		return qlt_semantic_pwr_optimal<node_t>(clause, update);
+		// TODO (HIGH) dropped error: qlt_semantic_pwr_optimal's report -- the
+		// ba_has_semantic_pwr concept fixes this member to tref.
+		auto r = qlt_semantic_pwr_optimal<node_t>(clause, update);
+		return r.has_value() ? r.value() : nullptr;
 	}
 
 	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */

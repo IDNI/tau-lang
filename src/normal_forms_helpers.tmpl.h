@@ -360,13 +360,15 @@ typename tree<node>::traverser operator|(
 }
 
 template <NodeType node>
-tref onf(tref n, tref var) {
+result<tref> onf(tref n, tref var) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<tref> r;
 	// FIXME take into account quantifiers
-	return tt(n) | tt::f(to_dnf<node, true>)
-		     | tt::f(onf_wff<node>(var))
-		     | tt::f(to_dnf<node, true>) | tt::ref;
+	TAU_TRY(auto dnf_n, (to_dnf<node, true>(n)));
+	tref onf_n = tt(dnf_n) | tt::f(onf_wff<node>(var)) | tt::ref;
+	TAU_TRY(auto dnf_onf, (to_dnf<node, true>(onf_n)));
+	return r.with_value(dnf_onf);
 }
 
 } // namespace idni::tau_lang

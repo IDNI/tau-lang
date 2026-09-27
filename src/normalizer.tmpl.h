@@ -2511,7 +2511,14 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				return nullptr;
 			}
 			current = nres.value();
-		} else current = bf_reduced_dnf<node>(current);
+		} else {
+			// TODO (HIGH) dropped error: bf_reduced_dnf's report --
+			// calculate_fixed_point returns tref, so nullptr has no
+			// channel for it.
+			auto dnf_r = bf_reduced_dnf<node>(current);
+			if (!dnf_r.has_value()) return nullptr;
+			current = dnf_r.value();
+		}
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
@@ -2558,14 +2565,14 @@ result<tref> bf_normalizer_without_rec_relation(tref bf) {
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
 	bf = syntactic_path_simplification<node>(bf);
-	tref reduced = bf_reduced_dnf<node>(bf);
+	TAU_TRY(tref reduced, bf_reduced_dnf<node>(bf));
 	// Apply present function/predicate definitions
 	TAU_TRY(tref expanded, expand_defs_until_settled<node>(reduced,
 		[](tref n) -> result<tref> {
 			return result<tref>(syntactic_path_simplification<node>(n));
 		},
 		[](tref n) -> result<tref> {
-			return result<tref>(bf_reduced_dnf<node>(n));
+			return bf_reduced_dnf<node>(n);
 		}));
 
 	LOG_DEBUG << "End Boolean function normalizer";

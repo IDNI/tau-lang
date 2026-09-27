@@ -231,61 +231,64 @@ std::optional<qint> qint_eval_interval(
 	return qint{{ {lo, hi} }};
 }
 
-std::optional<qint> qint_eval_parse_tree(
+result<qint> qint_eval_parse_tree(
 	const qint_parser::tree::traverser& t)
 {
 	using tt = qint_parser::tree::traverser;
 	using type = qint_parser::nonterminal;
 
+	result<qint> r;
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 
 	switch (nt) {
 	case type::qint_top:
-		return qint::top();
+		return r.with_value(qint::top());
 
 	case type::qint_bot:
-		return qint::bottom();
+		return r.with_value(qint::bottom());
 
 	case type::qint_integer: {
 		auto int_str = n | tt::terminals;
 		long long val = 0;
 		auto [ptr, ec] = std::from_chars(int_str.data(),
 			int_str.data() + int_str.size(), val);
-		if (ec != std::errc{}) return std::nullopt;
+		if (ec != std::errc{}) return r;
 
-		if (val == 0) return qint::bottom();
-		if (val == 1) return qint::top();
+		if (val == 0) return r.with_value(qint::bottom());
+		if (val == 1) return r.with_value(qint::top());
 
 		double lo = static_cast<double>(val);
 		double hi = lo + 1.0;
-		if (!(hi > lo)) return std::nullopt;
-		return qint{{ {lo, hi} }};
+		if (!(hi > lo)) return r;
+		return r.with_value(qint{{ {lo, hi} }});
 	}
 
 	case type::qint_single: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return std::nullopt;
-		return qint_eval_interval(children[0]);
+		if (children.empty()) return r;
+		auto interval = qint_eval_interval(children[0]);
+		if (!interval) return r;
+		return r.with_value(*interval);
 	}
 
 	case type::qint_union: {
 		// qint_union children = [interval, qint]
 		auto children = (n | tt::children)();
-		if (children.size() < 2) return std::nullopt;
+		if (children.size() < 2) return r;
 
 		auto left = qint_eval_interval(children[0]);
-		if (!left) return std::nullopt;
+		if (!left) return r;
 
-		auto right = qint_eval_parse_tree(children[1]);
-		if (!right) return std::nullopt;
+		TAU_TRY(auto right, qint_eval_parse_tree(children[1]));
 
-		return *left | *right;
+		return r.with_value(*left | right);
 	}
 
 	default:
-		LOG_ERROR << "Unknown qint node type\n";
-		return std::nullopt;
+		return r.with_error(code::internal_error,
+			"Unknown qint node type",
+			{{label::value, qint_parser::instance().name(nt)}});
 	}
 }
 

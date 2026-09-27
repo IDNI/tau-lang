@@ -1265,7 +1265,8 @@ result<tref> propagate_step_definitions(tref part_at_t,
 		if (consts.empty()) break;
 		tref replaced = rewriter::replace<node>(part_at_t, consts);
 		if (replaced == part_at_t) break;
-		part_at_t = syntactic_formula_simplification<node>(replaced);
+		TAU_TRY(part_at_t,
+			syntactic_formula_simplification<node>(replaced));
 	}
 	return r.with_assert_check_value(part_at_t);
 }
@@ -1322,8 +1323,8 @@ struct solve_step_provider : step_provider<node> {
 			// decides (GitHub #115).
 			TAU_TRY(tref part_at_t, update_to_time_point<node>(spec_part,
 				static_cast<int_t>(formula_time_point)));
-			part_at_t = syntactic_formula_simplification<node>(
-				rewriter::replace<node>(part_at_t, local_memory));
+			TAU_TRY(part_at_t, syntactic_formula_simplification<node>(
+				rewriter::replace<node>(part_at_t, local_memory)));
 			// A state part is left to the solver as a constraint (above).
 			subtree_map<node, tref> propagated;
 			if (!state_part) {
@@ -3781,8 +3782,8 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 		// decides (GitHub #115).
 		TAU_TRY(tref alt_at_t, update_to_time_point(part_alts[alt_idx],
 			static_cast<int_t>(formula_time_point)));
-		alt_at_t = syntactic_formula_simplification<node>(
-			rewriter::replace<node>(alt_at_t, memory));
+		TAU_TRY(alt_at_t, syntactic_formula_simplification<node>(
+			rewriter::replace<node>(alt_at_t, memory)));
 		if (!mentions_ltl_state_var<node>(alt_at_t)) {
 			subtree_map<node, tref> propagated;
 			TAU_TRY(alt_at_t, propagate_step_definitions<node>(
@@ -4426,13 +4427,14 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 		if (!f) continue;
 
 		// Check that f is wide (not 0 and has more than one zero), otherwise continue
-		f = bf_reduced_dnf<node>(f);
+		TAU_TRY(f, bf_reduced_dnf<node>(f));
 		if (tau::get(f).equals_0()) continue;
 		tref f0 = rewriter::replace<node>(f, u, tau::_0(
 			get_ba_type_id<node>(tau_type<node>())));
 		tref f1 = rewriter::replace<node>(f, u, tau::_1(
 			get_ba_type_id<node>(tau_type<node>())));
-		tref f0_xor_f1 = bf_reduced_dnf<node>(build_bf_xor<node>(f0, f1));
+		TAU_TRY(tref f0_xor_f1,
+			bf_reduced_dnf<node>(build_bf_xor<node>(f0, f1)));
 		if (tau::get(f0_xor_f1).equals_0()
 			|| tau::get(f0_xor_f1).equals_1()) continue;
 
@@ -4447,9 +4449,9 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 		assignment<node> sol = std::move(sol_r.value());
 		// Now we need to add solution for u[t]
 		max_u = rewriter::replace<node>(max_u, sol);
-		max_u = bf_reduced_dnf<node>(
+		TAU_TRY(max_u, bf_reduced_dnf<node>(
 			replace_free_vars_by<node>(max_u,
-			tau::_0_trimmed(find_ba_type<node>(max_u))));
+			tau::_0_trimmed(find_ba_type<node>(max_u)))));
 		sol.emplace(u, max_u);
 		return r.with_assert_check_value(std::move(sol));
 	}
@@ -4504,7 +4506,8 @@ result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 				return contains<node>(step_ubt_ctn, v); }))
 			return r.with_value(true);
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
+		TAU_TRY(step_ubt_ctn,
+			syntactic_formula_simplification<node>(step_ubt_ctn));
 		for (tref v : vars) {
 			if (contains<node>(step_ubt_ctn, v))
 				if (std::ranges::find_if(

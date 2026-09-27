@@ -3,6 +3,8 @@
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 
+#include <charconv>
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_helpers"
 
@@ -50,24 +52,26 @@ result<size_t> get_bv_type_bitwidth(tref t) {
 }
 
 // Numeric (unsigned) value of the bitvector constant in `t`, parsed from
-// its base-2 string. Precondition: `t` is a BA constant holding a `bv`
-// (std::get throws otherwise; not DBG-asserted here). Returns nullopt if
-// the term is not a concrete bitvector value or the value does not fit
-// in 64 bits (the stoull failure is logged).
+// its base-2 string. Precondition: `t` is a BA constant holding a `bv`.
+// Returns an empty optional if the term is not a concrete bitvector value.
 template<NodeType node>
-std::optional<uint64_t> get_bv_constant_value(tref t) {
+result<std::optional<uint64_t>> get_bv_constant_value(tref t) {
+	result<std::optional<uint64_t>> r;
+	std::optional<uint64_t> none;
 	auto constant = tree<node>::get(t).get_ba_constant();
-	auto cte = std::get<bv>(constant);
-	if (cte.isBitVectorValue()) {
-		auto value_str = cte.getBitVectorValue();
-		try {
-			uint64_t value = std::stoull(value_str, nullptr, 2);
-			return value;
-		} catch (const std::exception& e) {
-			LOG_ERROR << "Failed to parse bitvector constant value: " << e.what();
-		}
-	}
-	return std::nullopt;
+	auto* cte = std::get_if<bv>(&constant);
+	if (!cte) return r.with_error(code::type_error,
+		"get_bv_constant_value: the constant is not a bitvector",
+		{{label::value, truncate_for_message(TAU_TO_STR(t))}});
+	if (!cte->isBitVectorValue()) return r.with_value(std::move(none));
+	auto value_str = cte->getBitVectorValue();
+	uint64_t value = 0;
+	auto [ptr, ec] = std::from_chars(value_str.data(),
+		value_str.data() + value_str.size(), value, 2);
+	if (ec != std::errc{}) return r.with_error(code::invalid_argument,
+		"Failed to parse bitvector constant value",
+		{{label::value, value_str}});
+	return r.with_value(value);
 }
 
 } // namespace idni::tau_lang

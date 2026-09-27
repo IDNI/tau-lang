@@ -11,22 +11,23 @@ using namespace cvc5;
 using namespace idni;
 
 // The inverse operator used to cancel @p operation when moving an operand
-// across a block: bf_add <-> bf_sub and bf_mul <-> bf_div. Only these four
-// are valid inputs; anything else returns tau::nul after logging (and
-// asserts in debug builds) — see the caller-bug note in the body.
+// across a block: bf_add <-> bf_sub and bf_mul <-> bf_div. Anything else is an
+// unsupported operation -- see the caller-bug note in the body.
 template<NodeType node>
-typename node::type inverse_of(size_t operation) {
+result<typename node::type> inverse_of(size_t operation) {
 	using tau = tree<node>;
 
-	if (operation == tau::bf_add) return tau::bf_sub;
-	if (operation == tau::bf_mul) return tau::bf_div;
-	if (operation == tau::bf_sub) return tau::bf_add;
-	if (operation == tau::bf_div) return tau::bf_mul;
+	result<typename node::type> r;
+	if (operation == tau::bf_add) return r.with_value(tau::bf_sub);
+	if (operation == tau::bf_mul) return r.with_value(tau::bf_div);
+	if (operation == tau::bf_sub) return r.with_value(tau::bf_add);
+	if (operation == tau::bf_div) return r.with_value(tau::bf_mul);
 	// Every caller in this file only ever passes one of the four operators
 	// above; reaching here means a caller bug, not a malformed term.
 	DBG(assert(false && "inverse_of: operation is not one of bf_add/bf_sub/bf_mul/bf_div");)
-	LOG_ERROR << "inverse_of: unsupported operation " << LOG_NT(operation);
-	return tau::nul; // null is not allowed in a term
+	return r.with_error(code::unsupported_operation,
+		"inverse_of: unsupported operation",
+		{{ label::value, node::name(operation) }});
 }
 
 // The identity element for an associative @p operation: 0 for bf_add, the
@@ -164,9 +165,13 @@ result<tref> combine_diff(size_t operation, size_t type, tref args_side, tref in
 	if (!invs_side) return r.with_value(args_side);
 	if (!args_side) {
 		TAU_TRY(tref id, identity_of<node>(operation, type));
-		return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, invs_side)));
+		TAU_TRY(auto inverse, inverse_of<node>(operation));
+		return r.with_value(tau::get(inverse, id,
+			tau::get(tau::bf, invs_side)));
 	}
-	return r.with_value(tau::get(inverse_of<node>(operation), tau::get(tau::bf, args_side), tau::get(tau::bf, invs_side)));
+	TAU_TRY(auto inverse, inverse_of<node>(operation));
+	return r.with_value(tau::get(inverse, tau::get(tau::bf, args_side),
+		tau::get(tau::bf, invs_side)));
 }
 
 /**
@@ -247,9 +252,12 @@ result<tref> build_simplification(const trefs& arguments, const trefs& inverses,
 		// the replacement in a second bf layer
 		if (!vars && !ctes) return r.with_value(_0_trimmed<node>(type));
 		TAU_TRY(tref id, identity_of<node>(operation, type));
-		if (!vars) return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, ctes)));
-		if (!ctes) return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, vars)));
-		return r.with_value(tau::get(inverse_of<node>(operation),
+		TAU_TRY(auto inverse, inverse_of<node>(operation));
+		if (!vars) return r.with_value(tau::get(inverse, id,
+			tau::get(tau::bf, ctes)));
+		if (!ctes) return r.with_value(tau::get(inverse, id,
+			tau::get(tau::bf, vars)));
+		return r.with_value(tau::get(inverse,
 			id,
 			tau::get(tau::bf,
 				tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes)))));
@@ -319,7 +327,8 @@ result<bool> simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 	auto nt = tau::get(n).get_type();
 	if (nt == tau::bf_add || nt == tau::bf_sub || nt == tau::bf_mul) {
 		auto inverse = (nt == tau::bf_sub);
-		auto operation = inverse ? inverse_of<node>(nt) : nt;
+		auto operation = nt;
+		if (inverse) { TAU_TRY(operation, inverse_of<node>(nt)); }
 		auto type = tau::get(n).get_ba_type();
 		TAU_TRY(auto operands, collect_block_operand<node>(n, operation, changes));
 		auto& [args, invs] = operands;
@@ -385,7 +394,8 @@ result<std::pair<trefs, trefs>> collect_block_operand(tref n, size_t operation, 
 	auto nt = tau::get(n).get_type();
 	if (nt == tau::bf_add || nt == tau::bf_sub || nt == tau::bf_mul) {
 		auto inverse = (nt == tau::bf_sub);
-		auto nt_op = inverse ? inverse_of<node>(nt) : nt;
+		auto nt_op = nt;
+		if (inverse) { TAU_TRY(nt_op, inverse_of<node>(nt)); }
 		if (nt_op == operation) {
 			DBG(assert(tau::get(n).children_size() == 2
 				&& "collect_block_operand: block operator is not binary");)

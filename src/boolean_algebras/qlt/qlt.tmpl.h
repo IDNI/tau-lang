@@ -26,10 +26,9 @@ result<qlt> parse_qlt_grammar(const std::string& src) {
 		return r;
 	}
 
-	if (auto qval = qlt_eval_parse_tree(t); qval)
-		return r.with_value(*qval);
-	r.error(code::parse_error, "Not a valid qlt literal");
-	return r;
+	TAU_TRY_OR(auto qval, qlt_eval_parse_tree(t),
+		code::parse_error, "Not a valid qlt literal");
+	return r.with_value(qval);
 }
 
 template <typename... BAs>

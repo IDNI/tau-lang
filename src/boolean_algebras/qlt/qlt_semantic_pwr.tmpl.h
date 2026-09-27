@@ -154,28 +154,29 @@ tref build_win0_formula(
 //   4. Build θ = ψ ∧ G(Win)
 //      (using Win_0 ∧ G(Win → X Win) ≡ G(Win) when Win_0 ⊆ Win)
 //
-// Returns nullptr if optimal mode is not applicable or fails. The caller
+// Returns a null tree if optimal mode is not applicable or fails. The caller
 // checks that θ is realizable -- that question is not order-type theory.
 // ---------------------------------------------------------------------------
 
 template <NodeType node>
-tref qlt_semantic_pwr_optimal(tref clause, tref update) {
+result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	using tau = tree<node>;
+	result<tref> r;
 
 	// Build the conjunction C ∧ ψ for Algorithm D.
 	tref clause_and_update = build_wff_and<node>(clause, update);
 
 	// Extract data atoms.
 	auto atoms = extract_data_atoms<node>(clause_and_update);
-	if (atoms.empty()) return nullptr;
+	if (atoms.empty()) return r.with_value(nullptr);
 
 	// Check applicability: all atoms must be qlt-type, no input vars,
 	// lookback ≤ 1 (same gate as Algorithm D in ltl_aba).
 	bool has_input = false;
 	for (auto& [f, _] : atoms)
 		if (atom_has_any_input<node>(f)) { has_input = true; break; }
-	if (has_input) return nullptr;
-	if (!is_algorithm_a_applicable<node>(atoms)) return nullptr;
+	if (has_input) return r.with_value(nullptr);
+	if (!is_algorithm_a_applicable<node>(atoms)) return r.with_value(nullptr);
 
 	// LS-2: the encoding below is Algorithm A's T_3 encoding, but it used to
 	// run WITHOUT either of the two soundness guards `solve_ltl_aba` applies
@@ -192,20 +193,23 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	// `is_tau_formula_sat(theta)` does not catch it: that only checks that θ
 	// is realizable, not that G(Win) encodes the real winning region.  Fall
 	// back to fast mode instead.
-	if (!alg_a_can_classify<node>(clause_and_update, atoms)) {
+	TAU_TRY(auto can_classify,
+		alg_a_can_classify<node>(clause_and_update, atoms));
+	if (!can_classify) {
 		LOG_DEBUG << "[semantic_pwr] atom outside T_3 (top/bot qlt "
 		             "constant?) — optimal mode not applicable";
-		return nullptr;
+		return r.with_value(nullptr);
 	}
 	if (size_t n_out = count_distinct_output_vars<node>(atoms); n_out > 1) {
 		LOG_DEBUG << "[semantic_pwr] " << n_out << " output variables — "
 		             "Algorithm A's single Y/M slot would conflate them; "
 		             "optimal mode not applicable";
-		return nullptr;
+		return r.with_value(nullptr);
 	}
 
 	// Collect qlt constants and enumerate T3 types.
-	auto constants = omcat::collect_qlt_constants<node>(clause_and_update);
+	TAU_TRY(auto constants,
+		omcat::collect_qlt_constants<node>(clause_and_update));
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int K = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
@@ -218,17 +222,18 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 			TAU_LOG_DEBUG << "[semantic_pwr] optimal mode skipped: "
 				<< K << " atoms exceed the cap ("
 				<< semantic_pwr_max_atoms << ")";
-		return nullptr;
+		return r.with_value(nullptr);
 	}
 
 	// Compute D-bitmask for each T3 type and build the propositional
 	// skeleton φ*(D_i) (LS-12: shared helpers in qlt_ltl_synthesis.tmpl.h).
-	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	TAU_TRY(auto type_A,
+		qlt_type_A_bitmasks<node>(atoms, T3, constants));
 	auto phi_star_skel_r = ltl_skeleton<node>(clause_and_update, atoms);
 	// A CTL* node with no sound propositional encoding reached the skeleton
 	// walk: fall back to fast mode, same as every other not-applicable or
 	// backend-failure exit in this function (see the Algorithm D check below).
-	if (!phi_star_skel_r.has_value()) return nullptr;
+	if (!phi_star_skel_r.has_value()) return r.with_value(nullptr);
 	std::string phi_star = rename_skeleton_props_to_d(
 		std::move(phi_star_skel_r.value()), K);
 
@@ -242,12 +247,12 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 		alg_d::initial_memory(constants));
 	// A backend failure here is undecided, not unrealizable; fall back
 	// to fast mode the same way any other not-applicable case does.
-	if (!alg_result_r.has_value()) return nullptr;
+	if (!alg_result_r.has_value()) return r.with_value(nullptr);
 	auto& alg_result = alg_result_r.value();
 
 	if (!alg_result.realizable) {
 		LOG_DEBUG << "[semantic_pwr] unrealizable via Algorithm D";
-		return nullptr;
+		return r.with_value(nullptr);
 	}
 
 	LOG_DEBUG << "[semantic_pwr] winning region size="
@@ -256,7 +261,7 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 
 	// Build Win formula from winning region.
 	tref win = build_win_formula<node>(alg_result, atoms, T3, type_A);
-	if (!win) return nullptr;
+	if (!win) return r.with_value(nullptr);
 
 	// Build θ = ψ ∧ G(Win)
 	// Win_0 ∧ G(Win → X Win) ≡ G(Win) when Win_0 ⊆ Win.
@@ -266,7 +271,7 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	// Whether θ is realizable is an ordinary satisfiability question, so the
 	// caller asks it; nothing here is (Q,<) theory any more.
 	LOG_DEBUG << "[semantic_pwr] optimal mode produced a revision";
-	return theta;
+	return r.with_value(theta);
 }
 
 } // namespace idni::tau_lang

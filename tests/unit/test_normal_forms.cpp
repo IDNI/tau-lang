@@ -135,8 +135,10 @@ TEST_SUITE("normal forms: dnf_bf") {
 		const char* sample = uninterp_constants_sample;
 		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
-			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
-		CHECK( tau::get(fm).equals_0() );
+			| tau::bf | tt::ref;
+		auto dnf_r = to_dnf<node_t, false>(fm);
+		REQUIRE(dnf_r.has_value());
+		CHECK( tau::get(dnf_r.value()).equals_0() );
 	}
 
 	/*TEST_CASE("uninterpreted constants") {
@@ -263,8 +265,12 @@ TEST_SUITE("normal forms: onf") {
 		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
 		tref fm_lhs = get_nso_rr("x = y.").value().main->get();
 		tref fm_rhs = get_nso_rr("y = x.").value().main->get();
-		tref result_lhs = onf<node_t>(fm_lhs, x);
-		tref result_rhs = onf<node_t>(fm_rhs, x);
+		auto result_lhs_r = onf<node_t>(fm_lhs, x);
+		REQUIRE(result_lhs_r.has_value());
+		tref result_lhs = result_lhs_r.value();
+		auto result_rhs_r = onf<node_t>(fm_rhs, x);
+		REQUIRE(result_rhs_r.has_value());
+		tref result_rhs = result_rhs_r.value();
 		CHECK(tau::get(result_lhs).to_str() == tau::get(result_rhs).to_str());
 		// a genuine onf transformation replaces the bare equation
 		CHECK(tau::get(result_rhs).to_str() != tau::get(fm_rhs).to_str());
@@ -279,7 +285,9 @@ TEST_SUITE("normal forms: onf") {
 		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
 		tref fm = get_nso_rr("ex y (x = y).").value().main->get();
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_ex>) != nullptr );
-		tref result = onf<node_t>(fm, x);
+		auto result_r = onf<node_t>(fm, x);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		CHECK( tau::get(result).find_top(is<node_t, tau::wff_ex>) != nullptr );
 	}
 
@@ -292,7 +300,9 @@ TEST_SUITE("normal forms: onf") {
 	TEST_CASE("bf_neq atoms mentioning the variable are order-normalized") {
 		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
 		tref fm = get_nso_rr("x != y.").value().main->get();
-		tref result = onf<node_t>(fm, x);
+		auto result_r = onf<node_t>(fm, x);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		std::string s = tau::get(result).to_str();
 		CHECK(( s == "yx' != 0 || xy' != 0"
 			|| s == "xy' != 0 || yx' != 0" ));
@@ -304,7 +314,9 @@ TEST_SUITE("normal forms: onf") {
 	TEST_CASE("bf_neq atoms without the variable are left untouched") {
 		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
 		tref fm = get_nso_rr("x != y && z != w.").value().main->get();
-		tref result = onf<node_t>(fm, x);
+		auto result_r = onf<node_t>(fm, x);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		std::string s = tau::get(result).to_str();
 		// z != w survives untouched, x != y is decomposed away
 		CHECK( s.find("z != w") != std::string::npos );
@@ -816,7 +828,9 @@ TEST_SUITE("ToDNF") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		// fm is the wff node; [0] is the bf_eq child; first() is the bf
 		tref bf = tau::get(fm)[0].first();
-		tref res = to_dnf<node_t, false>(bf);
+		auto res_r = to_dnf<node_t, false>(bf);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// Result is an OR of AND terms
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_or>) );
 	}
@@ -824,7 +838,9 @@ TEST_SUITE("ToDNF") {
 		// (x=0 && y=0) || (x=0 && z=0)
 		const char* sample = "x = 0 && (y = 0 || z = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = to_dnf<node_t, true>(fm);
+		auto res_r = to_dnf<node_t, true>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// DNF result must be an OR
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
 		// DNF result must contain x=0
@@ -838,14 +854,18 @@ TEST_SUITE("ToCNF") {
 		const char* sample = "(a|b)&(a|c) = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref bf = tau::get(fm)[0].first();
-		tref res = to_cnf<node_t, false>(bf);
+		auto res_r = to_cnf<node_t, false>(bf);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// Result is an AND of OR terms
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_and>) );
 	}
 	TEST_CASE("wff: (x=0||y=0) && (z=0||w=0) is already CNF") {
 		const char* sample = "(x = 0 || y = 0) && (z = 0 || w = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = to_cnf<node_t, true>(fm);
+		auto res_r = to_cnf<node_t, true>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// Top-level should be an AND
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_and>) );
 	}
@@ -855,13 +875,17 @@ TEST_SUITE("ReduceWff") {
 	TEST_CASE("contradiction x=0 && x!=0 → F") {
 		const char* sample = "x = 0 && x != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_F() );
 	}
 	TEST_CASE("tautology x=0 || x!=0 → T") {
 		const char* sample = "x = 0 || x != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_T() );
 	}
 
@@ -879,7 +903,9 @@ TEST_SUITE("ReduceWff") {
 		REQUIRE( rr.has_value() );
 		tref fm = rr.value().main->get();
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::bf_lt>) );
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( !tau::get(res).equals_F() );
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
 	}
@@ -889,7 +915,9 @@ TEST_SUITE("ReduceWff") {
 		auto rr = get_nso_rr(sample);
 		REQUIRE( rr.has_value() );
 		tref fm = rr.value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
 	}
@@ -905,7 +933,9 @@ TEST_SUITE("ReduceWff") {
 		auto rr = get_nso_rr(sample);
 		REQUIRE( rr.has_value() );
 		tref fm = rr.value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( !tau::get(res).equals_F() );
 		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
 			|| tau::get(res).find_top(is<node_t, tau::bf_lt>)) );
@@ -916,7 +946,9 @@ TEST_SUITE("ReduceWff") {
 		auto rr = get_nso_rr(sample);
 		REQUIRE( rr.has_value() );
 		tref fm = rr.value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( !tau::get(res).equals_F() );
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
 		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
@@ -928,7 +960,9 @@ TEST_SUITE("ReduceWff") {
 		auto rr = get_nso_rr(sample);
 		REQUIRE( rr.has_value() );
 		tref fm = rr.value().main->get();
-		tref res = reduce<node_t>(fm);
+		auto res_r = reduce<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lteq>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
 	}
@@ -940,7 +974,9 @@ TEST_SUITE("BfReducedDNF") {
 		const char* sample = "ab|ab' = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref bf = tau::get(fm)[0].first();
-		tref res = bf_reduced_dnf<node_t>(bf);
+		auto res_r = bf_reduced_dnf<node_t>(bf);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).to_str() == "a" );
 	}
 	TEST_CASE("ab|a'b reduces to b") {
@@ -948,7 +984,9 @@ TEST_SUITE("BfReducedDNF") {
 		const char* sample = "ab|a'b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref bf = tau::get(fm)[0].first();
-		tref res = bf_reduced_dnf<node_t>(bf);
+		auto res_r = bf_reduced_dnf<node_t>(bf);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).to_str() == "b" );
 	}
 	TEST_CASE("ab|ab'|a'b|a'b' reduces to 1") {
@@ -956,7 +994,9 @@ TEST_SUITE("BfReducedDNF") {
 		const char* sample = "ab|ab'|a'b|a'b' = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref bf = tau::get(fm)[0].first();
-		tref res = bf_reduced_dnf<node_t>(bf);
+		auto res_r = bf_reduced_dnf<node_t>(bf);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_1() );
 	}
 
@@ -972,8 +1012,12 @@ TEST_SUITE("BfReducedDNF") {
 		const char* sample = "ac|a'b'c = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref bf = tau::get(fm)[0].first();
-		tref res_disjoint = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/true);
-		tref res_joined   = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/false);
+		auto res_disjoint_r = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/true);
+		REQUIRE(res_disjoint_r.has_value());
+		tref res_disjoint = res_disjoint_r.value();
+		auto res_joined_r = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/false);
+		REQUIRE(res_joined_r.has_value());
+		tref res_joined = res_joined_r.value();
 		// The two calls must yield structurally different results
 		CHECK( tau::get(res_disjoint) != tau::get(res_joined) );
 		// The disjoint version retains a bf_or (both paths kept)
@@ -985,14 +1029,18 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 	TEST_CASE("path contradiction x=0 && x!=0 → F") {
 		const char* sample = "x = 0 && x != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = syntactic_formula_simplification<node_t>(fm);
+		auto res_r = syntactic_formula_simplification<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_F() );
 	}
 	TEST_CASE("equality propagation x=0 && xy=0 → x=0") {
 		// x=0 implies xy=0, so the conjunct xy=0 is redundant
 		const char* sample = "x = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = syntactic_formula_simplification<node_t>(fm);
+		auto res_r = syntactic_formula_simplification<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( matches_to_str_to_any_of(res, {
 			"x = 0",
 			"yx = 0",
@@ -1001,7 +1049,9 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 	TEST_CASE("tautological path x=0 || x!=0 → T") {
 		const char* sample = "x = 0 || x != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = syntactic_formula_simplification<node_t>(fm);
+		auto res_r = syntactic_formula_simplification<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_T() );
 	}
 }

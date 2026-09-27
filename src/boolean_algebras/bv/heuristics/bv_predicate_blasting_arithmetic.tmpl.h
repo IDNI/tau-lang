@@ -292,7 +292,8 @@ static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
 	// the quotient bound below is computed with 64 bit arithmetic
 	if (bitwidth > 64) return r.with_value(nullptr);
-	auto divisor_value = get_bv_constant_value<node>(tau::trim(divisor));
+	TAU_TRY(auto divisor_value,
+		get_bv_constant_value<node>(tau::trim(divisor)));
 	// division by zero falls back to the solver semantics
 	if (!divisor_value || *divisor_value == 0) return r.with_value(nullptr);
 

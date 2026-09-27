@@ -12,10 +12,11 @@ namespace idni::tau_lang {
 using namespace idni;
 
 // evaluates a parsed bdd terminal node recursively
-inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
+inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
 	using type = sbf_parser::nonterminal;
 
+	result<sbf_ba> r;
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
@@ -32,12 +33,12 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	// (empty/null) construction here. bdd_init is idempotent (guarded by its
 	// own `if (!V.empty()) return;`), so calling it defensively is a no-op
 	// on every other path.
-	case type::zero: bdd_init<Bool>(); return bdd_handle<Bool>::hfalse;
-	case type::one:  bdd_init<Bool>(); return bdd_handle<Bool>::htrue;
+	case type::zero: bdd_init<Bool>(); return r.with_value(bdd_handle<Bool>::hfalse);
+	case type::one:  bdd_init<Bool>(); return r.with_value(bdd_handle<Bool>::htrue);
 	case type::negation: {
-		auto e = sbf_eval_node(n | tt::only_child);
+		TAU_TRY(auto e, sbf_eval_node(n | tt::only_child));
 		LOG_TRACE << e << "' = " << ~e;
-		return ~e;
+		return r.with_value(~e);
 	}
 	case type::variable: {
 		// get var id from var node's terminals
@@ -46,32 +47,33 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		// use cached var if exists
 		if (auto cn = var_cache.find(v);
 			cn != var_cache.end())
-				return cn->second;
+				return r.with_value(cn->second);
 		// otherwise create a new var and cache it, unless a full bdd
 		// node table made it F
 		auto h = bdd_handle<Bool>::get(bdd<Bool>::bit(v));
-		if (bdd_node_table_exhausted) return h;
-		return var_cache.emplace(v, h).first->second;
+		if (bdd_node_table_exhausted) return r.with_value(h);
+		return r.with_value(var_cache.emplace(v, h).first->second);
 	}
 	default:
 		auto o = (n | tt::children)();
-		auto l = sbf_eval_node(o[0]), r = sbf_eval_node(o[1]);
+		TAU_TRY(auto l, sbf_eval_node(o[0]));
+		TAU_TRY(auto right, sbf_eval_node(o[1]));
 		switch (nt) {
 		case type::disjunction:
-			// LOG_TRACE << l << " | " << r << " -> " << (l | r);
-			return l | r;
+			// LOG_TRACE << l << " | " << right << " -> " << (l | right);
+			return r.with_value(l | right);
 		case type::exclusive_disjunction:
-			// LOG_TRACE << l << " ^ " << r << " -> " << (l ^ r);
-			return l ^ r;
+			// LOG_TRACE << l << " ^ " << right << " -> " << (l ^ right);
+			return r.with_value(l ^ right);
 		case type::conjunction:
 		case type::conjunction_nosep:
-			// LOG_TRACE << l << " & " << r << " -> " << (l & r);
-			return l & r;
+			// LOG_TRACE << l << " & " << right << " -> " << (l & right);
+			return r.with_value(l & right);
 		default:
-			LOG_ERROR << "[sbf] unrecognized binary nonterminal: "
-				<< (size_t) nt << "\n";
-			DBG(assert(false);)
-			return bdd_handle<Bool>::hfalse;
+			return r.with_error(code::internal_error,
+				"[sbf] unrecognized binary nonterminal",
+				{{label::value,
+					sbf_parser::instance().name(nt)}});
 		}
 	}
 }
@@ -101,7 +103,10 @@ result<typename node<BAs...>::constant_with_type> parse_sbf(
 	// get the sbf_constant node
 	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
 							| sbf_parser::sbf;
-	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
+	result<sbf_ba> value;
+	if (t.has_value()) value = sbf_eval_node(t);
+	else value = result<sbf_ba>{ bdd_handle<Bool>::hfalse };
+	TAU_TRY(auto v, std::move(value));
 	// a constant built on a full bdd node table is not the source's value
 	if (bdd_node_table_exhausted)
 		return r.with_value(typename node<BAs...>::constant_with_type{

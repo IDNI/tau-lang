@@ -325,27 +325,33 @@ TEST_SUITE("omcat: oracle cache") {
 TEST_SUITE("omcat: parse_rat_literal") {
 	TEST_CASE("integer") {
 		auto r = omcat::parse_rat_literal("42");
-		CHECK(omcat::cmp(r, omcat::rational(42, 1)) == 0);
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(42, 1)) == 0);
 	}
 	TEST_CASE("fraction") {
 		auto r = omcat::parse_rat_literal("3/7");
-		CHECK(omcat::cmp(r, omcat::rational(3, 7)) == 0);
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(3, 7)) == 0);
 	}
 	TEST_CASE("negative fraction") {
 		auto r = omcat::parse_rat_literal("-1/2");
-		CHECK(omcat::cmp(r, omcat::rational(-1, 2)) == 0);
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(-1, 2)) == 0);
 	}
 	TEST_CASE("decimal") {
 		auto r = omcat::parse_rat_literal("0.25");
-		CHECK(omcat::cmp(r, omcat::rational(1, 4)) == 0);
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(1, 4)) == 0);
 	}
 	TEST_CASE("decimal 0.45") {
 		auto r = omcat::parse_rat_literal("0.45");
-		CHECK(omcat::cmp(r, omcat::rational(9, 20)) == 0);
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(9, 20)) == 0);
 	}
-	TEST_CASE("invalid returns {0, 0}") {
+	TEST_CASE("invalid is an invalid argument") {
 		auto r = omcat::parse_rat_literal("not-a-rational");
-		CHECK(r.q == 0);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
 }
 

@@ -804,12 +804,13 @@ TEST_SUITE("qint — parse tree evaluation") {
 // Parse a qint source string via the qint grammar and evaluate the parse
 // tree, mirroring parse_qint_grammar() (qint.tmpl.h) without needing a
 // BA pack.
-static std::optional<qint> parse_q(const std::string& src) {
-	auto result = qint_parser::instance().parse(src.c_str(), src.size());
-	if (!result.found) return std::nullopt;
-	auto t = qint_parser::tree::traverser(result.get_shaped_tree2())
+static result<qint> parse_q(const std::string& src) {
+	result<qint> r;
+	auto parsed = qint_parser::instance().parse(src.c_str(), src.size());
+	if (!parsed.found) return r;
+	auto t = qint_parser::tree::traverser(parsed.get_shaped_tree2())
 		| qint_parser::qint;
-	if (!t.has_value()) return std::nullopt;
+	if (!t.has_value()) return r;
 	return qint_eval_parse_tree(t);
 }
 
