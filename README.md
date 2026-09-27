@@ -764,10 +764,22 @@ vertex and reads the last values of every stream. At each step it follows
 the edge the inputs take, asks the solver for outputs within the move of
 the vertex reached (a value no stream holds when its code says so), and
 follows the edge those outputs take. The values before step 0 are its own:
-every input 0 and outputs for which the start is won. Such a run reads
-every input at every step, and it does not accept a revision of the
-specification. Otherwise `run` executes the strategy of (4) and (5), as a
-safety formula (below). The external tool
+every input 0 and outputs for which the start is won. A strategy of the game
+on codes is also a finite Mealy machine over atoms that compare the current
+values with 0, 1, the elements of their type and the last values of the
+streams: a state is a game vertex with the pattern of equalities among the
+last values, and the machine is minimized. The run plays that machine, which
+the Mealy introspection (the cached solution, its current state) shows, and
+a step reads only the inputs its move depends on. A revision of the
+specification is made as in any run: the running specification is revised
+pointwise by the update, and the data game is solved again for the revised
+specification, starting from the values already played; the revision is
+refused when that game does not decide it or is not won from those values.
+Otherwise `run` executes the strategy of (4) and (5), as a safety formula
+(below). A specification whose `always` part reads a fixed step, such as
+`o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
+through that strategy as well: the step counter of the realizability check
+carries the fixed steps. The external tool
 `ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
 
 #### Synthesis algorithms
@@ -2836,8 +2848,10 @@ prints outputs, and exits when its input closes.  Exit code `0` on success,
 `1` on every failure, with the reason in the `compile failed:` message (see
 [Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
 The program carries the strategy of the abstraction (steps 4 and 5 of the
-realizability algorithm); a spec that only the data game decides is refused
-with a message saying so, and `run` executes it.
+realizability algorithm), or, for a spec that only the data game decides,
+the Mealy machine of that game's strategy, which `run` plays too. A spec the
+data game decides only over formulas has no such machine; it is refused with
+a message saying so, and `run` executes it.
 
 Emitting a C++ *header* with the synthesized class (`tau_program`, with the
 `declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)
