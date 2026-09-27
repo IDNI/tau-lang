@@ -16,6 +16,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "test_scratch_dir.h"
 
 #include "io_context.h"
 
@@ -57,8 +58,7 @@ struct cerr_capture {
 struct temp_path {
 	std::filesystem::path path;
 	explicit temp_path(const std::string& tag)
-		: path(std::filesystem::temp_directory_path()
-			/ ("tau_test_io_context_" + tag)) {
+		: path(test_scratch_path("tau_test_io_context_" + tag)) {
 		std::error_code ec;
 		std::filesystem::remove(path, ec);
 	}
@@ -287,8 +287,7 @@ TEST_SUITE("file streams") {
 	// an error rather than throwing, and put() then reports failure.
 	TEST_CASE("opening an unwritable output path does not throw") {
 		const std::string bad =
-			(std::filesystem::temp_directory_path()
-				/ "tau_test_io_context_absent_dir"
+			(test_scratch_path("tau_test_io_context_absent_dir")
 				/ "out.txt").string();
 		REQUIRE(!std::filesystem::exists(
 			std::filesystem::path(bad).parent_path()));
@@ -301,8 +300,8 @@ TEST_SUITE("file streams") {
 	// empty strings). This is the failure branch of the constructor.
 	TEST_CASE("opening a missing file does not throw") {
 		const std::string missing =
-			(std::filesystem::temp_directory_path()
-				/ "tau_test_io_context_definitely_absent").string();
+			test_scratch_path("tau_test_io_context_definitely_absent")
+				.string();
 		std::error_code ec;
 		std::filesystem::remove(missing, ec);
 		file_input_stream in(missing);

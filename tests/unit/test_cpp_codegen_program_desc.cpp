@@ -9,6 +9,7 @@
 #include "codegen_strategy.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
+#include "test_scratch_dir.h"
 
 #include <algorithm>
 #include <chrono>
@@ -61,21 +62,23 @@ bool has_gpp() {
 	return ::system("g++ --version >/dev/null 2>&1") == 0;
 }
 
-// Write `header_src` + `main_src` to /tmp, compile with g++, run, return the
-// first stdout line ("" on any compile/run failure).
+// Write `header_src` + `main_src` to the test's scratch directory, compile
+// with g++, run, return the first stdout line ("" on any compile/run failure).
 std::string compile_and_run(
     const std::string& header_src,
     const std::string& main_src,
     const std::string& tag)
 {
-	std::string hdr  = "/tmp/_tau_cg_pd_" + tag + ".h";
-	std::string mainf = "/tmp/_tau_cg_pd_" + tag + "_main.cpp";
-	std::string exe  = "/tmp/_tau_cg_pd_" + tag + "_exe";
+	const std::string dir = test_scratch_dir().string();
+	std::string hdr  = dir + "/_tau_cg_pd_" + tag + ".h";
+	std::string mainf = dir + "/_tau_cg_pd_" + tag + "_main.cpp";
+	std::string exe  = dir + "/_tau_cg_pd_" + tag + "_exe";
 	{ std::ofstream f(hdr); f << header_src; }
 	{ std::ofstream f(mainf); f << main_src; }
-	std::string cmd = "g++ -O2 -std=c++23 -I/tmp -o " + exe + " " + mainf + " 2>&1";
+	std::string cmd = "g++ -O2 -std=c++23 -I\"" + dir + "\" -o \"" + exe
+		+ "\" \"" + mainf + "\" 2>&1";
 	if (::system(cmd.c_str()) != 0) return "";
-	std::string run_cmd = exe + " > " + exe + ".out 2>&1";
+	std::string run_cmd = "\"" + exe + "\" > \"" + exe + ".out\" 2>&1";
 	if (::system(run_cmd.c_str()) != 0) return "";
 	std::ifstream out(exe + ".out");
 	std::string line;
@@ -830,8 +833,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = stdfs::temp_directory_path()
-			/ "test_cpp_codegen_hello_world_sdk_link.build";
+		stdfs::path bdir =
+			test_scratch_path("test_cpp_codegen_hello_world_sdk_link.build");
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 
@@ -881,7 +884,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "piped inputs come back in order, exit code 0") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = stdfs::temp_directory_path() / "_tau_cg_pd_echo";
+		stdfs::path bdir = test_scratch_path("_tau_cg_pd_echo");
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 
