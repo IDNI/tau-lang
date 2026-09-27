@@ -52,6 +52,12 @@ cd "${REPO_ROOT}"
 
 TESTNET_REPO="${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}"
 TESTNET_DIR="${TAU_TESTNET_DIR:-${REPO_ROOT}/tau-testnet}"
+# The downstream revision the suite runs against. TAU_TESTNET_REF overrides
+# it, so a move of the pin is an explicit, visible change.
+TESTNET_REF="${TAU_TESTNET_REF:-8fa7f60748e676926bfeccf98cc60f9f623b7228}"
+# When set, install this prebuilt wheel instead of building the binding, so the
+# suite exercises the exact artifact a consumer would install.
+TESTNET_WHEEL="${TAU_TESTNET_WHEEL:-}"
 DEFAULT_PRESET="release-binding-python"
 
 # preset_entry defaults to the plain `release` preset, which does not build the
@@ -74,6 +80,10 @@ if [ ! -d "${TESTNET_DIR}" ]; then
 else
 	echo "Using tau-testnet at ${TESTNET_DIR}"
 fi
+
+# Pin the downstream ref so a rerun is reproducible.
+echo "Pinning tau-testnet to ${TESTNET_REF}"
+git -C "${TESTNET_DIR}" checkout --detach "${TESTNET_REF}"
 
 # tau_native.load_tau_module() looks for a build under <parent>/tau-lang
 # *before* falling back to PYTHONPATH. When TAU_TESTNET_DIR points at a
@@ -116,7 +126,14 @@ VENV_PYTHON="${VENV_DIR}/bin/python3"
 
 echo "Installing tau-testnet requirements"
 "${VENV_PYTHON}" -m pip install --upgrade pip setuptools wheel
-if ! "${VENV_PYTHON}" -m pip install -r "${TESTNET_DIR}/requirements.txt"; then
+REQ_INSTALL_ARGS=(-r "${TESTNET_DIR}/requirements.txt")
+if [ -n "${TESTNET_WHEEL}" ]; then
+	# A wheel-based run must not build a compiled dependency. Point the
+	# compilers at a failing command so a source build fails loudly instead of
+	# silently needing a toolchain; a pure-Python sdist still installs.
+	export CC=/bin/false CXX=/bin/false
+fi
+if ! "${VENV_PYTHON}" -m pip install "${REQ_INSTALL_ARGS[@]}"; then
 	echo >&2
 	echo "Error: could not install tau-testnet's requirements with" >&2
 	echo "  $("${VENV_PYTHON}" --version 2>&1)" >&2
@@ -140,8 +157,15 @@ if ! "${VENV_PYTHON}" -m pip install -r "${TESTNET_DIR}/requirements.txt"; then
 	exit 1
 fi
 # not in requirements.txt: needed to configure the binding, not to run it
-"${VENV_PYTHON}" -m pip install nanobind
+if [ -z "${TESTNET_WHEEL}" ]; then
+	"${VENV_PYTHON}" -m pip install nanobind
+fi
 
+if [ -n "${TESTNET_WHEEL}" ]; then
+	echo "Installing the prebuilt tau wheel ${TESTNET_WHEEL}"
+	"${VENV_PYTHON}" -m pip install --force-reinstall "${TESTNET_WHEEL}"
+	MODULE_DIR=""
+else
 # configure and build the preset; sets PRESET and TAU_BUILD_JOBS.
 # --keep-cache adds the binding to whatever the build directory holds
 # already instead of reconfiguring it from scratch.
@@ -160,6 +184,7 @@ if ! compgen -G "${MODULE_DIR}/tau*.so" > /dev/null; then
 	echo "does: ${DEFAULT_PRESET}, release-binding-python-tests," >&2
 	echo "debug-binding-python-tests or devel-binding-python-tests." >&2
 	exit 1
+fi
 fi
 
 # Much of the suite loads data/genesis.json, which is not committed at that
@@ -183,7 +208,15 @@ PYTEST_ARGS=("${DEV_PROGRAM[@]}")
 [[ ${#PYTEST_ARGS[@]} -eq 0 ]] && PYTEST_ARGS=(-p no:asyncio)
 
 # run the tau-testnet suite against it
-echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
+if [ -n "${MODULE_DIR}" ]; then
+	echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
+else
+	echo "Running tau-testnet tests with the installed wheel"
+fi
 cd "${TESTNET_DIR}"
-PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
+if [ -n "${MODULE_DIR}" ]; then
+	PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
+		"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+else
 	"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+fi
