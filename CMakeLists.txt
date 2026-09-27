@@ -290,6 +290,7 @@ if(TAU_BUILD_REPL_BROWSER_TESTS AND NOT TAU_BUILD_REPL_WASM)
 		"TAU_BUILD_REPL_BROWSER_TESTS=ON requires TAU_BUILD_REPL_WASM=ON "
 		"(the browser REPL page the suite drives).")
 endif()
+
 if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
 	message(FATAL_ERROR
 		"TAU_BUILD_REPL_WASM=ON requires the Emscripten toolchain "
@@ -327,6 +328,7 @@ if(TAU_BUILD_REPL_WASM AND NOT TAU_WASM_PTHREADS)
 	message(FATAL_ERROR
 		"TAU_BUILD_REPL_WASM=ON requires TAU_WASM_PTHREADS=ON.")
 endif()
+
 # emcc requires every linked object to agree on -pthread (shared vs
 # non-shared wasm memory), so this goes on the global flags -- ahead of
 # add_subdirectory(src) and js/repl's FTXUI build -- rather than as a

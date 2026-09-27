@@ -145,8 +145,12 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset debug-asan
 ./dev preset coverage
 ./dev preset release-wasm                        # wasm library (tau.js/.wasm/.esm.mjs)
-./dev preset debug-wasm-all-tests                # tau's own suite, run under node
-./dev preset release-wasm-repl-browser           # wasm REPL (tau_repl.js)
+./dev preset release-wasm-all-tests run          # C++ suite, REPL suite and js parity, under node
+./dev preset release-wasm-all-tests-browser run  # the compiled suite in headless Chrome
+./dev preset release-wasm-repl-tests run         # the REPL suite, run under node
+./dev preset release-wasm-repl-browser           # wasm browser REPL (tau_repl_web.js)
+./dev preset release-wasm-repl-tests-browser run # the REPL suite inside the browser REPL, in Chrome
+./dev preset release-wasm-nothreads              # the same library without -pthread
 ./dev preset devel-wasm-all-tests run            # every wasm preset also has a devel- and a debug- twin
 ```
 

@@ -699,6 +699,7 @@
 		},
 		{
 			"name": "release-wasm",
+			"displayName": "wasm library (tau.js/tau.wasm/tau.esm.mjs)",
 			"inherits": [
 				"_build_dir-release-wasm",
 				"_generator-make",
@@ -709,6 +710,7 @@
 		},
 		{
 			"name": "release-wasm-all-tests",
+			"displayName": "wasm library, C++ suite and CLI (node)",
 			"inherits": [
 				"_build_dir-release-wasm",
 				"_generator-make",
@@ -751,6 +753,7 @@
 		},
 		{
 			"name": "release-wasm-repl-browser",
+			"displayName": "browser REPL page (tau_repl_web.js, pthreads)",
 			"inherits": [
 				"_build_dir-release-wasm-repl-browser",
 				"_generator-make",
