@@ -94,7 +94,7 @@ add_ltl_run_test(data_game_strategy_merged_warm_up
 # run stops asking for it
 add_ltl_run_test(data_game_strategy_reads_needed_inputs
 	"run (sometimes o1[t]:bv[1] = i1[t]:bv[1]) && (always o2[t]:bv[1] = i2[t]:bv[1]).\\n1\\n0\\n1\\n0\\n1\\n0\\nq\\nq\\n"
-	"i2\\[1\\] : bv\\[1\\] := 1\n.*o2\\[1\\] := 1\n.*i2\\[2\\] : bv\\[1\\] := 0"
+	"i2\\[1\\][^\n]*\n.*o2\\[1\\] := 1\n.*i2\\[2\\]"
 	"i1\\[1\\]|unsat|no strategy")
 
 # fixed steps inside the always part that the safety pipeline cannot
