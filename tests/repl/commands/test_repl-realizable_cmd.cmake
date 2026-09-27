@@ -921,3 +921,36 @@ set_tests_properties("test_repl-realizable_cmd-data_game_complement_codes"
 # and 1 is played on its values: the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
 add_repl_test(realizable_cmd-data_game_bv_arithmetic_values
 	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T")
+
+# A bitvector stream of more than 4 bits is played on its bits, each
+# comparison a circuit over them: i1[t] + i1[t-1] never exceeds 1 when the
+# environment keeps i1 at 0
+add_repl_test(realizable_cmd-data_game_bv_bits_sum_of_inputs
+	"realizable (G ({1}:bv[8] = o1[t]:bv[8])) && (F (o1[t]:bv[8] < (i1[t]:bv[8] + i1[t-1]:bv[8])))" ": F")
+# o1 falls by at least 2 a step, wrapping around 0, and meets 3
+add_repl_test(realizable_cmd-data_game_bv_bits_falling_output
+	"realizable (always ((o1[t]:bv[8] + {1}:bv[8]) < o1[t-1]:bv[8])) && (sometimes ({3}:bv[8] = o1[t-1]:bv[8]))" ": T")
+# 3 is invertible modulo 2^16, so o2 meets the goal at step 0, before the
+# always part starts
+add_repl_test(realizable_cmd-data_game_bv_bits_product_by_constant
+	"realizable (always o2[t]:bv[16] = o1[t-1]:bv[16] + i1[t]:bv[16]) && (sometimes o2[t]:bv[16] * {3}:bv[16] = {1000}:bv[16] + i1[t]:bv[16])" ": T")
+# against i1 = 4094 only o1 = 4095 is above it, one more than i1
+add_repl_test(realizable_cmd-data_game_bv_bits_difference_with_past_input
+	"realizable (always o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12]) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F")
+
+# Streams of a dense order read through order comparisons are played on the
+# order type of the window: how its values and the constants compare.
+# The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.
+add_repl_test(realizable_cmd-data_game_order_types_input_below_output
+	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": F")
+# the environment keeps i1 constant
+add_repl_test(realizable_cmd-data_game_order_types_until_input_changes
+	"realizable (({1/2}:qlt > i1[t]:qlt) U (i1[t]:qlt != i1[t-1]:qlt))" ": F")
+add_repl_test(realizable_cmd-data_game_order_types_constant_input_below_one
+	"realizable (always {0}:qlt = o1[t-1]:qlt) && (sometimes (i1[t-1]:qlt = i1[t-1]:qlt || i1[t]:qlt < o1[t-1]:qlt)) && (sometimes (i1[t-1]:qlt != i1[t]:qlt || {1}:qlt <= i1[t]:qlt))" ": F")
+# an i1 at most 1 is copied into o1, which must stay above 1
+add_repl_test(realizable_cmd-data_game_order_types_copied_input_above_one
+	"realizable (always (o1[t]:qlt = i1[t-1]:qlt && {1}:qlt < o1[t-1]:qlt)) && (sometimes o1[t]:qlt <= o1[t-2]:qlt)" ": F")
+# o2 stays below 1 and o1 climbs from 0 to 1/2 over two steps
+add_repl_test(realizable_cmd-data_game_order_types_outputs_climb
+	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" ": T")
