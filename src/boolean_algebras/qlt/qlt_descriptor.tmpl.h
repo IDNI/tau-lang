@@ -45,6 +45,10 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 template <NodeType node>
 tref qlt_semantic_pwr_optimal(tref clause, tref update);
 
+template <NodeType node>
+static std::optional<int> qlt_singleton_cmp(
+	const tree<node>& c1, const tree<node>& c2);
+
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -177,6 +181,22 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		z.pieces.push_back(p);
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			typename node_t::constant(z), ba_type) });
+	}
+
+	/**
+	 * @brief The order of two qlt singleton constants. `0` and `1` are the
+	 * order's sentinels below and above every point, not points, so they
+	 * compare as nothing here.
+	 */
+	static std::optional<int> dense_order_compare(size_t, tref a, tref b) {
+		auto operand = [](tref c) -> const tau& {
+			const auto& t = tau::get(c);
+			return t.is(tau::bf) && t.has_child() ? t[0] : t;
+		};
+		const auto& x = operand(a);
+		const auto& y = operand(b);
+		if (!x.is_ba_constant() || !y.is_ba_constant()) return std::nullopt;
+		return qlt_singleton_cmp<node_t>(x, y);
 	}
 
 	/**

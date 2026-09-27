@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_DESCRIPTOR_H__
 
 #include <concepts>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -217,6 +218,27 @@ concept ba_has_value_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, size_t v) {
 		{ ba_descriptor<BA, Node>::value_constant(t, v) }
 			-> std::convertible_to<tref>; };
+
+// The type's values are the integers 0 .. 2^n - 1 (n = modular_width, 0 for
+// a type that is not), read with unsigned modular semantics: the Boolean
+// operators bitwise, + - * modulo 2^n, / % unsigned, shifts logical, the
+// comparisons unsigned. modular_value reads the integer a constant holds.
+template <typename Node, typename BA>
+concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t, tref c) {
+		{ ba_descriptor<BA, Node>::modular_width(t) }
+			-> std::convertible_to<size_t>;
+		{ ba_descriptor<BA, Node>::modular_value(t, c) }
+			-> std::convertible_to<std::optional<uint64_t>>; };
+
+// The type's values, read by = and the order comparisons, form a dense
+// linear order without endpoints; dense_order_compare orders two constants
+// (-1, 0, 1), nullopt when either is not a point of the order.
+template <typename Node, typename BA>
+concept ba_has_dense_order = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t, tref a, tref b) {
+		{ ba_descriptor<BA, Node>::dense_order_compare(t, a, b) }
+			-> std::convertible_to<std::optional<int>>; };
 
 template <typename Node, typename BA>
 concept ba_has_bool_carrier_type = ba_has_descriptor_v<Node, BA>

@@ -9,6 +9,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_PACK_TRAITS_H__
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -530,6 +531,65 @@ tref pack_value_constant(size_t ba_type, size_t value) {
 					ba_type, value);
 			return std::nullopt;
 		}).value_or(nullptr);
+}
+
+/**
+ * @brief The width n when the values of @p ba_type are the integers
+ * 0 .. 2^n - 1 under unsigned modular semantics, from the BA that owns it.
+ *
+ * 0 when no BA owns the type, its owner does not declare the capability, or
+ * the owner answers that the type is not read that way right now.
+ */
+template <typename Node>
+size_t pack_modular_width(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<size_t> {
+			if constexpr (ba_has_modular_bits<Node, BA>)
+				return ba_descriptor<BA, Node>::modular_width(ba_type);
+			return std::nullopt;
+		}).value_or(0);
+}
+
+/**
+ * @brief The integer the constant @p c of @p ba_type holds, when the type is
+ * read with modular semantics (see pack_modular_width); nullopt otherwise.
+ */
+template <typename Node>
+std::optional<uint64_t> pack_modular_value(size_t ba_type, tref c) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<uint64_t> {
+			if constexpr (ba_has_modular_bits<Node, BA>)
+				return ba_descriptor<BA, Node>::modular_value(ba_type, c);
+			return std::nullopt;
+		});
+}
+
+/**
+ * @brief `true` when the values of @p ba_type form a dense linear order
+ * without endpoints, read by = and the order comparisons.
+ */
+template <typename Node>
+bool pack_type_is_dense_order(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return ba_has_dense_order<Node, BA>;
+		}).value_or(false);
+}
+
+/**
+ * @brief The order of the constants @p a and @p b of a dense-order type:
+ * -1, 0 or 1; nullopt when either is not a point of the order or the type
+ * is not one.
+ */
+template <typename Node>
+std::optional<int> pack_dense_order_compare(size_t ba_type, tref a, tref b) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<int> {
+			if constexpr (ba_has_dense_order<Node, BA>)
+				return ba_descriptor<BA, Node>::dense_order_compare(
+					ba_type, a, b);
+			return std::nullopt;
+		});
 }
 
 /**
