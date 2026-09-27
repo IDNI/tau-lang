@@ -156,10 +156,15 @@ function(target_setup target)
 			-Wno-unused-template
 			-fwasm-exceptions
 			# the standardized wasm-exceptions encoding, not emsdk's
-			# legacy-by-default one; compile+link, must match everywhere an
-			# object is linked into a wasm artifact (B6/D2,
-			# .local/build-emscripten.md)
+			# legacy-by-default one. Every linked object in a wasm artifact
+			# must agree on this.
 			-sWASM_LEGACY_EXCEPTIONS=0
+			# a shift this wide is undefined at wasm32's 32-bit word size and
+			# traps at runtime, not a mere warning
+			-Werror=shift-count-overflow
+			# wasm32 is the only 32-bit target here. A 64-bit value
+			# narrowed to size_t there truncates silently instead of trapping
+			-Werror=shorten-64-to-32
 		)
 		target_link_options(${target} PRIVATE
 			-fwasm-exceptions
