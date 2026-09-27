@@ -805,8 +805,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	// No formula: continue the stored session (error if none).
 	if (!running) {
-		TAU_LOG_ERROR << "no run to continue; start one with "
-			"`run <formula>` (optionally `run N steps <formula>`)";
+		print_error(code::runtime_error,
+			"no run to continue; start one with "
+			"`run <formula>` (optionally `run N steps <formula>`)");
 		return;
 	}
 		// `run N steps` runs N more steps; bare `run` continues naturally.
@@ -1298,11 +1299,12 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	if (tref ref = get_unbindable_relative_offset<node>(
 		t[0].get(), t[1].get()); ref)
 	{
-		TAU_LOG_ERROR << "Definition " << tau::get(def).to_str()
-			<< " cannot use the relative offset of "
-			<< tau::get(ref).to_str() << ": its head declares no "
-			"offset to bind it. Give the head an offset, as in "
-			"f[n](x), or use a fixed offset";
+		print_error(code::invalid_argument,
+			"Definition cannot use the relative offset: its head "
+			"declares no offset to bind it. Give the head an offset, "
+			"as in f[n](x), or use a fixed offset",
+			{{label::value, truncate_for_message(tau::get(def).to_str())},
+			 {label::name, truncate_for_message(tau::get(ref).to_str())}});
 		return;
 	}
 	rr_defs.push_back(tau::geth(def));
@@ -1342,7 +1344,8 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 		out << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;
 	}
-	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
+	print_error(code::invalid_argument, "Definition does not exist",
+		{{label::name, std::to_string(i)}});
 	return;
 }
 
@@ -1353,7 +1356,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 	// tree<node>::geth() asserts on a null tref, and the read sites
 	// below would dereference it anyway.
 	if (!def) {
-		TAU_LOG_ERROR << "Invalid stream definition";
+		print_error(code::invalid_argument, "Invalid stream definition");
 		return;
 	}
 	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
@@ -1362,8 +1365,9 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 	if (tref name_node = tau::get(def).first(); name_node) {
 		const std::string sname = tau::get(name_node).to_str();
 		if (sname.rfind("w_", 0) == 0) {
-			TAU_LOG_ERROR << "Stream name '" << sname
-				<< "' uses the reserved witness prefix `w_`\n";
+			print_error(code::invalid_argument,
+				"Stream name uses the reserved witness prefix `w_`",
+				{{label::name, sname}});
 			return;
 		}
 	}
@@ -1379,7 +1383,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	// tree<node>::geth() asserts on a null tref, and the read sites
 	// below would dereference it anyway.
 	if (!def) {
-		TAU_LOG_ERROR << "Invalid stream definition";
+		print_error(code::invalid_argument, "Invalid stream definition");
 		return;
 	}
 	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
@@ -1388,8 +1392,9 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	if (tref name_node = tau::get(def).first(); name_node) {
 		const std::string sname = tau::get(name_node).to_str();
 		if (sname.rfind("w_", 0) == 0) {
-			TAU_LOG_ERROR << "Stream name '" << sname
-				<< "' uses the reserved witness prefix `w_`\n";
+			print_error(code::invalid_argument,
+				"Stream name uses the reserved witness prefix `w_`",
+				{{label::name, sname}});
 			return;
 		}
 	}
@@ -1447,12 +1452,13 @@ result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
 			std::string hint = classify_parse_error<node>(filt);
-			TAU_LOG_ERROR << "[repl] " << msg
-				<< (hint.empty() ? "" : "\nhint: " + hint) << "\n";
 			error = true;
-			// The parser's own diagnostic is already shown above; r
-			// only needs to stay well-formed for its caller.
-			r.error(code::parse_error, messages::failed_to_parse_spec);
+			// The parser's message plus the hint is the report; it is
+			// printed here because eval()'s result<int> return carries
+			// REPL quit codes, not a report.
+			r.error(code::parse_error,
+				msg + (hint.empty() ? "" : "\nhint: " + hint));
+			r.print(err);
 			return r;
 		}
 		return r.with_value(nullptr); // Unexpected eof, continue with reading input
@@ -2159,8 +2165,9 @@ requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::reject_ctl_star_if_disabled(tref fm) {
 	if (opt.fragment == fragment_ctl_star || !fm) return false;
 	if (has_ctl_star_operators<node>(fm)) {
-		TAU_LOG_ERROR << "CTL* operators (A/E/-) require the ctl_star "
-			"fragment. Switch with: fragment ctl_star\n";
+		print_error(code::invalid_argument,
+			"CTL* operators (A/E/-) require the ctl_star "
+			"fragment. Switch with: fragment ctl_star");
 		error = true;
 		return true;
 	}
@@ -2172,7 +2179,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 	auto fn = n | tau_parser::fragment_name;
 	if (!fn) {
-		TAU_LOG_ERROR << "Missing fragment name\n";
+		print_error(code::invalid_argument, "Missing fragment name");
 		error = true;
 		return;
 	}
@@ -2184,7 +2191,8 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 		opt.fragment = fragment_ctl_star;
 		out << "fragment: ctl_star\n";
 	} else {
-		TAU_LOG_ERROR << "Unknown fragment. Available: ltl, ctl_star\n";
+		print_error(code::invalid_argument,
+			"Unknown fragment. Available: ltl, ctl_star");
 		error = true;
 	}
 }
