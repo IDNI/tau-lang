@@ -39,6 +39,10 @@ struct messages {
 	static constexpr sv no_input_provided = "No input provided";
 	static constexpr sv auto_continue_is_false = "Auto continue is false";
 	static constexpr sv no_solution_found = "No solution found";
+	static constexpr sv generated_constant_too_large = "A value the "
+		"solver built passed the constant size budget (maxconstantsize, "
+		"--max-constant-size; 0 = unlimited), so no solution was found "
+		"within it";
 	static constexpr sv invalid_arguments = "Invalid argument(s)";
 	static constexpr sv normalization_failed = "Normalization failed";
 	static constexpr sv failed_to_apply_definitions

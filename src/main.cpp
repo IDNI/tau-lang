@@ -154,6 +154,10 @@ cli::options tau_options() {
 		cli::option("max-cover-products", 'n', "256")
 		.set_description("cap the ABA oracle's mixed-type coverage "
 			"expansion (default 256; 0 = unlimited)");
+	opts["max-constant-size"] =
+		cli::option("max-constant-size", 'u', "2000")
+		.set_description("largest region of fresh values, in tree nodes, "
+			"a run keeps across steps (default 2000; 0 = unlimited)");
 	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
@@ -235,7 +239,8 @@ cli::commands tau_commands() {
 			"file path without extension)"));
 	compile.add_option(cli::option("cxx", 'c', "")
 		.set_description("C++ compiler for the emitted project (default: "
-			"TAU_CXX, else clang++ when on PATH, else cmake's default)"));
+			"TAU_CXX, else the compiler Tau was built with, else "
+			"clang++ when on PATH, else cmake's default)"));
 	cs[compile.name()] = compile;
 	return cs;
 }
@@ -393,6 +398,7 @@ int main(int argc, char** argv) {
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
 	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
 	tau_api::set_max_cover_products(optnum("max-cover-products"));
+	tau_api::set_max_constant_size(optnum("max-constant-size"));
 	tau_api::set_cache_bound(optnum("cache-bound"));
 	// An option with an environment fallback is applied only when it was
 	// given: a flag that always wrote its own default would shadow the

@@ -113,8 +113,9 @@ To compile the source code you need a C++ compiler supporting C++23: GCC 13.3
 or newer, or Clang 19 or newer (Clang 18 crashes while instantiating the tree
 pack in `src/instantiate_pack.cpp`). You also need at least cmake version 3.22.1
 installed in your system. `tau compile` builds the emitted project with the
-compiler given by `--cxx` or `TAU_CXX`, else with `clang++` when it is on
-PATH, else with cmake's default.
+compiler given by `--cxx` or `TAU_CXX`, else with the compiler Tau was built
+with when it is installed, else with `clang++` when it is on PATH, else with
+cmake's default.
 The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
 libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
@@ -291,7 +292,7 @@ tau compile spec.tau -o sim
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | executable path (default: the spec file path without extension) |
-| `-c, --cxx <compiler>` | C++ compiler for the emitted project (default: `TAU_CXX`, else `clang++` when on PATH, else cmake's default) |
+| `-c, --cxx <compiler>` | C++ compiler for the emitted project (default: `TAU_CXX`, else the compiler Tau was built with, else `clang++` when on PATH, else cmake's default) |
 
 The exit code is `0` when the program was built and `1` on any failure; the
 reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
@@ -2782,6 +2783,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
 | -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
 | -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
+| -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
@@ -3048,6 +3050,11 @@ is sound but may answer unrealizable.
 
 * `maxcoverproducts`: cap on the ABA oracle's mixed-type coverage expansion
 (`--max-cover-products`). 256 by default.
+
+* `maxconstantsize`: largest region of fresh values, in tree nodes, that a run
+keeps across steps (`--max-constant-size`). Each value a run commits shrinks
+the region, which grows with it; past the cap the run stops tracking it and
+new values come from the general solver. 2000 by default, 0 = unlimited.
 
 * `cachebound`: bound on the string-keyed synthesis caches, with FIFO eviction
 (`--cache-bound`). 4096 by default; 0 = unbounded.

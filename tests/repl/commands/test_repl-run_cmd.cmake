@@ -675,3 +675,14 @@ add_repl_test(run_cmd-warm_up_tautology
 add_repl_test(run_cmd-warm_up_tautology_sometimes
 	"o2:tau := out console. run 3 steps (always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes (o2[t-1] = 0))."
 	"o2\\[0\\] := .*o2\\[1\\] := .*o2\\[2\\] := T")
+
+# Two outputs take the value of one input: the second commit of the same value
+# to the fresh-value ledger is a no-op (recomputing the region did not finish).
+add_repl_test(run_cmd-two_outputs_share_an_input_value
+	"i1:tau := in file(\\\"${TF}/tau-xyz_disjunction-length_1.in\\\"). o1:tau := out console. o2:tau := out console. run 1 steps (always (i1[t] = o2[t])) && (sometimes (i1[t] = o1[t]))."
+	"o1\\[0\\] := .*<:x>.*o2\\[0\\] := .*<:x>")
+# The values of this run grow with every step; past maxconstantsize the solver
+# gives up with a message instead of overflowing the stack.
+add_repl_test_fail(run_cmd-value_past_constant_size_budget
+	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 3 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"o1\\[1\\] := .*passed the constant size budget")

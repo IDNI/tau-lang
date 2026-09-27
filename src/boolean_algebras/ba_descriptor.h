@@ -268,6 +268,23 @@ concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::print_constant(os, x) }
 			-> std::same_as<std::ostream&>; };
 
+/**
+ * @brief `true` when @p BA's constants carry a tree that grows with the
+ * operations applied to them, and the descriptor measures it.
+ *
+ * Optional capability: the wrapper's constant embeds a whole spec, and each
+ * Boolean operation on two constants builds a larger one, so a leaf of one
+ * node can hold an arbitrarily large formula. `generated_constant_size`
+ * (solver.tmpl.h) adds `constant_size` to a tree's own node count, which is
+ * what `max_constant_size` bounds. Probed at the point of use, like
+ * `print_constant`; absent means a constant counts as its leaf alone.
+ */
+template <typename Node, typename BA>
+concept ba_has_constant_size = ba_has_descriptor_v<Node, BA>
+	&& requires(const BA& x) {
+		{ ba_descriptor<BA, Node>::constant_size(x) }
+			-> std::convertible_to<size_t>; };
+
 template <typename Node, typename BA>
 concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>
 	&& requires(unsigned short p, tref t) {

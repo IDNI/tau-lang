@@ -162,6 +162,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `output_always_satisfiable_by_system` | that a system can always meet an output constraint by choosing its output | owner |
 | `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading | owner, by type tree |
 | `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id) | the constant's own alternative, at the point of use |
+| `constant_size(x)` | how many tree nodes a constant carries when operations on constants build ever larger ones (the wrapper embeds a whole spec); `max_constant_size` bounds the values the solver builds by it | the constant's own alternative, at the point of use |
 | `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
 | `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |

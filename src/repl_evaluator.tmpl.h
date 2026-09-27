@@ -1588,6 +1588,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
 	if (x == "cachebound")               return cache_bound_opt;
 	if (x == "maxcoverproducts")         return cover_products_opt;
+	if (x == "maxconstantsize")          return constant_size_opt;
 	if (x == "ltltimeout")               return ltl_timeout_opt;
 	if (x == "ltlalg")                   return ltl_alg_opt;
 	if (x == "ltlqemaxvars")             return ltl_qe_max_vars_opt;
@@ -1718,6 +1719,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "cachebound:          " << climit(cache_bound) << "\n"; } },
 	{ cover_products_opt, [climit, this]() {
 		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } },
+	{ constant_size_opt, [climit, this]() {
+		out << "maxconstantsize:     " << climit(max_constant_size) << "\n"; } },
 	// Effective values, so the environment fallbacks show through when the
 	// parameter itself is unset.
 	{ ltl_timeout_opt, [this]() {
@@ -1929,6 +1932,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_cache_bound(*n); } },
 	{ cover_products_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_cover_products(*n); } },
+	{ constant_size_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_constant_size(*n); } },
 	{ ltl_timeout_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_timeout_sec((long) std::min<size_t>(*n,
 			(size_t) ltl_timeout_sec_max)); } },
@@ -2028,6 +2033,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case consistency_subsets_opt:
 	case cache_bound_opt:
 	case cover_products_opt:
+	case constant_size_opt:
 	case lgrs_max_vars_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
@@ -2077,6 +2083,7 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	auto [family, name] = split_ba_option_name(dotted);
 	const ba_option* o = resolve_ba_option(family, name);
 	if (!o) return;
+	option_change_guard<node> guard;
 	if (o->kind == ba_option_kind::flag) {
 		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
 		else TAU_LOG_ERROR << "Invalid value\n";
@@ -2101,6 +2108,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 		error = true;
 		return;
 	}
+	option_change_guard<node> guard;
 	bool v = o->get_flag();
 	update_fn(v);
 	o->set_flag(v);
@@ -2461,6 +2469,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsubsets             k-ary consistency subset checks      4096\n"
 		"  cachebound             string-keyed synthesis cache bound   4096\n"
 		"  maxcoverproducts       oracle mixed-type coverage products  256\n"
+		"  maxconstantsize        fresh-value region kept (tree nodes) 2000\n"
 		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
 		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
 		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"

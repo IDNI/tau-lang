@@ -1133,33 +1133,10 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		return r.with_value(sat);
 	}
 
-	// sol stays populated even when solve_ltl_aba returns std::nullopt.
-	ltl_aba_solution<node> sol;
-	std::optional<ltl_aba_solution<node>> maybe;
-	auto maybe_r = solve_ltl_aba<node>(fm, &sol);
-	if (!maybe_r.has_value()) {
-		// collect_hoist_conjuncts refuses a positional atom it cannot
-		// hoist -- that is a decided REFUSED verdict, not an undecided
-		// solver failure, same distinction admissible_outputs draws
-		// between code::unsat and a genuine solve() failure.
-		if (report_has_code(maybe_r.report(), code::unsupported_operation)) {
-			for (auto& n : maybe_r.report().nodes())
-				if (n.tag == code::unsupported_operation)
-					out << "REFUSED: " << maybe_r.report().str(n.key)
-					    << "\n";
-			return r.with_value(false);
-		}
-		r.merge(std::move(maybe_r));
-		return r.with_error(code::solver_error,
-			messages::unknown_realizability_timed_out);
-	}
-	maybe = std::move(maybe_r.value());
-	if (maybe) sol = std::move(*maybe);
-
 	// The trace below is the first ltlsynt round and its per-edge oracle
-	// checks; the verdict comes from `decide` when given, otherwise from
-	// is_ltl_aba_realizable, the procedure `realizable` runs (window
-	// oracle, refinement rounds).
+	// checks, or the round's refusal; the verdict comes from `decide` when
+	// given, otherwise from is_ltl_aba_realizable, the procedure
+	// `realizable` runs (window oracle, refinement rounds).
 	auto verdict = [&]() -> result<bool> {
 		auto real = decide ? decide()
 			: is_ltl_aba_realizable<node>(fm, 0, false);
@@ -1191,6 +1168,28 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 			<< "\n";
 		return r.with_value(real.value());
 	};
+
+	// sol stays populated even when solve_ltl_aba returns std::nullopt.
+	ltl_aba_solution<node> sol;
+	std::optional<ltl_aba_solution<node>> maybe;
+	auto maybe_r = solve_ltl_aba<node>(fm, &sol);
+	if (!maybe_r.has_value()) {
+		// collect_hoist_conjuncts refuses a positional atom it cannot
+		// hoist: the trace ends at the refusal, and the verdict is still
+		// the one every other path prints
+		if (report_has_code(maybe_r.report(), code::unsupported_operation)) {
+			for (auto& n : maybe_r.report().nodes())
+				if (n.tag == code::unsupported_operation)
+					out << "REFUSED: " << maybe_r.report().str(n.key)
+					    << "\n";
+			return verdict();
+		}
+		r.merge(std::move(maybe_r));
+		return r.with_error(code::solver_error,
+			messages::unknown_realizability_timed_out);
+	}
+	maybe = std::move(maybe_r.value());
+	if (maybe) sol = std::move(*maybe);
 
 	out << "\nData atoms (" << sol.atoms.size() << "):\n";
 	for (auto& [f, name] : sol.atoms)

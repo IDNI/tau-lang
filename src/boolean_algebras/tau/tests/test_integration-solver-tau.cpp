@@ -261,6 +261,24 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( check_atomless_solution(sys, solution.value()) );
 	}
 
+	// Committing the same tau constant twice, as the data game does when two
+	// outputs take the value of one input, leaves the fresh region as the
+	// first commit made it; recomputing it did not finish on this constant.
+	TEST_CASE("ledger: committing a value twice") {
+		using tau = tree<node_t>;
+		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
+		tref eq = get_nso_rr<node_t>(tau::get("o9[t]:tau = {<:y> = 0 "
+			"&& <:x> != 0 && <:z> != 0 || <:y> != 0 && <:x> != 0 || <:x> = 0 "
+			"&& <:z> != 0}:tau.").value_or(nullptr)).value().main->get();
+		tref v = tau::get(tau::get(eq).first()).second();
+		fresh_element_ledger ledger;
+		ledger_commit_witness<node_t>(ledger, v, type_id);
+		REQUIRE( ledger.fresh_region );
+		tref region = ledger.fresh_region->get();
+		ledger_commit_witness<node_t>(ledger, v, type_id);
+		CHECK( ledger.fresh_region->get() == region );
+	}
+
 	// Ledger contract: three successive calls sharing a ledger each exclude
 	// every earlier call's witness, pinning cross-call distinctness and its
 	// transitivity across the third call.

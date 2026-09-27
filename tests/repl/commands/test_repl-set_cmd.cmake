@@ -61,6 +61,8 @@ add_repl_test(set_cmd-maxsubsets
 	"set maxsubsets 7. get maxsubsets" "maxsubsets: *7")
 add_repl_test(set_cmd-cachebound
 	"set cachebound 99. get cachebound" "cachebound: *99")
+add_repl_test(set_cmd-maxconstantsize
+	"set maxconstantsize 300. get maxconstantsize" "maxconstantsize: *300")
 add_repl_test(set_cmd-maxcoverproducts
 	"set maxcoverproducts 17. get maxcoverproducts" "maxcoverproducts: *17")
 # The two pre-existing numeric options now accept 0 as "unlimited" (they
@@ -120,3 +122,12 @@ add_repl_test_fail(set_cmd-bvmaxwidth_enable_rejected
 add_repl_test(set_cmd-bvwidening_changes_semantics
 	"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]. set bv-widening on. sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]"
 	"%1.*: T.*%2.*: F")
+# The normalizer caches are keyed on the formula only, so a set that changes a
+# semantic option empties them: the second normalize computes again (its scope
+# shows the inner steps) instead of answering from the first one's cache.
+add_repl_test(set_cmd-option_change_drops_normalizer_cache
+	"normalize (x & y) = 0 && x = 0. set maxsimplifyrounds 3. normalize (x & y) = 0 && x = 0"
+	"simplifyrounds: *3[^%]*eliminate_arithmetic_and_quantifiers")
+add_repl_test(set_cmd-ba_option_change_drops_normalizer_cache
+	"normalize (x & y) = 0 && x = 0. set bv-definitional-elimination off. normalize (x & y) = 0 && x = 0"
+	"bv-definitional-elimination: *off[^%]*eliminate_arithmetic_and_quantifiers")

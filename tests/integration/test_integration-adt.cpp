@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "test_scratch_dir.h"
 
 #include <filesystem>
 #include <fstream>
@@ -48,8 +49,8 @@ static std::vector<std::string> run_point_spec(const std::string& tag,
 	const std::string& preamble, const std::string& spec_body)
 {
 	namespace stdfs = std::filesystem;
-	stdfs::path in_p  = stdfs::temp_directory_path() / ("tau_test_adt_" + tag + "_in.txt");
-	stdfs::path out_p = stdfs::temp_directory_path() / ("tau_test_adt_" + tag + "_out.txt");
+	stdfs::path in_p  = test_scratch_path("tau_test_adt_" + tag + "_in.txt");
+	stdfs::path out_p = test_scratch_path("tau_test_adt_" + tag + "_out.txt");
 	{
 		std::ofstream f(in_p);
 		f << "{ a: \"1\", b: \"0\" }\n" << "{ a: \"0\", b: \"1\" }\n";
@@ -336,8 +337,8 @@ TEST_SUITE("adt integration") {
 		// "two file streams on one line" case.
 		bdd_init<Bool>();
 		namespace stdfs = std::filesystem;
-		stdfs::path in_p  = stdfs::temp_directory_path() / "tau_test_adt_in.txt";
-		stdfs::path out_p = stdfs::temp_directory_path() / "tau_test_adt_out.txt";
+		stdfs::path in_p  = test_scratch_path("tau_test_adt_in.txt");
+		stdfs::path out_p = test_scratch_path("tau_test_adt_out.txt");
 		{
 			std::ofstream f(in_p);
 			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n";

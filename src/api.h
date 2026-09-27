@@ -50,6 +50,26 @@ struct stream_at {
 };
 
 /**
+ * @brief Empties the tree caches when the scope changed a semantic option.
+ *
+ * The normalizer and the other tree caches are keyed on the formula alone,
+ * so a result computed under the old options would otherwise answer for the
+ * new ones. Every api setter of such an option opens one; a caller that
+ * writes an option by another route (a BA option set directly) opens its own.
+ * Open it only between units of work, where no reference into a cache is
+ * held.
+ */
+template <NodeType node>
+struct option_change_guard {
+	option_change_guard();
+	~option_change_guard();
+	option_change_guard(const option_change_guard&) = delete;
+	option_change_guard& operator=(const option_change_guard&) = delete;
+private:
+	size_t before;
+};
+
+/**
  * @brief I/O stream remapping options passed to `api::get_interpreter`.
  */
 struct interpreter_options {
@@ -308,6 +328,9 @@ struct api {
 	 * 256; 0 = unlimited.
 	 */
 	static void set_max_cover_products(size_t n);
+	/** @brief Set the largest region of fresh values, in tree nodes, the
+	 * solver keeps across the steps of a run (0 = unlimited). */
+	static void set_max_constant_size(size_t n);
 	/**
 	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
 	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
