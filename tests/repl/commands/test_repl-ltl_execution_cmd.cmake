@@ -89,3 +89,37 @@ add_ltl_run_test(data_game_strategy_merged_warm_up
 	"run 4 steps (always ((o2[t]:bv[1] = 1 -> o2[t]:bv[1] = 1))) && (always (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t-2]:bv[1] = 1)).\\nq\\n"
 	"o2\\[0\\] := 1\n.*o2\\[1\\] := 0\n.*o2\\[2\\] := 1\n.*o2\\[3\\] := 0|o2\\[0\\] := 0\n.*o2\\[1\\] := 1\n.*o2\\[2\\] := 0\n.*o2\\[3\\] := 1"
 	"no solution|no strategy|unsat")
+
+# once o1 has met its goal the strategy no longer depends on i1, and the
+# run stops asking for it
+add_ltl_run_test(data_game_strategy_reads_needed_inputs
+	"run (sometimes o1[t]:bv[1] = i1[t]:bv[1]) && (always o2[t]:bv[1] = i2[t]:bv[1]).\\n1\\n0\\n1\\n0\\n1\\n0\\nq\\nq\\n"
+	"i2\\[1\\][^\n]*\n.*o2\\[1\\] := 1\n.*i2\\[2\\]"
+	"i1\\[1\\]|unsat|no strategy")
+
+# fixed steps inside the always part that the safety pipeline cannot
+# execute: the run plays a strategy that reads the step counter
+add_ltl_run_test(fixed_steps_through_the_counter
+	"run 4 steps (always o2[1] = 1 && o2[0] = 0 && o2[t] = o1[t-1] && o1[t-1] = 1).\\nq\\n"
+	"o2\\[0\\] := F\n.*o2\\[1\\] := T\n.*o2\\[2\\] := T\n.*o2\\[3\\] := T"
+	"unsat|no strategy")
+
+# the same with a sometimes part the normalizer finds implied
+add_ltl_run_test(fixed_steps_through_the_counter_sometimes
+	"run 4 steps (always o2[0] = 0 && o2[t] = o1[t-1] && !(o1[t-1] = 0) && o1[t-1] = 1) && (sometimes o1[t-1] = 1).\\nq\\n"
+	"o2\\[0\\] := F\n.*o2\\[1\\] := T\n.*o2\\[2\\] := T\n.*o2\\[3\\] := T"
+	"unsat|no strategy")
+
+# a fixed step no strategy can meet still leaves the spec unsat
+add_ltl_run_test(fixed_steps_unrealizable_stays_unsat
+	"run 4 steps (always o2[0] = 0 && o2[0] = 1 && o2[t] = o1[t-1]).\\nq\\n"
+	"unsat"
+	":= ")
+
+# a revision of a run of the data game's strategy: the game is solved again
+# for the revised spec from the values already played, and o1 stops
+# alternating
+add_ltl_run_test(data_game_strategy_revision
+	"run (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o1[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 1\n.*o1\\[6\\] := 1"
+	"cannot follow|unsat|no strategy")

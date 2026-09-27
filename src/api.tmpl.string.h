@@ -485,8 +485,9 @@ result<std::vector<stream_at>> api<node>::get_inputs_for_step(
 		// as (name, time_point) pairs.
 		auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
 		std::vector<stream_at> inputs;
-		if (!i.provider_->skip_lookback_filter())
-			step_inputs = i.appear_within_lookback(step_inputs);
+		if (auto reads = i.provider_->read_set(step_inputs))
+			step_inputs = *reads;
+		else step_inputs = i.appear_within_lookback(step_inputs);
 		for (auto& var : step_inputs) {
 			DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: " << TAU_LOG_FM_DUMP(var);)
 			inputs.emplace_back(get_var_name<node>(var), i.time_point);

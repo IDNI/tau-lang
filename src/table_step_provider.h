@@ -27,6 +27,16 @@ namespace idni::tau_lang {
 // depends on the step's own inputs.
 template <NodeType node>
 struct table_step_provider : step_provider<node> {
+	// The Mealy view of a strategy of the data game (ltl_aba_solution::
+	// data_game): every atom is read at the step played, from step 0 on,
+	// `history` (a conjunction of atoms over the steps before 0) is solved
+	// for the values the strategy starts from, and a step reads only the
+	// inputs of the atoms its state's guards compare.
+	struct from_start {
+		trefs history;
+		int_t lookback = 0;
+	};
+
 	// input_atoms: (name, atom template) per guard slot, evaluated each step.
 	// flag_outputs: one output variable name per flag-output guard slot.
 	// edge_witnesses[s][e]: precomputed (name, value) pairs for that edge.
@@ -51,11 +61,17 @@ struct table_step_provider : step_provider<node> {
 		std::vector<std::vector<trefs>> edge_witness_templates = {},
 		std::vector<std::vector<std::vector<bool>>>
 			edge_witness_template_is_counter = {},
-		std::vector<int_t> step_guard_ks = {});
+		std::vector<int_t> step_guard_ks = {},
+		std::optional<from_start> start = std::nullopt);
 
 	result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) override;
+
+	std::optional<trefs> read_set(const trefs& vars) const override;
+	std::optional<int> strategy_state() const override;
+	int_t lookback() const override;
+	void reset() override;
 
 	// Every atom this table strategy may consult this run: input guards
 	// (input_atoms_, evaluated unconditionally every step to route edges)
@@ -99,6 +115,16 @@ private:
 	// witness from an earlier step keeps its ledger identity later.
 	fresh_element_ledger ledger_;
 	int state_;
+	// Set in the from_start mode.
+	bool from_start_ = false;
+	std::vector<htref> history_;
+	int_t lookback_ = 0;
+	// The values before step 0, solved from history_ at the first step,
+	// held as htrefs for the reason above.
+	std::vector<std::pair<htref, htref>> before_;
+	bool before_ready_ = false;
+	// Values chosen at earlier steps (solve_equality_cube).
+	std::vector<htref> found_;
 };
 
 // Builds a table_step_provider from a solved LTL(ABA) strategy: carrier-

@@ -4726,6 +4726,52 @@ TEST_SUITE("Data game strategy") {
 		}
 		CHECK(met);
 	}
+
+	// A strategy on codes is also a finite Mealy machine over atoms that
+	// compare the values, which the run exposes as its solution.
+	TEST_CASE("a run of the data game's strategy has its Mealy view") {
+		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		const htref keep_fm = tau::geth(fm);
+		io_context<node_t> ctx;
+		auto ir = interpreter<node_t>::make_interpreter(fm, ctx);
+		REQUIRE(ir.has_value());
+		auto& in = ir.value();
+		REQUIRE(in.cached_solution.has_value());
+		CHECK(in.cached_solution->data_game);
+		CHECK(in.cached_solution->aut.num_states >= 1);
+		auto q = in.current_state();
+		REQUIRE(q.has_value());
+		CHECK(q.value() == in.cached_solution->aut.initial_state);
+	}
+
+	// Once the goal is met the move depends on no input: the Mealy view
+	// reads none.
+	TEST_CASE("a state of the Mealy view reads only the inputs its move needs") {
+		tref fm = spec("(sometimes o1[t]:bv[1] = i1[t]:bv[1]) "
+			"&& (always o2[t]:bv[1] = i2[t]:bv[1]).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		auto first = data->reads();
+		REQUIRE(first.has_value());
+		CHECK(first->contains("i1"));
+		CHECK(first->contains("i2"));
+		bool without_i1 = false;
+		for (size_t q = 0; q < data->machine.size(); ++q) {
+			bool reads_i1 = false;
+			for (const auto& e : data->machine[q])
+				for (auto [a, _] : e.guard)
+					reads_i1 = reads_i1 || tau::get(data->view->atoms[a]
+						.first).to_str().find("i1") != std::string::npos;
+			without_i1 = without_i1 || !reads_i1;
+		}
+		CHECK(without_i1);
+	}
 }
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────

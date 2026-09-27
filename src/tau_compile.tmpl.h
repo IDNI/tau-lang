@@ -364,7 +364,14 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\t\tstd::move(strat), std::move(input_atoms), std::move(flag_outputs),\n"
 		"\t\tstd::move(edge_witnesses), std::move(templates), "
 		"std::move(template_is_counter),\n"
-		"\t\tstd::move(step_guard_ks));\n"
+		"\t\tstd::move(step_guard_ks)";
+	if (d.data_game) {
+		f << ",\n\t\ttable_step_provider<node_t>::from_start{ {";
+		for (size_t k = 0; k < d.history.size(); ++k)
+			f << (k ? ",\n\t\t\t" : "\n\t\t\t") << d.history[k];
+		f << " }, " << d.lookback << " }";
+	}
+	f << ");\n"
 		// Captured before the move below: step()'s input filter needs this
 		// to tell which declared inputs a given step actually consults,
 		// the same way the general solve path uses ubt_ctn.
@@ -442,14 +449,18 @@ result<codegen_result> compile_spec(
 	TAU_TRY(auto sol, solve_ltl_aba<Node>(fm));
 	if (!sol) {
 		// The data game may decide what the abstraction does not; the
-		// emitted program carries only the abstraction's strategy.
+		// program then plays the Mealy view of its strategy, when the
+		// strategy has one.
 		std::shared_ptr<data_game_strategy<Node>> data;
 		ltl_to_safety_formula_full<Node>(fm, &data);
-		if (data) return r.with_error(code::unsupported_operation,
-			"compile: the spec is realizable, but only through the "
-			"strategy of the data game, which `run` executes and a "
-			"compiled program cannot carry");
-		return r.with_error(code::unsat, "compile: spec is UNREALIZABLE");
+		if (data && data->view) sol = *data->view;
+		else if (data) return r.with_error(code::unsupported_operation,
+			"compile: the spec is realizable, but only through a "
+			"strategy of the data game that no finite Mealy machine "
+			"describes, which `run` executes and a compiled program "
+			"cannot carry");
+		else return r.with_error(code::unsat,
+			"compile: spec is UNREALIZABLE");
 	}
 
 	// 3. Build the program_desc and emit the C++ artifact via the one

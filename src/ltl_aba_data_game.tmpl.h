@@ -989,12 +989,89 @@ struct data_game_strategy {
 	std::vector<vertex> v;
 	int init = 0;
 
+	// The Mealy view (code_strategy::build_mealy), which `step` then
+	// plays: a machine over the atoms of the view, each edge a guard on
+	// the atoms of the inputs, the atoms the outputs meet and the next
+	// state; null when no view was built.
+	struct mealy_edge {
+		std::vector<std::pair<size_t, int8_t>> guard;
+		std::vector<size_t> out;
+		int dst = 0;
+	};
+	std::shared_ptr<ltl_aba_solution<node>> view;
+	std::vector<std::vector<mealy_edge>> machine;
+
 	virtual ~data_game_strategy() = default;
 
-	void reset() { at = init; ready = false; }
+	void reset() {
+		at = init;
+		ready = false;
+		state_ = view ? view->aut.initial_state : 0;
+	}
+
+	// Starts the play from `prior` instead of values of its own:
+	// prior[s][k-1] is the value of stream s k steps before the first step
+	// played. False when the initial vertex is not won from them.
+	bool start_from(const std::vector<std::vector<tref>>& prior) {
+		window win(streams.size(), std::vector<tref>(depth + 1, nullptr));
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 1; k <= depth; ++k) {
+				if (s >= prior.size() || k > prior[s].size()
+					|| !prior[s][k - 1]) return false;
+				win[s][k] = prior[s][k - 1];
+			}
+		auto won = won_from(win);
+		if (!won || !*won) return false;
+		restart_view(win);
+		before.assign(streams.size(), {});
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 1; k <= depth; ++k)
+				before[s].push_back(tau::geth(win[s][k]));
+		at = init;
+		ready = true;
+		state_ = view ? view->aut.initial_state : 0;
+		return true;
+	}
+
+	// The value of stream `s` `k` steps before the first step played,
+	// nullptr before the play has started.
+	tref value_before(size_t s, size_t k) const {
+		if (!ready || s >= before.size() || k == 0
+			|| k > before[s].size()) return nullptr;
+		return before[s][k - 1]->get();
+	}
+
+	// The state of the Mealy view, when the strategy plays one.
+	std::optional<int> state() const {
+		if (!view) return std::nullopt;
+		return state_;
+	}
+
+	// The names of the input streams the next step reads; nullopt when
+	// it reads all of them.
+	std::optional<std::set<std::string>> reads() const {
+		using tau = tree<node>;
+		if (!view) return std::nullopt;
+		std::set<std::string> names;
+		auto add = [&](size_t a) {
+			for (tref x : tau::get(view->atoms[a].first).select_top(
+				is_child<node, tau::io_var>))
+				if (get_io_var_shift<node>(x) == 0) {
+					auto it = index.find(get_var_name<node>(x));
+					if (it != index.end() && streams[it->second].input)
+						names.insert(it->first);
+				}
+		};
+		for (const auto& e : machine[state_]) {
+			for (auto [a, _] : e.guard) add(a);
+			for (size_t a : e.out) add(a);
+		}
+		return names;
+	}
 
 	// The outputs of absolute step `t`, keyed like the solver keys them.
 	result<values> step(const value_fn& get, int_t t, const solver_fn& solve) {
+		if (view) return play(get, t, solve);
 		result<values> r;
 		if (!ready) {
 			TAU_TRY(bool chosen, choose_before(solve));
@@ -1065,9 +1142,120 @@ protected:
 	using window = std::vector<std::vector<tref>>;
 	int at = 0;
 	bool ready = false;
+	int state_ = 0;
+
+	// One step of the Mealy view: the values before step 0 solve the
+	// view's history, the first edge whose guard the inputs meet gives
+	// the atoms the outputs are solved for.
+	result<values> play(const value_fn& get, int_t t,
+		const solver_fn& solve)
+	{
+		using tau = tree<node>;
+		result<values> r;
+		if (!ready) {
+			before.assign(streams.size(), {});
+			for (size_t s = 0; s < streams.size(); ++s)
+				for (size_t k = 1; k <= depth; ++k)
+					before[s].push_back(tau::geth(
+						build_bf_f_type<node>(streams[s].tid)));
+			if (!view->history.empty()) {
+				auto sol = solve(tau::build_wff_and(view->history), 0);
+				if (!sol) return r.with_error(code::internal_error,
+					"the data game strategy found no values before "
+					"step 0");
+				for (size_t s = 0; s < streams.size(); ++s)
+					for (size_t k = 1; k <= depth; ++k) {
+						const auto& x = streams[s];
+						tref key = x.input ? build_in_var_at_n<node>(
+							x.name, -(int_t)k, x.tid)
+							: build_out_var_at_n<node>(x.name,
+								-(int_t)k, x.tid);
+						if (auto it = sol->find(key); it != sol->end())
+							before[s][k - 1] = tau::geth(it->second);
+					}
+			}
+			state_ = view->aut.initial_state;
+			ready = true;
+		}
+		// an atom with every value of the window in place, the outputs of
+		// step t left as the variables of that step
+		std::string missing;
+		auto ground = [&](tref f) -> tref {
+			subtree_map<node, tref> m;
+			for (tref x : tau::get(f).select_top(
+				is_child<node, tau::io_var>))
+			{
+				const size_t s = index.at(get_var_name<node>(x));
+				const auto& st = streams[s];
+				const int_t time = t - get_io_var_shift<node>(x);
+				tref val = time < 0 ? before[s][(size_t)(-time - 1)]->get()
+					: time == t && !st.input ? build_out_var_at_n<node>(
+						st.name, t, st.tid)
+					: get(st.name, st.tid, st.input, time);
+				if (!val) { missing = st.name; return nullptr; }
+				m.emplace(x, tau::trim(val));
+			}
+			return rewriter::replace<node>(f, m);
+		};
+		std::map<size_t, bool> truth;
+		for (const auto& e : machine[state_]) {
+			bool holds = true;
+			for (auto [a, sign] : e.guard) {
+				auto it = truth.find(a);
+				if (it == truth.end()) {
+					tref g = ground(view->atoms[a].first);
+					if (!g) return r.with_error(code::internal_error,
+						"the data game strategy reads the unknown value "
+						"of " + missing);
+					auto n = normalize_non_temp<node>(g);
+					if (!n.has_value() || !n.value()
+						|| (!tau::get(n.value()).equals_T()
+						&& !tau::get(n.value()).equals_F()))
+							return r.with_error(code::solver_error,
+								"the data game strategy cannot compare "
+								"the values");
+					it = truth.emplace(a,
+						tau::get(n.value()).equals_T()).first;
+				}
+				if (it->second != (sign > 0)) { holds = false; break; }
+			}
+			if (!holds) continue;
+			values out;
+			if (!e.out.empty()) {
+				trefs parts;
+				for (size_t a : e.out) {
+					tref g = ground(view->atoms[a].first);
+					if (!g) return r.with_error(code::internal_error,
+						"the data game strategy reads the unknown value "
+						"of " + missing);
+					parts.push_back(g);
+				}
+				auto sol = solve(tau::build_wff_and(parts), t);
+				if (!sol) return r.with_error(code::internal_error,
+					"the data game strategy has no outputs in its move");
+				out = std::move(*sol);
+			}
+			for (size_t s = 0; s < streams.size(); ++s)
+				if (!streams[s].input) {
+					tref key = build_out_var_at_n<node>(streams[s].name, t,
+						streams[s].tid);
+					if (!out.contains(key)) out.emplace(key,
+						build_bf_f_type<node>(streams[s].tid));
+				}
+			state_ = e.dst;
+			return r.with_value(std::move(out));
+		}
+		return r.with_error(code::internal_error,
+			"the data game strategy has no edge for the inputs");
+	}
 	// before[s][k-1]: the value of stream s at step -k
 	std::vector<std::vector<htref>> before;
 
+	// whether the initial vertex is won from the values of `w` before the
+	// first step
+	virtual std::optional<bool> won_from(const window& w) = 0;
+	// rebuilds the Mealy view, if any, to start from the values of `w`
+	virtual void restart_view(const window& w) { (void)w; }
 	// whether the label of edge `j` of environment vertex `i` holds
 	virtual std::optional<bool> holds_label(int i, size_t j,
 		const window& w) = 0;
@@ -1098,6 +1286,10 @@ protected:
 	}
 };
 
+// The bounds of a Mealy view (code_strategy::build_mealy).
+inline size_t data_game_mealy_max_states = 4096;
+inline size_t data_game_mealy_max_edges = size_t{1} << 16;
+
 // The strategy of a game played on code_regions.
 template <NodeType node>
 struct code_strategy : data_game_strategy<node> {
@@ -1116,8 +1308,28 @@ struct code_strategy : data_game_strategy<node> {
 	code_strategy(code_window win, data_bdd b)
 		: w(std::move(win)), bdd(std::move(b)) {}
 
+	bool build_mealy(size_t max_states, size_t max_edges,
+		const std::vector<int>* from = nullptr);
+
 protected:
 	using base::before;
+
+	std::optional<bool> won_from(const window& win) override {
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(won_init, *bits);
+	}
+
+	void restart_view(const window& win) override {
+		if (!this->view) return;
+		this->view = nullptr;
+		this->machine.clear();
+		if (auto bits = encode(win)) {
+			for (auto& b : *bits) if (b < 0) b = 0;
+			build_mealy(data_game_mealy_max_states,
+				data_game_mealy_max_edges, &*bits);
+		}
+	}
 
 	// Whether two values are equal; nullopt when undecided.
 	std::optional<bool> same(tref x, tref y) {
@@ -1380,6 +1592,523 @@ protected:
 	}
 };
 
+// ── The Mealy view of a code_strategy ────────────────────────────────────────
+//
+// A state is a game vertex where a step starts and the codes of the last
+// `depth` values of every stream, renamed canonically (the regions do not
+// tell apart two codes of distinct values, nor the two values of a pair).
+// A step reads the codes of the inputs through atoms comparing each input
+// with 0, 1, the values of its type, the window and the inputs before it;
+// the outputs the strategy picks are an equality cube over the same terms.
+// A slot of the window that no label or move reads is left out of the
+// state, and an input read by none of the step's labels and moves nor ever
+// from the window is not read at all. The machine found is minimized, and
+// a state's guards drop the inputs its moves do not depend on. It becomes
+// `view`, a solution over those atoms, read at the absolute step played,
+// with `history` giving the values before step 0; false, and no view, when
+// it exceeds `max_states` or `max_edges`.
+template <NodeType node>
+bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
+	const std::vector<int>* from)
+{
+	using tau = tree<node>;
+	const size_t S = streams.size(), d = w.depth;
+	const auto& vs = this->v;
+	// reach[s]: the deepest step back at which a label or a move reads s;
+	// read0[s]: whether a move reads s at the current step
+	std::vector<size_t> reach(S, 0);
+	std::vector<bool> read0(S, false);
+	{
+		std::set<data_bdd::id> seen;
+		std::function<void(data_bdd::id)> scan = [&](data_bdd::id n) {
+			if (n <= data_bdd::T || !seen.insert(n).second) return;
+			const uint32_t x = bdd.nodes[n].var;
+			const size_t s = x % w.block() % S, k = x % w.block() / S;
+			if (k) reach[s] = std::max(reach[s], k);
+			else read0[s] = true;
+			scan(bdd.nodes[n].lo);
+			scan(bdd.nodes[n].hi);
+		};
+		for (auto& ls : labels) for (auto l : ls) scan(l);
+		for (auto& ms : moves) for (auto m : ms) scan(m);
+	}
+	auto kept = [&](size_t s, size_t k) { return k >= 1 && k <= reach[s]; };
+	auto set_code = [&](std::vector<int>& bits, size_t s, size_t k,
+		size_t c)
+	{
+		for (size_t b = 0; b < w.streams[s].width; ++b)
+			bits[w.var(s, k, b)] = (int)(c >> b & 1);
+	};
+	const auto pair_mask = [&](size_t s) {
+		return (size_t{1} << (w.streams[s].width - 1)) - 1;
+	};
+	// whether two orbit codes stand for complementary values
+	auto complements = [&](size_t s, size_t c1, size_t c2) {
+		return w.streams[s].orbit && c1 != c2
+			&& (c1 & pair_mask(s)) == (c2 & pair_mask(s));
+	};
+	auto coded = [&](size_t s) {   // an equality or an orbit code
+		return !w.streams[s].finite();
+	};
+	// the value a code stands for when it is 0 or 1, else -1
+	auto constant = [&](size_t s, size_t c) -> int {
+		const auto& x = w.streams[s];
+		if (x.two) return (int)c;
+		if (!x.values.empty()) return -1;
+		if (x.orbit) return (c & pair_mask(s)) ? -1
+			: (int)(c >> (x.width - 1));
+		return c < 2 ? (int)c : -1;
+	};
+	// Renames the codes of the window's slots 1 .. d canonically and
+	// clears every other bit.
+	auto canonical = [&](const std::vector<int>& bits) {
+		std::vector<int> out(w.vars(), 0);
+		std::map<size_t, std::map<size_t, std::pair<size_t, size_t>>> ren;
+		std::map<size_t, size_t> next;
+		for (size_t k = 1; k <= d; ++k)
+			for (size_t s = 0; s < S; ++s) {
+				if (!kept(s, k)) continue;
+				const auto& x = w.streams[s];
+				size_t c = code_of(bits, s, k);
+				if (coded(s) && constant(s, c) < 0) {
+					const size_t tid = streams[s].tid;
+					const size_t p = x.orbit ? c & pair_mask(s) : c;
+					const size_t side = x.orbit ? c >> (x.width - 1) : 0;
+					auto& m = ren[tid];
+					auto it = m.find(p);
+					if (it == m.end()) {
+						auto [nx, _] = next.emplace(tid, x.orbit ? 1 : 2);
+						it = m.emplace(p, std::pair{ nx->second++, side })
+							.first;
+					}
+					c = it->second.first;
+					if (x.orbit) c |= (side ^ it->second.second)
+						<< (x.width - 1);
+				}
+				set_code(out, s, k, c);
+			}
+		return out;
+	};
+	auto term = [&](size_t s, size_t k) -> tref {
+		const auto& x = streams[s];
+		if (k == 0) return x.input
+			? tau::build_in_var_at_t(build_var_name<node>(x.name), x.tid)
+			: tau::build_out_var_at_t(build_var_name<node>(x.name), x.tid);
+		return x.input ? tau::build_in_var_at_t_minus(x.name, k, x.tid)
+			: tau::build_out_var_at_t_minus(x.name, k, x.tid);
+	};
+	auto zero = [&](size_t s) { return build_bf_f_type<node>(streams[s].tid); };
+	auto one = [&](size_t s) { return build_bf_t_type<node>(streams[s].tid); };
+
+	// The atoms, each kept once: a comparison of the current value of
+	// stream s, equal or not, with a constant (0 or 1), an element of
+	// its type, a slot (s2, k2) or the complement of one.
+	using akey = std::tuple<bool, int, size_t, size_t, size_t, size_t>;
+	std::map<akey, size_t> atom_index;
+	std::vector<akey> atom_key;
+	std::vector<std::pair<tref, std::string>> atoms;
+	std::vector<bool> atom_input;
+	auto atom = [&](bool eq, int kind, size_t s, size_t s2, size_t k2,
+		size_t val) -> size_t
+	{
+		akey key{ eq, kind, s, s2, k2, val };
+		if (auto it = atom_index.find(key); it != atom_index.end())
+			return it->second;
+		tref other = kind == 0 ? (val ? one(s) : zero(s))
+			: kind == 1 ? w.streams[s].values[val]->get()
+			: kind == 2 ? term(s2, k2)
+			: tau::build_bf_neg(term(s2, k2));
+		tref a = eq ? tau::build_bf_eq(term(s, 0), other)
+			: tau::build_bf_neq(term(s, 0), other);
+		atom_index.emplace(key, atoms.size());
+		atom_key.push_back(key);
+		atoms.emplace_back(a, "p" + std::to_string(atoms.size()));
+		atom_input.push_back(streams[s].input);
+		return atoms.size() - 1;
+	};
+	// The slots an input or an output of the step is compared with: the
+	// window's kept slots, then the current values met before it.
+	auto partners = [&](size_t s, const std::vector<bool>& current) {
+		std::vector<std::pair<size_t, size_t>> ps;
+		const size_t tid = streams[s].tid;
+		for (size_t k = 1; k <= d; ++k)
+			for (size_t s2 = 0; s2 < S; ++s2)
+				if (kept(s2, k) && streams[s2].tid == tid && coded(s2))
+					ps.emplace_back(s2, k);
+		for (size_t s2 = 0; s2 < S; ++s2)
+			if (current[s2] && streams[s2].tid == tid && coded(s2)
+				&& (streams[s2].input != streams[s].input || s2 < s))
+					ps.emplace_back(s2, 0);
+		return ps;
+	};
+
+	struct medge {
+		std::map<size_t, int8_t> guard;  // input atom -> 1 or -1
+		std::vector<size_t> out;         // output atoms, all positive
+		int dst = 0;
+	};
+	using skey = std::pair<int, std::vector<int>>;
+	std::map<skey, int> state_of;
+	std::vector<skey> states;
+	std::vector<std::vector<medge>> edges;
+	size_t edge_count = 0;
+	auto state = [&](int vx, std::vector<int> bits) {
+		if (vs[vx].picks != 0) bits.assign(w.vars(), 0);
+		skey key{ vx, std::move(bits) };
+		auto [it, fresh] = state_of.emplace(key, (int)states.size());
+		if (fresh) states.push_back(it->first), edges.emplace_back();
+		return it->second;
+	};
+	// the start: the codes `from` gives, else inputs 0 before step 0 and
+	// outputs as won_init allows
+	std::vector<int> start(w.vars(), 0);
+	if (from) start = *from;
+	else for (size_t s = 0; s < S; ++s)
+		if (!streams[s].input)
+			for (size_t k = 1; k <= d; ++k)
+				if (kept(s, k))
+					for (size_t b = 0; b < w.streams[s].width; ++b)
+						start[w.var(s, k, b)] = -1;
+	if (!pick(won_init, start)) return false;
+	const int first = state(this->follow(this->init), canonical(start));
+
+	for (size_t q = 0; q < states.size(); ++q) {
+		if (states.size() > max_states || edge_count > max_edges)
+			return false;
+		const int vx = states[q].first;
+		const std::vector<int> cbits = states[q].second;
+		if (vs[vx].picks != 0) {
+			// a sink: the play is decided
+			edges[q].push_back({ {}, {}, (int)q });
+			++edge_count;
+			continue;
+		}
+		// the inputs this step reads
+		std::vector<bool> need(S, false);
+		{
+			std::set<data_bdd::id> seen;
+			std::function<void(data_bdd::id)> scan = [&](data_bdd::id n) {
+				if (n <= data_bdd::T || !seen.insert(n).second) return;
+				const uint32_t x = bdd.nodes[n].var;
+				const size_t s = x % w.block() % S, k = x % w.block() / S;
+				if (k) { scan(cbits[x] ? bdd.nodes[n].hi : bdd.nodes[n].lo);
+					return; }
+				if (streams[s].input) need[s] = true;
+				scan(bdd.nodes[n].lo);
+				scan(bdd.nodes[n].hi);
+			};
+			for (size_t j = 0; j < vs[vx].dst.size(); ++j) {
+				scan(labels[vx][j]);
+				const int u = this->follow(vs[vx].dst[j]);
+				if (vs[u].picks == 1) for (auto m : moves[u]) scan(m);
+			}
+			for (size_t s = 0; s < S; ++s)
+				if (streams[s].input && reach[s]) need[s] = true;
+		}
+		std::vector<size_t> ins;
+		for (size_t s = 0; s < S; ++s) if (need[s]) ins.push_back(s);
+		// every choice of codes for the inputs read
+		std::vector<int> bits = cbits;
+		std::function<bool(size_t)> choose = [&](size_t i) -> bool {
+			if (i == ins.size()) {
+				medge e;
+				// the guard: every atom of an input read
+				for (size_t s : ins) {
+					const auto& x = w.streams[s];
+					const size_t c = code_of(bits, s, 0);
+					if (x.two) e.guard[atom(true, 0, s, 0, 0, 1)]
+						= c ? 1 : -1;
+					else if (!x.values.empty())
+						for (size_t val = 0; val < x.values.size(); ++val)
+							e.guard[atom(true, 1, s, 0, 0, val)]
+								= c == val ? 1 : -1;
+					else {
+						for (size_t val : { 0, 1 })
+							e.guard[atom(true, 0, s, 0, 0, val)]
+								= constant(s, c) == (int)val ? 1 : -1;
+						for (auto [s2, k2] : partners(s, need)) {
+							const size_t c2 = code_of(bits, s2, k2);
+							e.guard[atom(true, 2, s, s2, k2, 0)]
+								= c == c2 ? 1 : -1;
+							if (x.orbit) e.guard[atom(true, 3, s, s2,
+								k2, 0)] = complements(s, c, c2) ? 1 : -1;
+						}
+					}
+				}
+				int next = -1;
+				for (size_t j = 0; j < vs[vx].dst.size() && next < 0; ++j)
+					if (eval(labels[vx][j], bits).value_or(false))
+						next = this->follow(vs[vx].dst[j]);
+				if (next < 0 || vs[next].picks == 0) return false;
+				if (vs[next].picks != 1) {
+					e.dst = state(next, {});
+					edges[q].push_back(std::move(e));
+					++edge_count;
+					return true;
+				}
+				std::vector<int> full = bits;
+				for (size_t s = 0; s < S; ++s)
+					if (!streams[s].input)
+						for (size_t b = 0; b < w.streams[s].width; ++b)
+							full[w.var(s, 0, b)] = -1;
+				data_bdd::id any = data_bdd::F;
+				for (auto m : moves[next]) any = bdd.disj(any, m);
+				if (bdd.full || !pick(any, full)) return false;
+				int after = -1;
+				for (size_t j = 0; j < vs[next].dst.size() && after < 0; ++j)
+					if (eval(moves[next][j], full).value_or(false))
+						after = this->follow(vs[next].dst[j]);
+				if (after < 0 || (vs[after].picks != 0
+					&& vs[after].picks != -1)) return false;
+				// the outputs: an equality cube
+				std::vector<bool> current = need;
+				for (size_t s = 0; s < S; ++s) {
+					if (streams[s].input || (!read0[s] && !reach[s]))
+						continue;
+					const auto& x = w.streams[s];
+					const size_t c = code_of(full, s, 0);
+					if (x.two) e.out.push_back(atom(true, 0, s, 0, 0, c));
+					else if (!x.values.empty())
+						e.out.push_back(atom(true, 1, s, 0, 0, c));
+					else if (constant(s, c) >= 0)
+						e.out.push_back(atom(true, 0, s, 0, 0,
+							(size_t)constant(s, c)));
+					else {
+						auto ps = partners(s, current);
+						bool found = false;
+						for (auto [s2, k2] : ps) {
+							const size_t c2 = code_of(full, s2, k2);
+							if (c2 == c || complements(s, c, c2)) {
+								e.out.push_back(atom(true,
+									c2 == c ? 2 : 3, s, s2, k2, 0));
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							for (size_t val : { 0, 1 })
+								e.out.push_back(atom(false, 0, s, 0, 0,
+									val));
+							for (auto [s2, k2] : ps) {
+								e.out.push_back(atom(false, 2, s, s2, k2,
+									0));
+								if (x.orbit) e.out.push_back(atom(false,
+									3, s, s2, k2, 0));
+							}
+						}
+					}
+					current[s] = true;
+				}
+				// the window of the next step
+				std::vector<int> shifted(w.vars(), 0);
+				for (size_t s = 0; s < S; ++s)
+					for (size_t k = 0; k < d; ++k)
+						if (kept(s, k + 1))
+							set_code(shifted, s, k + 1,
+								code_of(full, s, k));
+				e.dst = state(after, canonical(shifted));
+				std::sort(e.out.begin(), e.out.end());
+				edges[q].push_back(std::move(e));
+				++edge_count;
+				return true;
+			}
+			const size_t s = ins[i];
+			const auto& x = w.streams[s];
+			std::vector<size_t> codes;
+			if (x.two) codes = { 0, 1 };
+			else if (!x.values.empty())
+				for (size_t c = 0; c < x.values.size(); ++c)
+					codes.push_back(c);
+			else {
+				std::set<size_t> held;
+				std::vector<bool> before_s(S, false);
+				for (size_t j = 0; j < i; ++j) before_s[ins[j]] = true;
+				for (auto [s2, k2] : partners(s, before_s)) {
+					const size_t c2 = code_of(bits, s2, k2);
+					if (constant(s, c2) < 0)
+						held.insert(x.orbit ? c2 & pair_mask(s) : c2);
+				}
+				size_t fresh = x.orbit ? 1 : 2;
+				while (held.contains(fresh)) ++fresh;
+				held.insert(fresh);
+				if (x.orbit) {
+					const size_t high = size_t{1} << (x.width - 1);
+					codes = { 0, high };
+					for (size_t p : held) {
+						if (p >= high) return false;
+						codes.push_back(p);
+						if (p != fresh) codes.push_back(p | high);
+					}
+				} else {
+					codes = { 0, 1 };
+					for (size_t c : held) {
+						if (c >> x.width) return false;
+						codes.push_back(c);
+					}
+				}
+			}
+			for (size_t c : codes) {
+				set_code(bits, s, 0, c);
+				if (!choose(i + 1)) return false;
+			}
+			set_code(bits, s, 0, 0);
+			return true;
+		};
+		if (!choose(0)) return false;
+	}
+	if (states.size() > max_states || edge_count > max_edges)
+		return false;
+
+	// minimization: states with the same edges into the same blocks
+	std::vector<int> block(states.size(), 0);
+	for (size_t blocks = 1;;) {
+		using sig_t = std::vector<std::tuple<std::vector<std::pair<size_t,
+			int8_t>>, std::vector<size_t>, int>>;
+		std::map<std::pair<int, sig_t>, int> ids;
+		std::vector<int> nb(states.size());
+		for (size_t q = 0; q < states.size(); ++q) {
+			sig_t sig;
+			for (const auto& e : edges[q])
+				sig.emplace_back(std::vector<std::pair<size_t, int8_t>>(
+					e.guard.begin(), e.guard.end()), e.out, block[e.dst]);
+			std::sort(sig.begin(), sig.end());
+			auto [it, _] = ids.emplace(std::pair{ block[q], std::move(sig) },
+				(int)ids.size());
+			nb[q] = it->second;
+		}
+		block = std::move(nb);
+		if (ids.size() == blocks) break;
+		blocks = ids.size();
+	}
+
+	auto view = std::make_shared<ltl_aba_solution<node>>();
+	auto& sol = *view;
+	sol.data_game = true;
+	sol.atoms = atoms;
+	std::vector<int> ap_of(atoms.size());
+	for (size_t i = 0; i < atoms.size(); ++i)
+		if (atom_input[i]) {
+			ap_of[i] = (int)sol.aut.aps.size();
+			sol.aut.aps.push_back(atoms[i].second);
+			sol.input_props.push_back(atoms[i].second);
+		}
+	for (size_t i = 0; i < atoms.size(); ++i)
+		if (!atom_input[i]) {
+			ap_of[i] = (int)sol.aut.aps.size();
+			sol.aut.aps.push_back(atoms[i].second);
+			sol.output_props.push_back(atoms[i].second);
+		}
+	int blocks = 0;
+	for (int b : block) blocks = std::max(blocks, b + 1);
+	sol.aut.num_states = blocks;
+	sol.aut.initial_state = block[first];
+	sol.aut.edges.resize(blocks);
+	sol.aut.state_accepting.assign(blocks, false);
+	std::vector<bool> done(blocks, false);
+	using medges = std::vector<typename base::mealy_edge>;
+	std::vector<medges> machine(blocks);
+	for (size_t q = 0; q < states.size(); ++q) {
+		if (done[block[q]]) continue;
+		done[block[q]] = true;
+		for (const auto& e : edges[q])
+			machine[block[q]].push_back({ { e.guard.begin(), e.guard.end() },
+				e.out, block[e.dst] });
+	}
+	// Whether atom `a` reads the current value of input `s`.
+	auto reads_input = [&](size_t a, size_t s) {
+		const auto& [eq, kind, s1, s2, k2, val] = atom_key[a];
+		return s1 == s || ((kind == 2 || kind == 3) && k2 == 0 && s2 == s);
+	};
+	// An input a state's move does not depend on is not read there: its
+	// atoms leave the guards when the edges that differ only in them agree
+	// on the outputs and the next state, and no output is compared with it.
+	for (auto& es : machine)
+		for (size_t s = S; s-- > 0;) {
+			if (!streams[s].input) continue;
+			bool read = false;
+			for (const auto& e : es)
+				for (size_t a : e.out) read = read || reads_input(a, s);
+			if (read) continue;
+			medges merged;
+			std::map<std::vector<std::pair<size_t, int8_t>>, size_t> at;
+			bool agree = true;
+			for (const auto& e : es) {
+				typename base::mealy_edge m{ {}, e.out, e.dst };
+				for (auto g : e.guard)
+					if (!reads_input(g.first, s)) m.guard.push_back(g);
+				auto [it, fresh] = at.emplace(m.guard, merged.size());
+				if (fresh) merged.push_back(std::move(m));
+				else if (merged[it->second].out != e.out
+					|| merged[it->second].dst != e.dst)
+						{ agree = false; break; }
+			}
+			if (agree) es = std::move(merged);
+		}
+	for (int q = 0; q < blocks; ++q)
+		for (const auto& e : machine[q]) {
+			std::string label;
+			auto lit = [&](size_t a, bool pos) {
+				if (!label.empty()) label += "&";
+				label += (pos ? "" : "!") + std::to_string(ap_of[a]);
+			};
+			for (auto [a, g] : e.guard) lit(a, g > 0);
+			for (size_t a : e.out) lit(a, true);
+			sol.aut.edges[q].push_back({ label.empty() ? "t" : label,
+				e.dst, false });
+		}
+	// the values before step 0: 0 for the inputs, the start's codes for
+	// the outputs
+	auto at = [&](size_t s, size_t k) {
+		const auto& x = streams[s];
+		return x.input ? build_in_var_at_n<node>(x.name, -(int_t)k, x.tid)
+			: build_out_var_at_n<node>(x.name, -(int_t)k, x.tid);
+	};
+	std::vector<std::pair<size_t, size_t>> met;
+	for (size_t k = 1; k <= d; ++k)
+		for (size_t s = 0; s < S; ++s) {
+			if (!kept(s, k)) continue;
+			const auto& x = w.streams[s];
+			const size_t c = code_of(start, s, k);
+			tref v = at(s, k);
+			if (!x.values.empty())
+				sol.history.push_back(tau::build_bf_eq(v,
+					x.values[c]->get()));
+			else if (constant(s, c) >= 0)
+				sol.history.push_back(tau::build_bf_eq(v,
+					constant(s, c) ? one(s) : zero(s)));
+			else {
+				bool found = false;
+				for (auto [s2, k2] : met) {
+					if (streams[s2].tid != streams[s].tid) continue;
+					const size_t c2 = code_of(start, s2, k2);
+					if (c2 == c || complements(s, c, c2)) {
+						tref y = at(s2, k2);
+						sol.history.push_back(tau::build_bf_eq(v, c2 == c
+							? y : tau::build_bf_neg(y)));
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					sol.history.push_back(tau::build_bf_neq(v, zero(s)));
+					sol.history.push_back(tau::build_bf_neq(v, one(s)));
+					for (auto [s2, k2] : met) {
+						if (streams[s2].tid != streams[s].tid) continue;
+						tref y = at(s2, k2);
+						sol.history.push_back(tau::build_bf_neq(v, y));
+						if (x.orbit) sol.history.push_back(
+							tau::build_bf_neq(v, tau::build_bf_neg(y)));
+					}
+				}
+			}
+			if (coded(s)) met.emplace_back(s, k);
+		}
+	this->view = std::move(view);
+	this->machine = std::move(machine);
+	this->reset();
+	return true;
+}
+
 // The strategy of a game played on formula_regions.
 template <NodeType node>
 struct formula_strategy : data_game_strategy<node> {
@@ -1419,6 +2148,10 @@ protected:
 		if (t.equals_T()) return true;
 		if (t.equals_F()) return false;
 		return std::nullopt;
+	}
+
+	std::optional<bool> won_from(const window& win) override {
+		return truth(won_init->get(), win);
 	}
 
 	std::optional<bool> holds_label(int i, size_t j, const window& win)
@@ -1555,6 +2288,9 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 					st->moves.push_back(w->moves[i]);
 				}
 				st->won_init = w->sys[arena.init];
+				// without a Mealy view the moves are played directly
+				st->build_mealy(data_game_mealy_max_states,
+					data_game_mealy_max_edges);
 				*strategy = st;
 			}
 		}
