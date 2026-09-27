@@ -8,5 +8,8 @@ include(tau_repl_pack)
 if (TAU_BUILD_REPL_TESTS)
 	enable_testing()
 	add_subdirectory(commands)
+	add_test(NAME test_repl-pack_gate
+		COMMAND ${CMAKE_COMMAND} -P
+			${CMAKE_CURRENT_SOURCE_DIR}/test_repl_pack_gate.cmake)
 	tau_repl_report_skips()
 endif ()
