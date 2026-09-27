@@ -684,8 +684,8 @@ result<tref> pointwise_revision_temporal(
 			if (pwr_semantic_fallback
 				&& (tau::subtree_equals(rev_clause, best)
 					|| tau::subtree_equals(rev_clause, update))) {
-				tref opt = pack_semantic_pwr_optimal<node>(
-					sc, update);
+				TAU_TRY(tref opt, (pack_semantic_pwr_optimal<node>(
+					sc, update)));
 				// A revision only helps if it is realizable.
 				if (opt) {
 					TAU_TRY(bool opt_real,

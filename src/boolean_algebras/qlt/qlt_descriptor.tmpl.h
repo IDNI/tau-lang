@@ -284,11 +284,8 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	{ return qlt_try_propositional_synthesis<node_t>(fm, atoms); }
 
 	/** @brief Revise @p clause by the winning region of its product game. */
-	static tref semantic_pwr_optimal(tref clause, tref update) {
-		// TODO (HIGH) dropped error: qlt_semantic_pwr_optimal's report -- the
-		// ba_has_semantic_pwr concept fixes this member to tref.
-		auto r = qlt_semantic_pwr_optimal<node_t>(clause, update);
-		return r.has_value() ? r.value() : nullptr;
+	static result<tref> semantic_pwr_optimal(tref clause, tref update) {
+		return qlt_semantic_pwr_optimal<node_t>(clause, update);
 	}
 
 	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */

@@ -798,17 +798,24 @@ tref pack_omcat_qe_residual(size_t ba_type_id, tref var, tref body) {
  * @brief Revise @p clause against @p update through a BA's winning region.
  *
  * Takes no type id: the capability decides for itself whether the clause is
- * its own, so nullptr covers both "not mine" and "no revision found" -- the
- * caller falls back to the syntactic mode either way.
+ * its own, so a `nullptr` value covers both "not mine" and "no revision
+ * found" -- the caller falls back to the syntactic mode either way. A failure
+ * in the owner's decision travels in the result.
  */
 template <typename Node>
-tref pack_semantic_pwr_optimal(tref clause, tref update) {
-	return pack_first_owner<Node>([&]<typename BA>() -> std::optional<tref> {
-		if constexpr (ba_has_semantic_pwr<Node, BA>)
-			return ba_descriptor<BA, Node>
-				::semantic_pwr_optimal(clause, update);
-		return std::nullopt;
-	}).value_or(nullptr);
+result<tref> pack_semantic_pwr_optimal(tref clause, tref update) {
+	result<tref> r;
+	pack_visit_all<Node>([&]<typename BA>() {
+		// The first owner answers; a later owner in the pack must not
+		// override it, and an owner's error propagates.
+		if (r.has_value() || r.has_error()) return;
+		if constexpr (ba_has_semantic_pwr<Node, BA>) {
+			auto opt = r.merge_take(ba_descriptor<BA, Node>
+				::semantic_pwr_optimal(clause, update));
+			if (opt.has_value()) r.emplace(std::move(*opt));
+		}
+	});
+	return r;
 }
 
 /**

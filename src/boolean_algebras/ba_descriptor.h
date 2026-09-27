@@ -268,7 +268,7 @@ template <typename Node, typename BA>
 concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
 	&& requires(tref c, tref u) {
 		{ ba_descriptor<BA, Node>::semantic_pwr_optimal(c, u) }
-			-> std::convertible_to<tref>; };
+			-> std::same_as<result<tref>>; };
 
 template <typename Node, typename BA>
 concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>
