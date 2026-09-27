@@ -33,6 +33,37 @@ add_test(NAME "test_codegen_cli-unrealizable_exit_3"
 set_tests_properties("test_codegen_cli-unrealizable_exit_3" PROPERTIES
 	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE.*EXIT=1")
 
+# The message follows the three-valued verdict. A spec with no strategy that
+# `realizable` decides F keeps UNREALIZABLE...
+add_test(NAME "test_codegen_cli-unrealizable_full_ltl"
+	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'G (o1[t] = 0) && F (o1[t] = 1)' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
+set_tests_properties("test_codegen_cli-unrealizable_full_ltl" PROPERTIES
+	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE.*EXIT=1"
+	FAIL_REGULAR_EXPRESSION "UNKNOWN")
+
+# ...and one it leaves undecided is UNKNOWN, with the budget that stopped it.
+# The stub answers UNREALIZABLE for the abstraction and outlasts the 1 s
+# ltl-timeout on the data game (tests/repl/stubs/slow_game/ltlsynt); the input
+# atom reads two steps, so no other check decides the spec.
+set(_unknown_compile "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'F (o1[t] = 1 && i1[t] != i1[t-1])' > \"$d/spec.tau\"; TAU_LTL_TIMEOUT_SEC=1 PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/slow_game:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\" 2>&1; echo EXIT=$?")
+add_test(NAME "test_codegen_cli-unknown_is_not_unrealizable"
+	COMMAND bash -c "${_unknown_compile}")
+set_tests_properties("test_codegen_cli-unknown_is_not_unrealizable" PROPERTIES
+	PASS_REGULAR_EXPRESSION "compile: the realizability of the spec is UNKNOWN.*EXIT=1"
+	FAIL_REGULAR_EXPRESSION "UNREALIZABLE")
+add_test(NAME "test_codegen_cli-unknown_names_the_budget"
+	COMMAND bash -c "${_unknown_compile}")
+set_tests_properties("test_codegen_cli-unknown_names_the_budget" PROPERTIES
+	PASS_REGULAR_EXPRESSION "killed by the ltl-timeout watchdog")
+
+# The same budget given as the option: the verb reads the global options
+# (without them each stubbed game call waits out the 60 s default).
+add_test(NAME "test_codegen_cli-compile_reads_the_ltl_timeout_option"
+	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'F (o1[t] = 1 && i1[t] != i1[t-1])' > \"$d/spec.tau\"; PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/slow_game:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-timeout 1 compile \"$d/spec.tau\" -o \"$d/exe\" 2>&1; echo EXIT=$?")
+set_tests_properties("test_codegen_cli-compile_reads_the_ltl_timeout_option" PROPERTIES
+	PASS_REGULAR_EXPRESSION "compile: the realizability of the spec is UNKNOWN.*EXIT=1"
+	TIMEOUT 30)
+
 # CG-N6: ltlsynt stubbed to fail like an internal/usage error (exit 2, no
 # verdict line -- see tests/repl/stubs/ltlsynt). The synthesis layer must
 # surface this as a failure without ever claiming UNREALIZABLE (that verdict

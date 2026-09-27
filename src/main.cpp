@@ -322,36 +322,6 @@ int main(int argc, char** argv) {
 	if (cl.process_args() != 0) return cl.status();
 	auto cmd = cl.get_processed_command();
 
-	if (cmd.ok() && cmd.name() == "compile") {
-		auto files = cl.get_files();
-		if (files.empty())
-			return error("Usage: tau compile <spec.tau> [-o out_exe]");
-		std::string spec_file = files.front();
-		std::string out_exe = cmd.get<std::string>("output");
-		if (out_exe.empty()) {
-			std::filesystem::path p(spec_file);
-			out_exe = (p.parent_path() / p.stem()).string();
-		}
-
-		std::string src;
-		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-		if (!ifs) return error("Cannot open file: " + spec_file);
-		auto l = ifs.tellg();
-		src.resize(l); ifs.seekg(0); ifs.read(&src[0], l);
-		if (src.empty()) return error("Spec file is empty: " + spec_file);
-
-		std::string build_dir = spec_file + ".build";
-		TAU_LOG_INFO << "tau compile: " << spec_file;
-		auto res = compile_spec<node_t>(src, out_exe, build_dir,
-			cmd.get<std::string>("cxx"));
-		if (!res.has_value()) {
-			res.print();
-			return 1;
-		}
-		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
-		return 0;
-	}
-
 	auto opts  = cl.get_processed_options();
 	auto files = cl.get_files();
 
@@ -464,6 +434,38 @@ int main(int argc, char** argv) {
 		auto n = given_count(cli_name.c_str());
 		if (!bad_option.empty()) return error(bad_option);
 		if (n) e.option.set_count(*n);
+	}
+
+	// After the options, so a budget given with the verb (--ltl-timeout,
+	// --max-consistency-subsets, ...) applies to its synthesis too.
+	if (cmd.ok() && cmd.name() == "compile") {
+		auto files = cl.get_files();
+		if (files.empty())
+			return error("Usage: tau compile <spec.tau> [-o out_exe]");
+		std::string spec_file = files.front();
+		std::string out_exe = cmd.get<std::string>("output");
+		if (out_exe.empty()) {
+			std::filesystem::path p(spec_file);
+			out_exe = (p.parent_path() / p.stem()).string();
+		}
+
+		std::string src;
+		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+		if (!ifs) return error("Cannot open file: " + spec_file);
+		auto l = ifs.tellg();
+		src.resize(l); ifs.seekg(0); ifs.read(&src[0], l);
+		if (src.empty()) return error("Spec file is empty: " + spec_file);
+
+		std::string build_dir = spec_file + ".build";
+		TAU_LOG_INFO << "tau compile: " << spec_file;
+		auto res = compile_spec<node_t>(src, out_exe, build_dir,
+			cmd.get<std::string>("cxx"));
+		if (!res.has_value()) {
+			res.print();
+			return 1;
+		}
+		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
+		return 0;
 	}
 
 	// Rule counting piggybacks on the benchmarks flag: both paths below

@@ -459,8 +459,25 @@ result<codegen_result> compile_spec(
 			"strategy of the data game that no finite Mealy machine "
 			"describes, which `run` executes and a compiled program "
 			"cannot carry");
-		else return r.with_error(code::unsat,
-			"compile: spec is UNREALIZABLE");
+		else {
+			// No strategy is not a verdict: the abstraction may lack
+			// one while the spec is realizable or undecided. The
+			// message follows what `realizable` decides, and an
+			// undecided check's report names its budget or reason.
+			auto real = is_ctl_star_realizable<Node>(fm, 0, false);
+			if (!real.has_value()) {
+				r.merge(std::move(real));
+				return r.with_error(code::solver_error,
+					"compile: the realizability of the spec is "
+					"UNKNOWN, so no program was built");
+			}
+			if (!real.value()) return r.with_error(code::unsat,
+				"compile: spec is UNREALIZABLE");
+			r.merge(std::move(real));
+			return r.with_error(code::unsupported_operation,
+				"compile: the spec is realizable, but no strategy "
+				"a compiled program can play was synthesized");
+		}
 	}
 
 	// 3. Build the program_desc and emit the C++ artifact via the one
