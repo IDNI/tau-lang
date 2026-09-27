@@ -297,7 +297,11 @@ tau compile spec.tau -o sim
 The exit code is `0` when the program was built and `1` on any failure; the
 reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
 `cmake` configure or build failure) is in the `compile failed: …` message,
-not in a dedicated code.  A spec whose strategy cannot be executed (an
+not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
+only when `realizable` would answer F; when realizability is undecided the
+message says UNKNOWN and names the budget or the reason that stopped it.
+The global options, the budgets among them, are given before the verb
+(`tau --ltl-timeout 120 compile spec.tau`).  A spec whose strategy cannot be executed (an
 Algorithm-B verdict over the `qlt` type, see the synthesis algorithms below)
 is refused the same way.
 
@@ -3651,8 +3655,9 @@ Further examples are in [`tests/bindings/python`](tests/bindings/python).
 The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
 carries the same budgets and switches under the camelCase form of those names
 (`tau.setMaxFixpointSteps(1000)`, `tau.setTrefBudget(n)`,
-`tau.setPreprocessing(false)`, `tau.trefCount()`, ...) and the options the
-algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
+`tau.setPreprocessing(false)`, `tau.setMaxConstantSize(n)`, `tau.trefCount()`,
+...), reads the constant size budget back with `tau.getMaxConstantSize()`, and
+carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
 `tau.getBaOption(name)`, which return the value now in force, or `null` with
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
