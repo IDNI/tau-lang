@@ -13,9 +13,10 @@ add_repl_test_fail(ltl_decisions-quantifier_under_temporal_undecided
 # a positional atom under F is refused, not an abort
 add_repl_test_fail(ltl_decisions-positional_under_F_no_abort
 	"realizable F (o1[0] = 1)" "could not be decided")
-# ltl prints why the synthesis refuses the positional atom
-add_repl_test(ltl_decisions-ltl_positional_under_F_refused
-	"ltl F (o1[0] = 1)" "REFUSED: positional atom under")
+# ltl prints why the synthesis refuses the positional atom, then the verdict
+# of realizable, which cannot decide it either
+add_repl_test_fail(ltl_decisions-ltl_positional_under_F_refused
+	"ltl F (o1[0] = 1)" "REFUSED: positional atom under.*could not be decided")
 
 # input facts the environment cannot violate are assumed: tautologies over
 # three input atoms, and a valid single input atom

@@ -4778,6 +4778,8 @@ TEST_SUITE("ltl_explain diagnostics") {
 		MESSAGE(out);
 	}
 
+	// the refusal ends the trace, not the decision: the verdict is still
+	// realizability's, here undecided as well
 	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
 		tref fm = wff("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
@@ -4785,10 +4787,28 @@ TEST_SUITE("ltl_explain diagnostics") {
 		result<bool> ok_r;
 		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
 		std::string out = oss.str();
-		REQUIRE(ok_r.has_value());
-		CHECK_FALSE(ok_r.value());
+		CHECK_FALSE(ok_r.has_value());
 		CHECK(out.find("REFUSED:") != std::string::npos);
+		CHECK(out.find("REALIZABLE") == std::string::npos);
 		MESSAGE(out);
+	}
+
+	TEST_CASE("a refused round answers with the verdict it is given") {
+		tref fm = wff("F (o1[0] = 1)");
+		REQUIRE(fm != nullptr);
+		for (bool given : { true, false }) {
+			std::ostringstream oss;
+			auto ok_r = ltl_explain<node_t>(fm, oss, [given] {
+				result<bool> v;
+				return v.with_value(given);
+			});
+			std::string out = oss.str();
+			REQUIRE(ok_r.has_value());
+			CHECK(ok_r.value() == given);
+			CHECK(out.find("REFUSED:") != std::string::npos);
+			CHECK(out.find(given ? "\nREALIZABLE" : "\nUNREALIZABLE")
+				!= std::string::npos);
+		}
 	}
 
 	// issue #131: a term is not a formula. It used to reach the backends
