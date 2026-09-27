@@ -2939,7 +2939,9 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
-		code_regions<node> codes(arena, *window, size_t{1} << 21);
+		// 2^23 nodes take about 1.5 GB; a product of two bitvector streams
+		// wider than 4 bits needs millions of them
+		code_regions<node> codes(arena, *window, size_t{1} << 23);
 		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
 			data_game_solver solver(codes, arena, 0, keep);
