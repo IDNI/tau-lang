@@ -23,8 +23,28 @@ inline std::string count_limit_str(size_t v) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::invalid_argument() const {
-	TAU_LOG_ERROR << "Invalid argument\n";
+	print_error(code::invalid_argument, "Invalid argument");
 	return nullptr;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::print_error(code c, std::string_view msg,
+	std::initializer_list<idni::diagnostics::attr_in> extra) const
+{
+	report rep;
+	rep.error(c, msg, extra);
+	rep.print(err);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::print_warning(std::string_view msg,
+	std::initializer_list<idni::diagnostics::attr_in> extra) const
+{
+	report rep;
+	rep.warning(msg, extra);
+	rep.print(err);
 }
 
 template <typename... BAs>
@@ -67,7 +87,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 {
 	if (auto pos = get_history_index(n, H.size(), silent); pos.has_value())
 		return { { H[pos.value()], pos.value() } };
-	TAU_LOG_ERROR << "History location does not exist\n";
+	print_error(code::invalid_argument, "History location does not exist");
 	return {};
 }
 
@@ -133,11 +153,13 @@ tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 			const auto& h = check.value().first;
 			if (tau::get(h).is(nt)) return h->get();
 			else if (!suppress_error)
-				TAU_LOG_ERROR << "Argument has a wrong type";
+				print_error(code::invalid_argument,
+					"Argument has a wrong type");
 			return nullptr;
 		}
 	}
-	if (!suppress_error) TAU_LOG_ERROR << "Argument has a wrong type";
+	if (!suppress_error)
+		print_error(code::invalid_argument, "Argument has a wrong type");
 	return nullptr;
 }
 
@@ -532,8 +554,10 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 				raw = tau::trim(raw);
 			auto add_change = [&](tref key, tref val) {
 				if (!changes.emplace(key, val).second) {
-					TAU_LOG_ERROR << "Duplicate match"
-						" pattern in substitution\n";
+					print_error(code::invalid_argument,
+						"Duplicate match pattern in substitution",
+						{{label::value, truncate_for_message(
+							tau::get(key).to_str())}});
 					return false;
 				}
 				return true;
@@ -568,16 +592,18 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 			// into an expression the pattern is absent from is
 			// legitimate in history-driven flows
 			if (occs.empty())
-				TAU_LOG_WARNING << "Substitution pattern did"
-					" not match anything in the input: "
-					<< tau::get(thiz).to_str() << "\n";
+				print_warning("Substitution pattern did not "
+					"match anything in the input",
+					{{label::value, truncate_for_message(
+						tau::get(thiz).to_str())}});
 			else for (tref occ : occs)
 				if (!add_change(occ, with)) return nullptr;
 		}
 		auto r_res = tau_api::substitute(in,
 			std::map<tref, tref>(changes.begin(), changes.end()));
+		if (!r_res.has_value()) { r_res.print(err); return nullptr; }
 		print_benchmarks(r_res);
-		tref r = r_res.has_value() ? r_res.value() : nullptr;
+		tref r = r_res.value();
 		// Reject a result that no longer type-checks (e.g. an sbf
 		// subterm replaced by a bv one, or mismatched bv widths)
 		// instead of storing an ill-typed expression that every later
@@ -588,17 +614,18 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		// that already failed inference is left to the old behavior.
 		if (r && in_typed) {
 			auto inferred_r = tau_api::infer(r);
-			tref inferred = inferred_r.has_value()
-				? inferred_r.value() : nullptr;
-			if (!inferred) {
-				TAU_LOG_ERROR << "Substitution rejected: "
-					"the result is not well-typed\n";
+			if (!inferred_r.has_value()) {
+				inferred_r.print(err);
+				print_error(code::type_error,
+					"Substitution rejected: the result is not well-typed",
+					{{label::value, truncate_for_message(
+						tau::get(r).to_str())}});
 				return nullptr;
 			}
 			// keep the fully inferred result so the next group
 			// and later type-id sensitive commands (further
 			// subst, n, sat, ...) see resolved types
-			r = inferred;
+			r = inferred_r.value();
 		}
 		return r;
 	};
@@ -623,10 +650,8 @@ tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
 	for (size_t g = 2; g < t.children_size(); ++g) {
 		const trefs pairs = tau::get(t.child(g)).get_children();
 		for (size_t i = 0; i + 1 < pairs.size(); i += 2)
-			if (!tau::get(pairs[i])[0].is(tau::variable)) {
-				TAU_LOG_ERROR << "Invalid argument\n";
-				return nullptr;
-			}
+			if (!tau::get(pairs[i])[0].is(tau::variable))
+				return invalid_argument();
 	}
 	return subst_cmd(n);
 }
@@ -2270,7 +2295,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::comment:            break;
 	// error handling
 	default: error = true; out << std::endl;
-		TAU_LOG_ERROR << "Unknown command";
+		print_error(code::invalid_argument, "Unknown command");
 	}
 	// The api reports a full bdd node table itself; this catches the
 	// commands that reach the bdds around it.

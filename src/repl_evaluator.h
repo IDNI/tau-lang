@@ -333,6 +333,13 @@ private:
 	/// @brief Print an "invalid argument" error and return `nullptr`.
 	tref invalid_argument() const;
 
+	/// @brief Print one command-level error to the REPL's error stream.
+	void print_error(code c, std::string_view msg,
+		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
+	/// @brief Print one command-level warning to the REPL's error stream.
+	void print_warning(std::string_view msg,
+		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
+
 	/// @brief Parse @p src as a CLI command and return the resulting tree.
 	result<tref> make_cli(const std::string& src);
 
