@@ -255,7 +255,8 @@ TEST_SUITE("Tau API - string - execution") {
 
 	// A tautological literal still carries its lookback (README "Lookback
 	// initialization"): o2 is free at steps 0 and 1.
-	TEST_CASE("each clause keeps the warm-up it is written with") {
+	TEST_CASE("each clause keeps the warm-up it is written with"
+		* doctest::skip(!ltlsynt_available())) {
 		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
 			"(sometimes o2[t-1] = 0)";
 		CHECK( tau_api::sat(spec).value() );
@@ -282,7 +283,8 @@ TEST_SUITE("Tau API - string - execution") {
 
 	// Every entry point that decides or runs a specification reads the
 	// same warm-ups, whatever polarity it decides.
-	TEST_CASE("the warm-ups as written reach every entry point") {
+	TEST_CASE("the warm-ups as written reach every entry point"
+		* doctest::skip(!ltlsynt_available())) {
 		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
 			"(sometimes o2[t-1] = 0)";
 		const std::string neg = std::string("!(") + spec + ")";

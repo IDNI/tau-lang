@@ -63,7 +63,8 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		CHECK(v == std::vector<std::string>{"T", "F", "T", "F"});
 	}
 
-	TEST_CASE("[IN-RT4-F] F: the obligation is discharged within the run") {
+	TEST_CASE("[IN-RT4-F] F: the obligation is discharged within the run"
+		* doctest::skip(!ltlsynt_available())) {
 		auto v = drive("F (o1[t] = 1).", 3, [](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
 		bool seen = false;
@@ -71,7 +72,8 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		CHECK(seen);
 	}
 
-	TEST_CASE("[IN-RT4-U] U: zeros until the release, never a stray value") {
+	TEST_CASE("[IN-RT4-U] U: zeros until the release, never a stray value"
+		* doctest::skip(!ltlsynt_available())) {
 		auto v = drive("(o1[t] = 0) until (o1[t] = 1).", 3, [](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
 		size_t first_one = v.size();
@@ -82,13 +84,15 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 			CHECK(v[k] == "F");
 	}
 
-	TEST_CASE("[IN-RT4-W] W: the left side holds while the input release never comes") {
+	TEST_CASE("[IN-RT4-W] W: the left side holds while the input release never comes"
+		* doctest::skip(!ltlsynt_available())) {
 		auto v = drive("(o1[t] = 1) weak_until (i1[t] = 1).", 3, [](size_t) { return "F."; });
 		REQUIRE(v.size() == 3);
 		for (auto& x : v) CHECK(x == "T");
 	}
 
-	TEST_CASE("[IN-RT4-R] R: the released side holds up to and including the release") {
+	TEST_CASE("[IN-RT4-R] R: the released side holds up to and including the release"
+		* doctest::skip(!ltlsynt_available())) {
 		// (o1=1) R (o1=1): o1 is 1 up to and including the release, and the
 		// release is o1 = 1 itself, so the first step is 1 and releases.
 		auto v = drive("(o1[t] = 1) release (o1[t] = 1).", 3, [](size_t) { return "T."; });
@@ -96,7 +100,8 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		CHECK(v[0] == "T");
 	}
 
-	TEST_CASE("[IN-RT4-S] past: always(o2=1) beside a Since obligation executes") {
+	TEST_CASE("[IN-RT4-S] past: always(o2=1) beside a Since obligation executes"
+		* doctest::skip(!ltlsynt_available())) {
 		auto v = drive("always (o1[t] = 1) && ((o1[t] = 1) since (o1[t] = 1)).", 3,
 			[](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
@@ -114,7 +119,8 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	// pipeline (its G(w → F χ) shape lies outside the safety pipeline's
 	// eventual-variable transform), so the spec executes — and the
 	// witness never appears among the user-visible outputs.
-	TEST_CASE("[IN-RT4-E] ctl_star E executes; the witness is not printed") {
+	TEST_CASE("[IN-RT4-E] ctl_star E executes; the witness is not printed"
+		* doctest::skip(!ltlsynt_available())) {
 		auto maybe_i = tau_api::get_interpreter(
 			"E (sometimes (o1[t] = 1)).");
 		REQUIRE(maybe_i.has_value());

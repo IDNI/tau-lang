@@ -196,7 +196,8 @@ static int get_env_int(const char* name, int def) {
 
 TEST_SUITE("LTL fuzz (property-based)") {
 
-	TEST_CASE("CRASH: no exception on random formulas") {
+	TEST_CASE("CRASH: no exception on random formulas"
+		* doctest::skip(!ltlsynt_available())) {
 		// Any formula tau can parse must not throw an exception.
 		// Parse failures (nullptr) are acceptable — crashes are not.
 		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  42);

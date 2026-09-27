@@ -122,7 +122,8 @@ TEST_SUITE("interpreter") {
 	}
 
 	TEST_CASE("a strategy with memory emits a valid initial output at "
-		  "step 0 in every pack with a Boolean carrier")
+		  "step 0 in every pack with a Boolean carrier"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// o[0] = 1 pins the first output and F(o[t] = 0) obliges a later
 		// change, so the strategy needs memory and step 0 must emit

@@ -1134,7 +1134,8 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// is vacuous at t = 0 and enforced from t = 1 on, so no initial memory
 	// value can defeat it -- the spec is realizable (output 2 forever).
 	TEST_CASE("[ALG-D-71] G(o1[t-1]>0) && F(o1>1) REALIZABLE: the rule is "
-	          "inactive before its past exists") {
+	          "inactive before its past exists"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(alg_d_realizable(
 			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}
@@ -1189,7 +1190,8 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// Guard in the other direction: the same shape winnable from
 	// ρ₀ = type_of(0) stays REALIZABLE (>= admits the defaulted 0 itself).
 	TEST_CASE("[ALG-D-72] G(o1[t-1]>=0) && F(o1>1) stays REALIZABLE "
-	          "from type_of(0)") {
+	          "from type_of(0)"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(alg_d_realizable(
 			"(G (o1[t-1]:qlt >= {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}

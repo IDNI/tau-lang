@@ -93,7 +93,8 @@ bool atom_holds(tref tmpl, const assignment<node_t>& memory,
 
 TEST_SUITE("table_step_provider") {
 
-	TEST_CASE("propositional spec: table provider matches the solve provider") {
+	TEST_CASE("propositional spec: table provider matches the solve provider"
+		* doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
@@ -133,7 +134,8 @@ TEST_SUITE("table_step_provider") {
 	// assumes a carrier atom's prop truth IS the variable's value. A carrier
 	// output constrained to 0 is the case where that assumption would show.
 	TEST_CASE("a carrier-typed output constrained to 0 is emitted as 0 by "
-	          "the table provider") {
+	          "the table provider"
+		* doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
@@ -168,7 +170,8 @@ TEST_SUITE("table_step_provider") {
 
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("data-atom spec (bv): table provider matches the solve provider "
-	          "on a real (non-carrier) guard atom")
+	          "on a real (non-carrier) guard atom"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
@@ -211,7 +214,8 @@ TEST_SUITE("table_step_provider") {
 	// provider grounds it against the committed input and solves for o1
 	// each step.
 	TEST_CASE("input-dependent witness (bv echo): template output follows "
-	          "the input, matching the solve provider")
+	          "the input, matching the solve provider"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		bdd_init<Bool>();
 		size_t bv4_tid = bv_type_id<node_t>(4);
@@ -258,7 +262,8 @@ TEST_SUITE("table_step_provider") {
 	// once real history exists, i.e. from step `lookback` onward -- the
 	// same convention test_ltl_strategy_exec.cpp's own lookback tests use.
 	TEST_CASE("lookback-bearing spec: table provider matches the solve "
-	          "provider from step `lookback` onward")
+	          "provider from step `lookback` onward"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
@@ -305,7 +310,8 @@ TEST_SUITE("table_step_provider") {
 	// like an extra input (time_point >= k). o1's own past value is the
 	// lookback here, not an input's.
 	TEST_CASE("output-lookback spec: table provider matches the solve "
-	          "provider from step `lookback` onward (__step_ge guard)")
+	          "provider from step `lookback` onward (__step_ge guard)"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
@@ -346,7 +352,8 @@ TEST_SUITE("table_step_provider") {
 	// precomputed value tref directly (the same ground constant the atom
 	// itself carries), sidestepping codegen's own witness-picking (which
 	// only ever surfaces as a C++ source string meant to be compiled).
-	TEST_CASE("data-atom spec (qlt): witness output reaches the real stream") {
+	TEST_CASE("data-atom spec (qlt): witness output reaches the real stream"
+		* doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		std::string spec = "G(o1[t]:qlt = {1/2}:qlt).";
 

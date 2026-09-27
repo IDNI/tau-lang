@@ -9,6 +9,7 @@
 #include "ocltl_phi_delta.h"
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -308,6 +309,13 @@ std::string read_codegen_spec(const std::string& name) {
 		}
 	}
 	return "";
+}
+
+// Whether the fixture directory is visible at all: the wasm build under node
+// sees only its in-memory file system.
+bool codegen_specs_visible() {
+	return std::filesystem::is_directory("codegen_specs")
+		|| std::filesystem::is_directory("tests/codegen_specs");
 }
 
 // The same shallow parse solve_ltl_aba's own callers use: a raw parse
@@ -749,7 +757,8 @@ TEST_SUITE("ocltl_phi_delta: direct predicate scaling") {
 
 TEST_SUITE("ocltl_phi_delta: assumption checks against a real spec") {
 
-	TEST_CASE("atomless2.tau data atoms are quantifier-free and its (s, l) match the packing formula") {
+	TEST_CASE("atomless2.tau data atoms are quantifier-free and its (s, l) match the packing formula"
+		* doctest::skip(!codegen_specs_visible())) {
 		std::string src = read_codegen_spec("atomless2.tau");
 		REQUIRE_MESSAGE(!src.empty(), "tests/codegen_specs/atomless2.tau not found");
 

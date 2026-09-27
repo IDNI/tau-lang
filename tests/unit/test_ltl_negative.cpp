@@ -109,15 +109,18 @@ TEST_SUITE("NEG-PARSE: malformed formulas return nullptr") {
 TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 
 	// Input variable: system cannot control environment
-	TEST_CASE("NEG-UNREAL-01: F(input=0) — cannot force env") {
+	TEST_CASE("NEG-UNREAL-01: F(input=0) — cannot force env"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("F (i1[t] = 0)."));
 	}
 
-	TEST_CASE("NEG-UNREAL-02: F(input=1) — cannot force env") {
+	TEST_CASE("NEG-UNREAL-02: F(input=1) — cannot force env"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("F (i1[t] = 1)."));
 	}
 
-	TEST_CASE("NEG-UNREAL-03: G(F(input=0)) — cannot force env infinitely often") {
+	TEST_CASE("NEG-UNREAL-03: G(F(input=0)) — cannot force env infinitely often"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("G (F (i1[t] = 0))."));
 	}
 
@@ -126,7 +129,8 @@ TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 		CHECK_FALSE(realizable("((o1[t] = 0) && (o1[t] = 1))."));
 	}
 
-	TEST_CASE("NEG-UNREAL-05: G(o=0) AND G(o=1) — contradiction in safety") {
+	TEST_CASE("NEG-UNREAL-05: G(o=0) AND G(o=1) — contradiction in safety"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("(G (o1[t] = 0) && G (o1[t] = 1))."));
 	}
 
@@ -140,16 +144,19 @@ TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 		CHECK_FALSE(realizable("G (i1[t] = 0)."));
 	}
 
-	TEST_CASE("NEG-UNREAL-08: F(input=0) U F(input=1) — both unrealizable") {
+	TEST_CASE("NEG-UNREAL-08: F(input=0) U F(input=1) — both unrealizable"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("(F (i1[t] = 0)) until (F (i1[t] = 1))."));
 	}
 
 	// Temporal contradictions
-	TEST_CASE("NEG-UNREAL-09: G(o=0) && F(o=1) — safety blocks liveness") {
+	TEST_CASE("NEG-UNREAL-09: G(o=0) && F(o=1) — safety blocks liveness"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK_FALSE(realizable("(G (o1[t] = 0) && F (o1[t] = 1))."));
 	}
 
-	TEST_CASE("NEG-UNREAL-10: (o=0) U (input=0) with G(input=1) — env contradiction") {
+	TEST_CASE("NEG-UNREAL-10: (o=0) U (input=0) with G(input=1) — env contradiction"
+		* doctest::skip(!ltlsynt_available())) {
 		// System must maintain o=0 until input=0, but input is always 1
 		// This is UNREALIZABLE: the Until never fires and G blocks escape
 		// Actually this test needs thought: with no G(input=1) constraint,
