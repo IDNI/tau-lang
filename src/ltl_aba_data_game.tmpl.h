@@ -2276,6 +2276,11 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 	const std::vector<int>* from)
 {
 	using tau = tree<node>;
+	// The atoms of the view name a code by an element or by an equality;
+	// the bits of a modular stream with no element table and the order
+	// relations name neither, so such a strategy is played without a view.
+	for (const auto& x : w.streams)
+		if (x.order || (x.modular && x.values.empty())) return false;
 	const size_t S = streams.size(), d = w.depth;
 	const auto& vs = this->v;
 	// reach[s]: the deepest step back at which a label or a move reads s;
