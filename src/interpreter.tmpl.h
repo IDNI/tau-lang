@@ -621,6 +621,26 @@ interpreter<node>::interpreter(
 	compute_lookback_and_initial();
 }
 
+// Whether a temporal part of `fm` reads a stream at a fixed step (o1[3]).
+template <NodeType node>
+static bool reads_fixed_step_in_temporal_part(tref fm) {
+	using tau = tree<node>;
+	auto temporal = [](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) || !t.has_child()) return false;
+		const auto nt = t[0].value.nt;
+		return nt == tau::wff_always || nt == tau::wff_sometimes
+			|| nt == tau::wff_until || nt == tau::wff_release
+			|| nt == tau::wff_weak_until || nt == tau::wff_since
+			|| nt == tau::wff_trigger;
+	};
+	for (tref part : tau::get(fm).select_top(temporal))
+		for (tref v : tau::get(part).select_top(
+			is_child<node, tau::io_var>))
+			if (is_io_initial<node>(v)) return true;
+	return false;
+}
+
 template <NodeType node>
 result<interpreter<node>>
 	interpreter<node>::make_interpreter(tref spec,
@@ -698,6 +718,31 @@ result<interpreter<node>>
 	}
 	const io_context<node>& ctx_eff =
 		witness_ltl_route ? ctx_with_witnesses : ctx;
+	// A spec whose temporal parts read a fixed step (o1[3] = 1) that the
+	// safety pipeline below cannot execute goes, as written, through the
+	// LTL pipeline instead: the step-counter encoding there turns the
+	// fixed steps into obligations the synthesized strategy meets, which
+	// is how `realizable` decides the spec.
+	const tref spec_as_given = spec;
+	bool counter_route = false;
+	// why the safety pipeline refused the spec, kept for the answer when
+	// the LTL pipeline refuses it too
+	std::vector<std::pair<tref, report>> safety_failures;
+	// Folds the reports of the rejected clauses into r, demoted when
+	// another route executes the spec.
+	auto fold_rejected = [&r](std::vector<std::pair<tref, report>>& fails,
+		bool demote)
+	{
+		for (auto& [rej_clause, rep] : fails) {
+			auto sc = r.open("rejected candidate");
+			r.info("the specification clause has no executable "
+				"candidate", {{label::value, truncate_for_message(
+					TAU_TO_STR(rej_clause))}});
+			if (demote) rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		fails.clear();
+	};
 	// Handle G(phi_A) && G(phi_B) with different BA types:
 	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
 	// types.  Normalize each G formula independently then combine.
@@ -770,13 +815,16 @@ post_normalization:
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<ltl_aba_solution<node>> ltl_sol;
 	std::vector<std::string> since_aux_anchor;
-	if (realizability_has_game_operators<node>(spec) || witness_ltl_route) {
+	if (realizability_has_game_operators<node>(spec) || witness_ltl_route
+		|| counter_route)
+	{
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		std::tie(safety_spec, sol_opt, unanchored_aux) =
-			ltl_to_safety_formula_full<node>(spec, &data_strategy);
+			ltl_to_safety_formula_full<node>(spec, &data_strategy,
+				counter_route);
 		// The data game decided the spec: its strategy chooses every
 		// step's outputs, so no spec part is solved.
 		if (data_strategy) {
@@ -808,10 +856,16 @@ post_normalization:
 					code::invalid_input_stream,
 					"Failed to collect input streams");
 			}
+			fold_rejected(safety_failures, true);
 			return r.with_assert_check_value(std::move(i));
 		}
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
+		if (!safety_spec && counter_route) {
+			fold_rejected(safety_failures, false);
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is unsat");
+		}
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is not executable: no "
 				"strategy was synthesised (see `realizable`)\n";
@@ -930,22 +984,21 @@ post_normalization:
 		// This clause won; the others' reports still fold in, demoted,
 		// so the report keeps why they lost without the result reading
 		// as a failure.
-		for (auto& [rej_clause, rep] : clause_failures) {
-			auto sc = r.open("rejected candidate");
-			r.info("the specification clause has no executable candidate",
-				{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
-		}
+		fold_rejected(safety_failures, true);
+		fold_rejected(clause_failures, true);
 		return r.with_assert_check_value(std::move(i));
 	}
-	// Given specification is not realizable
-	for (auto& [rej_clause, rep] : clause_failures) {
-		auto sc = r.open("rejected candidate");
-		r.info("the specification clause has no executable candidate",
-			{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
-		r.append(std::move(rep));
+	if (!counter_route && !ltl_sol
+		&& reads_fixed_step_in_temporal_part<node>(spec_as_given))
+	{
+		safety_failures = std::move(clause_failures);
+		counter_route = true;
+		spec = spec_as_given;
+		goto post_normalization;
 	}
+	// Given specification is not realizable
+	fold_rejected(safety_failures, false);
+	fold_rejected(clause_failures, false);
 	return r.with_assert_check_error(code::unsat, "Tau specification is unsat");
 }
 

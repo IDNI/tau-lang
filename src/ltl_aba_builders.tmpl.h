@@ -840,7 +840,7 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm,
-	std::shared_ptr<data_game_strategy<node>>* data_strategy)
+	std::shared_ptr<data_game_strategy<node>>* data_strategy, bool synthesize)
 {
 	using tau = tree<node>;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
@@ -885,7 +885,8 @@ ltl_to_safety_formula_full(tref fm,
 		// That matches the spec only when it has a lookback of its own;
 		// otherwise the Mealy route, whose past-operator testers start at
 		// step 0, executes it.
-		if (!realizability_has_game_operators<node>(compiled_fast)
+		if (!synthesize
+			&& !realizability_has_game_operators<node>(compiled_fast)
 			&& body_max_lookback<node>(fm) > 0)
 		{
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
