@@ -58,13 +58,18 @@ inline std::string log_tail(const std::string& path, size_t lines = 20) {
 }
 
 // The compiler the emitted project is configured with: an explicit
-// request first (`tau compile --cxx`, then TAU_CXX), else clang++ when it
-// is on PATH, else cmake's own default.
+// request first (`tau compile --cxx`, then TAU_CXX), else the compiler
+// libTAU.a was built with when it is present, else clang++ when it is on
+// PATH, else cmake's own default.
 inline std::string preferred_cxx_flag(const std::string& requested) {
 	if (!requested.empty())
 		return " -DCMAKE_CXX_COMPILER=" + requested;
 	if (const char* env = std::getenv("TAU_CXX"); env && *env)
 		return std::string(" -DCMAKE_CXX_COMPILER=") + env;
+#ifdef TAU_CODEGEN_CXX
+	if (compiler_available(TAU_CODEGEN_CXX))
+		return std::string(" -DCMAKE_CXX_COMPILER=") + TAU_CODEGEN_CXX;
+#endif
 	return compiler_available("clang++") ? " -DCMAKE_CXX_COMPILER=clang++" : "";
 }
 
@@ -152,8 +157,13 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 #endif
 		"target_link_libraries(" << exe_name << " PRIVATE\n"
 		"\ttau_prebuilt tau_prebuilt_parser Boost::log ${TAU_BA_LINK_LIBS})\n"
-#ifdef TAU_CODEGEN_COVERAGE
-		// libTAU.a is instrumented; its gcov references need the runtime.
+#if defined(TAU_CODEGEN_COVERAGE_LIB)
+		// libTAU.a is instrumented by GCC; its gcov references need that
+		// compiler's runtime, whichever compiler builds this program.
+		"target_link_libraries(" << exe_name << " PRIVATE \""
+			TAU_CODEGEN_COVERAGE_LIB "\")\n"
+#elif defined(TAU_CODEGEN_COVERAGE)
+		// libTAU.a is instrumented; its coverage references need the runtime.
 		"target_link_options(" << exe_name << " PRIVATE --coverage)\n"
 #endif
 		"\n"
