@@ -391,7 +391,7 @@ TEST_CASE("nlang: dispatcher parse_nlang empty => no value") {
 // it is unset (the no-key deepseek_query returns "", giving an atom whose
 // text is empty -- not asserted here).
 TEST_CASE("nlang: splitter on bot returns bot") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>(
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>(
 		"{nothing}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
