@@ -59,7 +59,10 @@ result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter
 		DBG(assert(!(neg_b_zero && pos_b_zero));) // the mask must extend tp(ā)
 		if (pos_b_zero && !neg_b_zero) continue;              // b excludes m entirely
 		else if (neg_b_zero && !pos_b_zero) b.emplace(*b | m); // b covers m entirely
-		else b.emplace(*b | desc::splitter(m, st));            // atomless proper part
+		else {
+			TAU_TRY(BA part, desc::splitter(m, st));
+			b.emplace(*b | part);                              // atomless proper part
+		}
 	}
 	return r.with_value(*b);
 }
@@ -85,7 +88,10 @@ result<BA> ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wi
 		DBG(assert(!(neg_b_zero && pos_b_zero));) // the mask must extend tp(ā)
 		if (pos_b_zero && !neg_b_zero) continue;              // b excludes m entirely
 		else if (neg_b_zero && !pos_b_zero) b.emplace(*b | m); // b covers m entirely
-		else b.emplace(*b | desc::splitter(m, st));            // atomless proper part
+		else {
+			TAU_TRY(BA part, desc::splitter(m, st));
+			b.emplace(*b | part);                              // atomless proper part
+		}
 	}
 	return r.with_value(*b);
 }

@@ -57,8 +57,10 @@ inline bool test_solve_inequality_system(
 		.mode = solver_mode::general,
 		.type_id = system.empty() ? 0 : find_ba_type<node_t>(*system.begin())
 	};
-	auto solution = solve_inequality_system<node_t>(system, options);
-	if (!solution.has_value()) return false;
+	auto solution_r = solve_inequality_system<node_t>(system, options);
+	if (!solution_r.has_value() || !solution_r.value().has_value())
+		return false;
+	auto solution = std::move(solution_r).value();
 	bool check = true;
 	for (tref equation : system)
 		check = check && check_solution<node_t>(equation, solution.value());
@@ -80,7 +82,10 @@ inline bool test_solve_system(
 		.splitter_one = splitter_one,
 		.mode = solver_mode::general
 	};
-	auto solution = solve_system<node_t>(system, options);
+	auto solution_r = solve_system<node_t>(system, options);
+	if (!solution_r.has_value() || !solution_r.value().has_value())
+		return false;
+	auto solution = std::move(solution_r).value();
 	auto copy = solution.value();
 	bool check = system.first
 		? check_solution<node_t>(system.first.value(), copy) : false;

@@ -128,7 +128,7 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 		opts.splitter_one = node::ba::splitter_one(
 			get_ba_type_tree<node>(opts.type_id));
 		opts.ledger = &ledger;
-		auto val = solve_inequality_system_atomless<node>(sys, opts);
+		TAU_TRY(auto val, solve_inequality_system_atomless<node>(sys, opts));
 		if (!val) return std::nullopt; // genuinely unsat for this history
 		// The solver's keys are bf-wrapped variables, not the bare `var`
 		// from get_free_vars; unwrap to compare by content. Keep the
@@ -266,8 +266,8 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		if (!history_.empty()) {
 			trefs parts;
 			for (const auto& h : history_) parts.push_back(h->get());
-			auto sol = solve_step_outputs<node>(tau::build_wff_and(parts),
-				0, found_, ledger_);
+			TAU_TRY(auto sol, solve_step_outputs<node>(tau::build_wff_and(parts),
+				0, found_, ledger_));
 			if (!sol) return r.with_assert_check_error(
 				code::internal_error, "the values before step 0 of the "
 				"strategy have no solution");
@@ -360,8 +360,9 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 			trefs grounded;
 			for (tref t : tmpls) grounded.push_back(rewriter::replace<node>(
 				update_to_time_point<node>(t, (int_t)time_point), *mem));
-			ws = solve_step_outputs<node>(tau::build_wff_and(grounded),
-				(int_t)time_point, found_, ledger_);
+			TAU_TRY(auto ws_r, solve_step_outputs<node>(tau::build_wff_and(grounded),
+				(int_t)time_point, found_, ledger_));
+			ws = std::move(ws_r);
 			if (!ws) return r.with_assert_check_error(code::internal_error,
 				"no values satisfy the outputs of the strategy edge");
 		}

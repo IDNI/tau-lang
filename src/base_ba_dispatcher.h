@@ -6,7 +6,8 @@
  *
  * `base_ba_dispatcher<BAs...>` forwards `nso_factory` operations (is_one, splitter,
  * normalize, etc.) to the appropriate BA implementation based on the active
- * `std::variant<BAs...>` alternative.
+ * `std::variant<BAs...>` alternative. A fallible operation returns a `result`
+ * carrying the owner's report.
  */
 
 #ifndef __BASE_BA_DISPATCHER_H__
@@ -128,9 +129,10 @@ struct base_ba_dispatcher {
 	 * @brief Splits the element using the specified splitter type.
 	 * @param elem The Boolean algebra element.
 	 * @param st The splitter type.
-	 * @return The split element as a variant.
+	 * @return The split element as a variant, or the report of a failed
+	 * split.
 	 */
-	static std::variant<BAs...> splitter(const std::variant<BAs...>& elem, splitter_type st = splitter_type::upper);
+	static result<std::variant<BAs...>> splitter(const std::variant<BAs...>& elem, splitter_type st = splitter_type::upper);
 
 	/**
 	 * @brief Returns a splitter of the one element of the given type,
@@ -158,9 +160,10 @@ struct base_ba_dispatcher {
 	/**
 	 * @brief Normalizes the Boolean algebra element.
 	 * @param v The element to normalize.
-	 * @return The normalized variant.
+	 * @return The normalized variant, or the report of a failed
+	 * normalization.
 	 */
-	static std::variant<BAs...> normalize(const std::variant<BAs...>& v);
+	static result<std::variant<BAs...>> normalize(const std::variant<BAs...>& v);
 
 	/**
 	 * @brief Simplifies a symbol tref for the Boolean algebra.

@@ -29,7 +29,8 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = get_ba_type_id<node_t>(tau_type<node_t>())
 		};
-		return !solve_inequality_system<node_t>(built.value(), options).has_value();
+		auto sol_r = solve_inequality_system<node_t>(built.value(), options);
+		return sol_r.has_value() && !sol_r.value().has_value();
 	}
 
 	// Shaped like atomless2's step-1 system: two free variables, disequal to
@@ -123,7 +124,9 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = type_id
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(sys, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		CHECK( check_atomless_solution(sys, solution.value()) );
 	}
@@ -139,7 +142,9 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = type_id
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(sys, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		CHECK( check_atomless_solution(sys, solution.value()) );
 	}
@@ -160,7 +165,9 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = type_id
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(sys, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		CHECK( check_atomless_solution(sys, solution.value()) );
 	}
@@ -186,7 +193,9 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = find_ba_type<node_t>(*system.begin())
 		};
-		auto solution = solve_inequality_system<node_t>(system, options);
+		auto solution_r = solve_inequality_system<node_t>(system, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		CHECK( solution.value().size() == 2 );
 		for (const auto& [var, value] : solution.value()) {
@@ -215,7 +224,9 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general,
 			.type_id = type_id
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(sys, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		REQUIRE( solution.value().size() == 1 );
 		tref key = solution.value().begin()->first;
@@ -256,7 +267,9 @@ TEST_SUITE("solve_inequality_system") {
 			.type_id = type_id,
 			.ledger = &ledger
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(sys, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		CHECK( check_atomless_solution(sys, solution.value()) );
 	}
@@ -320,7 +333,9 @@ TEST_SUITE("solve_inequality_system") {
 		inequality_system<node_t> sys1;
 		sys1.insert(tau::build_bf_neq(x1, tau::_1(type_id)));
 		sys1.insert(tau::build_bf_neq(x1, tau::_0(type_id)));
-		auto sol1 = solve_inequality_system_atomless<node_t>(sys1, options);
+		auto sol1_r = solve_inequality_system_atomless<node_t>(sys1, options);
+		REQUIRE( sol1_r.has_value() );
+		auto sol1 = std::move(sol1_r).value();
 		REQUIRE( sol1.has_value() );
 		REQUIRE( sol1->size() == 1 );
 		tref w1 = sol1->begin()->second;
@@ -332,7 +347,9 @@ TEST_SUITE("solve_inequality_system") {
 		sys2.insert(tau::build_bf_neq(x2, tau::_1(type_id)));
 		sys2.insert(tau::build_bf_neq(x2, tau::_0(type_id)));
 		sys2.insert(tau::build_bf_neq(x2, w1));
-		auto sol2 = solve_inequality_system_atomless<node_t>(sys2, options);
+		auto sol2_r = solve_inequality_system_atomless<node_t>(sys2, options);
+		REQUIRE( sol2_r.has_value() );
+		auto sol2 = std::move(sol2_r).value();
 		REQUIRE( sol2.has_value() );
 		tref w2 = sol2->begin()->second;
 		CHECK( check_atomless_solution(sys2, sol2.value()) );
@@ -344,7 +361,9 @@ TEST_SUITE("solve_inequality_system") {
 		sys3.insert(tau::build_bf_neq(x3, tau::_0(type_id)));
 		sys3.insert(tau::build_bf_neq(x3, w1));
 		sys3.insert(tau::build_bf_neq(x3, w2));
-		auto sol3 = solve_inequality_system_atomless<node_t>(sys3, options);
+		auto sol3_r = solve_inequality_system_atomless<node_t>(sys3, options);
+		REQUIRE( sol3_r.has_value() );
+		auto sol3 = std::move(sol3_r).value();
 		REQUIRE( sol3.has_value() );
 		CHECK( check_atomless_solution(sys3, sol3.value()) );
 	}
@@ -371,7 +390,9 @@ TEST_SUITE("solve_inequality_system") {
 		sys.insert(tau::build_bf_neq(x, tau::_1(type_id)));
 		sys.insert(tau::build_bf_neq(x, tau::_0(type_id)));
 		sys.insert(tau::build_bf_neq(x, a));
-		auto sol = solve_inequality_system_atomless<node_t>(sys, options);
+		auto sol_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( sol_r.has_value() );
+		auto sol = std::move(sol_r).value();
 		REQUIRE( sol.has_value() );
 		CHECK( check_atomless_solution(sys, sol.value()) );
 
@@ -382,7 +403,9 @@ TEST_SUITE("solve_inequality_system") {
 		sys2.insert(tau::build_bf_neq(y, tau::_0(type_id)));
 		sys2.insert(tau::build_bf_neq(y, a));
 		sys2.insert(tau::build_bf_neq(y, not_a));
-		auto sol2 = solve_inequality_system_atomless<node_t>(sys2, options);
+		auto sol2_r = solve_inequality_system_atomless<node_t>(sys2, options);
+		REQUIRE( sol2_r.has_value() );
+		auto sol2 = std::move(sol2_r).value();
 		REQUIRE( sol2.has_value() );
 		CHECK( check_atomless_solution(sys2, sol2.value()) );
 	}
@@ -407,7 +430,9 @@ TEST_SUITE("solve_inequality_system") {
 			.type_id = find_ba_type<node_t>(*system.begin()),
 			.ledger = &ledger
 		};
-		auto solution = solve_inequality_system_atomless<node_t>(system, options);
+		auto solution_r = solve_inequality_system_atomless<node_t>(system, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
 		REQUIRE( solution.has_value() );
 		for (tref eq : system) CHECK( check_solution<node_t>(eq, solution.value()) );
 	}

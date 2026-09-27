@@ -106,14 +106,21 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 	// VALUE {250}), so callers that fold at construction time (cte_neg
 	// et al. in hooks_bf.tmpl.h) route every constant through this before
 	// it is pooled.
-	static std::variant<bv, sbf_ba, Bool> normalize(
+	static result<std::variant<bv, sbf_ba, Bool>> normalize(
 		const std::variant<bv, sbf_ba, Bool>& elem)
 	{
+		result<std::variant<bv, sbf_ba, Bool>> r;
 		if (std::holds_alternative<bv>(elem))
-			return normalize_bv(std::get<bv>(elem));
+			return r.with_value(std::variant<bv, sbf_ba, Bool>(
+				std::in_place_type<bv>,
+				normalize_bv(std::get<bv>(elem))));
 		else if (std::holds_alternative<Bool>(elem))
-			return normalize_bool(std::get<Bool>(elem));
-		else return normalize_sbf(std::get<sbf_ba>(elem));
+			return r.with_value(std::variant<bv, sbf_ba, Bool>(
+				std::in_place_type<Bool>,
+				normalize_bool(std::get<Bool>(elem))));
+		else return r.with_value(std::variant<bv, sbf_ba, Bool>(
+			std::in_place_type<sbf_ba>,
+			normalize_sbf(std::get<sbf_ba>(elem))));
 	}
 
 	static std::vector<std::string> types() { return { "bool" }; }

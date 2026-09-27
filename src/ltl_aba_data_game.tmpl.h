@@ -1384,7 +1384,7 @@ struct data_game_strategy {
 	using values = subtree_map<node, tref>;
 	// Solves a formula over the outputs of absolute step `t`; nullopt when
 	// it has no solution.
-	using solver_fn = std::function<std::optional<values>(tref, int_t)>;
+	using solver_fn = std::function<result<std::optional<values>>(tref, int_t)>;
 	// The value of a stream (name, type, input) at an absolute step >= 0,
 	// or nullptr when there is none.
 	using value_fn = std::function<tref(const std::string&, size_t, bool,
@@ -1424,17 +1424,19 @@ struct data_game_strategy {
 	// Starts the play from `prior` instead of values of its own:
 	// prior[s][k-1] is the value of stream s k steps before the first step
 	// played. False when the initial vertex is not won from them.
-	bool start_from(const std::vector<std::vector<tref>>& prior) {
+	result<bool> start_from(const std::vector<std::vector<tref>>& prior) {
+		result<bool> r;
 		window win(streams.size(), std::vector<tref>(depth + 1, nullptr));
 		for (size_t s = 0; s < streams.size(); ++s)
 			for (size_t k = 1; k <= depth; ++k) {
 				if (s >= prior.size() || k > prior[s].size()
-					|| !prior[s][k - 1]) return false;
+					|| !prior[s][k - 1]) return r.with_value(false);
 				win[s][k] = prior[s][k - 1];
 			}
-		auto won = won_from(win);
-		if (!won || !*won) return false;
-		restart_view(win);
+		TAU_TRY(auto won, won_from(win));
+		if (!won || !*won) return r.with_value(false);
+		TAU_TRY(bool view_ok, restart_view(win));
+		(void)view_ok;
 		before.assign(streams.size(), {});
 		for (size_t s = 0; s < streams.size(); ++s)
 			for (size_t k = 1; k <= depth; ++k)
@@ -1442,7 +1444,7 @@ struct data_game_strategy {
 		at = init;
 		ready = true;
 		state_ = view ? view->aut.initial_state : 0;
-		return true;
+		return r.with_value(true);
 	}
 
 	// The value of stream `s` `k` steps before the first step played,
@@ -1508,7 +1510,7 @@ struct data_game_strategy {
 		if (v[at].picks == 0) {
 			int next = -1;
 			for (size_t j = 0; j < v[at].dst.size() && next < 0; ++j) {
-				auto holds = holds_label(at, j, w);
+				TAU_TRY(auto holds, holds_label(at, j, w));
 				if (!holds) return r.with_error(code::solver_error,
 					"the data game strategy cannot read an edge label");
 				if (*holds) next = follow(v[at].dst[j]);
@@ -1521,7 +1523,7 @@ struct data_game_strategy {
 		// a sink: the play is decided and no output matters
 		if (v[at].picks != 1) return r.with_value(std::move(out));
 		TAU_TRY(tref c, constraint(at, w, t));
-		auto sol = solve(c, t);
+		TAU_TRY(auto sol, solve(c, t));
 		if (!sol) return r.with_error(code::internal_error,
 			"the data game strategy has no outputs in its move");
 		for (size_t s = 0; s < streams.size(); ++s) {
@@ -1536,7 +1538,7 @@ struct data_game_strategy {
 		}
 		for (const auto& [key, x] : *sol) out.emplace(key, x);
 		for (size_t j = 0; j < v[at].dst.size(); ++j) {
-			auto holds = holds_move(at, j, w);
+			TAU_TRY(auto holds, holds_move(at, j, w));
 			if (!holds) return r.with_error(code::solver_error,
 				"the data game strategy cannot read a move");
 			if (*holds) {
@@ -1571,7 +1573,7 @@ protected:
 					before[s].push_back(tau::geth(
 						build_bf_f_type<node>(streams[s].tid)));
 			if (!view->history.empty()) {
-				auto sol = solve(tau::build_wff_and(view->history), 0);
+				TAU_TRY(auto sol, solve(tau::build_wff_and(view->history), 0));
 				if (!sol) return r.with_error(code::internal_error,
 					"the data game strategy found no values before "
 					"step 0");
@@ -1642,7 +1644,7 @@ protected:
 						"of " + missing);
 					parts.push_back(g);
 				}
-				auto sol = solve(tau::build_wff_and(parts), t);
+				TAU_TRY(auto sol, solve(tau::build_wff_and(parts), t));
 				if (!sol) return r.with_error(code::internal_error,
 					"the data game strategy has no outputs in its move");
 				out = std::move(*sol);
@@ -1665,14 +1667,15 @@ protected:
 
 	// whether the initial vertex is won from the values of `w` before the
 	// first step
-	virtual std::optional<bool> won_from(const window& w) = 0;
+	virtual result<std::optional<bool>> won_from(const window& w) = 0;
 	// rebuilds the Mealy view, if any, to start from the values of `w`
-	virtual void restart_view(const window& w) { (void)w; }
+	virtual result<bool> restart_view(const window& w)
+		{ (void)w; return result<bool>{true}; }
 	// whether the label of edge `j` of environment vertex `i` holds
-	virtual std::optional<bool> holds_label(int i, size_t j,
+	virtual result<std::optional<bool>> holds_label(int i, size_t j,
 		const window& w) = 0;
 	// whether move `j` of system vertex `i` holds
-	virtual std::optional<bool> holds_move(int i, size_t j,
+	virtual result<std::optional<bool>> holds_move(int i, size_t j,
 		const window& w) = 0;
 	// a formula over the outputs of step `t` whose solutions are the
 	// moves of system vertex `i`
@@ -1726,21 +1729,25 @@ struct code_strategy : data_game_strategy<node> {
 protected:
 	using base::before;
 
-	std::optional<bool> won_from(const window& win) override {
-		auto bits = encode(win);
-		if (!bits) return std::nullopt;
-		return eval(won_init, *bits);
+	result<std::optional<bool>> won_from(const window& win) override {
+		result<std::optional<bool>> r;
+		TAU_TRY(auto bits, encode(win));
+		if (!bits) return r.with_value(std::nullopt);
+		return r.with_value(eval(won_init, *bits));
 	}
 
-	void restart_view(const window& win) override {
-		if (!this->view) return;
+	result<bool> restart_view(const window& win) override {
+		result<bool> r;
+		if (!this->view) return r.with_value(true);
 		this->view = nullptr;
 		this->machine.clear();
-		if (auto bits = encode(win)) {
+		TAU_TRY(auto bits, encode(win));
+		if (bits) {
 			for (auto& b : *bits) if (b < 0) b = 0;
 			build_mealy(data_game_mealy_max_states,
 				data_game_mealy_max_edges, &*bits);
 		}
+		return r.with_value(true);
 	}
 
 	// Whether two values are equal; nullopt when undecided.
@@ -1754,7 +1761,7 @@ protected:
 		return std::nullopt;
 	}
 
-	static tref complement(tref x) {
+	static result<tref> complement(tref x) {
 		return normalize_ba<node>(tau::build_bf_neg(x));
 	}
 
@@ -1772,7 +1779,8 @@ protected:
 	// value of an orbit-coded stream gets the pair of the first value met
 	// it equals or complements, or a new one. A relation of two known
 	// points of an order gets their order.
-	std::optional<std::vector<int>> encode(const window& win) {
+	result<std::optional<std::vector<int>>> encode(const window& win) {
+		result<std::optional<std::vector<int>>> r;
 		std::vector<int> bits(w.vars(), -1);
 		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
 		for (size_t k = 0; k < win[0].size(); ++k)
@@ -1785,7 +1793,7 @@ protected:
 				if (ws.order) continue;
 				if (ws.modular) {
 					auto v = pack_modular_value<node>(tid, x);
-					if (!v) return std::nullopt;
+					if (!v) return r.with_value(std::nullopt);
 					for (size_t b = 0; b < ws.width; ++b)
 						bits[w.var(s, k, b)] = (int)(*v >> b & 1);
 					continue;
@@ -1794,21 +1802,21 @@ protected:
 					c = ws.values.size();
 					for (size_t j = 0; j < ws.values.size(); ++j) {
 						auto eq = same(x, ws.values[j]->get());
-						if (!eq) return std::nullopt;
+						if (!eq) return r.with_value(std::nullopt);
 						if (*eq) { c = j; break; }
 					}
-					if (c == ws.values.size()) return std::nullopt;
+					if (c == ws.values.size()) return r.with_value(std::nullopt);
 					for (size_t b = 0; b < ws.width; ++b)
 						bits[w.var(s, k, b)] = (int)(c >> b & 1);
 					continue;
 				}
 				auto one = same(x, build_bf_t_type<node>(tid));
-				if (!one) return std::nullopt;
+				if (!one) return r.with_value(std::nullopt);
 				if (ws.two) c = *one ? 1 : 0;
 				else if (*one) c = ws.orbit ? size_t{1} << (ws.width - 1) : 1;
 				else {
 					auto zero = same(x, build_bf_f_type<node>(tid));
-					if (!zero) return std::nullopt;
+					if (!zero) return r.with_value(std::nullopt);
 					if (*zero) c = 0;
 					else {
 						auto& reps = seen[tid];
@@ -1817,11 +1825,12 @@ protected:
 						c = fresh;
 						for (auto& [y, cy] : reps) {
 							auto eq = same(x, y);
-							if (!eq) return std::nullopt;
+							if (!eq) return r.with_value(std::nullopt);
 							if (*eq) { c = cy; break; }
 							if (!ws.orbit) continue;
-							auto neq = same(x, complement(y));
-							if (!neq) return std::nullopt;
+							TAU_TRY(tref neg_y, complement(y));
+							auto neq = same(x, neg_y);
+							if (!neq) return r.with_value(std::nullopt);
 							if (*neq) {
 								c = cy | size_t{1} << (ws.width - 1);
 								break;
@@ -1838,11 +1847,11 @@ protected:
 			tref x = point_value(p, win), y = point_value(q, win);
 			if (!x || !y) continue;
 			auto c = pack_dense_order_compare<node>(w.points[p].tid, x, y);
-			if (!c) return std::nullopt;
+			if (!c) return r.with_value(std::nullopt);
 			bits[w.code_vars() + 2 * i] = *c < 0;
 			bits[w.code_vars() + 2 * i + 1] = *c == 0;
 		}
-		return bits;
+		return r.with_value(std::move(bits));
 	}
 
 	// The relations that extend the order of the points `win` knows to the
@@ -1916,9 +1925,10 @@ protected:
 	// The formula giving each of `slots` (stream, step back, variable) the
 	// value its code in `bits` stands for, next to the known values of
 	// `win`.
-	tref decode(const std::vector<int>& bits, const window& win,
+	result<tref> decode(const std::vector<int>& bits, const window& win,
 		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
 	{
+		result<tref> r;
 		tref f = tau::_T();
 		// the value decoded for each slot of an order stream
 		std::vector<tref> placed(slots.size(), nullptr);
@@ -1931,8 +1941,11 @@ protected:
 			const size_t side = ws.orbit ? c >> (ws.width - 1) : 0;
 			const size_t pair = ws.orbit
 				? c & ((size_t{1} << (ws.width - 1)) - 1) : c;
-			auto as = [&](tref y, size_t other) {
-				return ws.orbit && side != other ? complement(y) : y;
+			auto as = [&](tref y, size_t other) -> result<tref> {
+				result<tref> ar;
+				if (!ws.orbit || side == other)
+					return ar.with_value(y);
+				return complement(y);
 			};
 			if (ws.order) {
 				// the point the relations to every known point and earlier
@@ -1995,8 +2008,9 @@ protected:
 				if (streams[s2].tid == tid && !w.streams[s2].two)
 					for (size_t k2 = 0; k2 < win[s2].size(); ++k2)
 						if (win[s2][k2] && same_pair(code_of(bits, s2, k2))) {
-							known = as(win[s2][k2],
-								side_of(code_of(bits, s2, k2)));
+							TAU_TRY(tref known_v, as(win[s2][k2],
+								side_of(code_of(bits, s2, k2))));
+							known = known_v;
 							break;
 						}
 			if (known) {
@@ -2011,8 +2025,11 @@ protected:
 				if (streams[s2].tid == tid)
 					for (tref y : win[s2]) if (y) {
 						f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
-						if (ws.orbit) f = tau::build_wff_and(f,
-							tau::build_bf_neq(x, complement(y)));
+						if (ws.orbit) {
+							TAU_TRY(tref cy, complement(y));
+							f = tau::build_wff_and(f,
+								tau::build_bf_neq(x, cy));
+						}
 					}
 			for (size_t i2 = 0; i2 < i; ++i2) {
 				auto [s2, k2, y] = slots[i2];
@@ -2028,28 +2045,30 @@ protected:
 				}
 			}
 		}
-		return f;
+		return r.with_value(f);
 	}
 
-	std::optional<bool> holds_label(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_label(int i, size_t j, const window& win)
 		override
 	{
-		auto bits = encode(win);
-		if (!bits) return std::nullopt;
-		return eval(labels[i][j], *bits);
+		result<std::optional<bool>> r;
+		TAU_TRY(auto bits, encode(win));
+		if (!bits) return r.with_value(std::nullopt);
+		return r.with_value(eval(labels[i][j], *bits));
 	}
 
-	std::optional<bool> holds_move(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_move(int i, size_t j, const window& win)
 		override
 	{
-		auto bits = encode(win);
-		if (!bits) return std::nullopt;
-		return eval(moves[i][j], *bits);
+		result<std::optional<bool>> r;
+		TAU_TRY(auto bits, encode(win));
+		if (!bits) return r.with_value(std::nullopt);
+		return r.with_value(eval(moves[i][j], *bits));
 	}
 
 	result<tref> constraint(int i, const window& win, int_t t) override {
 		result<tref> r;
-		auto bits = encode(win);
+		TAU_TRY(auto bits, encode(win));
 		if (!bits) return r.with_error(code::solver_error,
 			"the data game strategy cannot compare the values");
 		std::vector<std::tuple<size_t, size_t, tref>> slots;
@@ -2063,7 +2082,8 @@ protected:
 		if (bdd.full || !pick(any, *bits))
 			return r.with_error(code::internal_error,
 				"the data game strategy has no move from the history");
-		return r.with_value(decode(*bits, win, slots));
+		TAU_TRY(tref d, decode(*bits, win, slots));
+		return r.with_value(d);
 	}
 
 	result<bool> choose_before(const solver_fn& solve) override {
@@ -2086,7 +2106,7 @@ protected:
 				if (!streams[s].input)
 					slots.emplace_back(s, k,
 						this->before_var(s, k, streams[s].tid));
-		auto known = encode(win);
+		TAU_TRY(auto known, encode(win));
 		if (!known) return r.with_error(code::solver_error,
 			"the data game strategy cannot compare the values");
 		std::vector<int> bits = std::move(*known);
@@ -2094,7 +2114,8 @@ protected:
 			bits)) return r.with_value(false);
 		values sol;
 		if (!slots.empty()) {
-			auto got = solve(decode(bits, win, slots), 0);
+			TAU_TRY(tref win_bits, decode(bits, win, slots));
+			TAU_TRY(auto got, solve(win_bits, 0));
 			if (!got) return r.with_value(false);
 			sol = std::move(*got);
 		}
@@ -2671,20 +2692,23 @@ protected:
 		return std::nullopt;
 	}
 
-	std::optional<bool> won_from(const window& win) override {
-		return truth(won_init->get(), win);
+	result<std::optional<bool>> won_from(const window& win) override {
+		result<std::optional<bool>> r;
+		return r.with_value(truth(won_init->get(), win));
 	}
 
-	std::optional<bool> holds_label(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_label(int i, size_t j, const window& win)
 		override
 	{
-		return truth(labels[i][j]->get(), win);
+		result<std::optional<bool>> r;
+		return r.with_value(truth(labels[i][j]->get(), win));
 	}
 
-	std::optional<bool> holds_move(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_move(int i, size_t j, const window& win)
 		override
 	{
-		return truth(moves[i][j]->get(), win);
+		result<std::optional<bool>> r;
+		return r.with_value(truth(moves[i][j]->get(), win));
 	}
 
 	result<tref> constraint(int i, const window& win, int_t t) override {
@@ -2713,7 +2737,7 @@ protected:
 				? build_bf_f_type<node>(tid)
 				: this->before_var(s, k, tid)));
 		}
-		auto sol = solve(rewriter::replace<node>(won_init->get(), m), 0);
+		TAU_TRY(auto sol, solve(rewriter::replace<node>(won_init->get(), m), 0));
 		if (!sol) return r.with_value(false);
 		before.assign(n, {});
 		for (size_t s = 0; s < n; ++s)

@@ -54,10 +54,12 @@ struct ba_descriptor<qint, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "bot"; }
 
-	static qint normalize(const qint& x) { return normalize_qint(x); }
+	static result<qint> normalize(const qint& x) {
+		return result<qint>{normalize_qint(x)};
+	}
 
-	static qint splitter(const qint& x, splitter_type st) {
-		return qint_splitter(x, st);
+	static result<qint> splitter(const qint& x, splitter_type st) {
+		return result<qint>{qint_splitter(x, st)};
 	}
 
 	static tref splitter_one(tref) {

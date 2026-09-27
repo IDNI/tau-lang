@@ -73,7 +73,7 @@ result<solution<node>> lgrs(equality equality);
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_minterm_system(
+result<std::optional<solution<node>>> solve_minterm_system(
 	const minterm_system<node>& system, const solver_options& options);
 
 /**
@@ -85,7 +85,7 @@ std::optional<solution<node>> solve_minterm_system(
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_inequality_system(
+result<std::optional<solution<node>>> solve_inequality_system(
 	const inequality_system<node>& system, const solver_options& options);
 
 /**
@@ -102,7 +102,7 @@ std::optional<solution<node>> solve_inequality_system(
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_inequality_system_atomless(
+result<std::optional<solution<node>>> solve_inequality_system_atomless(
 	const inequality_system<node>& system, const solver_options& options);
 
 /**
@@ -114,7 +114,7 @@ std::optional<solution<node>> solve_inequality_system_atomless(
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_system(
+result<std::optional<solution<node>>> solve_system(
 	const equation_system<node>& system, const solver_options& options);
 
 /**
@@ -129,7 +129,7 @@ std::optional<solution<node>> solve_system(
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(const equations<node>& eqs,
+result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 					const solver_options& options);
 
 /**

@@ -438,11 +438,14 @@ concept ba_descriptor_complete =
  && requires(tref t) {
         { ba_descriptor<BA, Node>::literal_zero(t) }
             -> std::convertible_to<std::string>;                     }
-	// normalization and splitting
+	// normalization and splitting; both can run a full normalization, so
+	// each returns a result carrying why a failed one could not be made
  && requires(const BA& x) {
-        ba_descriptor<BA, Node>::normalize(x);                       }
+        { ba_descriptor<BA, Node>::normalize(x) }
+            -> std::same_as<result<BA>>;                             }
  && (!ba_descriptor<BA, Node>::atomless || requires(const BA& x, splitter_type st) {
-        ba_descriptor<BA, Node>::splitter(x, st);                    })
+        { ba_descriptor<BA, Node>::splitter(x, st) }
+            -> std::same_as<result<BA>>;                             })
  && (!ba_descriptor<BA, Node>::atomless || requires(tref t) {
         ba_descriptor<BA, Node>::splitter_one(t);                    })
 	// symbol and term simplification -- simplify_term can run a bounded

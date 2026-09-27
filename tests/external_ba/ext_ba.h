@@ -119,8 +119,10 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	static std::string literal_one(tref) { return "1"; }
 	static std::string literal_zero(tref) { return "0"; }
 
-	static ext_ba normalize(const ext_ba& x) { return x; }
-	static ext_ba splitter(const ext_ba& x, splitter_type) { return x; }
+	static result<ext_ba> normalize(const ext_ba& x) { return result<ext_ba>{x}; }
+	static result<ext_ba> splitter(const ext_ba& x, splitter_type) {
+		return result<ext_ba>{x};
+	}
 	static tref splitter_one(tref) { return nullptr; }
 
 	static tref simplify_symbol(tref sym) { return sym; }

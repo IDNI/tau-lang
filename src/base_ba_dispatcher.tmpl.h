@@ -202,15 +202,17 @@ result<std::string> base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::variant<BAs...> base_ba_dispatcher<BAs...>::splitter(
+result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::splitter(
 	const std::variant<BAs...>& elem, splitter_type st)
 {
-	return std::visit([&](const auto& x) -> std::variant<BAs...> {
+	return std::visit([&](const auto& x) -> result<std::variant<BAs...>> {
 		using BA = std::decay_t<decltype(x)>;
-		if constexpr (requires { ba_descriptor<BA, node_t>::splitter(x, st); })
-			return std::variant<BAs...>(
-				ba_descriptor<BA, node_t>::splitter(x, st));
-		else return std::variant<BAs...>(x);
+		result<std::variant<BAs...>> r;
+		if constexpr (requires { ba_descriptor<BA, node_t>::splitter(x, st); }) {
+			TAU_TRY(BA s, (ba_descriptor<BA, node_t>::splitter(x, st)));
+			return r.with_value(std::variant<BAs...>(std::move(s)));
+		}
+		else return r.with_value(std::variant<BAs...>(x));
 	}, elem);
 }
 
@@ -272,13 +274,14 @@ std::optional<std::variant<BAs...>> base_ba_dispatcher<BAs...>::pack_tau_ba(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::variant<BAs...> base_ba_dispatcher<BAs...>::normalize(
+result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::normalize(
 	const std::variant<BAs...>& v)
 {
-	return std::visit([](const auto& x) -> std::variant<BAs...> {
+	return std::visit([&](const auto& x) -> result<std::variant<BAs...>> {
 		using BA = std::decay_t<decltype(x)>;
-		return std::variant<BAs...>(
-			ba_descriptor<BA, node_t>::normalize(x));
+		result<std::variant<BAs...>> r;
+		TAU_TRY(BA n, (ba_descriptor<BA, node_t>::normalize(x)));
+		return r.with_value(std::variant<BAs...>(std::move(n)));
 	}, v);
 }
 

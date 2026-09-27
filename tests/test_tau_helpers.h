@@ -28,8 +28,9 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 		auto r = normalizer<node_t>(fm);
 		fm = r.has_value() ? r.value() : nullptr;
 	}
-	tref s = tau_splitter<bas_pack>(fm, st);
-	return std::make_pair(fm, s);
+	auto s = tau_splitter<bas_pack>(fm, st);
+	REQUIRE( s.has_value() );
+	return std::make_pair(fm, s.value());
 }
 
 #ifdef TAU_PACK_HAS_BA_BV

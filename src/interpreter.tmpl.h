@@ -1241,7 +1241,7 @@ result<tref> propagate_step_definitions(tref part_at_t,
 			if (!tau::get(vbf).child_is(tau::variable)) continue;
 			// The constant may still be an unevaluated term of the
 			// algebra: fold it before it is substituted and reported.
-			tref cbf = normalize_ba<node>(lc ? lbf : rbf);
+			TAU_TRY(tref cbf, normalize_ba<node>(lc ? lbf : rbf));
 			if (consts.emplace(vbf, cbf).second) propagated.emplace(vbf, cbf);
 		}
 		if (consts.empty()) break;
@@ -1401,10 +1401,11 @@ struct solve_step_provider : step_provider<node> {
 // and `ledger` keeps the fresh values of successive steps from
 // growing.
 template <NodeType node>
-std::optional<solution<node>> solve_equality_cube(tref fm,
+result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 	std::vector<htref>& found, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	trefs atoms;
 	std::function<bool(tref)> flatten = [&](tref n) {
 		const auto& x = tau::get(n);
@@ -1420,7 +1421,7 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 		atoms.push_back(n);
 		return true;
 	};
-	if (!flatten(fm)) return std::nullopt;
+	if (!flatten(fm)) return r.with_value(std::nullopt);
 	trefs vars;
 	for (tref a : atoms)
 		for (tref v : get_free_vars<node>(a))
@@ -1445,7 +1446,7 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 				if (!tau::subtree_equals(tau::trim(
 					x[0].first()), var) && !tau::subtree_equals(
 					tau::trim(x[0].second()), var))
-						return std::nullopt;
+						return r.with_value(std::nullopt);
 				value = other;
 			} else sys.insert(g);
 		}
@@ -1456,12 +1457,12 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 			solver_options opts;
 			opts.type_id = tid;
 			auto got = omcat_solve_verified<node>(sys, opts);
-			if (!got) return std::nullopt;
+			if (!got) return r.with_value(std::nullopt);
 			for (const auto& [k, kv] : *got)
 				if (tau::subtree_equals(tau::get(k).child_is(
 					tau::variable) ? tau::get(k).first() : k, var))
 						value = kv;
-			if (!value) return std::nullopt;
+			if (!value) return r.with_value(std::nullopt);
 		}
 		// first a value found at an earlier step, the type's splitter
 		// of 1 and its complement, or the complement of an excluded
@@ -1476,16 +1477,19 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 				get_ba_type_tree<node>(tid)))
 			{
 				candidates.push_back(split);
-				candidates.push_back(normalize_ba<node>(
+				TAU_TRY(tref neg_split, normalize_ba<node>(
 					tau::build_bf_neg(split)));
+				candidates.push_back(neg_split);
 			}
 			for (tref g : sys) {
 				all = tau::build_wff_and(all, g);
 				for (tref side : { tau::get(g)[0].first(),
 					tau::get(g)[0].second() })
-					if (get_free_vars<node>(side).empty())
-						candidates.push_back(normalize_ba<node>(
+					if (get_free_vars<node>(side).empty()) {
+						TAU_TRY(tref neg_side, normalize_ba<node>(
 							tau::build_bf_neg(side)));
+						candidates.push_back(neg_side);
+					}
 			}
 			for (tref c : candidates) {
 				auto n = normalize_non_temp<node>(rewriter::replace<node>(
@@ -1496,14 +1500,15 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 			}
 		}
 		if (!value && !sys.empty()) {
-			if (!pack_type_is_atomless<node>(tid)) return std::nullopt;
+			if (!pack_type_is_atomless<node>(tid))
+				return r.with_value(std::nullopt);
 			solver_options opts;
 			opts.type_id = tid;
 			opts.splitter_one = node::ba::splitter_one(
 				get_ba_type_tree<node>(tid));
 			opts.ledger = &ledger;
-			auto got = solve_inequality_system_atomless<node>(sys, opts);
-			if (!got) return std::nullopt;
+			TAU_TRY(auto got, solve_inequality_system_atomless<node>(sys, opts));
+			if (!got) return r.with_value(std::nullopt);
 			for (const auto& [k, kv] : *got) {
 				tref kvar = tau::get(k).child_is(tau::variable)
 					? tau::get(k).first() : k;
@@ -1516,7 +1521,7 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 	}
 	auto n = normalize_non_temp<node>(rewriter::replace<node>(fm, sol));
 	if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T())
-		return std::nullopt;
+		return r.with_value(std::nullopt);
 	for (const auto& [_, v] : sol) {
 		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
 		ledger.pin(tree<node>::geth(v));
@@ -1525,29 +1530,31 @@ std::optional<solution<node>> solve_equality_cube(tref fm,
 				found.push_back(tree<node>::geth(v));
 	}
 	if (found.size() > 8) found.erase(found.begin());
-	return sol;
+	return r.with_value(std::move(sol));
 }
 
 // A solution of `fm`, a formula over the outputs of step `t`: first as an
 // equality cube (solve_equality_cube), then path by path with the general
 // solver; nullopt when it has none.
 template <NodeType node>
-std::optional<solution<node>> solve_step_outputs(tref fm, int_t t,
+result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
 	std::vector<htref>& found, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
-	if (auto d = solve_equality_cube<node>(fm, found, ledger)) return d;
+	result<std::optional<solution<node>>> r;
+	TAU_TRY(auto d, solve_equality_cube<node>(fm, found, ledger));
+	if (d) return r.with_value(std::move(d));
 	auto n = normalize_non_temp<node>(fm);
-	if (!n.has_value() || !n.value()) return std::nullopt;
+	if (!n.has_value() || !n.value()) return r.with_value(std::nullopt);
 	for (tref path : expression_paths<node>(n.value())) {
 		auto p = normalize_non_temp<node>(path);
 		if (!p.has_value() || !p.value()
 			|| tau::get(p.value()).equals_F()) continue;
 		auto sol = solution_with_max_update<node>(p.value(),
 			(size_t)std::max<int_t>(t, 0));
-		if (sol.has_value()) return sol.value();
+		if (sol.has_value()) return r.with_value(std::move(sol.value()));
 	}
-	return std::nullopt;
+	return r.with_value(std::nullopt);
 }
 
 /**
@@ -1678,12 +1685,13 @@ bool interpreter<node>::plays_data_game() const {
 // solver produced them: `normalize_ba` only simplifies the tau BA's normal
 // form, it never substitutes or drops a split symbol.
 template <NodeType node>
-static tref canonicalize_committed_value(tref value) {
+static result<tref> canonicalize_committed_value(tref value) {
 	using tau = tree<node>;
-	if (!tau::get(value).is(tau::bf)) return value;
+	result<tref> r;
+	if (!tau::get(value).is(tau::bf)) return r.with_value(value);
 	tref inner = tau::trim(value);
-	if (!tau::get(inner).is_ba_constant()) return value;
-	if (!is_tau_type<node>(tau::get(inner).get_ba_type())) return value;
+	if (!tau::get(inner).is_ba_constant()) return r.with_value(value);
+	if (!is_tau_type<node>(tau::get(inner).get_ba_type())) return r.with_value(value);
 	return normalize_ba<node>(value);
 }
 
@@ -1706,12 +1714,13 @@ static bool ocltl_direct_atom_shaped(tref atom) {
 // are left undecided (genuinely unconstrained; caller's zero-default handles
 // those).
 template <NodeType node>
-static std::optional<solution<node>> ocltl_direct_decode_missing(
+static result<std::optional<solution<node>>> ocltl_direct_decode_missing(
 	const trefs& atoms, const trefs& missing, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	for (tref a : atoms) if (!ocltl_direct_atom_shaped<node>(a))
-		return std::nullopt;
+		return r.with_value(std::nullopt);
 
 	// Decode order: first-appearance, restricted to `missing`. `missing`
 	// entries are bf-wrapped; get_free_vars returns the bare variable --
@@ -1751,8 +1760,8 @@ static std::optional<solution<node>> ocltl_direct_decode_missing(
 		opts.splitter_one = node::ba::splitter_one(
 			get_ba_type_tree<node>(opts.type_id));
 		opts.ledger = &ledger;
-		auto val = solve_inequality_system_atomless<node>(sys, opts);
-		if (!val) return std::nullopt;
+		TAU_TRY(auto val, solve_inequality_system_atomless<node>(sys, opts));
+		if (!val) return r.with_value(std::nullopt);
 		tref v = nullptr;
 		tref sol_key = var;
 		for (const auto& [k, kv] : *val) {
@@ -1760,13 +1769,13 @@ static std::optional<solution<node>> ocltl_direct_decode_missing(
 				? tau::get(k).first_tree().get() : k;
 			if (tau::subtree_equals(k_var, var)) { v = kv; sol_key = k; break; }
 		}
-		if (!v && var_constrained) return std::nullopt;
+		if (!v && var_constrained) return r.with_value(std::nullopt);
 		if (!v) continue;
 		sol[sol_key] = v;
 	}
 	for (const auto& [key, v] : sol)
 		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
-	return sol;
+	return r.with_value(std::move(sol));
 }
 
 template <NodeType node>
@@ -1861,7 +1870,7 @@ interpreter<node>::step(const assignment<node>& values)
 			"the current step specification");
 	}
 	for (const auto& [var, raw_value] : produced.value()) {
-		tref value = canonicalize_committed_value<node>(raw_value);
+		TAU_TRY(tref value, canonicalize_committed_value<node>(raw_value));
 		// Check if we are dealing with a stream variable
 		if (tt(var) | tau::variable | tau::io_var) {
 			DBG(LOG_TRACE << LOG_FM_TREE(value));
@@ -1961,12 +1970,12 @@ interpreter<node>::step(const assignment<node>& values)
 					tref g = update_to_time_point(a, (int_t)time_point);
 					grounded_atoms.push_back(rewriter::replace<node>(g, memory));
 				}
-				if (auto fast = ocltl_direct_decode_missing<node>(
-						grounded_atoms, missing_outputs, ledger_); fast)
+				TAU_TRY(auto fast, ocltl_direct_decode_missing<node>(grounded_atoms, missing_outputs, ledger_));
+				if (fast)
 					for (tref mo : missing_outputs)
 						if (auto it = fast->find(mo); it != fast->end()
 							&& !global.contains(mo)) {
-							tref value = canonicalize_committed_value<node>(it->second);
+							TAU_TRY(tref value, canonicalize_committed_value<node>(it->second));
 							memory.emplace(mo, value);
 							global.emplace(mo, value);
 						}
@@ -2032,7 +2041,7 @@ interpreter<node>::step(const assignment<node>& values)
 					&& !global.contains(ot)) {
 					// Canonicalize like the primary commit loop, or an
 					// uncommon splitter value grows unbounded across steps.
-					tref value = canonicalize_committed_value<node>(it->second);
+					TAU_TRY(tref value, canonicalize_committed_value<node>(it->second));
 					memory.emplace(ot, value);
 					global.emplace(ot, value);
 				}
@@ -3203,7 +3212,8 @@ result<typename interpreter<node>::update_plan>
 						TAU_TO_STR(alt))}});
 				continue;
 			}
-			if (!next->start_from(*prior)) {
+			TAU_TRY(bool started, next->start_from(*prior));
+			if (!started) {
 				r.info("the data game of the revised specification is "
 					"not won from the values already played; the "
 					"alternative is skipped",

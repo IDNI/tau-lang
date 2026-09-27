@@ -551,7 +551,10 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 	auto type = type_l ? type_l : type_r;
 	// Normalized for the same reason as in cte_neg below: a BA may build
 	// the result as a symbolic term that interns apart from its value.
-	return build_bf_ba_constant<node>(node::ba::normalize(l | r), type, right);
+	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
+	auto nr = node::ba::normalize(l | r);
+	auto n = nr.has_value() ? nr.value() : (l | r);
+	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
@@ -566,7 +569,10 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 	auto type = type_l ? type_l : type_r;
 	// Normalized for the same reason as in cte_neg below: a BA may build
 	// the result as a symbolic term that interns apart from its value.
-	return build_bf_ba_constant<node>(node::ba::normalize(l & r), type, right);
+	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
+	auto nr = node::ba::normalize(l & r);
+	auto n = nr.has_value() ? nr.value() : (l & r);
+	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
@@ -581,7 +587,10 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	auto type = type_l ? type_l : type_r;
 	// Normalized for the same reason as in cte_neg below: a BA may build
 	// the result as a symbolic term that interns apart from its value.
-	return build_bf_ba_constant<node>(node::ba::normalize(l ^ r), type, right);
+	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
+	auto nr = node::ba::normalize(l ^ r);
+	auto n = nr.has_value() ? nr.value() : (l ^ r);
+	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
@@ -599,7 +608,10 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	// it canonicalized. node::ba::normalize is the same pack-generic,
 	// BA-naming-free dispatcher normalize_ba() itself uses, so core still
 	// names no BA.
-	return build_bf_ba_constant<node>(node::ba::normalize(~l), type, right);
+	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
+	auto nr = node::ba::normalize(~l);
+	auto n = nr.has_value() ? nr.value() : (~l);
+	return build_bf_ba_constant<node>(n, type, right);
 }
 
 } // namespace idni::tau_lang

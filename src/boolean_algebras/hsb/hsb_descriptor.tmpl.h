@@ -56,10 +56,12 @@ struct ba_descriptor<hsb, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "bot"; }
 
-	static hsb normalize(const hsb& x) { return normalize_hsb(x); }
+	static result<hsb> normalize(const hsb& x) {
+		return result<hsb>{normalize_hsb(x)};
+	}
 
-	static hsb splitter(const hsb& x, splitter_type st) {
-		return hsb_splitter(x, st);
+	static result<hsb> splitter(const hsb& x, splitter_type st) {
+		return result<hsb>{hsb_splitter(x, st)};
 	}
 
 	static tref splitter_one(tref) {

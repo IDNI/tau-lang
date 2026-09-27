@@ -42,7 +42,7 @@ tref term_boole_decomposition(tref term, tref var) {
 using boole_memo_t = std::vector<std::unordered_map<tref, tref>>;
 
 template<NodeType node>
-tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	const bool free_funcs, boole_memo_t& memo);
 
 // Note: Recursion depth is bound by the number of variables, which should
@@ -58,28 +58,35 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
  * @return The resulting Boole decomposition
  */
 template<NodeType node>
-tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	const bool free_funcs = false) {
 	boole_memo_t memo(vars.size() + 1);
 	return rec_term_boole_decomposition<node>(term, vars, idx, free_funcs, memo);
 }
 
 template<NodeType node>
-tref rec_term_boole_decomposition_step(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, const int_t idx,
 	const bool free_funcs, boole_memo_t& memo) {
 	using tau = tree<node>;
+	result<tref> r;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
+	if (tau::get(term).equals_0()) return r.with_value(term);
+	if (tau::get(term).equals_1()) return r.with_value(term);
 	if (idx == (int_t)vars.size()) {
 		if (!free_funcs) {
-			term = normalize_ba<node>(term);
+			TAU_TRY(tref nterm, normalize_ba<node>(term));
+			term = nterm;
 			auto func_syms = tau::get(term).select_top(is<node, tau::bf_ref>);
 			if (!func_syms.empty()) {
 				std::ranges::sort(func_syms, tau::subtree_less);
-				term = rec_term_boole_decomposition<node>(term, func_syms, 0, true);
+				TAU_TRY(tref decomp,
+					rec_term_boole_decomposition<node>(term,
+						func_syms, 0, true));
+				term = decomp;
 			}
 		}
 		DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
-		return term;
+		return r.with_value(term);
 	}
 	DBG(assert(tau::get(vars[idx]).is(tau::variable) || tau::get(vars[idx]).is(tau::bf_ref));)
 	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed(find_ba_type<node>(vars[idx])));
@@ -95,14 +102,17 @@ tref rec_term_boole_decomposition_step(tref term, const trefs& vars, const int_t
 	// ones, i.e. on an invariant nothing states.
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
-		return rec_term_boole_decomposition<node>(p1, vars, idx + 1,
-								free_funcs, memo);
+		TAU_TRY(tref same, rec_term_boole_decomposition<node>(p1, vars,
+			idx + 1, free_funcs, memo));
+		return r.with_value(same);
 	}
-	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1, free_funcs, memo);
-	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1, free_funcs, memo);
+	TAU_TRY(tref q1, rec_term_boole_decomposition<node>(p1, vars, idx + 1, free_funcs, memo));
+	TAU_TRY(tref q2, rec_term_boole_decomposition<node>(p2, vars, idx + 1, free_funcs, memo));
+	p1 = q1;
+	p2 = q2;
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
-		return p1;
+		return r.with_value(p1);
 	}
 	tref var = tau::get(tau::bf, vars[idx]);
 	// Build Boole decomposition
@@ -113,23 +123,24 @@ tref rec_term_boole_decomposition_step(tref term, const trefs& vars, const int_t
 	else term = tau::build_bf_or(tau::build_bf_and(var, p1),
 		tau::build_bf_and(tau::build_bf_neg(var), p2));
 	DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
-	return term;
+	return r.with_value(term);
 }
 
 // Memoized on (term, idx): the cofactors of a term are hash-consed, so the
 // same sub-term recurs at the same level whenever the function has shared
 // cofactors (x1 ^ ... ^ xn has only two distinct ones per level).
 template<NodeType node>
-tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	const bool free_funcs, boole_memo_t& memo) {
 	using tau = tree<node>;
-	if (tau::get(term).equals_0()) return term;
-	if (tau::get(term).equals_1()) return term;
+	result<tref> r;
+	if (tau::get(term).equals_0()) return r.with_value(term);
+	if (tau::get(term).equals_1()) return r.with_value(term);
 	auto& m = memo[idx];
-	if (auto it = m.find(term); it != m.end()) return it->second;
-	tref r = rec_term_boole_decomposition_step<node>(term, vars, idx, free_funcs, memo);
-	m.emplace(term, r);
-	return r;
+	if (auto it = m.find(term); it != m.end()) return r.with_value(it->second);
+	TAU_TRY(tref res, rec_term_boole_decomposition_step<node>(term, vars, idx, free_funcs, memo));
+	m.emplace(term, res);
+	return r.with_value(res);
 }
 
 /**
@@ -173,7 +184,7 @@ result<tref> term_boole_decomposition(tref term) {
 			return r.with_assert_check_value(term);
 		}
 		term = simplified;
-		tref res = normalize_ba<node>(term);
+		TAU_TRY(tref res, normalize_ba<node>(term));
 		// Cache this branch too: it is the bv/tau-constant path, i.e. the
 		// expensive one (simplify_term + normalize_ba), and callers hit it
 		// repeatedly through apply_unique_until_change.
@@ -196,10 +207,12 @@ result<tref> term_boole_decomposition(tref term) {
 		// simplification would.
 		TAU_TRY(tref simplified, node::ba::simplify_term(term));
 		if (simplified) term = simplified;
-		bd = normalize_ba<node>(bd);
+		TAU_TRY(tref nb, normalize_ba<node>(bd));
+		bd = nb;
 		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
 		std::ranges::sort(func_syms, tau::subtree_less);
-		bd = rec_term_boole_decomposition<node>(bd, func_syms, 0);
+		TAU_TRY(tref dec, rec_term_boole_decomposition<node>(bd, func_syms, 0));
+		bd = dec;
 #ifdef TAU_CACHE
 		cache.emplace(bd, bd);
 		return r.with_assert_check_value(
@@ -208,7 +221,8 @@ result<tref> term_boole_decomposition(tref term) {
 		return r.with_assert_check_value(bd);
 	}
 	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
-	bd = rec_term_boole_decomposition<node>(bd, vars, 0);
+	TAU_TRY(tref dec, rec_term_boole_decomposition<node>(bd, vars, 0));
+	bd = dec;
 	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(bd) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(bd, bd);

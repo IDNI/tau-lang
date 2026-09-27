@@ -128,7 +128,9 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return make_bitvector_bottom_elem(width.value()).getBitVectorValue(10);
 	}
 
-	static bv normalize(const bv& x) { return normalize_bv(x); }
+	static result<bv> normalize(const bv& x) {
+		return result<bv>{normalize_bv(x)};
+	}
 
 	static tref simplify_symbol(tref sym) {
 		return simplify_bv_symbol<node_t>(sym);

@@ -113,7 +113,11 @@ void check_boolean_laws() {
 	// a cvc5::Term, compared structurally -- so the laws are stated the way
 	// core relies on them: equal after normalization.
 	auto eq = [](const BA& a, const BA& b) {
-		return desc::normalize(a) == desc::normalize(b);
+		auto na = desc::normalize(a);
+		auto nb = desc::normalize(b);
+		REQUIRE(na.has_value());
+		REQUIRE(nb.has_value());
+		return na.value() == nb.value();
 	};
 	CHECK(eq(~one, zero));
 	CHECK(eq(~zero, one));
@@ -133,9 +137,15 @@ void check_boolean_laws() {
 	CHECK(std::hash<BA>{}(one) == std::hash<BA>{}(one));
 
 	// normalization fixes what is already normal
-	CHECK(desc::normalize(one) == one);
-	CHECK(desc::normalize(zero) == zero);
-	CHECK(desc::normalize(desc::normalize(one)) == desc::normalize(one));
+	auto n_one = desc::normalize(one);
+	REQUIRE(n_one.has_value());
+	CHECK(n_one.value() == one);
+	auto n_zero = desc::normalize(zero);
+	REQUIRE(n_zero.has_value());
+	CHECK(n_zero.value() == zero);
+	auto n_one_again = desc::normalize(n_one.value());
+	REQUIRE(n_one_again.has_value());
+	CHECK(n_one_again.value() == n_one.value());
 }
 
 // ── Optional capabilities ────────────────────────────────────────────────────
@@ -199,13 +209,21 @@ void check_splitter() {
 		REQUIRE(zero_opt.has_value());
 		const BA one = one_opt.value(), zero = zero_opt.value();
 		auto eq = [](const BA& a, const BA& b) {
-			return desc::normalize(a) == desc::normalize(b);
+			auto na = desc::normalize(a);
+			auto nb = desc::normalize(b);
+			REQUIRE(na.has_value());
+			REQUIRE(nb.has_value());
+			return na.value() == nb.value();
 		};
 
 		for (auto st : { splitter_type::lower, splitter_type::middle,
 				splitter_type::upper })
 		{
-			const BA y = desc::normalize(desc::splitter(one, st));
+			auto split_r = desc::splitter(one, st);
+			REQUIRE(split_r.has_value());
+			auto norm_r = desc::normalize(split_r.value());
+			REQUIRE(norm_r.has_value());
+			const BA y = norm_r.value();
 			// a proper sub-element: neither endpoint, and below one
 			CHECK_FALSE(eq(y, zero));
 			CHECK_FALSE(eq(y, one));
@@ -256,9 +274,13 @@ void check_term_round_trip(tref term, size_t ba_type, tref type) {
 	auto back = parsed_literal<BA>(src, type);
 	REQUIRE(back.has_value());
 
-	if (auto carried = constant_of<BA>(term))
-		CHECK(desc::normalize(back.value())
-			== desc::normalize(carried.value()));
+	if (auto carried = constant_of<BA>(term)) {
+		auto nb = desc::normalize(back.value());
+		auto nc = desc::normalize(carried.value());
+		REQUIRE(nb.has_value());
+		REQUIRE(nc.has_value());
+		CHECK(nb.value() == nc.value());
+	}
 	else if (tt(term) | tau::bf_f) CHECK(desc::is_zero(back.value()).value());
 	else if (tt(term) | tau::bf_t) CHECK(desc::is_one(back.value()).value());
 }

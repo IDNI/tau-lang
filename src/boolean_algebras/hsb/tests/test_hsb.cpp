@@ -1503,8 +1503,9 @@ TEST_SUITE("hsb — dispatcher") {
 		auto contra = make_hs({1.0}, 1.0) & make_hs({-1.0}, 2.0);
 		std::variant<TAU_PACK_BASE_BAS> v{contra};
 		auto result = dispatcher_t::normalize(v);
-		CHECK(std::holds_alternative<hsb>(result));
-		CHECK(std::get<hsb>(result) == hsb::bottom());
+		REQUIRE(result.has_value());
+		CHECK(std::holds_alternative<hsb>(result.value()));
+		CHECK(std::get<hsb>(result.value()) == hsb::bottom());
 	}
 
 	TEST_CASE("dispatcher splitter for hsb") {
@@ -1512,8 +1513,9 @@ TEST_SUITE("hsb — dispatcher") {
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		auto result = dispatcher_t::splitter(v, splitter_type::lower);
-		CHECK(std::holds_alternative<hsb>(result));
-		auto s = std::get<hsb>(result);
+		REQUIRE(result.has_value());
+		CHECK(std::holds_alternative<hsb>(result.value()));
+		auto s = std::get<hsb>(result.value());
 		CHECK(is_hsb_zero(s) == false);
 		CHECK(is_hsb_one(s) == false);
 	}
@@ -1540,8 +1542,9 @@ TEST_SUITE("hsb — dispatcher") {
 		auto h = make_hs({1.0}, -5.0);
 		std::variant<TAU_PACK_BASE_BAS> v{h};
 		auto result = dispatcher_t::normalize(v);
-		CHECK(std::holds_alternative<hsb>(result));
-		CHECK(is_hsb_zero(std::get<hsb>(result)) == false);
+		REQUIRE(result.has_value());
+		CHECK(std::holds_alternative<hsb>(result.value()));
+		CHECK(is_hsb_zero(std::get<hsb>(result.value())) == false);
 	}
 
 	TEST_CASE("dispatcher normalize of top is top") {
@@ -1549,7 +1552,8 @@ TEST_SUITE("hsb — dispatcher") {
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		auto result = dispatcher_t::normalize(v);
-		CHECK(std::get<hsb>(result) == hsb::top());
+		REQUIRE(result.has_value());
+		CHECK(std::get<hsb>(result.value()) == hsb::top());
 	}
 
 	TEST_CASE("dispatcher normalize of bot is bot") {
@@ -1557,7 +1561,8 @@ TEST_SUITE("hsb — dispatcher") {
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		auto result = dispatcher_t::normalize(v);
-		CHECK(std::get<hsb>(result) == hsb::bottom());
+		REQUIRE(result.has_value());
+		CHECK(std::get<hsb>(result.value()) == hsb::bottom());
 	}
 
 	TEST_CASE("dispatcher is_zero for top") {

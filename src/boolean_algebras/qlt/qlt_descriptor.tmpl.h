@@ -133,10 +133,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "bot"; }
 
-	static qlt normalize(const qlt& x) { return normalize_qlt(x); }
+	static result<qlt> normalize(const qlt& x) {
+		return result<qlt>{normalize_qlt(x)};
+	}
 
-	static qlt splitter(const qlt& x, splitter_type st) {
-		return qlt_splitter(x, st);
+	static result<qlt> splitter(const qlt& x, splitter_type st) {
+		return result<qlt>{qlt_splitter(x, st)};
 	}
 
 	static tref splitter_one(tref) {

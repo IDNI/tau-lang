@@ -78,10 +78,12 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	static sbf_ba normalize(const sbf_ba& x) { return normalize_sbf(x); }
+	static result<sbf_ba> normalize(const sbf_ba& x) {
+		return result<sbf_ba>{normalize_sbf(x)};
+	}
 
-	static sbf_ba splitter(const sbf_ba& x, splitter_type st) {
-		return sbf_splitter(x, st);
+	static result<sbf_ba> splitter(const sbf_ba& x, splitter_type st) {
+		return result<sbf_ba>{sbf_splitter(x, st)};
 	}
 
 	static tref splitter_one(tref) {

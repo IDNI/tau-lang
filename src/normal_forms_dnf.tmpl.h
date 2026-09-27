@@ -180,7 +180,9 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 			if (tau::get(fm).equals_0()) return report(false);
 			// fm is a Boolean function
 			// Normalize tau subformulas
-			fm_simp = normalize_ba<node>(fm);
+			// TODO (HIGH) assign_and_reduce returns a bool with no report channel: the normalize_ba report stops here.
+			auto nr = normalize_ba<node>(fm);
+			fm_simp = nr.has_value() ? nr.value() : fm;
 			DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
 			fm_simp = to_dnf<node, false>(fm_simp);

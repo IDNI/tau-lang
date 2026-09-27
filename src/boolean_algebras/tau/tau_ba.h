@@ -228,11 +228,11 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other);
  * @tparam BAs Variadic template parameters.
  * @param fm Reference to tau_ba.
  * @param st Splitter type.
- * @return Split tau_ba.
+ * @return Split tau_ba, or the report of a failed normalization.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st);
+result<tau_ba<BAs...>> splitter(const tau_ba<BAs...>& fm, splitter_type st);
 
 /**
  * @brief Splits tau_ba into one.

@@ -182,10 +182,11 @@ tref denorm_equation(tref eq) {
 
 // This function traverses a term fm and normalizes all Boolean algebra constants
 template <NodeType node>
-tref normalize_ba(tref fm) {
+result<tref> normalize_ba(tref fm) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
 	DBG(assert(tau::get(fm).is(tau::bf));)
+	result<tref> r;
 	auto push_negation = [&](tref n) {
 		const tau& t = tau::get(n);
 		// Push negation into constants
@@ -197,20 +198,33 @@ tref normalize_ba(tref fm) {
 		n = push_negation_one_in<node, false>(n);
 		return n;
 	};
-	auto norm_ba = [](tref n) {
+	// pre_order::apply_unique_if has no report channel, so the lambda keeps a
+	// tref and hands a failed normalization's report to the ambient result.
+	auto norm_ba = [&](tref n) {
 		const tau& t = tau::get(n);
 		// Check if node is a constant
 		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
 		auto c = t.get_ba_constant();
 		auto nc = node::ba::normalize(c);
-		if (c == nc) return n;
-		return tau::get_ba_constant(nc, t.get_ba_type());
+		if (!nc.has_value()) {
+			r.merge(std::move(nc));
+			return n;
+		}
+		if (c == nc.value()) return n;
+		return tau::get_ba_constant(nc.value(), t.get_ba_type());
 	};
 	fm = pre_order<node>(fm).apply_unique(push_negation);
-	tref r = pre_order<node>(fm).template apply_unique<normalize_ba_m>(norm_ba);
-	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(r));
-	return r;
+	// A result that carries a failed normalize must not be memoized: the
+	// lambda returned the constant unnormalized, and caching it would record
+	// that as the node's answer. The predicate refuses every node once the
+	// ambient result holds the failure.
+	auto cache_ok = [&](tref, tref) { return !r.has_error(); };
+	tref res = pre_order<node>(fm)
+			.template apply_unique_if<normalize_ba_m>(norm_ba, cache_ok);
+	if (r.has_error()) return r;
+	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(res));
+	return r.with_value(res);
 }
 
 #undef LOG_CHANNEL_NAME

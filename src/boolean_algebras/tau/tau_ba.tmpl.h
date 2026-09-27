@@ -477,29 +477,28 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 // Normalizes a tau_ba constant: applies its rec relations to the main
 // formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
 // result carries the normalized main only — the rec relations, already
-// applied, are not copied into the returned tau_ba.
+// applied, are not copied into the returned tau_ba — or the report of a
+// failed step.
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
+result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
 	using cache = detail::tau_decision_cache<node>;
 	{
 		std::lock_guard<std::mutex> lock(cache::mtx());
 		auto& memo = cache::normalize_memo();
 		if (auto it = memo.find(fm.nso_rr); it != memo.end())
-			return tau_ba<BAs...>(it->second.rec_relations, it->second.main);
+			return result<tau_ba<BAs...>>{tau_ba<BAs...>(
+				it->second.rec_relations, it->second.main)};
 	}
-	// No safe normalized form exists on failure; return the element
-	// unchanged, matching splitter()'s fallback below.
-	auto applied = nso_rr_apply<node>(fm.nso_rr);
-	if (!applied.has_value()) return fm;
-	auto simplified = simp_tau_unsat_valid<node>(applied.value());
-	if (!simplified.has_value()) return fm;
-	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
+	result<tau_ba<BAs...>> r;
+	TAU_TRY(tref applied, nso_rr_apply<node>(fm.nso_rr));
+	TAU_TRY(tref simplified, simp_tau_unsat_valid<node>(applied));
+	tau_ba<BAs...> out(tree<node>::geth(simplified));
 	std::lock_guard<std::mutex> lock(cache::mtx());
 	if (!bdd_node_table_exhausted)
 		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
-	return out;
+	return r.with_value(std::move(out));
 }
 
 // Memoized normalizer<node>(nso_rr) for the splitter's normalized-formula
@@ -509,20 +508,25 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 // normalize_tau's own simp_tau_unsat_valid pass, so the two aren't
 // interchangeable.
 template <typename node>
-tref normalize_for_splitter(const rr<node>& nso_rr) {
+result<tref> normalize_for_splitter(const rr<node>& nso_rr) {
 	using cache = detail::tau_decision_cache<node>;
 	{
 		std::lock_guard<std::mutex> lock(cache::mtx());
 		auto& memo = cache::splitter_normalize_memo();
 		if (auto it = memo.find(nso_rr); it != memo.end())
-			return it->second;
+			return result<tref>{it->second};
 	}
-	auto normalized = normalizer<node>(nso_rr);
-	tref result = normalized.has_value() ? normalized.value() : nullptr;
+	result<tref> r;
+	TAU_TRY(tref normalized, normalizer<node>(nso_rr));
+	// The normalizer never succeeds with a null formula; a null here is
+	// the normalizer breaking its contract.
+	if (!normalized)
+		return r.with_error(code::runtime_error,
+			"normalizer returned a null formula");
 	std::lock_guard<std::mutex> lock(cache::mtx());
 	if (!bdd_node_table_exhausted)
-		cache::splitter_normalize_memo().emplace(nso_rr, result);
-	return result;
+		cache::splitter_normalize_memo().emplace(nso_rr, normalized);
+	return r.with_value(normalized);
 }
 
 // Purely syntactic check: the main formula is literally T. No rec
@@ -545,12 +549,12 @@ bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
+result<tau_ba<BAs...>> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
-	auto normalized = normalizer<node>(fm.nso_rr);
-	if (!normalized.has_value()) return fm;
-	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(normalized.value(), st);
-	return tau_ba<BAs...>(tree<node>::geth(s));
+	result<tau_ba<BAs...>> r;
+	TAU_TRY(tref n, normalize_for_splitter<node>(fm.nso_rr));
+	TAU_TRY(tref s, (tau_splitter<tau_ba<BAs...>, BAs...>(n, st)));
+	return r.with_value(tau_ba<BAs...>(tree<node>::geth(s)));
 }
 
 template <typename... BAs>

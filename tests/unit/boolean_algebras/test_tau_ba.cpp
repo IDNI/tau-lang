@@ -248,17 +248,20 @@ TEST_CASE("F & F is zero") {
 
 TEST_CASE("T & T is syntactically one after normalize_tau") {
 	auto r = normalize_tau(tau_one() & tau_one());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 TEST_CASE("T & F is syntactically zero after normalize_tau") {
 	auto r = normalize_tau(tau_one() & tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("F & F is syntactically zero after normalize_tau") {
 	auto r = normalize_tau(tau_zero() & tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("A & ~A is zero (complement law)") {
@@ -295,12 +298,14 @@ TEST_CASE("F | F is zero") {
 
 TEST_CASE("T | T is syntactically one after normalize_tau") {
 	auto r = normalize_tau(tau_one() | tau_one());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 TEST_CASE("F | F is syntactically zero after normalize_tau") {
 	auto r = normalize_tau(tau_zero() | tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("A | ~A is one (complement law)") {
@@ -357,7 +362,8 @@ TEST_CASE("A ^ A is zero (XOR self-cancellation)") {
 
 TEST_CASE("F ^ F is syntactically zero after normalize_tau") {
 	auto r = normalize_tau(tau_zero() ^ tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 } // TEST_SUITE XOR / addition
@@ -454,42 +460,50 @@ TEST_SUITE("tau_ba — normalize_tau") {
 
 TEST_CASE("normalize_tau of T is syntactically T") {
 	auto r = normalize_tau(tau_one());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 TEST_CASE("normalize_tau of F is syntactically F") {
 	auto r = normalize_tau(tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("normalize_tau of ~T is syntactically F") {
 	auto r = normalize_tau(~tau_one());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("normalize_tau of ~F is syntactically T") {
 	auto r = normalize_tau(~tau_zero());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 TEST_CASE("normalize_tau of T & T is syntactically T") {
 	auto r = normalize_tau(tau_one() & tau_one());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 TEST_CASE("normalize_tau of T & F is syntactically F") {
 	auto r = normalize_tau(tau_one() & tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("normalize_tau of F | F is syntactically F") {
 	auto r = normalize_tau(tau_zero() | tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("normalize_tau of T | F is syntactically T") {
 	auto r = normalize_tau(tau_one() | tau_zero());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 } // TEST_SUITE normalize_tau
@@ -529,12 +543,14 @@ TEST_CASE("T & F is syntactically zero (operator& short-circuits)") {
 
 TEST_CASE("after normalize_tau: T & F is syntactically zero") {
 	auto r = normalize_tau(tau_one() & tau_zero());
-	CHECK(is_tau_syntactic_zero(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("after normalize_tau: T | T is syntactically one") {
 	auto r = normalize_tau(tau_one() | tau_one());
-	CHECK(is_tau_syntactic_one(r));
+	REQUIRE(r.has_value());
+	CHECK(is_tau_syntactic_one(r.value()));
 }
 
 } // TEST_SUITE syntactic checks
@@ -608,29 +624,34 @@ TEST_SUITE("tau_ba — splitter") {
 TEST_CASE("splitter of F is zero") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_zero(), splitter_type::upper);
-	CHECK(s.is_zero().value() == true);
+	REQUIRE(s.has_value());
+	CHECK(s.value().is_zero().value() == true);
 }
 
 TEST_CASE("splitter of T is non-zero") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_zero().value() == false);
+	REQUIRE(s.has_value());
+	CHECK(s.value().is_zero().value() == false);
 }
 
 TEST_CASE("splitter of T is non-one") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_one().value() == false);
+	REQUIRE(s.has_value());
+	CHECK(s.value().is_one().value() == false);
 }
 
 TEST_CASE("splitter of T with upper type is non-zero") {
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_zero().value() == false);
+	REQUIRE(s.has_value());
+	CHECK(s.value().is_zero().value() == false);
 }
 
 TEST_CASE("splitter of T with upper type is non-one") {
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_one().value() == false);
+	REQUIRE(s.has_value());
+	CHECK(s.value().is_one().value() == false);
 }
 
 TEST_CASE("tau_splitter_one is non-zero") {
@@ -652,8 +673,9 @@ TEST_CASE("tau_splitter_one complement is non-zero") {
 TEST_CASE("splitter result is sub-element of T") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
+	REQUIRE(s.has_value());
 	// s <= T, so s & ~T = s & F = F
-	CHECK((s & ~tau_one()).is_zero().value() == true);
+	CHECK((s.value() & ~tau_one()).is_zero().value() == true);
 }
 
 } // TEST_SUITE splitter
@@ -962,7 +984,8 @@ TEST_CASE("normalize_tau memoizes nothing while the flag is up") {
 	CHECK( memo.find(a.nso_rr) == memo.end() );
 	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
 	auto r = normalize_tau(a);
-	CHECK( is_tau_syntactic_zero(r) );
+	REQUIRE( r.has_value() );
+	CHECK( is_tau_syntactic_zero(r.value()) );
 	CHECK( memo.find(a.nso_rr) != memo.end() );
 }
 
@@ -974,8 +997,9 @@ TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
 	(void) normalize_for_splitter<typename test_ba::node>(a.nso_rr);
 	CHECK( memo.find(a.nso_rr) == memo.end() );
 	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
-	tref r = normalize_for_splitter<typename test_ba::node>(a.nso_rr);
-	CHECK( r != nullptr );
+	auto r = normalize_for_splitter<typename test_ba::node>(a.nso_rr);
+	REQUIRE( r.has_value() );
+	CHECK( r.value() != nullptr );
 	CHECK( memo.find(a.nso_rr) != memo.end() );
 }
 
@@ -1054,9 +1078,13 @@ TEST_CASE("a formula with an io variable is not static") {
 TEST_CASE("the complement of a constant over three constants") {
 	test_ba v(wff("<:y> = 0 && <:x> != 0 && <:z> != 0 "
 		"|| <:y> != 0 && <:x> != 0 || <:x> = 0 && <:z> != 0"));
-	test_ba c = normalize_tau(~v);
+	auto cr = normalize_tau(~v);
+	REQUIRE( cr.has_value() );
+	test_ba c = cr.value();
 	CHECK( disjuncts(c) == 2 );
-	test_ba d = normalize_tau(c & ~v);
+	auto dr = normalize_tau(c & ~v);
+	REQUIRE( dr.has_value() );
+	test_ba d = dr.value();
 	CHECK( disjuncts(d) == 2 );
 	CHECK( (d & v).is_zero().value() );
 	CHECK( (d | v).is_one().value() );

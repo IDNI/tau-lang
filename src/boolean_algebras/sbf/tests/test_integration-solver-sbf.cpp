@@ -98,7 +98,10 @@ TEST_SUITE("solve_minterm_system") {
 			.splitter_one = splitter_one_bdd(),
 			.mode = solver_mode::general
 		};
-		auto solution = solve_minterm_system<node_t>(system, options);
+		auto solution_r = solve_minterm_system<node_t>(system, options);
+		if (!solution_r.has_value() || !solution_r.value().has_value())
+			return false;
+		auto solution = std::move(solution_r).value();
 		bool check = true;
 		for (tref equation : system)
 			check = check ? check_solution<node_t>(

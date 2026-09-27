@@ -98,10 +98,12 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "nothing"; }
 
-	static nlang_ba normalize(const nlang_ba& x) { return normalize_nlang(x); }
+	static result<nlang_ba> normalize(const nlang_ba& x) {
+		return result<nlang_ba>{normalize_nlang(x)};
+	}
 
-	static nlang_ba splitter(const nlang_ba& x, splitter_type st) {
-		return nlang_splitter(x, st);
+	static result<nlang_ba> splitter(const nlang_ba& x, splitter_type st) {
+		return result<nlang_ba>{nlang_splitter(x, st)};
 	}
 
 	static tref splitter_one(tref) {

@@ -70,7 +70,9 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 			typename tau::constant(Bool(value != 0)), type_tree()));
 	}
 
-	static Bool normalize(const Bool& x) { return normalize_bool(x); }
+	static result<Bool> normalize(const Bool& x) {
+		return result<Bool>{normalize_bool(x)};
+	}
 
 	static tref simplify_symbol(tref sym) { return sym; }
 

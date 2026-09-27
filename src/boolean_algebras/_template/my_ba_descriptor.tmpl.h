@@ -67,7 +67,9 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	static std::string literal_zero(tref) { return "0"; }
 
 	// ── normalization and splitting ─────────────────────────────────────
-	static my_ba normalize(const my_ba& x) { return x; }
+	static result<my_ba> normalize(const my_ba& x) {
+		return result<my_ba>{x};
+	}
 
 	// ── term rewriting owned by this BA ─────────────────────────────────
 	static tref simplify_symbol(tref sym) { return sym; }

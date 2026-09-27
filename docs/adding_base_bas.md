@@ -109,23 +109,25 @@ against the line naming it:
   `result<bool>`, described below), plus `is_syntactic_one`,
   `is_syntactic_zero`, `literal_one`, `literal_zero` (plain `bool` or
   `string`, because these never run a decision procedure)
-- **normalization** — `normalize` (`splitter` and `splitter_one` join it when
-  `atomless`; see the optional table)
+- **normalization** — `normalize` and `splitter` (the latter joins when
+  `atomless`; see the optional table), each returning a `result` as described
+  below
 - **rewriting** — `simplify_symbol` (plain `tref`), `simplify_term` (returns
   a `result<tref>`, described below)
 - **parsing** — `parse`
 
-`is_one`, `is_zero`, `is_closed`, and `simplify_term` can each run a full
-decision or rewrite procedure. Each one can fail. Give each the same
+`is_one`, `is_zero`, `is_closed`, `normalize`, `splitter`, and
+`simplify_term` can each run a full decision or rewrite procedure. Each one
+can fail. Give each the same
 result-carrying shape that `preprocess` uses (see
 [Preprocessing](#preprocessing)). On success, the result holds a value. On
 failure, the result holds no value, only a report that names the reason. A
 BA whose own check cannot fail, such as a plain field comparison, still
-returns a result. Wrap the value with `result<bool>{...}` or
-`result<tref>{...}` and add no report.
+returns a result. Wrap the value with `result<bool>{...}`,
+`result<your_ba>{...}` or `result<tref>{...}` and add no report.
 
 Every other mandatory member keeps a fixed, non-`result` signature, such
-as `type_name` or `normalize`. A BA that meets a failure there cannot
+as `type_name`. A BA that meets a failure there cannot
 return a report, because the signature has no channel for one. Name the
 blocking contract on one line instead:
 
@@ -196,7 +198,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
 | `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type | owner |
 | `uses_oracle` | deciding a question leaves the process, so comparison-based checks (the conformance laws) skip you; absent means decided here | per BA |
-| `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one; required only when `atomless`, though a BA that is not may still provide them (qlt does). For a BA without them the dispatcher returns the element itself / `nullptr`, so a caller checks `pack_type_is_atomless` before relying on a proper sub-element | the constant's own alternative / owner |
+| `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one, returned as a `result`; required only when `atomless`, though a BA that is not may still provide them (qlt does). For a BA without them the dispatcher returns the element itself / `nullptr`, so a caller checks `pack_type_is_atomless` before relying on a proper sub-element | the constant's own alternative / owner |
 
 **Pack order is semantic** wherever the rule above says *first*, *any* or
 *chained*: `-DTAU_BAS=a,b` and `-DTAU_BAS=b,a` can differ there. Owner-gated
