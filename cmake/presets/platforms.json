@@ -1,0 +1,111 @@
+{
+	"version": 8,
+	"configurePresets": [
+		{
+			"name": "_generator-make",
+			"hidden": true,
+			"generator": "Unix Makefiles"
+		},
+		{
+			"name": "_generator-ninja",
+			"hidden": true,
+			"generator": "Ninja"
+		},
+		{
+			"name": "_toolchain-gcc",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "gcc",
+				"CMAKE_CXX_COMPILER": "g++"
+			}
+		},
+		{
+			"name": "_toolchain-clang",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+		{
+			"name": "_toolchain-mingw",
+			"hidden": true,
+			"toolchainFile": "${fileDir}/cmake/toolchains/mingw-w64-x86_64.cmake"
+		},
+		{
+			"name": "_toolchain-wasm",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EMSCRIPTEN": "ON"
+			}
+		},
+		{
+			"name": "_toolchain-msvc",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "cl",
+				"CMAKE_CXX_COMPILER": "cl"
+			}
+		},
+		{
+			"name": "_toolchain-clang-cl",
+			"hidden": true,
+			"generator": "Ninja",
+			"architecture": {
+				"value": "x64",
+				"strategy": "external"
+			},
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang-cl",
+				"CMAKE_CXX_COMPILER": "clang-cl"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"intelliSenseMode": "windows-clang-x64"
+				}
+			}
+		},
+		{
+			"name": "_build-type-debug",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "_build-type-devel",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Devel"
+			}
+		},
+		{
+			"name": "_build-type-release",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "_build-type-relwithdebinfo",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
+			}
+		},
+		{
+			"name": "_build-type-coverage",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Coverage"
+			}
+		},
+		{
+			"name": "_wasm-nothreads",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_WASM_PTHREADS": "OFF"
+			}
+		}
+	]
+}

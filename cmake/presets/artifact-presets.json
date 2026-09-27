@@ -1,0 +1,263 @@
+{
+	"version": 8,
+	"include": [
+		"./platforms.json"
+	],
+	"configurePresets": [
+		{
+			"name": "release",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release"
+			}
+		},
+		{
+			"name": "devel",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel"
+			}
+		},
+		{
+			"name": "debug",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug"
+			}
+		},
+		{
+			"name": "release-gcc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-gcc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-gcc"
+			}
+		},
+		{
+			"name": "devel-gcc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-gcc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-gcc"
+			}
+		},
+		{
+			"name": "debug-gcc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-gcc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-gcc"
+			}
+		},
+		{
+			"name": "release-w64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-w64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-w64"
+			}
+		},
+		{
+			"name": "devel-w64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-w64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-w64"
+			}
+		},
+		{
+			"name": "debug-w64",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-w64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-w64"
+			}
+		},
+		{
+			"name": "release-msvc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-msvc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-msvc"
+			}
+		},
+		{
+			"name": "devel-msvc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-msvc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-msvc"
+			}
+		},
+		{
+			"name": "debug-msvc",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-msvc",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-msvc"
+			}
+		},
+		{
+			"name": "release-msvc-clang-cl",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-msvc-clang-cl",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-msvc-clang-cl"
+			}
+		},
+		{
+			"name": "devel-msvc-clang-cl",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-msvc-clang-cl",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-msvc-clang-cl"
+			}
+		},
+		{
+			"name": "debug-msvc-clang-cl",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-msvc-clang-cl",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-msvc-clang-cl"
+			}
+		},
+		{
+			"name": "release-wasm",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-wasm",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-wasm"
+			}
+		},
+		{
+			"name": "devel-wasm",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-wasm",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-wasm"
+			}
+		},
+		{
+			"name": "debug-wasm",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-wasm",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-wasm"
+			}
+		},
+		{
+			"name": "release-wasm-nothreads",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_wasm-nothreads",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-wasm-nothreads",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-wasm-nothreads"
+			}
+		},
+		{
+			"name": "devel-wasm-nothreads",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_wasm-nothreads",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-wasm-nothreads",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-wasm-nothreads"
+			}
+		},
+		{
+			"name": "debug-wasm-nothreads",
+			"inherits": [
+				"_generator-make",
+				"_toolchain-wasm",
+				"_wasm-nothreads",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-wasm-nothreads",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-wasm-nothreads"
+			}
+		}
+	]
+}

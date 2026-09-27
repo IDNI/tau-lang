@@ -241,3 +241,21 @@ set(TAU_STATIC_LIB_NAME "${PROJECT_LIB_NAME}_static")
 set(TAU_SHARED_LIB_NAME "${PROJECT_LIB_NAME}")
 set(TAU_EXECUTABLE_NAME "${PROJECT_NAME}")
 set(TAU_EXE_SHARED_NAME "${PROJECT_NAME}_shared")
+
+include(tau-platform-map)
+
+# Writes the platform names `./dev preset` uses and the tau preset that owns
+# each, as a cmake file an SDK consumer reads, for `./dev compile` and the
+# cmake script. The map comes from tau_collect_platform_map, so this file and
+# the table compiled into tau cannot drift.
+function(tau_write_platform_map out_file)
+	tau_collect_platform_map()
+	set(_content "# Generated from CMakePresets.json at configure time. Do not edit.\n")
+	string(APPEND _content "set(TAU_PLATFORM_NAMES \"${TAU_PLATFORM_NAMES}\")\n")
+	string(APPEND _content "set(TAU_PRESET_PLATFORM_MAP\n")
+	foreach(_entry IN LISTS TAU_PRESET_PLATFORM_MAP)
+		string(APPEND _content "\t\"${_entry}\"\n")
+	endforeach()
+	string(APPEND _content ")\n")
+	file(WRITE "${out_file}" "${_content}")
+endfunction()

@@ -10,6 +10,8 @@
 
 set(TAU_BAS_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
+include(tau-platform-map)
+
 if(NOT DEFINED TAU_SOURCE_ROOT)
 	set(TAU_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src"
 		CACHE INTERNAL "Tau src root for BA manifests")
@@ -420,6 +422,39 @@ function(tau_generate_pack_header)
 	configure_file(
 		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
 		"${TAU_PACK_HEADER}"
+		@ONLY)
+
+	# The artifact template, its presets and the files they include travel
+	# inside tau, so `tau gen` writes a buildable project with no SDK on disk.
+	# The template's `@TAU_ARTIFACT_EXE_NAME@` placeholder stays literal, and
+	# platforms.json goes verbatim: `${fileDir}` resolves inside the artifact.
+	file(READ "${TAU_BAS_CMAKE_DIR}/presets/artifact-presets.json"
+		TAU_ARTIFACT_PRESETS_JSON)
+	file(READ "${TAU_BAS_CMAKE_DIR}/presets/platforms.json"
+		TAU_PLATFORMS_JSON)
+	file(READ "${TAU_BAS_CMAKE_DIR}/toolchains/mingw-w64-x86_64.cmake"
+		TAU_MINGW_TOOLCHAIN)
+
+	# The same map an SDK writes into cmake/tau-platforms.cmake, compiled into
+	# tau so `tau compile --preset X` maps X before any SDK lookup and an
+	# unknown name is an error with no SDK on disk.
+	tau_collect_platform_map()
+	set(TAU_PLATFORM_NAMES_CPP "")
+	foreach(_p IN LISTS TAU_PLATFORM_NAMES)
+		string(APPEND TAU_PLATFORM_NAMES_CPP "\t\"${_p}\",\n")
+	endforeach()
+	set(TAU_PRESET_PLATFORM_MAP_CPP "")
+	foreach(_entry IN LISTS TAU_PRESET_PLATFORM_MAP)
+		string(REPLACE "|" ";" _pair "${_entry}")
+		list(GET _pair 0 _preset)
+		list(GET _pair 1 _platform)
+		string(APPEND TAU_PRESET_PLATFORM_MAP_CPP
+			"\t{\"${_preset}\", \"${_platform}\"},\n")
+	endforeach()
+
+	configure_file(
+		"${TAU_BAS_CMAKE_DIR}/tau_artifact_template.h.in"
+		"${TAU_PACK_INCLUDE_DIR}/tau_artifact_template.h"
 		@ONLY)
 
 	add_custom_target(tau_pack_header ALL DEPENDS "${TAU_PACK_HEADER}")
