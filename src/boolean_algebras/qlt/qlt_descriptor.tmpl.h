@@ -45,6 +45,10 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 template <NodeType node>
 tref qlt_semantic_pwr_optimal(tref clause, tref update);
 
+template <NodeType node>
+static std::optional<int> qlt_singleton_cmp(
+	const tree<node>& c1, const tree<node>& c2);
+
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -174,6 +178,64 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		qlt_piece p;
 		p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
 		p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+		z.pieces.push_back(p);
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			typename node_t::constant(z), ba_type) });
+	}
+
+	/**
+	 * @brief The order of two qlt singleton constants. `0` and `1` are the
+	 * order's sentinels below and above every point, not points, so they
+	 * compare as nothing here.
+	 */
+	static std::optional<int> dense_order_compare(size_t, tref a, tref b) {
+		auto operand = [](tref c) -> const tau& {
+			const auto& t = tau::get(c);
+			return t.is(tau::bf) && t.has_child() ? t[0] : t;
+		};
+		const auto& x = operand(a);
+		const auto& y = operand(b);
+		if (!x.is_ba_constant() || !y.is_ba_constant()) return std::nullopt;
+		return qlt_singleton_cmp<node_t>(x, y);
+	}
+
+	/**
+	 * @brief The rational halfway between @p lo and @p hi, one above
+	 * @p lo or below @p hi when only one is given, 0 when neither is.
+	 */
+	static tref dense_order_between(size_t ba_type, tref lo, tref hi) {
+		auto point = [](tref c) -> std::optional<qlt_rational> {
+			const auto& t = tau::get(c);
+			const auto& x = t.is(tau::bf) && t.has_child() ? t[0] : t;
+			if (!x.is_ba_constant()) return std::nullopt;
+			auto v = x.get_ba_constant();
+			if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+			const auto& q = std::get<qlt>(v);
+			if (q.pieces.size() != 1) return std::nullopt;
+			const auto& p = q.pieces[0];
+			if (!p.lo.val.is_finite() || p.lo.val != p.hi.val
+				|| p.lo.bound != qlt_bound::CLOSED
+				|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
+			return p.lo.val;
+		};
+		qlt_rational v(0, 1);
+		if (lo && hi) {
+			auto a = point(lo), b = point(hi);
+			if (!a || !b) return nullptr;
+			v = a->midpoint(*b);
+		} else if (lo) {
+			auto a = point(lo);
+			if (!a) return nullptr;
+			v = *a + qlt_rational(1, 1);
+		} else if (hi) {
+			auto b = point(hi);
+			if (!b) return nullptr;
+			v = *b + qlt_rational(-1, 1);
+		}
+		qlt z;
+		qlt_piece p;
+		p.lo = qlt_endpoint{ v, qlt_bound::CLOSED };
+		p.hi = qlt_endpoint{ v, qlt_bound::CLOSED };
 		z.pieces.push_back(p);
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			typename node_t::constant(z), ba_type) });

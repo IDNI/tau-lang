@@ -740,8 +740,14 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    as the default type), possibly with a complement on one side
    (`x = y'`, read on the pairs `{v, v'}` of a Boolean algebra), or has a
    type of at most 16 values (`bv[2]` .. `bv[4]`, read in any way, with
-   arithmetic too), a region is a BDD over codes of those values and
-   the game runs before (4) and (5); otherwise, or when the BDD grows
+   arithmetic too), has a bitvector type of at most 16 bits (`bv[5]` ..
+   `bv[16]`, each value its bits, and the comparisons, bitwise operators,
+   `+`, `-`, shifts, `min`, `max` and, while it stays small, `*` circuits
+   over them), or has a dense order (`qlt`) read through `=`, `!=`, `<`,
+   `<=`, `>` and `>=` (each history then only matters up to its *order
+   type*, how its values and the constants of the formula compare, of
+   which there are finitely many), a region is a BDD over codes of those
+   values and the game runs before (4) and (5); otherwise, or when the BDD grows
    past its node limit, a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
    UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
@@ -765,7 +771,7 @@ the edge the inputs take, asks the solver for outputs within the move of
 the vertex reached (a value no stream holds when its code says so), and
 follows the edge those outputs take. The values before step 0 are its own:
 every input 0 and outputs for which the start is won. A strategy of the game
-on codes is also a finite Mealy machine over atoms that compare the current
+on codes of values and equalities (not on bits or order types) is also a finite Mealy machine over atoms that compare the current
 values with 0, 1, the elements of their type and the last values of the
 streams: a state is a game vertex with the pattern of equalities among the
 last values, and the machine is minimized. The run plays that machine, which
@@ -2850,8 +2856,9 @@ prints outputs, and exits when its input closes.  Exit code `0` on success,
 The program carries the strategy of the abstraction (steps 4 and 5 of the
 realizability algorithm), or, for a spec that only the data game decides,
 the Mealy machine of that game's strategy, which `run` plays too. A spec the
-data game decides only over formulas has no such machine; it is refused with
-a message saying so, and `run` executes it.
+data game decides only over formulas, over the bits of a bitvector wider
+than 4 bits, or over the order types of `qlt` values has no such machine; it
+is refused with a message saying so, and `run` executes it.
 
 Emitting a C++ *header* with the synthesized class (`tau_program`, with the
 `declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)

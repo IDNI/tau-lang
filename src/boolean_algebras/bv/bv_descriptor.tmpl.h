@@ -473,6 +473,39 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 			ba_type) });
 	}
 
+	/**
+	 * @brief The width of `bv[n]`: its values are read as unsigned
+	 * integers modulo 2^n. 0 while widening is on, since the operators then
+	 * compute at a wider width than the type's.
+	 */
+	static size_t modular_width(size_t ba_type) {
+		if (bv_widening) return 0;
+		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
+		// Advisory drop: a type without a width is not read modularly.
+		return width.has_value() ? width.value() : 0;
+	}
+
+	/** @brief The unsigned integer the bv constant @p c holds. */
+	static std::optional<uint64_t> modular_value(size_t ba_type, tref c) {
+		const auto& t = tau::get(c);
+		const auto& x = t.is(tau::bf) && t.has_child() ? t[0] : t;
+		const size_t n = modular_width(ba_type);
+		if (!n || n > 64) return std::nullopt;
+		if (x.is(tau::bf_f)) return uint64_t{0};
+		if (x.is(tau::bf_t)) return n == 64 ? ~uint64_t{0}
+			: (uint64_t{1} << n) - 1;
+		if (!x.is_ba_constant()) return std::nullopt;
+		auto v = x.get_ba_constant();
+		if (!std::holds_alternative<bv>(v)) return std::nullopt;
+		const bv& b = std::get<bv>(v);
+		if (!b.isBitVectorValue()) return std::nullopt;
+		const std::string bits = b.getBitVectorValue(2);
+		if (bits.size() > 64) return std::nullopt;
+		uint64_t out = 0;
+		for (char ch : bits) out = out << 1 | (ch == '1' ? 1 : 0);
+		return out;
+	}
+
 	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
 	static tref zero_constant(size_t ba_type) {
 		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));

@@ -90,6 +90,21 @@ add_ltl_run_test(data_game_strategy_merged_warm_up
 	"o2\\[0\\] := 1\n.*o2\\[1\\] := 0\n.*o2\\[2\\] := 1\n.*o2\\[3\\] := 0|o2\\[0\\] := 0\n.*o2\\[1\\] := 1\n.*o2\\[2\\] := 0\n.*o2\\[3\\] := 1"
 	"no solution|no strategy|unsat")
 
+# the strategy of a game on the bits of bv[16]: 3 is invertible, so o2
+# meets its goal at step 0, 3 * 335 = 1000 + 5
+add_ltl_run_test(data_game_strategy_bv_bits
+	"run (always o2[t]:bv[16] = o1[t-1]:bv[16] + i1[t]:bv[16]) && (sometimes o2[t]:bv[16] * {3}:bv[16] = {1000}:bv[16] + i1[t]:bv[16]).\\n5\\n7\\n9\\nq\\nq\\n"
+	"o2\\[0\\] := 335"
+	"no strategy|not executable|unsat|cannot")
+
+# the strategy of a game on the order types of qlt values: every output is
+# a rational, never the 0 or 1 of the type, and o1 meets 1/2 two steps
+# after a value at most 0
+add_ltl_run_test(data_game_strategy_order_types
+	"run (((o1[t]:qlt != i1[t-1]:qlt || {1}:qlt <= o2[t-1]:qlt)) U ((o1[t-2]:qlt <= {0}:qlt && o1[t]:qlt = {1/2}:qlt))).\\n{1}\\n{2}\\n{3}\\n{4}\\nq\\nq\\n"
+	"o1\\[[2-4]\\] := 1/2"
+	":= bot|:= top|no strategy|not executable|unsat|no values|no outputs")
+
 # once o1 has met its goal the strategy no longer depends on i1, and the
 # run stops asking for it
 add_ltl_run_test(data_game_strategy_reads_needed_inputs

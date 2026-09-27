@@ -251,16 +251,22 @@ struct data_bdd {
 	id var(uint32_t v, bool pos = true) {
 		return pos ? mk(v, F, T) : mk(v, T, F);
 	}
-	// op 0 conjunction, 1 disjunction
+	// op 0 conjunction, 1 disjunction, 3 exclusive or
 	id apply(uint32_t op, id a, id b) {
 		if (op == 0) {
 			if (a == F || b == F) return F;
 			if (a == T) return b;
 			if (b == T || a == b) return a;
-		} else {
+		} else if (op == 1) {
 			if (a == T || b == T) return T;
 			if (a == F) return b;
 			if (b == F || a == b) return a;
+		} else {
+			if (a == b) return F;
+			if (a == F) return b;
+			if (b == F) return a;
+			if (a == T) return neg(b);
+			if (b == T) return neg(a);
 		}
 		if (a > b) std::swap(a, b);
 		std::array<uint32_t, 3> k{ op, a, b };
@@ -275,6 +281,9 @@ struct data_bdd {
 	}
 	id conj(id a, id b) { return apply(0, a, b); }
 	id disj(id a, id b) { return apply(1, a, b); }
+	id exor(id a, id b) { return apply(3, a, b); }
+	id iff(id a, id b) { return neg(exor(a, b)); }
+	id ite(id c, id a, id b) { return disj(conj(c, a), conj(neg(c), b)); }
 	id neg(id a) {
 		if (a <= T) return a == T ? F : T;
 		std::array<uint32_t, 3> k{ 2, a, 0 };
@@ -299,20 +308,38 @@ struct data_bdd {
 		};
 		return go(a);
 	}
-	// Every variable v of `a` renamed v - d; false in `ok` when v modulo
-	// `block` is below d.
-	id lower(id a, uint32_t d, uint32_t block, bool& ok) {
+	// Every variable v of `a` renamed to[v]; false in `ok` when to[v] is
+	// `leaf`. The renaming must keep the order of the variables it meets.
+	id rename(id a, const std::vector<uint32_t>& to, bool& ok) {
 		std::unordered_map<id, id> seen;
 		std::function<id(id)> go = [&](id n) -> id {
 			if (n <= T) return n;
 			if (auto it = seen.find(n); it != seen.end()) return it->second;
 			const nd x = nodes[n];
-			if (x.var % block < d) { ok = false; return F; }
-			const id r = mk(x.var - d, go(x.lo), go(x.hi));
+			if (x.var >= to.size() || to[x.var] == leaf) {
+				ok = false;
+				return F;
+			}
+			const id r = mk(to[x.var], go(x.lo), go(x.hi));
 			seen.emplace(n, r);
 			return r;
 		};
 		return go(a);
+	}
+	// The variables `a` reads.
+	std::set<uint32_t> support(id a) const {
+		std::set<uint32_t> vs;
+		std::unordered_set<id> seen;
+		std::vector<id> todo{ a };
+		while (!todo.empty()) {
+			const id n = todo.back();
+			todo.pop_back();
+			if (n <= T || !seen.insert(n).second) continue;
+			vs.insert(nodes[n].var);
+			todo.push_back(nodes[n].lo);
+			todo.push_back(nodes[n].hi);
+		}
+		return vs;
 	}
 };
 
@@ -336,15 +363,35 @@ struct data_bdd {
 // values, none equal to another or to its complement, as the window holds
 // (make_code_window checks it).
 //
-// A stream of a type with few elements (at most 16, a power of two, such as
-// bv[n] for small n) read in any other way takes a value code: code c is the
-// c-th element, values[c], element 0 being 0. The code then is the value,
-// and each comparison is tabulated over the values of its streams.
+// A stream of a type with few elements (at most 16, a power of two) read
+// in any other way takes a value code: code c is the c-th element,
+// values[c], element 0 being 0. The code then is the value, and each
+// comparison is tabulated over the values of its streams.
+//
+// A stream of a type whose values are the integers below 2^n under
+// modular semantics (pack_modular_width) takes its n bits as its code, and
+// a comparison over such streams becomes a circuit on the bits
+// (code_regions::blast): the code is the value.
+//
+// A stream of a dense linear order without endpoints (pack_type_is_dense_
+// order) read through order comparisons takes no bits of its own. What the
+// comparisons read of a window is its order type: how its values and the
+// constants of the atoms compare, and every order type of such a window is
+// realized by the order, and any two windows of one order type are carried
+// onto each other by an automorphism fixing the constants. So a window is
+// coded by one relation per pair of points (a slot of a stream at a step
+// back, or a constant): two variables, `lt` (the first point is below the
+// second) and `eq`; neither set means above. An assignment that is no weak
+// order codes no window; the moves of the game keep to weak orders
+// (code_regions::quantify_step), so the positions that are none form a
+// part of the game no play from a window enters.
 //
 // Bit b of stream s at step t-k is variable b * block() + k * S + s, S the
 // number of streams: the same bit of every value sits in one layer, so an
-// equality of two values stays small in the BDD, and moving a region to the
-// next step subtracts S.
+// equality of two values stays small in the BDD. The relations follow the
+// bits, ordered by the step of their more recent point first. Reading a
+// region of the next step at the current one renames each variable to the
+// same bit, or the same relation, one step closer (shift).
 struct code_window {
 	struct stream {
 		std::string name;
@@ -352,13 +399,36 @@ struct code_window {
 		bool two = false;       // a two-element type, one bit
 		bool orbit = false;     // an orbit code, see above
 		std::vector<htref> values;   // a value code: the elements
+		size_t modular = 0;     // the width of a modular type, see above
+		bool order = false;     // read through the order relations
 		size_t width = 1;
+		size_t tid = 0;
+		size_t reach = 0;       // the deepest step back it is read at
 		// whether the stream's values are the codes themselves
-		bool finite() const { return two || !values.empty(); }
+		bool finite() const {
+			return two || !values.empty() || modular;
+		}
+	};
+	// A point of the order relations: a slot (stream s, step back k) or a
+	// constant.
+	struct point {
+		size_t s = SIZE_MAX, k = 0, tid = 0;
+		htref constant;
+		bool slot() const { return s != SIZE_MAX; }
 	};
 	std::vector<stream> streams;
 	std::map<std::string, size_t> index;
 	size_t depth = 0, max_width = 0;
+	std::vector<point> points;
+	// the first variable (lt) of the relation of an ordered pair of
+	// points; eq follows it
+	std::map<std::pair<size_t, size_t>, uint32_t> rel;
+	// per relation variable pair, its points
+	std::vector<std::pair<size_t, size_t>> rel_points;
+	// the order of two constants, -1, 0 or 1
+	std::map<std::pair<size_t, size_t>, int> fixed;
+	std::vector<uint32_t> shift;
+
 	uint32_t block() const {
 		return (uint32_t)((depth + 1) * streams.size());
 	}
@@ -366,7 +436,81 @@ struct code_window {
 	uint32_t var(size_t s, size_t k, size_t b) const {
 		return (uint32_t)(b * block() + k * streams.size() + s);
 	}
-	uint32_t vars() const { return (uint32_t)(max_width * block()); }
+	uint32_t code_vars() const { return (uint32_t)(max_width * block()); }
+	uint32_t vars() const {
+		return code_vars() + (uint32_t)(2 * rel_points.size());
+	}
+	bool has_order() const { return !rel_points.empty(); }
+	size_t slot_point(size_t s, size_t k) const {
+		for (size_t p = 0; p < points.size(); ++p)
+			if (points[p].s == s && points[p].k == k) return p;
+		return SIZE_MAX;
+	}
+	// The first variable of the relation of points p and q, and whether it
+	// relates them as (q, p); nullopt for two constants or p == q.
+	std::optional<std::pair<uint32_t, bool>> relation(size_t p, size_t q)
+		const
+	{
+		if (auto it = rel.find({ p, q }); it != rel.end())
+			return std::pair{ it->second, false };
+		if (auto it = rel.find({ q, p }); it != rel.end())
+			return std::pair{ it->second, true };
+		return std::nullopt;
+	}
+
+	// Lays out the relations of `points` after the code bits, and fills
+	// `shift`: a variable of a region over the next step's window renamed
+	// to the variable of the same value as the current step reads it.
+	void layout() {
+		// a pair is oriented by (step back, stream) of its points, a slot
+		// before a constant; the key orders the relations so that moving
+		// both points one step changes only the first component
+		using key = std::tuple<size_t, int, size_t, size_t, size_t>;
+		std::vector<std::pair<key, std::pair<size_t, size_t>>> pairs;
+		auto before = [&](size_t p, size_t q) {
+			const auto& a = points[p];
+			const auto& b = points[q];
+			return std::pair{ a.k, a.s } < std::pair{ b.k, b.s };
+		};
+		for (size_t p = 0; p < points.size(); ++p)
+			for (size_t q = 0; q < points.size(); ++q) {
+				const auto& a = points[p];
+				const auto& b = points[q];
+				if (p == q || !a.slot() || a.tid != b.tid) continue;
+				if (b.slot()) {
+					if (!before(p, q)) continue;
+					pairs.push_back({ key{ a.k, 1, b.k - a.k, a.s, b.s },
+						{ p, q } });
+				} else pairs.push_back({ key{ a.k, 0, 0, a.s, q },
+					{ p, q } });
+			}
+		std::sort(pairs.begin(), pairs.end());
+		rel.clear();
+		rel_points.clear();
+		for (auto& [_, pq] : pairs) {
+			rel.emplace(pq, code_vars() + 2 * (uint32_t)rel_points.size());
+			rel_points.push_back(pq);
+		}
+		shift.assign(vars(), data_bdd::leaf);
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 1; k <= depth; ++k)
+				for (size_t b = 0; b < streams[s].width; ++b)
+					shift[var(s, k, b)] = var(s, k - 1, b);
+		auto back = [&](size_t p) {
+			const auto& a = points[p];
+			return !a.slot() ? p : a.k ? slot_point(a.s, a.k - 1)
+				: SIZE_MAX;
+		};
+		for (size_t i = 0; i < rel_points.size(); ++i) {
+			auto [p, q] = rel_points[i];
+			const size_t p2 = back(p), q2 = back(q);
+			if (p2 == SIZE_MAX || q2 == SIZE_MAX) continue;
+			const uint32_t v = code_vars() + 2 * (uint32_t)i;
+			const uint32_t v2 = rel.at({ p2, q2 });
+			shift[v] = v2;
+			shift[v + 1] = v2 + 1;
+		}
+	}
 };
 
 // One side of an equality read on codes: an io_var (its variable node) or
@@ -507,9 +651,39 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max) {
 	return remember(std::nullopt);
 }
 
-// The code window of `atoms`, when every stream has a two-element type or
-// is read only through equalities and complements, or has few elements;
-// at most `max_vars` variables.
+// The widest modular type whose streams take their bits as codes.
+inline constexpr size_t max_blasted_width = 16;
+
+// The point of `w` an operand of an order comparison stands for: a slot of
+// an order stream or a constant of the same type; SIZE_MAX for anything
+// else.
+template <NodeType node>
+static size_t order_point(const code_window& w, tref operand) {
+	using tau = tree<node>;
+	const auto& b = tau::get(operand);
+	if (!b.is(tau::bf) || b.children_size() != 1) return SIZE_MAX;
+	if (is_child<node, tau::io_var>(b.first())) {
+		tref v = b.first();
+		auto it = w.index.find(get_var_name<node>(v));
+		if (it == w.index.end() || !w.streams[it->second].order)
+			return SIZE_MAX;
+		return w.slot_point(it->second, (size_t)get_io_var_shift<node>(v));
+	}
+	if (!tau::get(b.first()).is_ba_constant()) return SIZE_MAX;
+	for (size_t p = 0; p < w.points.size(); ++p) {
+		const auto& x = w.points[p];
+		if (x.slot()) continue;
+		auto c = pack_dense_order_compare<node>(x.tid, x.constant->get(),
+			operand);
+		if (c && *c == 0) return p;
+	}
+	return SIZE_MAX;
+}
+
+// The code window of `atoms`, when every stream has a two-element type, is
+// read only through equalities and complements, has few elements, a
+// modular type of at most max_blasted_width bits, or a dense order read
+// through order comparisons; at most `max_vars` variables.
 template <NodeType node>
 static std::optional<code_window> make_code_window(
 	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars)
@@ -517,24 +691,28 @@ static std::optional<code_window> make_code_window(
 	using tau = tree<node>;
 	data_quantifier<node> dq;
 	code_window w;
-	std::map<size_t, size_t> type_of;   // stream -> type id
 	for (auto& [atom, _] : atoms)
 		for (tref v : tau::get(atom).select_top(is_child<node, tau::io_var>)) {
 			if (is_io_initial<node>(v)) return std::nullopt;
-			w.depth = std::max(w.depth, (size_t)get_io_var_shift<node>(v));
+			const size_t k = (size_t)get_io_var_shift<node>(v);
+			w.depth = std::max(w.depth, k);
 			auto [it, fresh] = w.index.emplace(get_var_name<node>(v),
 				w.streams.size());
-			if (!fresh) continue;
-			code_window::stream s;
-			s.name = it->first;
-			s.input = is_input_stream<node>(v);
-			s.two = dq.is_two_element(v);
-			w.streams.push_back(s);
-			type_of[it->second] = find_ba_type<node>(v);
+			if (fresh) {
+				code_window::stream s;
+				s.name = it->first;
+				s.input = is_input_stream<node>(v);
+				s.two = dq.is_two_element(v);
+				s.tid = find_ba_type<node>(v);
+				w.streams.push_back(s);
+			}
+			auto& s = w.streams[it->second];
+			s.reach = std::max(s.reach, k);
 		}
 	// A stream of another type is read only through equalities, or has few
-	// elements; the types some complement relates take orbit codes.
-	std::set<size_t> orbit_types, value_types;
+	// elements, a modular type or a dense order; the types some complement
+	// relates take orbit codes.
+	std::set<size_t> orbit_types, value_types, modular_types, order_types;
 	for (auto& [atom, _] : atoms)
 		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
 			auto vars = tau::get(c).select_top(is_child<node, tau::io_var>);
@@ -543,23 +721,79 @@ static std::optional<code_window> make_code_window(
 					continue;
 			bool equal, flip;
 			if (!code_equality<node>(c, equal, flip)) {
-				for (tref v : vars)
-					if (!w.streams[w.index.at(get_var_name<node>(v))].two)
-						value_types.insert(find_ba_type<node>(v));
+				for (tref v : vars) {
+					const auto& s = w.streams[w.index.at(
+						get_var_name<node>(v))];
+					if (s.two) continue;
+					const size_t n = pack_modular_width<node>(s.tid);
+					if (pack_type_is_dense_order<node>(s.tid))
+						order_types.insert(s.tid);
+					else if (n && n <= max_blasted_width)
+						modular_types.insert(s.tid);
+					else value_types.insert(s.tid);
+				}
 			} else if (flip) orbit_types.insert(find_ba_type<node>(vars[0]));
 		}
+	for (auto& s : w.streams) {
+		if (s.two) continue;
+		if (modular_types.contains(s.tid)) {
+			s.modular = pack_modular_width<node>(s.tid);
+			// few enough values to tabulate what the circuits miss
+			if (s.modular <= 4)
+				for (size_t v = 0; v < (size_t{1} << s.modular); ++v) {
+					tref e = pack_value_constant<node>(s.tid, v);
+					if (!e) return std::nullopt;
+					s.values.push_back(tau::geth(e));
+				}
+		} else if (order_types.contains(s.tid)) s.order = true;
+	}
 	for (size_t tid : value_types) {
 		auto els = finite_elements<node>(tid, 16);
 		if (!els) return std::nullopt;
-		for (size_t s = 0; s < w.streams.size(); ++s)
-			if (type_of[s] == tid)
-				for (tref e : *els)
-					w.streams[s].values.push_back(tau::geth(e));
+		for (auto& s : w.streams)
+			if (s.tid == tid && !s.two)
+				for (tref e : *els) s.values.push_back(tau::geth(e));
 	}
+	// The points of the order relations: every slot of an order stream and
+	// every constant its comparisons name, which must be order
+	// comparisons of such slots and constants.
+	for (size_t s = 0; s < w.streams.size(); ++s)
+		if (w.streams[s].order)
+			for (size_t k = 0; k <= w.streams[s].reach; ++k)
+				w.points.push_back({ s, k, w.streams[s].tid, {} });
+	for (auto& [atom, _] : atoms)
+		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
+			auto vars = tau::get(c).select_top(is_child<node, tau::io_var>);
+			if (vars.empty() || !w.streams[w.index.at(
+				get_var_name<node>(vars[0]))].order) continue;
+			const size_t tid = w.streams[w.index.at(
+				get_var_name<node>(vars[0]))].tid;
+			const auto& op = tau::get(c)[0];
+			for (size_t i = 0; i < op.children_size(); ++i) {
+				tref x = op.child(i);
+				if (order_point<node>(w, x) != SIZE_MAX) continue;
+				const auto& b = tau::get(x);
+				if (!b.is(tau::bf) || b.children_size() != 1
+					|| !tau::get(b.first()).is_ba_constant()
+					|| !pack_dense_order_compare<node>(tid, x, x))
+						return std::nullopt;
+				w.points.push_back({ SIZE_MAX, 0, tid, tau::geth(x) });
+			}
+		}
+	for (size_t p = 0; p < w.points.size(); ++p)
+		for (size_t q = 0; q < w.points.size(); ++q) {
+			const auto& a = w.points[p];
+			const auto& b = w.points[q];
+			if (p == q || a.slot() || b.slot() || a.tid != b.tid) continue;
+			auto c = pack_dense_order_compare<node>(a.tid,
+				a.constant->get(), b.constant->get());
+			if (!c) return std::nullopt;
+			w.fixed[{ p, q }] = *c;
+		}
 	// Each other type needs as many values as a window holds, plus 0 and 1.
 	std::map<size_t, size_t> slots;
-	for (size_t s = 0; s < w.streams.size(); ++s)
-		if (!w.streams[s].finite()) slots[type_of[s]] += w.depth + 1;
+	for (auto& s : w.streams)
+		if (!s.finite() && !s.order) slots[s.tid] += w.depth + 1;
 	std::map<size_t, size_t> width;
 	for (auto& [tid, n] : slots) {
 		const bool orbits = orbit_types.contains(tid);
@@ -569,16 +803,90 @@ static std::optional<code_window> make_code_window(
 		width[tid] = bits + (orbits ? 1 : 0);
 		if (!codes_realized<node>(tid, n, orbits)) return std::nullopt;
 	}
-	for (size_t s = 0; s < w.streams.size(); ++s) {
-		auto& x = w.streams[s];
-		x.orbit = !x.finite() && orbit_types.contains(type_of[s]);
-		if (x.values.empty()) x.width = x.two ? 1 : width[type_of[s]];
+	for (auto& x : w.streams) {
+		x.orbit = !x.finite() && !x.order && orbit_types.contains(x.tid);
+		if (x.order) x.width = 0;
+		else if (x.modular) x.width = x.modular;
+		else if (x.values.empty()) x.width = x.two ? 1 : width[x.tid];
 		else for (x.width = 0; (size_t{1} << x.width) < x.values.size();)
 			++x.width;
 		w.max_width = std::max(w.max_width, x.width);
 	}
+	w.layout();
 	if (w.vars() > max_vars) return std::nullopt;
 	return w;
+}
+
+// Points p and q of `w` in relation r: -1 p below q, 0 equal, 1 above. A
+// variable `known` gives a value (0 or 1) is read as that value.
+static data_bdd::id order_literal(const code_window& w, data_bdd& bdd,
+	size_t p, size_t q, int r, const std::vector<int>* known = nullptr)
+{
+	if (p == q) return r == 0 ? data_bdd::T : data_bdd::F;
+	auto rel = w.relation(p, q);
+	if (!rel) {
+		if (auto it = w.fixed.find({ p, q }); it != w.fixed.end())
+			return it->second == r ? data_bdd::T : data_bdd::F;
+		return data_bdd::F;
+	}
+	auto [v, flip] = *rel;
+	if (flip) r = -r;
+	auto bit = [&](uint32_t x, bool pos) {
+		if (known && x < known->size() && (*known)[x] >= 0)
+			return ((*known)[x] == 1) == pos ? data_bdd::T : data_bdd::F;
+		return bdd.var(x, pos);
+	};
+	return bdd.conj(bit(v, r == -1), bit(v + 1, r == 0));
+}
+
+// The weak orders of the points `pts` (of one type), as far as the pairs
+// and triples with a point flagged in `in_x` read them. Over points whose
+// relations are a weak order, it holds exactly when the relations of the
+// flagged points extend that order to a weak order: every weak order of a
+// subset extends to one of the whole, so no other point constrains them.
+static data_bdd::id order_consistent(const code_window& w, data_bdd& bdd,
+	const std::vector<size_t>& pts, const std::vector<bool>& in_x,
+	const std::vector<int>* known = nullptr)
+{
+	// the relations (a, b), (b, c), (a, c) of the 13 weak orders of a, b, c
+	static const auto triples = [] {
+		std::set<std::array<int, 3>> out;
+		auto cmp = [](int x, int y) { return x < y ? -1 : x > y ? 1 : 0; };
+		for (int a = 0; a < 3; ++a)
+			for (int b = 0; b < 3; ++b)
+				for (int c = 0; c < 3; ++c)
+					out.insert({ cmp(a, b), cmp(b, c), cmp(a, c) });
+		return out;
+	}();
+	data_bdd::id all = data_bdd::T;
+	auto lit = [&](size_t i, size_t j, int r) {
+		return order_literal(w, bdd, pts[i], pts[j], r, known);
+	};
+	const size_t n = pts.size();
+	for (size_t i = 0; i < n; ++i)
+		for (size_t j = i + 1; j < n; ++j) {
+			if (!in_x[i] && !in_x[j]) continue;
+			all = bdd.conj(all, bdd.disj(lit(i, j, -1),
+				bdd.disj(lit(i, j, 0), lit(i, j, 1))));
+			for (size_t l = j + 1; l < n; ++l) {
+				data_bdd::id some = data_bdd::F;
+				for (const auto& t : triples)
+					some = bdd.disj(some, bdd.conj(lit(i, j, t[0]),
+						bdd.conj(lit(j, l, t[1]), lit(i, l, t[2]))));
+				all = bdd.conj(all, some);
+			}
+		}
+	for (size_t i = 0; i < n; ++i)
+		for (size_t j = i + 1; j < n; ++j)
+			for (size_t l = j + 1; l < n; ++l) {
+				if (in_x[i] || in_x[j] || !in_x[l]) continue;
+				data_bdd::id some = data_bdd::F;
+				for (const auto& t : triples)
+					some = bdd.disj(some, bdd.conj(lit(i, j, t[0]),
+						bdd.conj(lit(j, l, t[1]), lit(i, l, t[2]))));
+				all = bdd.conj(all, some);
+			}
+	return all;
 }
 
 // Regions as BDDs over the codes of a code_window.
@@ -593,6 +901,7 @@ struct code_regions {
 	bool failed = false;
 	std::vector<region> labels;           // per vertex, per edge
 	std::vector<size_t> edge_base;
+	std::map<std::vector<size_t>, region> consistent;
 
 	code_regions(const arena& ar, const code_window& win, size_t max_nodes)
 		: a(ar), w(win), bdd(max_nodes) {}
@@ -610,14 +919,58 @@ struct code_regions {
 		return r;
 	}
 
-	// The variables of the chooser's streams at step t-k.
+	// Whether point p is a slot of the chooser's streams at step t-k.
+	bool chosen(size_t p, size_t k, bool inputs) const {
+		const auto& x = w.points[p];
+		return x.slot() && x.k == k && w.streams[x.s].input == inputs;
+	}
+
+	// The variables of the chooser's streams at step t-k: their bits and
+	// the relations of their slots.
 	std::vector<bool> step_vars(size_t k, bool inputs) const {
 		std::vector<bool> qs(w.vars(), false);
 		for (size_t s = 0; s < w.streams.size(); ++s)
 			if (w.streams[s].input == inputs)
 				for (size_t b = 0; b < w.streams[s].width; ++b)
 					qs[w.var(s, k, b)] = true;
+		for (size_t i = 0; i < w.rel_points.size(); ++i) {
+			auto [p, q] = w.rel_points[i];
+			if (!chosen(p, k, inputs) && !chosen(q, k, inputs)) continue;
+			qs[w.code_vars() + 2 * i] = qs[w.code_vars() + 2 * i + 1] = true;
+		}
 		return qs;
+	}
+
+	// `body` with the chooser's values at step t-k quantified: over the
+	// values, or, for order streams, over the relations that extend the
+	// order of the other points to a weak order. Only the points `body`
+	// relates to the chosen slots constrain that extension.
+	region quantify_step(region body, size_t k, bool inputs, bool exists) {
+		if (w.has_order()) {
+			std::set<size_t> used;
+			for (uint32_t v : bdd.support(body)) {
+				if (v < w.code_vars()) continue;
+				auto [p, q] = w.rel_points[(v - w.code_vars()) / 2];
+				if (chosen(p, k, inputs) || chosen(q, k, inputs))
+					used.insert(p), used.insert(q);
+			}
+			std::map<size_t, std::vector<size_t>> by_type;
+			for (size_t p : used) by_type[w.points[p].tid].push_back(p);
+			for (auto& [_, pts] : by_type) {
+				std::vector<bool> in_x;
+				std::vector<size_t> key;
+				for (size_t p : pts) {
+					in_x.push_back(chosen(p, k, inputs));
+					key.push_back(2 * p + in_x.back());
+				}
+				auto it = consistent.find(key);
+				if (it == consistent.end()) it = consistent.emplace(key,
+					order_consistent(w, bdd, pts, in_x)).first;
+				body = exists ? bdd.conj(body, it->second)
+					: bdd.disj(bdd.neg(it->second), body);
+			}
+		}
+		return bdd.quantify(body, step_vars(k, inputs), exists);
 	}
 
 	// The value of io_var `v` equals the constant `c`, or the value of io_var
@@ -664,6 +1017,7 @@ struct code_regions {
 				build_bf_t_type<node>(tid) };
 			else for (const auto& e : w.streams[s].values)
 				x.values.push_back(e->get());
+			if (x.values.empty()) return std::nullopt;
 			combinations *= x.values.size();
 			if (combinations > 4096) return std::nullopt;
 			vars.push_back(std::move(x));
@@ -688,6 +1042,219 @@ struct code_regions {
 			if (t.equals_T()) r = bdd.disj(r, cube);
 		}
 		return r;
+	}
+
+	using bits = std::vector<region>;
+
+	// x + y + carry, modulo 2^n.
+	bits add(const bits& x, const bits& y, region carry = data_bdd::F) {
+		bits out(x.size());
+		for (size_t i = 0; i < x.size(); ++i) {
+			const region h = bdd.exor(x[i], y[i]);
+			out[i] = bdd.exor(h, carry);
+			carry = bdd.disj(bdd.conj(x[i], y[i]), bdd.conj(carry, h));
+		}
+		return out;
+	}
+	// x < y, unsigned.
+	region less(const bits& x, const bits& y) {
+		region lt = data_bdd::F;
+		for (size_t i = 0; i < x.size(); ++i)
+			lt = bdd.disj(bdd.conj(bdd.neg(x[i]), y[i]),
+				bdd.conj(bdd.iff(x[i], y[i]), lt));
+		return lt;
+	}
+	region same(const bits& x, const bits& y) {
+		region r = data_bdd::T;
+		for (size_t i = 0; i < x.size(); ++i)
+			r = bdd.conj(r, bdd.iff(x[i], y[i]));
+		return r;
+	}
+	bits select(region c, const bits& x, const bits& y) {
+		bits out(x.size());
+		for (size_t i = 0; i < x.size(); ++i) out[i] = bdd.ite(c, x[i], y[i]);
+		return out;
+	}
+	// x shifted by y: left towards the high bits, else right, logically;
+	// by n or more, 0.
+	bits shifted(const bits& x, const bits& y, bool left) {
+		const size_t n = x.size();
+		bits r = x;
+		for (size_t j = 0; j < n; ++j) {
+			bits moved(n, data_bdd::F);
+			if (j < 63 && (size_t{1} << j) < n) {
+				const size_t d = size_t{1} << j;
+				for (size_t i = 0; i < n; ++i) {
+					if (left && i >= d) moved[i] = r[i - d];
+					if (!left && i + d < n) moved[i] = r[i + d];
+				}
+			}
+			r = select(y[j], moved, r);
+		}
+		return r;
+	}
+
+	// The bits of `term`, a term over streams of modular type `tid` and
+	// width `n`, least significant first; nullopt for an operator the
+	// circuits do not cover, or a product that outgrows its share of the
+	// BDD.
+	std::optional<bits> blast(tref term, size_t tid, size_t n) {
+		const auto& b = tau::get(term);
+		if (!b.is(tau::bf) || b.children_size() != 1) return std::nullopt;
+		if (is_child<node, tau::io_var>(b.first())) {
+			tref v = b.first();
+			auto it = w.index.find(get_var_name<node>(v));
+			if (it == w.index.end()) return std::nullopt;
+			const auto& x = w.streams[it->second];
+			if (x.modular != n) return std::nullopt;
+			const size_t k = (size_t)get_io_var_shift<node>(v);
+			bits out(n);
+			for (size_t i = 0; i < n; ++i)
+				out[i] = bdd.var(w.var(it->second, k, i));
+			return out;
+		}
+		const auto& op = tau::get(b.first());
+		const auto nt = op.value.nt;
+		if (op.is_ba_constant() || nt == tau::bf_t || nt == tau::bf_f) {
+			auto c = pack_modular_value<node>(tid, term);
+			if (!c) return std::nullopt;
+			bits out(n);
+			for (size_t i = 0; i < n; ++i)
+				out[i] = i < 64 && (*c >> i & 1) ? data_bdd::T
+					: data_bdd::F;
+			return out;
+		}
+		if (nt == tau::bf_parenthesis && op.children_size() == 1)
+			return blast(op.child(0), tid, n);
+		if (nt == tau::bf_neg && op.children_size() == 1) {
+			auto x = blast(op.child(0), tid, n);
+			if (!x) return std::nullopt;
+			for (auto& e : *x) e = bdd.neg(e);
+			return x;
+		}
+		if (op.children_size() != 2) return std::nullopt;
+		auto x = blast(op.child(0), tid, n);
+		if (!x) return std::nullopt;
+		auto y = blast(op.child(1), tid, n);
+		if (!y) return std::nullopt;
+		bits out(n);
+		auto bitwise = [&](auto f) {
+			for (size_t i = 0; i < n; ++i) out[i] = f((*x)[i], (*y)[i]);
+			return out;
+		};
+		switch (nt) {
+		case tau::bf_and: return bitwise([&](region p, region q) {
+			return bdd.conj(p, q); });
+		case tau::bf_or: return bitwise([&](region p, region q) {
+			return bdd.disj(p, q); });
+		case tau::bf_xor: return bitwise([&](region p, region q) {
+			return bdd.exor(p, q); });
+		case tau::bf_nand: return bitwise([&](region p, region q) {
+			return bdd.neg(bdd.conj(p, q)); });
+		case tau::bf_nor: return bitwise([&](region p, region q) {
+			return bdd.neg(bdd.disj(p, q)); });
+		case tau::bf_xnor: return bitwise([&](region p, region q) {
+			return bdd.iff(p, q); });
+		case tau::bf_add: return add(*x, *y);
+		case tau::bf_sub: {
+			bits ny(n);
+			for (size_t i = 0; i < n; ++i) ny[i] = bdd.neg((*y)[i]);
+			return add(*x, ny, data_bdd::T);
+		}
+		case tau::bf_mul: {
+			// shift and add; a product may grow the BDD exponentially,
+			// so it gets a quarter of the table
+			const size_t cap = bdd.nodes.size() + bdd.max_nodes / 4;
+			bits acc(n, data_bdd::F);
+			for (size_t i = 0; i < n; ++i) {
+				if ((*y)[i] == data_bdd::F) continue;
+				bits part(n, data_bdd::F);
+				for (size_t j = i; j < n; ++j)
+					part[j] = bdd.conj((*x)[j - i], (*y)[i]);
+				acc = add(acc, part);
+				if (bdd.full || bdd.nodes.size() > cap) return std::nullopt;
+			}
+			return acc;
+		}
+		case tau::bf_shl: return shifted(*x, *y, true);
+		case tau::bf_shr: return shifted(*x, *y, false);
+		case tau::bf_min: return select(less(*y, *x), *y, *x);
+		case tau::bf_max: return select(less(*x, *y), *y, *x);
+		default: return std::nullopt;
+		}
+	}
+
+	// A comparison over streams of one modular type as a circuit.
+	std::optional<region> blast_comparison(tref cmp) {
+		const auto& t = tau::get(cmp);
+		auto vars = t.select_top(is_child<node, tau::io_var>);
+		if (vars.empty()) return std::nullopt;
+		const auto& s = w.streams[w.index.at(get_var_name<node>(vars[0]))];
+		const auto& op = t[0];
+		std::vector<bits> xs;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			auto x = blast(op.child(i), s.tid, s.modular);
+			if (!x || bdd.full) return std::nullopt;
+			xs.push_back(std::move(*x));
+		}
+		const auto nt = op.value.nt;
+		if (nt == tau::bf_interval) {
+			if (xs.size() != 3) return std::nullopt;
+			return bdd.conj(bdd.neg(less(xs[1], xs[0])),
+				bdd.neg(less(xs[2], xs[1])));
+		}
+		if (xs.size() != 2) return std::nullopt;
+		const bits& x = xs[0];
+		const bits& y = xs[1];
+		switch (nt) {
+		case tau::bf_eq: return same(x, y);
+		case tau::bf_neq: return bdd.neg(same(x, y));
+		case tau::bf_lt: return less(x, y);
+		case tau::bf_nlt: return bdd.neg(less(x, y));
+		case tau::bf_lteq: return bdd.neg(less(y, x));
+		case tau::bf_nlteq: return less(y, x);
+		case tau::bf_gt: return less(y, x);
+		case tau::bf_ngt: return bdd.neg(less(y, x));
+		case tau::bf_gteq: return bdd.neg(less(x, y));
+		case tau::bf_ngteq: return less(x, y);
+		default: return std::nullopt;
+		}
+	}
+
+	// An order comparison over order streams and constants.
+	std::optional<region> order_comparison(tref cmp) {
+		const auto& op = tau::get(cmp)[0];
+		std::vector<size_t> ps;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			const size_t p = order_point<node>(w, op.child(i));
+			if (p == SIZE_MAX) return std::nullopt;
+			ps.push_back(p);
+		}
+		auto lit = [&](size_t i, size_t j, int r) {
+			return order_literal(w, bdd, ps[i], ps[j], r);
+		};
+		auto at_most = [&](size_t i, size_t j) {
+			return bdd.disj(lit(i, j, -1), lit(i, j, 0));
+		};
+		const auto nt = op.value.nt;
+		if (nt == tau::bf_interval) {
+			if (ps.size() != 3) return std::nullopt;
+			return bdd.conj(at_most(0, 1), at_most(1, 2));
+		}
+		if (ps.size() != 2) return std::nullopt;
+		switch (nt) {
+		case tau::bf_eq: return lit(0, 1, 0);
+		case tau::bf_neq: return bdd.neg(lit(0, 1, 0));
+		case tau::bf_lt: return lit(0, 1, -1);
+		case tau::bf_nlt: return bdd.neg(lit(0, 1, -1));
+		case tau::bf_lteq: return at_most(0, 1);
+		case tau::bf_nlteq: return bdd.neg(at_most(0, 1));
+		case tau::bf_gt: return lit(0, 1, 1);
+		case tau::bf_ngt: return bdd.neg(lit(0, 1, 1));
+		case tau::bf_gteq: return at_most(1, 0);
+		case tau::bf_ngteq: return bdd.neg(at_most(1, 0));
+		default: return std::nullopt;
+		}
 	}
 
 	// A label: a Boolean combination of comparisons.
@@ -727,9 +1294,19 @@ struct code_regions {
 			return nt == tau::wff_equiv ? same : bdd.neg(same);
 		}
 		auto vars = t.select_top(is_child<node, tau::io_var>);
-		if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
-			return w.streams[w.index.at(get_var_name<node>(v))].finite(); }))
-				return tabulate(f);
+		auto all = [&](auto pred) {
+			return std::all_of(vars.begin(), vars.end(), [&](tref v) {
+				return pred(w.streams[w.index.at(get_var_name<node>(v))]);
+			});
+		};
+		if (all([](const auto& s) { return s.finite(); })) {
+			if (all([](const auto& s) { return s.modular > 0; }))
+				if (auto r = blast_comparison(f)) return r;
+			if (bdd.full) return std::nullopt;
+			return tabulate(f);
+		}
+		if (all([](const auto& s) { return s.order; }))
+			return order_comparison(f);
 		bool equal, flip;
 		auto sides = code_equality<node>(f, equal, flip);
 		if (!sides) return std::nullopt;
@@ -767,7 +1344,7 @@ struct code_regions {
 			region tgt = mine ? Y[e.dst] : bdd.disj(Y[e.dst], bdd.neg(G[e.dst]));
 			if (e.shift) {
 				bool ok = true;
-				tgt = bdd.lower(tgt, w.step(), w.block(), ok);
+				tgt = bdd.rename(tgt, w.shift, ok);
 				if (!ok) { failed = true; return data_bdd::F; }
 			}
 			const region l = labels[edge_base[i] + j];
@@ -775,8 +1352,8 @@ struct code_regions {
 				: bdd.conj(body, bdd.disj(bdd.neg(l), tgt));
 		}
 		if (x.picks != arena::chooser::none)
-			body = bdd.quantify(body,
-				step_vars(0, x.picks == arena::chooser::inputs), mine);
+			body = quantify_step(body, 0,
+				x.picks == arena::chooser::inputs, mine);
 		return check(body);
 	}
 
@@ -785,7 +1362,7 @@ struct code_regions {
 		region tgt = Y[e.dst];
 		if (e.shift) {
 			bool ok = true;
-			tgt = bdd.lower(tgt, w.step(), w.block(), ok);
+			tgt = bdd.rename(tgt, w.shift, ok);
 			if (!ok) { failed = true; return data_bdd::F; }
 		}
 		return check(bdd.conj(labels[edge_base[i] + j], tgt));
@@ -793,8 +1370,8 @@ struct code_regions {
 
 	std::optional<bool> reached(region r) {
 		for (size_t k = 1; k <= w.depth; ++k) {
-			r = bdd.quantify(r, step_vars(k, false), true);
-			r = bdd.quantify(r, step_vars(k, true), false);
+			r = quantify_step(r, k, false, true);
+			r = quantify_step(r, k, true, false);
 		}
 		if (bdd.full) return std::nullopt;
 		return r != data_bdd::F;
@@ -1346,11 +1923,20 @@ protected:
 		return normalize_ba<node>(tau::build_bf_neg(x));
 	}
 
+	// The value of point p of the order relations in `win`, nullptr when
+	// unknown.
+	tref point_value(size_t p, const window& win) const {
+		const auto& x = w.points[p];
+		if (!x.slot()) return x.constant->get();
+		return x.k < win[x.s].size() ? win[x.s][x.k] : nullptr;
+	}
+
 	// The bits of the known values of `win`, -1 for an unknown one. A
 	// value of a coded stream gets code 0 when it is 0, 1 when it is 1,
 	// and otherwise the code of the first equal value met or a new one; a
 	// value of an orbit-coded stream gets the pair of the first value met
-	// it equals or complements, or a new one.
+	// it equals or complements, or a new one. A relation of two known
+	// points of an order gets their order.
 	std::optional<std::vector<int>> encode(const window& win) {
 		std::vector<int> bits(w.vars(), -1);
 		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
@@ -1361,6 +1947,14 @@ protected:
 				const size_t tid = streams[s].tid;
 				const auto& ws = w.streams[s];
 				size_t c;
+				if (ws.order) continue;
+				if (ws.modular) {
+					auto v = pack_modular_value<node>(tid, x);
+					if (!v) return std::nullopt;
+					for (size_t b = 0; b < ws.width; ++b)
+						bits[w.var(s, k, b)] = (int)(*v >> b & 1);
+					continue;
+				}
 				if (!ws.values.empty()) {
 					c = ws.values.size();
 					for (size_t j = 0; j < ws.values.size(); ++j) {
@@ -1404,7 +1998,46 @@ protected:
 				for (size_t b = 0; b < ws.width; ++b)
 					bits[w.var(s, k, b)] = (int)(c >> b & 1);
 			}
+		for (size_t i = 0; i < w.rel_points.size(); ++i) {
+			auto [p, q] = w.rel_points[i];
+			tref x = point_value(p, win), y = point_value(q, win);
+			if (!x || !y) continue;
+			auto c = pack_dense_order_compare<node>(w.points[p].tid, x, y);
+			if (!c) return std::nullopt;
+			bits[w.code_vars() + 2 * i] = *c < 0;
+			bits[w.code_vars() + 2 * i + 1] = *c == 0;
+		}
 		return bits;
+	}
+
+	// The relations that extend the order of the points `win` knows to the
+	// order slots of `slots`, with them as weak orders. A point of neither
+	// stays out: the relations to it would only grow the BDD.
+	data_bdd::id order_extensions(const std::vector<int>& bits,
+		const window& win,
+		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
+	{
+		data_bdd::id r = data_bdd::T;
+		std::map<size_t, std::vector<size_t>> by_type;
+		std::map<size_t, std::vector<bool>> flagged;
+		for (size_t p = 0; p < w.points.size(); ++p) {
+			const auto& x = w.points[p];
+			const bool mine = x.slot() && std::any_of(slots.begin(),
+				slots.end(), [&](const auto& sl) {
+					return std::get<0>(sl) == x.s
+						&& std::get<1>(sl) == x.k; });
+			if (!mine && !point_value(p, win)) continue;
+			by_type[x.tid].push_back(p);
+			flagged[x.tid].push_back(mine);
+		}
+		for (auto& [tid, pts] : by_type) {
+			const std::vector<bool>& in_x = flagged[tid];
+			const bool any = std::find(in_x.begin(), in_x.end(), true)
+				!= in_x.end();
+			if (any) r = bdd.conj(r, order_consistent(w, bdd, pts, in_x,
+				&bits));
+		}
+		return r;
 	}
 
 	// nullopt when the BDD reads an unknown bit
@@ -1452,6 +2085,8 @@ protected:
 		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
 	{
 		tref f = tau::_T();
+		// the value decoded for each slot of an order stream
+		std::vector<tref> placed(slots.size(), nullptr);
 		for (size_t i = 0; i < slots.size(); ++i) {
 			auto [s, k, x] = slots[i];
 			const size_t tid = streams[s].tid;
@@ -1464,6 +2099,44 @@ protected:
 			auto as = [&](tref y, size_t other) {
 				return ws.orbit && side != other ? complement(y) : y;
 			};
+			if (ws.order) {
+				// the point the relations to every known point and earlier
+				// slot place it at: equal to one, else between the
+				// greatest below it and the least above it
+				const size_t me = w.slot_point(s, k);
+				auto cmp = [&](tref a, tref b) {
+					return pack_dense_order_compare<node>(tid, a, b)
+						.value_or(0);
+				};
+				tref same = nullptr, lo = nullptr, hi = nullptr;
+				for (size_t p = 0; p < w.points.size(); ++p) {
+					if (p == me || w.points[p].tid != tid) continue;
+					tref y = point_value(p, win);
+					for (size_t i2 = 0; i2 < i && !y; ++i2)
+						if (w.slot_point(std::get<0>(slots[i2]),
+							std::get<1>(slots[i2])) == p)
+								y = placed[i2];
+					auto rel = w.relation(me, p);
+					if (!y || !rel) continue;
+					auto [v, flip] = *rel;
+					int r = bits[v] > 0 ? -1 : bits[v + 1] > 0 ? 0 : 1;
+					if (flip) r = -r;
+					if (r == 0) same = y;
+					else if (r < 0) { if (!hi || cmp(y, hi) < 0) hi = y; }
+					else if (!lo || cmp(y, lo) > 0) lo = y;
+				}
+				placed[i] = same ? same
+					: pack_dense_order_between<node>(tid, lo, hi);
+				f = tau::build_wff_and(f, placed[i]
+					? tau::build_bf_eq(x, placed[i]) : tau::_F());
+				continue;
+			}
+			if (ws.modular) {
+				tref e = pack_value_constant<node>(tid, c);
+				f = tau::build_wff_and(f, e ? tau::build_bf_eq(x, e)
+					: tau::_F());
+				continue;
+			}
 			if (!ws.values.empty()) {
 				f = tau::build_wff_and(f, tau::build_bf_eq(x,
 					ws.values[c]->get()));
@@ -1544,38 +2217,46 @@ protected:
 		auto bits = encode(win);
 		if (!bits) return r.with_error(code::solver_error,
 			"the data game strategy cannot compare the values");
-		data_bdd::id any = data_bdd::F;
-		for (auto m : moves[i]) any = bdd.disj(any, m);
-		if (bdd.full || !pick(any, *bits))
-			return r.with_error(code::internal_error,
-				"the data game strategy has no move from the history");
 		std::vector<std::tuple<size_t, size_t, tref>> slots;
 		for (size_t s = 0; s < streams.size(); ++s)
 			if (!streams[s].input)
 				slots.emplace_back(s, 0, build_out_var_at_n<node>(
 					streams[s].name, t, streams[s].tid));
+		data_bdd::id any = data_bdd::F;
+		for (auto m : moves[i]) any = bdd.disj(any, m);
+		any = bdd.conj(any, order_extensions(*bits, win, slots));
+		if (bdd.full || !pick(any, *bits))
+			return r.with_error(code::internal_error,
+				"the data game strategy has no move from the history");
 		return r.with_value(decode(*bits, win, slots));
 	}
 
 	result<bool> choose_before(const solver_fn& solve) override {
 		result<bool> r;
 		const size_t n = streams.size(), d = w.depth;
-		std::vector<int> bits(w.vars(), -1);
 		window win(n, std::vector<tref>(d + 1, nullptr));
 		for (size_t s = 0; s < n; ++s)
 			for (size_t k = 1; k <= d; ++k)
 				if (streams[s].input) {
-					for (size_t b = 0; b < w.streams[s].width; ++b)
-						bits[w.var(s, k, b)] = 0;
-					win[s][k] = build_bf_f_type<node>(streams[s].tid);
+					// an order has no 0 below its points, but a zero
+					// constant among them
+					tref zero = w.streams[s].order
+						? pack_zero_constant<node>(streams[s].tid) : nullptr;
+					win[s][k] = zero ? zero
+						: build_bf_f_type<node>(streams[s].tid);
 				}
-		if (!pick(won_init, bits)) return r.with_value(false);
 		std::vector<std::tuple<size_t, size_t, tref>> slots;
 		for (size_t s = 0; s < n; ++s)
 			for (size_t k = 1; k <= d; ++k)
 				if (!streams[s].input)
 					slots.emplace_back(s, k,
 						this->before_var(s, k, streams[s].tid));
+		auto known = encode(win);
+		if (!known) return r.with_error(code::solver_error,
+			"the data game strategy cannot compare the values");
+		std::vector<int> bits = std::move(*known);
+		if (!pick(bdd.conj(won_init, order_extensions(bits, win, slots)),
+			bits)) return r.with_value(false);
 		values sol;
 		if (!slots.empty()) {
 			auto got = solve(decode(bits, win, slots), 0);
@@ -1612,6 +2293,11 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 	const std::vector<int>* from)
 {
 	using tau = tree<node>;
+	// The atoms of the view name a code by an element or by an equality;
+	// the bits of a modular stream with no element table and the order
+	// relations name neither, so such a strategy is played without a view.
+	for (const auto& x : w.streams)
+		if (x.order || (x.modular && x.values.empty())) return false;
 	const size_t S = streams.size(), d = w.depth;
 	const auto& vs = this->v;
 	// reach[s]: the deepest step back at which a label or a move reads s;
@@ -2252,7 +2938,7 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			if (is_io_initial<node>(var)
 				|| io_var_direction<node>(tau::trim(var)) == 0)
 					return r.with_value(data_game_verdict::undecided);
-	const auto window = make_code_window<node>(atoms, 256);
+	const auto window = make_code_window<node>(atoms, 1024);
 	if (!window && !formulas)
 		return r.with_value(data_game_verdict::undecided);
 	// ACD usually gives the smallest game and a parity condition, but may
@@ -2270,7 +2956,9 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
-		code_regions<node> codes(arena, *window, size_t{1} << 21);
+		// 2^23 nodes take about 1.5 GB; a product of two bitvector streams
+		// wider than 4 bits needs millions of them
+		code_regions<node> codes(arena, *window, size_t{1} << 23);
 		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
 			data_game_solver solver(codes, arena, 0, keep);

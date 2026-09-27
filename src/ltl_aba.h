@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "ltl_aba_limits.h"
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
@@ -37,6 +38,8 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace idni::tau_lang {
