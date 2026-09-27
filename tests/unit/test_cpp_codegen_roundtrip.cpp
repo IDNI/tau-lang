@@ -130,88 +130,6 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 		emit_program(d, os);
 		CHECK(compile_and_run_echo(os.str()));
 	}
-}
-
-// LG-23: the declare_open emitters were entirely untested (~400 lines,
-// including the "};"-splice injection and the generated oracle protocol).
-TEST_SUITE("cpp_codegen_open") {
-
-	TEST_CASE("open emit: scaffolding is spliced into the class") {
-		std::ostringstream os;
-		auto d = build_program_desc_prop(echo_spec(), {"in_sig"}, {"out_sig"},
-			"EchoCtrl", /*revisable=*/false, {"o_out_sig"});
-		emit_program(d, os);
-		std::string s = os.str();
-		CHECK(s.find("open_streams()") != std::string::npos);
-		CHECK(s.find("register_open_oracle") != std::string::npos);
-		CHECK(s.find("unregister_open_oracle") != std::string::npos);
-		CHECK(s.find("admissible_values_mask") != std::string::npos);
-		CHECK(s.find("step_with_oracle_dispatch") != std::string::npos);
-		CHECK(s.find("\"o_out_sig\"") != std::string::npos);
-		// Splice must not destroy the base program: state is a plain
-		// int, not an enum, so check for the accessor actually emitted.
-		CHECK(s.find("outputs step(") != std::string::npos);
-		CHECK(s.find("int state() const noexcept") != std::string::npos);
-	}
-
-	TEST_CASE("open emit: g++ compile, oracle dispatch, mask, edge walk") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		std::ostringstream os;
-		auto d = build_program_desc_prop(echo_spec(), {"in_sig"}, {"out_sig"},
-			"EchoCtrl", /*revisable=*/false, {"o_out_sig"});
-		emit_program(d, os);
-
-		const std::string hdr_path = cg_tmp("_tau_codegen_open_ctrl.h");
-		const std::string main_path = cg_tmp("_tau_codegen_open_main.cpp");
-		const std::string exe_path = cg_tmp("_tau_codegen_open_exe");
-		{ std::ofstream f(hdr_path); f << os.str(); }
-		{
-			std::ofstream f(main_path);
-			f <<
-			    "#include \"_tau_codegen_open_ctrl.h\"\n"
-			    "#include <cstdio>\n"
-			    "static const char* pick_true(const char*, void*) {\n"
-			    "  return \"o_out_sig := 1\";\n"
-			    "}\n"
-			    "int main() {\n"
-			    "  EchoCtrl c;\n"
-			    "  // echo spec: both output values admissible from q0\n"
-			    "  if (EchoCtrl::admissible_values_mask(\n"
-			    "      0, \"o_out_sig\") != 0x3)\n"
-			    "    { std::printf(\"FAILMASK\\n\"); return 1; }\n"
-			    "  // unknown stream is rejected on registration\n"
-			    "  if (c.register_open_oracle(\"o_nope\", &pick_true, nullptr) != -1)\n"
-			    "    { std::printf(\"FAILREG1\\n\"); return 2; }\n"
-			    "  // no handler yet: dispatch must fail closed\n"
-			    "  EchoCtrl::inputs in;\n"
-			    "  in.in_sig = true;\n"
-			    "  if (c.step_with_oracle_dispatch(in).ok)\n"
-			    "    { std::printf(\"FAILNOH\\n\"); return 3; }\n"
-			    "  if (c.register_open_oracle(\"o_out_sig\", &pick_true, nullptr) != 0)\n"
-			    "    { std::printf(\"FAILREG2\\n\"); return 4; }\n"
-			    "  // oracle picks true; with in=true the 0&1 edge matches\n"
-			    "  auto o1 = c.step_with_oracle_dispatch(in);\n"
-			    "  if (!o1.ok || !o1.out_sig)\n"
-			    "    { std::printf(\"FAIL1\\n\"); return 5; }\n"
-			    "  // oracle still picks true; with in=false no edge matches\n"
-			    "  in.in_sig = false;\n"
-			    "  if (c.step_with_oracle_dispatch(in).ok)\n"
-			    "    { std::printf(\"FAIL2\\n\"); return 6; }\n"
-			    "  if (c.unregister_open_oracle(\"o_out_sig\") != 0)\n"
-			    "    { std::printf(\"FAILUNREG\\n\"); return 7; }\n"
-			    "  std::printf(\"OK\\n\");\n"
-			    "  return 0;\n"
-			    "}\n";
-		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
-		                + exe_path + " " + main_path + " 2>&1";
-		REQUIRE(system(cmd.c_str()) == 0);
-		REQUIRE(system((std::string(exe_path)
-			+ " >" + cg_tmp("_tau_codegen_open_out")).c_str()) == 0);
-		std::ifstream out(cg_tmp("_tau_codegen_open_out"));
-		std::string line; std::getline(out, line);
-		CHECK(line == "OK");
-	}
 	// ── Re-ports of the pre-rebase compiled regressions (CG-RT1/CG-RT2/CG-RT5) ──
 
 	// CG-N2 (compiled): the paren'd disjunctive conjunct "(0|1)" must gate
@@ -291,47 +209,6 @@ TEST_SUITE("cpp_codegen_open") {
 			"  auto s3 = c.step(in);  // q0 requires i&o: fails\n"
 			"  std::printf(\"%s\\n\", (cycle_ok && !s3.ok) ? \"OK\" : \"BROKEN\");\n",
 			"cgrt02");
-		CHECK(result == "OK");
-	}
-
-	// CG-N3 / CG-RT5: step_with_oracle_dispatch only filled ap[] for
-	// inputs and DECLARED-open outputs; an undeclared positive output
-	// literal in the guard (here "o2", never registered open) stayed at
-	// its default `false`, so an edge whose guard requires it true could
-	// never fire even though the oracle satisfied every declared
-	// constraint.  Each cube is now evaluated on its input+declared
-	// projection and the undeclared outputs are assigned from it.
-	TEST_CASE("[CG-OPEN-02] compiled: undeclared positive output literal must still be derivable") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		hoa_automaton a;
-		a.num_states = 1;
-		a.initial_state = 0;
-		a.aps = {"i", "o1", "o2"};
-		a.edges.resize(1);
-		a.edges[0].push_back(hoa_edge{"0&1&2", 0, false});
-		a.edges[0].push_back(hoa_edge{"!0&!1&!2", 0, false});
-		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i"}, {"o1", "o2"}, "OpenDispatch",
-			/*revisable=*/false, {"o1"});
-		emit_program(d, os);
-		std::string result = compile_and_run(os.str(),
-			"  OpenDispatch d;\n"
-			"  int rc = d.register_open_oracle(\"o1\", &oracle, nullptr);\n"
-			"  if (rc != 0) { std::printf(\"REG_FAIL\\n\"); return 0; }\n"
-			"  OpenDispatch::inputs in;\n"
-			"  in.i = true;\n"
-			"  auto o = d.step_with_oracle_dispatch(in);\n"
-			"  if (!o.ok) { std::printf(\"NO_EDGE_MATCHED\\n\"); return 0; }\n"
-			"  if (!o.o2) { std::printf(\"O2_NOT_ASSIGNED\\n\"); return 0; }\n"
-			"  // a cube whose DECLARED part disagrees with the oracle must not fire\n"
-			"  in.i = false;\n"
-			"  auto o2 = d.step_with_oracle_dispatch(in);\n"
-			"  std::printf(\"%s\\n\", o2.ok ? \"WRONGFIRE\" : \"OK\");\n",
-			"cgopen02",
-			"static const char* oracle(const char*, void*) {\n"
-			"  static const char* r = \"o1 := 1\";\n"
-			"  return r;\n"
-			"}\n");
 		CHECK(result == "OK");
 	}
 

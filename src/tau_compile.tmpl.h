@@ -544,7 +544,7 @@ result<codegen_result> compile_spec(
 	if (sol) {
 		const std::string class_name = "tau_program";
 		TAU_TRY(d, build_program_desc<Node>(*sol, class_name,
-			/*revisable=*/false, /*open_streams=*/{},
+			/*revisable=*/false,
 			definitions<Node>::instance().get_io_context()));
 	}
 	d.spec_src = spec_src;

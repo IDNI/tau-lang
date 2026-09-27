@@ -182,15 +182,6 @@ TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
 		CHECK(s.find("outputs step(const inputs&") != std::string::npos);
 	}
 
-	TEST_CASE("[LG5-02] open-prop emitter does not reference q0 either") {
-		auto a = empty_automaton();
-		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "TrivialOpen", /*revisable=*/false, {"o"});
-		emit_program(d, os);
-		std::string s = os.str();
-		CHECK(s.find("State::q0") == std::string::npos);
-	}
-
 } // TEST_SUITE("cpp_codegen trivial solution (LG-5)")
 
 // guard_to_cpp had no caller anywhere in the suite (coverage 2026-09-16):

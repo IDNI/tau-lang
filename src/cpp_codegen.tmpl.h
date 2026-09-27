@@ -7,7 +7,7 @@
 // per-cube guard construction), the two program_desc builders
 // (build_program_desc_prop for the purely-propositional case and the
 // templated build_program_desc for solved strategies with data atoms), the
-// declared-open and atoms appendix emitters, and the single non-templated
+// atoms appendix emitter, and the single non-templated
 // emit_program() that walks a program_desc into the generated class.
 
 #ifndef __IDNI__TAU__CPP_CODEGEN_TMPL_H__
@@ -565,7 +565,7 @@ std::pair<int, int> compute_auto_continue_bounds(
 // ── Data-driven emit path (program_desc / emit_program) ───────────────────────
 //
 // One program_desc walked by one non-templated emit_program(): the prop,
-// data-atom, PWR and declare_open shapes are all data over this one path.
+// data-atom and PWR shapes are all data over this one path.
 // See src/codegen_strategy.h for the runtime shape and its guard convention;
 // program_desc/edge_desc/field_desc are declared in cpp_codegen.h since
 // build_program_desc()/emit_program() return/consume them across the
@@ -643,8 +643,7 @@ inline program_desc build_program_desc_prop(
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props,
     const std::string& class_name,
-    bool revisable,
-    const std::vector<std::string>& open_streams)
+    bool revisable)
 {
 	using namespace codegen_detail;
 
@@ -653,7 +652,6 @@ inline program_desc build_program_desc_prop(
 	d.num_states = aut.num_states;
 	d.initial_state = aut.initial_state;
 	d.revisable = revisable;
-	d.open_streams = open_streams;
 	d.needs_tau_link = false;
 
 	std::set<std::string> input_set(input_props.begin(), input_props.end());
@@ -702,7 +700,6 @@ result<program_desc> build_program_desc(
     const ltl_aba_solution<node>& sol,
     const std::string& class_name,
     bool revisable,
-    const std::vector<std::string>& open_streams,
     const io_context<node>* stream_ctx)
 {
 	using tau = tree<node>;
@@ -806,7 +803,6 @@ result<program_desc> build_program_desc(
 	d.num_states = sol.aut.num_states;
 	d.initial_state = sol.aut.initial_state;
 	d.revisable = revisable;
-	d.open_streams = open_streams;
 	d.atoms = std::move(atoms);
 	// An atom template needs the same tau_pack/ba_constants surface a witness factory expression does.
 	d.needs_tau_link = !witness_vars.empty() || !d.atoms.empty();
@@ -1033,194 +1029,6 @@ result<program_desc> build_program_desc(
 	return r.with_value(std::move(d));
 }
 
-// Emit the declared-open appendix: open_streams()/register_open_oracle()/
-// unregister_open_oracle()/admissible_values_mask(), the registration
-// surface for oracle-resolved output streams. admissible_values_mask reads
-// straight from edge_desc::guard's flag-output segment.
-inline void emit_open_streams_appendix(
-    const program_desc& d, size_t nflag, std::ostream& out)
-{
-	const size_t nstepg = d.step_guard_ks.size();
-	out << "\npublic:\n";
-	out << "\tusing oracle_callback = const char* (*)(\n";
-	out << "\t    const char* formula, void* user_data);\n\n";
-
-	out << "\tstatic const char* const* open_streams() noexcept {\n";
-	out << "\t\tstatic const char* const names[] = {\n";
-	for (auto& s : d.open_streams) out << "\t\t\t\"" << s << "\",\n";
-	out << "\t\t\tnullptr  // sentinel\n";
-	out << "\t\t};\n\t\treturn names;\n\t}\n\n";
-
-	out << "\tstatic constexpr std::size_t open_streams_count() noexcept {\n";
-	out << "\t\treturn " << d.open_streams.size() << ";\n\t}\n\n";
-
-	out << "\tint register_open_oracle(\n";
-	out << "\t    const char* stream, oracle_callback cb, void* user_data) noexcept {\n";
-	out << "\t\tif (in_oracle_dispatch_) return -2;\n";
-	out << "\t\tbool found = false;\n";
-	out << "\t\tfor (const char* const* p = open_streams(); *p; ++p)\n";
-	out << "\t\t\tif (std::string(*p) == stream) { found = true; break; }\n";
-	out << "\t\tif (!found) return -1;\n";
-	out << "\t\thandlers_[std::string(stream)] = {cb, user_data};\n";
-	out << "\t\treturn 0;\n\t}\n\n";
-
-	out << "\tint unregister_open_oracle(const char* stream) noexcept {\n";
-	out << "\t\tif (in_oracle_dispatch_) return -2;\n";
-	out << "\t\tauto it = handlers_.find(std::string(stream));\n";
-	out << "\t\tif (it == handlers_.end()) return -3;\n";
-	out << "\t\thandlers_.erase(it);\n";
-	out << "\t\treturn 0;\n\t}\n\n";
-
-	out << "\t// Bitmask: bit0 = false admissible, bit1 = true admissible;\n";
-	out << "\t// 0 = unreachable for this stream from q, 3 = both acceptable.\n";
-	out << "\tstatic std::uint8_t admissible_values_mask(\n";
-	out << "\t    int q, const char* stream) noexcept {\n";
-	for (size_t k = 0; k < nflag; ++k) {
-		// Accept both the bare prop and the "o_"-prefixed alias, so a
-		// --open flag written either way resolves to the same field.
-		out << "\t\tif (std::string(stream) == \"" << d.outputs[k].prop
-		    << "\" || std::string(stream) == \"o_" << d.outputs[k].cpp_name
-		    << "\") {\n";
-		out << "\t\t\tswitch (q) {\n";
-		for (int s = 0; s < d.num_states; ++s) {
-			std::uint8_t mask = 0;
-			const auto& edges = (size_t)s < d.edges.size()
-			                   ? d.edges[s] : std::vector<edge_desc>{};
-			for (auto& e : edges) {
-				std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
-				if (g == 0) mask |= 0x3;
-				else if (g == 1) mask |= 0x2;
-				else mask |= 0x1;
-			}
-			out << "\t\t\tcase " << s << ": return 0x"
-			    << std::hex << (int)mask << std::dec << ";\n";
-		}
-		out << "\t\t\tdefault: return 0x0;\n\t\t\t}\n\t\t}\n";
-	}
-	out << "\t\treturn 0x0;  // unknown stream\n\t}\n\n";
-
-	// ap[] uses inputs-then-step-guards-then-flag-outputs order, matching
-	// edge_desc::guard.
-	{
-		std::map<std::string, size_t> stream_to_field;
-		for (size_t k = 0; k < nflag; ++k)
-			for (auto& s : d.open_streams)
-				if (s == d.outputs[k].prop
-					|| s == "o_" + d.outputs[k].cpp_name)
-					stream_to_field[s] = k;
-		std::set<size_t> declared_fields;
-		for (auto& kv : stream_to_field) declared_fields.insert(kv.second);
-
-		const size_t nbits = d.inputs.size() + nstepg + nflag;
-		out << "\toutputs step_with_oracle_dispatch(const inputs& in) noexcept {\n";
-		out << "\t\toutputs o;\n";
-		if (d.inputs.empty()) out << "\t\t(void)in;\n";
-		if (nbits) {
-			out << "\t\tbool ap[" << nbits << "] = {};\n";
-			for (size_t i = 0; i < d.inputs.size(); ++i)
-				out << "\t\tap[" << i << "] = in." << d.inputs[i].cpp_name
-				    << ";\n";
-			// Same deterministic step-count computation as step()'s own
-			// __step_ge<k> slots (program_desc::step_guard_ks).
-			for (size_t k = 0; k < nstepg; ++k)
-				out << "\t\tap[" << d.inputs.size() + k << "] = step_ >= "
-				    << d.step_guard_ks[k] << ";\n";
-		}
-		out << "\n";
-
-		for (auto& s : d.open_streams) {
-			auto it = stream_to_field.find(s);
-			if (it == stream_to_field.end()) continue;
-			size_t k = it->second, idx = d.inputs.size() + nstepg + k;
-			out << "\t\t{\n";
-			out << "\t\t\tauto mask = admissible_values_mask(state_, \""
-			    << s << "\");\n";
-			out << "\t\t\tauto h = handlers_.find(\"" << s << "\");\n";
-			out << "\t\t\tif (h == handlers_.end()) { o.ok = false; return o; }\n";
-			out << "\t\t\tstd::string f;\n";
-			out << "\t\t\tif (mask & 0x1) f += \"(" << d.outputs[k].cpp_name
-			    << " = 0)\";\n";
-			out << "\t\t\tif ((mask & 0x3) == 0x3) f += \" || \";\n";
-			out << "\t\t\tif (mask & 0x2) f += \"(" << d.outputs[k].cpp_name
-			    << " = 1)\";\n";
-			out << "\t\t\tin_oracle_dispatch_ = true;\n";
-			out << "\t\t\tconst char* response = h->second.first(f.c_str(),\n";
-			out << "\t\t\t    h->second.second);\n";
-			out << "\t\t\tin_oracle_dispatch_ = false;\n";
-			out << "\t\t\tif (!response) { o.ok = false; return o; }\n";
-			out << "\t\t\tbool chose_true = std::strstr(response, \":= 1\") "
-			       "!= nullptr;\n";
-			out << "\t\t\tstd::uint8_t needed = chose_true ? 0x2 : 0x1;\n";
-			out << "\t\t\tif ((mask & needed) == 0) { o.ok = false; return o; }\n";
-			out << "\t\t\tap[" << idx << "] = chose_true;\n";
-			out << "\t\t\to." << d.outputs[k].cpp_name << " = chose_true;\n";
-			out << "\t\t}\n";
-		}
-
-		out << "\n\t\tswitch (state_) {\n";
-		for (int s = 0; s < d.num_states; ++s) {
-			out << "\t\tcase " << s << ": {\n";
-			const auto& edges = (size_t)s < d.edges.size()
-			                   ? d.edges[s] : std::vector<edge_desc>{};
-			size_t edge_idx = 0;
-			for (auto& e : edges) {
-				std::string cond;
-				for (size_t i = 0; i < d.inputs.size(); ++i) {
-					if (e.guard[i] == 0) continue;
-					if (!cond.empty()) cond += " && ";
-					if (e.guard[i] == -1) cond += "!";
-					cond += "ap[" + std::to_string(i) + "]";
-				}
-				for (size_t k = 0; k < nstepg; ++k) {
-					std::int8_t g = e.guard[d.inputs.size() + k];
-					if (g == 0) continue;
-					if (!cond.empty()) cond += " && ";
-					if (g == -1) cond += "!";
-					cond += "ap[" + std::to_string(d.inputs.size() + k) + "]";
-				}
-				for (size_t k = 0; k < nflag; ++k) {
-					if (!declared_fields.count(k)) continue;
-					std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
-					if (g == 0) continue;
-					if (!cond.empty()) cond += " && ";
-					if (g == -1) cond += "!";
-					cond += "ap[" + std::to_string(d.inputs.size() + nstepg + k) + "]";
-				}
-				if (cond.empty()) cond = "true";
-				out << "\t\t\tif (" << cond << ") {\n";
-				for (size_t k = 0; k < nflag; ++k) {
-					if (declared_fields.count(k)) continue;
-					std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
-					if (g == 0) continue;
-					out << "\t\t\t\to." << d.outputs[k].cpp_name << " = "
-					    << (g == 1 ? "true" : "false") << ";\n";
-				}
-				for (auto& [cpp_name, expr] : e.witness_ctors) {
-					std::string sv = "wd_s" + std::to_string(s) + "_e"
-						+ std::to_string(edge_idx) + "_" + cpp_name;
-					out << "\t\t\t\tstatic const tref " << sv << " = "
-					    << expr << ";\n";
-					out << "\t\t\t\to." << cpp_name << " = " << sv << ";\n";
-				}
-				out << "\t\t\t\tstate_ = " << e.dst << ";\n";
-				if (nstepg) out << "\t\t\t\t++step_;\n";
-				out << "\t\t\t\treturn o;\n";
-				out << "\t\t\t}\n";
-				++edge_idx;
-			}
-			out << "\t\t\to.ok = false; return o;\n";
-			out << "\t\t}\n";
-		}
-		out << "\t\t}\n";
-		out << "\t\to.ok = false; return o;\n";
-		out << "\t}\n\n";
-	}
-
-	out << "private:\n";
-	out << "\tstd::map<std::string, std::pair<oracle_callback, void*>> handlers_;\n";
-	out << "\tbool in_oracle_dispatch_ = false;\n";
-}
-
 // Emit program_desc::atoms as a lookup table of (prop, lazily-built tref) entries, for a future runtime consumer (not read by step() itself).
 inline void emit_atoms_appendix(const program_desc& d, std::ostream& out) {
 	out << "\tstruct atom_entry { const char* prop; tref (*value)(); };\n";
@@ -1268,8 +1076,6 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 	if (!d.needs_tau_link || !d.atoms.empty()) out << "#include <cstddef>\n";
 	if (!d.needs_tau_link) out << "#include <vector>\n";
 	if (!has_witness) out << "#include <cassert>\n#include <utility>\n#include <string>\n";
-	if (!d.open_streams.empty())
-		out << "#include <map>\n#include <string>\n#include <cstring>\n";
 	if (d.needs_tau_link) {
 		// tref + ba_constants<node_t> + ba_descriptor<...> for the witness factory expressions baked into step().
 		out << "#include \"tau_pack.h\"\n";
@@ -1440,8 +1246,6 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 			out << "\t\treturn strat_;\n\t}\n\n";
 		}
 
-		if (!d.open_streams.empty()) emit_open_streams_appendix(d, nflag, out);
-
 		out << "\nprivate:\n";
 		out << "\tint state_ = " << d.initial_state << ";\n";
 		if (nstepg) out << "\tstd::size_t step_ = 0;\n";
@@ -1535,8 +1339,6 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		out << "\t\t}\n";
 		out << "\t\to.ok = false; return o;  // unreachable\n";
 		out << "\t}\n\n";
-
-		if (!d.open_streams.empty()) emit_open_streams_appendix(d, nflag, out);
 
 		out << "\nprivate:\n";
 		out << "\tint state_ = " << d.initial_state << ";\n";

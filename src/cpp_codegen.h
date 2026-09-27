@@ -126,9 +126,6 @@ struct stream_desc {
  * @brief Everything emit_program() (the standalone step() class) and
  * emit_main() (compile_spec's one artifact driver) need, built once from a
  * solved LTL(ABA) strategy.
- *
- * The target of what used to be six separate emitters (prop/data/pwr/open
- * x2).
  */
 struct program_desc {
 	std::string class_name;
@@ -137,7 +134,6 @@ struct program_desc {
 	std::vector<field_desc> inputs, outputs;
 	std::vector<std::vector<edge_desc>> edges;  // edges[state] = outgoing
 	bool revisable = false;    // strategy table runtime-replaceable (PWR revise())
-	std::vector<std::string> open_streams;       // declare_open surface
 	bool needs_tau_link = false;   // emit_program(): false emits a self-contained class
 	int lookback = 0;            // max relative shift across non-positional atoms
 	int highest_initial_pos = 0; // highest constant position across positional atoms
@@ -183,7 +179,6 @@ struct program_desc {
  * @param sol Solved LTL(ABA) strategy.
  * @param class_name Identifier of the generated class.
  * @param revisable Whether the strategy table is runtime-replaceable.
- * @param open_streams Output stream names exposed as oracle-resolved.
  * @param stream_ctx io_context the spec was parsed against, or null.
  * @return The description, or an error report when none could be built.
  */
@@ -192,7 +187,6 @@ result<program_desc> build_program_desc(
     const ltl_aba_solution<node>& sol,
     const std::string& class_name = "tau_program",
     bool revisable = false,
-    const std::vector<std::string>& open_streams = {},
     const io_context<node>* stream_ctx = nullptr);
 
 /**
@@ -205,7 +199,6 @@ result<program_desc> build_program_desc(
  * @param output_props System-controlled proposition names.
  * @param class_name Identifier of the generated class.
  * @param revisable Whether the strategy table is runtime-replaceable.
- * @param open_streams Output stream names exposed as oracle-resolved.
  * @return The description.
  */
 program_desc build_program_desc_prop(
@@ -213,8 +206,7 @@ program_desc build_program_desc_prop(
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props,
     const std::string& class_name = "tau_program",
-    bool revisable = false,
-    const std::vector<std::string>& open_streams = {});
+    bool revisable = false);
 
 /**
  * @brief Emit the C++ class program_desc describes.
@@ -223,10 +215,10 @@ program_desc build_program_desc_prop(
  * `d.needs_tau_link` is false the emitted text is self-contained (the
  * codegen::edge/strategy/strategy_step shape is inlined, not #included, so
  * the artifact has no path dependency on this tree at compile time). Covers
- * the PWR-capable (d.revisable) and declare_open (d.open_streams) shapes
- * too -- program_desc replaced the old per-purpose emitters
- * (emit_cpp_program_pwr, emit_cpp_program_open[_prop],
- * emit_strategy_initializer) with one data-driven walk.
+ * the PWR-capable (d.revisable) shape too -- program_desc replaced the old
+ * per-purpose emitters
+ * (emit_cpp_program_pwr, emit_strategy_initializer) with one data-driven
+ * walk.
  * @param d Program description to emit.
  * @param out Stream receiving the generated source.
  */

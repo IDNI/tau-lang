@@ -24,7 +24,7 @@ add_compile_test(compile_verb-ltl_lookback_under_eventuality
 # as far as the configure; it is copied to a temp dir because the build
 # tree is placed beside the spec file.
 add_compile_test(compile_verb-cxx_override_is_used
-	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/declare_open_codegen.tau"
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo_untyped.tau"
 	CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_cxx_override.cmake"
 	PASS_REGEX "nonexistent/c\\+\\+")
 

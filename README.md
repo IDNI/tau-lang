@@ -2895,11 +2895,6 @@ wider than 4 bits, or over the order types of `qlt` values), that game or
 synthesis when it starts. The program then executes the embedded spec the
 same way, with the same solver, so it needs `ltlsynt` where `run` does.
 
-Emitting a C++ *header* with the synthesized class (`tau_program`, with the
-`declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)
-is a library operation: `build_program_desc` + `emit_program` in
-`src/cpp_codegen.h`; there is no CLI flag for it.
-
 ## When to use which
 
 | Situation                                               | Use         |

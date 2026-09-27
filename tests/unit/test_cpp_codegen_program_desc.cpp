@@ -1421,7 +1421,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(sol.has_value());
 
 		auto d = build_program_desc<node_t>(*sol, "file_stream_test",
-			/*revisable=*/false, /*open_streams=*/{},
+			/*revisable=*/false,
 			definitions<node_t>::instance().get_io_context());
 		REQUIRE(d.has_value());
 
