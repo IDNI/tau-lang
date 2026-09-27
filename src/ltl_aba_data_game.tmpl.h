@@ -734,6 +734,12 @@ static std::optional<code_window> make_code_window(
 				}
 			} else if (flip) orbit_types.insert(find_ba_type<node>(vars[0]));
 		}
+	// A dense order has no element for the codes of 0 and 1 to stand
+	// for: its streams take order-type codes even when only equalities
+	// read them.
+	for (auto& s : w.streams)
+		if (!s.two && pack_type_is_dense_order<node>(s.tid))
+			order_types.insert(s.tid);
 	for (auto& s : w.streams) {
 		if (s.two) continue;
 		if (modular_types.contains(s.tid)) {
