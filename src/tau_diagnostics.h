@@ -178,6 +178,12 @@ inline std::string truncate_for_message(std::string_view v,
 	if (!TAU_TRY_CONCAT(_tau_try_, __LINE__)) return r; \
 	decl = std::move(*TAU_TRY_CONCAT(_tau_try_, __LINE__))
 
+/// Like TAU_TRY, for a `result<void>` child: always merges its report into
+/// `r` and returns `r` on failure. Binds nothing, so it is a plain statement
+/// (same scope_guard/early-return contract as TAU_TRY).
+#define TAU_TRY_VOID(expr) \
+	if (!r.merge_ok(expr)) return r
+
 /// Like TAU_TRY, but for a malformed child (neither value nor error): synthesizes
 /// @p c / @p msg via `result::take_or_error` instead of `merge_take`. Same
 /// scope_guard/early-return contract as TAU_TRY.

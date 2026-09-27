@@ -2901,7 +2901,11 @@ static tref compile_since_trigger_rec(
 			// branch does, so the interpreter's fixpoint pipeline never
 			// has to reason about aux[t-1] at time 0.
 			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0);
+			// TODO (HIGH) dropped error: fm_at_time_point's report --
+			// this compile-away pass returns a formula, which cannot
+			// carry it.
+			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0)
+					.value_or(nullptr);
 			init_conds.push_back(psi_at_0);
 		}
 
@@ -2965,7 +2969,11 @@ static tref compile_since_trigger_rec(
 			// the interpreter's fixpoint pipeline would mis-treat as a
 			// G-unrolled seed.
 			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0);
+			// TODO (HIGH) dropped error: fm_at_time_point's report --
+			// this compile-away pass returns a formula, which cannot
+			// carry it.
+			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0)
+					.value_or(nullptr);
 			init_conds.push_back(psi_at_0);
 
 			// Outermost S safety invariant: G(curr && rhs).

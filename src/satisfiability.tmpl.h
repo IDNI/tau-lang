@@ -138,9 +138,10 @@ bool has_temporary_io_var(tref fm) {
  * @tparam node Tree node type.
  * @param io_var IO variable node to instantiate (e.g. `o1[t-1]`).
  * @param time_point Time step the variable's implicit `t` refers to.
- * @return `io_var` unchanged if it already refers to a constant time
- * point; otherwise a new IO variable at `time_point` minus @p io_var's
- * relative shift.
+ * @return A result carrying `io_var` unchanged if it already refers to a
+ * constant time point, otherwise a new IO variable at `time_point` minus
+ * @p io_var's relative shift. A failed result means @p io_var carries no
+ * input/output classification.
  * @endinternal
  *
  * @par Example
@@ -152,10 +153,11 @@ bool has_temporary_io_var(tref fm) {
  * per-variable building block used by `fm_at_time_point`.
  */
 template <NodeType node>
-tref transform_io_var(tref io_var, int_t time_point) {
+result<tref> transform_io_var(tref io_var, int_t time_point) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Check if io_var has constant time point
-	if (is_io_initial<node>(io_var)) return io_var;
+	if (is_io_initial<node>(io_var)) return r.with_value(io_var);
 	int_t shift = get_io_var_shift<node>(io_var);
 	size_t type = tau::get(io_var).get_ba_type();
 	// The input/output data bit is assigned while parsing a *spec*; it is not
@@ -165,20 +167,19 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	// `else` silently rebuilt such a variable as an *output*:
 	// transform_io_var(i1[t-2], 5) returned i1[3] with is_output_variable()
 	// == true. Every production caller does work on spec-parsed trees, which
-	// is exactly why the unclassified case must be loud rather than defaulted
-	// -- it is otherwise a wrong answer nothing reports.
+	// is exactly why the unclassified case must be reported rather than
+	// defaulted -- it is otherwise a wrong answer nothing reports.
 	if (tau::get(io_var).is_input_variable())
-		return tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift, type));
+		return r.with_value(tau::trim(build_in_var_at_n<node>(
+			get_var_name_node<node>(io_var), time_point - shift, type)));
 	if (tau::get(io_var).is_output_variable())
-		return tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift, type));
+		return r.with_value(tau::trim(build_out_var_at_n<node>(
+			get_var_name_node<node>(io_var), time_point - shift, type)));
 	DBG(assert(false && "transform_io_var: io_var is neither input nor output");)
-	LOG_ERROR << "transform_io_var: " << LOG_FM(io_var) << " is classified"
-		" neither as input nor as output (the in/out bit comes from spec"
-		" parsing, not from the name prefix); returning it unchanged rather"
-		" than rebuilding it as an output variable.";
-	return io_var;
+	return r.with_error(code::internal_error,
+		"the io variable is classified neither as input nor as output; "
+		"the in/out bit comes from spec parsing, not from the name prefix",
+		{{label::value, truncate_for_message(TAU_TO_STR(io_var))}});
 }
 
 /**
@@ -404,12 +405,14 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 }
 
 template <NodeType node>
-tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) {
+result<tref> fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) {
+	result<tref> r;
 	subtree_map<node, tref> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i)
-		changes[io_vars[i]] =
-				transform_io_var<node>(io_vars[i], time_point);
-	return rewriter::replace<node>(original_fm, changes);
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		TAU_TRY(tref new_io_var, transform_io_var<node>(io_vars[i], time_point));
+		changes[io_vars[i]] = new_io_var;
+	}
+	return r.with_value(rewriter::replace<node>(original_fm, changes));
 }
 
 /**
@@ -438,20 +441,21 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) 
  * @param time_point Time step at which the unrolling started.
  * @param cached_fm [in,out] Splice cursor: on entry the previous step's
  * unquantified instantiation, on exit the new step's.
- * @return @p prev_fm with the new step spliced in.
+ * @return A result carrying @p prev_fm with the new step spliced in.
  * @endinternal
  */
 template <NodeType node>
-tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
+result<tref> build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	const auto& initials, int_t step_num, int_t time_point, tref& cached_fm)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	// Use build_initial_step otherwise
 	DBG(assert(step_num > 0);)
 	subtree_map<node, tref> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(
-					io_vars[i], time_point + step_num);
+		TAU_TRY(tref new_io_var, transform_io_var<node>(
+					io_vars[i], time_point + step_num));
 		changes[io_vars[i]] = new_io_var;
 	}
 
@@ -463,7 +467,7 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	changes = { { cached_fm,
 			tau::build_wff_and(cached_fm, q_most_inner_step) }};
 	cached_fm = most_inner_step;
-	return rewriter::replace<node>(prev_fm, changes);
+	return r.with_value(rewriter::replace<node>(prev_fm, changes));
 }
 
 /**
@@ -693,11 +697,13 @@ result<bool> is_run_satisfiable_by_steps(const trefs& steps) {
 
 // Assumption is that the provided fm is an unbound continuation
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
+result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Substitute lookback as current time point
 	int_t look_back = get_max_shift<node>(io_vars);
-	tref uconst_ctns = fm_at_time_point<node>(fm, io_vars, look_back + start_time);
+	TAU_TRY(tref uconst_ctns,
+		fm_at_time_point<node>(fm, io_vars, look_back + start_time));
 	io_vars = tau::get(uconst_ctns).select_top(is_child<node, tau::io_var>);
 
 	// All io_vars in fm have to refer to constant time positions
@@ -734,13 +740,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 		else uconsts.push_back(v);
 	}
 	// Eliminate all variables
-	if (auto normed = normalize_non_temp<node>(uconst_ctns);
-		normed.has_value()) uconst_ctns = normed.value();
-	else {
-		LOG_ERROR << "get_uninterpreted_constants_constraints: "
-			"normalization failed; propagating failure.";
-		return nullptr;
-	}
+	TAU_TRY(tref normed_ctns, normalize_non_temp<node>(uconst_ctns));
+	uconst_ctns = normed_ctns;
 	// Now add all uninterpreted constants which disappeared during elimination of variables
 	// and set them to 0
 	trefs left_uconsts = tau::get(uconst_ctns).select_top(
@@ -756,7 +757,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 	LOG_DEBUG<<"Formula describing constraints on uninterpreted constants: "
 		<< LOG_FM(uconst_ctns);
 
-	return uconst_ctns;
+	return r.with_value(uconst_ctns);
 }
 
 /**
@@ -800,12 +801,12 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 {
 	using tau = tree<node>;
 	result<std::pair<tref, int_t>> r;
-	tref phi_prev = fm_at_time_point<node>(base_fm, io_vars, time_point);
-	phi_prev = tau::build_wff_and(ctn_initials, phi_prev);
+	TAU_TRY(tref phi_at_time, fm_at_time_point<node>(base_fm, io_vars, time_point));
+	tref phi_prev = tau::build_wff_and(ctn_initials, phi_at_time);
 	int_t step_num = 1;
 	tref cache = phi_prev;
-	tref phi = build_step<node>(base_fm, phi_prev, io_vars, initials, step_num,
-							time_point, cache);
+	TAU_TRY(tref phi, build_step<node>(base_fm, phi_prev, io_vars, initials,
+						step_num, time_point, cache));
 
 	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(phi);
 
@@ -854,8 +855,8 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 		phi_prev = phi;
 		++step_num;
 
-		phi = build_step<node>(base_fm, phi_prev, io_vars, initials, step_num,
-							time_point, cache);
+		TAU_TRY(phi, build_step<node>(base_fm, phi_prev, io_vars, initials,
+							step_num, time_point, cache));
 
 		LOG_DEBUG << "Continuation at step " << step_num << ": "
 								<< LOG_FM(phi);
@@ -920,9 +921,9 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	const int_t lookback = get_max_shift<node>(io_vars);
 	const int_t first_state = time_point - lookback;
 	const bool weakening = !tau::get(st).equals_T();
-	const tref chi_now = fm_at_time_point<node>(chi_base, io_vars,
-								time_point);
-	const tref st_now = fm_at_time_point<node>(st, io_vars, time_point);
+	TAU_TRY(tref chi_now, fm_at_time_point<node>(chi_base, io_vars,
+								time_point));
+	TAU_TRY(tref st_now, fm_at_time_point<node>(st, io_vars, time_point));
 
 	auto step = [&](tref prev) {
 		tref next = shift_state_io_vars<node>(prev, first_state, 1);
@@ -1123,8 +1124,9 @@ size_t& ctn_flag_counter() {
  * initial conditions).
  * @param reset_ctn_id When `true`, resets the (function-local static)
  * flag-numbering counter back to `0` before processing @p fm.
- * @return `fm` with each constraint replaced by `_fK[t] != 0` for a fresh
- * flag stream `_fK`, or `fm` unchanged if it contains no constraints.
+ * @return A result carrying `fm` with each constraint replaced by
+ * `_fK[t] != 0` for a fresh flag stream `_fK`, or `fm` unchanged if it
+ * contains no constraints.
  * @endinternal
  *
  * @par Example
@@ -1142,22 +1144,25 @@ size_t& ctn_flag_counter() {
  * 1`).
  */
 template <NodeType node>
-tref transform_ctn_to_streams(tref fm, tref& flag_initials,
+result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 	tref& flag_rules, const int_t lookback, const int_t start_time,
 	const bool reset_ctn_id)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	auto to_eq_1 = [](tref n) {
 			return tau::build_bf_eq_0(tau::build_bf_neg(n)); };
 	auto create_initial =
 		[&flag_initials](tref ctn, tref flag_iovar, const int_t t)
+			-> result<tref>
 	{
-		tref flag_init_cond = transform_io_var<node>(flag_iovar, t);
+		result<tref> r;
+		TAU_TRY(tref flag_init_cond, transform_io_var<node>(flag_iovar, t));
 		flag_init_cond = tau::get(tau::bf, flag_init_cond);
-		flag_initials = tau::build_wff_and(tau::build_bf_eq_0(
+		return r.with_value(tau::build_wff_and(tau::build_bf_eq_0(
 				tau::build_bf_xor(flag_init_cond,
 						calculate_ctn<node>(ctn, t))),
-			flag_initials);
+			flag_initials));
 	};
 	flag_initials = tau::_T();
 	subtree_map<node, tref> changes;
@@ -1204,14 +1209,18 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 		// Check if start_time is higher then initial ctn phase
 		if (is_initial_ctn_phase<node>(ctn, t))
 			while (is_initial_ctn_phase<node>(ctn, t)) {
-				create_initial(ctn, flag_iovar, t);
+				TAU_TRY(tref inits, create_initial(ctn, flag_iovar, t));
+				flag_initials = inits;
 				++t;
 			}
-		else // The flag needs to be initialized
-			create_initial(ctn, flag_iovar, t);
+		else { // The flag needs to be initialized
+			TAU_TRY(tref inits, create_initial(ctn, flag_iovar, t));
+			flag_initials = inits;
+		}
 	}
-	if (!changes.empty()) return rewriter::replace<node>(fm, changes);
-	return fm;
+	if (!changes.empty())
+		return r.with_value(rewriter::replace<node>(fm, changes));
+	return r.with_value(fm);
 }
 
 /**
@@ -1274,8 +1283,8 @@ result<tref> always_to_unbounded_continuation(tref fm,
 	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
 	int_t lookback = get_max_shift<node>(io_vars);
 	tref flag_initials = tau::_T(), flag_rules = tau::_T();
-	tref transformed_fm = transform_ctn_to_streams<node>(
-		fm, flag_initials, flag_rules, lookback, start_time, true);
+	TAU_TRY(tref transformed_fm, transform_ctn_to_streams<node>(
+		fm, flag_initials, flag_rules, lookback, start_time, true));
 	if (lookback == 0 && fm != transformed_fm) {
 		io_vars = tau::get(transformed_fm)
 				.select_top(is_child<node, tau::io_var>);
@@ -1324,7 +1333,7 @@ result<tref> always_to_unbounded_continuation(tref fm,
 	}
 	// variable furthest back needs to pass all initial conditions
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
-		auto current_step = fm_at_time_point<node>(ubd_ctn, io_vars, t);
+		TAU_TRY(tref current_step, fm_at_time_point<node>(ubd_ctn, io_vars, t));
 		run = tau::build_wff_and(run, current_step);
 
 		DBG(LOG_TRACE << "always_to_unbounded_continuation[run]: " << LOG_FM(run) << "\n";)
@@ -1398,12 +1407,12 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  * @param aw_warm_up Lookback of the always part as written, when @p fm
  * carries its unbounded continuation instead, whose lookback can be
  * smaller: the always part asks nothing before this step.
- * @return A pair `(res, max_st_lookback)`. If @p fm has no `sometimes`
- * sub-formula, `res` is `fm` unchanged and `max_st_lookback` is `0`.
- * Otherwise `res` is `fm` with each `sometimes` clause replaced by a flag
- * assumption folded into the `always`-part, plus a new `sometimes`
- * clause tracking when all flags have latched to zero, and
- * `max_st_lookback` is the greatest lookback among the original
+ * @return A result carrying the pair `(res, max_st_lookback)`. If @p fm
+ * has no `sometimes` sub-formula, `res` is `fm` unchanged and
+ * `max_st_lookback` is `0`. Otherwise `res` is `fm` with each `sometimes`
+ * clause replaced by a flag assumption folded into the `always`-part,
+ * plus a new `sometimes` clause tracking when all flags have latched to
+ * zero, and `max_st_lookback` is the greatest lookback among the original
  * `sometimes` clauses.
  * @endinternal
  *
@@ -1423,15 +1432,16 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  */
 // Assumes single normalized Tau DNF clause
 template <NodeType node>
-std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
+result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 	bool reset_ctn_stream, const int_t start_time,
 	const sometimes_inputs inputs = sometimes_inputs::universal,
 	const int_t aw_warm_up = 0)
 {
 	using tau = tree<node>;
+	result<std::pair<tref, int_t>> r;
 	const auto& t = tau::get(fm);
 	trefs smt_fms = t.select_top(is_child<node, tau::wff_sometimes>);
-	if (smt_fms.empty()) return { fm, 0 };
+	if (smt_fms.empty()) return r.with_value(std::make_pair(fm, 0));
 	tref aw_fm = t.find_top(is_child<node, tau::wff_always>);
 
 	int_t max_st_lookback = get_max_shift<node>(
@@ -1458,9 +1468,10 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 
 		// Transform constant time constraints to io var in sometimes statement
 		tref ctn_initials = tau::_T(), ctn_assm = tau::_T();
-		smt_fms[n] = transform_ctn_to_streams<node>(
+		TAU_TRY(tref transformed_smt, transform_ctn_to_streams<node>(
 			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
-			start_time, reset_ctn_stream);
+			start_time, reset_ctn_stream));
+		smt_fms[n] = transformed_smt;
 		st_io_vars = tau::get(smt_fms[n])
 				.select_top(is_child<node, tau::io_var>);
 
@@ -1546,11 +1557,11 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 				tau::build_wff_always(ev_assm),
 				tau::build_wff_sometimes(
 					tau::build_bf_eq_0(ev_collection)));
-		else return  { fm, max_st_lookback };
+		else return r.with_value(std::make_pair(fm, max_st_lookback));
 	}
 
 	LOG_TRACE << "transformed eventual variables: " << LOG_FM(res);
-	return { res, max_st_lookback };
+	return r.with_value(std::make_pair(res, max_st_lookback));
 }
 
 /**
@@ -1593,7 +1604,7 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback,
 
 	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
-		auto current_aw = fm_at_time_point<node>(aw, io_vars, t + i);
+		TAU_TRY(tref current_aw, fm_at_time_point<node>(aw, io_vars, t + i));
 		if (run) {
 			TAU_TRY(tref normed, normalize_non_temp<node>(
 				tau::build_wff_and(run, current_aw)));
@@ -1710,10 +1721,14 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// is_run_satisfiable_by_steps decides one time point at a time):
 	// run[0] is the initial run and run[k] the always part at step s+k-1.
 	trefs run{ initial_run };
-	auto extend_run = [&](int_t i) {
-		while ((int_t)run.size() <= i - s + 1)
-			run.push_back(fm_at_time_point<node>(aw, io_vars,
+	auto extend_run = [&](result<tref>& into, int_t i) {
+		while ((int_t)run.size() <= i - s + 1) {
+			auto step = into.merge_take(fm_at_time_point<node>(aw, io_vars,
 						s + (int_t)run.size() - 1));
+			if (!step) return false;
+			run.push_back(*step);
+		}
+		return true;
 	};
 	// Check whether the system can force every flag down by step i
 	// whatever the inputs do. The value is the formula to execute, or `F`
@@ -1723,9 +1738,12 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// this way.
 	auto raise_by = [&](int_t i) -> result<tref> {
 		result<tref> rr;
-		extend_run(i);
+		if (!extend_run(rr, i)) return rr;
 		trefs goal(run.begin(), run.begin() + (i - s + 2));
-		goal.push_back(fm_at_time_point<node>(st_flags, st_io_vars, i));
+		auto st_step = rr.merge_take(
+			fm_at_time_point<node>(st_flags, st_io_vars, i));
+		if (!st_step) return rr;
+		goal.push_back(*st_step);
 		auto sat = rr.merge_take(
 			is_run_satisfiable_by_steps<node>(goal));
 		if (!sat) return rr;
@@ -1751,7 +1769,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 			return r.with_value(res);
 		}
 	}
-	extend_run(flag_boundary);
+	if (!extend_run(r, flag_boundary)) return r;
 	// Check whether the flags can be forced down at all. To this end we
 	// calculate chi_inf
 
@@ -1957,8 +1975,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			ubd_aw_fm = *ubd_res;
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
-			ev_t = transform_to_eventual_variables<node>(ubd_fm,
-					false, start_time, inputs, aw_warm_up);
+			TAU_TRY(ev_t, transform_to_eventual_variables<node>(ubd_fm,
+					false, start_time, inputs, aw_warm_up));
 			// Check if there is a sometimes present
 			if (ev_t.first == ubd_fm) {
 				tref res = elim_aw(ubd_fm);
@@ -1974,8 +1992,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 				return r;
 			}
 		} else {
-			ev_t = transform_to_eventual_variables<node>(
-							fm, true, start_time, inputs);
+			TAU_TRY(ev_t, transform_to_eventual_variables<node>(
+							fm, true, start_time, inputs));
 			// Check if there is a sometimes present
 			if (ev_t.first == fm) {
 				// Here we deal with a non-temporal formula

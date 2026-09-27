@@ -337,7 +337,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( v_prev != nullptr );
 		REQUIRE( tau::get(v_prev).is_output_variable() );
 		REQUIRE( get_io_var_shift<node_t>(v_prev) == 1 );
-		tref r_prev = transform_io_var<node_t>(v_prev, 5);
+		tref r_prev = transform_io_var<node_t>(v_prev, 5).value();
 		CHECK( is_io_initial<node_t>(r_prev) );
 		CHECK( get_io_time_point<node_t>(r_prev) == 4 );
 		CHECK( get_var_name<node_t>(r_prev) == "o1" );
@@ -351,7 +351,7 @@ TEST_SUITE("satisfiability helpers") {
 		tref v_now = io_var_named(spec_io_vars("always o1[t] = 0."), "o1");
 		REQUIRE( v_now != nullptr );
 		REQUIRE( get_io_var_shift<node_t>(v_now) == 0 );
-		tref r_now = transform_io_var<node_t>(v_now, 5);
+		tref r_now = transform_io_var<node_t>(v_now, 5).value();
 		CHECK( is_io_initial<node_t>(r_now) );
 		CHECK( get_io_time_point<node_t>(r_now) == 5 );
 
@@ -360,14 +360,14 @@ TEST_SUITE("satisfiability helpers") {
 		// consulted, so a bare wff parse is fine here.
 		tref v_const = first_io_var("o1[0] = 0");
 		REQUIRE( is_io_initial<node_t>(v_const) );
-		CHECK( transform_io_var<node_t>(v_const, 5) == v_const );
+		CHECK( transform_io_var<node_t>(v_const, 5).value() == v_const );
 
 		// input streams take the build_in_var_at_n branch -- reachable only
 		// with a classified io_var, hence the spec parse (see spec_io_vars)
 		tref v_in = io_var_named(spec_io_vars("always i1[t-2] = 0."), "i1");
 		REQUIRE( v_in != nullptr );
 		REQUIRE( tau::get(v_in).is_input_variable() );
-		tref r_in = transform_io_var<node_t>(v_in, 5);
+		tref r_in = transform_io_var<node_t>(v_in, 5).value();
 		CHECK( tau::get(r_in).is_input_variable() );
 		CHECK( get_io_time_point<node_t>(r_in) == 3 );
 	}
@@ -383,7 +383,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
-		tref res = fm_at_time_point<node_t>(fm, vs, 5);
+		tref res = fm_at_time_point<node_t>(fm, vs, 5).value();
 		REQUIRE( res != nullptr );
 		trefs rvs = io_vars_of(res);
 		REQUIRE( rvs.size() == 2 );
@@ -408,7 +408,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
-		tref res = fm_at_time_point<node_t>(fm, vs, 5);
+		tref res = fm_at_time_point<node_t>(fm, vs, 5).value();
 		trefs rvs = io_vars_of(res);
 		REQUIRE( rvs.size() == 2 );
 		bool has0 = false, has5 = false;
@@ -652,7 +652,7 @@ TEST_SUITE("satisfiability helpers") {
 
 		// reset first, so the test does not depend on earlier test cases
 		tref inits = tau::_T(), rules = tau::_T();
-		tref r0 = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0, true);
+		tref r0 = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0, true).value();
 		REQUIRE( r0 != nullptr );
 		std::string s0 = tau::get(r0).to_str();
 		CHECK( str_has(s0, "_f0") );
@@ -666,21 +666,21 @@ TEST_SUITE("satisfiability helpers") {
 		// no reset: the static counter keeps counting up
 		tref inits1 = tau::_T(), rules1 = tau::_T();
 		tref r1 = transform_ctn_to_streams<node_t>(fm, inits1, rules1, 0, 0,
-									false);
+									false).value();
 		std::string s1 = tau::get(r1).to_str();
 		CHECK( str_has(s1, "_f1") );
 		CHECK( !str_has(s1, "_f0") );
 
 		tref inits2 = tau::_T(), rules2 = tau::_T();
 		tref r2 = transform_ctn_to_streams<node_t>(fm, inits2, rules2, 0, 0,
-									false);
+									false).value();
 		CHECK( str_has(tau::get(r2).to_str(), "_f2") );
 
 		// reset again: numbering restarts at _f0 and the very first result is
 		// reproduced exactly
 		tref inits3 = tau::_T(), rules3 = tau::_T();
 		tref r3 = transform_ctn_to_streams<node_t>(fm, inits3, rules3, 0, 0,
-									true);
+									true).value();
 		CHECK( str_has(tau::get(r3).to_str(), "_f0") );
 		CHECK( r3 == r0 );
 	}
@@ -689,7 +689,7 @@ TEST_SUITE("satisfiability helpers") {
 		tref fm = wff_of("o1[t] = 0");
 		tref inits = tau::_T(), rules = tau::_T();
 		tref res = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0,
-									true);
+									true).value();
 		CHECK( res == fm );
 		// flag_initials is unconditionally (re)set to T at line 812
 		CHECK( inits == tau::_T() );
@@ -757,7 +757,7 @@ TEST_SUITE("satisfiability helpers") {
 	// `transform_to_execution` relies on to detect non-temporal formulas.
 	TEST_CASE("transform_to_eventual_variables: identity without a sometimes") {
 		tref fm = create_spec("always o1[t] = 1.");
-		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
+		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		CHECK( res.first == fm );
 		CHECK( res.second == 0 );
 	}
@@ -770,18 +770,20 @@ TEST_SUITE("satisfiability helpers") {
 		};
 		auto universal = transform_to_eventual_variables<node_t>(
 								fm, true, 0);
-		REQUIRE( universal.first != nullptr );
-		CHECK( !has_uconst(universal.first) );
+		REQUIRE( universal.has_value() );
+		REQUIRE( universal.value().first != nullptr );
+		CHECK( !has_uconst(universal.value().first) );
 		auto guarded = transform_to_eventual_variables<node_t>(
 				fm, true, 0, sometimes_inputs::guarded);
-		REQUIRE( guarded.first != nullptr );
-		CHECK( has_uconst(guarded.first) );
+		REQUIRE( guarded.has_value() );
+		REQUIRE( guarded.value().first != nullptr );
+		CHECK( has_uconst(guarded.value().first) );
 	}
 
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {
 		tref fm = create_spec(
 			"(always o1[t] = 1) && (sometimes o2[t-2] = 0).");
-		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
+		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		REQUIRE( res.first != nullptr );
 		CHECK( res.first != fm );
 		// max_st_lookback is the greatest lookback among the `sometimes`
@@ -924,7 +926,7 @@ TEST_SUITE("satisfiability regression") {
 			.select_top(is_child<node_t, tau::io_var>);
 		REQUIRE( !io_vars.empty() );
 		tref ctns = get_uninterpreted_constants_constraints<node_t>(
-			guard, io_vars, 0);
+			guard, io_vars, 0).value();
 		REQUIRE( ctns != nullptr );
 		// The function computes a MODEL for the guard's uninterpreted
 		// constants: no uconst survives into the returned constraints.

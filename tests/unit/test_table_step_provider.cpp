@@ -77,7 +77,9 @@ tref parse_tmpl_atom(const std::string& src) {
 bool atom_holds(tref tmpl, const assignment<node_t>& memory,
 	const solution<node_t>& sol, int_t formula_time_point = 0)
 {
-	tref updated = update_to_time_point<node_t>(tmpl, formula_time_point);
+	auto updated_r = update_to_time_point<node_t>(tmpl, formula_time_point);
+	REQUIRE(updated_r.has_value());
+	tref updated = updated_r.value();
 	tref grounded = rewriter::replace<node_t>(updated, memory);
 	tref substituted = rewriter::replace<node_t>(grounded, sol);
 	auto check_r = normalizer<node_t>(substituted);
@@ -434,7 +436,10 @@ TEST_SUITE("table_step_provider") {
 		};
 		assignment<node_t> memory;
 		fresh_element_ledger ledger;
-		auto sol = ocltl_direct_decode_edge<node_t>(tmpls, memory, 0, 0, ledger);
+		auto sol_r = ocltl_direct_decode_edge<node_t>(tmpls, memory, 0, 0,
+			ledger);
+		REQUIRE(sol_r.has_value());
+		auto sol = sol_r.value();
 		REQUIRE(sol.has_value());
 		for (tref tmpl : tmpls)
 			CHECK(atom_holds(tmpl, memory, sol.value()));
@@ -452,8 +457,10 @@ TEST_SUITE("table_step_provider") {
 		};
 		assignment<node_t> memory;
 		fresh_element_ledger ledger;
-		auto sol1 = ocltl_direct_decode_edge<node_t>(
+		auto sol1_r = ocltl_direct_decode_edge<node_t>(
 			tmpls1, memory, 0, 0, ledger);
+		REQUIRE(sol1_r.has_value());
+		auto sol1 = sol1_r.value();
 		REQUIRE(sol1.has_value());
 		for (tref tmpl : tmpls1) CHECK(atom_holds(tmpl, memory, sol1.value()));
 
@@ -463,8 +470,10 @@ TEST_SUITE("table_step_provider") {
 			parse_tmpl_atom("o1[t]:tau != {F.}:tau."),
 			parse_tmpl_atom("o1[t]:tau != o1[t-1]:tau."),
 		};
-		auto sol2 = ocltl_direct_decode_edge<node_t>(
+		auto sol2_r = ocltl_direct_decode_edge<node_t>(
 			tmpls2, memory2, 1, 1, ledger);
+		REQUIRE(sol2_r.has_value());
+		auto sol2 = sol2_r.value();
 		REQUIRE(sol2.has_value());
 		for (tref tmpl : tmpls2)
 			CHECK(atom_holds(tmpl, memory2, sol2.value(), 1));
@@ -485,11 +494,14 @@ TEST_SUITE("table_step_provider") {
 			= build_bf_f_type<node_t>(tau_type_id<node_t>());
 		one[build_out_var_at_n<node_t>("o1", 0, tau_type_id<node_t>())]
 			= build_bf_t_type<node_t>(tau_type_id<node_t>());
-		CHECK_FALSE(ocltl_direct_decode_edge<node_t>(
-			tmpls, zero, 1, 1, ledger).has_value());
+		auto zero_r = ocltl_direct_decode_edge<node_t>(
+			tmpls, zero, 1, 1, ledger);
+		REQUIRE(zero_r.has_value());
+		CHECK_FALSE(zero_r.value().has_value());
 		auto sol = ocltl_direct_decode_edge<node_t>(tmpls, one, 1, 1, ledger);
 		REQUIRE(sol.has_value());
-		for (tref tmpl : tmpls) CHECK(atom_holds(tmpl, one, sol.value(), 1));
+		REQUIRE(sol.value().has_value());
+		for (tref tmpl : tmpls) CHECK(atom_holds(tmpl, one, *sol.value(), 1));
 	}
 
 	// During warm-up, get_ubt_ctn_at can quantify away the very coordinate

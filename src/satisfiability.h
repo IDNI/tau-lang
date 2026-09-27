@@ -44,7 +44,9 @@ enum class sometimes_inputs : bool {
  * @param original_fm Formula template to instantiate.
  * @param io_vars IO variable nodes to substitute.
  * @param time_point Time step to substitute into IO variables.
- * @return Formula with IO variables instantiated at @p time_point.
+ * @return A result carrying the formula with IO variables instantiated at
+ * @p time_point. A failed result means an IO variable reached no
+ * input/output classification.
  *
  * @par Example
  * This function works on internal formula templates with generic IO
@@ -58,7 +60,7 @@ enum class sometimes_inputs : bool {
  * unchanged.
  */
 template <NodeType node>
-tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
+result<tref> fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
 
 /**
  * @brief Compute constraints for uninterpreted constants in an unbounded continuation.
@@ -68,8 +70,10 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * @param fm Unbounded continuation formula.
  * @param io_vars IO variable nodes (updated with any new variables).
  * @param start_time Time step at which the continuation was started.
- * @return Formula constraining uninterpreted constants, or `T` if none exist;
- * `nullptr` when normalization fails on a `bv_widening` width-cap violation.
+ * @return A result carrying the formula constraining uninterpreted
+ * constants, or `T` if none exist. A failed result means the continuation
+ * could not be instantiated or normalized (e.g. a `bv_widening`
+ * width-cap violation).
  *
  * @par Example
  * This function only operates on an already-transformed unbounded
@@ -88,7 +92,7 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * uninterpreted constants are involved at all.
  */
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time);
+result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time);
 
 /**
  * @brief Transform a normalized Tau formula into execution form.

@@ -926,7 +926,7 @@ post_normalization:
 		// compile-away at t = formula_time_point - 1 (S(-1) = false).
 		// Kept on the interpreter so reset() can re-seed.
 		i.since_aux_anchor_ = since_aux_anchor;
-		i.seed_since_aux_bits();
+		TAU_TRY_VOID(i.seed_since_aux_bits());
 
 		// A multi-state Mealy strategy's G body (encode_mealy_as_safety)
 		// is enforced from formula_time_point on; the warm-up steps before
@@ -942,8 +942,9 @@ post_normalization:
 			for (int j = 0; j < k; ++j)
 				sv_names.push_back(
 					"o__ltl_ms" + std::to_string(j) + "__");
-			if (tref warmup = encode_mealy_warmup<node>(*ltl_sol,
-				sv_names, static_cast<int_t>(i.formula_time_point)))
+			TAU_TRY(tref warmup, encode_mealy_warmup<node>(*ltl_sol,
+				sv_names, static_cast<int_t>(i.formula_time_point)));
+			if (warmup)
 			{
 				// IN-N11: every ubt_ctn part needs its original_spec
 				// entry; the warm-up part is never revised, so it has
@@ -1300,8 +1301,8 @@ struct solve_step_provider : step_provider<node> {
 			// enumerating the raw formula's paths first multiplies the
 			// path count by the absolute run prefix that memory already
 			// decides (GitHub #115).
-			tref part_at_t = update_to_time_point<node>(spec_part,
-				static_cast<int_t>(formula_time_point));
+			TAU_TRY(tref part_at_t, update_to_time_point<node>(spec_part,
+				static_cast<int_t>(formula_time_point)));
 			part_at_t = syntactic_formula_simplification<node>(
 				rewriter::replace<node>(part_at_t, local_memory));
 			// A state part is left to the solver as a constraint (above).
@@ -1937,7 +1938,8 @@ interpreter<node>::step(const assignment<node>& values)
 			flatten_and(h->get(), raw_atoms);
 			// The interpreter's own memoized member, not the free
 			// template -- the member shadows it inside the class.
-			tref grounded = update_to_time_point(h->get(), (int_t)time_point);
+			TAU_TRY(tref grounded,
+				update_to_time_point(h->get(), (int_t)time_point));
 			grounded = rewriter::replace<node>(grounded, memory);
 			auto normalized = normalize_non_temp<node>(grounded);
 			if (!normalized.has_value()) {
@@ -1962,7 +1964,8 @@ interpreter<node>::step(const assignment<node>& values)
 				trefs grounded_atoms;
 				grounded_atoms.reserve(raw_atoms.size());
 				for (tref a : raw_atoms) {
-					tref g = update_to_time_point(a, (int_t)time_point);
+					TAU_TRY(tref g,
+						update_to_time_point(a, (int_t)time_point));
 					grounded_atoms.push_back(rewriter::replace<node>(g, memory));
 				}
 				TAU_TRY(auto fast, ocltl_direct_decode_missing<node>(grounded_atoms, missing_outputs, ledger_));
@@ -2114,7 +2117,9 @@ interpreter<node>::step()
 	// Get inputs for this step
 	auto [step_inputs, _] = build_inputs_for_step(time_point);
 	if (auto reads = provider_->read_set(step_inputs)) step_inputs = *reads;
-	else step_inputs = appear_within_lookback(step_inputs);
+	else {
+		TAU_TRY(step_inputs, appear_within_lookback(step_inputs));
+	}
 	// Get values for inputs which do not exceed time_point
 	LOG_TRACE << "interpreter::step/read";
 	std::optional<std::pair<std::optional<assignment<node>>, bool>> read_v;
@@ -2308,9 +2313,11 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		for (const htrefs& part : ubt_ctn) {
 			trefs part_alts;
 			part_alts.reserve(part.size());
-			for (const auto& h : part)
-				part_alts.push_back(
+			for (const auto& h : part) {
+				TAU_TRY(tref alt,
 					update_to_time_point(h->get(), ut));
+				part_alts.push_back(alt);
+			}
 			upd_ubt_ctn.push_back(std::move(part_alts));
 		}
 		return r.with_assert_check_value(std::move(upd_ubt_ctn));
@@ -2327,7 +2334,7 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		trefs part_alts;
 		part_alts.reserve(part.size());
 		for (const auto& h : part) {
-		auto step_ubt_ctn = update_to_time_point(h->get(), ut);
+		TAU_TRY(tref step_ubt_ctn, update_to_time_point(h->get(), ut));
 		auto io_vars = tau::get(step_ubt_ctn).select_top(
 				is_child<node, tau::io_var>);
 		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
@@ -2450,7 +2457,7 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 }
 
 template <NodeType node>
-tref interpreter<node>::update_to_time_point(
+result<tref> interpreter<node>::update_to_time_point(
 	tref f, const int_t t) {
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
@@ -2458,16 +2465,17 @@ tref interpreter<node>::update_to_time_point(
 	// Memoized per time point: within one t the rewrite of a formula is
 	// a pure function, and step()/get_ubt_ctn_at re-request the same
 	// trees (duplicated alternatives, repeated calls) many times.
+	result<tref> r;
 	if (t != tp_rewrite_memo_t_) {
 		tp_rewrite_memo_.clear();
 		tp_rewrite_memo_t_ = t;
 	}
 	if (auto it = tp_rewrite_memo_.find(f); it != tp_rewrite_memo_.end())
-		return it->second;
+		return r.with_value(it->second);
 	auto io_vars = tau::get(f).select_top(is_child<node, tau::io_var>);
-	tref result = fm_at_time_point<node>(f, io_vars, t);
-	tp_rewrite_memo_.emplace(f, result);
-	return result;
+	TAU_TRY(tref updated, fm_at_time_point<node>(f, io_vars, t));
+	tp_rewrite_memo_.emplace(f, updated);
+	return r.with_value(updated);
 }
 
 // Free-function counterpart: a step_provider (e.g. table_step_provider)
@@ -2477,10 +2485,12 @@ tref interpreter<node>::update_to_time_point(
 // unqualified calls; external callers reach this one via the explicit
 // `update_to_time_point<node>(...)` template-argument syntax.
 template <NodeType node>
-tref update_to_time_point(tref f, const int_t t) {
+result<tref> update_to_time_point(tref f, const int_t t) {
 	using tau = tree<node>;
+	result<tref> r;
 	auto io_vars = tau::get(f).select_top(is_child<node, tau::io_var>);
-	return fm_at_time_point<node>(f, io_vars, t);
+	TAU_TRY(tref updated, fm_at_time_point<node>(f, io_vars, t));
+	return r.with_value(updated);
 }
 
 template <NodeType node>
@@ -2489,7 +2499,8 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 {
 	using tau = tree<node>;
 	result<bool> r;
-	tref updated = update_to_time_point<node>(atom_ref, static_cast<int_t>(formula_time_point));
+	TAU_TRY(tref updated, update_to_time_point<node>(atom_ref,
+		static_cast<int_t>(formula_time_point)));
 	tref current = rewriter::replace<node>(updated, memory);
 	auto normalized = normalize_non_temp<node>(current);
 	// A normalization failure means the atom's truth could not be
@@ -2574,12 +2585,8 @@ result<tref> interpreter<node>::get_executable_spec(
 		}
 	}
 	// compute model for uninterpreted constants and solve it
-	tref constraints = get_uninterpreted_constants_constraints<node>(
-		executable, io_vars, static_cast<int_t>(start_time));
-	if (!constraints) {
-		return r.with_assert_check_error(code::unsat,
-			"Uninterpreted-constant constraints failed to normalize");
-	}
+	TAU_TRY(tref constraints, get_uninterpreted_constants_constraints<node>(
+		executable, io_vars, static_cast<int_t>(start_time)));
 	if (tau::get(constraints).equals_F()) {
 		return r.with_assert_check_error(code::unsat,
 			"Uninterpreted-constant constraints are unsatisfiable");
@@ -3735,8 +3742,8 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 		// enumerating the raw formula's paths first multiplies the
 		// path count by the absolute run prefix that memory already
 		// decides (GitHub #115).
-		tref alt_at_t = update_to_time_point(part_alts[alt_idx],
-			static_cast<int_t>(formula_time_point));
+		TAU_TRY(tref alt_at_t, update_to_time_point(part_alts[alt_idx],
+			static_cast<int_t>(formula_time_point)));
 		alt_at_t = syntactic_formula_simplification<node>(
 			rewriter::replace<node>(alt_at_t, memory));
 		if (!mentions_ltl_state_var<node>(alt_at_t)) {
@@ -3829,7 +3836,7 @@ tref interpreter<node>::chosen_spec_fm() const {
 // ── reset ─────────────────────────────────────────────────────────────────────
 
 template <NodeType node>
-void interpreter<node>::reset() {
+result<void> interpreter<node>::reset() {
 	// Clear the execution snapshot; preserve spec / streams / cached_solution.
 	memory.clear();
 	time_point = 0;
@@ -3851,15 +3858,17 @@ void interpreter<node>::reset() {
 	if (provider_) provider_->reset();
 	// LA-N3: make_interpreter pre-populated `memory` with the inner-S
 	// auxiliary anchors; a reset() that only cleared `memory` lost them.
-	seed_since_aux_bits();
+	return seed_since_aux_bits();
 }
 
 template <NodeType node>
-void interpreter<node>::seed_aux_lookback_bits(
+result<void> interpreter<node>::seed_aux_lookback_bits(
 	const std::map<std::string, int>& bits)
 {
 	using tau = tree<node>;
-	if (bits.empty() || formula_time_point < 1) return;
+	result<void> r;
+	if (bits.empty() || formula_time_point < 1)
+		return r.with_value();
 	// The carrier type's symbolic true/false, matching build_state_bit_eq
 	// and current_state()'s read-side check -- not a numeric constant,
 	// which a one-bit carrier normalizes away (see build_state_bit_eq).
@@ -3899,10 +3908,9 @@ void interpreter<node>::seed_aux_lookback_bits(
 			// mentions every bit at shift -1, so this arm firing
 			// means that encoding changed; say so instead of
 			// silently skipping.
-			LOG_WARNING << "seed_aux_lookback_bits: no lookback "
-				"occurrence of state bit '" << name
-				<< "' in the executable spec; its initial "
-				"value stays at the interpreter default\n";
+			r.warning("no lookback occurrence of state bit in the "
+				"executable spec; its initial value stays at "
+				"the interpreter default", {{label::name, name}});
 			continue;
 		}
 		// transform_io_var(name[t-1], formula_time_point)
@@ -3914,14 +3922,16 @@ void interpreter<node>::seed_aux_lookback_bits(
 		// later bf-level entry during replace (the whole bf subtree
 		// matches first), which let a step-0 solution override the
 		// seeds with zeros.
-		tref mem_key = tau::get(tau::bf, {transform_io_var<node>(
-			it->second, static_cast<int_t>(formula_time_point))});
+		TAU_TRY(tref mem_key_var, transform_io_var<node>(
+			it->second, static_cast<int_t>(formula_time_point)));
+		tref mem_key = tau::get(tau::bf, {mem_key_var});
 		memory.emplace(mem_key, bit ? bv_one_val : bv_zero_val);
 	}
+	return r.with_assert_check_value();
 }
 
 template <NodeType node>
-void interpreter<node>::seed_since_aux_bits() {
+result<void> interpreter<node>::seed_since_aux_bits() {
 	// LA-N3: every inner (off-spine) S auxiliary is anchored to 0 at the
 	// step before the first enforced one — S(-1) = false, and since a T
 	// compiles to a negated S, T(-1) = true is the same seed. Outermost
@@ -3929,7 +3939,7 @@ void interpreter<node>::seed_since_aux_bits() {
 	// G(curr && rhs); a 0-seed would outlaw their φ-chain).
 	std::map<std::string, int> bits;
 	for (const std::string& n : since_aux_anchor_) bits.emplace(n, 0);
-	seed_aux_lookback_bits(bits);
+	return seed_aux_lookback_bits(bits);
 }
 
 // ── current_state ─────────────────────────────────────────────────────────────
@@ -4057,7 +4067,8 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			}
 		}
 		if (!part) part = tau::build_wff_or(part_alts);
-		tref updated = update_to_time_point(part, static_cast<int_t>(formula_time_point));
+		TAU_TRY(tref updated, update_to_time_point(part,
+			static_cast<int_t>(formula_time_point)));
 		updated = rewriter::replace<node>(updated, memory);
 		auto normalized = normalize_non_temp<node>(updated);
 		if (normalized.has_value()) updated = normalized.value();
@@ -4434,23 +4445,27 @@ bool interpreter<node>::is_excluded_output(tref var) {
 }
 
 template <NodeType node>
-trefs interpreter<node>::appear_within_lookback(const trefs& vars){
+result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
+	result<trefs> r;
 	trefs appeared;
 	// step_spec is read below for t == time_point; keep it current here too,
 	// since callers (e.g. get_inputs_for_step) may reach this before step().
-	if (!calculate_initial_spec().value_or(false)) return appeared;
+	TAU_TRY(bool initial_ok, calculate_initial_spec());
+	if (!initial_ok) return r.with_value(appeared);
 	// No input to look for (e.g. a spec without inputs): skip the scan,
 	// which substitutes and simplifies every formula at every lookahead t.
-	if (vars.empty()) return appeared;
-	auto check = [&](tref fm, size_t t) {
-		tref step_ubt_ctn = update_to_time_point(fm,
-			static_cast<int_t>(t < formula_time_point ? formula_time_point : t));
+	if (vars.empty()) return r.with_value(appeared);
+	auto check = [&](tref fm, size_t t) -> result<bool> {
+		result<bool> r;
+		TAU_TRY(tref step_ubt_ctn, update_to_time_point(fm,
+			static_cast<int_t>(t < formula_time_point
+				? formula_time_point : t)));
 		// Exact: memory's values were committed before this step and
 		// hold none of its inputs, and the simplification only recombines
 		// existing subterms, so a var absent here cannot appear below.
 		if (std::ranges::none_of(vars, [&](tref v) {
 				return contains<node>(step_ubt_ctn, v); }))
-			return;
+			return r.with_value(true);
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
 		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
 		for (tref v : vars) {
@@ -4461,6 +4476,7 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 					}) == appeared.end())
 					appeared.emplace_back(v);
 		}
+		return r.with_value(true);
 	};
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
 		// Every var already appeared (appeared never repeats one).
@@ -4477,16 +4493,21 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 					appeared.emplace_back(v);
 			for (const trefs& part_alts : step_spec)
 				for (tref spec_part : part_alts)
-					check(spec_part, t);
+					if (!r.merge_take(check(spec_part, t))
+							.value_or(false)) return r;
 		} else {
 			for (const htrefs& part : ubt_ctn)
-				for (const auto& h : part) check(h->get(), t);
+				for (const auto& h : part)
+					if (!r.merge_take(check(h->get(), t))
+							.value_or(false)) return r;
 		}
 		// Table mode leaves ubt_ctn empty and seeds live_probe_atoms
 		// instead, so probe it at every t.
-		for (const auto& h : live_probe_atoms) check(h->get(), t);
+		for (const auto& h : live_probe_atoms)
+			if (!r.merge_take(check(h->get(), t)).value_or(false))
+				return r;
 	}
-	return appeared;
+	return r.with_value(appeared);
 }
 
 template <NodeType node>

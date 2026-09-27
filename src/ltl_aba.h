@@ -555,7 +555,7 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
  * initial state is out of range.
  */
 template <NodeType node>
-static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
+static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
                                 const std::vector<std::string>& sv,
                                 int_t warmup);
 

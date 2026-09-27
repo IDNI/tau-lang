@@ -463,7 +463,7 @@ TEST_SUITE("Tau API - string - execution") {
 
 		const std::string first = submit("T.");
 		CHECK(first == "T");
-		i.reset();
+		REQUIRE(i.reset().has_value());
 		CHECK(i.time_point == 0);
 		// The same input at time 0 again must produce the same output.
 		CHECK(submit("T.") == first);

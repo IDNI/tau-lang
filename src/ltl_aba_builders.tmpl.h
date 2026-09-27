@@ -788,16 +788,17 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 // strategy's choice cannot depend on it at that step): for the cube and DNF
 // labels ltlsynt emits that is the existential projection of the guard.
 template <NodeType node>
-static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
+static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
                                 const std::vector<std::string>& sv,
                                 int_t warmup)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	const auto& aut = sol.aut;
 	const int k      = (int)sv.size();
 	const int init_s = aut.initial_state;
-	if (init_s < 0 || init_s >= k) return nullptr;
-	auto at = [](tref fm, int_t t) {
+	if (init_s < 0 || init_s >= k) return r.with_value(nullptr);
+	auto at = [](tref fm, int_t t) -> result<tref> {
 		auto io = tau::get(fm).select_top(is_child<node, tau::io_var>);
 		return fm_at_time_point<node>(fm, io, t);
 	};
@@ -823,10 +824,11 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 				tau::build_wff_neg(
 					build_state_bit_eq<node>(sv[s], -1, true)),
 				edges_from(s)));
-		all = tau::build_wff_and(all,
+		TAU_TRY(tref at_t,
 			at(tau::build_wff_and(step, mealy_one_hot<node>(sv)), t));
+		all = tau::build_wff_and(all, at_t);
 	}
-	return all;
+	return r.with_value(all);
 }
 
 // ── ltl_to_safety_formula ─────────────────────────────────────────────────────

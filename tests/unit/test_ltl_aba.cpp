@@ -4617,8 +4617,9 @@ static std::optional<bool> holds_at(tref body,
 	const subtree_map<node_t, tref>& trace, int_t t)
 {
 	auto io = tau::get(body).select_top(is_child<node_t, tau::io_var>);
-	return ground_truth(rewriter::replace<node_t>(
-		fm_at_time_point<node_t>(body, io, t), trace));
+	auto point = fm_at_time_point<node_t>(body, io, t);
+	REQUIRE(point.has_value());
+	return ground_truth(rewriter::replace<node_t>(point.value(), trace));
 }
 
 TEST_SUITE("Data game strategy") {

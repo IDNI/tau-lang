@@ -68,22 +68,24 @@ static bool ocltl_is_output_coord(tref v) {
 // registered with it only once the whole edge succeeds, so a sibling
 // coordinate of the SAME step still sees it as external.
 template <NodeType node>
-static std::optional<solution<node>> ocltl_direct_decode_edge(
+static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	const trefs& tmpls, const assignment<node>& memory,
 	size_t time_point, size_t formula_time_point,
 	fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	(void)formula_time_point; // kept for call-site symmetry with produce()
 
 	trefs grounded;
 	grounded.reserve(tmpls.size());
 	for (tref tmpl : tmpls) {
-		tref updated = update_to_time_point<node>(tmpl, (int_t)time_point);
+		TAU_TRY(tref updated,
+			update_to_time_point<node>(tmpl, (int_t)time_point));
 		// an atom the committed values decide is no disequality left to
 		// solve: a false one makes the edge unsat for this history
 		tref g = rewriter::replace<node>(updated, memory);
-		if (tau::get(g).equals_F()) return std::nullopt;
+		if (tau::get(g).equals_F()) return r.with_value(std::nullopt);
 		if (!tau::get(g).equals_T()) grounded.push_back(g);
 	}
 
@@ -129,7 +131,9 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 			get_ba_type_tree<node>(opts.type_id));
 		opts.ledger = &ledger;
 		TAU_TRY(auto val, solve_inequality_system_atomless<node>(sys, opts));
-		if (!val) return std::nullopt; // genuinely unsat for this history
+		// Genuinely unsat for this history: a rejected candidate, not
+		// necessarily a failure of the whole step.
+		if (!val) return r.with_value(std::nullopt);
 		// The solver's keys are bf-wrapped variables, not the bare `var`
 		// from get_free_vars; unwrap to compare by content. Keep the
 		// matched bf-wrapped key as `sol_key`: both the substitution below
@@ -145,7 +149,7 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 			// var was named by a row of sys, so a miss here is a bug, not
 			// the unconstrained case below -- bail rather than silently
 			// substitute a value that may violate its own constraint.
-			return std::nullopt;
+			return r.with_value(std::nullopt);
 		// var had no constraint of its own (every atom mentioning it was
 		// also mutual and got attributed elsewhere -- shouldn't happen for
 		// a real spec, but any concrete element is a valid witness here).
@@ -166,14 +170,15 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 		tref g = rewriter::replace<node>(grounded[i], sol);
 		for (tref v : get_free_vars<node>(g))
 			for (tref c : coords)
-				if (tau::subtree_equals(c, v)) return std::nullopt;
+				if (tau::subtree_equals(c, v))
+					return r.with_value(std::nullopt);
 	}
 	// Commit every coordinate this edge decided, once, only now that the
 	// whole edge succeeded -- v is registered exactly as the solver
 	// produced it. A discarded decode (nullopt above) commits nothing.
 	for (const auto& [key, v] : sol)
 		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
-	return sol;
+	return r.with_value(std::move(sol));
 }
 
 template <NodeType node>
@@ -358,17 +363,22 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		std::optional<solution<node>> ws;
 		if (from_start_) {
 			trefs grounded;
-			for (tref t : tmpls) grounded.push_back(rewriter::replace<node>(
-				update_to_time_point<node>(t, (int_t)time_point), *mem));
+			for (tref t : tmpls) {
+				TAU_TRY(tref grounded_t,
+					update_to_time_point<node>(t, (int_t)time_point));
+				grounded.push_back(rewriter::replace<node>(
+					grounded_t, *mem));
+			}
 			TAU_TRY(auto ws_r, solve_step_outputs<node>(tau::build_wff_and(grounded),
 				(int_t)time_point, found_, ledger_));
 			ws = std::move(ws_r);
 			if (!ws) return r.with_assert_check_error(code::internal_error,
 				"no values satisfy the outputs of the strategy edge");
 		}
-		else if (eligible)
-			ws = ocltl_direct_decode_edge<node>(tmpls, memory,
-				time_point, formula_time_point, ledger_);
+		else if (eligible) {
+			TAU_TRY(ws, ocltl_direct_decode_edge<node>(tmpls, memory,
+				time_point, formula_time_point, ledger_));
+		}
 		if (!ws) {
 			// Ineligible edge, or (defensively) an eligible one whose direct
 			// decode failed at runtime -- the general path. Each template
@@ -384,8 +394,8 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 			tref conj = nullptr;
 			for (size_t k = 0; k < tmpls.size(); ++k) {
 				bool is_ctr = k < is_counter.size() && is_counter[k];
-				tref grounded = update_to_time_point<node>(tmpls[k],
-					is_ctr ? (int_t)time_point : (int_t)formula_time_point);
+				TAU_TRY(tref grounded, update_to_time_point<node>(tmpls[k],
+					is_ctr ? (int_t)time_point : (int_t)formula_time_point));
 				conj = conj ? tau::build_wff_and(conj, grounded) : grounded;
 			}
 			tref current = rewriter::replace<node>(conj, memory);

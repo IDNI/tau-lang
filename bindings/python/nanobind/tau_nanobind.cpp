@@ -18,6 +18,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <type_traits>
 
 #include "tau.h"
 #include "tau_pack.h"
@@ -111,7 +112,8 @@ static py_result to_py_result(idni::tau_lang::result<T>&& r) {
 	py_result out;
 	out.report = make_py_report(r.report());
 	out.has_value = r.has_value();
-	out.value = out.has_value
+	if constexpr (std::is_void_v<T>) out.value = nb::none();
+	else out.value = out.has_value
 		? nb::cast(std::move(r).value(), nb::rv_policy::move)
 		: nb::none();
 	return out;
@@ -464,7 +466,8 @@ NB_MODULE(tau, m) {
 		"carries the incoming revision rather than the merged result.")
 
 		// ── Inspection ──────────────────────────────────────────────
-		.def("reset", &interpreter_t::reset,
+		.def("reset",
+			[](interpreter_t& i) { return to_py_result(i.reset()); },
 			"Reset the interpreter to time t=0 (preserving spec / streams / cached_solution).")
 		.def("current_state",
 			[](const interpreter_t& i) {

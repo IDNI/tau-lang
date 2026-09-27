@@ -61,7 +61,7 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 		REQUIRE(sr.has_value());
 		auto [_, __] = sr.value();
 		// time_point may be 1 after a step (or higher if formula advanced).
-		i->reset();
+		REQUIRE(i->reset().has_value());
 		REQUIRE(i->time_point == 0);
 		// Memory should be cleared.
 		REQUIRE(i->memory.empty());
@@ -115,7 +115,7 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		auto s1_r = i->current_state();
 		REQUIRE(s1_r.has_value());
 		const int s1 = s1_r.value();
-		i->reset();
+		REQUIRE(i->reset().has_value());
 		REQUIRE(i->time_point == 0);
 		CHECK(i->memory.empty());
 		auto again = i->step();

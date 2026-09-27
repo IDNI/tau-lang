@@ -304,8 +304,9 @@ struct interpreter {
 	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
 	// the inner-S auxiliary anchors (see seed_since_aux_bits). The spec
 	// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
-	// preserved — only the execution snapshot is reset.
-	void reset();
+	// preserved — only the execution snapshot is reset. Returns the
+	// re-seeding result.
+	result<void> reset();
 
 	// LA-N3: pre-populate `memory` with bv-0 for every INNER (off-spine)
 	// S/T auxiliary `o__ltl_s<k>__` in `since_aux_anchor_`, at
@@ -316,7 +317,7 @@ struct interpreter {
 	// enforced step's `φ ∧ prev` arm lets the strategy claim a Since
 	// through phantom memory. Called by make_interpreter and by reset();
 	// no-op when the list is empty or lookback is 0.
-	void seed_since_aux_bits();
+	result<void> seed_since_aux_bits();
 
 	// Opaque identifier for the current Mealy state (or interpreter
 	// snapshot if the spec has no Mealy strategy). Two states with the
@@ -564,7 +565,7 @@ private:
 	/// entry whose `name[t-1]` lookback occurs in `ubt_ctn`, emplace
 	/// memory[name[t = formula_time_point - 1]] := bv-{bit}. No-op when
 	/// `formula_time_point` is 0 (no lookback, nothing to seed).
-	void seed_aux_lookback_bits(const std::map<std::string, int>& bits);
+	result<void> seed_aux_lookback_bits(const std::map<std::string, int>& bits);
 
 	/// @brief Everything update() needs to commit, computed without
 	/// mutating the interpreter.
@@ -710,7 +711,7 @@ private:
 	/// @brief Update formula @p f to reflect time point @p t (memoized;
 	/// see the free-function counterpart below for callers with no
 	/// interpreter instance, e.g. a step_provider).
-	tref update_to_time_point(tref f, const int_t t);
+	result<tref> update_to_time_point(tref f, const int_t t);
 
 
 	/// @brief Return `true` if all memory accesses in @p io_vars are valid.
@@ -747,7 +748,7 @@ private:
 		tref update, const int_t start_time);
 
 	/// @brief Return those variables in @p vars that appear within the lookback.
-	trefs appear_within_lookback(const trefs& vars);
+	result<trefs> appear_within_lookback(const trefs& vars);
 
 	/// @brief Re-fold the per-clause `always` wrappers of one partition
 	/// part into a single `always`, conjoining the bodies verbatim.
@@ -824,7 +825,7 @@ bool has_free_vars(tref fm, bool silent = false);
  * @tparam node Tree node type.
  */
 template <NodeType node>
-tref update_to_time_point(tref f, const int_t t);
+result<tref> update_to_time_point(tref f, const int_t t);
 
 // Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point. A normalization failure yields false, not an error; the report carries why.
 template <NodeType node>
