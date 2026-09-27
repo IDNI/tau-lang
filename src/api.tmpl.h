@@ -1678,9 +1678,9 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		TAU_TRY_OR(tref normalized, normalizer<node>(applied),
 			code::internal_error, "Normalization failed");
 		// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-		if (has_free_vars<node>(normalized)) {
-			return r.with_assert_check_error(code::invalid_argument, "Spec contains free variables");
-		}
+		TAU_TRY(bool has_free, has_free_vars<node>(normalized));
+		if (has_free) return r.with_error(code::invalid_argument,
+			"the specification contains free variables");
 		ctx.input_remaps = options.input_remaps;
 		ctx.output_remaps = options.output_remaps;
 		// LT-7: make_interpreter reaches ltlsynt through
@@ -1729,9 +1729,9 @@ result<interpreter<node>> api<node>::get_interpreter(
 		TAU_TRY_OR(tref normalized, normalizer<node>(applied),
 			code::internal_error, "Normalization failed");
 		// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-		if (has_free_vars<node>(normalized)) {
-			return r.with_assert_check_error(code::invalid_argument, "Spec contains free variables");
-		}
+		TAU_TRY(bool has_free, has_free_vars<node>(normalized));
+		if (has_free) return r.with_error(code::invalid_argument,
+			"the specification contains free variables");
 		ctx.input_remaps = options.input_remaps;
 		ctx.output_remaps = options.output_remaps;
 		// See the tref overload: make_interpreter's own result<T> error

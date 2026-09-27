@@ -172,9 +172,6 @@ inline file_input_stream::file_input_stream(const std::string& filename)
 	// A failed open stays on the stream: get() reports end-of-stream.
 	// make() turns that state into a report.
 	file.open(filename);
-	// TODO (HIGH) dropped error: file open failure -- logged instead of reported, the interpreter stream builders return no report
-	if (!file.is_open())
-		LOG_ERROR << "Failed to open file: '" << filename << "'";
 }
 
 inline result<std::shared_ptr<file_input_stream>>
@@ -197,6 +194,8 @@ inline file_input_stream::~file_input_stream() {
 inline std::shared_ptr<serialized_constant_input_stream>
 	file_input_stream::rebuild()
 {
+	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
+	// shared_ptr, so the interface carries no report.
 	return std::make_shared<file_input_stream>(filename);
 }
 
@@ -229,9 +228,6 @@ inline file_output_stream::file_output_stream(const std::string& filename)
 	// A failed open stays on the stream: put() reports failure. make()
 	// turns that state into a report.
 	file.open(filename);
-	// TODO (HIGH) dropped error: file open failure -- logged instead of reported, the interpreter stream builders return no report
-	if (!file.is_open())
-		LOG_ERROR << "Failed to open file: '" << filename << "'";
 }
 
 inline result<std::shared_ptr<file_output_stream>>
@@ -251,6 +247,8 @@ inline std::shared_ptr<serialized_constant_output_stream>
 	file_output_stream::rebuild()
 {
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): rebuild";)
+	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
+	// shared_ptr, so the interface carries no report.
 	return std::make_shared<file_output_stream>(filename);
 }
 

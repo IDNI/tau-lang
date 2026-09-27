@@ -206,10 +206,10 @@ struct interpreter {
 	 *        input filter can tell which declared inputs a given step
 	 *        actually needs, the same way the general solve path uses
 	 *        `ubt_ctn` (left empty here -- see the member's doc comment).
-	 * @return Initialized interpreter, or `std::nullopt` if a stream in @p ctx
-	 *         could not be opened.
+	 * @return Initialized interpreter, or a report error if a stream in
+	 *         @p ctx could not be opened.
 	 */
-	static std::optional<interpreter> make_table_interpreter(
+	static result<interpreter> make_table_interpreter(
 		const io_context<node>& ctx,
 		std::shared_ptr<step_provider<node>> provider,
 		int_t lookback, int_t highest_initial_pos = 0,
@@ -633,7 +633,8 @@ private:
 
 	/// @brief Drop dead and duplicate alternatives (keeping the earliest,
 	/// i.e. strongest, position) and apply the max_revision_alts cap.
-	static htrefs finalize_alternatives(const trefs& alts);
+	/// The report carries the cap warning; the value is always present.
+	static result<htrefs> finalize_alternatives(const trefs& alts);
 
 	/// Memo for update_to_time_point, valid for a single time point:
 	/// identical formulas (duplicate alternatives, repeated
@@ -660,37 +661,44 @@ private:
 	/// when a value cannot be serialized or written.
 	result<bool> write(const assignment<node>& outputs);
 	/// @brief Rebuild the input stream map from @p current_inputs.
-	/// @return false if a stream could not be found (interpretation should stop).
-	bool rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
+	/// The report says which stream could not be opened; interpretation
+	/// should stop on a valueless result.
+	result<bool> rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
 	/// @brief Rebuild the output stream map from @p current_outputs.
-	/// @return false if a stream could not be found (interpretation should stop).
-	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+	/// The report says which stream could not be opened; interpretation
+	/// should stop on a valueless result.
+	result<bool> rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
 	/// @brief Build the input stream map for @p current_inputs into
 	/// @p out_inputs/@p out_sources, reusing a stream from
 	/// @p previous_inputs when @p previous_sources says the same file
 	/// backs the variable. Touches no member state -- callers (including
 	/// a dry run such as can_extend) decide whether to keep the result.
-	bool build_inputs(const subtree_map<node, size_t>& current_inputs,
+	/// The report says which stream could not be opened or found.
+	result<bool> build_inputs(const subtree_map<node, size_t>& current_inputs,
 		const input_streams<node>& previous_inputs,
 		const subtree_map<node, size_t>& previous_sources,
 		input_streams<node>& out_inputs,
 		subtree_map<node, size_t>& out_sources) const;
 	/// @brief Build the output stream map for @p current_outputs; see
 	/// build_inputs for the continuity/side-effect contract.
-	bool build_outputs(const subtree_map<node, size_t>& current_outputs,
+	result<bool> build_outputs(const subtree_map<node, size_t>& current_outputs,
 		const output_streams<node>& previous_outputs,
 		const subtree_map<node, size_t>& previous_sources,
 		output_streams<node>& out_outputs,
 		subtree_map<node, size_t>& out_sources) const;
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
-	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
+	/// The report names an input stream that must be typed.
+	result<bool> collect_input_streams(tref dnf,
+		subtree_map<node, size_t>& current_inputs);
 	/// @brief Return the set of input stream variables present in @p dnf.
-	subtree_map<node, size_t> collect_input_streams(tref dnf);
+	result<subtree_map<node, size_t>> collect_input_streams(tref dnf);
 	/// @brief Collect all output stream variables from @p dnf into @p current_outputs.
-	bool collect_output_streams(tref dnf, subtree_map<node, size_t>& current_outputs);
+	/// The report names an output stream that must be typed.
+	result<bool> collect_output_streams(tref dnf,
+		subtree_map<node, size_t>& current_outputs);
 	/// @brief Return the set of output stream variables present in @p dnf.
-	subtree_map<node, size_t> collect_output_streams(tref dnf);
+	result<subtree_map<node, size_t>> collect_output_streams(tref dnf);
 
 	/// @brief Return the unbounded continuation formulas at time @p t,
 	/// per spec part in alternative order. The report carries any
@@ -808,11 +816,10 @@ tref unpack_tau_constant(tref constant);
  *
  * @tparam node Tree node type.
  * @param fm Formula to check.
- * @param silent Suppress the LOG_ERROR diagnostics naming the offenders.
  * @return `true` if a disallowed free variable (or undeclared stream) exists.
  */
 template <NodeType node>
-bool has_free_vars(tref fm, bool silent = false);
+result<bool> has_free_vars(tref fm);
 
 /**
  * @brief Update formula @p f to reflect time point @p t.

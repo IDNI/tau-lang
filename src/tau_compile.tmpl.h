@@ -466,7 +466,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\tauto interp = interpreter<node_t>::make_table_interpreter(\n"
 		"\t\tctx, std::move(provider), " << d.lookback << ", "
 		<< d.highest_initial_pos << ", live_probe_atoms);\n"
-		"\tif (!interp) {\n"
+		"\tif (!interp.has_value()) {\n"
+		"\t\tinterp.report().print(cerr);\n"
 		"\t\tfprintf(stderr, \"interpreter initialization failed\\n\");\n"
 		"\t\treturn 2;\n"
 		"\t}\n"
@@ -736,8 +737,9 @@ result<codegen_result> gen_spec(
 	TAU_TRY(tref applied, nso_rr_apply<Node>(*nso_rr));
 	TAU_TRY(tref fm, normalizer<Node>(applied));
 	// fm is checked before make_interpreter runs, so it is never a bare-reparsed atom.
-	if (has_free_vars<Node>(fm)) return r.with_error(code::invalid_argument,
-		verb + ": spec has unresolved free variables");
+	TAU_TRY(bool has_free, has_free_vars<Node>(fm));
+	if (has_free) return r.with_error(code::invalid_argument,
+		"the specification contains free variables");
 
 	// 2. Follow what `run` executes: make_interpreter chooses it, so a
 	// program and a run of the spec make the same moves. When the run

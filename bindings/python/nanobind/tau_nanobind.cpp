@@ -358,14 +358,30 @@ NB_MODULE(tau, m) {
 		.def(nb::init<const std::string&>());
 
 	// File input stream
+	//
+	// make() reports a failed open; the binding raises it at this boundary
+	// the way py_result::unwrap does, so a missing file is not a silent
+	// end-of-stream.
 	nb::class_<file_input_stream,
 		serialized_constant_input_stream>(m, "file_input_stream")
-		.def(nb::init<const std::string&>());
+		.def_static("make", [](const std::string& filename) {
+			auto r = file_input_stream::make(filename);
+			if (!r.has_value())
+				throw std::runtime_error(
+					make_py_report(r.report()).text);
+			return r.value();
+		}, "filename"_a);
 
 	// File output stream
 	nb::class_<file_output_stream,
 		serialized_constant_output_stream>(m, "file_output_stream")
-		.def(nb::init<const std::string&>());
+		.def_static("make", [](const std::string& filename) {
+			auto r = file_output_stream::make(filename);
+			if (!r.has_value())
+				throw std::runtime_error(
+					make_py_report(r.report()).text);
+			return r.value();
+		}, "filename"_a);
 
 	// Vector input stream
 	nb::class_<vector_input_stream,

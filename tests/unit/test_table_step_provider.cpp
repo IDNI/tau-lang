@@ -56,7 +56,7 @@ strings run_table_o1(std::shared_ptr<table_step_provider<node_t>> provider,
 	auto interp = interpreter<node_t>::make_table_interpreter(
 		ctx, std::move(provider), lookback, highest_initial_pos,
 		live_probe_atoms);
-	if (!interp.has_value()) return {};
+	REQUIRE(interp.has_value());
 	// api<node_t>::step() is the public wrapper around step()+write() --
 	// write() itself stays private to interpreter, reached only through it.
 	for (size_t k = 0; k < steps; ++k) api<node_t>::step(*interp);

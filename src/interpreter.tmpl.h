@@ -285,9 +285,10 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 }
 
 template<NodeType node>
-bool interpreter<node>::rebuild_inputs(
+result<bool> interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
 {
+	result<bool> r;
 	// Hand off the current maps as the previous state build_inputs may
 	// reuse streams from; restore them verbatim on failure so a rejected
 	// rebuild leaves the interpreter exactly as it was.
@@ -298,26 +299,28 @@ bool interpreter<node>::rebuild_inputs(
 	input_stream_sources.clear();
 	input_streams<node> new_inputs;
 	subtree_map<node, size_t> new_sources;
-	if (!build_inputs(current_inputs, previous_inputs, previous_sources,
-		new_inputs, new_sources))
+	if (auto built = r.merge_take(build_inputs(current_inputs,
+		previous_inputs, previous_sources, new_inputs, new_sources));
+		!built)
 	{
 		inputs = std::move(previous_inputs);
 		input_stream_sources = std::move(previous_sources);
-		return false;
+		return r;
 	}
 	inputs = std::move(new_inputs);
 	input_stream_sources = std::move(new_sources);
-	return true;
+	return r.with_value(true);
 }
 
 template<NodeType node>
-bool interpreter<node>::build_inputs(
+result<bool> interpreter<node>::build_inputs(
 	const subtree_map<node, size_t>& current_inputs,
 	const input_streams<node>& previous_inputs,
 	const subtree_map<node, size_t>& previous_sources,
 	input_streams<node>& out_inputs,
 	subtree_map<node, size_t>& out_sources) const
 {
+	result<bool> r;
 	// Reverse index from a flattened tuple member's own (canonized) io var
 	// to the adt_stream_layout root it belongs to (ctx.adt_streams, Task 7),
 	// so a member below is routed to its group instead of getting a private
@@ -344,11 +347,11 @@ bool interpreter<node>::build_inputs(
 		DBG(LOG_TRACE << "build_inputs[var]: " << LOG_FM(var) << "\n";)
 		auto it = ctx.inputs.find(var);
 		if (it == ctx.inputs.end()) {
-			LOG_ERROR << "Failed to find input stream for stream '"
-				<< get_var_name<node>(var) << "'\n";
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
-			return false; // stop interpreting: failed to open an input stream
+			return r.with_error(code::invalid_input_stream,
+				"no input stream is registered for the stream",
+				{{label::name, get_var_name<node>(var)}});
 		}
 		std::string vn = get_var_name<node>(var);
 
@@ -406,9 +409,15 @@ bool interpreter<node>::build_inputs(
 					if (old_physical) physical = std::make_unique<
 						adt_shared_physical_input_stream>(
 							std::move(old_physical));
-					else physical = std::make_unique<
-						file_input_stream>(
-							dict(layout.stream_id));
+					else {
+						auto f = r.merge_take(
+							file_input_stream::make(
+								dict(layout.stream_id)));
+						if (!f) return r;
+						physical = std::make_unique<
+							adt_shared_physical_input_stream>(
+								std::move(*f));
+					}
 				}
 				else if (ctx.console_input_factory)
 					physical = std::make_unique<
@@ -451,20 +460,25 @@ bool interpreter<node>::build_inputs(
 					&& ps->second == stream_id
 					&& pv != previous_inputs.end())
 					out_inputs.emplace(var, pv->second);
-				else out_inputs.emplace(var,
-					std::make_shared<file_input_stream>(
-						dict(stream_id)));
+				else {
+					auto f = r.merge_take(
+						file_input_stream::make(
+							dict(stream_id)));
+					if (!f) return r;
+					out_inputs.emplace(var, std::move(*f));
+				}
 				out_sources[var] = stream_id;
 			}
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
 template<NodeType node>
-bool interpreter<node>::rebuild_outputs(
+result<bool> interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
+	result<bool> r;
 	// Same handoff as rebuild_inputs: a fresh file_output_stream opens
 	// with truncation, so build_outputs is given the previous state to
 	// reuse from, and it is restored verbatim on failure.
@@ -475,26 +489,28 @@ bool interpreter<node>::rebuild_outputs(
 	output_stream_sources.clear();
 	output_streams<node> new_outputs;
 	subtree_map<node, size_t> new_sources;
-	if (!build_outputs(current_outputs, previous_outputs, previous_sources,
-		new_outputs, new_sources))
+	if (auto built = r.merge_take(build_outputs(current_outputs,
+		previous_outputs, previous_sources, new_outputs, new_sources));
+		!built)
 	{
 		outputs = std::move(previous_outputs);
 		output_stream_sources = std::move(previous_sources);
-		return false;
+		return r;
 	}
 	outputs = std::move(new_outputs);
 	output_stream_sources = std::move(new_sources);
-	return true;
+	return r.with_value(true);
 }
 
 template<NodeType node>
-bool interpreter<node>::build_outputs(
+result<bool> interpreter<node>::build_outputs(
 	const subtree_map<node, size_t>& current_outputs,
 	const output_streams<node>& previous_outputs,
 	const subtree_map<node, size_t>& previous_sources,
 	output_streams<node>& out_outputs,
 	subtree_map<node, size_t>& out_sources) const
 {
+	result<bool> r;
 	// Same grouping as build_inputs above, mirrored for the output side.
 	// Called both from rebuild_outputs (construction) and directly from
 	// interpreter::update, so this is rebuilt fresh each call rather than
@@ -511,9 +527,9 @@ bool interpreter<node>::build_outputs(
 		tref var = canonize<node>(current_var);
 		auto it = ctx.outputs.find(var);
 		if (it == ctx.outputs.end()) {
-			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(var) << "' when rebuilding outputs.";
-			return false; // stop interpreting: failed to open an output stream
+			return r.with_error(code::invalid_output_stream,
+				"no output stream is registered for the stream",
+				{{label::name, get_var_name<node>(var)}});
 		}
 		std::string vn = get_var_name<node>(var);
 
@@ -560,9 +576,15 @@ bool interpreter<node>::build_outputs(
 					if (old_physical) physical = std::make_unique<
 						adt_shared_physical_output_stream>(
 							std::move(old_physical));
-					else physical = std::make_unique<
-						file_output_stream>(
-							dict(layout.stream_id));
+					else {
+						auto f = r.merge_take(
+							file_output_stream::make(
+								dict(layout.stream_id)));
+						if (!f) return r;
+						physical = std::make_unique<
+							adt_shared_physical_output_stream>(
+								std::move(*f));
+					}
 				}
 				writer_it = adt_writers.emplace(root_sid,
 					std::make_shared<adt_tuple_writer<node>>(
@@ -596,14 +618,18 @@ bool interpreter<node>::build_outputs(
 					&& ps->second == stream_id
 					&& pv != previous_outputs.end())
 					out_outputs.emplace(var, pv->second);
-				else out_outputs.emplace(var,
-					std::make_shared<file_output_stream>(
-						dict(stream_id)));
+				else {
+					auto f = r.merge_take(
+						file_output_stream::make(
+							dict(stream_id)));
+					if (!f) return r;
+					out_outputs.emplace(var, std::move(*f));
+				}
 				out_sources[var] = stream_id;
 			}
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
 // -----------------------------------------------------------------------------
@@ -843,20 +869,16 @@ post_normalization:
 				std::move(data_strategy), spec);
 			i.compute_lookback_and_initial();
 			subtree_map<node, size_t> output_streams, input_streams;
-			if (!i.collect_output_streams(spec, output_streams)
-				|| !i.rebuild_outputs(output_streams))
-			{
-				return r.with_assert_check_error(
-					code::invalid_output_stream,
-					"Failed to collect output streams");
-			}
-			if (!i.collect_input_streams(spec, input_streams)
-				|| !i.rebuild_inputs(input_streams))
-			{
-				return r.with_assert_check_error(
-					code::invalid_input_stream,
-					"Failed to collect input streams");
-			}
+			if (auto collected = r.merge_take(
+				i.collect_output_streams(spec, output_streams));
+				!collected) return r;
+			if (auto rebuilt = r.merge_take(
+				i.rebuild_outputs(output_streams)); !rebuilt) return r;
+			if (auto collected = r.merge_take(
+				i.collect_input_streams(spec, input_streams));
+				!collected) return r;
+			if (auto rebuilt = r.merge_take(
+				i.rebuild_inputs(input_streams)); !rebuilt) return r;
 			fold_rejected(safety_failures, true);
 			return r.with_assert_check_value(std::move(i));
 		}
@@ -962,25 +984,19 @@ post_normalization:
 		// outputs and prompted console inputs referenced only in
 		// rejected clauses. update() already collects per chosen spec.
 		subtree_map<node, size_t> output_streams;
-		if (!i.collect_output_streams(clause, output_streams)) {
-			return r.with_assert_check_error(code::invalid_output_stream,
-				"Failed to collect output streams");
-		}
+		if (auto collected = r.merge_take(
+			i.collect_output_streams(clause, output_streams));
+			!collected) return r;
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
-		if (!i.rebuild_outputs(output_streams)) {
-			return r.with_assert_check_error(code::invalid_output_stream,
-				"Failed to rebuild output streams");
-		}
+		if (auto rebuilt = r.merge_take(
+			i.rebuild_outputs(output_streams)); !rebuilt) return r;
 		subtree_map<node, size_t> input_streams;
-		if (!i.collect_input_streams(clause, input_streams)) {
-			return r.with_assert_check_error(code::invalid_input_stream,
-				"Failed to collect input streams");
-		}
+		if (auto collected = r.merge_take(
+			i.collect_input_streams(clause, input_streams));
+			!collected) return r;
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
-		if (!i.rebuild_inputs(input_streams)) {
-			return r.with_assert_check_error(code::invalid_input_stream,
-				"Failed to rebuild input streams");
-		}
+		if (auto rebuilt = r.merge_take(
+			i.rebuild_inputs(input_streams)); !rebuilt) return r;
 
 		i.provider_ = std::make_shared<solve_step_provider<node>>();
 
@@ -1010,13 +1026,14 @@ post_normalization:
 }
 
 template <NodeType node>
-std::optional<interpreter<node>>
+result<interpreter<node>>
 	interpreter<node>::make_table_interpreter(
 		const io_context<node>& ctx,
 		std::shared_ptr<step_provider<node>> provider,
 		int_t lookback, int_t highest_initial_pos,
 		const trefs& live_probe_atoms)
 {
+	result<interpreter<node>> r;
 	// Empty spec-side state: table mode has no normalized spec to derive
 	// ubt_ctn / original_spec / output_partition from.
 	std::vector<htrefs> empty_ubt_ctn;
@@ -1040,14 +1057,16 @@ std::optional<interpreter<node>>
 	subtree_map<node, size_t> current_inputs;
 	for (const auto& [var, sid] : ctx.inputs) current_inputs[var->get()] = sid;
 	LOG_TRACE << "interpreter::make_table_interpreter/rebuild_inputs";
-	if (!i.rebuild_inputs(current_inputs)) return {};
+	if (auto rebuilt = r.merge_take(i.rebuild_inputs(current_inputs));
+		!rebuilt) return r;
 
 	subtree_map<node, size_t> current_outputs;
 	for (const auto& [var, sid] : ctx.outputs) current_outputs[var->get()] = sid;
 	LOG_TRACE << "interpreter::make_table_interpreter/rebuild_outputs";
-	if (!i.rebuild_outputs(current_outputs)) return {};
+	if (auto rebuilt = r.merge_take(i.rebuild_outputs(current_outputs));
+		!rebuilt) return r;
 
-	return i;
+	return r.with_value(std::move(i));
 }
 
 template <NodeType node>
@@ -3020,30 +3039,32 @@ result<typename interpreter<node>::update_plan>
 		subtree_map<node, size_t> out_stream_ids, in_stream_ids;
 		bool streams_ok = true;
 		for (const auto& [part_alts, _] : current_spec) {
-			for (const htref& alt : part_alts)
-				if (!collect_output_streams(alt->get(),
-					out_stream_ids))
-				{
+			for (const htref& alt : part_alts) {
+				auto collected = collect_output_streams(
+					alt->get(), out_stream_ids);
+				if (!collected.has_value()) {
+					update_failures.emplace_back(alt->get(),
+						std::move(collected).report());
 					streams_ok = false;
 					break;
 				}
+			}
 			if (!streams_ok) break;
 		}
 		if (streams_ok) for (const auto& [part_alts, _] : current_spec) {
-			for (const htref& alt : part_alts)
-				if (!collect_input_streams(alt->get(),
-					in_stream_ids))
-				{
+			for (const htref& alt : part_alts) {
+				auto collected = collect_input_streams(
+					alt->get(), in_stream_ids);
+				if (!collected.has_value()) {
+					update_failures.emplace_back(alt->get(),
+						std::move(collected).report());
 					streams_ok = false;
 					break;
 				}
+			}
 			if (!streams_ok) break;
 		}
-		if (!streams_ok) {
-			r.warning("stream collection failed for the revised "
-				"specification; no update was performed");
-			continue;
-		}
+		if (!streams_ok) continue;
 
 		// Open the revised streams into locals BEFORE anything is
 		// committed, reading this->inputs/input_stream_sources only
@@ -3053,20 +3074,20 @@ result<typename interpreter<node>::update_plan>
 		input_streams<node>  new_inputs;
 		subtree_map<node, size_t> new_output_sources;
 		subtree_map<node, size_t> new_input_sources;
-		if (!build_outputs(out_stream_ids, this->outputs,
+		auto built_outputs = build_outputs(out_stream_ids, this->outputs,
 			this->output_stream_sources, new_outputs,
-			new_output_sources))
-		{
-			r.warning("the output stream rebuild failed for the revised "
-				"specification; no update was performed");
+			new_output_sources);
+		if (!built_outputs.has_value()) {
+			update_failures.emplace_back(clause,
+				std::move(built_outputs).report());
 			continue;
 		}
-		if (!build_inputs(in_stream_ids, this->inputs,
+		auto built_inputs = build_inputs(in_stream_ids, this->inputs,
 			this->input_stream_sources, new_inputs,
-			new_input_sources))
-		{
-			r.warning("the input stream rebuild failed for the revised "
-				"specification; no update was performed");
+			new_input_sources);
+		if (!built_inputs.has_value()) {
+			update_failures.emplace_back(clause,
+				std::move(built_inputs).report());
 			continue;
 		}
 		tref updated_spec = spec_partition_fm(current_spec);
@@ -3098,7 +3119,7 @@ result<typename interpreter<node>::update_plan>
 		rep.demote_errors_to_warnings();
 		r.append(std::move(rep));
 	}
-	r.warning("the updated specification is unsat; no update was performed");
+	r.warning("no update candidate was accepted; no update was performed");
 	return r;
 }
 
@@ -3228,14 +3249,26 @@ result<typename interpreter<node>::update_plan>
 		output_streams<node> new_outputs;
 		input_streams<node> new_inputs;
 		subtree_map<node, size_t> new_output_sources, new_input_sources;
-		if (!collect_output_streams(alt, out_ids)
-			|| !collect_input_streams(alt, in_ids)
-			|| !build_outputs(out_ids, this->outputs,
+		// A stream that cannot be opened rejects this alternative only,
+		// so its report joins the demoted candidate failures.
+		bool streams_ok = true;
+		auto stream_step_failed = [&](result<bool>&& step) {
+			if (step.has_value()) return;
+			failures.emplace_back(alt, std::move(step).report());
+			streams_ok = false;
+		};
+		stream_step_failed(collect_output_streams(alt, out_ids));
+		if (streams_ok)
+			stream_step_failed(collect_input_streams(alt, in_ids));
+		if (streams_ok)
+			stream_step_failed(build_outputs(out_ids, this->outputs,
 				this->output_stream_sources, new_outputs,
-				new_output_sources)
-			|| !build_inputs(in_ids, this->inputs,
+				new_output_sources));
+		if (streams_ok)
+			stream_step_failed(build_inputs(in_ids, this->inputs,
 				this->input_stream_sources, new_inputs,
-				new_input_sources))
+				new_input_sources));
+		if (!streams_ok)
 		{
 			r.info("the streams of the revised specification could "
 				"not be opened; the alternative is skipped",
@@ -3419,8 +3452,10 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 				return r.with_assert_check_value(std::nullopt);
 			}
 			// Same dedupe and cap as the factored path below.
+			auto finalized = r.merge_take(finalize_alternatives(out));
+			if (!finalized) return r;
 			return r.with_assert_check_value(
-				std::optional<htrefs>(finalize_alternatives(out)));
+				std::optional<htrefs>(std::move(*finalized)));
 		}
 	}
 
@@ -3665,10 +3700,12 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 				new_alts.push_back(clause);
 			}
 		}
-		htrefs result = finalize_alternatives(new_alts);
-		if (result.empty()) continue;
+		auto final_alts = r.merge_take(finalize_alternatives(new_alts));
+		if (!final_alts) return r;
+		if (final_alts->empty()) continue;
 		fold_pwr_diag(true);
-		return r.with_assert_check_value(std::optional<htrefs>(std::move(result)));
+		return r.with_assert_check_value(
+			std::optional<htrefs>(std::move(*final_alts)));
 	}
 	// No update clause yields a satisfiable revision
 	fold_pwr_diag(false);
@@ -3676,15 +3713,16 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 }
 
 template <NodeType node>
-htrefs interpreter<node>::finalize_alternatives(const trefs& alts) {
+result<htrefs> interpreter<node>::finalize_alternatives(const trefs& alts) {
+	result<htrefs> r;
 	// Drop dead alternatives and duplicates (keeping the earliest,
 	// i.e. strongest, position).
 	trefs result;
 	for (tref d : alts) {
 		if (tau::get(d).equals_F()) continue;
 		bool dup = false;
-		for (tref r : result)
-			if (tau::subtree_equals(r, d)) {
+		for (tref prev : result)
+			if (tau::subtree_equals(prev, d)) {
 				dup = true;
 				break;
 			}
@@ -3694,19 +3732,18 @@ htrefs interpreter<node>::finalize_alternatives(const trefs& alts) {
 	// strongest prefix and the newest last-resort clause, drop the
 	// middle preference tiers (see max_revision_alts).
 	if (max_revision_alts && result.size() > max_revision_alts) {
-		LOG_WARNING << "Pointwise revision produced "
-			<< result.size() << " alternatives; keeping "
-			"the first " << max_revision_alts - 1
-			<< " and the newest one per "
-			"--max-revision-alts\n";
+		r.warning("pointwise revision produced more alternatives than "
+			"the cap keeps; the middle preference tiers are dropped",
+			{{label::limit, max_revision_alts},
+			 {label::value, result.size()}});
 		tref last = result.back();
 		result.resize(max_revision_alts - 1);
 		result.push_back(last);
 	}
-	htrefs r;
-	r.reserve(result.size());
-	for (tref f : result) r.push_back(tree<node>::geth(f));
-	return r;
+	htrefs kept;
+	kept.reserve(result.size());
+	for (tref f : result) kept.push_back(tree<node>::geth(f));
+	return r.with_value(std::move(kept));
 }
 
 // ── current_spec ──────────────────────────────────────────────────────────────
@@ -4589,39 +4626,29 @@ void warn_if_update_dropped(interpreter<node>& i,
 }
 
 // returns true if there is a free variable in formula fm
-// prints error messages by default
 template <NodeType node>
-bool has_free_vars(tref fm, bool silent) {
+result<bool> has_free_vars(tref fm) {
+	result<bool> r;
 	using tau = tree<node>;
-	const trefs& free_vars = get_free_vars<node>(fm);
-	if (!free_vars.empty()) {
-		// all elements of the set must be quantified
-		std::stringstream ss; bool has_real_free_vars = false;
-		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
-			if (is_child<node>(*it, tau::io_var)) {
-				const tau& io_var_node = tau::get(*it)[0];
-				if (       !io_var_node.is_input_variable()
-					&& !io_var_node.is_output_variable())
-				{
-					if (!silent) LOG_ERROR << "The stream "
-						<< io_var_node << " is not "
-						<< "defined as an input or "
-						<< "output stream";
-					return true;
-				}
-			} else if (!is_child<node>(*it, tau::uconst_name)) {
-				ss << tau::get(*it) << " ";
-				has_real_free_vars = true;
+	bool found = false;
+	for (tref v : get_free_vars<node>(fm)) {
+		if (is_child<node>(v, tau::io_var)) {
+			const tau& io_var_node = tau::get(v)[0];
+			if (       !io_var_node.is_input_variable()
+				&& !io_var_node.is_output_variable()) {
+				found = true;
+				r.info("the stream is not defined as an input or "
+					"output stream",
+					{{label::name, io_var_node.to_str()}});
 			}
-		}
-		if (has_real_free_vars) {
-			if (!silent) LOG_ERROR << "The following variable(s) must be "
-				<< "quantified and cannot appear free: "
-				<< ss.str();
-			return true;
+		} else if (!is_child<node>(v, tau::uconst_name)) {
+			found = true;
+			r.info("the variable must be quantified and cannot "
+				"appear free",
+				{{label::value, truncate_for_message(TAU_TO_STR(v))}});
 		}
 	}
-	return false;
+	return r.with_value(found);
 }
 
 template <NodeType node>
@@ -4741,9 +4768,10 @@ result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 }
 
 template <NodeType node>
-bool interpreter<node>::collect_input_streams(tref dnf,
+result<bool> interpreter<node>::collect_input_streams(tref dnf,
 	subtree_map<node, size_t>& current_inputs)
 {
+	result<bool> r;
 	using tau = tree<node>;
 	// select current input variables
 	auto is_in_var = [](tref n) {
@@ -4755,11 +4783,11 @@ bool interpreter<node>::collect_input_streams(tref dnf,
 	for (tref var_node : in_vars) {
 		size_t type_id = tau::get(var_node).get_ba_type();
 		DBG(LOG_TRACE << "collect_input_streams[var_node]: " << LOG_FM_DUMP(var_node) << "\n";)
-		if (type_id == 0) {
-			TAU_LOG_ERROR << "The following input stream must be typed: "
-				<< tau::get(var_node).to_str() << "\n";
-			return false;
-		}
+		if (type_id == 0)
+			return r.with_error(code::invalid_input_stream,
+				"the input stream must be typed",
+				{{label::value, truncate_for_message(
+					tau::get(var_node).to_str())}});
 		tref var = canonize<node>(var_node);
 		// size_t var_sid = get_var_name_sid<node>(var);
 		// update current input streams by known stream id
@@ -4774,21 +4802,25 @@ bool interpreter<node>::collect_input_streams(tref dnf,
 			current_inputs[var] = ctx.inputs.find(var)->second;
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
 template<NodeType node>
-subtree_map<node, size_t> interpreter<node>::collect_input_streams(tref dnf) {
+result<subtree_map<node, size_t>>
+	interpreter<node>::collect_input_streams(tref dnf) {
+	result<subtree_map<node, size_t>> r;
 	subtree_map<node, size_t> current_inputs;
-	if (collect_input_streams(dnf, current_inputs))
-		return current_inputs;
-	else return {};
+	if (auto collected = r.merge_take(
+		collect_input_streams(dnf, current_inputs)); !collected)
+		return r;
+	return r.with_value(std::move(current_inputs));
 }
 
 template <NodeType node>
-bool interpreter<node>::collect_output_streams(tref dnf,
+result<bool> interpreter<node>::collect_output_streams(tref dnf,
 	subtree_map<node, size_t>& current_outputs)
 {
+	result<bool> r;
 	using tau = tree<node>;
 	// select current output variables
 	auto is_out_var = [](tref n) {
@@ -4805,11 +4837,11 @@ bool interpreter<node>::collect_output_streams(tref dnf,
 		if (is_excluded_output(var_node)) continue;
 		size_t type_id = tau::get(var_node).get_ba_type();
 		DBG(LOG_TRACE << "collect_output_streams[var_node]: " << LOG_FM_DUMP(var_node) << "\n";)
-		if (type_id == 0) {
-			TAU_LOG_ERROR << "The following output stream must be typed: "
-				<< tau::get(var_node).to_str() << "\n";
-			return false;
-		}
+		if (type_id == 0)
+			return r.with_error(code::invalid_output_stream,
+				"the output stream must be typed",
+				{{label::value, truncate_for_message(
+					tau::get(var_node).to_str())}});
 		tref var = canonize<node>(var_node);
 		// size_t var_sid = get_var_name_sid<node>(var);
 		// update current output streams by known stream id
@@ -4831,15 +4863,18 @@ bool interpreter<node>::collect_output_streams(tref dnf,
 			current_outputs[var] = ctx.outputs.find(var)->second;
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
 template<NodeType node>
-subtree_map<node, size_t> interpreter<node>::collect_output_streams(tref dnf) {
+result<subtree_map<node, size_t>>
+	interpreter<node>::collect_output_streams(tref dnf) {
+	result<subtree_map<node, size_t>> r;
 	subtree_map<node, size_t> current_outputs;
-	if (collect_output_streams(dnf, current_outputs))
-		return current_outputs;
-	else return {};
+	if (auto collected = r.merge_take(
+		collect_output_streams(dnf, current_outputs)); !collected)
+		return r;
+	return r.with_value(std::move(current_outputs));
 }
 
 template <NodeType node>
