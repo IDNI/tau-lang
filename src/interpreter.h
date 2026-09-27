@@ -397,6 +397,13 @@ struct interpreter {
 	// entry that matched the name but did not serialise.
 	result<std::string> accumulator_state(const std::string& name) const;
 
+	// Whether the data game's strategy chooses this run's outputs. Its
+	// Mealy view, when it has one, is then `cached_solution`.
+	bool plays_data_game() const;
+
+	/// @brief Return `true` if @p var is excluded from output.
+	static bool is_excluded_output(tref var);
+
 	// ── Mealy-strategy introspection (cached_solution-dependent) ─────────
 	//
 	// All four methods below return meaningful results only when the spec
@@ -738,9 +745,6 @@ private:
 	/// revision; the report carries the probes tried along the way.
 	result<std::optional<htrefs>> pointwise_revision(const htrefs& alts,
 		tref update, const int_t start_time);
-
-	/// @brief Return `true` if @p var is excluded from output.
-	static bool is_excluded_output(tref var);
 
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	trefs appear_within_lookback(const trefs& vars);

@@ -1640,6 +1640,12 @@ struct data_game_step_provider : step_provider<node> {
 	}
 };
 
+template <NodeType node>
+bool interpreter<node>::plays_data_game() const {
+	return std::dynamic_pointer_cast<data_game_step_provider<node>>(
+		provider_) != nullptr;
+}
+
 // Prototype (minterm_solving_rework, "Lever B"): canonicalize a step's
 // committed witness value once, at commit time, so later steps' lookback
 // references decide/normalize a smaller equivalent tau constant instead of

@@ -186,12 +186,9 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 	return os.str();
 }
 
-// The artifact's one main: replays the baked ba-type table, rebuilds
-// atoms/strategy/templates/witnesses from the desc, and drives the same
-// run_loop() the tau binary's own `run` uses. Whether a witness is a baked
-// constant (edge_witnesses) or solved per step (edge_witness_templates) is a
-// table_step_provider construction detail, not a different main.
-inline void emit_main(const program_desc& d, std::ostream& f) {
+// The includes, the embedded spec and the option handling every artifact
+// main starts with, up to tau_init.
+inline void emit_main_head(const program_desc& d, std::ostream& f) {
 	f <<
 		"// Auto-generated driver for a tau-compiled spec.\n"
 		"// tau.h first: the amalgamation orders solver/interpreter internals\n"
@@ -245,6 +242,36 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\tbool quit_on_idle = opts[\"quit\"].get<bool>();\n"
 		"\tbool print_benchmarks = opts[\"benchmarks\"].get<bool>();\n"
 		"\ttau_init<node_t>();\n"
+		;
+}
+
+// The end of every artifact main: prints the run's report and leaves.
+inline void emit_main_tail(std::ostream& f) {
+	f <<
+		"\trun_r.report().print(cerr);\n"
+		"\tbool run_ok = run_r.has_value() && run_r.value();\n"
+		"\tif (print_benchmarks)\n"
+		"\t\tcerr << \"run: \" << std::chrono::duration<double, std::milli>(\n"
+		"\t\t\tstd::chrono::steady_clock::now() - run_start).count()\n"
+		"\t\t\t<< \" ms\\n\";\n"
+		"\t// Flush and leave without running static destructors: the pack's\n"
+		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
+		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"
+		"\t// must not lose its written outputs to a teardown crash.\n"
+		"\tcout.flush();\n"
+		"\tfflush(nullptr);\n"
+		"\t_Exit(run_ok ? 0 : 1);\n"
+		"}\n";
+}
+
+// The artifact's table main: replays the baked ba-type table, rebuilds
+// atoms/strategy/templates/witnesses from the desc, and drives the same
+// run_loop() the tau binary's own `run` uses. Whether a witness is a baked
+// constant (edge_witnesses) or solved per step (edge_witness_templates) is a
+// table_step_provider construction detail, not a different main.
+inline void emit_main(const program_desc& d, std::ostream& f) {
+	emit_main_head(d, f);
+	f <<
 		"\t// Replay the emitting process's ba-type registry so every baked\n"
 		"\t// numeric type id resolves to the same type here; entries the\n"
 		"\t// artifact's own static init already registered assert by identity.\n";
@@ -385,20 +412,36 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\t}\n"
 		"\tauto run_start = std::chrono::steady_clock::now();\n"
 		"\tauto run_r = interp->run_loop(0, quit_on_idle);\n"
-		"\trun_r.report().print(cerr);\n"
-		"\tbool run_ok = run_r.has_value() && run_r.value();\n"
-		"\tif (print_benchmarks)\n"
-		"\t\tcerr << \"run: \" << std::chrono::duration<double, std::milli>(\n"
-		"\t\t\tstd::chrono::steady_clock::now() - run_start).count()\n"
-		"\t\t\t<< \" ms\\n\";\n"
-		"\t// Flush and leave without running static destructors: the pack's\n"
-		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
-		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"
-		"\t// must not lose its written outputs to a teardown crash.\n"
-		"\tcout.flush();\n"
-		"\tfflush(nullptr);\n"
-		"\t_Exit(run_ok ? 0 : 1);\n"
-		"}\n";
+		;
+	emit_main_tail(f);
+}
+
+// The main of a spec `run` executes by solving as it goes: the artifact
+// executes the embedded spec with the same interpreter.
+inline void emit_solving_main(const program_desc& d, std::ostream& f) {
+	emit_main_head(d, f);
+	f <<
+		"\tauto gi = api<node_t>::get_interpreter(string(spec_src()));\n"
+		"\tif (!gi.has_value()) {\n"
+		"\t\tgi.print(cerr);\n"
+		"\t\treturn 2;\n"
+		"\t}\n"
+		"\tauto run_start = std::chrono::steady_clock::now();\n"
+		"\tauto run_r = api<node_t>::run(gi.value(), quit_on_idle);\n";
+	emit_main_tail(f);
+}
+
+// A copy of ctx whose streams are all console streams: an interpreter
+// built from it opens (and so truncates) no file.
+template <NodeType Node>
+io_context<Node> without_files(const io_context<Node>& ctx) {
+	io_context<Node> c = ctx;
+	for (auto& [var, sid] : c.inputs) sid = 0;
+	for (auto& [var, sid] : c.outputs) sid = 0;
+	for (auto& [root, layout] : c.adt_streams) layout.stream_id = 0;
+	c.input_remaps.clear();
+	c.output_remaps.clear();
+	return c;
 }
 
 } // namespace compile_detail
@@ -438,58 +481,90 @@ result<codegen_result> compile_spec(
 		"compile: failed to build the recurrence relation from spec");
 	TAU_TRY(tref applied, nso_rr_apply<Node>(*nso_rr));
 	TAU_TRY(tref fm, normalizer<Node>(applied));
-	// fm is checked before solve_ltl_aba runs, so it is never a bare-reparsed atom.
+	// fm is checked before make_interpreter runs, so it is never a bare-reparsed atom.
 	if (has_free_vars<Node>(fm)) return r.with_error(code::invalid_argument,
 		"compile: spec has unresolved free variables");
 
-	// 2. Synthesize: solve_ltl_aba drives the same ABA/ltlsynt pipeline
-	// the interpreter uses at runtime, but ahead of time. A positional
-	// atom outside its supported scope surfaces here as a compile error,
-	// not a crash.
-	TAU_TRY(auto sol, solve_ltl_aba<Node>(fm));
-	if (!sol) {
-		// The data game may decide what the abstraction does not; the
-		// program then plays the Mealy view of its strategy, when the
-		// strategy has one.
-		std::shared_ptr<data_game_strategy<Node>> data;
-		ltl_to_safety_formula_full<Node>(fm, &data);
-		if (data && data->view) sol = *data->view;
-		else if (data) return r.with_error(code::unsupported_operation,
-			"compile: the spec is realizable, but only through a "
-			"strategy of the data game that no finite Mealy machine "
-			"describes, which `run` executes and a compiled program "
-			"cannot carry");
-		else {
-			// No strategy is not a verdict: the abstraction may lack
-			// one while the spec is realizable or undecided. The
-			// message follows what `realizable` decides, and an
-			// undecided check's report names its budget or reason.
-			auto real = is_ctl_star_realizable<Node>(fm, 0, false);
-			if (!real.has_value()) {
-				r.merge(std::move(real));
-				return r.with_error(code::solver_error,
-					"compile: the realizability of the spec is "
-					"UNKNOWN, so no program was built");
-			}
-			if (!real.value()) return r.with_error(code::unsat,
-				"compile: spec is UNREALIZABLE");
+	// 2. Follow what `run` executes: make_interpreter chooses it, so a
+	// program and a run of the spec make the same moves. When the run
+	// plays the Mealy view of the data game's strategy, a finite machine,
+	// the program carries that machine. Otherwise the run solves as it
+	// goes (each step, the game or the abstraction when it starts, and a
+	// revision when the update stream asks for one), and the program
+	// executes the embedded spec the same way.
+	std::optional<ltl_aba_solution<Node>> sol;
+	bool solves_each_step = false;
+	// the output streams `run` prints, with their types
+	std::vector<std::pair<std::string, size_t>> run_outputs;
+	auto run_r = interpreter<Node>::make_interpreter(fm,
+		compile_detail::without_files(
+			*definitions<Node>::instance().get_io_context()));
+	if (run_r.has_value()) {
+		const auto& run = run_r.value();
+		for (const auto& [var, _] : run.outputs)
+			if (!interpreter<Node>::is_excluded_output(var))
+				run_outputs.emplace_back(get_var_name<Node>(var),
+					run.ctx.type_of(var));
+		// a run revises its spec with what the update stream u carries,
+		// which only a solving program does too
+		const bool revises = std::ranges::any_of(run_outputs,
+			[](const auto& o) { return o.first == "u"
+				&& o.second == get_ba_type_id<Node>(tau_type<Node>()); });
+		if (run.plays_data_game() && run.cached_solution && !revises)
+			sol = run.cached_solution;
+		else solves_each_step = true;
+	}
+	r.merge(std::move(run_r));
+	if (!sol && !solves_each_step) {
+		// `run` executes nothing, which is not a verdict: the spec may be
+		// realizable or undecided. The message follows what `realizable`
+		// decides, and an undecided check's report names its budget or
+		// reason.
+		auto real = is_ctl_star_realizable<Node>(fm, 0, false);
+		if (!real.has_value()) {
 			r.merge(std::move(real));
-			return r.with_error(code::unsupported_operation,
-				"compile: the spec is realizable, but no strategy "
-				"a compiled program can play was synthesized");
+			return r.with_error(code::solver_error,
+				"compile: the realizability of the spec is "
+				"UNKNOWN, so no program was built");
 		}
+		if (!real.value()) return r.with_error(code::unsat,
+			"compile: spec is UNREALIZABLE");
+		r.merge(std::move(real));
+		return r.with_error(code::unsupported_operation,
+			"compile: the spec is realizable, but `run` executes no "
+			"strategy for it, so no program was built");
 	}
 
-	// 3. Build the program_desc and emit the C++ artifact via the one
-	// data-driven emit path (build_program_desc picks flag-only vs
-	// witness-bearing itself; this wraps that choice rather than repeating
-	// it). A synthesis-time refusal (PWR x witness, or a witness owner that
+	// 3. Build the program_desc of the strategy via the one data-driven
+	// emit path (build_program_desc picks flag-only vs witness-bearing
+	// itself; this wraps that choice rather than repeating it). A
+	// synthesis-time refusal (PWR x witness, or a witness owner that
 	// declines) surfaces here as a compile error, not a crash.
-	const std::string class_name = "tau_program";
-	TAU_TRY(program_desc d, build_program_desc<Node>(*sol, class_name,
-		/*revisable=*/false, /*open_streams=*/{},
-		definitions<Node>::instance().get_io_context()));
+	program_desc d;
+	if (sol) {
+		const std::string class_name = "tau_program";
+		TAU_TRY(d, build_program_desc<Node>(*sol, class_name,
+			/*revisable=*/false, /*open_streams=*/{},
+			definitions<Node>::instance().get_io_context()));
+	}
 	d.spec_src = spec_src;
+	// A stream the strategy reads no atom of still prints, as in `run`.
+	if (sol) for (const auto& [name, type] : run_outputs) {
+		if (std::ranges::any_of(d.output_streams,
+			[&](const auto& s) { return s.name == name; })) continue;
+		stream_desc sd;
+		sd.name = name;
+		sd.ba_type = type;
+		auto& ctx = *definitions<Node>::instance().get_io_context();
+		tref var = build_canonized_io_var<Node>(name);
+		if (auto it = ctx.outputs.find(var);
+			it != ctx.outputs.end() && it->second != 0)
+		{
+			sd.bind = stream_desc::binding::file;
+			sd.filename = dict(it->second);
+		}
+		d.output_streams.push_back(std::move(sd));
+	}
 
 	// Every flag output field must key its stream on a single variable --
 	// emit_main's flag_outputs list has no other way to name its guard slot.
@@ -499,12 +574,14 @@ result<codegen_result> compile_spec(
 				+ d.outputs[k].prop + "' has no single variable "
 				"to key its stream on; the artifact cannot be emitted");
 
-	// 4. Emit the one artifact main (main.cpp only -- see emit_main).
+	// 4. Emit the artifact's main.cpp: the table main playing the
+	// strategy, or the solving main.
 	{
 		std::ofstream f(bdir / "main.cpp");
 		if (!f) return r.with_error(code::io_error,
 			"compile: cannot write main.cpp in " + bdir.string());
-		compile_detail::emit_main(d, f);
+		if (solves_each_step) compile_detail::emit_solving_main(d, f);
+		else compile_detail::emit_main(d, f);
 	}
 
 	// 5. Emit CMakeLists.txt: every artifact links the emitting build's SDK.

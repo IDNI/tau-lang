@@ -270,22 +270,54 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
 	}
 
-	TEST_CASE("compile_spec: a data game strategy without a Mealy view is refused") {
+	// The main.cpp compile_spec emits for spec; the unusable compiler
+	// stops the build right after it is written.
+	std::string emitted_main(const std::string& spec, const std::string& tag) {
+		namespace stdfs = std::filesystem;
+		const stdfs::path dir = test_scratch_dir() / tag;
+		std::error_code ec;
+		stdfs::remove_all(dir, ec);
+		auto res = compile_spec<node_t>(spec, "", dir.string(),
+			"/nonexistent/c++");
+		CHECK_FALSE(res.has_value());
+		std::ifstream f(dir / "main.cpp");
+		std::ostringstream os;
+		os << f.rdbuf();
+		return os.str();
+	}
+
+	TEST_CASE("compile_spec: a data game strategy without a Mealy view is played as run plays it") {
 		// no view within a bound of 0 states, as for a game decided over
 		// formulas
 		const size_t saved = data_game_mealy_max_states;
 		data_game_mealy_max_states = 0;
-		const std::string dir = (test_scratch_dir() / "dg_no_view").string();
-		auto res = compile_spec<node_t>(
+		const std::string m = emitted_main(
 			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
-			"|| i1[t-1]:bv[1] = 1)))", "", dir);
+			"|| i1[t-1]:bv[1] = 1)))", "dg_no_view");
 		data_game_mealy_max_states = saved;
-		CHECK_FALSE(res.has_value());
-		std::ostringstream oss;
-		res.print(oss);
-		CHECK(has(oss.str(), "no finite Mealy machine"));
-		CHECK_FALSE(has(oss.str(), "UNREALIZABLE"));
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "table_step_provider<node_t>>("));
+	}
+
+	TEST_CASE("compile_spec: a spec run solves step by step is solved step by step") {
+		// run executes it by the safety pipeline, with no strategy; the
+		// abstraction's strategy chose o1[0] = 1 and broke the spec
+		const std::string m = emitted_main(
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0",
+			"safety_pipeline");
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "codegen::strategy strat;"));
+	}
+
+	TEST_CASE("compile_spec: the data game's Mealy view is carried as a table") {
+		const std::string m = emitted_main(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "dg_view");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
 	}
 
 	// ── (b') untyped io var reaching codegen is a hard error ─────────────
