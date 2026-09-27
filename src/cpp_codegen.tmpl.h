@@ -817,6 +817,11 @@ result<program_desc> build_program_desc(
 	// recorded instead.
 	if (sol.counter_highest_initial_pos >= 0)
 		d.highest_initial_pos = (int)sol.counter_highest_initial_pos;
+	d.data_game = sol.data_game;
+	for (tref h : sol.history) {
+		TAU_TRY(auto ge, build_atom_ground_expr<node>(h));
+		d.history.push_back(std::move(ge));
+	}
 
 	for (auto& p : sol.input_props)
 		d.inputs.push_back({p, sanitize(p), field_kind::flag});

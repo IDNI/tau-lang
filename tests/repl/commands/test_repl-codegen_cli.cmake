@@ -43,14 +43,15 @@ set_tests_properties("test_codegen_cli-backend_failure_exit_4" PROPERTIES
 	PASS_REGULAR_EXPRESSION "ltlsynt produced no verdict.*EXIT=1"
 	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|terminate called")
 
-# only the data game decides this spec: compile says so instead of calling
-# it unrealizable
+# only the data game decides this spec: the program plays the Mealy view of
+# that game's strategy, as `run` does
 set(_dg_spec "(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) && (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))")
 tau_repl_unsupported(_tau_skip "${_dg_spec}")
 if(NOT _tau_skip)
-	add_test(NAME "test_codegen_cli-data_game_only_refused"
-		COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' '${_dg_spec}' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
-	set_tests_properties("test_codegen_cli-data_game_only_refused" PROPERTIES
-		PASS_REGULAR_EXPRESSION "only through the strategy of the data game"
-		FAIL_REGULAR_EXPRESSION "UNREALIZABLE|EXIT=0")
+	add_test(NAME "test_codegen_cli-data_game_only_emits"
+		COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' '${_dg_spec}' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?; printf '1\\n0\\n0\\n1\\n1\\n0\\n0\\n1\\n' | \"$d/exe\"")
+	set_tests_properties("test_codegen_cli-data_game_only_emits" PROPERTIES
+		PASS_REGULAR_EXPRESSION "EXIT=0.*o2\\[1\\] := 0"
+		FAIL_REGULAR_EXPRESSION "only through|UNREALIZABLE|EXIT=1"
+		TIMEOUT 900 RUN_SERIAL TRUE)
 endif()

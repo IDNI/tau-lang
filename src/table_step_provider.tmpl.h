@@ -180,13 +180,19 @@ table_step_provider<node>::table_step_provider(
 	std::vector<std::vector<std::vector<std::pair<std::string, tref>>>> edge_witnesses,
 	std::vector<std::vector<trefs>> edge_witness_templates,
 	std::vector<std::vector<std::vector<bool>>> edge_witness_template_is_counter,
-	std::vector<int_t> step_guard_ks)
+	std::vector<int_t> step_guard_ks,
+	std::optional<from_start> start)
 	: strat_(std::move(strat)), flag_outputs_(std::move(flag_outputs)),
 	  edge_witness_template_is_counter_(std::move(edge_witness_template_is_counter)),
 	  step_guard_ks_(std::move(step_guard_ks)),
 	  state_(strat_.initial_state)
 {
 	using tau = tree<node>;
+	if (start) {
+		from_start_ = true;
+		for (tref h : start->history) history_.push_back(tau::geth(h));
+		lookback_ = start->lookback;
+	}
 	for (auto& [name, atom_ref] : input_atoms)
 		input_atoms_.emplace_back(std::move(name), tau::geth(atom_ref));
 	edge_witnesses_.reserve(edge_witnesses.size());
@@ -250,12 +256,44 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	// followed by one per step guard -- a deterministic time_point >= k
 	// check, not a free choice, but matched the same way since the strategy
 	// never gets to pick it (see step_guard_ks_'s doc comment).
+	// In the from_start mode the values before step 0 come first, and
+	// every atom is read at the step played.
+	if (from_start_ && !before_ready_) {
+		if (!history_.empty()) {
+			trefs parts;
+			for (const auto& h : history_) parts.push_back(h->get());
+			auto sol = solve_step_outputs<node>(tau::build_wff_and(parts),
+				0, found_, ledger_);
+			if (!sol) return r.with_assert_check_error(
+				code::internal_error, "the values before step 0 of the "
+				"strategy have no solution");
+			for (const auto& [k, v] : *sol)
+				before_.emplace_back(tau::geth(k), tau::geth(v));
+		}
+		before_ready_ = true;
+	}
+	assignment<node> merged;
+	const assignment<node>* mem = &memory;
+	if (!before_.empty()) {
+		merged = memory;
+		for (const auto& [k, v] : before_) merged.emplace(k->get(), v->get());
+		mem = &merged;
+	}
+	const size_t at = from_start_ ? time_point : formula_time_point;
 	const size_t n = input_atoms_.size();
 	const size_t m = step_guard_ks_.size();
+	// the atoms the state's guards compare; the others are not read
+	std::vector<bool> compared(n, !from_start_);
+	if (from_start_ && state_ >= 0 && state_ < (int)strat_.edges.size())
+		for (const auto& e : strat_.edges[state_])
+			for (size_t k = 0; k < n && k < e.guard.size(); ++k)
+				if (e.guard[k]) compared[k] = true;
 	auto ap = std::make_unique<bool[]>(n + m ? n + m : 1);
 	for (size_t k = 0; k < n; ++k) {
+		ap[k] = false;
+		if (!compared[k]) continue;
 		auto ev = r.merge_take(evaluate_atom<node>(
-			input_atoms_[k].second->get(), memory, formula_time_point));
+			input_atoms_[k].second->get(), *mem, at));
 		// An undecided guard atom cannot be defaulted to false: the
 		// table strategy would then pick an edge on a guess instead
 		// of the atom's actual truth.
@@ -314,7 +352,16 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 			&& edge_direct_decode_eligible_[state_][edge_idx];
 
 		std::optional<solution<node>> ws;
-		if (eligible)
+		if (from_start_) {
+			trefs grounded;
+			for (tref t : tmpls) grounded.push_back(rewriter::replace<node>(
+				update_to_time_point<node>(t, (int_t)time_point), *mem));
+			ws = solve_step_outputs<node>(tau::build_wff_and(grounded),
+				(int_t)time_point, found_, ledger_);
+			if (!ws) return r.with_assert_check_error(code::internal_error,
+				"no values satisfy the outputs of the strategy edge");
+		}
+		else if (eligible)
 			ws = ocltl_direct_decode_edge<node>(tmpls, memory,
 				time_point, formula_time_point, ledger_);
 		if (!ws) {
@@ -378,6 +425,58 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 
 	state_ = e->dst;
 	return r.with_assert_check_value(std::move(result));
+}
+
+template <NodeType node>
+std::optional<trefs> table_step_provider<node>::read_set(const trefs& vars)
+	const
+{
+	using tau = tree<node>;
+	if (!from_start_) return std::nullopt;
+	std::set<std::string> names;
+	auto add = [&](tref atom) {
+		for (tref v : tau::get(atom).select_top(is_child<node, tau::io_var>))
+			if (io_var_direction<node>(tau::trim(v)) == 1
+				&& !is_io_initial<node>(v)
+				&& get_io_var_shift<node>(v) == 0)
+					names.insert(get_var_name<node>(v));
+	};
+	// the inputs the state's guards compare and its outputs are solved with
+	if (state_ >= 0 && state_ < (int)strat_.edges.size())
+		for (size_t j = 0; j < strat_.edges[state_].size(); ++j) {
+			const auto& e = strat_.edges[state_][j];
+			for (size_t k = 0; k < input_atoms_.size()
+				&& k < e.guard.size(); ++k)
+				if (e.guard[k]) add(input_atoms_[k].second->get());
+			if (state_ < (int)edge_witness_templates_.size()
+				&& j < edge_witness_templates_[state_].size())
+				for (const auto& h : edge_witness_templates_[state_][j])
+					add(h->get());
+		}
+	trefs out;
+	for (tref v : vars)
+		if (names.contains(get_var_name<node>(v))) out.push_back(v);
+	return out;
+}
+
+template <NodeType node>
+std::optional<int> table_step_provider<node>::strategy_state() const {
+	if (!from_start_) return std::nullopt;
+	return state_;
+}
+
+template <NodeType node>
+int_t table_step_provider<node>::lookback() const {
+	return from_start_ ? lookback_ : 0;
+}
+
+template <NodeType node>
+void table_step_provider<node>::reset() {
+	state_ = strat_.initial_state;
+	before_.clear();
+	before_ready_ = false;
+	found_.clear();
+	ledger_ = fresh_element_ledger{};
 }
 
 template <NodeType node>
@@ -488,11 +587,13 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 	if (sol.counter_highest_initial_pos >= 0)
 		hip = (int)sol.counter_highest_initial_pos;
 
+	std::optional<typename table_step_provider<node>::from_start> start;
+	if (sol.data_game) start = { sol.history, lookback };
 	auto provider = std::make_shared<table_step_provider<node>>(
 		std::move(strat), std::move(input_atoms), std::move(flag_outputs),
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>{},
 		std::move(templates), std::move(template_is_counter),
-		sol.step_guard_ks);
+		sol.step_guard_ks, std::move(start));
 	return {provider, {lookback, hip}};
 }
 

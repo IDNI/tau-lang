@@ -248,6 +248,46 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK_FALSE(has(s, "void revise("));
 	}
 
+	// ── the Mealy view of a strategy of the data game ─────────────────────
+
+	TEST_CASE("build_program_desc: the data game's Mealy view plays from its history") {
+		// only the data game decides this spec
+		tref fm = parse_like_compile_spec(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		auto d = build_program_desc<node_t>(*data->view, "data_game");
+		REQUIRE(d.has_value());
+		CHECK(d->data_game);
+		CHECK(d->history.size() == data->view->history.size());
+		std::ostringstream os;
+		compile_detail::emit_main(*d, os);
+		CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
+	}
+
+	TEST_CASE("compile_spec: a data game strategy without a Mealy view is refused") {
+		// no view within a bound of 0 states, as for a game decided over
+		// formulas
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		const std::string dir = (test_scratch_dir() / "dg_no_view").string();
+		auto res = compile_spec<node_t>(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "", dir);
+		data_game_mealy_max_states = saved;
+		CHECK_FALSE(res.has_value());
+		std::ostringstream oss;
+		res.print(oss);
+		CHECK(has(oss.str(), "no finite Mealy machine"));
+		CHECK_FALSE(has(oss.str(), "UNREALIZABLE"));
+	}
+
 	// ── (b') untyped io var reaching codegen is a hard error ─────────────
 
 	TEST_CASE("build_program_desc: untyped io var is a hard emission error") {
