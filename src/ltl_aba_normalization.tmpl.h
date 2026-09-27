@@ -2126,6 +2126,12 @@ struct ltl_aba_solution {
 	// the counter's bits (gate_counter_props).
 	std::map<std::string, std::set<int_t>> counter_gated_props;
 	std::vector<std::string> counter_bits;
+	// Set for the Mealy view of a strategy of the data game
+	// (code_strategy::build_mealy): its atoms are read at the absolute step
+	// played, from step 0 on, and `history`, a conjunction of atoms over
+	// the steps before 0, gives the values the strategy starts from.
+	bool data_game = false;
+	std::vector<tref> history;
 
 	// False when realizability was decided by a route whose strategy CANNOT
 	// be re-expressed as a safety formula over the user's data atoms:

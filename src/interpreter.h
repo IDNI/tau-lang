@@ -56,8 +56,19 @@ struct step_provider {
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) = 0;
 
-	/// @brief True to skip the appear_within_lookback input filter in step().
-	virtual bool skip_lookback_filter() const { return false; }
+	/**
+	 * @brief The inputs of a step the provider reads.
+	 * @param vars The inputs of the step, one io_var each.
+	 * @return The ones to read, or nullopt to leave the choice to the
+	 * spec's lookback filter (appear_within_lookback).
+	 */
+	virtual std::optional<trefs> read_set(const trefs& vars) const {
+		(void)vars;
+		return std::nullopt;
+	}
+
+	/// @brief The state of the strategy the provider plays, when it has one.
+	virtual std::optional<int> strategy_state() const { return std::nullopt; }
 
 	/// @brief Past steps the provider reads beyond the spec's own lookback.
 	virtual int_t lookback() const { return 0; }

@@ -89,3 +89,10 @@ add_ltl_run_test(data_game_strategy_merged_warm_up
 	"run 4 steps (always ((o2[t]:bv[1] = 1 -> o2[t]:bv[1] = 1))) && (always (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t-2]:bv[1] = 1)).\\nq\\n"
 	"o2\\[0\\] := 1\n.*o2\\[1\\] := 0\n.*o2\\[2\\] := 1\n.*o2\\[3\\] := 0|o2\\[0\\] := 0\n.*o2\\[1\\] := 1\n.*o2\\[2\\] := 0\n.*o2\\[3\\] := 1"
 	"no solution|no strategy|unsat")
+
+# once o1 has met its goal the strategy no longer depends on i1, and the
+# run stops asking for it
+add_ltl_run_test(data_game_strategy_reads_needed_inputs
+	"run (sometimes o1[t]:bv[1] = i1[t]:bv[1]) && (always o2[t]:bv[1] = i2[t]:bv[1]).\\n1\\n0\\n1\\n0\\n1\\n0\\nq\\nq\\n"
+	"i2\\[1\\] : bv\\[1\\] := 1\n.*o2\\[1\\] := 1\n.*i2\\[2\\] : bv\\[1\\] := 0"
+	"i1\\[1\\]|unsat|no strategy")
