@@ -465,7 +465,10 @@
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-release"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
 		},
 		{
 			"name": "debug-w64",
@@ -483,7 +486,10 @@
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-devel"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
 		},
 		{
 			"name": "release-arm64",
