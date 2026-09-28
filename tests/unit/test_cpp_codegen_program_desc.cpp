@@ -9,7 +9,6 @@
 #include "codegen_strategy.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
-#include "test_scratch_dir.h"
 
 #include <algorithm>
 #include <chrono>
@@ -26,6 +25,14 @@
 using namespace idni::tau_lang;
 
 namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+static const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir =
+		tau_test_tmp("test_cpp_codegen_program_desc");
+	return dir;
+}
 
 hoa_automaton echo_spec() {
 	hoa_automaton a;
@@ -69,7 +76,7 @@ std::string compile_and_run(
     const std::string& main_src,
     const std::string& tag)
 {
-	const std::string dir = test_scratch_dir().string();
+	const std::string dir = suite_scratch_dir().string();
 	std::string hdr  = dir + "/_tau_cg_pd_" + tag + ".h";
 	std::string mainf = dir + "/_tau_cg_pd_" + tag + "_main.cpp";
 	std::string exe  = dir + "/_tau_cg_pd_" + tag + "_exe";
@@ -274,7 +281,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// stops the build right after it is written.
 	std::string emitted_main(const std::string& spec, const std::string& tag) {
 		namespace stdfs = std::filesystem;
-		const stdfs::path dir = test_scratch_dir() / tag;
+		const stdfs::path dir = suite_scratch_dir() / tag;
 		std::error_code ec;
 		stdfs::remove_all(dir, ec);
 		auto res = compile_spec<node_t>(spec, "", dir.string(),
@@ -905,8 +912,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir =
-			test_scratch_path("test_cpp_codegen_hello_world_sdk_link.build");
+		stdfs::path bdir = suite_scratch_dir() /
+			"test_cpp_codegen_hello_world_sdk_link.build";
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 
@@ -956,7 +963,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "piped inputs come back in order, exit code 0") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = test_scratch_path("_tau_cg_pd_echo");
+		stdfs::path bdir = suite_scratch_dir() / "_tau_cg_pd_echo";
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 

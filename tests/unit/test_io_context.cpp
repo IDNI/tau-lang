@@ -16,7 +16,6 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "test_scratch_dir.h"
 
 #include "io_context.h"
 
@@ -25,6 +24,13 @@
 #include <sstream>
 
 namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+static const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir = tau_test_tmp("test_io_context");
+	return dir;
+}
 
 // --- stdin/stdout redirection helpers -------------------------------------
 
@@ -58,7 +64,7 @@ struct cerr_capture {
 struct temp_path {
 	std::filesystem::path path;
 	explicit temp_path(const std::string& tag)
-		: path(test_scratch_path("tau_test_io_context_" + tag)) {
+		: path(suite_scratch_dir() / ("tau_test_io_context_" + tag)) {
 		std::error_code ec;
 		std::filesystem::remove(path, ec);
 	}
@@ -287,7 +293,7 @@ TEST_SUITE("file streams") {
 	// an error rather than throwing, and put() then reports failure.
 	TEST_CASE("opening an unwritable output path does not throw") {
 		const std::string bad =
-			(test_scratch_path("tau_test_io_context_absent_dir")
+			(suite_scratch_dir() / "tau_test_io_context_absent_dir"
 				/ "out.txt").string();
 		REQUIRE(!std::filesystem::exists(
 			std::filesystem::path(bad).parent_path()));
@@ -300,7 +306,7 @@ TEST_SUITE("file streams") {
 	// empty strings). This is the failure branch of the constructor.
 	TEST_CASE("opening a missing file does not throw") {
 		const std::string missing =
-			test_scratch_path("tau_test_io_context_definitely_absent")
+			(suite_scratch_dir() / "tau_test_io_context_definitely_absent")
 				.string();
 		std::error_code ec;
 		std::filesystem::remove(missing, ec);

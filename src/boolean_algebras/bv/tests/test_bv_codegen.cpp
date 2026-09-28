@@ -8,7 +8,6 @@
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
-#include "test_scratch_dir.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -21,6 +20,13 @@
 using namespace idni::tau_lang;
 
 namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir = tau_test_tmp("test_bv_codegen");
+	return dir;
+}
 
 // Parse and synthesize a formula, returning the solution.
 std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
@@ -97,7 +103,7 @@ TEST_SUITE("bv_codegen") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = test_scratch_path("test_bv_codegen_sdk_link.build");
+		stdfs::path bdir = suite_scratch_dir() / "test_bv_codegen_sdk_link.build";
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 

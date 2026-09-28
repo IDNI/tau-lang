@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include "doctest.h"
 #include "defs.h"
 #include "logging.h"
@@ -89,6 +90,11 @@ inline void apply_tau_experiment_env() {
 // so this header, which must not pull in the tau tree, never has to.
 inline void (*test_tau_init_hook)() = nullptr;
 
+// Set by a suite that must re-execute itself as a worker process: main()
+// hands argv over before doctest runs, and the hook returns the worker's
+// exit code, or -1 when it does not recognize the invocation.
+inline int (*test_child_hook)(int argc, char** argv) = nullptr;
+
 int main(int argc, char** argv) {
 	apply_tau_experiment_env();
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
@@ -98,5 +104,8 @@ int main(int argc, char** argv) {
 #endif // TAU_LOG_TRACE_TESTS
 
 	if (test_tau_init_hook) test_tau_init_hook();
+	if (test_child_hook) {
+		if (int rc = test_child_hook(argc, argv); rc >= 0) return rc;
+	}
 	return doctest::Context(argc, argv).run();
 }

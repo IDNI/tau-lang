@@ -28,6 +28,12 @@
 #include <unistd.h>
 #endif
 
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <random>
+#include <sstream>
+
 namespace idni::tau_lang {
 
 using strings = std::vector<std::string>;
@@ -505,6 +511,246 @@ inline bool normalize_and_check_mod_and_or(const char* sample,
 	auto result = normalizer<node_t>(nso_rr.value());
 	if (!result.has_value()) return false;
 	return matches_wff_mod_and_or(result.value(), expected_wff);
+}
+
+// ── portable subprocess, scratch-dir and host-compiler helpers ──────────────
+//
+// The codegen, blasting and revision suites drive a child process, a scratch
+// directory or a host C++ compiler. These wrap the platform differences once,
+// so a suite stays free of /tmp, popen and mkdtemp -- none of which MinGW or
+// MSVC has.
+
+/// Every directory tau_test_tmp made, removed when the test process exits.
+/// Only a tau_test_ name is ever removed.
+struct tau_test_tmp_registry {
+	std::vector<std::filesystem::path> dirs;
+	~tau_test_tmp_registry() {
+		std::error_code ec;
+		for (const auto& dir : dirs)
+			if (dir.filename().string().starts_with("tau_test_"))
+				std::filesystem::remove_all(dir, ec);
+	}
+};
+
+inline tau_test_tmp_registry& tau_test_tmp_dirs() {
+	static tau_test_tmp_registry registry;
+	return registry;
+}
+
+/// A fresh scratch directory under the platform temp directory. The suffix is
+/// random, not the pid, so two checkouts sharing a temp directory never
+/// collide; a collision retries instead of reusing a live directory.
+inline std::filesystem::path tau_test_tmp(const std::string& name) {
+	namespace fs = std::filesystem;
+	static std::mt19937_64 rng{ std::random_device{}() };
+	static unsigned long long counter = 0;
+	std::error_code ec;
+	fs::path base = fs::temp_directory_path(ec);
+	if (ec) base = ".";
+	for (int attempt = 0; attempt < 64; ++attempt) {
+		const fs::path dir = base / ("tau_test_" + name + "_"
+			+ std::to_string(rng()) + "_"
+			+ std::to_string(counter++));
+		if (fs::create_directory(dir, ec)) {
+			tau_test_tmp_dirs().dirs.push_back(dir);
+			return dir;
+		}
+	}
+	// Only reachable when the temp directory itself is unusable; every
+	// caller then fails on its first write instead of sharing a directory.
+	return base / ("tau_test_" + name + "_unavailable");
+}
+
+/// The platform's executable suffix, for a path built by hand.
+inline const char* tau_test_exe_suffix() {
+#ifdef _WIN32
+	return ".exe";
+#else
+	return "";
+#endif
+}
+
+/// This test binary's own path, baked in by CMake as TAU_TEST_EXE_PATH. A
+/// suite that re-executes itself as a worker needs it; empty when the
+/// definition is absent, so the suite can fall back to running inline.
+inline std::string tau_test_exe_path() {
+#ifdef TAU_TEST_EXE_PATH
+	return TAU_TEST_EXE_PATH;
+#else
+	return "";
+#endif
+}
+
+/// The exit code a std::system() status carries: the raw value on Windows,
+/// WEXITSTATUS elsewhere (a signal death maps to the shell's 128+signal).
+inline int exit_code_of(int status) {
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	return status;
+#else
+	return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+#endif
+}
+
+/// Outcome of tau_test_run: 0 only when the child exited zero, -1 otherwise.
+/// `err` holds the separately captured stderr, and the rendered spawn report
+/// when the child never produced a code (not found, killed, non-zero exit).
+struct tau_test_run_result {
+	std::string out;
+	std::string err;
+	int exit_code = -1;
+	bool timed_out = false;
+};
+
+/// Run `argv` directly, with `stdin_data` on its stdin, capturing stdout and
+/// stderr. spawn_capture decides the exit code itself, so only the
+/// zero/non-zero distinction leaves this helper.
+inline tau_test_run_result tau_test_run(const std::vector<std::string>& argv,
+	const std::string& stdin_data = "", int timeout_sec = 0)
+{
+	tau_test_run_result r;
+	namespace fs = std::filesystem;
+	const fs::path dir = tau_test_tmp("run");
+	const fs::path in_path = dir / "stdin";
+	const fs::path err_path = dir / "stderr";
+	{
+		std::ofstream in(in_path, std::ios::binary);
+		in.write(stdin_data.data(),
+			static_cast<std::streamsize>(stdin_data.size()));
+	}
+	spawn_options opts;
+	opts.stdin_path = in_path.string();
+	opts.stderr_path = err_path.string();
+	auto res = spawn_capture(argv, timeout_sec,
+		[](int c) { return c == 0; }, opts);
+	std::error_code ec;
+	if (fs::exists(err_path, ec)) {
+		std::ifstream err(err_path, std::ios::binary);
+		std::ostringstream buf;
+		buf << err.rdbuf();
+		r.err = buf.str();
+	}
+#ifdef _WIN32
+	r.err.erase(std::remove(r.err.begin(), r.err.end(), '\r'),
+		r.err.end());
+#endif
+	fs::remove_all(dir, ec);
+	if (res.has_value()) {
+		r.out = std::move(res.value());
+		r.exit_code = 0;
+		return r;
+	}
+	// A failed run still produced output: the report carries the captured
+	// stdout under label::value. Keeping it is what lets a caller tell two
+	// failed runs apart instead of comparing two empty bodies.
+	for (const auto& n : res.report().nodes())
+		if (auto v = node_attr_text(res.report(), n, label::value)) {
+			r.out = *v;
+			break;
+		}
+	if (auto code_v = report_attr_value(res.report(), label::exit_code))
+		r.exit_code = static_cast<int>(*code_v);
+	std::ostringstream why;
+	res.print(why);
+	r.err += why.str();
+	r.timed_out = report_has_attr(res.report(), label::timeout);
+	return r;
+}
+
+/// True when `cxx` can be spawned at all. Deliberately not "exits 0": MSVC's
+/// cl rejects an unknown flag, and a compiler that runs is what a test needs.
+/// Only a not-found report means it is absent.
+inline bool tau_test_cxx_available(const std::string& cxx) {
+	auto probe = spawn_capture({ cxx, "--version" }, 30,
+		[](int) { return true; });
+	return probe.has_value()
+		|| !report_has_code(probe.report(), code::not_found);
+}
+
+/// The host C++ compiler a codegen suite compiles its driver with: the
+/// TAU_TEST_CXX override, else the first of g++, clang++ and cl that runs.
+inline const std::string& tau_test_cxx() {
+	static const std::string cxx = []() -> std::string {
+		if (const char* v = std::getenv("TAU_TEST_CXX"); v && *v)
+			return v;
+		for (const char* name : { "g++", "clang++", "cl" })
+			if (tau_test_cxx_available(name)) return name;
+		return "g++";
+	}();
+	return cxx;
+}
+
+/// True when the compiler's flags have MSVC's shape (/O2, /Fe:), not gcc's.
+inline bool tau_test_cxx_is_msvc(const std::string& cxx) {
+	std::string base = cxx;
+	if (auto sep = base.find_last_of("/\\"); sep != std::string::npos)
+		base = base.substr(sep + 1);
+	if (base.size() > 4
+		&& (base.ends_with(".exe") || base.ends_with(".EXE")))
+		base.resize(base.size() - 4);
+	return base == "cl";
+}
+
+struct tau_test_compile_result { bool ok = false; std::string out; };
+
+/// Compile and link `sources` into the executable `exe` (the caller supplies
+/// the platform suffix) with tau_test_cxx(). The flag table covers g++,
+/// clang++ and cl; `ndebug` adds the customer build's -DNDEBUG.
+inline tau_test_compile_result tau_test_compile(const std::string& exe,
+	const std::vector<std::string>& sources, const std::string& include_dir,
+	int std_year = 17, bool ndebug = false, bool lto = false)
+{
+	const std::string& cxx = tau_test_cxx();
+	std::vector<std::string> argv{ cxx };
+	if (tau_test_cxx_is_msvc(cxx)) {
+		argv.push_back("/nologo");
+		argv.push_back("/O2");
+		if (lto) argv.push_back("/GL");
+		// cl has no /std:c++23; c++latest is its C++23 mode.
+		argv.push_back(std_year >= 23
+			? std::string("/std:c++latest")
+			: "/std:c++" + std::to_string(std_year));
+		argv.push_back("/EHsc");
+		if (ndebug) argv.push_back("/DNDEBUG");
+		if (!include_dir.empty()) argv.push_back("/I" + include_dir);
+		argv.push_back("/Fe:" + exe);
+		// cl writes .obj beside the source unless /Fo names a directory;
+		// the executable's own scratch dir keeps the source tree clean.
+		std::filesystem::path exe_dir =
+			std::filesystem::path(exe).parent_path();
+		if (!exe_dir.empty()) {
+			std::string fo = exe_dir.string();
+			fo += std::filesystem::path::preferred_separator;
+			argv.push_back("/Fo" + fo);
+		}
+	} else {
+		argv.push_back(lto ? "-O3" : "-O2");
+		if (lto) argv.push_back("-flto");
+		argv.push_back("-std=c++" + std::to_string(std_year));
+		if (ndebug) argv.push_back("-DNDEBUG");
+		if (!include_dir.empty()) argv.push_back("-I" + include_dir);
+		argv.push_back("-o");
+		argv.push_back(exe);
+	}
+	for (const auto& s : sources) argv.push_back(s);
+	auto run = tau_test_run(argv);
+	return { run.exit_code == 0, run.out + run.err };
+}
+
+// Probes spawn_capture() itself (the primitive ltlsynt/ltlfilt use) rather
+// than checking the platform, so this tracks real subprocess capability
+// wherever it changes.
+inline bool can_spawn_subprocess() {
+	static const bool available = [] {
+		// spawn_capture decides the exit code itself, so a successful
+		// probe is a value and every failure is an error. Windows has no
+		// `true`, so probe a command every install ships.
+#ifdef _WIN32
+		return spawn_capture({"cmd", "/c", "exit", "0"}).has_value();
+#else
+		return spawn_capture({"true"}).has_value();
+#endif
+	}();
+	return available;
 }
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)

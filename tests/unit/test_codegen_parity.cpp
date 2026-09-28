@@ -30,7 +30,6 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "test_scratch_dir.h"
 #include "tau_compile.h"
 
 #include <algorithm>
@@ -51,6 +50,13 @@ using namespace idni::tau_lang;
 namespace {
 
 namespace stdfs = std::filesystem;
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir = tau_test_tmp("test_codegen_parity");
+	return dir;
+}
 
 // Fixtures the interpreter runs but compile_spec cannot yet build, so a
 // straight parity comparison would fail rather than exercise a real gap:
@@ -165,8 +171,8 @@ struct proc_result { std::string out, err; int exit_code = -1; };
 proc_result run_piped(const std::string& exe_cmd, const stdfs::path& stdin_file,
 	const std::string& tag)
 {
-	stdfs::path out_path = test_scratch_path("_tau_cg_parity_" + tag + ".out");
-	stdfs::path err_path = test_scratch_path("_tau_cg_parity_" + tag + ".err");
+	stdfs::path out_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".out");
+	stdfs::path err_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".err");
 	std::string cmd = exe_cmd
 		+ " < \"" + stdin_file.string() + "\""
 		+ " > \"" + out_path.string() + "\""
@@ -188,7 +194,7 @@ stdfs::path write_stdin_tape(const stdfs::path& spec_path, const std::string& ta
 	stdfs::path in_path = spec_path;
 	in_path.replace_extension(".in");
 	std::string content = stdfs::exists(in_path) ? read_file(in_path) : "";
-	stdfs::path tape_path = test_scratch_path("_tau_cg_parity_" + tag + ".stdin");
+	stdfs::path tape_path = suite_scratch_dir() / ("_tau_cg_parity_" + tag + ".stdin");
 	std::ofstream f(tape_path, std::ios::binary);
 	f << content;
 	return tape_path;
@@ -580,7 +586,7 @@ TEST_SUITE("codegen_parity") {
 				+ "\" -q -b off", stdin_file, name + "_cli");
 			auto cli_ms = elapsed_ms(t0);
 
-			stdfs::path build_dir = test_scratch_path("_tau_cg_parity_build_" + name);
+			stdfs::path build_dir = suite_scratch_dir() / ("_tau_cg_parity_build_" + name);
 			stdfs::remove_all(build_dir, ec);
 			auto t1 = std::chrono::steady_clock::now();
 			auto res = compile_spec<node_t>(src, "", build_dir.string());
@@ -617,7 +623,17 @@ TEST_SUITE("codegen_parity") {
 
 			std::string cli_body = extract_console_body(cli.out);
 			std::string artifact_body = extract_console_body(artifact.out);
-			if (cli_body == artifact_body) {
+			if (cli.exit_code != 0 || artifact.exit_code != 0) {
+				// Two failed runs must never read as agreement: an
+				// empty body on both sides is not parity.
+				CHECK_MESSAGE(false,
+					name << ": a side exited non-zero (tau "
+					     << cli.exit_code << ", artifact "
+					     << artifact.exit_code
+					     << ")\n--- tau body ---\n" << cli_body
+					     << "\n--- artifact body ---\n"
+					     << artifact_body);
+			} else if (cli_body == artifact_body) {
 				MESSAGE(name, ": pass (exact)");
 			} else {
 				// Graded fallback: an exact-text mismatch is not
@@ -699,8 +715,8 @@ TEST_SUITE("codegen_parity") {
 
 		stdfs::path stdin_file = write_stdin_tape(spec_path, name + "_stepguard");
 		std::error_code ec;
-		stdfs::path build_dir = test_scratch_path(
-			"_tau_cg_parity_build_" + name + "_stepguard");
+		stdfs::path build_dir = suite_scratch_dir() /
+			("_tau_cg_parity_build_" + name + "_stepguard");
 		stdfs::remove_all(build_dir, ec);
 
 		auto res = compile_spec<node_t>(src, "", build_dir.string());

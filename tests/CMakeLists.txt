@@ -227,6 +227,13 @@ function(_tau_add_test_target N src work_dir)
 		endif()
 	endif()
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
+	# GetProcessMemoryInfo for the blasting suite's current-VM query.
+	if(WIN32)
+		target_link_libraries(${N} psapi)
+	endif()
+	# The suite's own path, for a test that re-executes itself as a worker.
+	target_compile_definitions(${N} PRIVATE
+		TAU_TEST_EXE_PATH="$<TARGET_FILE:${N}>")
 	add_dependencies(${N} tau_header)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
 	if(TAU_IS_GNU_OR_CLANG)

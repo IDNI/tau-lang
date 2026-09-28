@@ -11,7 +11,6 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "test_scratch_dir.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
@@ -27,6 +26,14 @@
 using namespace idni::tau_lang;
 
 namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+static const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir =
+		tau_test_tmp("test_cpp_codegen_data_atoms");
+	return dir;
+}
 
 // Parse and synthesize a formula, returning the solution.
 // Returns nullopt if UNREALIZABLE or parse failure.
@@ -267,7 +274,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = test_scratch_path("test_cpp_codegen_sdk_link.build");
+		stdfs::path bdir = suite_scratch_dir() / "test_cpp_codegen_sdk_link.build";
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 

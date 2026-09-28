@@ -2,7 +2,6 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "test_scratch_dir.h"
 
 #include <filesystem>
 #include <fstream>
@@ -39,6 +38,13 @@ static bool check_adt_solution(tref eq, const solution<node_t>& sol) {
 	return tau::get(check).equals_T();
 }
 
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+static const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir = tau_test_tmp("test_integration-adt");
+	return dir;
+}
+
 // Runs `spec_body` (preceded by `preamble`, e.g. a definition) over a
 // two-line Point input file and returns the output file's lines, following
 // the "interpreter: tuple io through file streams" case's own idiom: the
@@ -49,8 +55,8 @@ static std::vector<std::string> run_point_spec(const std::string& tag,
 	const std::string& preamble, const std::string& spec_body)
 {
 	namespace stdfs = std::filesystem;
-	stdfs::path in_p  = test_scratch_path("tau_test_adt_" + tag + "_in.txt");
-	stdfs::path out_p = test_scratch_path("tau_test_adt_" + tag + "_out.txt");
+	stdfs::path in_p  = suite_scratch_dir() / ("tau_test_adt_" + tag + "_in.txt");
+	stdfs::path out_p = suite_scratch_dir() / ("tau_test_adt_" + tag + "_out.txt");
 	{
 		std::ofstream f(in_p);
 		f << "{ a: \"1\", b: \"0\" }\n" << "{ a: \"0\", b: \"1\" }\n";
@@ -337,8 +343,8 @@ TEST_SUITE("adt integration") {
 		// "two file streams on one line" case.
 		bdd_init<Bool>();
 		namespace stdfs = std::filesystem;
-		stdfs::path in_p  = test_scratch_path("tau_test_adt_in.txt");
-		stdfs::path out_p = test_scratch_path("tau_test_adt_out.txt");
+		stdfs::path in_p  = suite_scratch_dir() / "tau_test_adt_in.txt";
+		stdfs::path out_p = suite_scratch_dir() / "tau_test_adt_out.txt";
 		{
 			std::ofstream f(in_p);
 			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n";
