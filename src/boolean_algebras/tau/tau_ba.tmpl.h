@@ -313,11 +313,49 @@ inline bool ba_component_factoring_enabled() {
 	return env ? *env : ba_component_factoring;
 }
 
+template <typename node>
+static int factored_tau_valid(tref fm);
+
+/**
+ * @brief The dual of a `sometimes` formula: `G(!D)` for `F(D)`, in NNF.
+ *
+ * A complemented `:tau` constant `{K}'` whose body is an always-conjunction
+ * normalizes to a `sometimes` over the DNF of `!K`. Neither factored path
+ * can split that shape (the units are always-clauses); `F(D) == !G(!D)`
+ * maps both questions back to the always/CNF units of `K`, which the
+ * per-unit caches already hold: `sat(F(D)) == !valid(G(!D))` and
+ * `valid(F(D)) == !sat(G(!D))`. Both identities are the engine's own
+ * definitions of the two predicates (`valid(X)` is decided as `!sat(!X)`),
+ * so the dual adds no assumption beyond the per-unit factoring.
+ *
+ * Returns nullptr when @p fm is not a `sometimes` formula, or when its body
+ * holds a temporal operator of its own: the dual of a nested temporal body
+ * is not an always-conjunction the unit split could take apart, and pushing
+ * the negation through the full-LTL operators is the LTL pipeline's job.
+ * The callers pass the normalized main, where the complement of an
+ * always-conjunction is one `sometimes` over a DNF; a disjunction of
+ * several `sometimes`, as `to_nnf` alone produces, is not taken apart here
+ * and goes to the units path.
+ */
+template <typename node>
+static tref sometimes_dual(tref fm) {
+	using tau = tree<node>;
+	const tau& t = tau::get(fm);
+	if (!t.has_child() || !t.child_is(tau::wff_sometimes)) return nullptr;
+	const tref body = tau::trim2(fm);
+	if (tau::get(body).find_top(is_temporal_quantifier<node>)) return nullptr;
+	return to_nnf<node>(tau::build_wff_always(tau::build_wff_neg(body)));
+}
+
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
 static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
+	// sat(F(D)) == !valid(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_valid<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	for (tref u : units)
@@ -390,6 +428,10 @@ static int factored_tau_sat(tref fm) {
 template <typename node>
 static int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
+	// valid(F(D)) == !sat(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_sat<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
