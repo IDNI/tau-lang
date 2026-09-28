@@ -69,7 +69,7 @@ inline std::optional<verdict_line> parse_verdict_line(const std::string& out) {
 #if defined(__EMSCRIPTEN__)
 
 inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
-	int, std::function<bool(int)>)
+	int, std::function<bool(int)>, const spawn_options&)
 {
 	result<std::string> r;
 	// the same refusal as the POSIX path; an empty name would also be an
@@ -157,7 +157,8 @@ inline bool win_find_exe(const std::string& name, char* exe, DWORD exe_sz) {
 }
 
 inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
-	int timeout_sec, std::function<bool(int)> exit_ok)
+	int timeout_sec, std::function<bool(int)> exit_ok,
+	const spawn_options& opts)
 {
 	result<std::string> r;
 
@@ -186,15 +187,45 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			"subprocess pipe", {{label::name, "CreatePipe"}});
 	SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
 
+	HANDLE in_file = INVALID_HANDLE_VALUE, err_file = INVALID_HANDLE_VALUE;
+	if (!opts.stdin_path.empty()) {
+		in_file = CreateFileA(opts.stdin_path.c_str(), GENERIC_READ,
+			FILE_SHARE_READ, &sa, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (in_file == INVALID_HANDLE_VALUE) {
+			CloseHandle(rd); CloseHandle(wr);
+			return r.with_error(code::io_error,
+				"failed to open the subprocess stdin file",
+				{{label::name, "CreateFileA"},
+				 {label::value, opts.stdin_path}});
+		}
+	}
+	if (!opts.stderr_path.empty()) {
+		err_file = CreateFileA(opts.stderr_path.c_str(), GENERIC_WRITE,
+			FILE_SHARE_READ, &sa, CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (err_file == INVALID_HANDLE_VALUE) {
+			CloseHandle(rd); CloseHandle(wr);
+			if (in_file != INVALID_HANDLE_VALUE) CloseHandle(in_file);
+			return r.with_error(code::io_error,
+				"failed to open the subprocess stderr file",
+				{{label::name, "CreateFileA"},
+				 {label::value, opts.stderr_path}});
+		}
+	}
+
 	HANDLE nul = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
 		&sa, OPEN_EXISTING, 0, nullptr);
 
 	STARTUPINFOA si{};
 	si.cb = sizeof(si);
 	si.dwFlags = STARTF_USESTDHANDLES;
-	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+	si.hStdInput = in_file != INVALID_HANDLE_VALUE
+		? in_file : GetStdHandle(STD_INPUT_HANDLE);
 	si.hStdOutput = wr;
-	si.hStdError = (nul != INVALID_HANDLE_VALUE) ? nul : wr;
+	if (err_file != INVALID_HANDLE_VALUE) si.hStdError = err_file;
+	else if (opts.merge_stderr) si.hStdError = wr;
+	else si.hStdError = (nul != INVALID_HANDLE_VALUE) ? nul : wr;
 
 	PROCESS_INFORMATION pi{};
 	std::vector<char> cl(cmdline.begin(), cmdline.end());
@@ -202,6 +233,8 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	BOOL ok = CreateProcessA(exe, cl.data(), nullptr, nullptr, TRUE,
 		CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
 	CloseHandle(wr);
+	if (in_file != INVALID_HANDLE_VALUE) CloseHandle(in_file);
+	if (err_file != INVALID_HANDLE_VALUE) CloseHandle(err_file);
 	if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
 	if (!ok) {
 		CloseHandle(rd);
@@ -241,7 +274,6 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	CloseHandle(pi.hProcess);
 	// MinGW Spot writes text-mode CRLF; hoa.tgf and line parsers want LF.
 	out.erase(std::remove(out.begin(), out.end(), '\r'), out.end());
-
 	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << ec
 		<< ", stdout=" << out;
 
@@ -261,7 +293,8 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 #else // POSIX
 
 inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
-	int timeout_sec, std::function<bool(int)> exit_ok)
+	int timeout_sec, std::function<bool(int)> exit_ok,
+	const spawn_options& opts)
 {
 	result<std::string> r;
 
@@ -282,12 +315,24 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			"subprocess",
 			{{label::name, "posix_spawn_file_actions_init"}});
 	}
-	// Child: redirect stdout -> pipe write end; stderr -> /dev/null.
+	// Child: stdout -> pipe write end; stderr -> the named file, the stdout
+	// pipe (merged), or /dev/null; stdin -> the named file.
 	posix_spawn_file_actions_addclose(&fa, pipefd[0]);
 	posix_spawn_file_actions_adddup2 (&fa, pipefd[1], STDOUT_FILENO);
+	if (!opts.stderr_path.empty()) {
+		posix_spawn_file_actions_addopen(&fa, STDERR_FILENO,
+			opts.stderr_path.c_str(),
+			O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	} else if (opts.merge_stderr) {
+		posix_spawn_file_actions_adddup2 (&fa, pipefd[1], STDERR_FILENO);
+	} else {
+		posix_spawn_file_actions_addopen (&fa, STDERR_FILENO, "/dev/null",
+		                                  O_WRONLY, 0);
+	}
 	posix_spawn_file_actions_addclose(&fa, pipefd[1]);
-	posix_spawn_file_actions_addopen (&fa, STDERR_FILENO, "/dev/null",
-	                                  O_WRONLY, 0);
+	if (!opts.stdin_path.empty())
+		posix_spawn_file_actions_addopen(&fa, STDIN_FILENO,
+			opts.stdin_path.c_str(), O_RDONLY, 0);
 
 	std::vector<char*> cargv;
 	cargv.reserve(argv.size() + 1);

@@ -66,6 +66,21 @@ bool available();
 // ── Internal to this backend, named here only so its own unit tests can
 // reach it ─────────────────────────────────────────────────────────────────
 
+/// Extras for `spawn_capture`. The defaults keep the tool-facing contract:
+/// the child reads this process's stdin, and its stderr is dropped so a
+/// noisy tool cannot corrupt the parsed stdout.
+struct spawn_options {
+	/// Send the child's stderr to the stdout pipe, a shell's `2>&1`.
+	/// `stderr_path` takes precedence when it is set.
+	bool merge_stderr = false;
+	/// When not empty, the child reads its stdin from this file. When
+	/// empty, the child inherits this process's stdin.
+	std::string stdin_path;
+	/// When not empty, the child writes its stderr to this file, created
+	/// or truncated. `merge_stderr` then has no effect.
+	std::string stderr_path;
+};
+
 /// Spawn `argv` directly (no shell), capture its stdout, and decide the
 /// outcome right here -- the raw exit code never leaves this function.
 /// `exit_ok` names which exit codes count as success for the tool being
@@ -74,7 +89,8 @@ bool available();
 /// reported as a signal death with `label::timeout` attached.
 result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int timeout_sec = 0,
-	std::function<bool(int)> exit_ok = [](int c) { return c == 0; });
+	std::function<bool(int)> exit_ok = [](int c) { return c == 0; },
+	const spawn_options& opts = spawn_options{});
 
 } // namespace idni::tau_lang
 
