@@ -24,6 +24,7 @@ TAU_JS_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_
 
 # Content hash of the Tau working tree. The provenance helpers and this recipe
 # are excluded: each is hashed on its own or cannot change the package bytes.
+# Tracked files only, so an untracked build artifact cannot move the id.
 _dep_tau_js_tree_hash() {
 	local src="$1" value digest
 	local exclude='^(external/parser|scripts/dep-tau-js-package\.sh)$'
@@ -32,7 +33,7 @@ _dep_tau_js_tree_hash() {
 	else
 		digest="shasum -a 256"
 	fi
-	value="$(cd "$src" && git ls-files -z --cached --others --exclude-standard \
+	value="$(cd "$src" && git ls-files -z --cached \
 		| grep -zvE "$exclude" \
 		| LC_ALL=C sort -z | xargs -0 -r $digest | dep_sha256_stdin)"
 	[ -n "$value" ] || { echo "dep-tau-js: Tau tree hash is empty" >&2; return 1; }
