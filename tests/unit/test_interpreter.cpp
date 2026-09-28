@@ -121,13 +121,15 @@ TEST_SUITE("interpreter") {
 		for (auto& v : vals) CHECK(matches_to_any_of(v, strings{ "T" }));
 	}
 
-	TEST_CASE("a multi-state Mealy strategy emits a valid initial output at "
-		  "step 0 in every pack with a Boolean carrier")
+	TEST_CASE("a strategy with memory emits a valid initial output at "
+		  "step 0 in every pack with a Boolean carrier"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// o[0] = 1 pins the first output and F(o[t] = 0) obliges a later
-		// change, so the strategy has two states and step 0 must emit
+		// change, so the strategy needs memory and step 0 must emit
 		// something other than the default zero; the carrier is whatever
-		// this pack resolves it to
+		// this pack resolves it to. The data game decides the spec, so
+		// the run plays its strategy.
 		const size_t cid = get_ba_type_id<node_t>(
 			pack_bool_carrier_type<node_t>());
 		const std::string ct = get_ba_type_name<node_t>(cid).value();
@@ -143,14 +145,35 @@ TEST_SUITE("interpreter") {
 
 		auto ran = run<node_t>(fm, ctx, 3);
 		REQUIRE(ran.has_value());
-		REQUIRE(ran.value().cached_solution.has_value());
-		REQUIRE(ran.value().cached_solution->aut.num_states > 1);
 		auto vals = o->get_values();
 		REQUIRE(vals.size() == 3);
 		// the pinned first output, not the default zero, and the
 		// eventual obligation met inside the run
 		CHECK(vals[0] == "1");
 		CHECK(std::find(vals.begin(), vals.end(), "0") != vals.end());
+	}
+
+	TEST_CASE("an input-free lookback recurrence runs without a read set") {
+		// no input stream, so step() skips the lookback read-set scan;
+		// o[t] = o[t-1] ^ o[t-2] from 1, 1 repeats 1, 1, 0
+		const size_t cid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		const std::string ct = get_ba_type_name<node_t>(cid).value();
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", cid, o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		auto at = [&](const std::string& t) { return "o[" + t + "]" + ct; };
+		tref fm = tau::get(at("0") + " = {1}" + ct + " && " + at("1")
+			+ " = {1}" + ct + " && " + at("t") + " = " + at("t-1")
+			+ " ^ " + at("t-2"), opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 6);
+		REQUIRE(ran.has_value());
+		CHECK(o->get_values() == strings{ "1", "1", "0", "1", "1", "0" });
 	}
 }
 

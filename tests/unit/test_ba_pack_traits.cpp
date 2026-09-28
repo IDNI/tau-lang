@@ -55,6 +55,49 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK(pack_zero_constant<node_t>(sbf_id) == nullptr);
 #endif
 	}
+	TEST_CASE("pack_modular_width / pack_modular_value") {
+		CHECK(pack_modular_width<node_t>(tid(untyped_type<node_t>())) == 0);
+		CHECK(pack_modular_width<node_t>(size_t{0}) == 0);
+#ifdef TAU_PACK_HAS_BA_BV
+		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
+		CHECK(pack_modular_width<node_t>(bv8) == 8);
+		CHECK(pack_modular_value<node_t>(bv8, pack_value_constant<node_t>(bv8, 200))
+			== std::optional<uint64_t>{ 200 });
+		CHECK(pack_modular_value<node_t>(bv8, build_bf_t_type<node_t>(bv8))
+			== std::optional<uint64_t>{ 255 });
+#endif
+#ifdef TAU_PACK_HAS_BA_SBF
+		const size_t sbf_id = tid(ba_descriptor<sbf_ba, node_t>::type_tree());
+		CHECK(pack_modular_width<node_t>(sbf_id) == 0);
+#endif
+	}
+	TEST_CASE("pack_dense_order_compare / pack_dense_order_between") {
+		CHECK_FALSE(pack_type_is_dense_order<node_t>(size_t{0}));
+		CHECK(pack_dense_order_between<node_t>(size_t{0}, nullptr, nullptr)
+			== nullptr);
+#ifdef TAU_PACK_HAS_BA_QLT
+		const size_t q = qlt_type_id<node_t>();
+		CHECK(pack_type_is_dense_order<node_t>(q));
+		tref zero = pack_zero_constant<node_t>(q);
+		tref mid = pack_dense_order_between<node_t>(q, nullptr, nullptr);
+		REQUIRE(zero != nullptr);
+		REQUIRE(mid != nullptr);
+		CHECK(pack_dense_order_compare<node_t>(q, zero, mid) == 0);
+		tref above = pack_dense_order_between<node_t>(q, zero, nullptr);
+		tref below = pack_dense_order_between<node_t>(q, nullptr, zero);
+		REQUIRE(above != nullptr);
+		REQUIRE(below != nullptr);
+		CHECK(pack_dense_order_compare<node_t>(q, below, zero) == -1);
+		CHECK(pack_dense_order_compare<node_t>(q, above, zero) == 1);
+		tref between = pack_dense_order_between<node_t>(q, below, zero);
+		REQUIRE(between != nullptr);
+		CHECK(pack_dense_order_compare<node_t>(q, below, between) == -1);
+		CHECK(pack_dense_order_compare<node_t>(q, between, zero) == -1);
+		// the type's 0 is no point of the order
+		CHECK_FALSE(pack_dense_order_compare<node_t>(q, zero,
+			build_bf_f_type<node_t>(q)).has_value());
+#endif
+	}
 	TEST_CASE("pack_type_is_atomless agrees with every descriptor's flag") {
 		pack_visit_all<node_t>([]<typename BA>() {
 			using desc = ba_descriptor<BA, node_t>;
@@ -95,6 +138,21 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 	TEST_CASE("pack_omcat_qe declines a type without the theory") {
 		CHECK_FALSE(pack_omcat_qe<node_t>(tid(untyped_type<node_t>()), nullptr, nullptr).has_value());
 		CHECK_FALSE(pack_omcat_qe<node_t>(size_t{0}, nullptr, nullptr).has_value());
+	}
+	TEST_CASE("pack_omcat_qe_residual is nullptr without an owner or without the capability") {
+		CHECK(pack_omcat_qe_residual<node_t>(tid(untyped_type<node_t>()), nullptr, nullptr) == nullptr);
+		CHECK(pack_omcat_qe_residual<node_t>(size_t{0}, nullptr, nullptr) == nullptr);
+		size_t without = 0;
+		pack_visit_all<node_t>([&]<typename BA>() {
+			if constexpr (!ba_has_omcat_qe_residual<node_t, BA>) {
+				using desc = ba_descriptor<BA, node_t>;
+				CHECK(pack_omcat_qe_residual<node_t>(tid(desc::type_tree()), nullptr, nullptr) == nullptr);
+				++without;
+			}
+		});
+#ifdef TAU_PACK_HAS_BA_SBF
+		CHECK(without > 0);
+#endif
 	}
 	TEST_CASE("pack_codegen_witness / pack_codegen_constant_expr are empty without an owner") {
 		CHECK_FALSE(pack_codegen_witness<node_t>(size_t{0}, nullptr, nullptr).has_value());

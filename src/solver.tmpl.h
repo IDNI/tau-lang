@@ -920,6 +920,36 @@ tref atomless_bad_splitter(tref cte) {
 		splitter_type::bad).get();
 }
 
+// The nodes of `fm` with the trees its constants carry, for a Tau constant
+// its embedded spec: what `max_constant_size` bounds.
+template <NodeType node>
+size_t generated_constant_size(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	size_t n = (size_t) node_count<node>(fm);
+	for (tref c : tau::get(fm).select_top(is_child<node, tau::ba_constant>)) {
+		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
+		if (!ba_const || tau::get(ba_const).get_ba_constant_id() == 0)
+			continue;
+		std::visit([&n](const auto& x) {
+			using BA = std::decay_t<decltype(x)>;
+			if constexpr (ba_has_constant_size<node, BA>)
+				n += ba_descriptor<BA, node>::constant_size(x);
+		}, tau::get(ba_const).get_ba_constant());
+	}
+	return n;
+}
+
+// True when a constant built from `a` and `b` may exceed
+// `max_constant_size`.
+template <NodeType node>
+bool exceeds_constant_size(tref a, tref b = nullptr) {
+	if (!max_constant_size) return false;
+	size_t n = generated_constant_size<node>(a);
+	if (b) n += generated_constant_size<node>(b);
+	return n > max_constant_size;
+}
+
 // Ledger-backed fast path for a per-coordinate exclusion system (Design A):
 // a single variable `var`, every row a plain exclusion `var != v_j`. A
 // ledger-tracked v_j needs zero solver decisions: freeness (TABA,
@@ -937,7 +967,8 @@ std::optional<tref> atomless_choose_value_ledger(
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	if (!options.ledger || cofactors.empty()) return std::nullopt;
+	if (!options.ledger || options.ledger->exhausted || cofactors.empty())
+		return std::nullopt;
 
 	auto red_and = [&](tref a, tref b) {
 		return tt(tau::get(a) & tau::get(b))
@@ -972,7 +1003,10 @@ std::optional<tref> atomless_choose_value_ledger(
 	tref region = options.ledger->fresh_region
 		? options.ledger->fresh_region->get() : nullptr;
 	if (!region) region = tau::_1(type);
-	for (tref v : external) region = red_and(region, red_not(v));
+	for (tref v : external) {
+		if (exceeds_constant_size<node>(region, v)) return std::nullopt;
+		region = red_and(region, red_not(v));
+	}
 	if (tau::get(region).equals_0()) return std::nullopt; // real check
 
 	// atomless_bad_splitter needs a ba_constant child, which the literal-1
@@ -1027,9 +1061,11 @@ std::optional<solution<node>> atomless_exclusion_system_ledger(
 }
 
 // Registers a committed witness with the ledger and shrinks its fresh
-// region to exclude it (syntactic only, no solver call): every later mint
-// must stay disjoint from everything ever committed, regardless of which
-// solver sub-path produced the value.
+// region to exclude it: every later mint must stay disjoint from everything
+// ever committed, regardless of which solver sub-path produced the value.
+// Reducing the region decides the Tau constants in it, and that cost grows
+// with the region, so a region past `max_constant_size` is dropped and the
+// ledger marked exhausted.
 //
 // Roots the new region as an htref (solver_types.h) so it survives GC
 // across interpreter steps -- the ledger is invisible to
@@ -1041,10 +1077,18 @@ void ledger_commit_witness(fresh_element_ledger& ledger, tref value,
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	// the region already excludes a value committed before
+	if (ledger.is_committed(value)) return;
 	ledger.register_committed(value);
+	if (ledger.exhausted) return;
 	tref region = ledger.fresh_region
 		? ledger.fresh_region->get() : nullptr;
 	if (!region) region = tau::_1(type);
+	if (exceeds_constant_size<node>(region, value)) {
+		ledger.exhausted = true;
+		ledger.fresh_region = nullptr;
+		return;
+	}
 	tref next = tt(tau::get(region) & ~tau::get(value))
 		| bf_reduce_canonical<node>() | tt::ref;
 	ledger.fresh_region = tau::geth(next);
@@ -1066,15 +1110,26 @@ std::optional<tref> atomless_choose_value(
 	using tt = tau::traverser;
 	size_t type = find_ba_type<node>(var);
 
+	// Past `max_constant_size` an operation is not built: `oversized` is
+	// set, the operand stands in for the result, and the call answers no
+	// value at the next check, so a stand-in never reaches the caller.
+	bool oversized = false;
+	auto too_big = [&](tref a, tref b = nullptr) {
+		return oversized = oversized
+			|| exceeds_constant_size<node>(a, b);
+	};
 	auto red_and = [&](tref a, tref b) {
+		if (too_big(a, b)) return a;
 		return tt(tau::get(a) & tau::get(b))
 			| bf_reduce_canonical<node>() | tt::ref;
 	};
 	auto red_or = [&](tref a, tref b) {
+		if (too_big(a, b)) return a;
 		return tt(tau::get(a) | tau::get(b))
 			| bf_reduce_canonical<node>() | tt::ref;
 	};
 	auto red_not = [&](tref a) {
+		if (too_big(a)) return a;
 		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
 	};
 
@@ -1125,6 +1180,7 @@ std::optional<tref> atomless_choose_value(
 	};
 
 	for (const auto& [c0, c1] : cofactors) {
+		if (oversized) return ++constant_size_hits, std::nullopt;
 		bool c1_side = !tau::get(c1).equals_0();
 		tref b = c1_side ? c1 : c0;
 		if (tau::get(b).equals_0()) return {}; // (0,0) row: not satisfiable
@@ -1209,6 +1265,7 @@ std::optional<tref> atomless_choose_value(
 		if (!split_done) return {}; // splitter machinery failure
 	}
 
+	if (oversized) return ++constant_size_hits, std::nullopt;
 	tref x = tau::_0(type);
 	for (size_t i = 0; i < reps.size(); ++i)
 		if (is_c1_side[i]) x = red_or(x, reps[i]);
@@ -1218,6 +1275,7 @@ std::optional<tref> atomless_choose_value(
 		if (!is_and_zero(x, c1)) continue;
 		if (is_and_zero(red_not(x), c0)) return {};
 	}
+	if (oversized) return ++constant_size_hits, std::nullopt;
 	return x;
 }
 
@@ -1653,6 +1711,23 @@ static std::optional<solution<Node>> pack_omcat_solve(size_t ba_type_id,
 		});
 }
 
+// The owning BA's model of an ordering system, kept only when every atom
+// holds under it.
+template <NodeType node>
+static std::optional<solution<node>> omcat_solve_verified(
+	const inequality_system<node>& sys, const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto s = pack_omcat_solve<node>(options.type_id, sys, options);
+	if (!s) return {};
+	for (tref atom : sys)
+		if (!tau::get(tt(rewriter::replace<node>(atom, s.value()))
+			| bf_reduce_canonical<node>() | tt::ref).equals_T())
+			return {};
+	return s;
+}
+
 template <NodeType node>
 std::optional<solution<node>> solve(const equations<node>& eqs,
 					const solver_options& options)
@@ -1697,9 +1772,13 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 		// A failed attempt (e.g. a bf_neq in XOR-encoded rather than
 		// comparison form, which the owning BA's QE cannot read) falls
 		// through to the solve-then-verify path below.
+		// The owning BA's model is checked against every atom before it
+		// is returned, as the fallback path below does: qlt skips the
+		// disequalities it cannot read and relies on this. A model that
+		// does not verify falls through like a decline.
 		if (dlo_compatible)
-			if (auto s = pack_omcat_solve<node>(options.type_id,
-					system.second, options); s)
+			if (auto s = omcat_solve_verified<node>(system.second,
+					options); s)
 				return s;
 	}
 	// SO-1: a system that still contains an ordering atom cannot be handed
@@ -1853,7 +1932,7 @@ bool is_negated_var_eq_zero(tref f) {
 /**
  * @brief True iff @p conjs is non-empty and every conjunct is a bf_eq
  * with no bv arithmetic or casts, so the bv partition can be squeezed
- * and solved algebraically per width (via lgrs) instead of via cvc5.
+ * and solved algebraically per width instead of via cvc5.
  */
 template <NodeType node>
 bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
@@ -1868,7 +1947,7 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 
 /**
  * @brief True iff the pure-equality partition @p conjs mentions more
- * distinct variables than `lgrs_max_vars` allows on the lgrs route.
+ * distinct variables than `lgrs_max_vars` allows on the algebraic route.
  */
 template <NodeType node>
 bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
@@ -1885,7 +1964,7 @@ bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
 // Reports why solve failed: an unsupported clause is code::solver_error,
 // no solution is code::unsat.
 template <NodeType node>
-result<solution<node>> solve(tref form, solver_options options) {
+static result<solution<node>> solve_form(tref form, solver_options options) {
 	result<solution<node>> r;
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -1978,6 +2057,9 @@ result<solution<node>> solve(tref form, solver_options options) {
 
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
+		// the atoms of an ordered type as the path states them, before
+		// the Boolean-algebra rewriting below
+		std::map<size_t, subtree_set<node>> order_atoms;
 		std::optional<size_t> bv_partition_key;
 		// Partition types
 		bool path_sat = false;
@@ -2021,6 +2103,8 @@ result<solution<node>> solve(tref form, solver_options options) {
 				clause_error = true;
 				break;
 			}
+			if (pack_type_is_non_aba_omcat<node>(type))
+				order_atoms[type].insert(conj);
 			if (!pack_type_has_arith_ops<node>(type)) {
 				conj = norm_equation<node>(conj);
 				conj = apply_all_xor_def<node>(conj);
@@ -2055,8 +2139,8 @@ result<solution<node>> solve(tref form, solver_options options) {
 				// Read off every `var = constant` conjunct before choosing a
 				// route, substituting it into the rest until nothing new is
 				// read off: a normalized step formula is one such equation
-				// per output, and the Boole expansion of the lgrs route
-				// below is exponential in the variables it is handed
+				// per output, and the Boole expansion of the algebraic
+				// route below is exponential in the variables it is handed
 				// (GitHub #121). A conjunct that folds to F under the
 				// substitution refutes the clause; one folding to T is done.
 				subtree_map<node, tref> read_off;
@@ -2106,7 +2190,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 						clause_solution[var] = value;
 					// Without arithmetic (a cast counts as arithmetic) no variable
 					// spans two widths, so each width is an independent Boolean
-					// algebra: squeeze and solve via lgrs per width.
+					// algebra: squeeze per width and find a ground zero.
 					std::map<size_t, std::optional<equality>> squeezed_by_width;
 					for (tref raw_eq : remaining) {
 						tref conj = norm_equation<node>(raw_eq);
@@ -2121,12 +2205,21 @@ result<solution<node>> solve(tref form, solver_options options) {
 						}
 					}
 					DBG(assert(!squeezed_by_width.empty());)
+					// A ground zero of each squeezed equality: lgrs'
+					// reproductive solution still mentions the variables
+					// it solves, so a caller could not commit it as a
+					// model. solve_system answers the same way when a
+					// system has no inequalities.
 					for (const auto& [_, squeezed] : squeezed_by_width) {
 						DBG(assert(squeezed.has_value());)
-						if (auto lgrs_sol = lgrs<node>(squeezed.value()); lgrs_sol.has_value()) {
-							for (const auto& [var, value] : lgrs_sol.value())
+						auto zero = options.mode == solver_mode::minimum
+							? find_minimal_solution<node>(
+								equation_system<node>{ squeezed, {} })
+							: find_solution<node>(squeezed.value());
+						if (zero.has_value()) {
+							for (const auto& [var, value] : zero.value())
 								clause_solution[var] = value;
-						} else { // lgrs found no solution; advisory, a later route may solve
+						} else { // no zero; advisory, a later route may solve
 							theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
@@ -2141,7 +2234,21 @@ result<solution<node>> solve(tref form, solver_options options) {
 				} else skip = true;
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);
-				if (auto solution = solve<node>(conjs, op); solution.has_value()) {
+				// A variable of an ordered type that is no Boolean
+				// algebra stands for one point of the order, so its
+				// model comes from the owner's point solver. The
+				// Boolean-algebra solve below answers with elements
+				// (top, bot, intervals) that are no points; a minimum
+				// or maximum is asked of it only in those elements.
+				std::optional<solution<node>> points;
+				if (options.mode == solver_mode::general
+					&& pack_type_is_non_aba_omcat<node>(type))
+					points = omcat_solve_verified<node>(
+						order_atoms[type], op);
+				if (points) {
+					for (const auto& [var, value]: points.value())
+						clause_solution[var] = value;
+				} else if (auto solution = solve<node>(conjs, op); solution.has_value()) {
 					for (const auto& [var, value]: solution.value()) {
 						clause_solution[var] = value;
 					}
@@ -2162,6 +2269,15 @@ result<solution<node>> solve(tref form, solver_options options) {
 					fv = tau::get(tau::bf, fv);
 					// Skip already solved variables
 					if (clause_solution.contains(fv)) continue;
+					const size_t fv_type = find_ba_type<node>(fv);
+					if (options.mode == solver_mode::general
+						&& pack_type_is_non_aba_omcat<node>(fv_type))
+						if (tref pt = pack_zero_constant<node>(
+							fv_type); pt)
+						{
+							clause_solution.emplace(fv, pt);
+							continue;
+						}
 					if (options.mode == minimum)
 						clause_solution.emplace(fv, tau::_0(
 							find_ba_type<node>(fv)));
@@ -2183,6 +2299,19 @@ result<solution<node>> solve(tref form, solver_options options) {
 // ------------------------------------------------------------
 // result-based API
 // ------------------------------------------------------------
+
+template <NodeType node>
+result<solution<node>> solve(tref form, solver_options options) {
+	const size_t hits = constant_size_hits;
+	auto r = solve_form<node>(form, options);
+	if (r.has_value() || constant_size_hits == hits
+		|| !report_has_code(r.report(), code::unsat)) return r;
+	// a value was given up for its size: the system may have a solution
+	result<solution<node>> out;
+	out.merge(std::move(r));
+	return out.with_error(code::solver_error,
+		messages::generated_constant_too_large);
+}
 
 template <NodeType node>
 result<solution<node>> solve(const trefs& forms, solver_options options) {

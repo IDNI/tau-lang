@@ -249,7 +249,7 @@ std::string llm_query(const std::string& prompt) {
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, nlang_curl_write_cb);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 	// Runtime parameter (nlang-http-timeout); 0 = no cap.
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, nlang_http_timeout_sec);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, nlang_http_timeout_sec());
 
 	CURLcode res = curl_easy_perform(curl);
 	long status = 0;

@@ -305,12 +305,12 @@ TEST_SUITE("LTL(ABA) realizability") {
 		CHECK(sat(fm));
 	}
 
-	TEST_CASE("F(input = 0) is satisfiable") {
-		// A trace exists where the input reaches 0, even though the
-		// system cannot force it (that is a realizability question).
+	TEST_CASE("F(input = 0) is unsatisfiable") {
+		// Satisfiability quantifies the inputs universally, inside F
+		// too: the environment can keep i1 away from 0 forever.
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("F(input = 0) is unrealizable") {
@@ -2929,12 +2929,12 @@ TEST_CASE("qlt: ((o1=i1[t-2]) weak_until (o2=i2[t])) until (o1={0} && o2={1}) is
     CHECK(sat(fm));
 }
 
-TEST_CASE("qlt: (o1={top}) weak_until (o2={bot}) && F(o1={3} && o2=i1[t-1]) is REALIZABLE") {
-    // Strategy: at t=0 output o2={bot} (releases W), at t=1 output o1={3} and o2=i1[0].
-    // F satisfied at t=1. W released at t=0 with o1={top} vacuously (W fires immediately).
+TEST_CASE("qlt: (o1={top}) weak_until (o2={bot}) && F(o1={3} && o2=i1[t-1]) is UNSATISFIABLE") {
+    // {top} and {bot} are the ends of the order, not points, so neither
+    // equality ever holds: the weak-until is G F, which nothing releases.
     tref fm = spec("(o1[t]:qlt = {top}:qlt) weak_until (o2[t]:qlt = {bot}:qlt) && F(o1[t]:qlt = {3}:qlt && o2[t]:qlt = i1[t-1]:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("qlt: (o1=i2[t-1]) until ((o2=i1[t]) weak_until (i1={[0,1]})) is REALIZABLE") {
@@ -4329,16 +4329,15 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	}
 
 	// Same-value positional atoms at different positions: o[0]=1 and o[2]=1
-	// relativize to identical text but come from two DIFFERENT source
-	// atoms, so they stay two distinct props. The ground-equality fast
-	// path compares actual constants, not just shape, so no spurious forbid.
-	TEST_CASE("same-value positional atoms at different positions: no "
-	          "spurious forbid after the fast-path tightening") {
+	// relativize to the same o[t]=1, one prop guarded at both steps, with
+	// no forbid of its own.
+	TEST_CASE("same-value positional atoms at different positions share "
+	          "one prop and no spurious forbid") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
-		REQUIRE(sol->atoms.size() == 2); // stay separate, one prop per position
+		REQUIRE(sol->atoms.size() == 1);
 		CHECK(sol->consistency_constraints.empty());
 	}
 
@@ -4406,13 +4405,381 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		CHECK(r.value());
 	}
 
+	// The prop of a hoisted initial value reads its relativized atom at
+	// every step; only its own step fixes it, so o1 may stay 0 afterwards.
+	TEST_CASE("an initial value leaves its stream free at later steps") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} "
+			"&& o1[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	TEST_CASE("initial values with a delay chain and sometimes are REALIZABLE") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} && o2[0]:bv[2] = {0} "
+			"&& o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	// o1[0] = 1 and o1[1] = 1 relativize to the same o1[t] = 1: one prop,
+	// guarded at both steps.
+	TEST_CASE("equal relativized atoms of two conjuncts share one prop") {
+		tref fm = spec("(always o1[0]:bv[2] = {1} && o1[1]:bv[2] = {1} "
+			"&& o2[0]:bv[2] = {1} && o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes (o1[t-1]:bv[2] = o2[t]:bv[2] "
+			"&& o2[t]:bv[2] != o1[t]:bv[2])).");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		for (size_t i = 0; i < sol->atoms.size(); ++i)
+			for (size_t j = i + 1; j < sol->atoms.size(); ++j)
+				CHECK_FALSE(tau::subtree_equals(
+					sol->atoms[i].first, sol->atoms[j].first));
+		CHECK(realizable(fm));
+	}
+
 } // TEST_SUITE("Positional atoms: X-encoding")
+
+// A strategy passes only if it wins against the data: every input is picked
+// after the history is fixed, and relations of any length are checked.
+TEST_SUITE("Strategy played against the data") {
+
+	TEST_CASE("an output fixed a step before the input it must meet is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("a past atom the environment already decided is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = 0) "
+			"&& G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1]))).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("copying a past input is REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t-1]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	TEST_CASE("a contradiction chain longer than the lookback window is UNREALIZABLE") {
+		tref fm = spec("(always o2[t]:bv[1] = o1[t-2]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-2]:bv[1] "
+			"&& !(o1[t]:bv[1] = o3[t]:bv[1]) "
+			"&& o3[t-2]:bv[1] = o1[t]:bv[1]) "
+			"&& (sometimes o1[t-1]:bv[1] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(realizable(fm));
+	}
+
+} // TEST_SUITE("Strategy played against the data")
+
+// ── The synthesis game played on the data ───────────────────────────────────
+
+// Unwraps is_ltl_aba_realizable; an undecided verdict is no decision.
+static std::optional<bool> decided(tref fm) {
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	if (!r.has_value()) return std::nullopt;
+	return r.value();
+}
+
+TEST_SUITE("Data game") {
+
+	TEST_CASE("an output fixed a step before the input it must meet is UNREALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(false));
+	}
+
+	TEST_CASE("over an infinite algebra the environment still picks another value") {
+		tref fm = spec("G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t])).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(false));
+	}
+
+	TEST_CASE("a delayed copy of a past input meets it") {
+		tref fm = spec("(always o1[1]:bv[1] = 1 "
+			"&& o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& (sometimes i1[t-1]:bv[1] = o2[t]:bv[1]).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(true));
+	}
+
+	TEST_CASE("a value fixed two steps before the input is UNREALIZABLE") {
+		tref fm = spec("(always o1[0]:bv[1] = 0 "
+			"&& o1[t]:bv[1] = o2[t-1]:bv[1]) "
+			"&& (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1]).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(false));
+	}
+
+	// The environment alternating 0 and 1 meets the input goal a step
+	// later; no input sequence avoids it.
+	TEST_CASE("an input goal the environment cannot avoid is REALIZABLE") {
+		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(true));
+	}
+
+	// o1 mirrors i1, so the goal is !(i1[t] = 1) || i1[t-1] = 1, which two
+	// steps of any input sequence meet.
+	TEST_CASE("an output that mirrors an input can still meet a goal over it") {
+		tref fm = spec("(always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 "
+			"&& o1[t]:bv[1] = i1[t]:bv[1]) "
+			"&& (sometimes (!(o1[t]:bv[1] = 1) || i1[t-1]:bv[1] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(true));
+	}
+
+	// The always part reads two steps back, so o1[0] and o1[1] are free and
+	// the goal holds at step 1.
+	TEST_CASE("an outputs-only goal met during the warm-up is REALIZABLE") {
+		tref fm = spec("(always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] "
+			"&& (o2[t-1] = 1 && o2[t-1] = o1[t-1]) && !(o1[t-2] = 0)) "
+			"&& (sometimes o1[t] = o2[t-1]).");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(true));
+	}
+
+	// A bare formula carries no stream declarations: i1 is an input by its
+	// name, as for the atoms, so the environment keeps it at 0.
+	TEST_CASE("the input of a bare formula is the environment's") {
+		tref fm = wff("G (F (i1[t]:bv[1] = 1))");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(false));
+		tref sbf = wff("G (F (i1[t]:sbf = 1))");
+		REQUIRE(sbf != nullptr);
+		CHECK(decided(sbf) != std::optional<bool>(true));
+	}
+
+} // TEST_SUITE("Data game")
+
+// ── The strategy of the data game, executed ─────────────────────────────────
+
+// The truth of a formula without free variables; nullopt when undecided.
+static std::optional<bool> ground_truth(tref f) {
+	auto n = normalize_non_temp<node_t>(f);
+	if (!n.has_value() || !n.value()) return std::nullopt;
+	if (tau::get(n.value()).equals_T()) return true;
+	if (tau::get(n.value()).equals_F()) return false;
+	return std::nullopt;
+}
+
+// Plays `fm` for as many steps as `inputs` has entries, each entry giving
+// i1 and i2 (bv[1], 1 when true) of its step, and records every value.
+static std::optional<subtree_map<node_t, tref>> play_bv1(tref fm,
+	const std::vector<std::pair<bool, bool>>& inputs)
+{
+	io_context<node_t> ctx;
+	auto ir = interpreter<node_t>::make_interpreter(fm, ctx);
+	if (!ir.has_value()) return std::nullopt;
+	auto& in = ir.value();
+	std::vector<htref> keep;
+	subtree_map<node_t, tref> trace;
+	for (size_t t = 0; t < inputs.size(); ++t) {
+		assignment<node_t> vals;
+		for (auto& [var, _] : in.inputs) {
+			const std::string name = get_var_name<node_t>(var);
+			const size_t tid = in.ctx.type_of(var);
+			const bool one = name == "i1" ? inputs[t].first
+				: inputs[t].second;
+			tref key = build_in_var_at_n<node_t>(name, (int_t)t, tid);
+			tref v = one ? build_bf_t_type<node_t>(tid)
+				: build_bf_f_type<node_t>(tid);
+			vals[key] = v;
+			trace[key] = v;
+			keep.push_back(tau::geth(key));
+			keep.push_back(tau::geth(v));
+		}
+		auto sr = in.step(vals);
+		if (!sr.has_value() || !sr.value().first) return std::nullopt;
+		for (auto& [k, v] : *sr.value().first) {
+			trace[k] = v;
+			keep.push_back(tau::geth(k));
+			keep.push_back(tau::geth(v));
+		}
+	}
+	return trace;
+}
+
+// Whether `body` holds on `trace` at step `t`.
+static std::optional<bool> holds_at(tref body,
+	const subtree_map<node_t, tref>& trace, int_t t)
+{
+	auto io = tau::get(body).select_top(is_child<node_t, tau::io_var>);
+	return ground_truth(rewriter::replace<node_t>(
+		fm_at_time_point<node_t>(body, io, t), trace));
+}
+
+TEST_SUITE("Data game strategy") {
+
+	// ltlsynt's strategy of the abstraction loses against the data here, so
+	// only the data game has a strategy to execute.
+	TEST_CASE("a spec only the data game decides gets its strategy") {
+		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		auto [safety, sol, aux] =
+			ltl_to_safety_formula_full<node_t>(fm, &data);
+		CHECK(safety == nullptr);
+		REQUIRE(data != nullptr);
+		CHECK(data->depth == 1);
+		CHECK(data->streams.size() == 3);
+	}
+
+	// every input sequence of six steps meets the goal
+	TEST_CASE("the strategy meets its goal against every input sequence") {
+		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		tref goal = spec("o2[t]:bv[1] = i2[t-1]:bv[1].");
+		// an interpreter's step may sweep unreferenced trees
+		const htref keep_fm = tau::geth(fm), keep_goal = tau::geth(goal);
+		for (size_t seq = 0; seq < 64; ++seq) {
+			std::vector<std::pair<bool, bool>> inputs;
+			for (size_t t = 0; t < 6; ++t)
+				inputs.emplace_back(seq >> t & 1, (seq >> t) % 3 == 1);
+			auto trace = play_bv1(fm, inputs);
+			REQUIRE(trace.has_value());
+			bool met = false;
+			for (int_t t = 1; t < 6 && !met; ++t)
+				met = holds_at(goal, *trace, t).value_or(false);
+			CHECK(met);
+		}
+	}
+
+	// The always part holds at every step after its warm-up and the goal
+	// is met, whatever the input.
+	TEST_CASE("the strategy keeps the always part and meets the goal") {
+		tref fm = spec("(always o1[1]:bv[1] = 1 "
+			"&& o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& (sometimes i1[t-1]:bv[1] = o2[t]:bv[1]).");
+		REQUIRE(fm != nullptr);
+		tref always = spec("o1[1]:bv[1] = 1 "
+			"&& o2[t]:bv[1] = o1[t-1]:bv[1].");
+		tref goal = spec("i1[t-1]:bv[1] = o2[t]:bv[1].");
+		const htref keep_fm = tau::geth(fm), keep_always = tau::geth(always),
+			keep_goal = tau::geth(goal);
+		for (size_t seq = 0; seq < 32; ++seq) {
+			std::vector<std::pair<bool, bool>> inputs;
+			for (size_t t = 0; t < 5; ++t)
+				inputs.emplace_back(seq >> t & 1, false);
+			auto trace = play_bv1(fm, inputs);
+			REQUIRE(trace.has_value());
+			for (int_t t = 1; t < 5; ++t)
+				CHECK(holds_at(always, *trace, t) == std::optional(true));
+			bool met = false;
+			for (int_t t = 1; t < 5 && !met; ++t)
+				met = holds_at(goal, *trace, t).value_or(false);
+			CHECK(met);
+		}
+	}
+
+	// Over the default type the goal asks for a value other than 0, 1 and
+	// the input: the strategy's code of it is a value none of the window
+	// holds.
+	TEST_CASE("a new value is found for a code the window does not hold") {
+		tref fm = spec("(always o2[t] = o1[t-1]) "
+			"&& (sometimes o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t]).");
+		REQUIRE(fm != nullptr);
+		const htref keep_fm = tau::geth(fm);
+		io_context<node_t> ctx;
+		auto ir = interpreter<node_t>::make_interpreter(fm, ctx);
+		REQUIRE(ir.has_value());
+		auto& in = ir.value();
+		bool met = false;
+		for (int_t t = 0; t < 4 && !met; ++t) {
+			assignment<node_t> vals;
+			tref iv = nullptr;
+			for (auto& [var, _] : in.inputs) {
+				const size_t tid = in.ctx.type_of(var);
+				iv = t % 2 ? build_bf_t_type<node_t>(tid)
+					: build_bf_f_type<node_t>(tid);
+				vals[build_in_var_at_n<node_t>("i1", t, tid)] = iv;
+			}
+			REQUIRE(iv != nullptr);
+			auto sr = in.step(vals);
+			REQUIRE(sr.has_value());
+			REQUIRE(sr.value().first.has_value());
+			for (auto& [k, v] : *sr.value().first) {
+				if (get_var_name<node_t>(tau::trim(k)) != "o2") continue;
+				const size_t tid = tau::get(v).get_ba_type();
+				tref goal = tau::build_wff_and(tau::build_wff_and(
+					tau::build_bf_neq(v, build_bf_f_type<node_t>(tid)),
+					tau::build_bf_neq(v, build_bf_t_type<node_t>(tid))),
+					tau::build_bf_neq(v, iv));
+				met = ground_truth(goal).value_or(false);
+			}
+		}
+		CHECK(met);
+	}
+
+	// A strategy on codes is also a finite Mealy machine over atoms that
+	// compare the values, which the run exposes as its solution.
+	TEST_CASE("a run of the data game's strategy has its Mealy view") {
+		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		const htref keep_fm = tau::geth(fm);
+		io_context<node_t> ctx;
+		auto ir = interpreter<node_t>::make_interpreter(fm, ctx);
+		REQUIRE(ir.has_value());
+		auto& in = ir.value();
+		REQUIRE(in.cached_solution.has_value());
+		CHECK(in.cached_solution->data_game);
+		CHECK(in.cached_solution->aut.num_states >= 1);
+		auto q = in.current_state();
+		REQUIRE(q.has_value());
+		CHECK(q.value() == in.cached_solution->aut.initial_state);
+	}
+
+	// Once the goal is met the move depends on no input: the Mealy view
+	// reads none.
+	TEST_CASE("a state of the Mealy view reads only the inputs its move needs") {
+		tref fm = spec("(sometimes o1[t]:bv[1] = i1[t]:bv[1]) "
+			"&& (always o2[t]:bv[1] = i2[t]:bv[1]).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		auto first = data->reads();
+		REQUIRE(first.has_value());
+		CHECK(first->contains("i1"));
+		CHECK(first->contains("i2"));
+		bool without_i1 = false;
+		for (size_t q = 0; q < data->machine.size(); ++q) {
+			bool reads_i1 = false;
+			for (const auto& e : data->machine[q])
+				for (auto [a, _] : e.guard)
+					reads_i1 = reads_i1 || tau::get(data->view->atoms[a]
+						.first).to_str().find("i1") != std::string::npos;
+			without_i1 = without_i1 || !reads_i1;
+		}
+		CHECK(without_i1);
+	}
+}
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
 
 TEST_SUITE("ltl_explain diagnostics") {
 
-	TEST_CASE("a realizable relative-time formula prints REALIZABLE with a safety formula") {
+	// the data game decides it, so execution plays that game's strategy
+	TEST_CASE("a realizable relative-time formula prints REALIZABLE with the strategy it executes") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
@@ -4421,7 +4788,8 @@ TEST_SUITE("ltl_explain diagnostics") {
 		REQUIRE(ok_r.has_value());
 		CHECK(ok_r.value());
 		CHECK(out.find("REALIZABLE") != std::string::npos);
-		CHECK(out.find("Safety formula:") != std::string::npos);
+		CHECK(out.find("Execution plays the strategy of the data game")
+			!= std::string::npos);
 		MESSAGE(out);
 	}
 
@@ -4456,6 +4824,8 @@ TEST_SUITE("ltl_explain diagnostics") {
 		MESSAGE(out);
 	}
 
+	// the refusal ends the trace, not the decision: the verdict is still
+	// realizability's, here undecided as well
 	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
 		tref fm = wff("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
@@ -4463,10 +4833,51 @@ TEST_SUITE("ltl_explain diagnostics") {
 		result<bool> ok_r;
 		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
 		std::string out = oss.str();
-		REQUIRE(ok_r.has_value());
-		CHECK_FALSE(ok_r.value());
+		CHECK_FALSE(ok_r.has_value());
 		CHECK(out.find("REFUSED:") != std::string::npos);
+		CHECK(out.find("REALIZABLE") == std::string::npos);
 		MESSAGE(out);
+	}
+
+	TEST_CASE("a refused round answers with the verdict it is given") {
+		tref fm = wff("F (o1[0] = 1)");
+		REQUIRE(fm != nullptr);
+		for (bool given : { true, false }) {
+			std::ostringstream oss;
+			auto ok_r = ltl_explain<node_t>(fm, oss, [given] {
+				result<bool> v;
+				return v.with_value(given);
+			});
+			std::string out = oss.str();
+			REQUIRE(ok_r.has_value());
+			CHECK(ok_r.value() == given);
+			CHECK(out.find("REFUSED:") != std::string::npos);
+			CHECK(out.find(given ? "\nREALIZABLE" : "\nUNREALIZABLE")
+				!= std::string::npos);
+		}
+	}
+
+	// issue #131: a term is not a formula. It used to reach the backends
+	// as one (a bv term aborted on a cvc5 exception; an sbf term answered
+	// UNREALIZABLE).
+	TEST_CASE("a term is an invalid argument, not a verdict") {
+		tref eq = wff("x = 0");
+		REQUIRE(eq != nullptr);
+		tref term = tau::get(eq)[0].first();
+		REQUIRE(tau::get(term).is(tau::bf));
+		std::ostringstream oss;
+		result<bool> r;
+		CHECK_NOTHROW(r = ltl_explain<node_t>(term, oss));
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+		CHECK(oss.str().find("REALIZABLE") == std::string::npos);
+	}
+
+	TEST_CASE("a null formula is an invalid argument") {
+		std::ostringstream oss;
+		auto r = ltl_explain<node_t>(nullptr, oss);
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
 
 } // TEST_SUITE("ltl_explain diagnostics")

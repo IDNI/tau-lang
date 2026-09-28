@@ -24,3 +24,37 @@ add_test(NAME "test_repl-compile_verb-cxx_override_is_used"
 	COMMAND bash -c "d=$(mktemp -d /tmp/tau_cxx_override.XXXXXX); cp ${CMAKE_SOURCE_DIR}/tests/codegen_specs/declare_open_codegen.tau $d/spec.tau; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile --cxx /nonexistent/c++ $d/spec.tau -o $d/out; rc=$?; test $rc -ne 0 && grep -q 'nonexistent/c++' $d/spec.tau.build/configure.log && echo CXX_OVERRIDE_REACHED_CONFIGURE; rm -rf $d")
 set_tests_properties("test_repl-compile_verb-cxx_override_is_used" PROPERTIES
 	PASS_REGULAR_EXPRESSION "CXX_OVERRIDE_REACHED_CONFIGURE")
+
+# A tautological literal still gives its clause a two-step warm-up, so the
+# spec is realizable and compiles (o2 may be 0 at steps 0 and 1).
+add_compile_test(compile_verb-warm_up_tautology
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/warm_up_tautology.tau")
+
+# The program plays the strategy `run` plays. Over each of these specs the
+# data game decides, and the program used to play the abstraction's
+# strategy instead: it stopped at step 2 finding no witness for its edge,
+add_compile_run_test(compile_verb-plays_run_strategy 6
+	"(always o2[t] = o1[t-1] && !(o1[t-1] = 0)) && (sometimes !(o2[t-1] = o1[t]))")
+# printed nothing (its edge had no solution at step 0),
+add_compile_run_test(compile_verb-plays_run_strategy_from_start 6
+	"(always o2[t] = o1[t-1] && o3[t] = o2[t-1] && (!(o2[t-1] = o1[t]) || !(o2[t-1] = 1))) && (sometimes (o1[t] = 0 && o2[t-1] = o1[t]))")
+# never met the awaited event,
+add_compile_run_test(compile_verb-plays_run_strategy_goal_met 6
+	"(always o2[t]:bv[1] = o1[t-1]:bv[1] && o1[t-1]:bv[1] = 0) && (sometimes !(o1[t]:bv[1] = o2[t-1]:bv[1]))")
+# or was refused, its bitvector output given no witness.
+add_compile_run_test(compile_verb-plays_run_strategy_witness 6
+	"(always o1[t-1]:bv[1] = 0) && (sometimes !(o2[t-1]:bv[1] = 1))")
+# An output no atom of the strategy reads is printed, as `run` prints it.
+add_compile_run_test(compile_verb-prints_every_output 6
+	"(always (o2[0]:bv[1] = 1 || o2[0]:bv[1] = 0) && o1[1]:bv[1] = 1 && !((o3[t-1]:bv[1] = 1 && o3[t]:bv[1] = 0))) && (sometimes (o3[t]:bv[1] = o1[t-1]:bv[1] && !(o3[t-2]:bv[1] = 1)))")
+# `run` executes each of these specs by solving each step, with no
+# strategy, and so does the program. It used to play the abstraction's
+# strategy, which broke the specification at step 1,
+add_compile_run_test(compile_verb-solves_as_run 6
+	"always o2[t]:bv[1] = o1[t-1]:bv[1] && o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0")
+# printed nothing,
+add_compile_run_test(compile_verb-solves_as_run_from_start 6
+	"(always o3[0] = 0 && (!(o2[t-1] = o1[t-1]) || o2[t-1] = 0) && o1[t-1] = o3[t-1]) && (sometimes o3[t-1] = o1[t-1])")
+# or was refused, its bitvector output given no witness.
+add_compile_run_test(compile_verb-solves_as_run_witness 6
+	"always o1[t-1]:bv[1] = 1")

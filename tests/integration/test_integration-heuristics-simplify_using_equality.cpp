@@ -643,3 +643,57 @@ TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
 		CHECK( are_nso_equivalent<node_t>(res, expected) );
 	}
 }
+
+// ── issue #130: a representative must not contain its own class member ──────
+
+TEST_SUITE("simplify_using_equality: self-containing representatives") {
+
+	// `x & y' = x` also merges its negations `x' | y` and `x'`. With the
+	// hash-first order `x' | y` could represent `x'`, and rewriting then
+	// descended into the replacement forever (std::bad_alloc). Which input
+	// hit it depended on the variable names, so every naming is checked.
+	const std::vector<std::string> self_absorbing = {
+		"x = x & y' && x' != 0.",
+		"a = a & b && a' != 0.",
+		"u = u & v && u' != 0.",
+		"y = y & w && y' != 0.",
+		"x = x & y' && z = x'.",
+		"x' & z = 0 && x = x & y'.",
+		"y' != 0 && w'y = y.",
+	};
+
+	TEST_CASE("a compound term orders after its own subterm") {
+		tref atm   = get_nso_rr("x' | y = x'.").value().main->get();
+		tref big   = tau::get(atm)[0].first();
+		tref small = tau::get(atm)[0].second();
+		CHECK(simplify_using_equality_term_comp<node_t>(small, big) == true);
+		CHECK(simplify_using_equality_term_comp<node_t>(big, small) == false);
+	}
+
+	TEST_CASE("the representative of a negation class is the smaller term") {
+		for (const auto& src : { "x & y' = x.", "a & b = a.",
+			"u & v = u.", "y & w = y." })
+		{
+			CAPTURE(src);
+			auto uf = make_uf();
+			tref eq = get_nso_rr(src).value().main->get();
+			simplify_using_equality_add_raw_equality<node_t>(uf, eq);
+			// the negated right-hand side: x', a', u', y'
+			tref neg = tau::build_bf_neg(tau::get(eq)[0].second());
+			tref rep = uf.find(neg);
+			CHECK((tau::get(rep) == tau::get(neg)
+				|| !tau::get(rep).find_top([&](tref n) {
+					return tau::get(n) == tau::get(neg); })));
+		}
+	}
+
+	TEST_CASE("simplification terminates and keeps the meaning") {
+		for (const auto& src : self_absorbing) {
+			CAPTURE(src);
+			tref fm  = get_nso_rr(src.c_str()).value().main->get();
+			tref res = simplify_using_equality<node_t>(fm);
+			REQUIRE(res != nullptr);
+			CHECK( are_nso_equivalent<node_t>(res, fm) );
+		}
+	}
+}

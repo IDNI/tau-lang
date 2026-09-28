@@ -20,6 +20,25 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief How `transform_to_execution` reads the input streams of a
+ * `sometimes` clause.
+ */
+enum class sometimes_inputs : bool {
+	/// Universally at their time step, like the inputs of the `always`
+	/// part: the system must make the clause true at some step whatever
+	/// the inputs do (README "Satisfiability"). Satisfiability and
+	/// execution use this reading.
+	universal,
+	/// Through a guard of uninterpreted constants: the clause only has to
+	/// hold when the inputs equal constants that the check chooses. The
+	/// implication and equivalence checks decide `unsat(f1 && !f2)`, whose
+	/// negated side turns an `always` over inputs into a `sometimes`. Read
+	/// universally, `sometimes i1[t] != 0` is unsatisfiable, and
+	/// `always i1[t] = 0` would be implied by `T`.
+	guarded
+};
+
+/**
  * @brief Instantiate @p original_fm for IO variables at @p time_point.
  * @tparam node Tree node type.
  * @param original_fm Formula template to instantiate.
@@ -77,6 +96,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  * @param fm Normalized Tau formula.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
+ * @param inputs How the input streams of a `sometimes` clause are read
+ * (default: universally, as satisfiability defines them).
  * @return Formula ready for step-by-step execution (`F` when @p fm has no
  * satisfiable continuation), or `nullptr` when normalization fails on a
  * `bv_widening` width-cap violation (already logged by the widening pass).
@@ -98,7 +119,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
-					const bool output = false);
+	const bool output = false,
+	const sometimes_inputs inputs = sometimes_inputs::universal);
 
 
 /**
@@ -136,13 +158,60 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
 
 
 /**
+ * @brief Keep the warm-up of each clause of @p fm at its lookback as written.
+ *
+ * A clause asks nothing before the deepest lookback it reads (README
+ * "Lookback initialization"). The clauses of a written conjunction are its
+ * always part (every always statement whose body has no temporal operator,
+ * merged), each other conjunct headed by `always`, `sometimes`, `U`, `R` or
+ * `W`, or the whole formula when it has no temporal operator. Normalization
+ * can drop the literal that carries that lookback, a tautology such as
+ * `o1[t-2] = o1[t-2]` or one absorbed by another always statement. Such a
+ * clause gets the literal `o__warmup[t-k] = 0` on a fresh output of the
+ * Boolean carrier type, `k` the written lookback; execution never prints
+ * this stream. A clause read positively gets it conjoined to its body. A
+ * clause read under a negation gets its negation disjoined, so that the
+ * marker is conjoined once the negation is pushed through the temporal
+ * operator; there each always statement of the always part keeps the always
+ * part's lookback. Clauses under `<->`, `^` or `?:`, full-LTL clauses under
+ * a negation and clauses that call a definition are left as they are.
+ *
+ * Run it on the formula that is decided, as written: after any negation the
+ * decision applies and before the construction hooks fold it (`tau::reget`,
+ * `api::simplify`). A formula pinned for one polarity must not be negated
+ * afterwards.
+ * @tparam node Tree node type.
+ * @param fm Formula, typed but not yet rebuilt through the hooks.
+ * @return @p fm with the clauses pinned, built without the hooks, or the
+ * error of a normalization that failed.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)
+ * // becomes (always o2[t] = 1 && o1[t-2] = o1[t-2] && o__warmup[t-2] = 0)
+ * //         && (sometimes o2[t-1] = 0)
+ * // and under a negation the always body becomes
+ * // (o2[t] = 1 && o1[t-2] = o1[t-2]) || o__warmup[t-2] != 0
+ * @endcode
+ */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm);
+
+/**
  * @brief Check whether temporal formula @p f1 implies @p f2.
+ *
+ * The inputs of the negated implication are quantified universally, so
+ * `false` means the system can keep @p f1 true and @p f2 false whatever the
+ * inputs do; the inputs of its `sometimes` clauses are read through a guard
+ * (`sometimes_inputs::guarded`). A trace validity check reads every input as an output first
+ * (`inputs_as_outputs`, as `api::valid_spec` does).
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
  * @param f2 Consequent formula.
- * @return `true` if every model of @p f1 satisfies @p f2; `false` also when
- * normalization fails on a `bv_widening` width-cap violation (a logged,
- * conservative fallback, not a proof).
+ * @return `true` if every model of @p f1 satisfies @p f2, `false` as soon
+ * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
+ * disjunct is satisfiable and one of them is undecided, or when
+ * normalization fails.
  *
  * @par Example
  * @code{.cpp}
@@ -150,9 +219,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * // negating the implication gives (always o1[t] = 1) && (sometimes
  * // o1[t] != 1 && ...), which contradicts the "always" part and is
  * // therefore unsatisfiable, so the implication holds. This mirrors the
- * // "is fm valid/a tautology" idiom used at src/api.tmpl.h:439
- * // (`is_tau_impl<node>(tau::_T(), normalize_formula(fm)).value_or(false)`) and
- * // src/boolean_algebras/tau/tau_ba.tmpl.h.
+ * // "is fm valid/a tautology" idiom of api::valid_spec
+ * // (`is_tau_impl<node>(tau::_T(), nfm)`) and src/boolean_algebras/tau/tau_ba.tmpl.h.
  * tref f1 = create_spec("always o1[t] = 1.");
  * tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
  * bool result = is_tau_impl<node_t>(f1, f2).value();
@@ -165,13 +233,15 @@ result<bool> is_tau_impl(tref f1, tref f2);
 /**
  * @brief Check whether two closed temporal formulas are logically equivalent.
  *
- * The formulas must be closed (no free variables).
+ * The formulas must be closed (no free variables). The inputs of the
+ * `sometimes` clauses of the check are read like in `is_tau_impl`.
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
- * @return `true` if @p f1 and @p f2 have identical models; `false` also
- * when normalization fails on a `bv_widening` width-cap violation (a
- * logged, conservative fallback, not a proof).
+ * @return `true` if @p f1 and @p f2 have identical models, `false` as soon
+ * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
+ * disjunct is satisfiable and one of them is undecided, or when
+ * normalization fails.
  *
  * @par Example
  * @code{.cpp}

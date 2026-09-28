@@ -41,6 +41,7 @@
 
 #include "backends/cvc5/cvc5.h"
 #include "backends/cvc5/cvc5_options.h"
+#include "backends/cvc5/cvc5_bitblast.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
@@ -90,6 +91,15 @@ inline bool bv_quantifier_free_decision_enabled() {
 	}();
 	return bv_quantifier_free_decision || env;
 }
+
+/// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
+/// the nodes it may build before it leaves the formula to cvc5; 0 leaves
+/// every formula to cvc5. The option `bv-bitblast-max-nodes`.
+inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
+
+/// Widest bit-vector the BDD decision takes. A product of two wider values
+/// outgrows any useful budget.
+inline constexpr size_t bv_bitblast_max_width = 16;
 
 /**
  * @brief Configure a solver for a quantifier-free decision-only query.

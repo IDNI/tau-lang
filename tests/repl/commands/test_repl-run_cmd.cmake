@@ -111,9 +111,10 @@ add_repl_test(run_cmd-ltl_correctness-adv_u_03_alt
 add_repl_test(run_cmd-ltl_correctness-adv_w_01_o1_until_o0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) weak_until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
+# a weak until need not release: F at every step is a run of it
 add_repl_test(run_cmd-ltl_correctness-adv_w_02_o0_until_o1_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 0) weak_until (o1[t] = 1)."
-	"o1\\[[0-9]+\\] := T")
+	"o1\\[5\\] := [TF]")
 
 # ── ADV-SBF / ADV-BV: no input; every output is non-empty ─────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_sbf_01_g_x_and_y
@@ -125,6 +126,11 @@ add_repl_test(run_cmd-ltl_correctness-adv_sbf_02_f_x_or_z
 add_repl_test(run_cmd-ltl_correctness-adv_bv_01_g_b10110101
 	"o1:bv[8] := out console. run 6 steps G (o1[t]:bv[8] = {#b10110101}:bv[8])."
 	"o1\\[[0-9]+\\] := 181")
+# GitHub #136: two equal bv outputs take the solver's pure-equality route;
+# every step must print a value for both outputs.
+add_repl_test(run_cmd-ltl_correctness-adv_bv_02_g_two_equal_outputs
+	"o1:bv[2] := out console. o2:bv[2] := out console. run 3 steps G (o1[t]:bv[2] = o2[t]:bv[2])."
+	"o1\\[0\\] := [0-3].*o2\\[0\\] := [0-3].*o1\\[1\\] := [0-3].*o2\\[1\\] := [0-3].*o1\\[2\\] := [0-3].*o2\\[2\\] := [0-3]")
 
 # ── stop command ──────────────────────────────────────────────────────────────
 add_repl_test(stop_cmd-no_run_in_progress "stop" "no run in progress")
@@ -570,6 +576,12 @@ set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTI
 add_repl_test_fail(run_cmd-continue_running-genuine_step_error
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
 	"failed to write to the output stream")
+# GitHub #136: the same failure under a step budget ends the run too. `-b
+# false` because the benchmark report would print the error anyway.
+add_test(NAME "test_repl-run_cmd-continue_running-genuine_step_error_finite"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -b false -e \"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run 3 steps o1[t] = 1.\" -S trace")
+set_tests_properties("test_repl-run_cmd-continue_running-genuine_step_error_finite"
+	PROPERTIES PASS_REGULAR_EXPRESSION "failed to write to the output stream")
 
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
 # The reporter's 7-line reproducer (two :tau streams, a cross-stream
@@ -629,13 +641,53 @@ set_tests_properties("test_repl-run_cmd-sbf_multiline_value" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o1\\[0\\] := x \\| x' y")
 
 # ── MIRROR: F and sometimes are one operator, so both spellings mirror ───────
-# The input alternates F and T, so a mirroring program outputs F, T, F.
+# The input alternates F and T: the goal is met at step 0, where o1 mirrors
+# the F, and the run goes on.
 add_repl_test(run_cmd-mirror_01_f_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps F (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+	"o1\\[0\\] := F.*o1\\[2\\] := ")
 add_repl_test(run_cmd-mirror_02_sometimes_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps sometimes (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+	"o1\\[0\\] := F.*o1\\[2\\] := ")
 add_repl_test(run_cmd-mirror_03_always_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
 	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+
+# ── Initial conditions with a delay chain and `sometimes` ─────────────────────
+# o2 repeats o1 one step late from the initial zeros, so o2[1] is 0 and o2
+# becomes 1 at a later step.
+add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes
+	"o1:tau := out console. o2:tau := out console. run 6 steps (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)."
+	"o1\\[0\\] := F.*o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[[2-5]\\] := T")
+add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes_bv
+	"o1:bv[2] := out console. o2:bv[2] := out console. run 6 steps (always o1[0]:bv[2] = 0 && o2[0]:bv[2] = 0 && o2[t]:bv[2] = o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] = 1)."
+	"o1\\[0\\] := 0.*o2\\[0\\] := 0.*o2\\[1\\] := 0.*o2\\[[2-5]\\] := 3")
+add_repl_test(run_cmd-initial_value_constant_stream_with_sometimes
+	"o1:tau := out console. o2:tau := out console. run 4 steps (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)."
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F")
+
+# ── Warm-up of a literal normalization drops ──────────────────────────────────
+# o1[t-2] = o1[t-2] gives the always part a two-step warm-up, so o2 takes the
+# bottom value at steps 0 and 1; the spec with a sometimes is executable.
+add_repl_test(run_cmd-warm_up_tautology
+	"o2:tau := out console. run 3 steps always (o2[t] = 1 && o1[t-2] = o1[t-2])."
+	"o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[2\\] := T")
+add_repl_test(run_cmd-warm_up_tautology_sometimes
+	"o2:tau := out console. run 3 steps (always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes (o2[t-1] = 0))."
+	"o2\\[0\\] := .*o2\\[1\\] := .*o2\\[2\\] := T")
+
+# Two outputs take the value of one input: the second commit of the same value
+# to the fresh-value ledger is a no-op (recomputing the region did not finish).
+add_repl_test(run_cmd-two_outputs_share_an_input_value
+	"i1:tau := in file(\\\"${TF}/tau-xyz_disjunction-length_1.in\\\"). o1:tau := out console. o2:tau := out console. run 1 steps (always (i1[t] = o2[t])) && (sometimes (i1[t] = o1[t]))."
+	"o1\\[0\\] := .*<:x>.*o2\\[0\\] := .*<:x>")
+# The values of this run grow with every step; past maxconstantsize the solver
+# gives up with a message instead of overflowing the stack.
+add_repl_test_fail(run_cmd-value_past_constant_size_budget
+	"i1:tau := in file(\\\"${TF}/tau-nonzero_a1_to_a10-length_10.in\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"o1\\[6\\] := .*passed the constant size budget")
+# Over inputs pinned to 0 the values of the same run stay small DNFs: each
+# complement and conjunction drops its repeated and absorbed disjuncts.
+add_repl_test(run_cmd-values_stay_within_constant_size_budget
+	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"o1\\[9\\] := ")

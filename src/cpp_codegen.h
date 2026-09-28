@@ -153,6 +153,12 @@ struct program_desc {
 	std::vector<stream_desc> input_streams, output_streams;
 	std::vector<std::string> flag_output_vars; // one var per flag guard slot
 	std::string spec_src; // embedded verbatim for --print-spec; empty = none
+	// The Mealy view of a strategy of the data game (ltl_aba_solution::
+	// data_game): its atoms are read at the absolute step played, and
+	// `history`, ground expressions of atoms over the steps before 0, gives
+	// the values the strategy starts from.
+	bool data_game = false;
+	std::vector<std::string> history;
 };
 
 /**

@@ -41,7 +41,7 @@ inline size_t round_cap() { return bv_defelim_max_rounds; }
 // polarities. Flattening of `D || (A && B)` into `(D || A), (D || B)` is
 // capped, and a clause beyond the cap is a reader. Nothing else is touched.
 template <NodeType node>
-tref bv_definitional_block_elimination(tref root) {
+tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 	using tau = tree<node>;
 	using namespace bv_defelim_detail;
 	auto is_wff_of = [](tref n, auto nt) {
@@ -147,17 +147,29 @@ tref bv_definitional_block_elimination(tref root) {
 		const size_t vt = tau::get(v).get_ba_type();
 		return vt != 0 && is_bv_type_family<node>(vt);
 	};
-	struct binder { tref bnode; tref var; tref scope; };
-	// The `ex` binders in conjunct position under n0, outermost first.
+	// `end` is one past the last binder nested in this one's scope.
+	struct binder { tref bnode; tref var; tref scope; size_t end; };
+	// The `ex` binders in conjunct position under n0, outermost first: in
+	// depth-first order, so the binders nested in one follow it.
 	auto collect = [&](tref n0) {
-		std::vector<binder> out; std::vector<tref> st{n0};
+		std::vector<binder> out;
+		std::vector<std::pair<tref, size_t>> st{ { n0, SIZE_MAX } };
+		std::vector<size_t> parent;
 		while (!st.empty()) {
-			tref n = st.back(); st.pop_back();
+			auto [n, p] = st.back(); st.pop_back();
 			if (!is_wff_of(n, tau::wff_ex)) continue;
 			const tau& t = tau::get(n);
-			out.push_back({ n, t[0].first(), t[0].second() });
+			parent.push_back(p);
+			out.push_back({ n, t[0].first(), t[0].second(), 0 });
 			std::vector<tref> cs; conjuncts(t[0].second(), cs);
-			for (tref c : cs) if (is_wff_of(c, tau::wff_ex)) st.push_back(c);
+			for (tref c : cs) if (is_wff_of(c, tau::wff_ex))
+				st.push_back({ c, out.size() - 1 });
+		}
+		for (size_t i = out.size(); i-- > 0; ) {
+			out[i].end = std::max(out[i].end, i + 1);
+			if (parent[i] != SIZE_MAX)
+				out[parent[i]].end = std::max(out[parent[i]].end,
+					out[i].end);
 		}
 		return out;
 	};
@@ -320,8 +332,20 @@ tref bv_definitional_block_elimination(tref root) {
 		def_cache[key] = d;
 		return true;
 	};
-	auto find_def = [&](tref var, const std::vector<binder>& chain, def& d) -> bool {
-		for (const binder& b : chain) if (find_def_in_scope(var, b, d)) return true;
+	// A definition is looked for in the scope of the variable's binder
+	// and in the scopes nested in it that still mention the variable;
+	// any other scope cannot hold one the elimination may use.
+	auto find_def = [&](tref var, const std::vector<binder>& chain,
+		size_t at, def& d) -> bool
+	{
+		for (size_t j = at; j < chain[at].end; ) {
+			if (!contains<node>(chain[j].scope, var)) {
+				j = chain[j].end;
+				continue;
+			}
+			if (find_def_in_scope(var, chain[j], d)) return true;
+			++j;
+		}
 		return false;
 	};
 	// Declined binders, by node: a binder is retried only once the block
@@ -335,7 +359,8 @@ tref bv_definitional_block_elimination(tref root) {
 		// leaf choice no definition mentions the eliminated variable); its
 		// readers are recomputed from the current scope.
 		std::vector<std::pair<binder, def>> defs;
-		for (const binder& b : chain) {
+		for (size_t at = 0; at < chain.size(); ++at) {
+			const binder& b = chain[at];
 			if (!is_bv_var(b.var) || skip.contains(b.bnode)) continue;
 			bool reused = false;
 			if (auto it = prev_defs.find(b.var);
@@ -358,9 +383,19 @@ tref bv_definitional_block_elimination(tref root) {
 						if (!consumed) { d.readers.push_back(c); continue; }
 						std::vector<std::vector<tref>> flat;
 						if (!flatten(b.var, c, flat)) { d.readers.push_back(c); continue; }
+						// A clause for x whose witness is not a chosen one
+						// is a reader, as in find_def_in_scope.
 						for (auto& ds : flat) {
 							dclause dc;
-							if (!classify(b.var, ds, dc)) d.readers.push_back(or_of(ds));
+							bool chosen = classify(b.var, ds, dc);
+							if (chosen) {
+								chosen = false;
+								for (const dclause& k : d.defs)
+									if (tau::get(k.cbf) == tau::get(dc.cbf)) {
+										chosen = true; break;
+									}
+							}
+							if (!chosen) d.readers.push_back(or_of(ds));
 						}
 					}
 					defs.emplace_back(b, d); reused = true; break;
@@ -368,9 +403,17 @@ tref bv_definitional_block_elimination(tref root) {
 			}
 			if (reused) continue;
 			def d;
-			if (find_def(b.var, chain, d)) defs.emplace_back(b, d);
+			if (find_def(b.var, chain, at, d)) defs.emplace_back(b, d);
 		}
-		if (defs.empty()) break;
+		if (defs.empty()) {
+			// Every binder of the block was searched with the scopes a
+			// block starting at it would see, and none was declined,
+			// so each of them, taken as a block of its own, is left
+			// as it is.
+			if (settled && skip.empty())
+				for (const binder& b : chain) settled->insert(b.bnode);
+			break;
+		}
 		prev_defs.clear();
 		for (auto& pd : defs) prev_defs[pd.first.var] = pd.second;
 		// Leaf first: a variable no other definition mentions.
@@ -481,11 +524,21 @@ tref bv_definitional_block_elimination(tref root) {
 }
 
 template <NodeType node>
+tref bv_definitional_block_elimination(tref root) {
+	return bv_definitional_block_elimination<node>(root, nullptr);
+}
+
+template <NodeType node>
 tref bv_eliminate_definitional_existentials(tref fm) {
 	using tau = tree<node>;
-	auto block = [](tref n) -> tref {
-		if (!is_child<node>(n, tau::wff_ex)) return n;
-		return bv_definitional_block_elimination<node>(n);
+	// The binders of a block already found to hold no definition, which
+	// would otherwise be searched again as blocks of their own, once per
+	// level of a deep chain.
+	subtree_set<node> settled;
+	auto block = [&settled](tref n) -> tref {
+		if (!is_child<node>(n, tau::wff_ex) || settled.contains(n))
+			return n;
+		return bv_definitional_block_elimination<node>(n, &settled);
 	};
 	return pre_order<node>(fm).apply_unique(block);
 }

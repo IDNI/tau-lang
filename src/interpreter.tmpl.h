@@ -199,6 +199,10 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 template <NodeType node>
 result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	result<bool> r;
+	// outputs computed on a full bdd node table are unknown: none is written
+	if (bdd_node_table_exhausted)
+		return r.with_error(code::runtime_error,
+			messages::bdd_node_table_exhausted);
 	// Sort variables in output by time
 	trefs io_vars;
 	for (const auto& [var, _ ] : output_values) {
@@ -617,6 +621,26 @@ interpreter<node>::interpreter(
 	compute_lookback_and_initial();
 }
 
+// Whether a temporal part of `fm` reads a stream at a fixed step (o1[3]).
+template <NodeType node>
+static bool reads_fixed_step_in_temporal_part(tref fm) {
+	using tau = tree<node>;
+	auto temporal = [](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) || !t.has_child()) return false;
+		const auto nt = t[0].value.nt;
+		return nt == tau::wff_always || nt == tau::wff_sometimes
+			|| nt == tau::wff_until || nt == tau::wff_release
+			|| nt == tau::wff_weak_until || nt == tau::wff_since
+			|| nt == tau::wff_trigger;
+	};
+	for (tref part : tau::get(fm).select_top(temporal))
+		for (tref v : tau::get(part).select_top(
+			is_child<node, tau::io_var>))
+			if (is_io_initial<node>(v)) return true;
+	return false;
+}
+
 template <NodeType node>
 result<interpreter<node>>
 	interpreter<node>::make_interpreter(tref spec,
@@ -694,6 +718,31 @@ result<interpreter<node>>
 	}
 	const io_context<node>& ctx_eff =
 		witness_ltl_route ? ctx_with_witnesses : ctx;
+	// A spec whose temporal parts read a fixed step (o1[3] = 1) that the
+	// safety pipeline below cannot execute goes, as written, through the
+	// LTL pipeline instead: the step-counter encoding there turns the
+	// fixed steps into obligations the synthesized strategy meets, which
+	// is how `realizable` decides the spec.
+	const tref spec_as_given = spec;
+	bool counter_route = false;
+	// why the safety pipeline refused the spec, kept for the answer when
+	// the LTL pipeline refuses it too
+	std::vector<std::pair<tref, report>> safety_failures;
+	// Folds the reports of the rejected clauses into r, demoted when
+	// another route executes the spec.
+	auto fold_rejected = [&r](std::vector<std::pair<tref, report>>& fails,
+		bool demote)
+	{
+		for (auto& [rej_clause, rep] : fails) {
+			auto sc = r.open("rejected candidate");
+			r.info("the specification clause has no executable "
+				"candidate", {{label::value, truncate_for_message(
+					TAU_TO_STR(rej_clause))}});
+			if (demote) rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		fails.clear();
+	};
 	// Handle G(phi_A) && G(phi_B) with different BA types:
 	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
 	// types.  Normalize each G formula independently then combine.
@@ -766,14 +815,65 @@ post_normalization:
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<ltl_aba_solution<node>> ltl_sol;
 	std::vector<std::string> since_aux_anchor;
-	if (realizability_has_game_operators<node>(spec) || witness_ltl_route) {
+	if (realizability_has_game_operators<node>(spec) || witness_ltl_route
+		|| counter_route)
+	{
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
+		std::shared_ptr<data_game_strategy<node>> data_strategy;
+		bool unrealizable = false;
 		std::tie(safety_spec, sol_opt, unanchored_aux) =
-			ltl_to_safety_formula_full<node>(spec);
+			ltl_to_safety_formula_full<node>(spec, &data_strategy,
+				counter_route, &unrealizable);
+		// The data game decided the spec: its strategy chooses every
+		// step's outputs, so no spec part is solved.
+		if (data_strategy) {
+			std::vector<htrefs> no_ctn;
+			std::vector<std::pair<htrefs, htref>> no_spec;
+			union_find_with_sets<decltype(stream_comp), node>
+				no_partition(stream_comp);
+			assignment<node> memory;
+			auto i = interpreter{ no_ctn, no_spec, no_partition, memory,
+				ctx_eff };
+			// the Mealy view, when the strategy plays one
+			if (data_strategy->view)
+				i.cached_solution = *data_strategy->view;
+			i.provider_ = std::make_shared<data_game_step_provider<node>>(
+				std::move(data_strategy), spec);
+			i.compute_lookback_and_initial();
+			subtree_map<node, size_t> output_streams, input_streams;
+			if (!i.collect_output_streams(spec, output_streams)
+				|| !i.rebuild_outputs(output_streams))
+			{
+				return r.with_assert_check_error(
+					code::invalid_output_stream,
+					"Failed to collect output streams");
+			}
+			if (!i.collect_input_streams(spec, input_streams)
+				|| !i.rebuild_inputs(input_streams))
+			{
+				return r.with_assert_check_error(
+					code::invalid_input_stream,
+					"Failed to collect input streams");
+			}
+			fold_rejected(safety_failures, true);
+			return r.with_assert_check_value(std::move(i));
+		}
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
+		if (!safety_spec && counter_route) {
+			fold_rejected(safety_failures, false);
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is unsat");
+		}
+		if (!safety_spec && unrealizable) {
+			fold_rejected(safety_failures, false);
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is not executable: it is "
+				"unrealizable, no choice of output values keeps "
+				"it for all inputs");
+		}
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is not executable: no "
 				"strategy was synthesised (see `realizable`)\n";
@@ -892,22 +992,21 @@ post_normalization:
 		// This clause won; the others' reports still fold in, demoted,
 		// so the report keeps why they lost without the result reading
 		// as a failure.
-		for (auto& [rej_clause, rep] : clause_failures) {
-			auto sc = r.open("rejected candidate");
-			r.info("the specification clause has no executable candidate",
-				{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
-		}
+		fold_rejected(safety_failures, true);
+		fold_rejected(clause_failures, true);
 		return r.with_assert_check_value(std::move(i));
 	}
-	// Given specification is not realizable
-	for (auto& [rej_clause, rep] : clause_failures) {
-		auto sc = r.open("rejected candidate");
-		r.info("the specification clause has no executable candidate",
-			{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
-		r.append(std::move(rep));
+	if (!counter_route && !ltl_sol
+		&& reads_fixed_step_in_temporal_part<node>(spec_as_given))
+	{
+		safety_failures = std::move(clause_failures);
+		counter_route = true;
+		spec = spec_as_given;
+		goto post_normalization;
 	}
+	// Given specification is not realizable
+	fold_rejected(safety_failures, false);
+	fold_rejected(clause_failures, false);
 	return r.with_assert_check_error(code::unsat, "Tau specification is unsat");
 }
 
@@ -1292,6 +1391,283 @@ struct solve_step_provider : step_provider<node> {
 		return r.with_assert_check_value(std::move(result));
 	}
 };
+
+// The solution of a conjunction of equalities and disequalities
+// between one variable and values, over atomless types for the
+// disequalities, solved variable by variable in the order they first
+// appear; nullopt when `fm` has another shape. The general solver
+// can take long to find a value distinct from a few given ones.
+// `found` keeps the values chosen at earlier steps, the latest last,
+// and `ledger` keeps the fresh values of successive steps from
+// growing.
+template <NodeType node>
+std::optional<solution<node>> solve_equality_cube(tref fm,
+	std::vector<htref>& found, fresh_element_ledger& ledger)
+{
+	using tau = tree<node>;
+	trefs atoms;
+	std::function<bool(tref)> flatten = [&](tref n) {
+		const auto& x = tau::get(n);
+		if (x.equals_T()) return true;
+		if (!x.has_child()) return false;
+		const auto nt = x[0].value.nt;
+		if (nt == tau::wff_and) {
+			for (size_t i = 0; i < x[0].children_size(); ++i)
+				if (!flatten(x[0].child(i))) return false;
+			return true;
+		}
+		if (nt != tau::bf_eq && nt != tau::bf_neq) return false;
+		atoms.push_back(n);
+		return true;
+	};
+	if (!flatten(fm)) return std::nullopt;
+	trefs vars;
+	for (tref a : atoms)
+		for (tref v : get_free_vars<node>(a))
+			if (std::none_of(vars.begin(), vars.end(), [&](tref w) {
+				return tau::subtree_equals(v, w); }))
+					vars.push_back(v);
+	solution<node> sol;
+	for (tref var : vars) {
+		const size_t tid = find_ba_type<node>(var);
+		tref value = nullptr;
+		inequality_system<node> sys;
+		for (tref a : atoms) {
+			tref g = rewriter::replace<node>(a, sol);
+			trefs fv = get_free_vars<node>(g);
+			if (fv.size() != 1 || !tau::subtree_equals(fv[0], var))
+				continue;
+			const auto& x = tau::get(g);
+			if (x[0].value.nt == tau::bf_eq) {
+				tref other = tau::subtree_equals(
+					tau::trim(x[0].first()), var)
+					? x[0].second() : x[0].first();
+				if (!tau::subtree_equals(tau::trim(
+					x[0].first()), var) && !tau::subtree_equals(
+					tau::trim(x[0].second()), var))
+						return std::nullopt;
+				value = other;
+			} else sys.insert(g);
+		}
+		// A variable of an ordered type that is no Boolean algebra
+		// takes a point of the order, which the owner's solver picks.
+		const bool point = pack_type_is_non_aba_omcat<node>(tid);
+		if (!value && !sys.empty() && point) {
+			solver_options opts;
+			opts.type_id = tid;
+			auto got = omcat_solve_verified<node>(sys, opts);
+			if (!got) return std::nullopt;
+			for (const auto& [k, kv] : *got)
+				if (tau::subtree_equals(tau::get(k).child_is(
+					tau::variable) ? tau::get(k).first() : k, var))
+						value = kv;
+			if (!value) return std::nullopt;
+		}
+		// first a value found at an earlier step, the type's splitter
+		// of 1 and its complement, or the complement of an excluded
+		// value, which a Boolean algebra always has
+		if (!value && !sys.empty()) {
+			tref all = tau::_T();
+			trefs candidates;
+			for (auto it = found.rbegin(); it != found.rend(); ++it)
+				if (tau::get((*it)->get()).get_ba_type() == tid)
+					candidates.push_back((*it)->get());
+			if (tref split = node::ba::splitter_one(
+				get_ba_type_tree<node>(tid)))
+			{
+				candidates.push_back(split);
+				candidates.push_back(normalize_ba<node>(
+					tau::build_bf_neg(split)));
+			}
+			for (tref g : sys) {
+				all = tau::build_wff_and(all, g);
+				for (tref side : { tau::get(g)[0].first(),
+					tau::get(g)[0].second() })
+					if (get_free_vars<node>(side).empty())
+						candidates.push_back(normalize_ba<node>(
+							tau::build_bf_neg(side)));
+			}
+			for (tref c : candidates) {
+				auto n = normalize_non_temp<node>(rewriter::replace<node>(
+					all, tau::get(tau::bf, var), c));
+				if (n.has_value() && n.value()
+					&& tau::get(n.value()).equals_T())
+						{ value = c; break; }
+			}
+		}
+		if (!value && !sys.empty()) {
+			if (!pack_type_is_atomless<node>(tid)) return std::nullopt;
+			solver_options opts;
+			opts.type_id = tid;
+			opts.splitter_one = node::ba::splitter_one(
+				get_ba_type_tree<node>(tid));
+			opts.ledger = &ledger;
+			auto got = solve_inequality_system_atomless<node>(sys, opts);
+			if (!got) return std::nullopt;
+			for (const auto& [k, kv] : *got) {
+				tref kvar = tau::get(k).child_is(tau::variable)
+					? tau::get(k).first() : k;
+				if (tau::subtree_equals(kvar, var)) value = kv;
+			}
+		}
+		if (!value && point) value = pack_zero_constant<node>(tid);
+		if (!value) value = build_bf_f_type<node>(tid);
+		sol.emplace(tau::get(tau::bf, var), value);
+	}
+	auto n = normalize_non_temp<node>(rewriter::replace<node>(fm, sol));
+	if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T())
+		return std::nullopt;
+	for (const auto& [_, v] : sol) {
+		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+		ledger.pin(tree<node>::geth(v));
+		if (std::none_of(found.begin(), found.end(), [&](const htref& h) {
+			return tau::subtree_equals(h->get(), v); }))
+				found.push_back(tree<node>::geth(v));
+	}
+	if (found.size() > 8) found.erase(found.begin());
+	return sol;
+}
+
+// A solution of `fm`, a formula over the outputs of step `t`: first as an
+// equality cube (solve_equality_cube), then path by path with the general
+// solver; nullopt when it has none.
+template <NodeType node>
+std::optional<solution<node>> solve_step_outputs(tref fm, int_t t,
+	std::vector<htref>& found, fresh_element_ledger& ledger)
+{
+	using tau = tree<node>;
+	if (auto d = solve_equality_cube<node>(fm, found, ledger)) return d;
+	auto n = normalize_non_temp<node>(fm);
+	if (!n.has_value() || !n.value()) return std::nullopt;
+	for (tref path : expression_paths<node>(n.value())) {
+		auto p = normalize_non_temp<node>(path);
+		if (!p.has_value() || !p.value()
+			|| tau::get(p.value()).equals_F()) continue;
+		auto sol = solution_with_max_update<node>(p.value(),
+			(size_t)std::max<int_t>(t, 0));
+		if (sol.has_value()) return sol.value();
+	}
+	return std::nullopt;
+}
+
+/**
+ * @brief Plays a strategy of the data game: each step's outputs are the
+ * ones the strategy chooses for the history in memory and the step's
+ * inputs, found by the general solver.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+struct data_game_step_provider : step_provider<node> {
+	std::shared_ptr<data_game_strategy<node>> strategy;
+	// The spec the strategy was solved for, its fixed steps absolute; a
+	// revision revises it.
+	htref spec;
+	// The absolute step the strategy's step 0 is: a revision re-solves
+	// the game from the step it is made at.
+	int_t offset = 0;
+
+	explicit data_game_step_provider(
+		std::shared_ptr<data_game_strategy<node>> s, tref fm = nullptr,
+		int_t start = 0)
+		: strategy(std::move(s)),
+		  spec(fm ? tree<node>::geth(fm) : nullptr), offset(start) {}
+
+	result<std::optional<solution<node>>> produce(const trefs&,
+		const assignment<node>& memory, size_t time_point, size_t) override
+	{
+		result<std::optional<solution<node>>> r;
+		auto get = [&](const std::string& name, size_t tid, bool input,
+			int_t time) -> tref
+		{
+			tref key = input
+				? build_in_var_at_n<node>(name, time + offset, tid)
+				: build_out_var_at_n<node>(name, time + offset, tid);
+			auto it = memory.find(key);
+			return it == memory.end() ? nullptr : it->second;
+		};
+		auto solve = [this](tref fm, int_t t) {
+			return solve_step_outputs<node>(fm, t, found, ledger);
+		};
+		const int_t t = (int_t)time_point - offset;
+		TAU_TRY(auto out, strategy->step(get, t, solve));
+		if (!offset) return r.with_value(
+			std::optional<solution<node>>(std::move(out)));
+		// the strategy keys the outputs by its own steps
+		solution<node> moved;
+		for (const auto& x : strategy->streams) {
+			if (x.input) continue;
+			auto it = out.find(build_out_var_at_n<node>(x.name, t, x.tid));
+			if (it != out.end()) moved.emplace(build_out_var_at_n<node>(
+				x.name, (int_t)time_point, x.tid), it->second);
+		}
+		return r.with_value(std::optional<solution<node>>(std::move(moved)));
+	}
+
+	// The values before `time_point` a strategy `next` over the same or
+	// other streams starts from, prior[s][k-1] the value of its stream s
+	// k steps before: from memory, or, before this strategy's first step,
+	// the values it chose there. nullopt when one is not known.
+	std::optional<std::vector<std::vector<tref>>> prior_values(
+		const data_game_strategy<node>& next,
+		const assignment<node>& memory, int_t time_point) const
+	{
+		std::vector<std::vector<tref>> prior(next.streams.size());
+		for (size_t s = 0; s < next.streams.size(); ++s) {
+			const auto& x = next.streams[s];
+			for (size_t k = 1; k <= next.depth; ++k) {
+				const int_t at = time_point - (int_t)k;
+				tref v = nullptr;
+				if (at >= offset) {
+					auto it = memory.find(x.input
+						? build_in_var_at_n<node>(x.name, at, x.tid)
+						: build_out_var_at_n<node>(x.name, at, x.tid));
+					if (it != memory.end()) v = it->second;
+				} else if (auto i = strategy->index.find(x.name);
+					i != strategy->index.end()
+					&& strategy->streams[i->second].tid == x.tid)
+						v = strategy->value_before(i->second,
+							(size_t)(offset - at));
+				if (!v) return std::nullopt;
+				prior[s].push_back(v);
+			}
+		}
+		return prior;
+	}
+
+	// values chosen at earlier steps, the latest last
+	std::vector<htref> found;
+	// keeps the fresh values of successive steps from growing
+	fresh_element_ledger ledger;
+
+	std::optional<trefs> read_set(const trefs& vars) const override {
+		auto names = strategy->reads();
+		if (!names) return vars;
+		trefs read;
+		for (tref v : vars)
+			if (names->contains(get_var_name<node>(v))) read.push_back(v);
+		return read;
+	}
+	std::optional<int> strategy_state() const override {
+		return strategy->state();
+	}
+	int_t lookback() const override { return (int_t)strategy->depth; }
+	// memory keeps the values of the fixed steps a revision reads
+	int_t highest_fixed_step() const override {
+		if (!spec) return 0;
+		return get_max_initial<node>(tree<node>::get(spec->get())
+			.select_top(is_child<node, tree<node>::io_var>));
+	}
+	void reset() override {
+		offset = 0;
+		strategy->reset();
+	}
+};
+
+template <NodeType node>
+bool interpreter<node>::plays_data_game() const {
+	return std::dynamic_pointer_cast<data_game_step_provider<node>>(
+		provider_) != nullptr;
+}
 
 // Prototype (minterm_solving_rework, "Lever B"): canonicalize a step's
 // committed witness value once, at commit time, so later steps' lookback
@@ -1733,8 +2109,8 @@ interpreter<node>::step()
 	}
 	// Get inputs for this step
 	auto [step_inputs, _] = build_inputs_for_step(time_point);
-	if (!provider_->skip_lookback_filter())
-		step_inputs = appear_within_lookback(step_inputs);
+	if (auto reads = provider_->read_set(step_inputs)) step_inputs = *reads;
+	else step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	LOG_TRACE << "interpreter::step/read";
 	std::optional<std::pair<std::optional<assignment<node>>, bool>> read_v;
@@ -1829,21 +2205,33 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 	// note) and the raw atom trefs of the cached Mealy solution, which
 	// nothing else anchors.
 	for (auto& [k, v] : last_outputs_) { keep.insert(k); keep.insert(v); }
-	if (cached_solution)
+	if (cached_solution) {
 		for (const auto& [atom, _] : cached_solution->atoms)
 			keep.insert(atom);
+		keep.insert(cached_solution->history.begin(),
+			cached_solution->history.end());
+	}
 	output_partition.collect_live_refs(keep);
 }
 
 template <NodeType node>
 void interpreter<node>::maybe_gc(const assignment<node>* pin) {
-	if (gc_growth_factor <= 0.0) return;
 	const size_t m_pre = tau::m_size();
-	// Floor: don't sweep until M is non-trivially large. Bounds peak size
-	// for any workload (a sweep fires no later than M = gc_min_size + growth).
-	if (m_pre < gc_min_size) return;
-	// Amortize: don't sweep unless M grew enough since the last sweep.
-	if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc) return;
+	// A store approaching its budget sweeps whatever the growth trigger
+	// says, and even with gc disabled: the alternative is refusing the
+	// next api call over nodes a sweep would have freed. This is the one
+	// place a sweep can be forced, because it is the one place the whole
+	// root set is known -- see collect_live_refs below.
+	if (!over_tref_soft_mark<node>()) {
+		if (gc_growth_factor <= 0.0) return;
+		// Floor: don't sweep until M is non-trivially large. Bounds peak
+		// size for any workload (a sweep fires no later than
+		// M = gc_min_size + growth).
+		if (m_pre < gc_min_size) return;
+		// Amortize: don't sweep unless M grew enough since the last sweep.
+		if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc)
+			return;
+	}
 
 	const auto t0 = std::chrono::steady_clock::now();
 	std::unordered_set<tref> keep;
@@ -2135,8 +2523,11 @@ void interpreter<node>::compute_lookback_and_initial() {
 			current_io_vars.begin(), current_io_vars.end());
 	}
 	lookback = get_max_shift<node>(io_vars);
+	if (provider_) lookback = std::max(lookback, provider_->lookback());
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
+	if (provider_) highest_initial_pos = std::max(highest_initial_pos,
+		provider_->highest_fixed_step());
 	fixed_inputs_.clear();
 	for (tref v : io_vars)
 		if (is_io_initial<node>(v) && tau::get(v).is_input_variable())
@@ -2354,6 +2745,13 @@ result<typename interpreter<node>::update_plan>
 {
 	result<update_plan> r;
 	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
+	if (std::dynamic_pointer_cast<data_game_step_provider<node>>(provider_))
+		return plan_data_game_update(update);
+	if (provider_ && !provider_->revisable()) {
+		r.warning("the running strategy cannot follow a revised "
+			"specification; no update was performed");
+		return r;
+	}
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
@@ -2694,6 +3092,165 @@ result<typename interpreter<node>::update_plan>
 }
 
 template <NodeType node>
+result<typename interpreter<node>::update_plan>
+	interpreter<node>::plan_data_game_update(tref update)
+{
+	result<update_plan> r;
+	auto dg = std::dynamic_pointer_cast<data_game_step_provider<node>>(
+		provider_);
+	if (!dg || !dg->spec) {
+		r.warning("the running strategy cannot follow a revised "
+			"specification; no update was performed");
+		return r;
+	}
+	// As in plan_update: the fixed steps of the update count from
+	// time_point, and the values in memory replace the ones it reads.
+	trefs io_vars = tau::get(update).select_top(is_child<node, tau::io_var>);
+	tref shifted_update = shift_const_io_vars_in_fm<node>(
+		update, io_vars, time_point);
+	if (tau::get(shifted_update).equals_F()) {
+		r.warning("the constant time position is below 0; no update was performed");
+		return r;
+	}
+	io_vars = tau::get(shifted_update).select_top(is_child<node, tau::io_var>);
+	if (!is_memory_access_valid(io_vars)) {
+		r.warning("an invalid memory access was found; no update was performed");
+		return r;
+	}
+	shifted_update = rewriter::replace<node>(shifted_update, memory);
+	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
+	// the fixed steps already played read their values
+	auto played = [&](tref fm) {
+		subtree_map<node, tref> values;
+		for (tref v : tau::get(fm).select_top(
+			is_child<node, tau::io_var>))
+		{
+			if (!is_io_initial<node>(v)) continue;
+			const int_t tp = get_io_time_point<node>(v);
+			if (tp >= (int_t)time_point) continue;
+			const size_t type = tau::get(v).get_ba_type();
+			tref name = get_var_name_node<node>(v);
+			auto it = memory.find(tau::get(v).is_input_variable()
+				? build_in_var_at_n<node>(name, tp, type)
+				: build_out_var_at_n<node>(name, tp, type));
+			if (it != memory.end()) values.emplace(v, tau::trim(it->second));
+		}
+		return rewriter::replace<node>(fm, values);
+	};
+	tref running = played(dg->spec->get());
+	std::vector<std::pair<tref, report>> failures;
+	auto revision_r = pointwise_revision(
+		htrefs{ tree<node>::geth(running) }, shifted_update, time_point);
+	const bool revised = revision_r.has_value()
+		&& revision_r.value().has_value();
+	htrefs revision;
+	if (revised) revision = std::move(*revision_r.value());
+	failures.emplace_back(running, std::move(revision_r).report());
+	// The game counts the steps from the one the revision is made at: a
+	// fixed step moves back by time_point, and one before it is refused.
+	auto rebase = [&](tref fm) -> tref {
+		subtree_map<node, tref> changes;
+		for (tref v : tau::get(fm).select_top(
+			is_child<node, tau::io_var>))
+		{
+			if (!is_io_initial<node>(v)) continue;
+			const int_t tp = get_io_time_point<node>(v)
+				- (int_t)time_point;
+			if (tp < 0) return nullptr;
+			const size_t type = tau::get(v).get_ba_type();
+			tref name = get_var_name_node<node>(v);
+			changes.emplace(v, tau::trim(tau::get(v).is_input_variable()
+				? build_in_var_at_n<node>(name, tp, type)
+				: build_out_var_at_n<node>(name, tp, type)));
+		}
+		return rewriter::replace<node>(fm, changes);
+	};
+	auto fold_failures = [&]() {
+		for (auto& [candidate, rep] : failures) {
+			auto sc = r.open("rejected candidate");
+			r.info("the update candidate was not accepted",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+	};
+	// the first alternative of the revision the data game plays from the
+	// values of the steps already played
+	for (const htref& alt_h : revision) {
+		tref alt = alt_h->get();
+		tref rebased = rebase(alt);
+		if (!rebased) {
+			r.info("the revised specification reads a fixed step "
+				"already played; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		std::shared_ptr<data_game_strategy<node>> next;
+		ltl_to_safety_formula_full<node>(rebased, &next, true);
+		if (!next) {
+			r.info("the data game does not decide the revised "
+				"specification; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		if (time_point > 0) {
+			auto prior = dg->prior_values(*next, memory,
+				(int_t)time_point);
+			if (!prior) {
+				r.info("the revised specification reads values the "
+					"run no longer keeps; the alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+			if (!next->start_from(*prior)) {
+				r.info("the data game of the revised specification is "
+					"not won from the values already played; the "
+					"alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+		}
+		subtree_map<node, size_t> out_ids, in_ids;
+		output_streams<node> new_outputs;
+		input_streams<node> new_inputs;
+		subtree_map<node, size_t> new_output_sources, new_input_sources;
+		if (!collect_output_streams(alt, out_ids)
+			|| !collect_input_streams(alt, in_ids)
+			|| !build_outputs(out_ids, this->outputs,
+				this->output_stream_sources, new_outputs,
+				new_output_sources)
+			|| !build_inputs(in_ids, this->inputs,
+				this->input_stream_sources, new_inputs,
+				new_input_sources))
+		{
+			r.info("the streams of the revised specification could "
+				"not be opened; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
+		fold_failures();
+		std::optional<ltl_aba_solution<node>> view;
+		if (next->view) view = *next->view;
+		auto provider = std::make_shared<data_game_step_provider<node>>(
+			std::move(next), alt, (int_t)time_point);
+		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
+		update_plan plan(std::vector<htrefs>{},
+			std::vector<std::pair<htrefs, htref>>{}, std::move(uf),
+			std::move(new_inputs), std::move(new_outputs),
+			std::move(new_input_sources), std::move(new_output_sources),
+			TAU_TO_STR(alt));
+		plan.provider = std::move(provider);
+		plan.solution = std::move(view);
+		return r.with_assert_check_value(std::move(plan));
+	}
+	fold_failures();
+	r.warning("the updated specification is unsat; no update was performed");
+	return r;
+}
+
+template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
 	result<bool> r;
@@ -2730,6 +3287,14 @@ result<bool> interpreter<node>::update(tref update) {
 	chosen_alt_.clear();
 	// The cached step spec belongs to the previous specification.
 	step_spec_time_point_ = -1;
+	// A run of the data game's strategy plays the one of the revised spec.
+	if (plan->provider) {
+		provider_ = std::move(plan->provider);
+		cached_solution = std::move(plan->solution);
+		cached_solution_stale_ = false;
+		compute_lookback_and_initial();
+		return r.with_assert_check_value(true);
+	}
 	compute_lookback_and_initial();
 	// IN-N3: the synthesised strategy (if any) described the spec
 	// before this revision; keep it for reset()'s re-seeding, but mark
@@ -3278,6 +3843,7 @@ void interpreter<node>::reset() {
 	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
 	// will rebuild step_spec on the next step().
 	compute_lookback_and_initial();
+	if (provider_) provider_->reset();
 	// LA-N3: make_interpreter pre-populated `memory` with the inner-S
 	// auxiliary anchors; a reset() that only cleared `memory` lost them.
 	seed_since_aux_bits();
@@ -3366,6 +3932,10 @@ void interpreter<node>::seed_since_aux_bits() {
 template <NodeType node>
 result<int> interpreter<node>::current_state() const {
 	result<int> r;
+	// A provider playing a Mealy machine itself knows its state.
+	if (provider_)
+		if (auto q = provider_->strategy_state())
+			return r.with_assert_check_value(*q);
 	// If the spec needed Mealy synthesis (general LTL with future operators),
 	// the strategy state is encoded in auxiliary one-hot bits
 	// `o__ltl_ms<i>__` per `encode_mealy_as_safety`. Find the unique i with
@@ -3852,6 +4422,8 @@ bool interpreter<node>::is_excluded_output(tref var) {
 	// The LTL step-counter encoding's own o__ltl_ctr bits are internal
 	// bookkeeping the same way (see apply_step_counter_encoding).
 	if (io_name.size() > 10 && io_name.substr(0, 10) == "o__ltl_ctr") return true;
+	// The warm-up of a clause (pin_written_warm_ups).
+	if (io_name == "o__warmup") return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }
@@ -3862,9 +4434,18 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	// step_spec is read below for t == time_point; keep it current here too,
 	// since callers (e.g. get_inputs_for_step) may reach this before step().
 	if (!calculate_initial_spec().value_or(false)) return appeared;
+	// No input to look for (e.g. a spec without inputs): skip the scan,
+	// which substitutes and simplifies every formula at every lookahead t.
+	if (vars.empty()) return appeared;
 	auto check = [&](tref fm, size_t t) {
 		tref step_ubt_ctn = update_to_time_point(fm,
 			t < formula_time_point ? formula_time_point : t);
+		// Exact: memory's values were committed before this step and
+		// hold none of its inputs, and the simplification only recombines
+		// existing subterms, so a var absent here cannot appear below.
+		if (std::ranges::none_of(vars, [&](tref v) {
+				return contains<node>(step_ubt_ctn, v); }))
+			return;
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
 		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
 		for (tref v : vars) {
@@ -3877,6 +4458,8 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 		}
 	};
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
+		// Every var already appeared (appeared never repeats one).
+		if (appeared.size() == vars.size()) break;
 		// This step's read set must come from the same tree, substituted
 		// and simplified the same way, that step(values) hands the solver.
 		// Lookahead steps keep the raw alternatives: no step formula yet.
@@ -3916,16 +4499,12 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 	// clauses of one part come from a single always body that
 	// create_spec_partition split per conjunct, so they already share
 	// one time frame: `always (A(t) && B(t))` means A and B from the same
-	// start point. Folding them through always_conjunction instead (as
-	// 76a69031 did) shifts the clause with the smaller lookback into the
-	// past, `always (A(t-1) && B(t))`, which asserts A one step BEFORE the
-	// run starts and, with an initial condition on the state, constrains
+	// start point. Shifting the clause with the smaller lookback into the
+	// past, `always (A(t-1) && B(t))`, would assert A one step BEFORE the
+	// run starts and, with an initial condition on the state, constrain
 	// an input the run never reads: a guarded latch such as
 	// `(o1[0] = 0) && (i1[t] = 1 ? o1[t] = 1 : o1[t] = o1[t-1])` was
-	// reported unsat (GitHub #100). always_conjunction is only right for
-	// two SEPARATELY written always statements, each with its own start;
-	// that case is merged by the normalizer before the spec reaches the
-	// interpreter and never arrives here as clauses of one always.
+	// reported unsat (GitHub #100).
 	tref aw_body = nullptr;
 	for (tref b : aw_clauses)
 		aw_body = aw_body ? tau::build_wff_and(aw_body, b) : b;

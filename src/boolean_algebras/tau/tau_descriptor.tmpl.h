@@ -53,6 +53,16 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	static result<bool> is_one(const ba_t& x) { return x.is_one(); }
 
+	// the nodes of the embedded spec: its main and its rules
+	static size_t constant_size(const ba_t& x) {
+		size_t n = x.nso_rr.main
+			? (size_t) node_count<node_t>(x.nso_rr.main->get()) : 0;
+		for (const auto& [head, body] : x.nso_rr.rec_relations)
+			n += (size_t) node_count<node_t>(head->get())
+				+ (size_t) node_count<node_t>(body->get());
+		return n;
+	}
+
 	static result<bool> is_zero(const ba_t& x) { return x.is_zero(); }
 
 	static result<bool> is_closed(const ba_t& x) { return is_tau_closed<BaseBAs...>(x); }

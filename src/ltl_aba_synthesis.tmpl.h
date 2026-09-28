@@ -9,6 +9,7 @@
 // tau_tree.h's own include of "tau_parser.generated.h".
 #include "hoa_parser.generated.h"
 #include "backends/spot/spot.h"
+#include "reset_hooks.h"
 #include <climits>
 
 namespace idni::tau_lang {
@@ -147,9 +148,10 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	// A strategy with more states than this is not something ltlsynt
 	// produces for any specification this pipeline builds; an absurd
 	// count is a garbled header, not an automaton (SY-R3). Runtime
-	// parameter `ltl_hoa_max_states` (0 = unlimited).
-	const long max_states = ltl_hoa_max_states
-		? (long) std::min<size_t>(ltl_hoa_max_states, (size_t) LONG_MAX)
+	// parameter `ltl_hoa_max_states()` (0 = unlimited).
+	const size_t cap = ltl_hoa_max_states();
+	const long max_states = cap
+		? (long) std::min<size_t>(cap, (size_t) LONG_MAX)
 		: LONG_MAX;
 	bool seen_states = false;
 
@@ -256,7 +258,8 @@ namespace alg_d {
 inline result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs)
+	const std::vector<std::string>& outs,
+	const std::string& algo)
 {
 	result<synth_game> r;
 
@@ -265,6 +268,9 @@ inline result<synth_game> call_ltlsynt_game(
 	// unbounded, FIFO eviction). Callers get their own copy of the
 	// cached entry.
 	static bounded_cache<std::string, synth_game> cache{&cache_bound};
+	static const bool reset_registered =
+		(on_reset([] { cache.clear(); }), true);
+	(void)reset_registered;
 	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
 	// name, so the concatenation is injective. Local to this cache key --
 	// the backend's own comma-joiner formats an argv flag, a different job.
@@ -273,7 +279,8 @@ inline result<synth_game> call_ltlsynt_game(
 		for (size_t i = 0; i < v.size(); ++i) { if (i) s += ","; s += v[i]; }
 		return s;
 	};
-	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
+	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs)
+		+ '\x1e' + algo;
 	if (auto it = cache.find(key); it != cache.end()) { return r.with_value(it->second); }
 
 	int timeout_sec = ltl_timeout_sec();
@@ -281,7 +288,8 @@ inline result<synth_game> call_ltlsynt_game(
 	// SY-R1: a timeout, a missing binary or a usage error is a backend
 	// error, not the EMPTY game every caller used to read as a definitive
 	// UNREALIZABLE. Nothing transient is cached.
-	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec));
+	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec,
+		algo));
 
 	// Insert-then-copy: the freshly inserted entry is the newest in FIFO
 	// order, so an eviction triggered by this insert can only remove

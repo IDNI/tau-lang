@@ -253,6 +253,84 @@ TEST_SUITE("Tau API - string - execution") {
 #endif // TAU_PACK_HAS_BA_SBF
 
 
+	// A tautological literal still carries its lookback (README "Lookback
+	// initialization"): o2 is free at steps 0 and 1.
+	TEST_CASE("each clause keeps the warm-up it is written with"
+		* doctest::skip(!ltlsynt_available())) {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		CHECK( tau_api::sat(spec).value() );
+		CHECK( tau_api::realizable(spec).value() );
+		CHECK( !tau_api::unsat(spec).value() );
+
+		auto maybe_i = tau_api::get_interpreter(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value()) {
+				CHECK( output_at.name == "o2" );
+				collected.push_back(value);
+			}
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
+	// Every entry point that decides or runs a specification reads the
+	// same warm-ups, whatever polarity it decides.
+	TEST_CASE("the warm-ups as written reach every entry point"
+		* doctest::skip(!ltlsynt_available())) {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		const std::string neg = std::string("!(") + spec + ")";
+		CHECK( !tau_api::valid(neg).value() );
+		CHECK( !tau_api::valid_spec(neg).value() );
+		CHECK( !tau_api::valid(spec).value() );
+		CHECK( tau_api::valid("(always o2[t] = 1) -> "
+			"(always o2[t] = 1 && o1[t-2] = o1[t-2])").value() );
+		CHECK( !tau_api::valid("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"-> (always o2[t] = 1)").value() );
+		CHECK( !tau_api::unrealizable(spec).value() );
+		auto core = tau_api::unsat_core(std::string(spec) + ".", false);
+		REQUIRE( core.has_value() );
+		CHECK( core.value().empty() );
+		tau_api::reset_definitions();
+
+		// get_spec_as_written keeps the spec as written for the tref
+		// procedures
+		auto parsed = tau_api::get_spec_as_written(std::string(spec) + ".");
+		REQUIRE( parsed.has_value() );
+		CHECK( tau_api::sat(parsed.value()).value() );
+		CHECK( tau_api::realizable(parsed.value()).value() );
+		auto negated = tau_api::get_spec_as_written(neg + ".");
+		REQUIRE( negated.has_value() );
+		CHECK( !tau_api::valid(negated.value()).value() );
+		tau_api::reset_definitions();
+
+		// get_interpreter(tref) runs it with the warm-up
+		auto late = tau_api::get_spec_as_written(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( late.has_value() );
+		auto maybe_i = tau_api::get_interpreter(late.value());
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value())
+				collected.push_back(value);
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
 	TEST_CASE("using get_inputs_for_step") {
 
 		// Make the interpreter for a given specification as a string
@@ -472,6 +550,46 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK( o_values.size() == i_values.size() );
 		CHECK( o_values == i_values );
 	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	// The lookback read set stops scanning once every input was found and
+	// skips formulas holding none of them. Pins the exact read set: ilb[t]
+	// is found only by the lookahead step (ilb[t-1]), and ila[1] drops out
+	// once the committed ilb[0] = 1 is substituted (1 | ila[1] = 1). The
+	// stream names are this test's own: definitions persist across tests.
+	TEST_CASE("get_inputs_for_step keeps lookahead inputs and drops "
+		  "inputs the committed memory decides")
+	{
+		auto maybe_i = tau_api::get_interpreter(
+			"ola[t]:sbf = ila[t]:sbf | ilb[t-1]:sbf.");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		const std::vector<std::vector<std::string>> expected = {
+			{ "ilb" }, { "ilb" }, { "ila", "ilb" } };
+		std::vector<std::string> outs;
+		for (size_t step = 0; step < expected.size(); ++step) {
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			std::vector<std::string> names;
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : inputs.value()) {
+				names.push_back(at.name);
+				CHECK(at.time_point == step);
+				// ila is always 0, ilb is 1 at step 0 and 0 afterwards
+				assigned[at] = at.name == "ilb" && step == 0
+					? "1" : "0";
+			}
+			std::sort(names.begin(), names.end());
+			CHECK(names == expected[step]);
+			auto o = tau_api::step(i, assigned);
+			REQUIRE(o.has_value());
+			REQUIRE(o.value().contains({ "ola", step }));
+			outs.push_back(o.value().at({ "ola", step }));
+		}
+		CHECK(outs[1] == "1");
+		CHECK(outs[2] == "0");
+	}
+#endif // TAU_PACK_HAS_BA_SBF
 }
 
 // NF-1 / NF-2 regression: api::boole_normal_form(const std::string&) used
@@ -957,6 +1075,33 @@ TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
 	}
 }
 #endif // TAU_PACK_HAS_BA_BV
+
+// The decision procedures over a parsed spec, what the bindings hand them.
+TEST_SUITE("Tau API - spec decisions and unsat core") {
+	TEST_CASE_FIXTURE(api_fixture, "sat takes a spec root") {
+		auto spec = tau_api::get_spec("f(x) := x'. always o1[t] = f(o1[t]).");
+		REQUIRE(spec.has_value());
+		auto s = tau_api::sat(spec.value());
+		REQUIRE(s.has_value());
+		CHECK(!s.value());
+		auto ok = tau_api::get_spec("always o2[t] = i2[t].");
+		REQUIRE(ok.has_value());
+		CHECK(tau_api::sat(ok.value()).value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "unsat_core is minimal") {
+		auto core = tau_api::unsat_core(
+			"always (o3[t] = i3[t] && o4[t] = i4[t]) && always o3[t] = 1 "
+			"&& always o4[t] = o4[t].");
+		REQUIRE(core.has_value());
+		CHECK(core.value().size() == 2);
+		auto none = tau_api::unsat_core(
+			"always o3[t] = i3[t] && always o4[t] = 1.");
+		REQUIRE(none.has_value());
+		CHECK(none.value().empty());
+		CHECK(!tau_api::unsat_core("not a spec ((").has_value());
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

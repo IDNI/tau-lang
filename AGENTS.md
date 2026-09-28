@@ -242,6 +242,8 @@ Four constraints, each of which has broken a build here:
 - **Values that must agree across platforms need a fixed width.** wasm32 is the only
   32-bit target here, and `size_t` is a word size, not a width. `tau_tree.h`'s node
   word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
+  Node data is still read back as `size_t`, so a numeric literal must fit both
+  the node word and `size_t` (`tau_tree_from_parser.tmpl.h`).
 
 The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
 1493 REPL tests run for wasm only through a preset that turns `TAU_BUILD_REPL_TESTS`

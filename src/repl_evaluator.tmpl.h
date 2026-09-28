@@ -212,9 +212,21 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::get_applied(tref arg) const {
+tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
+	// Definitions are matched on the folded specification: one whose
+	// calls stay unapplied as written is read folded instead.
+	if (auto check = get_type_and_arg(arg, true); check
+		&& !tau::get(check.value().second).find_top(is<node, tau::ref>))
+		return check.value().second;
+	return get_any(arg);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
+	if (as_written) spec.keep_as_written();
 	spec.add(arg);
 	auto& defs = definitions<node>::instance();
 	// type_defs is spliced first only for parallel structure with rr_defs/
@@ -301,8 +313,9 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		DBG(TAU_LOG_TRACE << "main is nullptr";)
 		return nullptr;
 	}
-	// add defs to global definitions:
-	for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
+	// add defs to global definitions; the definitions read as written
+	// are the same ones, left unfolded:
+	if (!as_written) for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
 		defs.add(r.first, r.second);
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
 	}
@@ -316,7 +329,8 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
-	repl_evaluator<BAs...>::get_type_and_arg(const tt& n) const
+	repl_evaluator<BAs...>::get_type_and_arg(const tt& n,
+		bool as_written) const
 {
 	auto nt = n | tt::nt;
 	tref r = nullptr;
@@ -332,7 +346,7 @@ std::optional<std::pair<size_t, tref>>
 			} else return {};
 		default: r = n | tt::ref;
 	}
-	r = get_applied(r);
+	r = get_applied(r, as_written);
 	if (!r) return {};
 	return { { tau::get(r).get_type(), r } };
 }
@@ -358,25 +372,13 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	// itself (must not go through get_any/apply_all_defs, which expect a
 	// formula/history argument), n[2] is the formula.
 	tref var = n[1].get();
-	tref arg = n[2].get();
-	report rep;
-	auto root = rep.open_if(opt.print_benchmarks, "onf");
 	tref r = nullptr;
-	if (auto value = get_any(arg); value) {
-		auto applied = tau_api::apply_all_defs(value);
-		if (!applied.has_value()) {
-			applied.print(err);
-			rep.append(std::move(applied).report());
-			root.close();
-			print_benchmarks(rep);
-			return r;
-		}
-		tref a = applied.value();
-		rep.append(std::move(applied).report());
-		r = onf<node>(a, var);
+	if (auto value = get_any(n[2].get()); value) {
+		auto res = tau_api::onf(value, var);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
 	}
-	root.close();
-	print_benchmarks(rep);
 	return r;
 }
 
@@ -435,42 +437,25 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
-		r = pnf<node>(value);
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::pnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
+	}
 	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
-	report rep;
-	auto root = rep.open_if(opt.print_benchmarks, "mnf");
- 	tref r = nullptr;
-	tref arg = n[1].get();
-	auto wff_mnf = [](tref applied) {
-		return unequal_to_not_equal<node>(
-			reduce<node>(to_dnf<node>(
-				bf_reduce_canonical<node>()(applied))));
-	};
-	if (auto value = get_any(arg); value) {
-		auto applied = tau_api::apply_all_defs(value);
-		if (!applied.has_value()) {
-			applied.print(err);
-			rep.append(std::move(applied).report());
-			root.close();
-			print_benchmarks(rep);
-			return r;
-		}
-		tref a = applied.value();
-		rep.append(std::move(applied).report());
-		switch (tau::get(a).get_type()) {
-		case tau::wff: r = wff_mnf(a); break;
-		case tau::bf:  r = bf_reduced_dnf<node>(a); break;
-		default: return invalid_argument();
-		}
+	tref r = nullptr;
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::mnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
 	}
-	root.close();
-	print_benchmarks(rep);
 	return r;
 }
 
@@ -692,13 +677,20 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::reset_cmd() {
+	// The run goes first: its interpreter holds raw trefs the sweep in
+	// api::reset cannot see.
+	const bool was_running = (bool)running;
+	finish_running();
 	H.clear();
 	rr_defs.clear();
 	io_defs.clear();
 	type_defs.clear();
 	names = {};
-	definitions<node>::instance().clear();
-	out << "Session reset: history, definitions, and IO streams cleared.\n";
+	const size_t freed = api<node>::reset();
+	out << "Session reset: " << (was_running ? "run stopped, " : "")
+		<< "history, definitions, IO streams and caches cleared, "
+		<< freed << " tree nodes freed (live: "
+		<< api<node>::tref_count() << ").\n";
 }
 
 template <typename... BAs>
@@ -741,7 +733,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// Formula is the 3rd child when a count was given, else the 2nd.
 	tref value = nullptr;
 	if (auto fc = bounded ? (n | tt::third) : (n | tt::second))
-		value = get_any(fc | tt::ref);
+		value = get_spec_as_written(fc | tt::ref);
 
 	if (value) {
 		if (reject_ctl_star_if_disabled(value)) return;
@@ -809,7 +801,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	DBG(TAU_LOG_TRACE << "ltl_cmd: " << TAU_LOG_FM(n.value());)
 
-	tref value = get_any(n[1].get());
+	tref value = get_spec_as_written(n[1].get());
 	if (!value) return;
 	// IN-N5: `ltl` was the one formula command with no fragment gate.
 	if (reject_ctl_star_if_disabled(value)) return;
@@ -825,7 +817,28 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 		// refused CTL* placement) used to terminate the REPL. Print the
 		// whole report -- UNKNOWN summary plus the refusal detail --
 		// exactly once here instead.
-		auto explain_r = ltl_explain<node>(value, out);
+		//
+		// ltl_explain prints its verdict itself, so it runs inside the
+		// same boundary as the api calls, writing to a buffer: a bdd
+		// node table that fills during it makes that verdict unknown,
+		// and then nothing of the buffer is shown, only the error.
+		std::stringstream explained;
+		bool table_filled = false;
+		// The trace explains the formula `realizable` decides, and the
+		// verdict is `realizable`'s own, so both commands read the same
+		// warm-ups and always part.
+		auto explain_r = with_budget<node>([&] {
+			result<bool> r;
+			TAU_TRY(tref target,
+				tau_api::realizability_target(value));
+			auto e = r.merge_take(ltl_explain<node>(target,
+				explained, [&] {
+					return tau_api::realizable(value); }));
+			table_filled = bdd_node_table_exhausted;
+			if (e) r = *e;
+			return r;
+		});
+		if (!table_filled) out << explained.str();
 		if (!explain_r.has_value()) {
 			explain_r.print(err);
 			error = true;
@@ -868,7 +881,10 @@ void repl_evaluator<BAs...>::continue_running(
 				running->interp.time_point != tp_before;
 			// Input-independent step: output already written.
 			// "continue?" prompt, mirroring C++ run(fm, ctx, N).
-			if (produced && running->steps_to_run != 0) {
+			// A write or serialization failure also leaves `produced`
+			// set; only an awaiting stop counts the step.
+			if (produced && running->steps_to_run != 0
+				&& step_awaiting_input(st.report())) {
 				++running->steps_done;
 				if (opt.print_benchmarks) {
 					st.report().print(out);
@@ -1177,7 +1193,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::valid(value);
@@ -1192,7 +1208,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::sat(value);
@@ -1207,7 +1223,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::unsat(value);
@@ -1222,7 +1238,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get()); value) {
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
@@ -1235,7 +1251,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get()); value) {
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
@@ -1560,6 +1576,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxprobesteps")     return probe_steps_opt;
 	if (x == "rewriterounds"
 		|| x == "maxrewriterounds")  return rewrite_rounds_opt;
+	if (x == "trefbudget")               return tref_budget_opt;
+	if (x == "trefbudgetsoft")           return tref_budget_soft_opt;
 	if (x == "gcminsize")                return gc_min_size_opt;
 	if (x == "gcgrowth"
 		|| x == "gcgrowthfactor")    return gc_growth_opt;
@@ -1570,6 +1588,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
 	if (x == "cachebound")               return cache_bound_opt;
 	if (x == "maxcoverproducts")         return cover_products_opt;
+	if (x == "maxconstantsize")          return constant_size_opt;
 	if (x == "ltltimeout")               return ltl_timeout_opt;
 	if (x == "ltlalg")                   return ltl_alg_opt;
 	if (x == "ltlqemaxvars")             return ltl_qe_max_vars_opt;
@@ -1700,6 +1719,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "cachebound:          " << climit(cache_bound) << "\n"; } },
 	{ cover_products_opt, [climit, this]() {
 		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } },
+	{ constant_size_opt, [climit, this]() {
+		out << "maxconstantsize:     " << climit(max_constant_size) << "\n"; } },
 	// Effective values, so the environment fallbacks show through when the
 	// parameter itself is unset.
 	{ ltl_timeout_opt, [this]() {
@@ -1712,13 +1733,19 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ ltl_qe_max_vars_opt, [this]() {
 		out << "ltlqemaxvars:        " << ltl_qe_max_vars() << "\n"; } },
 	{ ltl_hoa_max_states_opt, [climit, this]() {
-		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states) << "\n"; } },
+		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states()) << "\n"; } },
 	{ ltl_guard_max_cubes_opt, [climit, this]() {
-		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes) << "\n"; } },
+		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes()) << "\n"; } },
 	{ ltl_refinement_rounds_opt, [climit, this]() {
-		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds) << "\n"; } },
+		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds()) << "\n"; } },
 	{ ltl_window_max_paths_opt, [climit, this]() {
-		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths) << "\n"; } }
+		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths()) << "\n"; } },
+	{ tref_budget_opt, [climit, this]() {
+		out << "trefbudget:          " << climit(tref_budget())
+			<< " (live: " << api<node>::tref_count() << ")\n"; } },
+	{ tref_budget_soft_opt, [this]() {
+		out << "trefbudgetsoft:      " << tref_budget_soft_percent()
+			<< "%\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1905,6 +1932,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_cache_bound(*n); } },
 	{ cover_products_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_cover_products(*n); } },
+	{ constant_size_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_constant_size(*n); } },
 	{ ltl_timeout_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_timeout_sec((long) std::min<size_t>(*n,
 			(size_t) ltl_timeout_sec_max)); } },
@@ -1926,7 +1955,11 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ ltl_refinement_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_max_refinement_rounds(*n); } },
 	{ ltl_window_max_paths_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_ltl_window_max_paths(*n); } } };
+		api<node>::set_ltl_window_max_paths(*n); } },
+	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_tref_budget(*n); } },
+	{ tref_budget_soft_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_tref_budget_soft_percent(*n); } } };
 	setters[o]();
 }
 
@@ -2000,6 +2033,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case consistency_subsets_opt:
 	case cache_bound_opt:
 	case cover_products_opt:
+	case constant_size_opt:
 	case lgrs_max_vars_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
@@ -2049,6 +2083,7 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	auto [family, name] = split_ba_option_name(dotted);
 	const ba_option* o = resolve_ba_option(family, name);
 	if (!o) return;
+	option_change_guard<node> guard;
 	if (o->kind == ba_option_kind::flag) {
 		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
 		else TAU_LOG_ERROR << "Invalid value\n";
@@ -2073,6 +2108,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 		error = true;
 		return;
 	}
+	option_change_guard<node> guard;
 	bool v = o->get_flag();
 	update_fn(v);
 	o->set_flag(v);
@@ -2139,6 +2175,30 @@ requires BAsPack<BAs...>
 int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command = n | tt::only_child;
 	auto command_type = command | tt::nt;
+	// Refuse before the command runs, not after: a command allowed to
+	// start keeps its result. This covers the commands that do not go
+	// through the api -- anf_cmd today, and whatever is added next --
+	// while the api's own guard covers the rest; the check is a cheap
+	// measurement, so doing it twice costs nothing.
+	//
+	// The control commands are exempt, and have to be: they are how a
+	// session at its budget recovers. Gating `quit` strands the user in a
+	// REPL they cannot leave, and gating `set`/`clear` takes away the two
+	// ways to get back under the cap.
+	switch (command_type) {
+	case tau::quit_cmd: case tau::clear_cmd: case tau::help_cmd:
+	case tau::version_cmd: case tau::get_cmd: case tau::set_cmd:
+	case tau::enable_cmd: case tau::disable_cmd: case tau::toggle_cmd:
+	case tau::reset_cmd: case tau::comment:
+		break;
+	default:
+		if (over_tref_budget<node>()) {
+			error = true;
+			TAU_LOG_ERROR << tref_budget_message<node>();
+			return 0;
+		}
+	}
+	budget_scope<node> budget;
 #ifdef DEBUG
 	if (opt.debug_repl) {
 		// out << "command: " << command << "\n";
@@ -2210,6 +2270,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	// error handling
 	default: error = true; out << std::endl;
 		TAU_LOG_ERROR << "Unknown command";
+	}
+	// The api reports a full bdd node table itself; this catches the
+	// commands that reach the bdds around it.
+	if (take_bdd_node_table_exhausted<node>()) {
+		error = true, result = 0;
+		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+		if (command_type == tau::run_cmd) finish_running();
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
@@ -2302,6 +2369,11 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 			if (req.kind == pending_request::stream_value)
 				continue_running(req);
 			else continue_running();
+			if (take_bdd_node_table_exhausted<node>()) {
+				error = true;
+				TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+				finish_running();
+			}
 		}
 		out << "\n", out.flush();
 		if (!pending) reprompt();
@@ -2311,6 +2383,12 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 	// make_cli() already prints its own report (see its own comment);
 	// eval()'s result<int> return carries REPL quit codes, not a report.
 	tref cli = make_cli(src).value_or(nullptr);
+	// parsing builds the bdds of sbf constants: a line whose constants did
+	// not fit in the node table is not run
+	if (take_bdd_node_table_exhausted<node>()) {
+		error = true, cli = nullptr;
+		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+	}
 	// Pin the parsed command line for the whole evaluation: a `run` among
 	// its commands steps the interpreter, which calls maybe_gc(), and the
 	// commands still queued behind it live in this very tree. A line that
@@ -2372,7 +2450,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
-		"  lgrsmaxvars            pure-equality variables on lgrs route 8\n"
+		"  lgrsmaxvars            pure-equality vars solved algebraically 8\n"
 		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
 		"  fixpointsteps          temporal-normalization fixpoint steps 500\n"
 		"  flagsteps              eventual-flag search steps           500\n"
@@ -2384,11 +2462,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
 		"  gcminsize              gc trigger floor (tree nodes)        256\n"
 		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
+		"  trefbudget             live interned tree nodes allowed     unlimited\n"
+		"  trefbudgetsoft         % of trefbudget that forces a sweep  75\n"
 		"  specsizewarn           updated-spec size warning (chars)    off\n"
 		"  revisionalts           revision alternatives kept per part  unlimited\n"
 		"  maxsubsets             k-ary consistency subset checks      4096\n"
 		"  cachebound             string-keyed synthesis cache bound   4096\n"
 		"  maxcoverproducts       oracle mixed-type coverage products  256\n"
+		"  maxconstantsize        fresh-value region kept (tree nodes) 2000\n"
 		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
 		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
 		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
@@ -2468,7 +2549,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "History and definitions:\n"
 		<< "  history or hist         show all Tau expressions stored in the repl history\n"
 		<< "  definitions or defs     show stored IO variables and function and predicate definitions\n"
-		<< "  reset                   clear history, definitions, and IO streams\n"
+		<< "  reset                   reset the session and free unused memory\n"
 		<< "\n"
 
 		<< "Inspection commands:\n"
@@ -2603,6 +2684,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "a new `run <tau>` replaces any stored session; `run` / `run N steps`\n"
 		<< "with no formula continue the stored one. `N step` (singular) also works.\n"
+		<< "a step that fails, for instance on an output that cannot be written,\n"
+		<< "ends the run and prints the error.\n"
 		<< "\n";
 		break;
 	case tau::stop_sym: out
@@ -2644,6 +2727,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --min, --minimum                   computes a minimum solution of the system of equations\n"
 		<< "  --max, --maximum                   computes a maximum solution of the system of equations\n"
 		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
+		<< "\n"
+		<< "every value of the assignment is a constant (lgrs gives the reproductive solution)\n"
 		<< "\n";
 		break;
 	case tau::lgrs_sym: out
@@ -2668,15 +2753,22 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "type names: wff, bf, " << node::ba::types_joined() << "\n";
 		break;
 	case tau::reset_sym: out
-		<< "the reset command clears the REPL session state\n"
+		<< "the reset command starts the REPL session afresh\n"
+		<< "\n"
+		<< "it stops a run in progress, clears the history, the definitions,\n"
+		<< "the IO streams and the caches, and frees the tree nodes nothing\n"
+		<< "uses any more; options keep the values they were set to\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  reset                   clears history, definitions, and IO streams\n";
+		<< "  reset                   resets the session\n";
 		break;
 	case tau::sat_sym: out
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is satisfiable if there exists a variable assignment to non-temporal variables\n"
 		<< "such that for all possible inputs there exist time compatible outputs at each point in time\n"
+		<< "inputs under sometimes are read the same way (sat sometimes i1[t] = 1 is F)\n"
+		<< "a formula without a temporal operator is read as if it were wrapped in always\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  sat <rr>                checks the given tau formula with additional predicate and function definitions for satisfiability\n"
@@ -2684,7 +2776,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  sat <repl_history>      checks the Tau formula stored at the specified repl history position for satisfiability\n";
 		break;
 	case tau::valid_sym: out
-		<< "the valid command checks if a Tau formula is logically equivalent to T and if so prints T and else F\n"
+		<< "the valid command checks if a Tau formula is valid and if so prints T and else F\n\n"
+		<< "a tau formula is valid if no trace violates it: validity quantifies over traces, not over\n"
+		<< "an environment, so every input stream is read as an output (valid sometimes i1[t] = 1 is F)\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  valid <rr>              checks the given tau formula with additional predicate and function definitions for validity\n"
@@ -2695,6 +2790,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the unsat command checks if a Tau formula is unsatisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is unsatisfiable if for every variable assignment to non-temporal variables\n"
 		<< "there exist inputs such that there are no time compatible outputs at some point in time\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  unsat <rr>              checks the given tau formula with additional predicate and function definitions for unsatisfiability\n"

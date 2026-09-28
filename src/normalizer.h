@@ -205,9 +205,9 @@ result<bool> has_no_boolean_combs_of_models(tref n);
  * `normalize_non_temp`, and returns `true` if the result is `T`.
  * @tparam node Tree node type.
  * @param n Non-temporal formula to test (must not contain `always`/`sometimes`).
- * @return `true` if satisfiable; `false` also when normalization fails on
- * a `bv_widening` width-cap violation (a logged, conservative fallback,
- * not a proof of unsatisfiability).
+ * @return `true` if satisfiable, `false` if not; an error (UNKNOWN,
+ * `code::solver_error`) when normalization leaves the closed formula
+ * undecided or fails.
  *
  * @par Example
  * @code{.cpp}
@@ -228,7 +228,8 @@ result<bool> is_non_temp_nso_satisfiable(tref n);
  * `normalize_non_temp`, and returns `true` if the result is `F`.
  * @tparam node Tree node type.
  * @param n The non-temporal formula to test.
- * @return `true` if the formula is unsatisfiable, `false` otherwise.
+ * @return `true` if the formula is unsatisfiable, `false` if it is
+ * satisfiable; an error (UNKNOWN) when normalization leaves it undecided.
  *
  * @par Example
  * @code{.cpp}
@@ -313,9 +314,8 @@ bool are_nso_equivalent(tref n1, tref n2);
  * @tparam node Tree node type.
  * @param n1 Antecedent formula.
  * @param n2 Consequent formula.
- * @return `true` if `n1 => n2` is valid; `false` also when normalization
- * fails on a `bv_widening` width-cap violation (a logged, conservative
- * fallback, not a proof).
+ * @return `true` if `n1 => n2` is valid, `false` if not; an error
+ * (UNKNOWN) when normalization leaves the implication undecided or fails.
  *
  * @par Example
  * @code{.cpp}

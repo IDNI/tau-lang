@@ -9,6 +9,7 @@
 #include "codegen_strategy.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
+#include "test_scratch_dir.h"
 
 #include <algorithm>
 #include <chrono>
@@ -61,21 +62,23 @@ bool has_gpp() {
 	return ::system("g++ --version >/dev/null 2>&1") == 0;
 }
 
-// Write `header_src` + `main_src` to /tmp, compile with g++, run, return the
-// first stdout line ("" on any compile/run failure).
+// Write `header_src` + `main_src` to the test's scratch directory, compile
+// with g++, run, return the first stdout line ("" on any compile/run failure).
 std::string compile_and_run(
     const std::string& header_src,
     const std::string& main_src,
     const std::string& tag)
 {
-	std::string hdr  = "/tmp/_tau_cg_pd_" + tag + ".h";
-	std::string mainf = "/tmp/_tau_cg_pd_" + tag + "_main.cpp";
-	std::string exe  = "/tmp/_tau_cg_pd_" + tag + "_exe";
+	const std::string dir = test_scratch_dir().string();
+	std::string hdr  = dir + "/_tau_cg_pd_" + tag + ".h";
+	std::string mainf = dir + "/_tau_cg_pd_" + tag + "_main.cpp";
+	std::string exe  = dir + "/_tau_cg_pd_" + tag + "_exe";
 	{ std::ofstream f(hdr); f << header_src; }
 	{ std::ofstream f(mainf); f << main_src; }
-	std::string cmd = "g++ -O2 -std=c++23 -I/tmp -o " + exe + " " + mainf + " 2>&1";
+	std::string cmd = "g++ -O2 -std=c++23 -I\"" + dir + "\" -o \"" + exe
+		+ "\" \"" + mainf + "\" 2>&1";
 	if (::system(cmd.c_str()) != 0) return "";
-	std::string run_cmd = exe + " > " + exe + ".out 2>&1";
+	std::string run_cmd = "\"" + exe + "\" > \"" + exe + ".out\" 2>&1";
 	if (::system(run_cmd.c_str()) != 0) return "";
 	std::ifstream out(exe + ".out");
 	std::string line;
@@ -243,6 +246,78 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(s, "tref o1"));
 		CHECK(has(s, "o.o1 ="));
 		CHECK_FALSE(has(s, "void revise("));
+	}
+
+	// ── the Mealy view of a strategy of the data game ─────────────────────
+
+	TEST_CASE("build_program_desc: the data game's Mealy view plays from its history") {
+		// only the data game decides this spec
+		tref fm = parse_like_compile_spec(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		auto d = build_program_desc<node_t>(*data->view, "data_game");
+		REQUIRE(d.has_value());
+		CHECK(d->data_game);
+		CHECK(d->history.size() == data->view->history.size());
+		std::ostringstream os;
+		compile_detail::emit_main(*d, os);
+		CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
+	}
+
+	// The main.cpp compile_spec emits for spec; the unusable compiler
+	// stops the build right after it is written.
+	std::string emitted_main(const std::string& spec, const std::string& tag) {
+		namespace stdfs = std::filesystem;
+		const stdfs::path dir = test_scratch_dir() / tag;
+		std::error_code ec;
+		stdfs::remove_all(dir, ec);
+		auto res = compile_spec<node_t>(spec, "", dir.string(),
+			"/nonexistent/c++");
+		CHECK_FALSE(res.has_value());
+		std::ifstream f(dir / "main.cpp");
+		std::ostringstream os;
+		os << f.rdbuf();
+		return os.str();
+	}
+
+	TEST_CASE("compile_spec: a data game strategy without a Mealy view is played as run plays it") {
+		// no view within a bound of 0 states, as for a game decided over
+		// formulas
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		const std::string m = emitted_main(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "dg_no_view");
+		data_game_mealy_max_states = saved;
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "table_step_provider<node_t>>("));
+	}
+
+	TEST_CASE("compile_spec: a spec run solves step by step is solved step by step") {
+		// run executes it by the safety pipeline, with no strategy; the
+		// abstraction's strategy chose o1[0] = 1 and broke the spec
+		const std::string m = emitted_main(
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0",
+			"safety_pipeline");
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "codegen::strategy strat;"));
+	}
+
+	TEST_CASE("compile_spec: the data game's Mealy view is carried as a table") {
+		const std::string m = emitted_main(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "dg_view");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
 	}
 
 	// ── (b') untyped io var reaching codegen is a hard error ─────────────
@@ -567,7 +642,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		auto d = build_program_desc<node_t>(*sol, "pos_flag_run");
 		REQUIRE(d.has_value());
 		REQUIRE_FALSE(d->needs_tau_link);
-		REQUIRE(d->outputs.size() == 3);
+		REQUIRE(d->outputs.size() == 2);
 		std::ostringstream os;
 		emit_program(*d, os);
 
@@ -583,9 +658,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "    pos_flag_run::inputs in;\n"
 		    "    auto out = prog.step(in);\n"
 		    "    if (!out.ok) { ok = false; break; }\n"
-		    "    std::printf(\"%d%d%d \", (int)out." + d->outputs[0].cpp_name
-		            + ", (int)out." + d->outputs[1].cpp_name
-		            + ", (int)out." + d->outputs[2].cpp_name + ");\n"
+		    "    std::printf(\"%d%d \", (int)out." + d->outputs[0].cpp_name
+		            + ", (int)out." + d->outputs[1].cpp_name + ");\n"
 		    "    bool has_input = false;\n"
 		    "    auto_continue = has_input || (t < pos_flag_run::highest_initial_pos);\n"
 		    "    ++t;\n"
@@ -596,14 +670,13 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "  std::printf(\"\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
-		// One field per atom, all over the same variable o, each holding
-		// o's value as its own atom decides it: at step 1 the spec pins
-		// o = 0, so the o = 0 field reads 0 there and 1 elsewhere, the two
-		// o = 1 fields the other way round. (A field is never its prop's
-		// truth -- that would print 100 010 001 and write 1 into a stream
-		// the spec constrains to 0.)
+		// One field per atom, both over the same variable o, each holding
+		// o's value as its own atom decides it: o[0] = 1 and o[2] = 1 share
+		// the o = 1 atom, so both fields read 1, 0, 1. (A field is never its
+		// prop's truth -- that would print 10 01 10 and write 1 into a
+		// stream the spec constrains to 0.)
 		auto result = compile_and_run(os.str(), main_src, "posflag");
-		CHECK(result == "110 000 011 ");
+		CHECK(result == "11 00 11 ");
 	}
 
 	// Both positional atoms sit inside an implication -- an implication of
@@ -832,8 +905,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = stdfs::temp_directory_path()
-			/ "test_cpp_codegen_hello_world_sdk_link.build";
+		stdfs::path bdir =
+			test_scratch_path("test_cpp_codegen_hello_world_sdk_link.build");
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 
@@ -883,7 +956,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "piped inputs come back in order, exit code 0") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = stdfs::temp_directory_path() / "_tau_cg_pd_echo";
+		stdfs::path bdir = test_scratch_path("_tau_cg_pd_echo");
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 

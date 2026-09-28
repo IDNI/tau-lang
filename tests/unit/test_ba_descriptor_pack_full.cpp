@@ -159,6 +159,7 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		static_assert(ba_has_literal_incomplete<N, qint> && ba_has_literal_incomplete<N, hsb>);
 		static_assert(!ba_has_literal_incomplete<N, tau_t>);
 		static_assert(ba_has_print_constant<N, bv> && !ba_has_print_constant<N, sbf_ba>);
+		static_assert(ba_has_constant_size<N, tau_t> && !ba_has_constant_size<N, bv>);
 		static_assert(ba_has_type_tree_for<N, bv>);
 		static_assert(ba_arith_ops_v<N, bv> && !ba_arith_ops_v<N, sbf_ba>);
 		static_assert(ba_can_host_bool_v<N, bv> && ba_can_host_bool_v<N, sbf_ba>);

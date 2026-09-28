@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_DESCRIPTOR_H__
 
 #include <concepts>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -218,6 +219,31 @@ concept ba_has_value_constant = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::value_constant(t, v) }
 			-> std::convertible_to<tref>; };
 
+// The type's values are the integers 0 .. 2^n - 1 (n = modular_width, 0 for
+// a type that is not), read with unsigned modular semantics: the Boolean
+// operators bitwise, + - * modulo 2^n, / % unsigned, shifts logical, the
+// comparisons unsigned. modular_value reads the integer a constant holds.
+template <typename Node, typename BA>
+concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t, tref c) {
+		{ ba_descriptor<BA, Node>::modular_width(t) }
+			-> std::convertible_to<size_t>;
+		{ ba_descriptor<BA, Node>::modular_value(t, c) }
+			-> std::convertible_to<std::optional<uint64_t>>; };
+
+// The type's values, read by = and the order comparisons, form a dense
+// linear order without endpoints; dense_order_compare orders two constants
+// (-1, 0, 1), nullopt when either is not a point of the order, and
+// dense_order_between gives a point above `lo` and below `hi` (either
+// nullptr for no bound), nullptr when a bound is not a point.
+template <typename Node, typename BA>
+concept ba_has_dense_order = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t, tref a, tref b) {
+		{ ba_descriptor<BA, Node>::dense_order_compare(t, a, b) }
+			-> std::convertible_to<std::optional<int>>;
+		{ ba_descriptor<BA, Node>::dense_order_between(t, a, b) }
+			-> std::convertible_to<tref>; };
+
 template <typename Node, typename BA>
 concept ba_has_bool_carrier_type = ba_has_descriptor_v<Node, BA>
 	&& requires {
@@ -229,6 +255,14 @@ concept ba_has_omcat_qe = ba_has_descriptor_v<Node, BA>
 	&& requires(tref v, tref b) {
 		{ ba_descriptor<BA, Node>::omcat_qe(v, b) }
 			-> std::convertible_to<std::optional<bool>>; };
+
+// A quantifier-free formula equivalent to `ex var. body` over the other
+// variables, or nullptr when the theory cannot eliminate var that way.
+template <typename Node, typename BA>
+concept ba_has_omcat_qe_residual = ba_has_descriptor_v<Node, BA>
+	&& requires(tref v, tref b) {
+		{ ba_descriptor<BA, Node>::omcat_qe_residual(v, b) }
+			-> std::convertible_to<tref>; };
 
 template <typename Node, typename BA>
 concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
@@ -259,6 +293,23 @@ concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(std::ostream& os, const BA& x) {
 		{ ba_descriptor<BA, Node>::print_constant(os, x) }
 			-> std::same_as<std::ostream&>; };
+
+/**
+ * @brief `true` when @p BA's constants carry a tree that grows with the
+ * operations applied to them, and the descriptor measures it.
+ *
+ * Optional capability: the wrapper's constant embeds a whole spec, and each
+ * Boolean operation on two constants builds a larger one, so a leaf of one
+ * node can hold an arbitrarily large formula. `generated_constant_size`
+ * (solver.tmpl.h) adds `constant_size` to a tree's own node count, which is
+ * what `max_constant_size` bounds. Probed at the point of use, like
+ * `print_constant`; absent means a constant counts as its leaf alone.
+ */
+template <typename Node, typename BA>
+concept ba_has_constant_size = ba_has_descriptor_v<Node, BA>
+	&& requires(const BA& x) {
+		{ ba_descriptor<BA, Node>::constant_size(x) }
+			-> std::convertible_to<size_t>; };
 
 template <typename Node, typename BA>
 concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>

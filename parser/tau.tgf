@@ -291,12 +291,16 @@ fragment_name          => ("ltl" :fragment_ltl | "ctl_star" :fragment_ctl_star
 # command arguments
 #
 bf_cmd_arg             => history | bf.
-wff_cmd_arg            => history | wff.
+# A term is accepted after the formula (here and in onf_cmd_arg) so that a
+# command given one reports it instead of the whole line being read as a
+# term (`solve x` was stored as the history entry `solvex`); production
+# order keeps a formula first.
+wff_cmd_arg            => history | wff | bf.
                           # ref is excluded from a bare min/max call so the
                           # builtin (bf_min/bf_max) wins at the command level
                           # too, not only inside larger formulas
 nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
-onf_cmd_arg            => history | wff.
+onf_cmd_arg            => history | wff | bf.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
 # one '[ match / replace, ... ]' group of the subst command; the group node is

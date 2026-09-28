@@ -8,6 +8,7 @@ set(TAU_BA_TESTS
 	tests/test_bv_ba-cast.cpp
 	tests/test_bv_ba-simplification.cpp
 	tests/test_bv_ba_helpers.cpp
+	tests/test_bv_bitblast.cpp
 	tests/test_bv_codegen.cpp
 	tests/test_bv_widening.cpp
 	tests/test_integration-blasting_correctness_check1.cpp

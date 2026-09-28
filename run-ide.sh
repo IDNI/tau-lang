@@ -96,7 +96,8 @@ fix_parser_mutex() {
 # ---- Build tau binary ------------------------------------------------------
 TAU_BIN=""
 find_tau_binary() {
-  for d in build-Release build-Debug build-RelWithDebInfo build; do
+  for d in build-Release build/release build-RelWithDebInfo build/relwithdebinfo \
+           build-Debug build/devel build/debug; do
     local p="$SCRIPT_DIR/$d/tau"
     [[ -x "$p" ]] && { TAU_BIN="$p"; return 0; }
   done

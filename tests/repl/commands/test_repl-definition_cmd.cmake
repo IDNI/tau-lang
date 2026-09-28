@@ -77,3 +77,61 @@ add_repl_test_fail(definitions-solve_unresolved_reference
 	"type Point = {a: sbf, b: sbf}. solve x:Point = x && foo(x.a, x.b) && x.a != 0"
 	"unresolved reference")
 set_tests_properties("test_repl-definitions-solve_unresolved_reference" PROPERTIES TIMEOUT 60)
+
+# A definition body brings its own bound variables, numbered per formula, so
+# the body's `ex b1` and a call site's `all b1` used to be the same name and
+# the argument was captured on expansion: `all x (t(x))` answered T because it
+# had become `all b1 (ex b1 (b1 != 0))`. The argument is only at risk when it
+# is the innermost binder, hence the two nesting orders.
+add_repl_test(definitions-quant_body_no_capture
+	"t(a) := (ex c (a != 0)). valid all x (t(x))" ": F")
+add_repl_test(definitions-quant_body_no_capture-inner
+	"t(a) := (ex c (a != 0)). valid all y (all x (t(x)))" ": F")
+add_repl_test(definitions-quant_body_no_capture-outer
+	"t(a) := (ex c (a != 0)). valid all x (all y (t(x)))" ": F")
+# The renaming must not break a body that does bind the argument's value.
+add_repl_test(definitions-quant_body_witness
+	"t(a) := (ex c (a = c)). valid all x (t(x))" ": T")
+
+# A bound variable of the body handed to another definition is a value, not a
+# pattern hole. It used to be turned into a capture, which left an unbound
+# capture in the expansion -- `q1(0)` normalized to `1 != 0` and answered F.
+add_repl_test(definitions-bound_var_as_ref_arg
+	"q0(b) := (0 != b). q1(a) := (ex c (q0(c))). valid q1(0)" ": T")
+add_repl_test(definitions-bound_var_as_fn_ref_arg
+	"f(x) := x'. g(a) := (ex c (f(c) = 0)). valid g(0)" ": T")
+# A head parameter passed on to another definition stays a pattern hole.
+add_repl_test(definitions-head_var_as_ref_arg
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(1)" ": T")
+add_repl_test(definitions-head_var_as_ref_arg-false
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(0)" ": F")
+
+# The same two defects on a recurrence relation, which is unrolled by
+# calculate_fixed_point one rule at a time rather than through nso_rr_apply's
+# fixpoint loop, so the bodies it splices in keep their shifted ids. f
+# alternates: f[n](y) is y = 0 for even n and y = 1 for odd n; its body hands
+# its bound variable to the previous step, which used to leave `1 = 0` for
+# every query below.
+set(_rec_f "f[0](y) := y = 0. f[n](y) := ex x (f[n-1](x) && y = x')")
+add_repl_test(definitions-rec_bound_var_step_1_true
+	"${_rec_f}. normalize f[1](1)" ": T")
+add_repl_test(definitions-rec_bound_var_step_1_false
+	"${_rec_f}. normalize f[1](0)" ": F")
+add_repl_test(definitions-rec_bound_var_step_2
+	"${_rec_f}. normalize f[2](0)" ": T")
+add_repl_test(definitions-rec_bound_var_step_3
+	"${_rec_f}. normalize f[3](1)" ": T")
+# f has no fixed point (it alternates), so f(0) is F.
+add_repl_test(definitions-rec_bound_var_fixed_point
+	"${_rec_f}. normalize f(0)" ": F")
+# A quantified query over the unrolled recurrence (a control: it was right
+# before as well).
+add_repl_test(definitions-rec_bound_var_quantified_query
+	"${_rec_f}. normalize all z (f[2](z) -> z = 0)" ": T")
+# g[n](y) is T for every n (take c = y'); a query binder at the innermost
+# position used to be captured by the body's `ex c` and answered F.
+set(_rec_g "g[0](y) := ex c (c = y). g[n](y) := ex c (g[n-1](c) && c != y)")
+add_repl_test(definitions-rec_quant_body_no_capture
+	"${_rec_g}. normalize all z (g[2](z))" ": T")
+add_repl_test(definitions-rec_quant_body_fixed_point
+	"${_rec_g}. normalize g(0)" ": T")

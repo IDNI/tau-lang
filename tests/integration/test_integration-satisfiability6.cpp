@@ -77,6 +77,20 @@ static tref make_ctn(node_t::type kind, bool num_first, size_t n) {
 		: tau::get(kind, { cv, nm }));
 }
 
+// A spec as written: no construction hook has folded any of its literals.
+static tref spec_as_written(const char* spec) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return create_spec(spec);
+}
+
+// The lookback of the warm-up stream pin_written_warm_ups adds, -1 without it.
+static int_t warm_up_pin(tref fm) {
+	for (tref v : io_vars_of(fm))
+		if (get_var_name<node_t>(v) == "o__warmup")
+			return get_io_var_shift<node_t>(v);
+	return -1;
+}
+
 static bool str_has(const std::string& hay, const char* needle) {
 	return hay.find(needle) != std::string::npos;
 }
@@ -120,6 +134,137 @@ TEST_SUITE("satisfiability public API") {
 		// Not a tautology: o1 need not be constantly 1.
 		tref not_valid_fm = create_spec("always o1[t] = 1.");
 		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm).value() );
+	}
+
+	// Satisfiability quantifies the inputs of a `sometimes` universally,
+	// like the inputs of the `always` part (README "Satisfiability").
+	TEST_CASE("is_tau_formula_sat: the inputs of a sometimes are universal") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		// the environment can keep i1 away from 1 forever
+		CHECK( !sat("sometimes i1[t] = 1.") );
+		CHECK( !sat("(always o1[t] = 1) && (sometimes i1[t] = 1).") );
+		// a stronger formula than the unsatisfiable
+		// `(always o1[t] = i1[t]) && (sometimes o1[t] = 1)`
+		CHECK( !sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 && o1[t] = 1)).") );
+		CHECK( !sat("(always o1[t] = 0) && (sometimes o1[t] = i1[t]).") );
+		// the output can follow the input at the step it reads it
+		CHECK( sat("sometimes o1[t] = i1[t].") );
+		CHECK( sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 -> o2[t] = 1)).") );
+	}
+
+	// Each clause is enforced from its own deepest lookback (README
+	// "Lookback initialization"): an always part reading the past asks
+	// nothing at the first steps, where a sometimes part may hold.
+	TEST_CASE("is_tau_formula_sat: a sometimes may hold during the always warm-up") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes o2[t] = 1).") );
+		// the unbounded continuation of this always part reads only one
+		// step back, the always part as written two
+		CHECK( sat("(always (i2[t] = o1[t-2] || o1[t-1] = 0) && "
+			"o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t]).") );
+		// no warm-up left once the sometimes part reads as far back
+		CHECK( !sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes (o2[t] = 1 && o1[t-1] = 1)).") );
+		CHECK( !sat("(always o2[t] = 0) && (sometimes o2[t] = 1).") );
+	}
+
+	// A clause is enforced from the deepest lookback it is written with,
+	// also when normalization drops the literal that reads it.
+	TEST_CASE("pin_written_warm_ups: a clause keeps the lookback it is written with") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref taut = pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0).");
+		CHECK( warm_up_pin(taut) == 2 );
+		auto sat = is_tau_formula_sat<node_t>(taut);
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+		// a semantic tautology, and a literal another always statement
+		// absorbs
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && "
+			"(o1[t-2] = 0 || o1[t-2] != 0)) && (sometimes o2[t-1] = 0).")) == 2 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+			"(sometimes o2[t-1] = 0).")) == 2 );
+		// a sometimes clause, and a formula without temporal operator
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o3[t-1] = 0) && "
+			"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).")) == 1 );
+		CHECK( warm_up_pin(pinned("o2[t] = 1 && i1[t-1] = i1[t-1].")) == 1 );
+		// a lookback that normalization keeps needs no pin
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = 0) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+	}
+
+	// Under a negation the always body gets the negated marker disjoined,
+	// so the marker is conjoined once the negation is pushed; each always
+	// statement keeps the lookback of the always part.
+	TEST_CASE("pin_written_warm_ups: clauses read under a negation") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref neg = pinned("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)).");
+		CHECK( warm_up_pin(neg) == 2 );
+		CHECK( tau::get(neg).find_top(is_child<node_t, tau::wff_or>) );
+		// the merged always part reads two steps back, o2[t] = 1 alone
+		// none: its negation is asked from step 2 on
+		CHECK( warm_up_pin(pinned("!((always o2[t] = 1) && "
+			"(always o1[t] = o1[t-2])).")) == 2 );
+		// read under <-> the clause is left as written
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"<-> (always o2[t] = 1).")) == -1 );
+	}
+
+	// is_tau_impl and are_tau_equivalent decide f1 && !f2 (and its mirror)
+	// as written: the tautology still delays the always part.
+	TEST_CASE("is_tau_impl / are_tau_equivalent: warm-ups as written") {
+		tref plain = spec_as_written("always o2[t] = 1.");
+		tref late = spec_as_written("always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		auto impl = [](tref a, tref b) {
+			auto r = is_tau_impl<node_t>(a, b);
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( impl(plain, late) );
+		CHECK( !impl(late, plain) );
+		auto eq = are_tau_equivalent<node_t>(plain, late);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
+		auto self = are_tau_equivalent<node_t>(late, late);
+		REQUIRE( self.has_value() );
+		CHECK( self.value() );
+	}
+
+	// The negated side of an implication turns an `always` over inputs
+	// into a `sometimes`, which the check reads through a guard: read
+	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
+	// imply `always i1[t] = 0`.
+	TEST_CASE("is_tau_impl: T does not imply an always over an input") {
+		tref fm = create_spec("always i1[t] = 0.");
+		auto impl = is_tau_impl<node_t>(tau::_T(), fm);
+		REQUIRE( impl.has_value() );
+		CHECK( !impl.value() );
+		auto eq = are_tau_equivalent<node_t>(tau::_T(), fm);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
 	}
 
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
@@ -617,6 +762,22 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( res.second == 0 );
 	}
 
+	TEST_CASE("transform_to_eventual_variables: guards the inputs of a sometimes only on request") {
+		tref fm = create_spec("sometimes o1[t] = i1[t].");
+		auto has_uconst = [](tref f) {
+			return tau::get(f).find_top(
+				is_child<node_t, tau::uconst_name>) != nullptr;
+		};
+		auto universal = transform_to_eventual_variables<node_t>(
+								fm, true, 0);
+		REQUIRE( universal.first != nullptr );
+		CHECK( !has_uconst(universal.first) );
+		auto guarded = transform_to_eventual_variables<node_t>(
+				fm, true, 0, sometimes_inputs::guarded);
+		REQUIRE( guarded.first != nullptr );
+		CHECK( has_uconst(guarded.first) );
+	}
+
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {
 		tref fm = create_spec(
 			"(always o1[t] = 1) && (sometimes o2[t-2] = 0).");
@@ -656,6 +817,49 @@ TEST_SUITE("satisfiability helpers") {
 		tref res = always_to_unbounded_continuation<node_t>(aw, 0, false);
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
+	}
+
+	// find_fixpoint_chi on a three-stage delay chain with the target
+	// o4[t] = 1. From the state where o1..o4 are all 0 at time 1, o4 can
+	// only become 1 four steps later (o1[2] = 1 gives o4[5] = 1), so the
+	// fixpoint needs at least four unrolling steps and must accept that
+	// state.
+	static std::pair<tref, int_t> delay_chain_chi(const char* extra) {
+		std::string aw = std::string("always o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1]") + extra + ".";
+		tref chi_base = spec_always_body(aw.c_str());
+		tref st = spec_always_body("always o4[t] = 1.");
+		REQUIRE( chi_base != nullptr );
+		REQUIRE( st != nullptr );
+		trefs io_vars = io_vars_of(tau::build_wff_and(chi_base, st));
+		std::set<std::pair<std::string, int_t>> initials;
+		auto res = find_fixpoint_chi<node_t>(chi_base, st, io_vars,
+			initials, 1);
+		REQUIRE( res.has_value() );
+		return res.value();
+	}
+
+	static tref all_zero_at_1() {
+		return spec_always_body("always o1[1] = 0 && o2[1] = 0 "
+			"&& o3[1] = 0 && o4[1] = 0.");
+	}
+
+	TEST_CASE("find_fixpoint_chi: reachability grows past the lookback") {
+		auto [chi, steps] = delay_chain_chi("");
+		CHECK( steps >= 4 );
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+	}
+
+	TEST_CASE("find_fixpoint_chi: an unreachable target stays unreachable") {
+		// With o1 held at 0 the zero state never reaches o4[t] = 1.
+		auto [chi, steps] = delay_chain_chi(" && o1[t] = 0");
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( !sat.value() );
 	}
 }
 

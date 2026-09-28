@@ -188,8 +188,14 @@ tref to_dnf(tref fm) {
 		}
 		return n;
 	};
+	// Push negation in and expand XOR in the same pre-order step: the
+	// distribution below and the reduce() it calls read only `&`, `|` and
+	// negated literals, so a `bf_xor` left in place was later expanded by
+	// reduce() with its negations unpushed and read as a clause (issue #129).
 	auto pn = [](const auto& n) {
-		return push_negation_one_in<node, is_wff>(n);
+		tref r = push_negation_one_in<node, is_wff>(n);
+		if constexpr (!is_wff) r = apply_xor_def<node>(r);
+		return r;
 	};
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
@@ -259,8 +265,12 @@ tref to_cnf(tref fm) {
 			}
 		return n;
 	};
+	// See to_dnf: XOR is expanded while descending, here straight into its
+	// conjunctive shape `(A | B) & (A' | B')` so no distribution is needed.
 	auto pn = [](tref n) {
-		return push_negation_one_in<node, is_wff>(n);
+		tref r = push_negation_one_in<node, is_wff>(n);
+		if constexpr (!is_wff) r = apply_xor_def_cnf<node>(r);
+		return r;
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
@@ -310,7 +320,9 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 	return rewriter::replace<node>(fm, changes);
 }
 
-// Adjust the lookback before conjunction of fm1 and fm2
+// Conjunction of the bodies of two always statements. They form one always
+// part, enforced from its deepest lookback (README "Lookback
+// initialization"), so the bodies are conjoined as they stand.
 template <NodeType node>
 tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	using tau = tree<node>;
@@ -325,26 +337,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	if (fm2 == tau::_T()) return fm1;
 	if (fm1 == tau::_F()) return fm1;
 	if (fm2 == tau::_F()) return fm2;
-	auto io_vars1 = tau::get(fm1)
-		.select_top(is_child<node, tau::io_var>);
-	auto io_vars2 = tau::get(fm2)
-		.select_top(is_child<node, tau::io_var>);
-	// Get lookbacks
-	int_t lb1 = get_max_shift<node>(io_vars1);
-	int_t lb2 = get_max_shift<node>(io_vars2);
-	if (lb1 < lb2) {
-		// adjust fm1 by lb2 - lb1
-		return tau::build_wff_and(
-			shift_io_vars_in_fm<node>(fm1, io_vars1, lb2 - lb1),
-			fm2);
-	} else if (lb2 < lb1) {
-		// adjust fm2 by lb1 - lb2
-		return tau::build_wff_and(fm1,
-			shift_io_vars_in_fm<node>(fm2, io_vars2, lb1 - lb2));
-	} else {
-		// no adjustment needed
-		return tau::build_wff_and(fm1, fm2);
-	}
+	return tau::build_wff_and(fm1, fm2);
 }
 
 // Squeeze all equalities found in n

@@ -14,6 +14,7 @@
 
 #include "solver.h"
 #include "ltl_aba.h"
+#include "tau_memory_budget.h"
 
 #include <functional>
 #include <map>
@@ -55,14 +56,42 @@ struct step_provider {
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) = 0;
 
-	/// @brief True to skip the appear_within_lookback input filter in step().
-	virtual bool skip_lookback_filter() const { return false; }
+	/**
+	 * @brief The inputs of a step the provider reads.
+	 * @param vars The inputs of the step, one io_var each.
+	 * @return The ones to read, or nullopt to leave the choice to the
+	 * spec's lookback filter (appear_within_lookback).
+	 */
+	virtual std::optional<trefs> read_set(const trefs& vars) const {
+		(void)vars;
+		return std::nullopt;
+	}
+
+	/// @brief The state of the strategy the provider plays, when it has one.
+	virtual std::optional<int> strategy_state() const { return std::nullopt; }
+
+	/// @brief Past steps the provider reads beyond the spec's own lookback.
+	virtual int_t lookback() const { return 0; }
+
+	/// @brief The last fixed step the spec the provider plays reads.
+	virtual int_t highest_fixed_step() const { return 0; }
+
+	/// @brief Starts the provider's own memory afresh (interpreter::reset).
+	virtual void reset() {}
+
+	/// @brief False when the provider cannot follow a revised spec.
+	virtual bool revisable() const { return true; }
 };
 
 /// @brief Default step_provider: re-runs the general solver every step. Full
 /// definition in interpreter.tmpl.h; forward-declared for make_interpreter's use.
 template <NodeType node>
 struct solve_step_provider;
+
+/// @brief step_provider playing a strategy of the data game; defined in
+/// interpreter.tmpl.h.
+template <NodeType node>
+struct data_game_step_provider;
 
 /**
  * @brief Step-by-step interpreter for a normalized Tau specification.
@@ -368,6 +397,13 @@ struct interpreter {
 	// entry that matched the name but did not serialise.
 	result<std::string> accumulator_state(const std::string& name) const;
 
+	// Whether the data game's strategy chooses this run's outputs. Its
+	// Mealy view, when it has one, is then `cached_solution`.
+	bool plays_data_game() const;
+
+	/// @brief Return `true` if @p var is excluded from output.
+	static bool is_excluded_output(tref var);
+
 	// ── Mealy-strategy introspection (cached_solution-dependent) ─────────
 	//
 	// All four methods below return meaningful results only when the spec
@@ -541,6 +577,11 @@ private:
 		subtree_map<node, size_t> input_sources;
 		subtree_map<node, size_t> output_sources;
 		std::string spec_str;
+		// Set by a revision of a run of the data game's strategy: the
+		// provider playing the strategy for the revised spec and its
+		// Mealy view.
+		std::shared_ptr<step_provider<node>> provider;
+		std::optional<ltl_aba_solution<node>> solution;
 		// The union-find's move constructor is explicit, so the members
 		// are direct-initialized here rather than brace-aggregated.
 		update_plan(std::vector<htrefs>&& c,
@@ -561,6 +602,12 @@ private:
 	/// @return The plan, or a structured error/warning report when no
 	///         clause does.
 	result<update_plan> plan_update(tref update);
+
+	/// @brief plan_update for a run of the data game's strategy: the
+	/// running spec is revised by @p update as in plan_update, and the
+	/// data game is solved again for the revised spec from the values of
+	/// the steps already played.
+	result<update_plan> plan_data_game_update(tref update);
 
 	/// @brief The index of the first alternative of part @p part whose
 	/// continuation is solvable at the current time point under the
@@ -607,6 +654,9 @@ private:
 	result<std::pair<std::optional<assignment<node>>, bool>> read(
 		const trefs& in_vars, size_t time_step);
 	/// @brief Write output assignments to the output context.
+	/// @return An error and nothing written when a bdd node table filled
+	/// while the outputs were computed (`bdd_node_table_exhausted`), or
+	/// when a value cannot be serialized or written.
 	result<bool> write(const assignment<node>& outputs);
 	/// @brief Rebuild the input stream map from @p current_inputs.
 	/// @return false if a stream could not be found (interpretation should stop).
@@ -695,9 +745,6 @@ private:
 	/// revision; the report carries the probes tried along the way.
 	result<std::optional<htrefs>> pointwise_revision(const htrefs& alts,
 		tref update, const int_t start_time);
-
-	/// @brief Return `true` if @p var is excluded from output.
-	static bool is_excluded_output(tref var);
 
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	trefs appear_within_lookback(const trefs& vars);

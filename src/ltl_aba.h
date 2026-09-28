@@ -27,15 +27,19 @@
 #include "logging.h"
 #include "ltl_aba_limits.h"
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace idni::tau_lang {
@@ -94,10 +98,10 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	mix((size_t) ltl_timeout_sec());
 	mix(std::hash<std::string>{}(ltl_algorithm_choice()));
 	mix(ltl_qe_max_vars());
-	mix(ltl_hoa_max_states);
-	mix(ltl_guard_max_cubes);
-	mix(ltl_max_refinement_rounds);
-	mix(ltl_window_max_paths);
+	mix(ltl_hoa_max_states());
+	mix(ltl_guard_max_cubes());
+	mix(ltl_max_refinement_rounds());
+	mix(ltl_window_max_paths());
 	return seed;
 }
 
@@ -424,12 +428,17 @@ bool has_semantic_negation(tref fm);
  * negation placement with no sound reduction) -- the caller must check
  * has_value() and must not read an error as a decided false.
  * @tparam node Tree node type.
- * @param fm Formula to explain.
+ * @param fm Formula to explain: a wff, or a spec whose main part is one;
+ *        anything else is an invalid_argument error, not a verdict.
  * @param out Stream receiving the trace.
+ * @param decide When given, the verdict printed and returned: the caller's
+ *        realizability check of the spec @p fm was prepared from, so the
+ *        trace never answers differently from it.
  * @return `true` iff @p fm is realizable, or an error when undecided.
  */
 template <NodeType node>
-result<bool> ltl_explain(tref fm, std::ostream& out);
+result<bool> ltl_explain(tref fm, std::ostream& out,
+	const std::function<result<bool>()>& decide = {});
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
@@ -459,6 +468,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // signature below — the type only needs to be complete at instantiation
 // sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
 // chain that defines it.
+
+// A strategy of the data game (ltl_aba_data_game.tmpl.h).
+template <NodeType node>
+struct data_game_strategy;
 
 // ── Interpreter-facing helpers (LT-29) ───────────────────────────────────────
 //
@@ -589,13 +602,23 @@ tref ltl_to_safety_formula(tref fm);
  * (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
  * other path (the ppLTLTT tester encoding anchors inside the skeleton).
  * @tparam node Tree node type.
+ * With @p data_strategy, a formula the data game decides gets that game's
+ * strategy there instead, and the first element is nullptr.
  * @param fm Normalised LTL formula.
+ * @param data_strategy Optional sink for the strategy of the data game.
+ * @param synthesize Synthesize a strategy also for a formula without future
+ * operators, which is otherwise returned as its own safety formula.
+ * @param unrealizable Optional sink, set when a procedure deciding the
+ * formula exactly (the data game, or an algebra's own synthesis) proves
+ * that no strategy exists.
  * @return {safety formula or nullptr, optional solution, unanchored
  * auxiliary output names}.
  */
 template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
-ltl_to_safety_formula_full(tref fm);
+ltl_to_safety_formula_full(tref fm,
+	std::shared_ptr<data_game_strategy<node>>* data_strategy = nullptr,
+	bool synthesize = false, bool* unrealizable = nullptr);
 
 } // namespace idni::tau_lang
 

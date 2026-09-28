@@ -193,13 +193,13 @@ State: 0
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 1\nStart: x" + tail).num_states == 0);
 		// The state cap is the runtime parameter ltl_hoa_max_states.
-		const size_t saved = ltl_hoa_max_states;
-		ltl_hoa_max_states = 3;
+		const long saved = ltl_hoa_max_states_param;
+		ltl_hoa_max_states_param = 3;
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 4\nStart: 0" + tail).num_states == 0);
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 3\nStart: 0" + tail).num_states == 3);
-		ltl_hoa_max_states = saved;
+		ltl_hoa_max_states_param = saved;
 	}
 
 	TEST_CASE("[ALG-D-32c] more atomic propositions than the game can "
@@ -451,6 +451,79 @@ State: 2
 		CHECK(g.player[0] == 0);
 		CHECK(g.player[1] == 1);
 		CHECK(g.player[2] == 1);
+	}
+
+	// Spot wraps the players of a large game onto indented lines; every
+	// state past the first line would otherwise stay env-owned.
+	TEST_CASE("[ALG-D-41b] a state-player header wrapped over lines assigns "
+	          "every state") {
+		std::string hoa = R"(HOA: v1
+States: 4
+Start: 0
+AP: 2 "p0"
+      "p1"
+controllable-AP: 1
+spot-state-player: 0 0
+                   1 1
+acc-name: all
+Acceptance: 0 t
+--BODY--
+State: 0
+[0] 2
+[!0] 3
+State: 1
+[t] 2
+State: 2
+[t] 0
+State: 3
+[1] 1
+[!1] 0
+--END--
+)";
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.player.size() == 4u);
+		CHECK(g.player[0] == 0);
+		CHECK(g.player[1] == 0);
+		CHECK(g.player[2] == 1);
+		CHECK(g.player[3] == 1);
+		REQUIRE(g.aps.size() == 2u);
+		CHECK(g.aps[1] == "p1");
+		CHECK(g.controllable[1]);
+	}
+
+	TEST_CASE("[ALG-D-61] the acceptance of a run that sees no colour") {
+		CHECK(alg_d::acceptance_without_colors("Inf(0)") == false);
+		CHECK(alg_d::acceptance_without_colors("Fin(0)") == true);
+		CHECK(alg_d::acceptance_without_colors(" t") == true);
+		CHECK(alg_d::acceptance_without_colors("f") == false);
+		CHECK(alg_d::acceptance_without_colors(
+			"Fin(2) & (Inf(1) | Fin(0))") == true);
+		CHECK(alg_d::acceptance_without_colors(
+			"Inf(0) | (Fin(1) & Inf(2))") == false);
+		CHECK(alg_d::acceptance_without_colors("!Inf(3)") == true);
+		CHECK_FALSE(alg_d::acceptance_without_colors("Inf(0) &").has_value());
+		CHECK_FALSE(alg_d::acceptance_without_colors("Rabin").has_value());
+	}
+
+	TEST_CASE("[ALG-D-62] a parity acceptance is known, a Streett one is not") {
+		auto game = [](const std::string& acc) {
+			return alg_d::parse_synth_game_hoa("HOA: v1\nStates: 1\n"
+				"Start: 0\nAP: 1 \"p0\"\n" + acc + "--BODY--\n"
+				"State: 0\n[t] 0\n--END--\n");
+		};
+		auto buchi = game("acc-name: Buchi\nAcceptance: 1 Inf(0)\n");
+		CHECK(buchi.acc_known);
+		CHECK_FALSE(buchi.acc_accepts_uncolored);
+		auto cobuchi = game("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n");
+		CHECK(cobuchi.acc_known);
+		CHECK(cobuchi.acc_accepts_uncolored);
+		auto parity = game("acc-name: parity max odd 3\n"
+			"Acceptance: 3 Fin(2) & (Inf(1) | Fin(0))\n");
+		CHECK(parity.acc_known);
+		CHECK(parity.acc_accepts_uncolored);
+		auto streett = game("acc-name: Streett 1\n"
+			"Acceptance: 2 Fin(0) | Inf(1)\n");
+		CHECK_FALSE(streett.acc_known);
 	}
 
 	// AL-11 / AL-RT2 (re-port of the pre-rebase [ALG-D-45]): an HOA whose
@@ -1061,7 +1134,8 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// is vacuous at t = 0 and enforced from t = 1 on, so no initial memory
 	// value can defeat it -- the spec is realizable (output 2 forever).
 	TEST_CASE("[ALG-D-71] G(o1[t-1]>0) && F(o1>1) REALIZABLE: the rule is "
-	          "inactive before its past exists") {
+	          "inactive before its past exists"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(alg_d_realizable(
 			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}
@@ -1116,7 +1190,8 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// Guard in the other direction: the same shape winnable from
 	// ρ₀ = type_of(0) stays REALIZABLE (>= admits the defaulted 0 itself).
 	TEST_CASE("[ALG-D-72] G(o1[t-1]>=0) && F(o1>1) stays REALIZABLE "
-	          "from type_of(0)") {
+	          "from type_of(0)"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(alg_d_realizable(
 			"(G (o1[t-1]:qlt >= {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}

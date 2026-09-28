@@ -8,12 +8,12 @@ add_repl_test(get_cmd-all "get" "status:")
 add_repl_test(get_cmd-one "get colors" "colors:")
 
 # Bare `get` also lists every numeric limit option with its default
-# (unlimited caps except the finite temporal-search cap, tuned gc
+# (unlimited caps except the finite temporal-search caps, tuned gc
 # values, spec-size warning off).
 add_repl_test(get_cmd-lists_limits "get" "maxsplits: *unlimited")
-# flagsteps ships FINITE (500): its search has no termination guarantee;
-# 0 still means unlimited, which is fixpointsteps' own default.
-add_repl_test(get_cmd-fixpointsteps_default_unlimited "get fixpointsteps" "fixpointsteps: *unlimited")
+# The two temporal searches have no termination guarantee, so both caps
+# ship FINITE (500) through the CLI as well; 0 still means unlimited.
+add_repl_test(get_cmd-fixpointsteps_default_finite "get fixpointsteps" "fixpointsteps: *500")
 add_repl_test(get_cmd-flagsteps_default_finite "get flagsteps" "flagsteps: *500")
 add_repl_test(get_cmd-fixpointsteps_zero_is_unlimited "set fixpointsteps 0. get fixpointsteps" "fixpointsteps: *unlimited")
 add_repl_test(get_cmd-lists_gc_defaults "get" "gcgrowth: *1.5")
@@ -23,7 +23,7 @@ add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 foreach(opt maxsplits maxrounds decisionpins fixpointsteps flagsteps squeezecap
 		simplifyrounds defpasses enumsteps probesteps rewriterounds gcminsize
 		gcgrowth specsizewarn revisionalts maxsubsets cachebound
-		maxcoverproducts)
+		maxcoverproducts maxconstantsize)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()
 
@@ -59,6 +59,11 @@ add_repl_test(get_cmd-cachebound_zero_is_unlimited
 	"set cachebound 0. get cachebound" "cachebound: *unlimited")
 # Batch O8: the oracle's mixed-type coverage expansion cap ships
 # FINITE (256); 0 opts into unlimited.
+add_repl_test(get_cmd-maxconstantsize_default_finite "get maxconstantsize"
+	"maxconstantsize: *2000")
+add_repl_test(get_cmd-maxconstantsize_zero_is_unlimited
+	"set maxconstantsize 0. get maxconstantsize"
+	"maxconstantsize: *unlimited")
 add_repl_test(get_cmd-maxcoverproducts_default_finite "get maxcoverproducts"
 	"maxcoverproducts: *256")
 add_repl_test(get_cmd-maxcoverproducts_zero_is_unlimited

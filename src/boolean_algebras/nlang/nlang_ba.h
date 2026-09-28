@@ -12,6 +12,7 @@
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
 #include "ba_constants.h"
+#include "env_limits.h"
 #include "splitter_types.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 
@@ -52,13 +53,32 @@ template <NodeType node> size_t nlang_type_id();
 //                       https://api.openai.com/v1)
 //   TAU_LLM_MODEL     — optional; when unset no model is sent and the
 //                       endpoint picks its own.
+//   TAU_NLANG_HTTP_TIMEOUT — optional; seconds per request (default 15,
+//                       0 = no cap). Environment fallback of the
+//                       `nlang-http-timeout` option, which wins when given.
 
 /**
  * @brief Wall-clock cap, in seconds, on each LLM HTTP request the nlang
  * oracle makes (curl's CURLOPT_TIMEOUT). Runtime parameter by policy
  * (nlang's own `nlang-http-timeout` CLI/REPL option); 0 = no cap.
+ *
+ * The sentinel -1 means "not set", in which case `TAU_NLANG_HTTP_TIMEOUT`
+ * is consulted and 15 s applies when that is absent too; the option always
+ * wins over the variable. Read through @ref nlang_http_timeout_sec.
  */
-inline long nlang_http_timeout_sec = 15;
+inline long nlang_http_timeout_sec_param = -1;
+
+/**
+ * @brief Effective per-request LLM HTTP timeout in seconds (0 = no cap).
+ *
+ * Precedence: @ref nlang_http_timeout_sec_param when set (>= 0), else
+ * `TAU_NLANG_HTTP_TIMEOUT`, else 15.
+ */
+inline long nlang_http_timeout_sec() {
+	if (nlang_http_timeout_sec_param >= 0)
+		return nlang_http_timeout_sec_param;
+	return (long) env_limit_count("TAU_NLANG_HTTP_TIMEOUT", 15);
+}
 
 // --- LLM API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
 std::string llm_query(const std::string& prompt);

@@ -12,9 +12,17 @@
 # Sets <out> to TRUE when <cmd> names a BA that is not in the configured pack.
 # The ids come from the registry, so an algebra added in-tree or registered from
 # outside is matched without editing a list here.
+#
+# Every word holding a '/' is dropped before matching: file paths say where the
+# checkout and its data live, not what the spec needs, and a checkout under a
+# directory such as `fix-qlt` must not hide cases from a qlt-less pack. The
+# separators keep a Tau fraction's type in view: `{1/2}:qlt` still names qlt.
 function(tau_repl_unsupported out cmd)
+	string(REGEX REPLACE
+		"[^][ \t\r\n\"'();:=,{}<>|&]*/[^][ \t\r\n\"'();:=,{}<>|&]*"
+		"" _spec "${cmd}")
 	foreach(_id ${TAU_REGISTERED_BA_IDS})
-		if("${cmd}" MATCHES "[^A-Za-z0-9_]${_id}"
+		if("${_spec}" MATCHES "[^A-Za-z0-9_]${_id}"
 			AND NOT _id IN_LIST TAU_PACK_BA_IDS)
 			set(${out} TRUE PARENT_SCOPE)
 			return()
@@ -46,5 +54,7 @@ function(tau_repl_report_skips)
 		message(STATUS
 			"REPL suite: ${_n} case(s) skipped, naming a BA outside "
 			"TAU_BAS=${TAU_BAS}")
+		list(JOIN _skipped "\n  " _names)
+		message(VERBOSE "REPL suite skipped:\n  ${_names}")
 	endif()
 endfunction()

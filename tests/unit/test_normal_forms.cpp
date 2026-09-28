@@ -1031,6 +1031,34 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 		CHECK( *res != nullptr );
 	}
 
+	// The always part reads one step back, so it asks nothing at step 0,
+	// where the sometimes part can hold (README "Lookback initialization").
+	TEST_CASE("an always part with a deeper lookback keeps the clause") {
+		tref clause = get_nso_rr("(always o2[t] = 0 && o1[t-1] = 1) "
+			"&& (sometimes o2[t] = 1).").value().main->get();
+		REQUIRE( clause != nullptr );
+		CHECK( simplify_temporal_clause<node_t>(clause).has_value() );
+	}
+
+	// o2[t] = 0 implies o2[t] = 0 || o1[t-1] = 1, but only from step 1 on
+	// is the second sometimes asked, where the first may no longer hold.
+	TEST_CASE("an implied sometimes part with a deeper lookback is kept") {
+		tref clause = get_nso_rr("(sometimes o2[t] = 0) && "
+			"(sometimes (o2[t] = 0 || o1[t-1] = 1)).").value().main->get();
+		REQUIRE( clause != nullptr );
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		CHECK( tau::get(*res).select_top(
+			is_child<node_t, tau::wff_sometimes>).size() == 2 );
+		// the implied part reading no further back is dropped
+		tref same = get_nso_rr("(sometimes (o2[t] = 0 && o1[t-1] = 1)) && "
+			"(sometimes (o2[t] = 0 || o1[t-1] = 1)).").value().main->get();
+		auto res2 = simplify_temporal_clause<node_t>(same);
+		REQUIRE( res2.has_value() );
+		CHECK( tau::get(*res2).select_top(
+			is_child<node_t, tau::wff_sometimes>).size() == 1 );
+	}
+
 	// A sometimes part implied by an always part is replaced by T rather than
 	// dropping the clause (normalizer.tmpl.h:781-782).
 	TEST_CASE("a sometimes part implied by an always part is eliminated") {
@@ -1064,7 +1092,8 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 // because it inspects only variable nodes, and which cvc5 then fails to
 // translate) comes back with its quantifier intact. All three predicates below
 // asserted that could not happen, so each aborted a Debug build on this input.
-// They now fall back to their negative answer and log it.
+// are_nso_equivalent (bool) falls back to its negative answer and logs it; the
+// result-returning predicates report UNKNOWN.
 TEST_SUITE("UndecidableNormalizationFallback") {
 
 	static tref undecidable() {
@@ -1082,16 +1111,24 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
-	TEST_CASE("is_nso_impl answers false instead of aborting") {
-		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()).value() );
+	// An error with no value: a negative answer would read as a definite
+	// F for sat and as T for valid of the negation.
+	TEST_CASE("is_nso_impl reports UNKNOWN instead of aborting") {
+		auto res = is_nso_impl<node_t>(tau::_T(), undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
-	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()).value() );
+	TEST_CASE("is_non_temp_nso_unsat reports UNKNOWN instead of aborting") {
+		auto res = is_non_temp_nso_unsat<node_t>(undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
-	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()).value() );
+	TEST_CASE("is_non_temp_nso_satisfiable reports UNKNOWN instead of aborting") {
+		auto res = is_non_temp_nso_satisfiable<node_t>(undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
 	TEST_CASE("are_nso_equivalent answers false instead of aborting") {

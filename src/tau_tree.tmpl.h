@@ -53,6 +53,10 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref ref);
 
+/** @brief Declared for tau_spec; documented in satisfiability.h. */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm);
+
 /**
  * @brief Append to @p leaves the maximal subtrees of @p n that are not
  * themselves headed by @p branch, flattening the (arbitrarily deep)
@@ -383,6 +387,15 @@ htref tree<node>::geth(tref h) {
 template <NodeType node>
 size_t tree<node>::m_size() {
 	return bintree<node>::M().size();
+}
+
+template <NodeType node>
+void tree<node>::clear_caches() {
+	std::unique_lock lock(bintree<node>::mutex());
+	std::unordered_set<tref> interned;
+	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n.get());
+	for (const auto& cb : bintree<node>::gc_callbacks) cb({});
+	for (const auto& cb : bintree<node>::gc_callbacks) cb(interned);
 }
 
 template <NodeType node>

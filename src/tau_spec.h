@@ -55,6 +55,19 @@ struct tau_spec {
 	 * @return `rr<node>` if parsing succeeded, or `std::nullopt`.
 	 */
 	std::optional<rr<node>> get_nso_rr();
+	/**
+	 * @brief Keep the warm-up of each clause of the main formula at its
+	 * lookback as written (pin_written_warm_ups) in what get() builds,
+	 * read positively. Execution sets it.
+	 */
+	void keep_warm_ups() { mode_ = build_mode::pinned; }
+	/**
+	 * @brief Build the specification as written: types inferred, no
+	 * construction hook run, so a decision procedure can still read the
+	 * warm-up of each clause (pin_written_warm_ups) under the polarity it
+	 * decides. The procedures that decide it fold it themselves.
+	 */
+	void keep_as_written() { mode_ = build_mode::as_written; }
 
 private:
 	/// @brief Build tree-get options from current parser state.
@@ -83,6 +96,8 @@ private:
 	std::vector<std::string> errors_{};
 	trefs defs_{};
 	tref main_ = nullptr;
+	enum class build_mode { folded, as_written, pinned };
+	build_mode mode_ = build_mode::folded;
 	// span a spec's parts, since a type declared in one part must stay
 	// live for the parts parsed after it; mutable so the const
 	// get_options() can hand out their addresses

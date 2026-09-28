@@ -191,6 +191,35 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		if (has_ordering) {
 			trefs vars(block);
 			trefs rem(conjs);
+			// First drop, in any order and until nothing
+			// changes, every binder the theory decides outright
+			// (existentials commute). The innermost-first peel
+			// below wraps an undetermined binder around its
+			// conjuncts, which freezes every outer binder that
+			// conjunct mentions; in `x2 < x1 && x1 < x3` x1 is
+			// two-sided, yet one-sided once x2 is gone.
+			for (bool progress = true; progress && !vars.empty();) {
+				progress = false;
+				for (size_t vi = vars.size(); vi-- > 0;) {
+					tref v = vars[vi];
+					trefs mine, rest;
+					for (tref c : rem)
+						(contains<node>(c, v) ? mine
+							: rest).push_back(c);
+					if (!mine.empty()) {
+						auto sat = pack_omcat_qe<node>(
+							clause_type, v,
+							tau::build_wff_and(mine));
+						if (!sat) continue;
+						if (!*sat)
+							return r.with_value(
+								_F<node>());
+						rem = std::move(rest);
+					}
+					vars.erase(vars.begin() + vi);
+					progress = true;
+				}
+			}
 			while (!vars.empty()) {
 				tref v = vars.back();
 				vars.pop_back();
@@ -208,6 +237,15 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 					// Satisfiable for every value of the
 					// outer/kept endpoints: the conjuncts
 					// and the binder go.
+					rem = std::move(rest);
+					continue;
+				}
+				// A bound by other variables on both sides is
+				// eliminated symbolically: `ex x (a < x &&
+				// x < b)` is `a < b`.
+				if (tref res = pack_omcat_qe_residual<node>(
+					clause_type, v, scoped_v); res) {
+					rest.push_back(res);
 					rem = std::move(rest);
 					continue;
 				}

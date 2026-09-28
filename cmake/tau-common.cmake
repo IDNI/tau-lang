@@ -141,6 +141,9 @@ function(target_setup target)
 			# warnings as errors in dev configs only, so a newly
 			# introduced warning is caught there, not in Release
 			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
+			# GCC 15 reports -Wstrict-overflow at -O0 with --coverage in
+			# code no other configuration flags; keep it visible, not fatal
+			$<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Coverage>>:-Wno-error=strict-overflow>
 			# -ftemplate-backtrace-limit=0
 		)
 	else()

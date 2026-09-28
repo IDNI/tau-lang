@@ -61,10 +61,15 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int, std::function<bool(int)>)
 {
 	result<std::string> r;
+	// the same refusal as the POSIX path; an empty name would also be an
+	// attr value the report cannot hold
+	if (argv.empty())
+		return r.with_error(code::invalid_argument,
+			"spawn_capture requires a non-empty argv");
 	// no process model under wasm; matches the not-on-PATH contract
 	return r.with_error(code::not_found,
 		"no process model is available under this build",
-		{{label::name, argv.empty() ? std::string() : argv[0]}});
+		{{label::name, argv[0]}});
 }
 
 #else // POSIX
@@ -233,7 +238,8 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 
 inline result<std::string> synthesize_game(const std::string& formula,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs, int timeout_sec)
+	const std::vector<std::string>& outs, int timeout_sec,
+	const std::string& algo)
 {
 	result<std::string> r;
 
@@ -250,6 +256,7 @@ inline result<std::string> synthesize_game(const std::string& formula,
 	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
 	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
 	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
+	if (!algo.empty()) argv.push_back("--algo=" + algo);
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);

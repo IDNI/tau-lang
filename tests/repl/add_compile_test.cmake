@@ -3,6 +3,7 @@
 
 # Resolved at include time (see add_strategy_export_test.cmake for why).
 set(TAU_COMPILE_VERB_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_verb.sh")
+set(TAU_COMPILE_RUN_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_matches_run.sh")
 
 function(add_compile_test test_name spec_file)
 	file(READ "${spec_file}" _spec_src)
@@ -22,5 +23,21 @@ function(add_compile_test test_name spec_file)
 	# which costs a few sequential minutes per gate and makes both the
 	# compile tests and their neighbours deterministic.
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		TIMEOUT 900 RUN_SERIAL TRUE)
+endfunction()
+
+# `tau compile` against `run`: the program of a spec with no inputs prints
+# what `run <steps> steps` prints (check_compile_matches_run.sh).
+function(add_compile_run_test test_name steps spec)
+	tau_repl_unsupported(_tau_skip "${spec}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash "${TAU_COMPILE_RUN_CHECKER}"
+			"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>" "${steps}" "${spec}")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "SAME: "
 		TIMEOUT 900 RUN_SERIAL TRUE)
 endfunction()

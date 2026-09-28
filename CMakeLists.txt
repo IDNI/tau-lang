@@ -24,6 +24,8 @@ endif()
 if(TAU_BUILD_EMSCRIPTEN)
 	include(tau-shared-emscripten)
 	set_emscripten_toolchain()
+	include(emsdk-node)
+	tau_resolve_emsdk_node()
 endif()
 
 set(namespace "TAU")

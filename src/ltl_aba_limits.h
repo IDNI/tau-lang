@@ -6,12 +6,17 @@
  * game headers (algorithm_d_game.h) need before ltl_aba.h is complete.
  *
  * Every limit here is a runtime parameter by policy (CLI flag, REPL `set`,
- * `api::set_*`), never a header constant; ltl_aba.h documents the surface.
+ * `api::set_*`, and a `TAU_*` environment variable as the last fallback),
+ * never a header constant; ltl_aba.h documents the surface. Each one is read
+ * through its accessor, which resolves parameter > environment > default; the
+ * parameter is what the three option surfaces write, so a flag always wins
+ * over the environment.
  */
 
 #ifndef __IDNI__TAU__LTL_ABA_LIMITS_H__
 #define __IDNI__TAU__LTL_ABA_LIMITS_H__
 
+#include "env_limits.h"
 #include "logging.h"
 #include <algorithm>
 #include <cctype>
@@ -28,8 +33,11 @@ namespace idni::tau_lang {
  *
  * Runtime parameter by policy (`--ltl-hoa-max-states`, REPL
  * `set ltlhoamaxstates`, `api::set_ltl_hoa_max_states`); 0 = unlimited.
+ * The sentinel -1 means "not set", in which case `TAU_LTL_HOA_MAX_STATES`
+ * is consulted and 2^22 applies when that is absent too. Read through
+ * @ref ltl_hoa_max_states.
  */
-inline size_t ltl_hoa_max_states = size_t(1) << 22;
+inline long ltl_hoa_max_states_param = -1;
 
 /**
  * @brief Cap on the DNF cubes a HOA guard label may expand into in the
@@ -37,19 +45,25 @@ inline size_t ltl_hoa_max_states = size_t(1) << 22;
  *
  * Runtime parameter by policy (`--ltl-guard-max-cubes`, REPL
  * `set ltlguardmaxcubes`, `api::set_ltl_guard_max_cubes`); 0 = unlimited.
+ * The sentinel -1 means "not set", in which case `TAU_LTL_GUARD_MAX_CUBES`
+ * is consulted and 512 applies when that is absent too. Read through
+ * @ref ltl_guard_max_cubes.
  */
-inline size_t ltl_guard_max_cubes = 512;
+inline long ltl_guard_max_cubes_param = -1;
 
 /**
  * @brief Cap on the ABA-oracle refinement rounds of `is_ltl_aba_realizable`:
- * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. On
- * the cap the verdict is UNKNOWN (an error), never a false answer.
+ * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. The
+ * same cap bounds the fixpoint rounds of `strategy_wins_on_data`. On the cap
+ * the verdict is UNKNOWN (an error), never a false answer.
  *
  * Runtime parameter by policy (`--ltl-refinement-rounds`, REPL
  * `set ltlrefinementrounds`, `api::set_ltl_max_refinement_rounds`);
- * 0 = unlimited.
+ * 0 = unlimited. The sentinel -1 means "not set", in which case
+ * `TAU_LTL_REFINEMENT_ROUNDS` is consulted and 64 applies when that is
+ * absent too. Read through @ref ltl_max_refinement_rounds.
  */
-inline size_t ltl_max_refinement_rounds = 64;
+inline long ltl_max_refinement_rounds_param = -1;
 
 /**
  * @brief Cap on the strategy paths the window oracle examines per check
@@ -57,8 +71,11 @@ inline size_t ltl_max_refinement_rounds = 64;
  *
  * Runtime parameter by policy (`--ltl-window-max-paths`, REPL
  * `set ltlwindowmaxpaths`, `api::set_ltl_window_max_paths`); 0 = unlimited.
+ * The sentinel -1 means "not set", in which case `TAU_LTL_WINDOW_MAX_PATHS`
+ * is consulted and 4096 applies when that is absent too. Read through
+ * @ref ltl_window_max_paths.
  */
-inline size_t ltl_window_max_paths = 4096;
+inline long ltl_window_max_paths_param = -1;
 
 /**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
@@ -106,9 +123,6 @@ inline std::string ltl_algorithm_param;
  */
 inline size_t ltl_qe_max_vars_param = 0;
 
-// `ltl_hoa_max_states`, `ltl_guard_max_cubes` and `ltl_max_game_aps` live in
-// ltl_aba_limits.h so the game headers can read them before this header is
-// complete; they belong to the same runtime-parameter surface.
 
 /**
  * @brief Effective `ltlsynt` watchdog in seconds (0 = disabled).
@@ -126,7 +140,9 @@ inline int ltl_timeout_sec() {
 	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
 		char* end = nullptr;
 		errno = 0;
-		long v = std::strtol(env_sec, &end, 10);
+		// 64 bits on every target: a 32-bit long (wasm32) would read
+		// 2^32 as out of range instead of clamping it
+		long long v = std::strtoll(env_sec, &end, 10);
 		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
 			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
 				<< "' is not a non-negative number; keeping the default "
@@ -191,6 +207,58 @@ inline size_t ltl_qe_max_vars() {
 }
 
 /**
+ * @brief Effective largest state count accepted from an `ltlsynt` HOA
+ * strategy (0 = unlimited).
+ *
+ * Precedence: @ref ltl_hoa_max_states_param when set (>= 0), else
+ * `TAU_LTL_HOA_MAX_STATES`, else 2^22.
+ */
+inline size_t ltl_hoa_max_states() {
+	if (ltl_hoa_max_states_param >= 0)
+		return (size_t) ltl_hoa_max_states_param;
+	return env_limit_count("TAU_LTL_HOA_MAX_STATES", size_t(1) << 22);
+}
+
+/**
+ * @brief Effective cap on the DNF cubes a HOA guard may expand into
+ * (0 = unlimited).
+ *
+ * Precedence: @ref ltl_guard_max_cubes_param when set (>= 0), else
+ * `TAU_LTL_GUARD_MAX_CUBES`, else 512.
+ */
+inline size_t ltl_guard_max_cubes() {
+	if (ltl_guard_max_cubes_param >= 0)
+		return (size_t) ltl_guard_max_cubes_param;
+	return env_limit_count("TAU_LTL_GUARD_MAX_CUBES", 512);
+}
+
+/**
+ * @brief Effective cap on the ABA-oracle refinement rounds of one
+ * realizability check (0 = unlimited).
+ *
+ * Precedence: @ref ltl_max_refinement_rounds_param when set (>= 0), else
+ * `TAU_LTL_REFINEMENT_ROUNDS`, else 64.
+ */
+inline size_t ltl_max_refinement_rounds() {
+	if (ltl_max_refinement_rounds_param >= 0)
+		return (size_t) ltl_max_refinement_rounds_param;
+	return env_limit_count("TAU_LTL_REFINEMENT_ROUNDS", 64);
+}
+
+/**
+ * @brief Effective cap on the strategy paths the window oracle examines per
+ * check (0 = unlimited).
+ *
+ * Precedence: @ref ltl_window_max_paths_param when set (>= 0), else
+ * `TAU_LTL_WINDOW_MAX_PATHS`, else 4096.
+ */
+inline size_t ltl_window_max_paths() {
+	if (ltl_window_max_paths_param >= 0)
+		return (size_t) ltl_window_max_paths_param;
+	return env_limit_count("TAU_LTL_WINDOW_MAX_PATHS", 4096);
+}
+
+/**
  * @brief Set when a cap of the synthesis pipeline gave up on a check whose
  * skipped part could make an UNREALIZABLE verdict wrong.
  *
@@ -198,6 +266,29 @@ inline size_t ltl_qe_max_vars() {
  * UNREALIZABLE result as undecided when it is set.
  */
 inline thread_local bool ltl_verdict_incomplete = false;
+
+/**
+ * @brief Set while the observed abstraction is built (a second solve after
+ * a strategy lost against the data): the consistency constraints then
+ * forbid only combinations no data satisfies, since observations tell a
+ * strategy when a claim depending on the inputs can be kept.
+ */
+inline thread_local bool ltl_observed_abstraction = false;
+
+/**
+ * @brief Set, with ltl_observed_abstraction, while the abstraction that
+ * settles an UNREALIZABLE verdict is built: an input atom reading a past
+ * step then gets a present-time twin (add_input_twins).
+ */
+inline thread_local bool ltl_input_twins = false;
+
+/**
+ * @brief Cleared while execution solves again a formula whose algebra
+ * synthesised it propositionally with a strategy that names no data (a
+ * strategy over bookkeeping bits): the default path then builds the
+ * abstraction and the data game, whose strategies can be played.
+ */
+inline thread_local bool ltl_propositional_synthesis = true;
 
 } // namespace idni::tau_lang
 

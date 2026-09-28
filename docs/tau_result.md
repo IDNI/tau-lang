@@ -178,7 +178,7 @@ if not r:
 out = r.value                          # or r.unwrap() to raise instead
 ```
 
-Every fallible call in the Python binding returns one `tau.result`: `get_interpreter`, `step`, `can_extend`, `update`, and `is_realizable`.
+Every fallible call in the Python binding returns one `tau.result`: `get_interpreter`, `step`, `can_extend`, `update`, `sat`, `unsat`, `valid`, `realizable` (alias `is_realizable`), `unrealizable`, and `unsat_core`.
 Each result carries `.value`, `.report`, `__bool__`, and `unwrap()`.
 The binding never raises.
 An exception carries one string, so it drops the warnings, the infos, and the timing scopes that a report holds.
@@ -189,7 +189,8 @@ Nanobind erases the type on purpose.
 It binds concrete types, so a per-`T` result class would need one new Python class for each result-returning method.
 
 `update` puts the real verdict of the interpreter in `.value`: True when the interpreter accepts the revision, False when it rejects the revision.
-`is_realizable` returns no value when the backend gives no verdict.
+`sat`, `unsat`, `valid`, `realizable` and `unrealizable` return no value when the spec does not parse or the backend gives no verdict.
+`unsat_core` returns the conflicting top-level conjuncts, an empty list when there is no conflict, and no value when the whole spec gets no verdict.
 It never uses False as a substitute verdict.
 
 `unwrap()` raises a RuntimeError with the report instead of returning a falsy result.

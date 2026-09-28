@@ -183,16 +183,21 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				//    bits, so anything above node::data_mask was
 				//    truncated by the node constructor and the
 				//    parse silently continued with a wrong value.
-				// Both are reported as a parse failure.
+				// Both are reported as a parse failure. The
+				// value is read at 64 bits and must also fit
+				// size_t, the type node data is read back as:
+				// on wasm32 size_t has 32 bits.
 				const std::string ds = ptr.get_terminals();
-				size_t value = 0;
+				unsigned long long value = 0;
 				bool fits = true;
 				try {
 					size_t pos = 0;
 					value = std::stoull(ds, &pos);
 					fits = pos == ds.size();
 				} catch (const std::exception&) { fits = false; }
-				if (!fits || value > node::data_mask) {
+				if (!fits || value > node::data_mask
+					|| value > std::numeric_limits<size_t>::max())
+				{
 					// Keep producing a node so that the rest
 					// of the traversal stays well formed; the
 					// error discards the whole tree.

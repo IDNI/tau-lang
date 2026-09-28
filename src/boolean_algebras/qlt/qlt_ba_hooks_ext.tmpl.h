@@ -6,7 +6,8 @@
  *
  * qlt is a dense linear order, so a comparison of two ground constants decides
  * outright; anything else stays an atom for the QE and solver path, which core
- * does by passing the node through unchanged.
+ * does by passing the node through unchanged. The typed 0 and 1 are the order's
+ * ends, not points, so a variable's equality with either decides as well.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_BA_HOOKS_EXT_TMPL_H__
@@ -116,6 +117,30 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	}
 	static tref wff_ngteq(const tref* ch, tref r) {
 		return eval(ch, r, [](int c) { return c < 0; });
+	}
+
+	/**
+	 * @brief `v = 0`, `v = 1` and their disequalities for a variable v.
+	 *
+	 * No point sits at an end of the order, so the equality is F and the
+	 * disequality T. A compound term declines: `x & {3} = 0` is a meet, not
+	 * a point.
+	 */
+	static tref end_eq(const tref* ch, tref r, bool is_eq) {
+		const auto& a = arg1_hook(ch);
+		const auto& b = arg2_hook(ch);
+		auto is_end = [](const tree<node_t>& t) {
+			return t.is(tau::bf_f) || t.is(tau::bf_t);
+		};
+		if (!(a.is(tau::variable) && is_end(b))
+			&& !(b.is(tau::variable) && is_end(a))) return nullptr;
+		return decide(ch, r, !is_eq);
+	}
+	static tref wff_eq(const tref* ch, tref r) {
+		return end_eq(ch, r, true);
+	}
+	static tref wff_neq(const tref* ch, tref r) {
+		return end_eq(ch, r, false);
 	}
 };
 

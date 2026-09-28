@@ -108,6 +108,10 @@ template <NodeType node> tref build_wff_since(tref l, tref r);
 template <NodeType node> tref build_wff_trigger(tref l, tref r);
 /** @brief Largest canonical quantifier id in @p fm (0 when none). */
 template <NodeType node> int_t find_biggest_quant_id(tref fm);
+/** @brief Largest bound-variable id occurring anywhere in @p fm (0 when none). */
+template <NodeType node> int_t max_bound_var_id(tref fm);
+/** @brief Rename every bound variable of @p fm to its id plus @p off. */
+template <NodeType node> tref shift_bound_var_ids(tref fm, int_t off);
 
 // ---------------------------------------------------------------------------
 // Constraint builders

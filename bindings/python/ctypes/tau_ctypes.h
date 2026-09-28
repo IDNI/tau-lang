@@ -72,6 +72,11 @@ int64_t tau_lang_mealy_state(int64_t handle);
 // Release resources for a synthesized machine.
 void tau_lang_mealy_free(int64_t handle);
 
+// Return the engine to a fresh state: release every synthesized machine
+// (their handles become invalid), drop the definitions, empty the caches and
+// free every tree node nothing holds. Returns the number of nodes freed.
+int64_t tau_lang_reset(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

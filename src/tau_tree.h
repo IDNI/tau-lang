@@ -269,6 +269,16 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static htref geth(const tree& n);
 	/** @brief Number of interned tree nodes (size of `bintree<node>::M()`). */
 	static size_t m_size();
+	/**
+	 * @brief Empty every cache made with `create_cache` and drop what the
+	 * other gc callbacks index.
+	 *
+	 * Runs the gc callbacks with no survivor, then with every interned
+	 * node, so a callback that rebuilds an index from the survivors
+	 * (`ba_types::type_tree_to_idx`) rebuilds it whole. No node is freed.
+	 * Must not run while a caller holds a reference into a cache.
+	 */
+	static void clear_caches();
 
 	/** @brief Transform parse tree @p t to a tree using @p options. */
 	static result<tref> get(const tau_parser::tree& t, get_options& options);

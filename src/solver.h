@@ -22,12 +22,27 @@ namespace idni::tau_lang {
 
 /// Above this many distinct variables, a partition of pure equalities over
 /// an arithmetic type (bitvectors) is handed to the pack solver instead of
-/// being squeezed and solved through `lgrs`, whose Boole expansion is
-/// exponential in the variables (GitHub #121). `var = constant` conjuncts
+/// being squeezed per width and given a ground solution by `find_solution` /
+/// `find_minimal_solution`, whose Boole expansion is exponential in the
+/// variables (GitHub #121). `var = constant` conjuncts
 /// are read off before the count. SIZE_MAX = unlimited (0 through the
 /// setter); set via `api::set_lgrs_max_vars`, `--lgrs-max-vars` or the REPL
 /// option `lgrsmaxvars`.
 inline size_t lgrs_max_vars = 8;
+
+/// Largest region of fresh values, in tree nodes, that a
+/// `fresh_element_ledger` keeps: every committed value shrinks the region by
+/// its complement, so the region grows with each step of a run, and each
+/// shrink decides the Tau constants it holds. Past the budget the ledger
+/// stops tracking the region and values come from the general solver.
+/// 0 = unlimited; set via `api::set_max_constant_size`,
+/// `--max-constant-size` or the REPL option `maxconstantsize`.
+inline size_t max_constant_size = 2000;
+
+/// How many times a solver call gave up on a value because building it
+/// passed `max_constant_size`; `solve` reads it to tell that apart from a
+/// system without solutions.
+inline size_t constant_size_hits = 0;
 
 /**
  * @brief Finds a solution for the given equality.
@@ -105,6 +120,9 @@ std::optional<solution<node>> solve_system(
 /**
  * @brief Solves the given set of equations.
  *
+ * A model from the owning BA's ordering solver
+ * (`omcat_solve_inequality_system`) is checked against every atom before it
+ * is returned; a model that does not hold falls through to the general path.
  * @tparam node Tree node type.
  * @param eqs The set of equations to solve.
  * @param options The solver options.
@@ -151,6 +169,10 @@ tref var, tref term);
 /**
  * @brief Solves the given tau form.
  *
+ * A pure-equality bitvector clause gets a ground zero of each equation
+ * (the least one in `solver_mode::minimum`), so every value is a constant
+ * a caller can commit as a model; `lgrs` returns the reproductive solution
+ * instead.
  * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.

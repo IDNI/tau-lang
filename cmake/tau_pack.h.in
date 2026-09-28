@@ -58,6 +58,12 @@
 // extern-declare them instead of an emitted artifact instantiating its own.
 @TAU_CODEGEN_ARTIFACT_PREINST_DEFINE@
 
+// Set in a Coverage build: an artifact linking this libTAU.a links --coverage.
+@TAU_CODEGEN_COVERAGE_DEFINE@
+
+// The compiler libTAU.a was built with; `tau compile` prefers it.
+@TAU_CODEGEN_CXX_DEFINE@
+
 #include <string_view>
 
 #include "tau_tree.h"

@@ -152,8 +152,11 @@ need solver or LTL types, which sit beside their single consumer:
 | `term_is_blasteable(term)` | whether a term with an arithmetic operator can be blasted | owner of the term's type |
 | `arith_ops` | that the grammar's arithmetic term operators apply to your type | owner |
 | `zero_constant(ba_type)`, `value_constant(ba_type, v)` | the type's default zero, when it is not `bf_f`; a constant holding a plain integer | owner |
+| `modular_width(ba_type)`, `modular_value(ba_type, c)` | that the type's values are the integers below 2^n with unsigned modular semantics (bitwise Boolean operators, `+ - *` modulo 2^n, unsigned `/ %` and comparisons, logical shifts), and the integer a constant holds; 0 / `nullopt` when not. The data game then plays such a stream on its n bits (bv declares it, answering 0 while widening is on) | owner |
+| `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (qlt declares it) | owner |
 | `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
 | `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
+| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`); `nullptr` keeps the binder | owner |
 | `omcat_solve_inequality_system(sys, opts)` | solve a pure ordering system over your theory | owner |
 | `try_propositional_synthesis(fm, atoms)` | synthesise a propositional strategy for your own atoms | the single declarer |
 | `semantic_pwr_optimal(clause, update)` | revise a clause through your winning region | first declarer that answers |
@@ -161,6 +164,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `output_always_satisfiable_by_system` | that a system can always meet an output constraint by choosing its output | owner |
 | `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading | owner, by type tree |
 | `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id) | the constant's own alternative, at the point of use |
+| `constant_size(x)` | how many tree nodes a constant carries when operations on constants build ever larger ones (the wrapper embeds a whole spec); `max_constant_size` bounds the values the solver builds by it | the constant's own alternative, at the point of use |
 | `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
 | `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
@@ -199,6 +203,16 @@ process-wide storage of your own, so every pack in one process shares the
 value. A switch that gates a preprocessing pass also needs core's master
 `preprocessing` switch on: `bv-blasting` is the example.
 
+A `count` option is written back only when its flag is actually given on the
+command line, so a getter is free to resolve an environment fallback of its
+own and the CLI will not shadow it with the option's default. Read the
+variable in the getter with `env_limit_count` (`env_limits.h`), keep the
+setter writing a parameter that the getter prefers when set, and the option
+then resolves option > environment > default like core's own limits do;
+`qlt-t3-cap` (`TAU_QLT_T3_CAP`) is the example. Name the default in the help
+string: the CLI registers the option with an empty default, so `--help` shows
+the help string alone.
+
 ### Rewrite hooks
 
 Capabilities answer questions; **hooks rewrite trees**, and they are a separate
@@ -212,14 +226,18 @@ template <typename BA, typename Node> struct ba_wff_hooks {};
 *defined and empty*, unlike `ba_descriptor` — so specialize neither, one, or
 both, in your own `<id>_ba_hooks_ext.tmpl.h` (see `_template/`), included from
 your descriptor header. `ba_wff_hooks` takes `wff_lt`, `wff_nlt`, `wff_lteq`,
-`wff_nlteq`, `wff_gt`, `wff_ngt`, `wff_gteq`, `wff_ngteq`; `ba_term_hooks` takes
-`term_cast`.
+`wff_nlteq`, `wff_gt`, `wff_ngt`, `wff_gteq`, `wff_ngteq`, `wff_eq`, `wff_neq`;
+`ba_term_hooks` takes `term_cast`.
 
 Each returns `nullptr` to decline. **Declining is not the same as having no
-hook**: core asks `pack_ba_type_has_wff_lt_hook` separately, and when your type
-owns the operator but you declined, it preserves the comparison as an atom
-rather than falling through to the generic Boolean definition. So return
-`nullptr` freely for operands you cannot fold — the atom survives for the solver.
+hook**: for an ordering operator core asks `pack_ba_type_has_wff_lt_hook`
+separately, and when your type owns the operator but you declined, it preserves
+the comparison as an atom rather than falling through to the generic Boolean
+definition. So return `nullptr` freely for operands you cannot fold — the atom
+survives for the solver. `wff_eq` and `wff_neq` differ: every algebra has the
+Boolean equation, so when you decline core's own equality rules go on (qlt
+uses them to decide `v = 1` for a point variable, since its typed 0 and 1 are
+the order's ends rather than points).
 
 A hook keeps a fixed signature too, so it cannot carry a report. A hook
 that meets a failure there declines with `nullptr` and names the blocking

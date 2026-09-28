@@ -1,6 +1,8 @@
 # Under Emscripten a test target links to a .js+.wasm pair rather than a
 # native binary, so ctest must run it through node; TEST_RUNNER/TEST_SUFFIX
-# stay empty natively, leaving add_test()'s COMMAND unchanged there.
+# stay empty natively, leaving add_test()'s COMMAND unchanged there. The
+# top-level configure has resolved NODE_EXECUTABLE to emsdk's node
+# (cmake/emsdk-node.cmake); find_program only fills it when it is unset.
 if(EMSCRIPTEN)
 	find_program(NODE_EXECUTABLE node REQUIRED)
 	set(TEST_RUNNER "${NODE_EXECUTABLE}")

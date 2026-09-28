@@ -119,16 +119,18 @@ add_repl_test(solver_cmd-qlt-solve_system-relational
 
 add_repl_test(solver_cmd-qlt-solve-neq0
 	"solve x : qlt != 0." "solution: \\{") # qlt.cpp:105-107
+# The typed 0 and 1 are the ends of the qlt order, not points, so `x != 0`
+# and `x != 1` constrain nothing and every mode solves them.
 add_repl_test(solver_cmd-qlt-solve-neq0-min
-	"solve --min (x : qlt != 0)." "no solution") # qlt.cpp:108
+	"solve --min (x : qlt != 0)." "solution: \\{") # qlt.cpp:108
 add_repl_test(solver_cmd-qlt-solve-neq0-max
 	"solve --max (x : qlt != 0)." "solution: \\{") # qlt.cpp:109
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1
 	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{") # qlt.cpp:112-114
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
-	"solve --min (x : qlt != 0 && x : qlt != 1)." "no solution") # qlt.cpp:115
+	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:115
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
-	"solve --max (x : qlt != 0 && x : qlt != 1)." "no solution") # qlt.cpp:116
+	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:116
 add_repl_test(solver_cmd-qlt-solve-two_vars
 	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:119-121
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
@@ -140,6 +142,21 @@ add_repl_test(solver_cmd-qlt-solve-unsatisfiable
 # used to abort the process.
 add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
 	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{") # qlt.cpp:130-133
+
+# Relations between qlt variables are solved jointly: the model satisfies them
+# and a satisfiable chain has a solution.
+add_repl_test(solver_cmd-qlt-solve-strict_pair
+	"solve x:qlt < y:qlt" "y := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-strict_pair_reversed
+	"solve y:qlt < x:qlt" "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-increasing_chain
+	"solve x:qlt < y:qlt && y:qlt < z:qlt" "z := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-decreasing_chain
+	"solve z:qlt < y:qlt && y:qlt < x:qlt" "x := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-bounded_chain
+	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "x := \\{ -1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-inconsistent_cycle
+	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution")
 
 # mixed -- tests/integration/solver/test_integration-solver-mixed.cpp
 
@@ -317,3 +334,9 @@ add_repl_test(solver_cmd-bv_through_def
 add_repl_test(solver_cmd-bv_through_def_rev
 	"g(y:bv[16]) := y:bv[16]. solve g({ 2 }:bv[16]) = y:bv[16]"
 	"y := \\{ 2 \\}:bv\\[16\\]")
+
+# solve takes a formula: a term argument is rejected instead of the whole line
+# being stored as a term (`solve x` used to print `%1: solvex`)
+add_repl_test_fail(solver_cmd-term_rejected "solve x" "Invalid formula")
+add_repl_test_fail(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula")
+add_repl_test_fail(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula")

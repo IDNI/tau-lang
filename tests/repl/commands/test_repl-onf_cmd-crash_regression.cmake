@@ -10,3 +10,7 @@
 
 add_repl_test(onf_cmd-no_crash_on_conjunction "onf x (xy = 0)" ": xy = 0")
 add_repl_test(onf_cmd-no_crash_on_variable_equality "onf x (x = y)" ": x = y")
+
+# onf takes a formula: a term argument is rejected instead of the whole line
+# being stored as a term (`onf x y` used to print `%1: onfxy`)
+add_repl_test_fail(onf_cmd-term_rejected "onf x y" "Invalid formula")

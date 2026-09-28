@@ -246,6 +246,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 			|| i->cached_solution->aut.num_states <= 1)
 			return; // single-state strategy: the init_out part n/a
 		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
+		// a run of the data game's strategy is revised by solving the
+		// game again, whose Mealy view then describes the revised spec
+		const bool data_game = i->cached_solution->data_game;
 		(void)i->step();
 		tref psi = parse_formula("always o2[t]:tau = 1");
 		REQUIRE(psi != nullptr);
@@ -254,7 +257,15 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		REQUIRE(accepted_r.has_value());
 		bool accepted = accepted_r.value();
 		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
-		if (accepted) {
+		if (accepted && data_game) {
+			CHECK_FALSE(i->strategy_stale());
+			REQUIRE(i->cached_solution.has_value());
+			CHECK(i->cached_solution->data_game);
+			auto sr = i->step();
+			REQUIRE(sr.has_value());
+			auto [out, _] = sr.value();
+			CHECK(out.has_value());
+		} else if (accepted) {
 			// IN-N3: the synthesised automaton no longer describes
 			// the running spec; introspection says so instead of
 			// showing a stale machine (reset() still re-seeds).

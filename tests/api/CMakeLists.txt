@@ -4,7 +4,11 @@ set(TESTS
 	tref_api
 	string_api
 	limits
+	memory_budget
+	reset
 	ltl_execution
+	normal_forms_xor
+	undecided_verdicts
 )
 
 foreach(TEST IN LISTS TESTS)

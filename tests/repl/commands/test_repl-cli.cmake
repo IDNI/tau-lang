@@ -83,16 +83,14 @@ add_test(NAME "test_repl-cli-spec_file"
 set_tests_properties("test_repl-cli-spec_file" PROPERTIES
 	PASS_REGULAR_EXPRESSION "No more inputs provided")
 
-# --- CLI ARGUMENT ORDERING (regression guard) --------------------------------
-# `tau -q <spec>` used to consume the file as the boolean flag's value, so
-# cl.get_files() stayed empty and the specification was silently ignored in
-# favour of the interactive REPL. The argument parser no longer does that, so
-# an option placed before a positional spec file runs the file. Pinned here so
-# the ordering cannot regress unnoticed.
+# --- CLI argument ordering ---------------------------------------------------
+# A boolean option takes an optional value (cli::option(name, short, <bool
+# default>)); a file placed after it must still reach cl.get_files() and run,
+# rather than being consumed as the flag's value and leaving the REPL open.
 add_test(NAME "test_repl-cli-option_before_file_runs_file"
 	COMMAND bash -c "printf 'o[t] = i[t].\\n' > cli_order_fixture.tau && echo q | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -q cli_order_fixture.tau; r=$?; rm -f cli_order_fixture.tau; exit $r")
 set_tests_properties("test_repl-cli-option_before_file_runs_file" PROPERTIES
-	PASS_REGULAR_EXPRESSION "No more inputs provided"
+	PASS_REGULAR_EXPRESSION "Execution step: 0"
 	FAIL_REGULAR_EXPRESSION "Welcome to the Tau Language Framework")
 
 # --- spec file WITHOUT --quit ------------------------------------------------
@@ -114,6 +112,12 @@ add_test(NAME "test_repl-cli-max_fixpoint_steps_flag"
 set_tests_properties("test_repl-cli-max_fixpoint_steps_flag" PROPERTIES
 	PASS_REGULAR_EXPRESSION "fixpointsteps: *9"
 	FAIL_REGULAR_EXPRESSION "Error")
+
+# The option is applied on every run, so its default must be the library's.
+add_test(NAME "test_repl-cli-max_fixpoint_steps_default"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get fixpointsteps\"")
+set_tests_properties("test_repl-cli-max_fixpoint_steps_default" PROPERTIES
+	PASS_REGULAR_EXPRESSION "fixpointsteps: *500")
 
 add_test(NAME "test_repl-cli-gc_growth_factor_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --gc-growth-factor 2.5 -e \"get gcgrowth\"")
@@ -157,6 +161,9 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_consistency_subsets|max-consistency-subsets|j|9|maxsubsets|9"
 	"cache_bound|cache-bound|A|123|cachebound|123"
 	"max_cover_products|max-cover-products|n|9|maxcoverproducts|9"
+	"max_constant_size|max-constant-size|u|300|maxconstantsize|300"
+	"tref_budget|tref-budget|y|4096|trefbudget|4096"
+	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

@@ -30,6 +30,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "test_scratch_dir.h"
 #include "tau_compile.h"
 
 #include <algorithm>
@@ -164,8 +165,8 @@ struct proc_result { std::string out, err; int exit_code = -1; };
 proc_result run_piped(const std::string& exe_cmd, const stdfs::path& stdin_file,
 	const std::string& tag)
 {
-	stdfs::path out_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".out");
-	stdfs::path err_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".err");
+	stdfs::path out_path = test_scratch_path("_tau_cg_parity_" + tag + ".out");
+	stdfs::path err_path = test_scratch_path("_tau_cg_parity_" + tag + ".err");
 	std::string cmd = exe_cmd
 		+ " < \"" + stdin_file.string() + "\""
 		+ " > \"" + out_path.string() + "\""
@@ -187,7 +188,7 @@ stdfs::path write_stdin_tape(const stdfs::path& spec_path, const std::string& ta
 	stdfs::path in_path = spec_path;
 	in_path.replace_extension(".in");
 	std::string content = stdfs::exists(in_path) ? read_file(in_path) : "";
-	stdfs::path tape_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".stdin");
+	stdfs::path tape_path = test_scratch_path("_tau_cg_parity_" + tag + ".stdin");
 	std::ofstream f(tape_path, std::ios::binary);
 	f << content;
 	return tape_path;
@@ -479,13 +480,22 @@ TEST_SUITE("codegen_parity") {
 		const std::string spec_src =
 			"G (o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {42}:bv[8]).";
 
-		// CLI's rendering of the witness: o1 prints as "bot".
+		// CLI's rendering of the witness: o1 prints as "0".
 		auto cli_trace = trace_is_admissible(spec_src,
-			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
+			{ {"o1", 0, "0"}, {"o2", 0, "0"} });
 		REQUIRE_MESSAGE(cli_trace.has_value(),
 			"admissibility check could not decide the CLI-style trace");
 		CHECK_MESSAGE(*cli_trace,
-			"CLI-style trace (o1=bot, o2=0) should be admissible");
+			"CLI-style trace (o1=0, o2=0) should be admissible");
+
+		// "bot" is the order's lower end, not a point a stream can hold.
+		auto end_trace = trace_is_admissible(spec_src,
+			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
+		REQUIRE_MESSAGE(end_trace.has_value(),
+			"admissibility check could not decide the end-valued trace");
+		CHECK_MESSAGE(!*end_trace,
+			"trace (o1=bot, o2=0) puts a qlt stream at the order's end "
+			"and must be inadmissible");
 
 		// artifact's rendering of the same witness: o1 prints as "-1/2".
 		auto artifact_trace = trace_is_admissible(spec_src,
@@ -570,8 +580,7 @@ TEST_SUITE("codegen_parity") {
 				+ "\" -q -b off", stdin_file, name + "_cli");
 			auto cli_ms = elapsed_ms(t0);
 
-			stdfs::path build_dir = stdfs::temp_directory_path()
-				/ ("_tau_cg_parity_build_" + name);
+			stdfs::path build_dir = test_scratch_path("_tau_cg_parity_build_" + name);
 			stdfs::remove_all(build_dir, ec);
 			auto t1 = std::chrono::steady_clock::now();
 			auto res = compile_spec<node_t>(src, "", build_dir.string());
@@ -690,8 +699,8 @@ TEST_SUITE("codegen_parity") {
 
 		stdfs::path stdin_file = write_stdin_tape(spec_path, name + "_stepguard");
 		std::error_code ec;
-		stdfs::path build_dir = stdfs::temp_directory_path()
-			/ ("_tau_cg_parity_build_" + name + "_stepguard");
+		stdfs::path build_dir = test_scratch_path(
+			"_tau_cg_parity_build_" + name + "_stepguard");
 		stdfs::remove_all(build_dir, ec);
 
 		auto res = compile_spec<node_t>(src, "", build_dir.string());

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlsynt: every synthesis call answers
+# UNREALIZABLE at once, and every --print-game-hoa call outlasts any small
+# ltl-timeout, so the data game is never built. With an input atom reading
+# several steps, no check can then decide the spec: it is UNKNOWN.
+for a in "$@"; do
+	[ "$a" = "--print-game-hoa" ] && exec sleep 60
+done
+echo UNREALIZABLE
+exit 1

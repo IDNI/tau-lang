@@ -40,6 +40,8 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 	};
 	pre_order<node>(fm).visit(populate_scope, all, populate_ids);
+	// No binder: nothing to rename, and no need to walk the terms.
+	if (scope_to_id.empty()) return fm;
 	// Next update variables using the information from var_to_id
 	subtree_map<node, std::vector<size_t>> var_to_id;
 	subtree_map<node, tref> old_name;
@@ -72,7 +74,40 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 		return n;
 	};
-	fm = pre_order<node>(fm).apply(update_var, all, update_var_up);
+	// A term holds no binder, so its renaming depends only on the binders in
+	// scope: each maximal term is renamed from its parent's `up` with a
+	// memoized walk, because a Boole-decomposed term is a DAG whose shared
+	// cofactors are exponentially larger as a tree (x1 ^ ... ^ xn). Bare
+	// `variable` children (a binder's own variable) are still visited by
+	// update_var, which update_var_up relies on.
+	auto rename_in_term = [&](tref n) -> tref {
+		if (is<node, tau::variable>(n))
+			if (auto it = var_to_id.find(n); it != var_to_id.end())
+				return tau::build_variable(
+					std::to_string(it->second.back()),
+					tau::get(n).get_ba_type());
+		return n;
+	};
+	auto visit_non_term = [](tref n) {
+		return !tau::get(n).is_term() || is<node, tau::variable>(n);
+	};
+	auto up = [&](tref n) -> tref {
+		if (!var_to_id.empty() && !is_quantifier<node>(n)
+			&& !tau::get(n).is_term())
+		{
+			trefs ch = tau::get(n).get_children();
+			bool changed = false;
+			for (tref& c : ch) if (tau::get(c).is_term()
+				&& !is<node, tau::variable>(c)) // renamed by update_var
+			{
+				tref r = pre_order<node>(c).apply_unique(rename_in_term);
+				if (r != c) c = r, changed = true;
+			}
+			if (changed) n = tau::get(tau::get(n).value, ch);
+		}
+		return update_var_up(n);
+	};
+	fm = pre_order<node>(fm).apply(update_var, visit_non_term, up);
 	DBG(LOG_DEBUG << "End canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
 	return fm;
 }
@@ -291,6 +326,63 @@ int_t find_biggest_quant_id(tref fm) {
 	};
 	pre_order<node>(fm).visit_unique(f);
 	return id;
+}
+
+// A bound variable's name is purely numeric (canonize_quantifier_ids gives
+// it the quantifier depth below its binder plus one); every other variable
+// carries its source name.
+inline bool is_bound_var_name(const std::string& s) {
+	if (s.empty()) return false;
+	for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+	return true;
+}
+
+// Largest bound-variable id anywhere in fm, terms included and with no
+// early exit -- unlike find_biggest_quant_id, which relies on the canonical
+// numbering to stop at the outermost quantifier of a scope. Names too big
+// for int_t saturate to the int_t maximum.
+template <NodeType node>
+int_t max_bound_var_id(tref fm) {
+	using tau = tree<node>;
+	int_t id = 0;
+	auto f = [&](tref n) {
+		if (!tau::get(n).is(tau::variable)) return;
+		const std::string& name = get_var_name<node>(n);
+		if (!is_bound_var_name(name)) return;
+		try {
+			id = std::max(id, static_cast<int_t>(std::stoll(name)));
+		} catch (const std::out_of_range&) {
+			id = std::numeric_limits<int_t>::max();
+		}
+	};
+	pre_order<node>(fm).visit_unique(f);
+	return id;
+}
+
+// Alpha-renaming: every bound variable of fm becomes id + off. The binding
+// structure is untouched (each binder and its occurrences move together),
+// so this only moves fm's names out of the way of another formula's.
+template <NodeType node>
+tref shift_bound_var_ids(tref fm, int_t off) {
+	using tau = tree<node>;
+	if (off <= 0) return fm;
+	subtree_map<node, tref> changes;
+	auto f = [&](tref n) {
+		if (!tau::get(n).is(tau::variable)) return;
+		const std::string& name = get_var_name<node>(n);
+		if (!is_bound_var_name(name)) return;
+		int_t id;
+		try {
+			id = static_cast<int_t>(std::stoll(name));
+		} catch (const std::out_of_range&) { return; }
+		if (id > std::numeric_limits<int_t>::max() - off) return;
+		changes.emplace(n, tau::build_variable(
+			std::to_string(id + off),
+			tau::get(n).get_ba_type()));
+	};
+	pre_order<node>(fm).visit_unique(f);
+	if (changes.empty()) return fm;
+	return rewriter::replace<node>(fm, changes);
 }
 
 // If calculate_quant_id is false no variable renaming in subformula

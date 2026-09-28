@@ -294,6 +294,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_qf_decision_option(bool enabled) {
 		bv_quantifier_free_decision = enabled;
 	}
+	static size_t get_bitblast_max_nodes_option() {
+		return bv_bitblast_max_nodes;
+	}
+	static void set_bitblast_max_nodes_option(size_t n) {
+		bv_bitblast_max_nodes = n;
+	}
 	static bool get_widening_option() { return bv_widening; }
 	static void set_widening_option(bool enabled) { bv_widening = enabled; }
 	static size_t get_max_width_option() { return bv_max_width; }
@@ -308,7 +314,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `bv-definitional-elimination`, `bv-defelim-max-clauses`,
 	 * `bv-defelim-max-atoms`, `bv-defelim-max-subset`,
 	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
-	 * `bv-widening` and `bv-max-width`.
+	 * `bv-bitblast-max-nodes`, `bv-widening` and `bv-max-width`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -323,11 +329,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * the four `defelim-max-*` caps mirror `bv_definitional_elimination`
 	 * and its caps (heuristics/bv_definitional_elimination.h), read by
 	 * @ref eliminate_definitional_existentials. `quantifier-free-decision`
-	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h).
+	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h), and
+	 * `bitblast-max-nodes` its `bv_bitblast_max_nodes` budget.
 	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
 	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 12> options() {
+	static std::array<ba_option, 13> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -385,6 +392,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				"decide a closed bitvector formula whose binders are all "
 				"of one kind quantifier-free (off by default)" },
+			{ "bitblast-max-nodes", ba_option_kind::count,
+				nullptr, nullptr,
+				get_bitblast_max_nodes_option,
+				set_bitblast_max_nodes_option,
+				"cap the BDD nodes a bitvector formula of at most 16 "
+				"bits is decided with before cvc5 takes it (default "
+				"1048576, 0 = always cvc5)" },
 			{ "widening", ba_option_kind::flag,
 				get_widening_option, set_widening_option,
 				nullptr, nullptr,
@@ -471,6 +485,39 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			make_bitvector_value(width.value(), value),
 			ba_type) });
+	}
+
+	/**
+	 * @brief The width of `bv[n]`: its values are read as unsigned
+	 * integers modulo 2^n. 0 while widening is on, since the operators then
+	 * compute at a wider width than the type's.
+	 */
+	static size_t modular_width(size_t ba_type) {
+		if (bv_widening) return 0;
+		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
+		// Advisory drop: a type without a width is not read modularly.
+		return width.has_value() ? width.value() : 0;
+	}
+
+	/** @brief The unsigned integer the bv constant @p c holds. */
+	static std::optional<uint64_t> modular_value(size_t ba_type, tref c) {
+		const auto& t = tau::get(c);
+		const auto& x = t.is(tau::bf) && t.has_child() ? t[0] : t;
+		const size_t n = modular_width(ba_type);
+		if (!n || n > 64) return std::nullopt;
+		if (x.is(tau::bf_f)) return uint64_t{0};
+		if (x.is(tau::bf_t)) return n == 64 ? ~uint64_t{0}
+			: (uint64_t{1} << n) - 1;
+		if (!x.is_ba_constant()) return std::nullopt;
+		auto v = x.get_ba_constant();
+		if (!std::holds_alternative<bv>(v)) return std::nullopt;
+		const bv& b = std::get<bv>(v);
+		if (!b.isBitVectorValue()) return std::nullopt;
+		const std::string bits = b.getBitVectorValue(2);
+		if (bits.size() > 64) return std::nullopt;
+		uint64_t out = 0;
+		for (char ch : bits) out = out << 1 | (ch == '1' ? 1 : 0);
+		return out;
 	}
 
 	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */

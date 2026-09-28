@@ -171,3 +171,30 @@ add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 # assignments by dependency).
 add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
+
+# GitHub #188: the typed 0 and 1 of qlt are the ends of the order, not points,
+# so a point variable never equals either; every path (the equality hook, the
+# substitution heuristic, the interval collector) agrees.
+add_repl_test(normalize_cmd-qlt_end_is_no_point_ex
+	"normalize ex x:qlt (x = 1 && all y:qlt (y < x))" ": F")
+add_repl_test(normalize_cmd-qlt_end_is_no_point_all
+	"normalize all x:qlt (x < 1) && ex y:qlt (y = 1)" ": F")
+add_repl_test(normalize_cmd-qlt_var_eq_end "normalize x:qlt = 1" ": F")
+add_repl_test(normalize_cmd-qlt_var_neq_end "normalize x:qlt != 0" ": T")
+add_repl_test(normalize_cmd-qlt_all_below_end "normalize all x:qlt (x < 1)" ": T")
+
+# GitHub #189: a closed conjunct that does not mention the variable under
+# elimination (here the inner scope, folded to `ex z F`) is not dropped by the
+# interval collector; the outer closed scope declines instead of reading T.
+add_repl_test(normalize_cmd-qlt_closed_conjunct_not_dropped
+	"normalize ex x:qlt ex z:qlt all w:qlt ((x != w && (x > w || z > x) && z >= x) || (x = w && z < x))" ": F")
+add_repl_test(normalize_cmd-qlt_nested_equiv_valid
+	"normalize all x:qlt all z:qlt ex w:qlt (((x != w) && ((x > w) || (z > x))) <-> (z < x))" ": T")
+add_repl_test(normalize_cmd-qlt_nested_xor_unsat
+	"normalize ex x:qlt ex z:qlt all w:qlt (((x != w) && ((x > w) || (z > x))) ^^ (z < x))" ": F")
+
+# GitHub #187: a compound term holding a qlt variable is no bound on it, so the
+# interval collector declines `(x & {3}) < {1}` instead of reading it as
+# `x < {1}` and contradicting `x > {5}`; the binder stays.
+add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
+	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")

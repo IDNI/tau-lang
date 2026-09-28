@@ -19,6 +19,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "test_scratch_dir.h"
 #include "cpp_codegen.h"
 #include "tau_compile.h"
 #include "ltl_aba.h"
@@ -133,7 +134,7 @@ static compiled_result compiled_seconds(const char* formula_str,
                                const strings& input_vars,
                                const std::string& tag,
                                long N) {
-    stdfs::path bdir = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".build");
+    stdfs::path bdir = test_scratch_path("_tau_bench_" + tag + ".build");
     std::error_code ec;
     stdfs::remove_all(bdir, ec);
 
@@ -143,7 +144,7 @@ static compiled_result compiled_seconds(const char* formula_str,
         return { -1.0, true, why.str() };
     }
 
-    stdfs::path tape = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".stdin");
+    stdfs::path tape = test_scratch_path("_tau_bench_" + tag + ".stdin");
     {
         std::ofstream f(tape);
         for (long t = 0; t < N; ++t) {
@@ -152,7 +153,7 @@ static compiled_result compiled_seconds(const char* formula_str,
         }
     }
 
-    stdfs::path out = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".out");
+    stdfs::path out = test_scratch_path("_tau_bench_" + tag + ".out");
     std::string cmd = "\"" + res.value().exe_path + "\" < \"" + tape.string()
                      + "\" > \"" + out.string() + "\" 2>/dev/null";
     auto t0 = clk::now();

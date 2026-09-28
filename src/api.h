@@ -29,6 +29,8 @@
 #include "heuristics/simplify_options.h"
 #include "interpreter.h"
 #include "tau_diagnostics.h"
+#include "tau_memory_budget.h"
+#include "reset_hooks.h"
 
 namespace idni::tau_lang {
 
@@ -45,6 +47,26 @@ struct stream_at {
 	size_t time_point;   ///< Discrete time index.
 
 	auto operator<=>(const stream_at& other) const = default;
+};
+
+/**
+ * @brief Empties the tree caches when the scope changed a semantic option.
+ *
+ * The normalizer and the other tree caches are keyed on the formula alone,
+ * so a result computed under the old options would otherwise answer for the
+ * new ones. Every api setter of such an option opens one; a caller that
+ * writes an option by another route (a BA option set directly) opens its own.
+ * Open it only between units of work, where no reference into a cache is
+ * held.
+ */
+template <NodeType node>
+struct option_change_guard {
+	option_change_guard();
+	~option_change_guard();
+	option_change_guard(const option_change_guard&) = delete;
+	option_change_guard& operator=(const option_change_guard&) = delete;
+private:
+	size_t before;
 };
 
 /**
@@ -92,7 +114,10 @@ void tau_init();
 ///   3. **htref** — operates on shared-pointer handles (GC-safe)
 ///
 /// Every method returns a `result<T>` carrying either the value or a
-/// structured diagnostics report (see `tau_diagnostics.h`).
+/// structured diagnostics report (see `tau_diagnostics.h`). A call during
+/// which a bdd node table fills returns an error and no value
+/// (`messages::bdd_node_table_exhausted`); the next call runs normally
+/// (see `with_budget` in `tau_memory_budget.h`).
 template <NodeType node>
 struct api {
 	using tau = tree<node>;
@@ -183,8 +208,9 @@ struct api {
 	static void set_cqe_max_clauses(size_t n);
 	/**
 	 * @brief Above this many distinct variables a pure-equality bitvector
-	 * partition goes to the pack solver instead of the `lgrs` route, whose
-	 * Boole expansion is exponential in them (default 8; 0 = unlimited).
+	 * partition goes to the pack solver instead of being squeezed per width
+	 * and solved algebraically (`find_solution`), whose Boole expansion is
+	 * exponential in them (default 8; 0 = unlimited).
 	 */
 	static void set_lgrs_max_vars(size_t n);
 	/**
@@ -256,6 +282,24 @@ struct api {
 	 */
 	static void set_gc_growth_factor(double f);
 	/**
+	 * @brief Cap on live interned tree nodes; 0 = unlimited (default).
+	 *
+	 * Checked on entry to every api call: a call that starts with the
+	 * store already at or above the cap returns an error without doing
+	 * any work, while a call that was allowed to start returns its value
+	 * whatever it does to the store. See `tau_memory_budget.h` for what
+	 * this does and does not bound.
+	 */
+	static void set_tref_budget(size_t n);
+	/**
+	 * @brief Percentage of the tref budget at which the store counts as
+	 * approaching its cap and the interpreter sweeps regardless of its
+	 * own growth trigger. Default 75.
+	 */
+	static void set_tref_budget_soft_percent(size_t pct);
+	/// Live interned tree node count.
+	static size_t tref_count();
+	/**
 	 * @brief Warn when an updated specification exceeds this many printed
 	 * characters (the I7 size guard); 0 = off (default).
 	 */
@@ -284,6 +328,9 @@ struct api {
 	 * 256; 0 = unlimited.
 	 */
 	static void set_max_cover_products(size_t n);
+	/** @brief Set the largest region of fresh values, in tree nodes, the
+	 * solver keeps across the steps of a run (0 = unlimited). */
+	static void set_max_constant_size(size_t n);
 	/**
 	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
 	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
@@ -291,9 +338,6 @@ struct api {
 	 * environment fallback (default 60) applies again. Values above one
 	 * day clamp.
 	 */
-	/// sat() past its simplify/flatten prefix, for callers (realizable)
-	/// that already simplified and flattened `fm`.
-	static result<bool> sat_prepared(tref fm);
 	static void set_ltl_timeout_sec(long seconds);
 	/**
 	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
@@ -311,25 +355,29 @@ struct api {
 	static void set_ltl_qe_max_vars(size_t n);
 	/**
 	 * @brief Largest state count accepted from an `ltlsynt` HOA strategy
-	 * (`ltl_hoa_max_states`); default 2^22, 0 = unlimited.
+	 * (`ltl_hoa_max_states_param`); 0 = unlimited. The parameter wins over
+	 * the `TAU_LTL_HOA_MAX_STATES` environment fallback (default 2^22).
 	 */
 	static void set_ltl_hoa_max_states(size_t n);
 	/**
 	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
-	 * the Algorithm D product game (`ltl_guard_max_cubes`); default 512,
-	 * 0 = unlimited.
+	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
+	 * 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_GUARD_MAX_CUBES` environment fallback (default 512).
 	 */
 	static void set_ltl_guard_max_cubes(size_t n);
 	/**
 	 * @brief Cap on the ABA-oracle refinement rounds of a realizability
-	 * check (`ltl_max_refinement_rounds`); on the cap the verdict is
-	 * UNKNOWN. Default 64; 0 = unlimited.
+	 * check (`ltl_max_refinement_rounds_param`); on the cap the verdict is
+	 * UNKNOWN. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_REFINEMENT_ROUNDS` environment fallback (default 64).
 	 */
 	static void set_ltl_max_refinement_rounds(size_t n);
 	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
-	 * examines per check (`ltl_window_max_paths`); a hit cap yields
-	 * UNKNOWN. Default 4096; 0 = unlimited.
+	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
+	 * UNKNOWN. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_WINDOW_MAX_PATHS` environment fallback (default 4096).
 	 */
 	static void set_ltl_window_max_paths(size_t n);
 	/**
@@ -351,6 +399,26 @@ struct api {
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
 	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096.
 	static void set_ba_decision_pins(size_t n);
+	/**
+	 * @brief Set an option an algebra of the pack declares about itself,
+	 * named `<family>-<option>` as on the command line without its dashes
+	 * (`bv-widening`, `bv-defelim-max-atoms`, `qlt-t3-cap`) and as in the
+	 * REPL `set` command.
+	 *
+	 * A flag is switched on by a non-zero @p value; a count takes @p value.
+	 * The value is the option's value afterwards, which differs from
+	 * @p value where the option clamps or ignores it (`bv-max-width 0`).
+	 * An error, and nothing changes, when no algebra of the pack declares
+	 * @p name.
+	 */
+	static result<size_t> set_ba_option(const std::string& name,
+		size_t value);
+	/// The value of a BA-declared option (a flag reads 0 or 1); an error
+	/// when no algebra of the pack declares @p name.
+	static result<size_t> get_ba_option(const std::string& name);
+	/// The `<family>-<option>` names of every BA-declared option of the
+	/// pack.
+	static std::vector<std::string> ba_option_names();
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
 	/// Enable or disable ANSI colour in engine output, the same switch
@@ -410,6 +478,12 @@ struct api {
 	/// stream declarations, and a main formula terminated by '.').
 	/// @return Parsed spec tree, or a structured error on failure.
 	static result<tref> get_spec(const std::string& spec);
+	/// get_spec() without the construction hooks: types inferred, every
+	/// literal kept as written, for the procedures that decide or run it
+	/// (sat, realizable, valid, get_interpreter, unsat_core), which keep
+	/// the warm-up of each clause (pin_written_warm_ups) and fold it
+	/// themselves.
+	static result<tref> get_spec_as_written(const std::string& spec);
 	/// @copydoc get_spec
 	static result<htref> geth_spec(const std::string& spec);
 
@@ -447,6 +521,21 @@ struct api {
 	/// same stream differently (o5:bv[16], then o5:bv[24]) must reset in
 	/// between. Interpreters already built keep their own I/O context.
 	static void reset_definitions();
+	/**
+	 * @brief Return the process to a fresh state: drop the definitions (as
+	 * @ref reset_definitions), empty the caches, and free every interned
+	 * tree node that no `htref` holds.
+	 *
+	 * Options and limits keep their values. The interning pools -- BA
+	 * types, BA constants and the BDD stores -- are kept, since the
+	 * values still held index into them.
+	 *
+	 * Destroy every interpreter first: an interpreter holds raw trefs the
+	 * sweep cannot see. A value kept across the call must be an `htref`;
+	 * a raw `tref` into a freed node dangles.
+	 * @return The number of tree nodes freed.
+	 */
+	static size_t reset();
 
 	// -----------------------------------------------------------------------
 	// Querying
@@ -600,6 +689,36 @@ struct api {
 	/// @copydoc nnf(const std::string&)
 	static result<htref> nnf(htref expression);
 
+	/// Convert a wff to order normal form (ONF) with respect to @p var.
+	/// @p var is a variable, or a bf wrapping one; it is NOT a formula and
+	/// is passed through untouched. Unlike the other normal forms this one
+	/// does not run `simplify` on the expression: inference there can give
+	/// the formula's own variables a BA type, which would stop them
+	/// matching the caller's untyped @p var.
+	static result<std::string> onf(const std::string& formula,
+						const std::string& var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<tref> onf(tref formula, tref var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<htref> onf(htref formula, htref var);
+
+	/// Convert a formula to prenex normal form (PNF): all quantifiers
+	/// pulled to the front.
+	static result<std::string> pnf(const std::string& formula);
+	/// @copydoc pnf(const std::string&)
+	static result<tref> pnf(tref formula);
+	/// @copydoc pnf(const std::string&)
+	static result<htref> pnf(htref formula);
+
+	/// Convert an expression to minimal normal form (MNF): a reduced DNF
+	/// with `!=` atoms presented as negated equalities.
+	/// Dispatches to bf or wff MNF depending on the root node type.
+	static result<std::string> mnf(const std::string& expression);
+	/// @copydoc mnf(const std::string&)
+	static result<tref> mnf(tref expression);
+	/// @copydoc mnf(const std::string&)
+	static result<htref> mnf(htref expression);
+
 	// -----------------------------------------------------------------------
 	// Procedures
 	// ------------------------------------------------------------
@@ -667,6 +786,10 @@ struct api {
 	static result<bool> realizable(tref spec);
 	/// @copydoc realizable(const std::string&)
 	static result<bool> realizable(htref spec);
+	/// The formula realizable(spec) decides: the spec simplified with the
+	/// warm-ups it is written with, its always statements merged into one
+	/// always part, then normalized. The REPL's `ltl` explains this one.
+	static result<tref> realizability_target(tref spec);
 
 	/// Check if a specification is unrealizable.  Equivalent to
 	/// negating realizable(spec).
@@ -676,15 +799,24 @@ struct api {
 	/// @copydoc unrealizable(const std::string&)
 	static result<bool> unrealizable(htref spec);
 
-	/// Check satisfiability: does some trace satisfy the formula?
-	/// realizable(fm) implies sat(fm), never the converse, so this is a
-	/// weaker question than realizable() and can answer true where
-	/// realizable() answers false. Merges top-level G-conjuncts before
-	/// checking; for genuinely full-LTL content with no realizable
-	/// program, the verdict is undecided (an error result), not false.
+	/// Check satisfiability as README "Satisfiability" defines it: for
+	/// all inputs there exist outputs at each step, quantified in time
+	/// order, such that the formula holds. Input streams are read
+	/// universally under `sometimes` too, so `sometimes i1[t] = 1` is
+	/// unsatisfiable. For full LTL the verdict is realizability, and
+	/// realizable(fm) implies sat(fm). A spec root (what get_spec yields)
+	/// is unwrapped to its main formula with its definitions applied.
+	/// Merges top-level G-conjuncts before checking; a formula with a
+	/// stream variable and no temporal quantifier is read as its implicit
+	/// `always`, so a one-step solver answer only decides unsat. A closed
+	/// formula that normalization leaves undecided is an error whose
+	/// message starts with "UNKNOWN:" (`code::solver_error`), never false.
 	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(tref formula);
+	/// sat() past its simplify/flatten prefix, for callers (realizable)
+	/// that already simplified and flattened `fm`.
+	static result<bool> sat_prepared(tref fm);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(htref formula);
 
@@ -695,21 +827,49 @@ struct api {
 	/// @copydoc unsat(const std::string&)
 	static result<bool> unsat(htref formula);
 
-	/// Check validity: true iff the formula holds for all models.
-	/// Merges top-level G-conjuncts, then checks via valid_spec().
+	/// Check validity: true iff no trace violates the formula (every
+	/// input stream read as an output). Merges top-level G-conjuncts, then
+	/// checks via valid_spec(). An undecided formula is an UNKNOWN error.
 	static result<bool> valid(const std::string& formula);
 	/// @copydoc valid(const std::string&)
 	static result<bool> valid(tref formula);
 	/// @copydoc valid(const std::string&)
 	static result<bool> valid(htref formula);
 
-	/// Check if T (tautology) implies the normalized formula.
+	/// Check if T (tautology) implies the normalized formula with every
+	/// input stream read as an output, i.e. whether no trace violates it.
 	/// This is the underlying validity check used by valid().
 	static result<bool> valid_spec(const std::string& spec);
 	/// @copydoc valid_spec(const std::string&)
 	static result<bool> valid_spec(tref spec);
 	/// @copydoc valid_spec(const std::string&)
 	static result<bool> valid_spec(htref spec);
+
+	/**
+	 * @brief A minimal set of the top-level conjuncts of @p spec that is
+	 * already unsatisfiable (@p realizability false) or unrealizable
+	 * (@p realizability true, the default).
+	 *
+	 * The conjuncts are the operands of the main formula's top-level `&&`,
+	 * with `always (A && B)` split into `always A` and `always B`
+	 * (G distributes over conjunction). Both properties are monotone in
+	 * the conjunct set, so a deletion pass that drops a conjunct whenever
+	 * the rest still conflicts ends on a subset-minimal core: n + 1
+	 * decisions for n conjuncts.
+	 *
+	 * The string overload parses a full specification (definitions,
+	 * trailing '.'), as get_interpreter does.
+	 *
+	 * @return The core in source order; empty when @p spec is satisfiable
+	 *         (realizable). An error when the whole spec gets no verdict.
+	 *         A sub-check that gets no verdict keeps its conjunct and adds
+	 *         a warning: the core then still conflicts but may not be
+	 *         minimal.
+	 */
+	static result<std::vector<std::string>> unsat_core(
+		const std::string& spec, bool realizability = true);
+	/// @copydoc unsat_core(const std::string&,bool)
+	static result<trefs> unsat_core(tref spec, bool realizability = true);
 
 	// -----------------------------------------------------------------------
 	// Solving
@@ -881,12 +1041,33 @@ struct api {
 	static result<tref> simplify(tref expr, bool use_defaults = true);
 	/// @copydoc simplify(const std::string&,bool)
 	static result<htref> simplify(htref expr, bool use_defaults = true);
+	/// simplify() without the construction hooks: types inferred, every
+	/// literal kept as written.
+	static result<tref> simplify_as_written(tref expr);
+	/// The main formula of @p expr (a formula or a spec root) with the
+	/// warm-up of each clause kept at its lookback as written
+	/// (pin_written_warm_ups). With @p negate the clauses are read under
+	/// a negation, for a procedure that decides the negation of @p expr.
+	static result<tref> pin_main(tref expr, bool negate = false);
+	/// simplify_as_written(), pin_main() and the construction hooks.
+	static result<tref> simplify_keeping_warm_ups(tref expr,
+		bool negate = false);
 
 private:
 	/// Extract a normalized rr<node> from an expression tree.
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	static result<tref> get_spec(const std::string& spec, bool as_written);
+	/// get_formula_or_term() without the construction hooks, for the
+	/// decision procedures, which keep the warm-ups as written.
+	static result<tref> parse_as_written(const std::string& expr);
+	/// realizable()'s prefix: simplify_keeping_warm_ups() and the merge
+	/// of the top-level always statements, checked to be a formula or a
+	/// spec root.
+	static result<tref> prepare_realizability(tref spec);
+	/// The formula the decision procedures get from a prepared spec.
+	static result<tref> realizability_target_of(tref prepared);
 };
 
 

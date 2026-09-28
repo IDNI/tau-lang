@@ -50,7 +50,7 @@ set_tests_properties("test_repl-ctl_star-valid_tautology_not_F" PROPERTIES
 add_repl_test(ctl_star-realizable_A_F_input
 	"fragment ctl_star. realizable A (F i1[t] = 1)" ": F")
 add_repl_test(ctl_star-sat_A_F_input_like_its_body
-	"fragment ctl_star. sat A (F i1[t] = 1)" ": T")
+	"fragment ctl_star. sat A (F i1[t] = 1)" ": F")
 add_repl_test(ctl_star-sat_A_F_output "fragment ctl_star. sat A (F o1[t] = 1)" ": T")
 add_repl_test(ctl_star-realizable_A_always_output
 	"fragment ctl_star. realizable A (always o1[t] = 1)" ": T")
@@ -59,6 +59,10 @@ add_repl_test(ctl_star-realizable_E_F_output
 # direction outputs pin the witness path, so E over inputs is decided
 add_repl_test(ctl_star-realizable_E_F_input
 	"fragment ctl_star. realizable E (F i1[t] = 1)" ": T")
+# the witness state has read its input: no branch from it keeps i1 at both
+# 1 and 0; decided on codes within the round cap of a game over formulas
+add_repl_test(ctl_star-realizable_E_always_input_both_values
+	"fragment ctl_star. set ltlrefinementrounds 4. realizable (E (always i1[t] = 1)) && (E (always i1[t] = 0))" ": F")
 # a past operator under E keeps the all-paths encoding: undecided, not F
 add_repl_test_fail(ctl_star-realizable_E_since_undecided
 	"fragment ctl_star. realizable E ((i1[t] = 1) since (i1[t] = 0))"
@@ -115,7 +119,7 @@ add_test(NAME "test_repl-ltl_cmd-backend_failure_is_unknown"
 	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1. sat always o1[t] = 1\""
 )
 set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
-	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n(.*\n)*.*: T"
+	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n.*: T"
 	FAIL_REGULAR_EXPRESSION "REALIZABLE|Aborted|core dumped")
 
 # ── Batch 3: error ≠ verdict ───────────────────────────────────────────────

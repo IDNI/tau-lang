@@ -16,6 +16,8 @@ set(TAU_CORE_HEADERS
 	heuristics/simplify_options.h           # runtime option-set for bv simplification heuristics
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
+	env_limits.h       # environment fallback of a numeric runtime limit
+	reset_hooks.h      # caches api::reset empties
 	tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,
 	                   # extractors, printers, queries, and
@@ -45,6 +47,7 @@ set(TAU_CORE_HEADERS
 	interpreter.h
 	pointwise_revision.h
 	tau_diagnostics.h  # idni::tau_lang aliases for the parser library's diagnostics types
+	tau_memory_budget.h # cap on the interned tree store, checked on entry to each api call
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h

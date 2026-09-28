@@ -39,6 +39,10 @@ struct messages {
 	static constexpr sv no_input_provided = "No input provided";
 	static constexpr sv auto_continue_is_false = "Auto continue is false";
 	static constexpr sv no_solution_found = "No solution found";
+	static constexpr sv generated_constant_too_large = "A value the "
+		"solver built passed the constant size budget (maxconstantsize, "
+		"--max-constant-size; 0 = unlimited), so no solution was found "
+		"within it";
 	static constexpr sv invalid_arguments = "Invalid argument(s)";
 	static constexpr sv normalization_failed = "Normalization failed";
 	static constexpr sv failed_to_apply_definitions
@@ -58,6 +62,9 @@ struct messages {
 	static constexpr sv specification_could_not_be_compiled
 		= "the specification could not be compiled";
 	static constexpr sv failed_to_write_outputs = "Failed to write outputs";
+	static constexpr sv bdd_node_table_exhausted
+		= "bdd node table exhausted: a node did not fit, so the result "
+		  "is unknown and no answer is given";
 	static constexpr sv no_ba_element_assigned_to_output
 		= "No Boolean algebra element assigned to output";
 	static constexpr sv execution_stopped_on_failed_step

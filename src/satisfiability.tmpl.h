@@ -4,10 +4,13 @@
 #include "normalizer.h"
 #include "ltl_aba.h"
 #include "boolean_algebras/ba_pack_traits.h"
+#include "heuristics/preprocess_placement.h"
 
 #include <cstdlib>
 #include <functional>
+#include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -40,20 +43,24 @@ inline size_t max_flag_search_steps = 500;
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
- * caps above and the LTL(ABA) knobs (`ltl_verdict_budget_fingerprint`).
- * The verdict memos in this file are keyed on the formula only and drop
- * their entries when it changes. (The semantic PWR fallback lives in
- * pointwise_revision.h, which includes this header; it steers the
- * revision, not these memos.)
+ * caps above, the master preprocessing switch, the options the algebras of
+ * the pack declare (`pack_ba_options_fingerprint`) and the LTL(ABA) knobs
+ * (`ltl_verdict_budget_fingerprint`). The verdict memos in this file are
+ * keyed on the formula only and drop their entries when it changes. (The
+ * semantic PWR fallback lives in pointwise_revision.h, which includes this
+ * header; it steers the revision, not these memos.)
  */
-inline size_t verdict_budget_fingerprint() {
+template <NodeType node>
+size_t verdict_budget_fingerprint() {
 	size_t seed = 0;
 	auto mix = [&seed](size_t v) {
 		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 	};
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
-	return ltl_verdict_budget_fingerprint(seed);
+	mix(preprocessing);
+	return ltl_verdict_budget_fingerprint(
+		pack_ba_options_fingerprint<node>(seed));
 }
 
 /**
@@ -183,10 +190,10 @@ tref transform_io_var(tref io_var, int_t time_point) {
  * Constant-time (initial-condition) variables in @p io_vars are skipped,
  * as are streams whose value at @p time_point is predefined by
  * @p initials; each remaining output stream name is quantified once.
- * The bound variables are deliberately not renamed: the phi/chi
- * unrolling (`build_step`/`build_step_chi`) splices later steps
- * underneath the quantifiers built here, and their lookback occurrences
- * must be captured by exactly these binders.
+ * The bound variables are deliberately not renamed: the phi unrolling
+ * (`build_step`) splices later steps underneath the quantifiers built
+ * here, and their lookback occurrences must be captured by exactly these
+ * binders.
  * @tparam node Tree node type.
  * @param fm Formula to quantify.
  * @param io_vars IO variable nodes of the surrounding formula.
@@ -406,51 +413,6 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) 
 
 /**
  * @internal
- * @brief Build step 0 of the chi unrolling (`find_fixpoint_chi`): the
- * always-part and the sometimes-flag formula instantiated at
- * @p time_point, with the flag part hidden behind a placeholder atom.
- *
- * Both @p chi and @p st are instantiated at @p time_point; instead of
- * conjoining the instantiated @p st directly, the placeholder atom
- * `_pholder[time_point] = 0` is conjoined and mapped to it in
- * @p pholder_to_st. The placeholder marks the splice point at which
- * `build_step_chi` inserts step 1; callers recover the real formula by
- * replacing every placeholder via @p pholder_to_st. Unlike later steps,
- * step 0 carries no quantifier prefix.
- * @tparam node Tree node type.
- * @param chi Always-part local specification driving the recurrence.
- * @param st Eventual-variable flag formula tracked by the unrolling.
- * @param io_vars IO variable nodes appearing in @p chi and @p st.
- * @param time_point Time step at which the unrolling starts.
- * @param pholder_to_st [in,out] Map extended with the placeholder atom
- * mapped to the instantiated @p st.
- * @return Pair `(chi@time_point && placeholder, placeholder)`; the
- * second element seeds `build_step_chi`'s @p cached_fm splice cursor.
- * @endinternal
- */
-template <NodeType node>
-std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
-	const trefs& io_vars, int_t time_point, auto& pholder_to_st)
-{
-	using tau = tree<node>;
-	subtree_map<node, tref> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
-		changes[io_vars[i]] = new_io_var;
-	}
-	// SO-9: same type as build_step_chi's placeholder -- each is only
-	// used as its own replace key, but the asymmetry invited bugs.
-	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point,
-		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-	c_pholder = tau::build_bf_eq_0(c_pholder);
-	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
-	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
-					 c_pholder);
-	return std::make_pair(new_fm, c_pholder);
-}
-
-/**
- * @internal
  * @brief Extend the phi unrolling (`find_fixpoint_phi`) by one step:
  * instantiate @p original_fm at time `time_point + step_num`, wrap it in
  * that step's time-compatible quantifier prefix, and splice it into the
@@ -505,74 +467,34 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 
 /**
  * @internal
- * @brief Extend the chi unrolling (`find_fixpoint_chi`) by one step:
- * instantiate @p chi and @p st at time `time_point + step_num`, hide the
- * instantiated @p st behind a fresh placeholder, quantify the step, and
- * splice it into @p prev_fm as the alternative of raising the flag one
- * step later.
+ * @brief Move every constant-time IO variable of @p fm whose time point is at
+ * least @p from by @p delta steps.
  *
- * The new step `chi@n && _pholder@n` (with `_pholder@n` mapped to the
- * instantiated @p st in @p pholder_to_st) is quantified
- * `all inputs ex outputs` at its time point and spliced in by replacing
- * @p cached_fm — the previous step's placeholder atom — with
- * `cached_fm || <quantified new step>`. After placeholder substitution
- * chi therefore reads "the always-part holds and the flag is raised
- * now, or one step later, or ...", one disjunctive layer per step. When
- * @p st is `T` (empty sometimes clause) the previous placeholder is
- * replaced instead of disjoined.
+ * Variables below @p from (initial conditions) stay put. All occurrences are
+ * replaced at once, so a variable moved onto the time point of another one
+ * is not moved again.
  * @tparam node Tree node type.
- * @param chi Always-part local specification driving the recurrence.
- * @param st Eventual-variable flag formula tracked by the unrolling.
- * @param prev_fm Chi telescope built so far (steps `0..step_num-1`),
- * still containing placeholders.
- * @param io_vars IO variable nodes appearing in @p chi and @p st.
- * @param initials Set of `(variable name, time point)` pairs predefined
- * by explicit initial conditions (not re-quantified).
- * @param step_num Index of the step to add; must be `> 0` (step 0 is
- * `build_initial_step_chi`).
- * @param time_point Time step at which the unrolling started.
- * @param cached_fm [in,out] Splice cursor: on entry the previous step's
- * placeholder atom, on exit the new step's.
- * @param pholder_to_st [in,out] Map extended with the new placeholder
- * atom mapped to the instantiated @p st.
- * @return @p prev_fm with the new step spliced in (placeholders intact).
+ * @param fm Formula whose IO variables all refer to constant time points.
+ * @param from Smallest time point that moves.
+ * @param delta Number of steps to move by; may be negative.
+ * @return @p fm with the moved variables.
  * @endinternal
  */
 template <NodeType node>
-tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
-	const auto& initials, int_t step_num, int_t time_point, tref& cached_fm,
-	auto& pholder_to_st)
-{
+tref shift_state_io_vars(tref fm, int_t from, int_t delta) {
 	using tau = tree<node>;
-	// Use build_initial_step otherwise
-	DBG(assert(step_num > 0);)
 	subtree_map<node, tref> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(
-					io_vars[i], time_point + step_num);
-		changes[io_vars[i]] = new_io_var;
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		DBG(assert(is_io_initial<node>(v));)
+		const int_t tp = get_io_time_point<node>(v);
+		if (tp < from || changes.contains(v)) continue;
+		const size_t type = tau::get(v).get_ba_type();
+		tref name = get_var_name_node<node>(v);
+		changes.emplace(v, tau::trim(tau::get(v).is_input_variable()
+			? build_in_var_at_n<node>(name, tp + delta, type)
+			: build_out_var_at_n<node>(name, tp + delta, type)));
 	}
-	// We need a placeholder symbol in order to substitute during the next step
-	tref c_chi = rewriter::replace<node>(chi, changes);
-	tref c_pholder = build_out_var_at_n<node>("_pholder",
-							time_point + step_num,
-							get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-	c_pholder = tau::build_bf_eq_0(c_pholder);
-	tref c_st = rewriter::replace<node>(st, changes);
-	pholder_to_st.emplace(c_pholder, c_st);
-	// Quantify formula which is to be added to chi
-	tref q_most_inner_step = existentially_quantify_output_streams<node>(
-		tau::build_wff_and(c_chi, c_pholder), io_vars,
-		time_point + step_num, initials);
-	q_most_inner_step = universally_quantify_input_streams<node>(
-		q_most_inner_step, io_vars, time_point + step_num, initials);
-	// If build_step_chi is used with empty sometimes clause
-	if (tau::get(st).equals_T())
-		changes = { { cached_fm,  q_most_inner_step } };
-	else changes = { { cached_fm,
-			tau::build_wff_or(cached_fm, q_most_inner_step) }};
-	cached_fm = c_pholder;
-	return rewriter::replace<node>(prev_fm, changes);
+	return rewriter::replace<node>(fm, changes);
 }
 
 /**
@@ -702,6 +624,70 @@ result<bool> is_run_satisfiable(tref fm) {
 
 	DBG(assert(r.is_well_formed());)
 	return r;
+}
+
+/**
+ * @internal
+ * @brief `is_run_satisfiable` for a run given as the conjunction of
+ * @p steps, deciding the time-compatible quantification one time point at
+ * a time.
+ *
+ * From the latest time point down to the earliest, the steps whose
+ * latest variable sits at that time point are conjoined, the variables of
+ * that time point are quantified (outputs existentially inside inputs
+ * universally) and the result is normalized. Each intermediate formula
+ * therefore only speaks about the time points a step can look back to,
+ * while quantifying the whole run at once grows with its length.
+ * @tparam node Tree node type.
+ * @param steps Formulas over IO variables at constant time points only.
+ * @return `true` if the time-compatibly quantified conjunction of
+ * @p steps is satisfiable; a failed result when a normalization fails.
+ * @endinternal
+ */
+template <NodeType node>
+result<bool> is_run_satisfiable_by_steps(const trefs& steps) {
+	using tau = tree<node>;
+	result<bool> r;
+	std::map<int_t, trefs> by_time;
+	tref fm = tau::_T();
+	int_t earliest = 0, latest_all = -1;
+	for (tref step : steps) {
+		trefs vs = tau::get(step).select_top(is_child<node, tau::io_var>);
+		if (vs.empty()) {
+			fm = tau::build_wff_and(fm, step);
+			continue;
+		}
+		int_t latest = get_io_time_point<node>(vs[0]);
+		for (tref v : vs) {
+			DBG(assert(is_io_initial<node>(v));)
+			const int_t vt = get_io_time_point<node>(v);
+			latest = std::max(latest, vt);
+			earliest = latest_all < 0 ? vt : std::min(earliest, vt);
+			latest_all = std::max(latest_all, vt);
+		}
+		by_time[latest].push_back(step);
+	}
+	for (int_t tp = latest_all;
+		tp >= earliest && !tau::get(fm).equals_F(); --tp)
+	{
+		if (auto it = by_time.find(tp); it != by_time.end())
+			for (tref step : it->second)
+				fm = tau::build_wff_and(fm, step);
+		trefs inputs, outputs;
+		for (tref v : tau::get(fm).get_free_vars()) {
+			if (!tau::get(v).child_is(tau::io_var)
+				|| get_io_time_point<node>(v) != tp) continue;
+			(tau::get(v)[0].is_input_variable()
+				? inputs : outputs).push_back(v);
+		}
+		for (tref v : outputs) fm = tau::build_wff_ex(v, fm, false);
+		for (tref v : inputs) fm = tau::build_wff_all(v, fm, false);
+		TAU_TRY(fm, normalize_non_temp<node>(fm));
+	}
+	if (tau::get(fm).equals_F()) return r.with_value(false);
+	if (tau::get(fm).equals_T()) return r.with_value(true);
+	TAU_TRY(bool sat, is_non_temp_nso_satisfiable<node>(fm));
+	return r.with_value(sat);
 }
 
 // Assumption is that the provided fm is an unbound continuation
@@ -875,68 +861,87 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 
 /**
  * @internal
- * @brief Compute the unbounded continuation of the combined always/flag
- * ("chi") state used to decide whether a `sometimes` clause's guard flag
- * can ever be raised, by repeatedly unrolling one more time step
- * (`build_step_chi`) and checking for a fixpoint against the previous
- * step's (placeholder-substituted) formula.
+ * @brief Compute the set of states of the combined always/flag ("chi")
+ * recurrence from which a `sometimes` clause's flag can still be raised,
+ * as the least fixpoint of a backward reachability iteration.
+ *
+ * Writing `chi@tp` and `st@tp` for @p chi_base and @p st instantiated at
+ * @p time_point, and `Q` for the time-compatible quantification
+ * `all i[tp+1] ex o[tp+1]`, the iterates are
+ * `chi_0 = chi@tp && st@tp` and
+ * `chi_{n+1} = chi@tp && (st@tp || Q chi_n')`, where `chi_n'` is `chi_n`
+ * with its state (every variable at @p time_point minus the lookback or
+ * later) moved one step forward. `chi_n` holds exactly in the states from
+ * which the flag can be raised within `n` steps. Every iterate is
+ * normalized, so its size stays bounded by the state and does not grow
+ * with `n`.
+ *
+ * Each step adds one more chance to raise the flag, so the iterates only
+ * weaken and the fixpoint is reached once `chi_{n+1} -> chi_n`. With
+ * @p st `T` the flag part is absent, `chi_{n+1} = chi@tp && Q chi_n'`,
+ * the iterates only strengthen and the test is `chi_n -> chi_{n+1}`.
  * @tparam node Tree node type.
  * @param chi_base Always-part local specification driving the recurrence.
  * @param st Eventual-variable flag formula (from
  * `transform_to_eventual_variables`) whose satisfiability is being
  * tracked.
- * @param io_vars IO variable nodes appearing in `chi_base`.
+ * @param io_vars IO variable nodes appearing in `chi_base` and `st`.
  * @param initials Set of `(variable name, time point)` pairs marking
  * positions predefined by explicit initial conditions.
- * @param time_point Time step at which unrolling starts.
+ * @param time_point Time step at which the state is anchored; the
+ * initial conditions must all lie before @p time_point minus the lookback.
  * @return A `result` carrying the pair `(chi, steps)`: `chi` is the
- * (placeholder-substituted) formula at the fixpoint and `steps` is the
- * number of steps taken. A failed result means the step cap
+ * normalized fixpoint over constant-time variables anchored at
+ * @p time_point, and `steps` is the number of steps taken. A failed
+ * result means a normalization failed or the step cap
  * (`max_fixpoint_steps`) was hit before a fixpoint was reached.
  * @endinternal
  *
  * @par Example
- * Like `find_fixpoint_phi`, this operates on partially unrolled,
- * placeholder-substituted AST state rather than a parseable spec string,
- * so the following is illustrative only. `to_unbounded_continuation` calls
- * `find_fixpoint_chi` only after the initial segment up to
- * `flag_boundary` failed to raise the flag directly; it then unrolls the
- * always-part together with the flag recurrence until two consecutive
- * steps agree (up to implication), yielding a formula describing every
- * time point from which the flag could still be raised, or `F` once
- * normalized if it never can be (see the "flag_boundary" tests in
- * tests/integration/test_integration-solver.cpp:841-878 for concrete
- * sat/unsat outcomes of this overall code path).
+ * For the always-part `o2[t] = o1[t-1] && o3[t] = o2[t-1] &&
+ * o4[t] = o3[t-1]` and the flag `o4[t] = 1` anchored at 1, `chi_n` accepts
+ * the states where one of `o4[1]`, `o3[1]`, ... already carries the 1
+ * that reaches `o4` within `n` steps; the free `o1` makes every state
+ * reach it, so the fixpoint is `chi@1` after four steps
+ * (tests/integration/test_integration-satisfiability6.cpp).
  */
 template <NodeType node>
 result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
 {
+	using tau = tree<node>;
 	result<std::pair<tref, int_t>> r;
-	subtree_map<node, tref> pholder_to_st;
-	auto [chi_prev, cache] = build_initial_step_chi<node>(
-		chi_base, st, io_vars, time_point, pholder_to_st);
+	const int_t lookback = get_max_shift<node>(io_vars);
+	const int_t first_state = time_point - lookback;
+	const bool weakening = !tau::get(st).equals_T();
+	const tref chi_now = fm_at_time_point<node>(chi_base, io_vars,
+								time_point);
+	const tref st_now = fm_at_time_point<node>(st, io_vars, time_point);
 
-	int_t lookback = get_max_shift<node>(io_vars);
-	int_t step_num = 1;
-
-	tref chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
-		 initials, step_num, time_point, cache, pholder_to_st);
-
-	tref chi_replc = rewriter::replace<node>(chi, pholder_to_st);
-	tref chi_prev_replc = rewriter::replace<node>(chi_prev, pholder_to_st);
-
-	LOG_DEBUG << "Continuation at step " << step_num << ": "
-			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
-
-	// Find fix point once the lookback is greater the step_num
-	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
-	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
+	auto step = [&](tref prev) {
+		tref next = shift_state_io_vars<node>(prev, first_state, 1);
+		next = existentially_quantify_output_streams<node>(
+			next, io_vars, time_point + 1, initials);
+		next = universally_quantify_input_streams<node>(
+			next, io_vars, time_point + 1, initials);
+		if (weakening) next = tau::build_wff_or(st_now, next);
+		return normalize_non_temp<node>(tau::build_wff_and(chi_now, next));
+	};
 	auto impl = [](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
 		return ir.has_value() && ir.value();
 	};
-	while (step_num < lookback || !impl(chi_prev_replc, chi_replc))
+
+	TAU_TRY(tref chi_prev, normalize_non_temp<node>(
+					tau::build_wff_and(chi_now, st_now)));
+	int_t step_num = 1;
+	TAU_TRY(tref chi, step(chi_prev));
+	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(chi);
+
+	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
+	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
+	while (step_num < lookback || !(weakening ? impl(chi, chi_prev)
+						: impl(chi_prev, chi)))
 	{
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
@@ -949,23 +954,15 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 				"0 = unlimited) to decide this specification",
 				{{label::limit, max_fixpoint_steps}});
 		}
-		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
-
-		chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
-			initials, step_num, time_point, cache, pholder_to_st);
-		chi_replc = rewriter::replace<node>(chi, pholder_to_st);
-
+		chi_prev = chi, ++step_num;
+		TAU_TRY(chi, step(chi_prev));
 		LOG_DEBUG << "Continuation at step " << step_num << ": "
-			<< LOG_FM(chi_replc);
+			<< LOG_FM(chi);
 	}
-	auto normed_trace = normalize_non_temp<node>(chi_prev_replc);
-	std::string trace_str = normed_trace.has_value()
-		? tree<node>::get(normed_trace.value()).to_str()
-		: "<normalization failed>";
 	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		<< "reached fixpoint after " << step_num - 1 << " steps: "
-		<< trace_str;
-	return r.with_value(std::make_pair(chi_prev_replc, step_num - 1));
+		<< LOG_FM(chi_prev);
+	return r.with_value(std::make_pair(chi_prev, step_num - 1));
 }
 
 /**
@@ -983,7 +980,7 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
  * initial conditions and stay constant.
  * @tparam node Tree node type.
  * @param fm Formula over constant-time IO variables, as produced by
- * `find_fixpoint_phi`/`find_fixpoint_chi` after normalization.
+ * `find_fixpoint_phi` after normalization.
  * @param highest_init_cond Greatest time point still predefined by an
  * explicit initial condition.
  * @return @p fm with all non-initial IO variables made relative again.
@@ -1342,7 +1339,14 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		}
 		run = normed_run.value();
 		auto sat = is_run_satisfiable<node>(run);
-		if (!sat.has_value() || !sat.value()) {
+		// An undecided run is not a refutation: nullptr is this
+		// function's "no verdict".
+		if (!sat.has_value()) {
+			LOG_ERROR << "always_to_unbounded_continuation: the "
+				"satisfiability of the run could not be decided";
+			return nullptr;
+		}
+		if (!sat.value()) {
 			print_fixpoint_info(
 				"Temporal normalization of G specification reached fixpoint after "
 				+ std::to_string(steps) +
@@ -1408,6 +1412,10 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  * @param reset_ctn_stream Forwarded to `transform_ctn_to_streams` for each
  * `sometimes` clause, to reset the flag-numbering counter.
  * @param start_time Time step at which execution begins.
+ * @param inputs How the input streams of each `sometimes` clause are read.
+ * @param aw_warm_up Lookback of the always part as written, when @p fm
+ * carries its unbounded continuation instead, whose lookback can be
+ * smaller: the always part asks nothing before this step.
  * @return A pair `(res, max_st_lookback)`. If @p fm has no `sometimes`
  * sub-formula, `res` is `fm` unchanged and `max_st_lookback` is `0`.
  * Otherwise `res` is `fm` with each `sometimes` clause replaced by a flag
@@ -1434,7 +1442,9 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 // Assumes single normalized Tau DNF clause
 template <NodeType node>
 std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
-	bool reset_ctn_stream, const int_t start_time)
+	bool reset_ctn_stream, const int_t start_time,
+	const sometimes_inputs inputs = sometimes_inputs::universal,
+	const int_t aw_warm_up = 0)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
@@ -1451,7 +1461,8 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	if (aw_fm != nullptr) {
 		aw_io_vars = tau::get(aw_fm)
 				.select_top(is_child<node, tau::io_var>);
-		aw_lookback = get_max_shift<node>(aw_io_vars);
+		aw_lookback = std::max(get_max_shift<node>(aw_io_vars),
+								aw_warm_up);
 	}
 
 	LOG_TRACE << "transforming eventual variables: " << LOG_FM(fm);
@@ -1496,16 +1507,17 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 				st_io_vars, (max_st_lookback - st_lookback)
 								+ aw_lookback);
 
-		// Guard statement using uninterpreted constants to express that
-		// "if the inputs equal the uninterpreted constants, the Tau formula
-		// under sometimes is implied"
-		// This mimics an existential quantifier capturing the inputs but at the same
-		// time the inputs are not quantified
-		st_io_vars = tau::get(shifted_sometimes)
-				.select_top(is_child<node, tau::io_var>);
-		tref guard = create_guard<node>(st_io_vars, n);
-		shifted_sometimes = tau::build_wff_imply(
-						guard, shifted_sometimes);
+		// Read universally, the inputs of psi stay free here and the
+		// fixpoint searches quantify them at their time step, before the
+		// outputs of that step and the flag. The guard instead requires
+		// psi only when the inputs equal uninterpreted constants.
+		if (inputs == sometimes_inputs::guarded) {
+			st_io_vars = tau::get(shifted_sometimes)
+					.select_top(is_child<node, tau::io_var>);
+			tref guard = create_guard<node>(st_io_vars, n);
+			shifted_sometimes = tau::build_wff_imply(
+							guard, shifted_sometimes);
+		}
 
 		ev_assm = tau::build_wff_and(ev_assm, tau::build_wff_imply(
 			tau::build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
@@ -1574,8 +1586,11 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param aw Original (pre-continuation) always-part.
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
+ * @param aw_warm_up Lookback of the always part as written, when @p aw is
+ * its unbounded continuation.
  * @return A `result<tref>` carrying the conjunction
- * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is @p aw's lookback;
+ * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is the greater of
+ * @p aw's lookback and @p aw_warm_up;
  * an engaged value of `T` is the legitimate "no initial segment at all"
  * answer for @p max_st_lookback `0`, the identity callers conjoin in as an
  * empty conjunct rather than a failure. A failed result -- e.g. on a D4
@@ -1586,12 +1601,13 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @endinternal
  */
 template <NodeType node>
-result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
-	// get lookback of aw
+result<tref> make_initial_run(tref aw, const int_t max_st_lookback,
+	const int_t aw_warm_up = 0)
+{
 	using tau = tree<node>;
 	result<tref> r;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
-	const int_t t = get_max_shift<node>(io_vars);
+	const int_t t = std::max(get_max_shift<node>(io_vars), aw_warm_up);
 
 	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
@@ -1610,10 +1626,11 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * @internal
  * @brief Given the unbounded continuation of an always-part combined with
  * eventual-variable flags (from `transform_to_eventual_variables`),
- * determine whether the flag guarding the original `sometimes` clause can
- * ever be raised, first by direct search over an initial time segment and,
+ * determine whether the system can force the flag guarding the original
+ * `sometimes` clause whatever the inputs do: first at the first step and,
  * failing that, by computing the flag's own unbounded continuation
- * (`find_fixpoint_chi`).
+ * (`find_fixpoint_chi`), then searching the step by which the flag is
+ * forced.
  *
  * Assumes `ubd_aw_continuation` is the result of computing the unbounded
  * always continuation of the always-part of the output of
@@ -1630,6 +1647,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * clauses, as returned by `transform_to_eventual_variables`.
  * @param output When `true`, print diagnostic fixpoint information via
  * `print_fixpoint_info`.
+ * @param aw_warm_up Lookback of the always part as written, as passed to
+ * `transform_to_eventual_variables`.
  * @return A `result<tref>` carrying `F` if the flag can never be raised
  * (the `sometimes` clause is unsatisfiable given the always-part), or a
  * formula describing a run in which the flag is raised, conjoined with
@@ -1655,7 +1674,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 template <NodeType node>
 result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,
-	const int_t max_st_lookback, const bool output)
+	const int_t max_st_lookback, const bool output,
+	const int_t aw_warm_up = 0)
 {
 	LOG_DEBUG << "Begin to_unbounded_continuation";
 
@@ -1698,48 +1718,60 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// guarded site below: continuing with `run = nullptr` would silently
 	// DROP the initial-run conjuncts and make the remaining search easier,
 	// i.e. answer satisfiable/realizable when it must not.
-	TAU_TRY(tref run, make_initial_run<node>(ori_aw_ctn, max_st_lookback));
-	// Check if flag can be raised up to the highest initial condition + 2
-	// which corresponds to checking the sometimes statement up to time point
-	// of the highest initial condition + 1
+	TAU_TRY(tref initial_run,
+		make_initial_run<node>(ori_aw_ctn, max_st_lookback, aw_warm_up));
 	const int_t s = start_time + time_point;
 	// TODO: flag_boundary is upper bound, improve!
 	const int_t flag_boundary =
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
-	for (int_t i = s; i <= flag_boundary; ++i) {
-		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
-		// `T` is the empty-run identity here, matching the old nullptr case.
-		if (!tau::get(run).equals_T())
-			run = tau::build_wff_and(run, current_aw);
-		else run = current_aw;
-		auto current_flag = fm_at_time_point<node>(st_flags, st_io_vars, i);
-		auto normed_run = normalize_non_temp<node>(
-					tau::build_wff_and(run, current_flag)).value_or(nullptr);
-		// A cap violation surfaces as nullptr; propagate it rather than
-		// dereferencing it below.
-		if (!normed_run) return r.with_value(nullptr);
-		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		if (sat.has_value() && sat.value()) {
-			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
-			LOG_DEBUG << LOG_FM(normed_run);
-			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
+	// The run, kept as the list of its steps (which
+	// is_run_satisfiable_by_steps decides one time point at a time):
+	// run[0] is the initial run and run[k] the always part at step s+k-1.
+	trefs run{ initial_run };
+	auto extend_run = [&](int_t i) {
+		while ((int_t)run.size() <= i - s + 1)
+			run.push_back(fm_at_time_point<node>(aw, io_vars,
+						s + (int_t)run.size() - 1));
+	};
+	// Check whether the system can force every flag down by step i
+	// whatever the inputs do. The value is the formula to execute, or `F`
+	// when the flags cannot be forced down by step i. No step before i is
+	// assumed to keep a flag up: on some inputs a flag may drop earlier,
+	// and a strategy whose drop step depends on the inputs is only found
+	// this way.
+	auto raise_by = [&](int_t i) -> result<tref> {
+		result<tref> rr;
+		extend_run(i);
+		trefs goal(run.begin(), run.begin() + (i - s + 2));
+		goal.push_back(fm_at_time_point<node>(st_flags, st_io_vars, i));
+		auto sat = rr.merge_take(
+			is_run_satisfiable_by_steps<node>(goal));
+		if (!sat) return rr;
+		if (!*sat) return rr.with_value(tau::_F());
+		auto normed = rr.merge_take(normalize_non_temp<node>(
+						tau::build_wff_and(goal)));
+		if (!normed) return rr;
+		LOG_DEBUG << "Flag raised by time point " << i - time_point;
+		LOG_DEBUG << LOG_FM(*normed);
+		return rr.with_value(tau::build_wff_and(*normed, ori_aw_ctn));
+	};
+	// The flags can most often be forced down at the first step; any
+	// later step is only searched once chi_inf below has shown that the
+	// flags can be forced down at all, since each later check is costlier
+	// than the previous one.
+	{
+		TAU_TRY(tref res, raise_by(s));
+		if (!tau::get(res).equals_F()) {
 			print_fixpoint_info("Temporal normalization of "
 				"Tau specification did not rely on fixpoint "
 				"finding, yielding the result: ",
 				TAU_TO_STR(res), output);
 			return r.with_value(res);
 		}
-		// Since the flag could not be raised in this step, we can add the assumption
-		// that it will never be raised at this timepoint
-		run = normalize_non_temp<node>(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag))).value_or(nullptr);
-		// A cap violation surfaces as nullptr; return it immediately --
-		// falling into the next iteration's `equals_T()` check would
-		// silently restart from `current_aw`, masking the failure.
-		if (!run) return r.with_value(nullptr);
 	}
-	// Since flag could not be raised in the initial segment, we now check if it
-	// can be raised at all. To this end we calculate chi_inf
+	extend_run(flag_boundary);
+	// Check whether the flags can be forced down at all. To this end we
+	// calculate chi_inf
 
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
@@ -1772,15 +1804,24 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 			TAU_TO_STR(tau::_F()), output);
 		return r.with_value(tau::_F());
 	}
-	chi_inf = transform_back_non_initials<node>(chi_inf, point_after_inits-1);
-	io_vars = tau::get(chi_inf).select_top(is_child<node, tau::io_var>);
-	auto chi_inf_anchored = fm_at_time_point<node>(chi_inf, io_vars,
-				std::max(point_after_inits, time_point));
+	// chi_inf is anchored at time_point + point_after_inits; its state
+	// starts at point_after_inits and moves as a whole to the new anchor.
+	auto chi_inf_anchored = shift_state_io_vars<node>(chi_inf,
+		point_after_inits, std::max(point_after_inits, time_point)
+					- (time_point + point_after_inits));
 
-	LOG_TRACE << "Fm to check sat: "
-			<< LOG_FM(tau::build_wff_and(run, chi_inf_anchored));
-	auto run_sat = r.merge_take(is_run_satisfiable<node>(
-		tau::build_wff_and(run, chi_inf_anchored)));
+	// The run up to the anchor of chi_inf: chi_inf implies the always part
+	// at its anchor, from where the unbounded continuation can always be
+	// kept, so the later steps of the run add nothing.
+	int_t anchor = -1;
+	for (tref v : tau::get(chi_inf_anchored)
+			.select_top(is_child<node, tau::io_var>))
+		anchor = std::max(anchor, get_io_time_point<node>(v));
+	trefs reach(run.begin(), run.begin() + std::clamp<int_t>(
+		anchor - s + 2, 1, (int_t)run.size()));
+	reach.push_back(chi_inf_anchored);
+	LOG_TRACE << "Fm to check sat: " << LOG_FM(tau::build_wff_and(reach));
+	auto run_sat = r.merge_take(is_run_satisfiable_by_steps<node>(reach));
 	// A real failure (as opposed to a legitimate "not satisfiable")
 	// propagates as an error instead of masquerading as the F verdict.
 	if (!run_sat) return r;
@@ -1793,23 +1834,15 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 			TAU_TO_STR(tau::_F()), output);
 		return r.with_value(tau::_F());
 	}
-	// Here we know that the formula is satisfiable at some point
-	// Since the initial segment is already checked we continue from there
-	//
-	// SO-1: the "guaranteed to be sat at some point" argument below rests on
-	// the is_run_satisfiable check *above*, made before this loop starts
-	// conjoining !current_flag into `run` on every iteration -- so the
-	// property it depends on is not preserved and the search is not
-	// guaranteed to terminate. The global max_flag_search_steps (default
-	// 500; 0 = unlimited) bounds it: a give-up reports unsatisfiable,
-	// which is wrong but bounded and loud, where an unlimited run on such
-	// a spec hangs. Deciding this properly needs a
-	// tri-state (sat/unsat/unknown) result threaded through
-	// transform_to_execution.
+	// The run reaches a state of chi_inf, the chi iterate of `steps`
+	// steps, so the flags can be forced down within `steps` steps past
+	// the anchor whatever the inputs do, and the search below ends by
+	// then. max_flag_search_steps (default 500; 0 = unlimited) stays as a
+	// bound, and a give-up is an error, not a verdict.
 	const bool flag_search_bounded = max_flag_search_steps > 0;
 	const int_t flag_search_limit = flag_boundary + 1
 					+ (int_t)max_flag_search_steps;
-	for (int_t i = flag_boundary + 1; true; ++i) {
+	for (int_t i = s + 1; true; ++i) {
 		if (flag_search_bounded && i > flag_search_limit) {
 			// A bounded give-up is no verdict: it used to report F,
 			// which callers read as a proof of unsatisfiability. Surface
@@ -1830,23 +1863,8 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				"specification.",
 				{{label::limit, max_flag_search_steps}});
 		}
-		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
-		run = tau::build_wff_and(run, current_aw);
-		auto current_flag
-			= fm_at_time_point<node>(st_flags, st_io_vars, i);
-
-		auto normed_run = normalize_non_temp<node>(
-					tau::build_wff_and(run, current_flag)).value_or(nullptr);
-		// A cap violation surfaces as nullptr; propagate it rather than
-		// dereferencing it below.
-		if (!normed_run) return r.with_value(nullptr);
-		// The formula is guaranteed to have be sat at some point
-		// Therefore, the loop will exit eventually
-		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		if (sat.has_value() && sat.value()) {
-			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
-			LOG_DEBUG << LOG_FM(normed_run);
-			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
+		TAU_TRY(tref res, raise_by(i));
+		if (!tau::get(res).equals_F()) {
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification "
 				"reached fixpoint after "+std::to_string(steps)+
@@ -1854,20 +1872,12 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				TAU_TO_STR(res), output);
 			return r.with_value(res);
 		}
-		// Since the flag could not be raised in this step, we can add the assumption
-		// that it will never be raised at this timepoint
-		run = normalize_non_temp<node>(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag))).value_or(nullptr);
-		// A cap violation surfaces as nullptr; return it immediately --
-		// this unbounded loop rebuilds `run` unconditionally next
-		// iteration, unlike the bounded loop above.
-		if (!run) return r.with_value(nullptr);
 	}
 }
 
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const sometimes_inputs inputs)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -1885,14 +1895,22 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
 				subtree_pair_less<node, int_t>>;
-	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// The reading of the inputs under `sometimes` changes the result, so
+	// each reading keeps its own cache.
+	static cache_t& universal_cache
+		= tree<node>::template create_cache<cache_t>();
+	static cache_t& guarded_cache
+		= tree<node>::template create_cache<cache_t>();
+	cache_t& cache = inputs == sometimes_inputs::universal
+		? universal_cache : guarded_cache;
 	// The continuation depends on the runtime budgets (fixpoint and flag
-	// search steps, the synthesis knobs); a budget change between two
-	// queries must not return the first one's result.
-	static size_t cache_budget = verdict_budget_fingerprint();
-	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	// search steps, the synthesis knobs, the algebras' options); a change
+	// between two queries must not return the first one's result.
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
-		cache.clear();
+		universal_cache.clear();
+		guarded_cache.clear();
 		cache_budget = fp;
 	}
 	if (auto it = cache.find(std::make_pair(fm, start_time));
@@ -1907,7 +1925,35 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	};
 	LOG_DEBUG << "Start transform_to_execution: " << LOG_FM(fm);
 
+	// Several sometimes clauses are decided together, with one flag each,
+	// and that joint search grows quickly with their number. Each clause
+	// with the always part alone is a weaker formula, so one of them that
+	// is unsatisfiable decides the whole clause. A clause left undecided
+	// here only means the joint search below decides.
+	if (trefs sts = tau::get(fm).select_top(
+		is_child<node, tau::wff_sometimes>); sts.size() >= 2)
+	{
+		tref aw = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+		for (tref st : sts) {
+			auto single = transform_to_execution<node>(
+				aw ? tau::build_wff_and(aw, st) : st,
+				start_time, false, inputs);
+			if (!single.has_value()
+				|| !tau::get(single.value()).equals_F()) continue;
+#ifdef TAU_CACHE
+			cache.emplace(std::make_pair(fm, start_time), tau::_F());
+#endif // TAU_CACHE
+			return r.with_value(tau::_F());
+		}
+	}
+
 	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+	// The always part asks nothing before its deepest lookback as written
+	// (README "Lookback initialization"); its unbounded continuation can
+	// read less far back, so the sometimes transformation is given this
+	// lookback explicitly.
+	const int_t aw_warm_up = aw_fm ? get_max_shift<node>(tau::get(aw_fm)
+			.select_top(is_child<node, tau::io_var>)) : 0;
 	std::pair<tref, int_t> ev_t;
 	tref ubd_aw_fm = nullptr;
 	{
@@ -1928,8 +1974,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
-			ev_t = transform_to_eventual_variables<node>(
-							ubd_fm, false, start_time);
+			ev_t = transform_to_eventual_variables<node>(ubd_fm,
+					false, start_time, inputs, aw_warm_up);
 			// Check if there is a sometimes present
 			if (ev_t.first == ubd_fm) {
 				tref res = elim_aw(ubd_fm);
@@ -1946,7 +1992,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 		} else {
 			ev_t = transform_to_eventual_variables<node>(
-								fm, true, start_time);
+							fm, true, start_time, inputs);
 			// Check if there is a sometimes present
 			if (ev_t.first == fm) {
 				// Here we deal with a non-temporal formula
@@ -2013,7 +2059,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			// an error here; `result<tref>` rejects `nullptr` as a value.
 			TAU_TRY(tref ctn, to_unbounded_continuation<node>(
 					aw_after_ev, st[0], ubd_aw_fm, start_time,
-					ev_t.second, output));
+					ev_t.second, output, aw_warm_up));
 			TAU_TRY_OR(res, normalize_non_temp<node>(ctn),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");
@@ -2030,6 +2076,216 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 #endif // TAU_CACHE
 	DBG(assert(r.is_well_formed());)
 	return r;
+}
+
+/** @internal @copydoc pin_written_warm_ups @endinternal */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument,
+			messages::invalid_arguments);
+	}
+	// New nodes are built raw: a construction hook could fold a literal
+	// of a clause that is still to be read.
+	auto raw = [](auto&& build) {
+		use_hooks_guard<node> hooks_off(false);
+		return build();
+	};
+	auto peel = [](tref n) {
+		while (tau::get(n).child_is(tau::wff_parenthesis))
+			n = tau::get(n)[0].first();
+		return n;
+	};
+	auto is_temporal = [](tref n) {
+		return tau::get(n).find_top(is_temporal_quantifier<node>)
+			!= nullptr;
+	};
+	auto shifted_vars = [](tref n) {
+		return tau::get(n).select_top(is_child<node, tau::io_var>);
+	};
+	auto has_ref = [](tref n) {
+		return tau::get(n).find_top(is<node, tau::ref>) != nullptr;
+	};
+	bool failed = false;
+	// Deepest lookback left once the non-temporal parts of @p n are
+	// normalized, each on its own.
+	auto kept_lookback = [&](tref n) -> int_t {
+		int_t kept = 0;
+		trefs parts = tau::get(n).select_top([&](tref x) {
+			return tau::get(x).is(tau::wff) && !is_temporal(x); });
+		for (tref part : parts) {
+			auto nf = r.merge_take(normalize_non_temp<node>(part));
+			if (!nf) { failed = true; return 0; }
+			if (*nf) kept = std::max(kept, get_max_shift<node>(
+				shifted_vars(*nf)));
+		}
+		return kept;
+	};
+	// The deepest io variable of @p n and its shift.
+	auto written = [&](tref n) -> std::pair<tref, int_t> {
+		tref deepest = nullptr;
+		int_t k = 0;
+		for (tref v : shifted_vars(n))
+			if (int_t s = get_io_var_shift<node>(v); s > k)
+				k = s, deepest = v;
+		return { deepest, k };
+	};
+	// `o__warmup[t-k] = 0` at the offset of @p deepest, a fresh output
+	// that holds at every step.
+	auto marker = [&](tref deepest) {
+		const auto& io = tau::get(deepest).is(tau::io_var)
+			? tau::get(deepest) : tau::get(deepest)[0];
+		return raw([&] { return tau::build_bf_eq_0(build_out_var<node>(
+			tau::build_var_name("o__warmup"), io.child(1),
+			get_ba_type_id<node>(pack_bool_carrier_type<node>()))); });
+	};
+	// A body read positively gets the marker conjoined. One read under a
+	// negation gets its negation disjoined, so the marker is conjoined
+	// again once the negation is pushed through the temporal operator.
+	auto pin_body = [&](tref body, tref deepest, bool positive) {
+		tref m = marker(deepest);
+		return raw([&] { return positive ? tau::build_wff_and(body, m)
+			: tau::build_wff_or(body, tau::build_wff_neg(m)); });
+	};
+	// Rebuilds @p n with the children @p ch, or returns it unchanged.
+	auto rebuild = [&](tref n, const trefs& ch) {
+		const auto& t = tau::get(n);
+		const auto& op = t[0];
+		bool same = ch.size() == op.children_size();
+		for (size_t i = 0; same && i < ch.size(); ++i)
+			same = ch[i] == op.child(i);
+		if (same) return n;
+		return raw([&] {
+			return tau::get(tau::wff, tau::get(op.value, ch)); });
+	};
+	auto with_body = [&](tref statement, size_t i, tref body) {
+		trefs ch = tau::get(statement)[0].get_children();
+		ch[i] = body;
+		return rebuild(statement, ch);
+	};
+	// A clause read positively whose written lookback normalization
+	// would shrink; the body at child @p i gets the marker.
+	auto pin_statement = [&](tref s, size_t i, bool positive) {
+		if (has_ref(s)) return s;
+		auto [deepest, k] = written(s);
+		if (k == 0 || kept_lookback(s) >= k) return s;
+		return with_body(s, i, pin_body(tau::get(s)[0].child(i),
+			deepest, positive));
+	};
+	std::function<tref(tref, bool)> walk;
+	// A written conjunction of statements: its always statements whose
+	// bodies have no temporal operator form one always part (README
+	// "Lookback initialization"), enforced from their deepest lookback.
+	auto group = [&](tref n, bool positive) -> tref {
+		trefs leaves;
+		std::function<void(tref)> collect = [&](tref x) {
+			if (const auto& t = tau::get(peel(x)); t.child_is(tau::wff_and)) {
+				collect(t[0].first());
+				collect(t[0].second());
+			} else leaves.push_back(x);
+		};
+		collect(n);
+		subtree_map<node, tref> repl;
+		trefs aw;
+		for (tref leaf : leaves) {
+			tref s = peel(leaf);
+			const auto& t = tau::get(s);
+			if (!t.has_child()) continue;
+			const auto nt = t[0].value.nt;
+			const bool temporal_body = t[0].children_size() == 1
+				&& is_temporal(t[0].first());
+			tref res = leaf;
+			if (nt == tau::wff_always && !temporal_body) {
+				aw.push_back(s);
+				continue;
+			} else if (nt == tau::wff_sometimes && !temporal_body)
+				res = pin_statement(s, 0, positive);
+			else if (nt == tau::wff_always || nt == tau::wff_sometimes)
+				res = positive ? pin_statement(s, 0, true) : s;
+			else if (nt == tau::wff_until || nt == tau::wff_release
+				|| nt == tau::wff_weak_until)
+				res = positive ? pin_statement(s, 1, true) : s;
+			else res = walk(s, positive);
+			if (res != s) repl[leaf] = res;
+		}
+		if (!aw.empty()) {
+			trefs bodies;
+			bool refs = false;
+			for (tref s : aw) {
+				bodies.push_back(tau::get(s)[0].first());
+				refs = refs || has_ref(s);
+			}
+			tref merged = raw([&] { return tau::build_wff_and(bodies); });
+			auto [deepest, k] = written(merged);
+			if (!refs && k > 0) {
+				if (positive) {
+					if (kept_lookback(merged) < k)
+						repl[aw[0]] = with_body(aw[0], 0,
+							pin_body(bodies[0], deepest, true));
+				// Under a negation each always statement becomes
+				// a clause of its own, which keeps the always
+				// part's warm-up.
+				} else for (size_t i = 0; i < aw.size(); ++i)
+					if (kept_lookback(bodies[i]) < k)
+						repl[aw[i]] = with_body(aw[i], 0,
+							pin_body(bodies[i], deepest, false));
+			}
+		}
+		if (repl.empty()) return n;
+		std::function<tref(tref)> apply = [&](tref x) -> tref {
+			if (auto it = repl.find(x); it != repl.end()) return it->second;
+			const auto& t = tau::get(x);
+			if (t.child_is(tau::wff_and) || t.child_is(tau::wff_parenthesis)) {
+				trefs ch;
+				for (tref c : t[0].get_children()) ch.push_back(apply(c));
+				return rebuild(x, ch);
+			}
+			return x;
+		};
+		return apply(n);
+	};
+	// Tracks the polarity each statement is read with. Operators that read
+	// an operand in both polarities (<->, ^, ?:) are left as written.
+	walk = [&](tref n, bool positive) -> tref {
+		const auto& t = tau::get(n);
+		if (failed || !t.is(tau::wff) || !t.has_child()) return n;
+		const auto& op = t[0];
+		switch (op.value.nt) {
+		case tau::wff_parenthesis:
+			return rebuild(n, { walk(op.first(), positive) });
+		case tau::wff_neg:
+			return rebuild(n, { walk(op.first(), !positive) });
+		case tau::wff_imply:
+			return rebuild(n, { walk(op.first(), !positive),
+				walk(op.second(), positive) });
+		case tau::wff_rimply:
+			return rebuild(n, { walk(op.first(), positive),
+				walk(op.second(), !positive) });
+		case tau::wff_or:
+			return rebuild(n, { walk(op.first(), positive),
+				walk(op.second(), positive) });
+		case tau::wff_and:
+		case tau::wff_always:
+		case tau::wff_sometimes:
+		case tau::wff_until:
+		case tau::wff_release:
+		case tau::wff_weak_until:
+			return group(n, positive);
+		default: return n;
+		}
+	};
+	// A formula without temporal operator is one clause, read as its
+	// implicit always.
+	tref res = is_temporal(fm) ? walk(fm, true) : pin_statement(
+		raw([&] { return tau::build_wff_always(fm); }), 0, true);
+	if (failed) return r;
+	if (!is_temporal(fm)) {
+		tref body = tau::get(res)[0].first();
+		res = body == fm ? fm : body;
+	}
+	return r.with_value(res);
 }
 
 // This is the cross-revision satisfiability result cache. Any U/R/W/S/T
@@ -2069,6 +2325,202 @@ tref inputs_as_outputs(tref fm) {
 	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
 }
 
+// Whether the paths of `fm` can be enumerated by for_each_static_path: no io
+// variable (so no lookback decides when a conjunct is enforced), no temporal
+// operator, and no disjunction below a node other than a conjunction,
+// disjunction or quantifier.
+template <NodeType node>
+bool has_static_paths(tref fm) {
+	using tau = tree<node>;
+	if (tau::get(fm).find_top([](tref n) {
+		return is_io_var<node>(n) || is_temporal_quantifier<node>(n);
+	})) return false;
+	std::vector<tref> todo{ fm };
+	while (!todo.empty()) {
+		tref n = todo.back();
+		todo.pop_back();
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			todo.push_back(t[0].first());
+			todo.push_back(t[0].second());
+		} else if (!is_child_quantifier<node>(n)
+			&& t.find_top(is<node, tau::wff_or>))
+			return false;
+	}
+	return true;
+}
+
+// Calls `f` on the paths of `fm`, a conjunction of literals each, until `f`
+// returns false; returns false then, true otherwise. The disjunction of the
+// paths is equivalent to `fm`, as with expression_paths, but no path holds a
+// literal and its negation, no literal twice, and no path is made for a
+// disjunction one of whose disjuncts the path already holds (those paths
+// would be absorbed by the one that takes that disjunct). Expects
+// has_static_paths(fm).
+template <NodeType node>
+bool for_each_static_path(tref fm, const auto& f) {
+	using tau = tree<node>;
+	const subtree_less<node> less;
+	auto same = [&](tref a, tref b) { return !less(a, b) && !less(b, a); };
+	auto negates = [&](tref a, tref b) {
+		const auto& x = tau::get(a);
+		const auto& y = tau::get(b);
+		if (x.child_is(tau::wff_neg)) return same(tau::trim2(a), b);
+		if (y.child_is(tau::wff_neg)) return same(tau::trim2(b), a);
+		auto eq_neq = [&](const tau& e, const tau& n) {
+			return e.child_is(tau::bf_eq) && n.child_is(tau::bf_neq)
+				&& same(e[0].first(), n[0].first())
+				&& same(e[0].second(), n[0].second());
+		};
+		return eq_neq(x, y) || eq_neq(y, x);
+	};
+	// The and/or skeleton of fm, with its leaves numbered by literal
+	enum kind_t { AND, OR, LIT, TRUE, FALSE };
+	struct part { kind_t kind; std::vector<size_t> sub; size_t lit = 0; };
+	std::vector<part> parts;
+	trefs lits;
+	std::map<tref, size_t, subtree_less<node>> lit_ids;
+	std::function<size_t(tref)> build = [&](tref g) -> size_t {
+		const auto& t = tau::get(g);
+		part p;
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			p.kind = t.child_is(tau::wff_and) ? AND : OR;
+			for (tref c : t.child_is(tau::wff_and)
+					? get_cnf_wff_clauses<node>(g)
+					: get_dnf_wff_clauses<node>(g))
+				p.sub.push_back(build(c));
+		} else if (t.equals_T()) p.kind = TRUE;
+		else if (t.equals_F()) p.kind = FALSE;
+		else {
+			p.kind = LIT;
+			auto [it, fresh] = lit_ids.emplace(g, lits.size());
+			if (fresh) lits.push_back(g);
+			p.lit = it->second;
+		}
+		parts.push_back(std::move(p));
+		return parts.size() - 1;
+	};
+	const size_t root = build(fm);
+	std::vector<std::vector<size_t>> negations(lits.size());
+	for (size_t i = 0; i < lits.size(); ++i)
+		for (size_t j = i + 1; j < lits.size(); ++j)
+			if (negates(lits[i], lits[j]))
+				negations[i].push_back(j),
+				negations[j].push_back(i);
+	std::vector<size_t> held(lits.size(), 0);
+	std::vector<size_t> path, todo{ root };
+	std::function<bool()> go = [&]() -> bool {
+		if (todo.empty()) {
+			if (path.empty()) return f(tau::_T());
+			trefs conj;
+			for (size_t l : path) conj.push_back(lits[l]);
+			return f(conj.size() == 1 ? conj[0]
+				: tau::build_wff_and(conj));
+		}
+		const size_t g = todo.back();
+		todo.pop_back();
+		const part& p = parts[g];
+		bool cont = true;
+		switch (p.kind) {
+		case AND:
+			todo.insert(todo.end(), p.sub.rbegin(), p.sub.rend());
+			cont = go();
+			todo.resize(todo.size() - p.sub.size());
+			break;
+		case OR:
+			if (std::ranges::any_of(p.sub, [&](size_t c) {
+				return parts[c].kind == TRUE
+					|| (parts[c].kind == LIT
+						&& held[parts[c].lit]);
+			})) cont = go();
+			else for (size_t c : p.sub) {
+				todo.push_back(c);
+				cont = go();
+				todo.pop_back();
+				if (!cont) break;
+			}
+			break;
+		case LIT:
+			if (held[p.lit]) cont = go();
+			else if (std::ranges::none_of(negations[p.lit],
+				[&](size_t n) { return held[n] > 0; }))
+			{
+				++held[p.lit], path.push_back(p.lit);
+				cont = go();
+				--held[p.lit], path.pop_back();
+			}
+			break;
+		case TRUE: cont = go(); break;
+		case FALSE: break;
+		}
+		todo.push_back(g);
+		return cont;
+	};
+	return go();
+}
+
+// Calls `f` on the paths of `fm` until `f` returns false; returns false
+// then, true otherwise. Static formulas take for_each_static_path, the rest
+// expression_paths.
+template <NodeType node>
+bool for_each_path(tref fm, const auto& f) {
+	if (has_static_paths<node>(fm))
+		return for_each_static_path<node>(fm, f);
+	for (tref c : expression_paths<node>(fm)) if (!f(c)) return false;
+	return true;
+}
+
+// Keeps the first occurrence of each conjunct within a disjunct and of each
+// disjunct, and drops a disjunct that holds every conjunct of another
+// (A || A && B = A). A disjunct with an io variable is neither dropped nor
+// used to drop another this way: the lookbacks of a disjunct set the time
+// from which each of its conjuncts is enforced, so A && B need not imply A.
+// Each complement or conjunction of Tau constants is normalized through
+// here, and every repeated or absorbed disjunct it keeps multiplies the
+// paths of the next complement.
+template <NodeType node>
+trefs simplify_dnf_clauses(const trefs& clauses) {
+	using tau = tree<node>;
+	const subtree_less<node> less;
+	auto same = [&](tref a, tref b) { return !less(a, b) && !less(b, a); };
+	struct disjunct { tref fm; trefs lits; bool timed; };
+	std::vector<disjunct> ds;
+	std::set<trefs, decltype([](const trefs& a, const trefs& b) {
+		return std::ranges::lexicographical_compare(a, b,
+			subtree_less<node>{}); })> seen;
+	for (tref c : clauses) {
+		if (tau::get(c).equals_F()) continue;
+		trefs conj = get_cnf_wff_clauses<node>(c);
+		trefs lits;
+		for (tref l : conj)
+			if (std::ranges::none_of(lits,
+				[&](tref k) { return same(k, l); }))
+				lits.push_back(l);
+		trefs key = lits;
+		std::ranges::sort(key, less);
+		if (!seen.insert(key).second) continue;
+		bool timed = tau::get(c).find_top(is<node, tau::io_var>) != nullptr;
+		tref fm = lits.size() == conj.size() ? c
+			: lits.size() == 1 ? lits[0] : tau::build_wff_and(lits);
+		ds.push_back({ fm, std::move(key), timed });
+	}
+	std::vector<bool> absorbed(ds.size(), false);
+	for (size_t i = 0; i < ds.size(); ++i) {
+		if (ds[i].timed) continue;
+		for (size_t j = 0; j < ds.size() && !absorbed[i]; ++j)
+			if (j != i && !absorbed[j] && !ds[j].timed
+				&& ds[j].lits.size() < ds[i].lits.size()
+				&& std::ranges::includes(ds[i].lits, ds[j].lits,
+					less))
+				absorbed[i] = true;
+	}
+	trefs out;
+	for (size_t i = 0; i < ds.size(); ++i)
+		if (!absorbed[i]) out.push_back(ds[i].fm);
+	if (out.empty()) out.push_back(tau::_F());
+	return out;
+}
+
 template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	const bool output)
@@ -2094,11 +2546,11 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	static cache_t& undecided = tree<node>::template create_cache<cache_t>();
 	// Both memos are keyed on (formula, start_time) only, while every
 	// runtime budget (max_fixpoint_steps, max_flag_search_steps, the
-	// LTL(ABA) caps and knobs, the semantic PWR fallback) can change the
+	// LTL(ABA) caps and knobs, the algebras' options) can change the
 	// verdict: `sat φ`, `set fixpointsteps 0`, `sat φ` must not return the
 	// first query's answer. Drop the entries whenever the budgets moved.
-	static size_t cache_budget = verdict_budget_fingerprint();
-	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
 		cache.clear();
 		undecided.clear();
@@ -2208,20 +2660,35 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	}
 	{
 		auto _s = r.open("expression_paths");
-		// Convert each disjunct to unbounded continuation
-		for (tref clause : expression_paths<node>(normalized_fm)) {
-			TAU_TRY_OR(tref val, transform_to_execution<node>(
-				clause, start_time, output),
+		// Convert each disjunct to unbounded continuation. An undecided
+		// disjunct does not stop the scan -- a later satisfiable one
+		// still decides the disjunction -- but it keeps "no disjunct
+		// satisfiable" from reading as F.
+		std::optional<result<tref>> undecided_path;
+		// true while no disjunct is satisfiable
+		auto unsat_path = [&](tref clause) {
+			auto val = transform_to_execution<node>(
+				clause, start_time, output);
+			if (!val.has_value()) {
+				if (!undecided_path) undecided_path.emplace(
+					std::move(val));
+				return true;
+			}
+			return tau::get(val.value()).equals_F();
+		};
+		if (!for_each_path<node>(normalized_fm, unsat_path)) {
+			LOG_DEBUG << "End is_tau_formula_sat: true";
+			memoize(true);
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		if (undecided_path) {
+			TAU_TRY_OR(tref unused, std::move(*undecided_path),
 				code::internal_error,
 				"transform_to_execution returned neither a "
 				"value nor an error while checking a "
 				"disjunct's satisfiability");
-			if (!tau::get(val).equals_F()) {
-				LOG_DEBUG << "End is_tau_formula_sat: true";
-				memoize(true);
-				DBG(assert(r.is_well_formed());)
-				return r;
-			}
+			(void)unused;
 		}
 	}
 	LOG_DEBUG << "End is_tau_formula_sat: false";
@@ -2242,10 +2709,24 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		return r.with_error(code::unsupported_operation,
 			"implication between formulas with CTL* operators cannot "
 			"be decided");
-	TAU_TRY(tref f1n, normalize<node>(f1));
-	TAU_TRY(tref f2n, normalize<node>(f2));
-	TAU_TRY(tref imp_check, normalize_with_temp_simp<node>(
-		tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
+	// The decided formula is f1 && !f2; its clauses keep the warm-ups
+	// f1 and f2 are written with.
+	tref decided;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		decided = tau::build_wff_and(f1, tau::build_wff_neg(f2));
+	}
+	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+	tref imp_check;
+	if (pinned != decided) {
+		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
+			tau::reget(pinned)));
+	} else {
+		TAU_TRY(tref f1n, normalize<node>(f1));
+		TAU_TRY(tref f2n, normalize<node>(f2));
+		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
+			tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
+	}
 	// transform_to_execution decides the safety fragment only; anything
 	// sat routes to the LTL pipeline would be misread as unsatisfiable
 	if (sat_has_ltl_operators<node>(imp_check))
@@ -2254,11 +2735,25 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
-	for (tref c : expression_paths<node>(imp_check)) {
-		TAU_TRY(tref val, transform_to_execution<node>(c));
-		if (!tau::get(val).equals_F()) {
-			return r.with_assert_check_value(false);
+	// One satisfiable disjunct refutes the implication even when another
+	// is undecided; an undecided one only matters when no disjunct is
+	// satisfiable, and then it is the result.
+	std::optional<result<tref>> undecided_path;
+	// true while no path is satisfiable
+	auto unsat_path = [&](tref c) {
+		auto val = transform_to_execution<node>(c, 0, false,
+			sometimes_inputs::guarded);
+		if (!val.has_value()) {
+			if (!undecided_path) undecided_path.emplace(std::move(val));
+			return true;
 		}
+		return tau::get(val.value()).equals_F();
+	};
+	if (!for_each_path<node>(imp_check, unsat_path))
+		return r.with_assert_check_value(false);
+	if (undecided_path) {
+		TAU_TRY(tref unused, std::move(*undecided_path));
+		(void)unused;
 	}
 	return r.with_assert_check_value(true);
 }
@@ -2271,14 +2766,33 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	if (!f1 || !f2) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	// Negate equivalence for unsat check
-	TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
-		"Normalization of the first formula failed");
-	TAU_TRY_OR(tref f2n, normalize<node>(f2), code::internal_error,
-		"Normalization of the second formula failed");
-	TAU_TRY_OR(tref equiv_check, normalize_with_temp_simp<node>(
-			tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
-		code::internal_error, "Normalization of the equivalence check failed");
+	// The decided formula is (f1 && !f2) || (!f1 && f2), each side read
+	// with the warm-ups it is written with.
+	tref decided;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		decided = tau::build_wff_or(
+			tau::build_wff_and(f1, tau::build_wff_neg(f2)),
+			tau::build_wff_and(tau::build_wff_neg(f1), f2));
+	}
+	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
+	tref equiv_check;
+	if (pinned != decided) {
+		TAU_TRY_OR(equiv_check, normalize_with_temp_simp<node>(
+				tau::reget(pinned)),
+			code::internal_error,
+			"Normalization of the equivalence check failed");
+	} else {
+		// Negate equivalence for unsat check
+		TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
+			"Normalization of the first formula failed");
+		TAU_TRY_OR(tref f2n, normalize<node>(f2), code::internal_error,
+			"Normalization of the second formula failed");
+		TAU_TRY_OR(equiv_check, normalize_with_temp_simp<node>(
+				tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
+			code::internal_error,
+			"Normalization of the equivalence check failed");
+	}
 	if (has_ctl_star_operators<node>(equiv_check)
 		|| sat_has_ltl_operators<node>(equiv_check))
 		return r.with_error(code::unsupported_operation,
@@ -2286,14 +2800,25 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
+	// Same undecided-disjunct rule as is_tau_impl.
+	std::optional<result<tref>> undecided_path;
 	for (const auto& c : expression_paths<node>(equiv_check)) {
-		TAU_TRY_OR(tref val, transform_to_execution<node>(c),
+		auto val = transform_to_execution<node>(c, 0, false,
+			sometimes_inputs::guarded);
+		if (!val.has_value()) {
+			if (!undecided_path) undecided_path.emplace(std::move(val));
+			continue;
+		}
+		if (!tau::get(val.value()).equals_F()) {
+			return r.with_assert_check_value(false);
+		}
+	}
+	if (undecided_path) {
+		TAU_TRY_OR(tref unused, std::move(*undecided_path),
 			code::internal_error,
 			"transform_to_execution returned neither a value nor "
 			"an error while checking equivalence");
-		if (!tau::get(val).equals_F()) {
-			return r.with_assert_check_value(false);
-		}
+		(void)unused;
 	}
 	return r.with_assert_check_value(true);
 }
@@ -2336,23 +2861,35 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// Check satisfiability of each clause -- unit-wise where exact
 	{
 		auto _s = r.open("expression_paths");
-		for (tref clause: expression_paths<node>(normalized_fm)) {
-			bool keep;
+		// the report of the first clause that could not be decided
+		std::optional<result<tref>> failed;
+		auto keep_sat = [&](tref clause) {
 			int fs = factor ? factored_tau_sat<node>(clause) : -1;
-			if (fs >= 0) keep = (fs == 1);
-			else {
-				TAU_TRY_OR(tref val, transform_to_execution<node>(
-					clause, start_time, output),
-					code::internal_error,
-					"transform_to_execution returned "
-					"neither a value nor an error while "
-					"simplifying a disjunct");
-				keep = !tau::get(val).equals_F();
+			if (fs >= 0) {
+				if (fs == 1) clauses.push_back(clause);
+				return true;
 			}
-			if (keep) clauses.push_back(clause);
+			auto val = transform_to_execution<node>(clause,
+				start_time, output);
+			if (!val.has_value()) {
+				failed.emplace(std::move(val));
+				return false;
+			}
+			if (!tau::get(val.value()).equals_F())
+				clauses.push_back(clause);
+			return true;
+		};
+		for_each_path<node>(normalized_fm, keep_sat);
+		if (failed) {
+			TAU_TRY_OR(tref unused, std::move(*failed),
+				code::internal_error,
+				"transform_to_execution returned neither a "
+				"value nor an error while simplifying a "
+				"disjunct");
+			(void)unused;
 		}
 	}
-	r = tau::build_wff_or(clauses);
+	r = tau::build_wff_or(simplify_dnf_clauses<node>(clauses));
 	LOG_DEBUG << "End simp_tau_unsat_valid: " << LOG_FM(r.value());
 	DBG(assert(r.is_well_formed());)
 	return r;

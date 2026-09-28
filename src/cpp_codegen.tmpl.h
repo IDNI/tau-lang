@@ -817,6 +817,11 @@ result<program_desc> build_program_desc(
 	// recorded instead.
 	if (sol.counter_highest_initial_pos >= 0)
 		d.highest_initial_pos = (int)sol.counter_highest_initial_pos;
+	d.data_game = sol.data_game;
+	for (tref h : sol.history) {
+		TAU_TRY(auto ge, build_atom_ground_expr<node>(h));
+		d.history.push_back(std::move(ge));
+	}
 
 	for (auto& p : sol.input_props)
 		d.inputs.push_back({p, sanitize(p), field_kind::flag});
@@ -1007,6 +1012,21 @@ result<program_desc> build_program_desc(
 				d.edges[s].push_back(std::move(ed));
 			}
 		}
+	}
+	// An edge solves a witness atom of a template variable jointly with
+	// the templates, so the artifact needs that atom too.
+	{
+		std::set<std::string> have;
+		for (const auto& a : d.atoms) have.insert(a.prop);
+		for (const auto& es : d.edges)
+			for (const auto& ed : es)
+				for (const auto& prop : ed.witness_template_props) {
+					if (!have.insert(prop).second) continue;
+					TAU_TRY(auto ge, build_atom_ground_expr<node>(
+						prop_to_atom.at(prop)));
+					d.atoms.push_back({prop, std::move(ge)});
+					d.needs_tau_link = true;
+				}
 	}
 
 	return r.with_value(std::move(d));

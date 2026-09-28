@@ -8,6 +8,87 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "anti_prenex"
 
+/// What bf_var_dependence could establish about a term and a variable.
+enum class bf_dependence { unknown, depends, zero, one };
+
+/**
+ * @brief Exact, cheap classification of a Boolean function against @p var.
+ *
+ * Builds a reduced ordered BDD of @p term with @p var as the top BDD variable:
+ * the term depends on @p var (as a Boolean function) iff the root tests it,
+ * and is constant iff the root is a terminal. Only terms built from 0, 1,
+ * variables, ', &, | and ^ are handled. Anything else, or a BDD larger than a
+ * fixed cap, answers `unknown`.
+ * @param term A bf term
+ * @param var The variable wrapped in a bf node, as syntactic_variable_simplification
+ * substitutes it
+ * @return `depends`, `zero` or `one` when proven, `unknown` otherwise
+ */
+template<NodeType node>
+bf_dependence bf_var_dependence(tref term, tref var) {
+	using tau = tree<node>;
+	static constexpr size_t cap = 1 << 16;
+	// node 0 is the false terminal, node 1 the true terminal
+	struct bdd_node { size_t v, lo, hi; };
+	std::vector<bdd_node> nodes{ { SIZE_MAX, 0, 0 }, { SIZE_MAX, 1, 1 } };
+	std::map<std::array<size_t, 3>, size_t> unique, memo;
+	subtree_map<node, size_t> atoms;
+	atoms.emplace(var, 0);
+	auto mk = [&](size_t v, size_t lo, size_t hi) -> size_t {
+		if (lo == hi) return lo;
+		auto [it, added] = unique.emplace(std::array{ v, lo, hi }, nodes.size());
+		if (added) nodes.push_back({ v, lo, hi });
+		return it->second;
+	};
+	// op: 0 = and, 1 = or, 2 = xor
+	std::function<size_t(size_t, size_t, size_t)> apply =
+		[&](size_t op, size_t a, size_t b) -> size_t {
+		if (a <= 1 && b <= 1) return op == 0 ? (a & b) : op == 1 ? (a | b) : (a ^ b);
+		if (op == 0 && (a == 0 || b == 0)) return 0;
+		if (op == 1 && (a == 1 || b == 1)) return 1;
+		if (a > b) std::swap(a, b);
+		auto key = std::array{ op, a, b };
+		if (auto it = memo.find(key); it != memo.end()) return it->second;
+		size_t v = std::min(nodes[a].v, nodes[b].v);
+		auto lo = [&](size_t x) { return nodes[x].v == v ? nodes[x].lo : x; };
+		auto hi = [&](size_t x) { return nodes[x].v == v ? nodes[x].hi : x; };
+		size_t l = apply(op, lo(a), lo(b));
+		size_t h = apply(op, hi(a), hi(b));
+		size_t r = mk(v, l, h);
+		memo.emplace(key, r);
+		return r;
+	};
+	bool failed = false;
+	std::unordered_map<tref, size_t> done;
+	std::function<size_t(tref)> build = [&](tref n) -> size_t {
+		if (failed) return 0;
+		if (auto it = done.find(n); it != done.end()) return it->second;
+		const tau& t = tau::get(n);
+		size_t r = 0;
+		if (!t.is(tau::bf) || !t.has_child()) return failed = true, 0;
+		if (t.child_is(tau::variable)) {
+			auto [it, added] = atoms.emplace(n, atoms.size());
+			r = mk(it->second, 0, 1);
+		} else if (t.child_is(tau::bf_t)) r = 1;
+		else if (t.child_is(tau::bf_f)) r = 0;
+		else if (t.child_is(tau::bf_neg)) r = apply(2, build(t[0].first()), 1);
+		else if (t.child_is(tau::bf_and))
+			r = apply(0, build(t[0].first()), build(t[0].second()));
+		else if (t.child_is(tau::bf_or))
+			r = apply(1, build(t[0].first()), build(t[0].second()));
+		else if (t.child_is(tau::bf_xor))
+			r = apply(2, build(t[0].first()), build(t[0].second()));
+		else return failed = true, 0;
+		if (nodes.size() > cap) failed = true;
+		done.emplace(n, r);
+		return r;
+	};
+	size_t root = build(term);
+	if (failed) return bf_dependence::unknown;
+	if (root <= 1) return root ? bf_dependence::one : bf_dependence::zero;
+	return nodes[root].v == 0 ? bf_dependence::depends : bf_dependence::unknown;
+}
+
 /**
  * @brief The procedure tries to detect, using 0/1 substitutions for the provided
  * variable and syntactic comparison, if the atomic formula is equivalent to T
@@ -52,43 +133,62 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	auto atm_type = tau::get(atomic_fm)[0].value.nt;
 	tref func1 = tau::get(atomic_fm)[0].first();
 	tref func2 = tau::get(atomic_fm)[0].second();
-	// Make sure that it works only on Boolean parts by using replace_if
-	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
-		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-	func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
-	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
-		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-	func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
-	// Is func syntactically identically 0
-	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
+	// The reduced DNF of a cofactor can be exponential (x1 ^ ... ^ xn), so
+	// settle the outcome of the checks below from a BDD when it can. If
+	// func1 depends on var, its cofactors differ as Boolean functions: their
+	// reduced forms can neither coincide nor both be 0 or 1, so nothing
+	// fires. If func1 is constant, both cofactors reduce to that constant.
+	const auto dep1 = bf_var_dependence<node>(func1, var);
+	if (dep1 == bf_dependence::zero)
 		func1 = tau::_0(find_ba_type<node>(func1));
-	// Is func syntactically identically 1
-	else if (tau::get(func1_v_0).equals_1() && tau::get(func1_v_1).equals_1())
+	else if (dep1 == bf_dependence::one)
 		func1 = tau::_1(find_ba_type<node>(func1));
-	// func is not dependent on var
-	else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
-		func1 = func1_v_0;
+	else if (dep1 == bf_dependence::unknown) {
+		// Make sure that it works only on Boolean parts by using replace_if
+		tref func1_v_0 = rewriter::replace_if<node>(func1, var,
+			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
+		func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
+		tref func1_v_1 = rewriter::replace_if<node>(func1, var,
+			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
+		func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		// Is func syntactically identically 0
+		if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
+			func1 = tau::_0(find_ba_type<node>(func1));
+		// Is func syntactically identically 1
+		else if (tau::get(func1_v_0).equals_1() && tau::get(func1_v_1).equals_1())
+			func1 = tau::_1(find_ba_type<node>(func1));
+		// func is not dependent on var
+		else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
+			func1 = func1_v_0;
+	}
 	if (tau::get(func2).equals_0())
 		return memo(denorm_equation<node>(
 			tau::get(tau::wff, tau::get(atm_type, func1, func2))));
 	// Simplify func2. Reached only for bf_lt/bf_lteq atoms: norm_equation
 	// zeroes the right-hand side of every bf_eq/bf_neq, which the return above
 	// then catches.
-	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
-		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-	func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
-	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
-		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-	func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
-	// Is func syntactically identically 0
-	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
+	const auto dep2 = bf_var_dependence<node>(func2, var);
+	if (dep2 == bf_dependence::zero)
 		func2 = tau::_0(find_ba_type<node>(func2));
-	// Is func syntactically identically 1
-	else if (tau::get(func2_v_0).equals_1() && tau::get(func2_v_1).equals_1())
+	else if (dep2 == bf_dependence::one)
 		func2 = tau::_1(find_ba_type<node>(func2));
-	// func is not dependent on var
-	else if (tau::get(func2_v_0) == tau::get(func2_v_1) && !contains<node>(func2_v_0, var))
-		func2 = func2_v_0;
+	else if (dep2 == bf_dependence::unknown) {
+		tref func2_v_0 = rewriter::replace_if<node>(func2, var,
+			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
+		func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
+		tref func2_v_1 = rewriter::replace_if<node>(func2, var,
+			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
+		func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		// Is func syntactically identically 0
+		if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
+			func2 = tau::_0(find_ba_type<node>(func2));
+		// Is func syntactically identically 1
+		else if (tau::get(func2_v_0).equals_1() && tau::get(func2_v_1).equals_1())
+			func2 = tau::_1(find_ba_type<node>(func2));
+		// func is not dependent on var
+		else if (tau::get(func2_v_0) == tau::get(func2_v_1) && !contains<node>(func2_v_0, var))
+			func2 = func2_v_0;
+	}
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
 	return memo(res);

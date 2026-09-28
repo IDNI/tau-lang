@@ -137,6 +137,8 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_mealy_state.restype = c_int64
     _LIB.tau_lang_mealy_free.argtypes = [c_int64]
     _LIB.tau_lang_mealy_free.restype = None
+    _LIB.tau_lang_reset.argtypes = []
+    _LIB.tau_lang_reset.restype = c_int64
     return _LIB
 
 
@@ -255,3 +257,14 @@ def mealy_free(handle: int) -> None:
     """Release resources for a synthesized machine."""
     lib = _load()
     lib.tau_lang_mealy_free(handle)
+
+
+def reset() -> int:
+    """Return the engine to a fresh state.
+
+    Releases every synthesized machine (their handles become invalid), drops
+    the definitions, empties the caches and frees every tree node nothing
+    holds. Returns the number of nodes freed.
+    """
+    lib = _load()
+    return lib.tau_lang_reset()

@@ -295,7 +295,8 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 	}
 
 	TEST_CASE("an identifier starting with a synonym word still parses "
-	          "as one variable") {
+	          "as one variable"
+		* doctest::skip(!ltlsynt_available())) {
 		// "_x" can't start an identifier of its own, so the parser has
 		// no valid reading of e.g. "until_x" other than as one whole
 		// variable name -- it never gets split as the "until" operator
@@ -326,28 +327,63 @@ TEST_SUITE("temporal connectives — valid of full LTL is trace validity") {
 		return r.value();
 	}
 
-	TEST_CASE("G F over an input is not valid: the inputs can stay 0") {
+	TEST_CASE("G F over an input is not valid: the inputs can stay 0"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(valid_str("G (F (i1[t] = 1)).") == std::optional<bool>(false));
 		CHECK(sat_str("G (F (i1[t] = 1)).") == false);
 	}
 
-	TEST_CASE("until reaching an input is not valid") {
+	TEST_CASE("until reaching an input is not valid"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(valid_str("(o1[t] = 1) until (i1[t] = 1).")
 			== std::optional<bool>(false));
 	}
 
-	TEST_CASE("G F phi -> F phi is valid, over an input too") {
+	TEST_CASE("G F phi -> F phi is valid, over an input too"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(valid_str("(G (F (i1[t] = 1))) -> (F (i1[t] = 1)).")
 			== std::optional<bool>(true));
 	}
 
-	TEST_CASE("phi U psi -> F psi is valid") {
+	TEST_CASE("phi U psi -> F psi is valid"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(valid_str("((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1)).")
 			== std::optional<bool>(true));
 	}
 
-	TEST_CASE("valid stays F where the negation has an execution") {
+	TEST_CASE("valid stays F where the negation has an execution"
+		* doctest::skip(!ltlsynt_available())) {
 		CHECK(valid_str("(o1[t] = 1) until (o2[t] = 1).")
 			== std::optional<bool>(false));
+	}
+
+	// the same trace validity holds for always / sometimes: a formula the
+	// inputs can violate is not valid
+	TEST_CASE("sometimes over an input is not valid: the inputs can avoid it") {
+		CHECK(valid_str("sometimes (i1[t] = 1).")
+			== std::optional<bool>(false));
+		CHECK(valid_str("(always o1[t] = i1[t]) -> (sometimes o1[t] = 1).")
+			== std::optional<bool>(false));
+	}
+
+	TEST_CASE("input tautologies stay valid under always and sometimes") {
+		CHECK(valid_str("always (i1[t] = i1[t]).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("sometimes (i1[t] = i1[t]).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("(always i1[t] = 1) -> (sometimes i1[t] = 1).")
+			== std::optional<bool>(true));
+	}
+
+	// the negation of F ψ is G ¬ψ, which the safety pipeline decides; an
+	// input in ψ must not be read universally there
+	TEST_CASE("F over an input is not valid in the safety fragment") {
+		CHECK(valid_str("F (i1[t] = 1).") == std::optional<bool>(false));
+		CHECK(valid_str("F (o1[t] = 1 || i1[t] = 1).")
+			== std::optional<bool>(false));
+		CHECK(valid_str("F (i1[t] = 0 || i1[t] != 0).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("(F (i1[t] = 1)) || (G (i1[t] != 1)).")
+			== std::optional<bool>(true));
 	}
 }

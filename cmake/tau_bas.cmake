@@ -289,6 +289,35 @@ function(tau_generate_pack_header)
 	set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
 		"${TAU_CODEGEN_ARTIFACT_PREINST_DEFINE}" PARENT_SCOPE)
 
+	# Under a Coverage build libTAU.a is instrumented, so a program `tau
+	# compile` links against it needs the coverage runtime too. With GCC that
+	# is this compiler's libgcov, named by path: the program may be built by
+	# another compiler (clang++ by default), whose --coverage runtime does not
+	# define the gcov symbols.
+	if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+		set(TAU_CODEGEN_COVERAGE_DEFINE "#define TAU_CODEGEN_COVERAGE 1")
+		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			execute_process(
+				COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libgcov.a
+				OUTPUT_VARIABLE _tau_gcov_lib
+				OUTPUT_STRIP_TRAILING_WHITESPACE)
+			if(IS_ABSOLUTE "${_tau_gcov_lib}" AND EXISTS "${_tau_gcov_lib}")
+				string(APPEND TAU_CODEGEN_COVERAGE_DEFINE
+					"\n#define TAU_CODEGEN_COVERAGE_LIB \"${_tau_gcov_lib}\"")
+			endif()
+		endif()
+	else()
+		set(TAU_CODEGEN_COVERAGE_DEFINE "")
+	endif()
+	set(TAU_CODEGEN_COVERAGE_DEFINE
+		"${TAU_CODEGEN_COVERAGE_DEFINE}" PARENT_SCOPE)
+
+	# The compiler that builds libTAU.a: a program linking it is built by the
+	# same one, since GCC and Clang mangle constrained templates differently.
+	set(TAU_CODEGEN_CXX_DEFINE
+		"#define TAU_CODEGEN_CXX \"${CMAKE_CXX_COMPILER}\"")
+	set(TAU_CODEGEN_CXX_DEFINE "${TAU_CODEGEN_CXX_DEFINE}" PARENT_SCOPE)
+
 	# The carrier order reaches the fold as one macro rather than through
 	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
 	# includes tau_tree.h and so the traits themselves.

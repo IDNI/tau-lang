@@ -4,8 +4,8 @@
 
 include(add_repl_test)
 
-# the valid command checks if a Tau formula is logically equivalent to T
-# and prints T or F
+# the valid command checks if no trace violates a Tau formula and prints
+# T or F
 add_repl_test(valid_cmd-t "valid T" ": T")
 add_repl_test(valid_cmd-formula "valid x = 0" ": F")
 add_repl_test(valid_cmd-excluded_middle "valid x=0 || !x=0" ": T")
@@ -64,3 +64,25 @@ add_repl_test(valid_cmd-hooks_wff_lt_lteq-02_lteq_expansion          "valid (x <
 # structured error instead of deciding a verdict.
 add_repl_test_fail(valid_cmd-oscillating_definition
 	"f(x) := f(x)'. valid f(1) = 0" "Definition expansion oscillates")
+
+# issue #132: `valid` takes a formula; a term is rejected instead of aborting
+# on a cvc5 exception
+add_repl_test_fail(valid_cmd-issue132_bv1_term "valid x:bv[1]" "Invalid formula")
+add_repl_test_fail(valid_cmd-issue132_bv1_constant "valid 0:bv[1]" "Invalid formula")
+add_repl_test_fail(valid_cmd-issue132_bv64_term "valid x:bv[64]" "Invalid formula")
+add_repl_test_fail(valid_cmd-issue132_sbf_term "valid x:sbf" "Invalid formula")
+add_repl_test(valid_cmd-issue132_bv_formula_control "valid x:bv[1] = x:bv[1]" ": T")
+
+# a top-level sometimes is decided, not rejected as a Boolean combination
+# of models
+add_repl_test(valid_cmd-issue144_sometimes_tautology "valid sometimes (o1[t] = 0 || o1[t] != 0)" ": T")
+add_repl_test(valid_cmd-issue144_sometimes_input_tautology "valid sometimes (i1[t] = 0 || i1[t] != 0)" ": T")
+add_repl_test(valid_cmd-issue144_sometimes_atom "valid sometimes o1[t] = 1" ": F")
+add_repl_test(valid_cmd-issue144_always_implies_sometimes "valid (always o1[t] = 1) -> (sometimes o1[t] = 1)" ": T")
+add_repl_test(valid_cmd-issue144_sometimes_implies_always "valid (sometimes o1[t] = 1) -> (always o1[t] = 1)" ": F")
+# validity is over traces: a trace whose input is never 1 violates these, so
+# the input must not be read universally when `always ¬ψ` is decided
+add_repl_test(valid_cmd-issue144_sometimes_input_atom "valid sometimes i1[t] = 1" ": F")
+add_repl_test(valid_cmd-issue144_sometimes_input_or_output "valid sometimes (o1[t] = 1 || i1[t] = 1)" ": F")
+add_repl_test(valid_cmd-issue144_sometimes_or_always_input "valid (sometimes i1[t] = 1) || (always i1[t] = 1)" ": F")
+add_repl_test(valid_cmd-issue144_input_excluded_middle "valid (sometimes i1[t] = 1) || (always i1[t] != 1)" ": T")

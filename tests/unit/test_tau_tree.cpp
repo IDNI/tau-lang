@@ -147,6 +147,33 @@ TEST_SUITE("canonize_quantifier_ids") {
 
 		CHECK(canonize_quantifier_ids<node_t>(raw) == raw);
 	}
+
+	// A Boole-decomposed term is a DAG whose shared cofactors
+	// are exponentially larger as a tree. p_k = x_k p_{k-1} | x_k' p_{k-1}'
+	// has 2^k paths down to x0; renaming the bound x0 must visit each shared
+	// subterm once instead of once per path (2^32 here, i.e. never).
+	TEST_CASE("a bound variable at the bottom of a shared-cofactor DAG is renamed once per subterm") {
+		auto parity = [](const std::string& bottom) {
+			tref p = x_eq_0_bf(bottom.c_str());
+			for (size_t k = 1; k <= 32; ++k) {
+				tref v = x_eq_0_bf(("x" + std::to_string(k)).c_str());
+				p = tau::build_bf_or(tau::build_bf_and(v, p),
+					tau::build_bf_and(tau::build_bf_neg(v),
+						tau::build_bf_neg(p)));
+			}
+			return p;
+		};
+		tref x0 = tau::build_variable(std::string("x0"), tau_type_id<node_t>());
+		tref one = tau::build_variable(std::string("1"), tau_type_id<node_t>());
+		tref raw = tau::build_wff_ex(x0,
+			tau::build_bf_eq_0(parity("x0")), false);
+		tref expected = tau::build_wff_ex(one,
+			tau::build_bf_eq_0(parity("1")), false);
+		CHECK(canonize_quantifier_ids<node_t>(raw) == expected);
+		// Without a binder there is nothing to rename.
+		tref free = tau::build_bf_eq_0(parity("x0"));
+		CHECK(canonize_quantifier_ids<node_t>(free) == free);
+	}
 }
 
 // ── build_wff_all_many / build_rr_ref (TT-4) ────────────────────────────────

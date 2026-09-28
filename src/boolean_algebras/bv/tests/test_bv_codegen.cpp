@@ -8,6 +8,7 @@
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
+#include "test_scratch_dir.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -96,7 +97,7 @@ TEST_SUITE("bv_codegen") {
 			return;
 		}
 		namespace stdfs = std::filesystem;
-		stdfs::path bdir = stdfs::temp_directory_path() / "test_bv_codegen_sdk_link.build";
+		stdfs::path bdir = test_scratch_path("test_bv_codegen_sdk_link.build");
 		std::error_code ec;
 		stdfs::remove_all(bdir, ec);
 
