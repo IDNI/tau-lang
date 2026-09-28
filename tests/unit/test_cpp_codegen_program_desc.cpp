@@ -270,6 +270,66 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
 	}
 
+	// ── a strategy whose atoms read earlier outputs ───────────────────────
+
+	TEST_CASE("build_program_desc: atoms over earlier outputs play the data game's Mealy view") {
+		// the abstraction's table chose o1[0] = 1 and broke the spec at
+		// step 2
+		const char* specs[] = {
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0.",
+			"(always o2[t] = o1[t-1]) && (sometimes o1[t-2] = 1)." };
+		for (const char* spec : specs) {
+			CAPTURE(spec);
+			tref fm = parse_like_compile_spec(spec);
+			REQUIRE(fm != nullptr);
+			auto sol = solve_ltl_aba<node_t>(fm);
+			REQUIRE(sol.has_value());
+			REQUIRE(sol.value());
+			CHECK_FALSE(sol.value()->data_game);
+			auto d = build_program_desc<node_t>(*sol.value(), "earlier_output");
+			REQUIRE(d.has_value());
+			CHECK(d->data_game);
+			std::ostringstream os;
+			compile_detail::emit_main(*d, os);
+			CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
+			// the standalone class has no values before step 0
+			std::ostringstream cls;
+			CHECK_FALSE(emit_program(*d, cls).has_value());
+		}
+	}
+
+	TEST_CASE("build_program_desc: atoms over earlier outputs without a Mealy view are refused") {
+		tref fm = parse_like_compile_spec(
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0.");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		REQUIRE(sol.value());
+		// no view within a bound of 0 states
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		auto d = build_program_desc<node_t>(*sol.value(), "refused_earlier");
+		auto played = playable_table_solution<node_t>(*sol.value());
+		data_game_mealy_max_states = saved;
+		CHECK_FALSE(d.has_value());
+		std::ostringstream oss;
+		d.print(oss);
+		CHECK(has(oss.str(), "makes a claim the outputs of a step cannot always meet"));
+		CHECK(has(oss.str(), "no Mealy view"));
+		CHECK_FALSE(played.has_value());
+	}
+
+	TEST_CASE("playable_table_solution: atoms over outputs of their own step keep the strategy") {
+		auto sol = synth("G(o1[t]:bv[1] = i1[t]:bv[1] && o2[t]:bv[1] = i1[t-1]:bv[1])");
+		REQUIRE(sol);
+		auto played = playable_table_solution<node_t>(*sol);
+		REQUIRE(played.has_value());
+		CHECK_FALSE(played.value().data_game);
+		CHECK(played.value().aut.num_states == sol->aut.num_states);
+	}
+
 	// The main.cpp compile_spec emits for spec; the unusable compiler
 	// stops the build right after it is written.
 	std::string emitted_main(const std::string& spec, const std::string& tag) {

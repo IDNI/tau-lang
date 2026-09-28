@@ -127,13 +127,15 @@ private:
 	std::vector<htref> found_;
 };
 
-// Builds a table_step_provider from a solved LTL(ABA) strategy: carrier-
-// typed output atoms keep a flag slot, data-typed ones become per-edge
-// witness templates solved at runtime. Returns {provider, {lookback,
-// highest_initial_pos}}; provider is nullptr when a flag atom isn't
-// single-variable.
+// Builds a table_step_provider from a solved LTL(ABA) strategy, the one
+// playable_table_solution(sol) returns: carrier-typed output atoms keep a
+// flag slot, data-typed ones become per-edge witness templates solved at
+// runtime. Returns {provider, {lookback, highest_initial_pos}}; the report
+// carries an error when playable_table_solution refuses the solution or a
+// flag atom is not over a single variable.
 template <NodeType node>
-std::pair<std::shared_ptr<table_step_provider<node>>, std::pair<int, int>>
+result<std::pair<std::shared_ptr<table_step_provider<node>>,
+	std::pair<int, int>>>
 make_table_provider(const ltl_aba_solution<node>& sol);
 
 } // namespace idni::tau_lang

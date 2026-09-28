@@ -697,8 +697,57 @@ inline program_desc build_program_desc_prop(
 }
 
 template <NodeType node>
+result<ltl_aba_solution<node>> playable_table_solution(
+	const ltl_aba_solution<node>& sol)
+{
+	using tau = tree<node>;
+	result<ltl_aba_solution<node>> r;
+	if (sol.data_game) return r.with_value(sol);
+	// A table grounds every atom at the deepest lookback until the play
+	// reaches it, so a part of the spec starting earlier (a step guard
+	// below that lookback) goes unplayed on the steps between.
+	const int_t lookback =
+		codegen_detail::compute_auto_continue_bounds<node>(sol.atoms).first;
+	const bool staggered = std::ranges::any_of(sol.step_guard_ks,
+		[&](int_t k) { return k < lookback; });
+	std::optional<tref> unforced;
+	if (!staggered) {
+		unforced = first_unforced_claim<node>(sol);
+		if (!unforced) return r.with_value(sol);
+	}
+	std::string reason;
+	if (sol.game_skeleton.empty())
+		reason = "the solution carries no game skeleton to refine it by";
+	else {
+		std::shared_ptr<data_game_strategy<node>> strategy;
+		TAU_TRY(auto verdict, solve_data_game<node>(sol.game_skeleton,
+			sol.atoms, sol.input_props, sol.output_props, false,
+			&strategy));
+		if (strategy && strategy->view)
+			return r.with_value(*strategy->view);
+		reason = verdict == data_game_verdict::undecided
+			? "the data game does not decide the skeleton"
+			: verdict == data_game_verdict::unrealizable
+			? "the data game finds the skeleton unrealizable"
+			: "the data game's strategy has no Mealy view within its "
+				"bounds";
+	}
+	if (staggered) return r.with_error(code::unsupported_operation,
+		"the parts of the spec start at different steps, which a table of "
+		"the abstraction's strategy follows only from the latest one on, "
+		"and " + reason);
+	const std::string claim = truncate_for_message(
+		tau::get(*unforced).to_str());
+	return r.with_error(code::unsupported_operation,
+		"the abstraction's strategy makes a claim the outputs of a step "
+		"cannot always meet, whatever the inputs and the earlier values, "
+		"so a table of it can break the spec or stop, and " + reason,
+		{ { label::value, claim } });
+}
+
+template <NodeType node>
 result<program_desc> build_program_desc(
-    const ltl_aba_solution<node>& sol,
+    const ltl_aba_solution<node>& given,
     const std::string& class_name,
     bool revisable,
     const std::vector<std::string>& open_streams,
@@ -713,7 +762,7 @@ result<program_desc> build_program_desc(
 	// job, at the string->tree step. Scan every atom's free io variables
 	// up front and refuse immediately, naming the offending variable,
 	// rather than let classify_output_field discover it mid-emission.
-	for (auto& [atom_ref, prop] : sol.atoms)
+	for (auto& [atom_ref, prop] : given.atoms)
 		for (tref v : get_free_vars<node>(atom_ref))
 			if (tau::get(v).get_ba_type() == 0) {
 				return r.with_error(code::missing_type_information,
@@ -722,6 +771,7 @@ result<program_desc> build_program_desc(
 					"build_program_desc",
 					{{label::name, get_var_name<node>(v)}});
 			}
+	TAU_TRY(const auto sol, playable_table_solution<node>(given));
 
 	std::set<std::string> input_set(sol.input_props.begin(), sol.input_props.end());
 	std::map<std::string, atom_field_info> ameta;
@@ -951,13 +1001,13 @@ result<program_desc> build_program_desc(
 					const auto& prop = sol.aut.aps[ap_idx];
 					auto it = ameta.find(prop);
 					if (it == ameta.end()) continue;
-					// Routed by prop for the runtime joint solve, which ignores
-					// polarity, so a negative-signed one is dropped here.
+					// Routed by prop, with its sign, for the runtime joint
+					// solve.
 					if (it->second.kind == field_kind::witness_template
 						|| (it->second.kind == field_kind::witness
 							&& template_var_set.count(it->second.var_name))) {
-						if (!positive) continue;
 						ed.witness_template_props.push_back(prop);
+						ed.witness_template_negated.push_back(!positive);
 						ed.witness_template_is_counter.push_back(
 							sol.counter_relativized_props.count(prop) > 0);
 					}
@@ -977,30 +1027,21 @@ result<program_desc> build_program_desc(
 					if (!io_ref) io_ref = var_io_ref.at(var);
 					size_t ba_type = tau::get(io_ref).get_ba_type();
 
-					// A BA that rejects the full conjunction is retried with
-					// negatives dropped; that fallback stays sound for the cube.
-					tref full_conj = nullptr, pos_conj = nullptr;
+					// The witness meets every literal of the cube: a value
+					// meeting only the positive ones can make a negative
+					// one true, and the play then leaves the strategy.
+					tref full_conj = nullptr;
 					for (auto& [atom, positive] : atom_list) {
 						tref signed_atom = positive
 							? atom : tau::build_wff_neg(atom);
 						full_conj = full_conj
 							? tau::build_wff_and(full_conj, signed_atom)
 							: signed_atom;
-						if (positive)
-							pos_conj = pos_conj
-								? tau::build_wff_and(pos_conj, atom)
-								: atom;
 					}
 
 					auto w = pack_codegen_witness<node>(
 						ba_type, io_ref, full_conj);
-					if (!w && pos_conj)
-						w = pack_codegen_witness<node>(
-							ba_type, io_ref, pos_conj);
 					if (!w) {
-						// No pos_conj means every literal was negative and
-						// the owner declined; keep the output default.
-						if (!pos_conj) continue;
 						return r.with_error(code::unsupported_operation,
 							"the output is owned by a data BA that declined to "
 							"supply a codegen witness for a feasible edge",
@@ -1248,6 +1289,15 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 	// doc comment) -- nstepg is every offset below's addend between the two.
 	const size_t nstepg = d.step_guard_ks.size();
 
+	// The standalone step() reads its atoms from step `lookback` on, with
+	// no values before step 0; a Mealy view reading earlier steps from
+	// step 0 on needs the values its history gives them.
+	if (d.data_game && (d.lookback > 0 || !d.history.empty()))
+		return r.with_assert_check_error(code::unsupported_operation,
+			"the strategy is a Mealy view of the data game, played from "
+			"step 0 on over values before step 0, which the standalone "
+			"emitted step() does not carry; drive the program through "
+			"the interpreter's table step provider");
 	// A witness-template output's value is solved at runtime from the atom
 	// templates; this standalone step() has no solver, so such programs run
 	// through the interpreter's table_step_provider instead.
