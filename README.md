@@ -2890,6 +2890,23 @@ Emitting a C++ *header* with the synthesized class (`tau_program`, with the
 is a library operation: `build_program_desc` + `emit_program` in
 `src/cpp_codegen.h`; there is no CLI flag for it.
 
+A table (`build_program_desc`, and `make_table_provider` in
+`src/table_step_provider.h`, which plays one in the interpreter) picks each
+step's outputs from the edge that step takes. It plays the strategy of the
+abstraction only when every claim an edge makes about the outputs can be met
+at that step whatever the inputs and the earlier values are, and the parts of
+the spec all start at the same step; otherwise a value chosen now could break
+the spec later, as `o1[0] = 1` does for
+`always o2[t] = o1[t-1] && o3[t] = o2[t-1] && o3[t-1] = 0`. Such a strategy
+is refined the way `run` refines it: the data game is solved on the same
+abstraction, and the table plays the Mealy machine of its strategy.
+`playable_table_solution` returns the strategy a table plays. When the data
+game has no such machine, these functions return an error saying why, and
+the spec is executed by `run` (or `tau compile`). `emit_program` also refuses
+a Mealy machine of the data game that reads values before step 0, which its
+standalone class cannot carry; drive such a strategy through the table step
+provider.
+
 ## When to use which
 
 | Situation                                               | Use         |
