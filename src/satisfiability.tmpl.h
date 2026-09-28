@@ -831,9 +831,18 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	// repeated runs, 2026-08-17): the extra per-step normalization of the
 	// accumulated telescope costs more than it saves, buying only a ~21%
 	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
-	auto impl = [](tref a, tref b) {
+	auto impl = [&](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
-		return ir.has_value() && ir.value();
+		if (ir.has_value()) return ir.value();
+		// an undecided implication leaves the step unrolled: a rejected
+		// candidate, not a verdict
+		auto sc = r.open("rejected candidate");
+		r.info("the fixpoint implication could not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(b))}});
+		report cand = std::move(ir).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+		return false;
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
 		if (max_fixpoint_steps
@@ -934,9 +943,18 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 		if (weakening) next = tau::build_wff_or(st_now, next);
 		return normalize_non_temp<node>(tau::build_wff_and(chi_now, next));
 	};
-	auto impl = [](tref a, tref b) {
+	auto impl = [&](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
-		return ir.has_value() && ir.value();
+		if (ir.has_value()) return ir.value();
+		// an undecided implication leaves the step unrolled: a rejected
+		// candidate, not a verdict
+		auto sc = r.open("rejected candidate");
+		r.info("the fixpoint implication could not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(b))}});
+		report cand = std::move(ir).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+		return false;
 	};
 
 	TAU_TRY(tref chi_prev, normalize_non_temp<node>(
@@ -1790,8 +1808,8 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// A fixpoint-step give-up surfaces as an error on `r`; propagate it.
 	if (!chi_fp) return r;
 	auto [chi_inf, steps] = *chi_fp;
-	// TODO (HIGH) dropped error: normalize_non_temp's report -- the cap violation is carried as a null tree, which has no report channel.
-	chi_inf = normalize_non_temp<node>(chi_inf).value_or(nullptr);
+	TAU_TRY(tref chi_norm, normalize_non_temp<node>(chi_inf));
+	chi_inf = chi_norm;
 	// A cap violation surfaces as nullptr; propagate it rather than
 	// dereferencing it below.
 	if (!chi_inf) return r.with_value(nullptr);
@@ -1941,7 +1959,19 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 				aw ? tau::build_wff_and(aw, st) : st,
 				start_time, false, inputs);
 			if (!single.has_value()
-				|| !tau::get(single.value()).equals_F()) continue;
+				|| !tau::get(single.value()).equals_F())
+			{
+				// a clause that is not F is no verdict: a rejected
+				// candidate for the joint search below
+				auto sc = r.open("rejected candidate");
+				r.info("the sometimes clause was not refuted alone",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(st))}});
+				report cand = std::move(single).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+				continue;
+			}
 #ifdef TAU_CACHE
 			cache.emplace(std::make_pair(fm, start_time), tau::_F());
 #endif // TAU_CACHE
@@ -2589,8 +2619,18 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		auto _s = r.open("ctl_star_reduction");
 		// same reason as in is_ctl_star_realizable: the witness
 		// constraints are decided over the formula's own atoms
-		if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
-			fm = nf.value();
+		auto nf = normalize<node>(fm);
+		if (nf.has_value() && nf.value()) fm = nf.value();
+		else {
+			// the reduction runs on the unnormalized formula: a rejected
+			// candidate, not a verdict
+			auto sc = r.open("rejected candidate");
+			r.info("the CTL* formula could not be normalized",
+				{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+			report cand = std::move(nf).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		// a backend that gave no verdict leaves satisfiability unknown,
 		// which is not the "not implemented" case mark_undecided states
@@ -2853,11 +2893,16 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	}
 	if (fv < 0) {
 		// an undecided validity only means no simplification here
-		if (auto v = is_tau_impl<node>(tau::_T(), fm);
-			v.has_value() && v.value())
-		{
+		auto v = is_tau_impl<node>(tau::_T(), fm);
+		if (v.has_value() && v.value())
 			return r.with_assert_check_value(tau::_T());
-		}
+		// the simplification keeps its answer: a rejected candidate
+		auto sc = r.open("rejected candidate");
+		r.info("the validity of the formula could not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+		report cand = std::move(v).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
 	}
 	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");
