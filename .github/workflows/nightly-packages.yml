@@ -197,13 +197,14 @@ jobs:
         with:
           submodules: recursive
 
-      # python3-dev, nanobind-dev and auditwheel are what the x86 test image
-      # installs for the binding; clang is the release preset's compiler.
+      # clang is the release preset's compiler. nanobind and the wheel repair
+      # tool come from the shared venv, never from the system Python, and the
+      # build takes the interpreter from TAU_PYTHON.
       - name: Install the wheel dependencies
         run: |
           ./dev setup-ubuntu-ci-deps.sh
-          sudo apt-get install -y --no-install-recommends \
-            clang python3-dev nanobind-dev python3-auditwheel
+          sudo apt-get install -y --no-install-recommends clang
+          ./dev dep-python-venv
 
       # The store is content-addressed; a miss is built here with the preset's
       # own clang and reused by the next run.
@@ -243,7 +244,7 @@ jobs:
         run: |
           TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
           export TAU_WHEEL_PATH
-          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the arm64 wheel
         uses: actions/upload-artifact@v4
@@ -266,13 +267,14 @@ jobs:
         with:
           submodules: recursive
 
-      # python3-dev, nanobind-dev and auditwheel are what the x86 test image
-      # installs for the binding; clang is the release preset's compiler.
+      # clang is the release preset's compiler. nanobind and the wheel repair
+      # tool come from the shared venv, never from the system Python, and the
+      # build takes the interpreter from TAU_PYTHON.
       - name: Install the wheel dependencies
         run: |
           ./dev setup-ubuntu-ci-deps.sh
-          sudo apt-get install -y --no-install-recommends \
-            clang python3-dev nanobind-dev python3-auditwheel
+          sudo apt-get install -y --no-install-recommends clang
+          ./dev dep-python-venv
 
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -308,7 +310,7 @@ jobs:
         run: |
           TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
           export TAU_WHEEL_PATH
-          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the x86_64 wheel
         uses: actions/upload-artifact@v4
@@ -432,8 +434,8 @@ jobs:
           path: ${{ env.PKG_DIR }}
 
   # The macOS wheel is arm64 (the macos-15 image) and delocate retags it
-  # macosx_*_arm64. nanobind comes from Homebrew and delocate from pip. The
-  # cvc5 runtime resolves from the store with AppleClang.
+  # macosx_*_arm64. nanobind and delocate come from pip. The cvc5 runtime
+  # resolves from the store with AppleClang.
   macos-wheel:
     name: macOS wheel
     needs: [ check_date, check_tests ]
@@ -451,11 +453,10 @@ jobs:
       - name: Stamp nightly version
         run: printf '%s' "$(head -n 1 VERSION)-$(date +%F)" > VERSION
 
-      - name: Install the wheel dependencies
-        run: |
-          brew install nanobind
-          python3 -m pip install --break-system-packages delocate \
-            || python3 -m pip install delocate
+      # The venv carries the interpreter, nanobind and delocate, and the
+      # script appends TAU_PYTHON for the build and the wheel check.
+      - name: Create the wheel venv
+        run: ./dev dep-python-venv
 
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -491,7 +492,7 @@ jobs:
         run: |
           TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
           export TAU_WHEEL_PATH
-          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the macOS wheel
         uses: actions/upload-artifact@v4
@@ -518,12 +519,10 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install the wheel dependencies
-        run: python -m pip install nanobind delvewheel setuptools
+      # The venv carries the interpreter, nanobind and delvewheel, and the
+      # script appends TAU_PYTHON for the build and the wheel check.
+      - name: Create the wheel venv
+        run: ./dev dep-python-venv
 
       # cl.exe is on PATH only inside a developer command prompt.
       - uses: ilammy/msvc-dev-cmd@v1
@@ -554,9 +553,8 @@ jobs:
 
       - name: Build the MSVC wheel
         run: |
-          python_exe="$(python -c 'import sys; print(sys.executable)')"
           ./dev preset release-msvc-binding-python --target tau_wheel \
-            -DPython_EXECUTABLE="$python_exe" -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+            -DPython_EXECUTABLE="$TAU_PYTHON" -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -574,7 +572,7 @@ jobs:
         run: |
           TAU_WHEEL_PATH="$(ls build/release-msvc/bindings/python/nanobind/wheel/*.whl)"
           export TAU_WHEEL_PATH
-          python tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the MSVC wheel
         uses: actions/upload-artifact@v4

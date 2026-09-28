@@ -90,6 +90,14 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
 - `dep-oras` — the pinned oras client, verified by sha256, for reading the remote
   store. CI runs it; a local build needs it only with `TAU_STORE_REMOTE` set.
+- `dep-python-venv [-DTAU_PYTHON_ARCH=<arch>]` — the shared Python 3.12.14
+  venv the nanobind binding builds against, on Linux, macOS and Windows (Git
+  Bash). uv fetches the interpreter, the venv lands in
+  `$TAU_SHARED_PREFIX/py312`, and nanobind plus the platform's wheel repair
+  tool (auditwheel, delocate or delvewheel) install into it with the venv's
+  own pip. The script exports the interpreter as `TAU_PYTHON` to a CI job
+  through `$GITHUB_ENV`. A target arch needs binfmt for that arch, which the
+  arm64 cross job registers first.
 - `dep-*-package` — the store producers configure runs itself (`dep-cvc5-package`,
   `dep-boost-package`, `dep-curl-package`, `dep-spot-package`); called by hand
   only to prefetch. `dep-spot-package` builds the Spot CLI Tau execs, never

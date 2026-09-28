@@ -51,14 +51,17 @@ jobs:
       - name: Run tests
         run: ./dev test-release
 
-      - name: Install nanobind
-        run: brew install nanobind
+      # The venv carries the interpreter and nanobind, and the script appends
+      # TAU_PYTHON to the env, so the build takes both from the venv.
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
 
       - name: Build Python bindings
         run: ./dev binding python
 
       - name: Run Python test
-        run: python3 ./tests/bindings/python/test_direct_api_update.py
+        run: |
+          "$TAU_PYTHON" ./tests/bindings/python/test_direct_api_update.py
 
       - name: Save the dependency store (~/.tau/store)
         if: always()

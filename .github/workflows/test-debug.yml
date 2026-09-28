@@ -101,8 +101,12 @@ jobs:
           restore-keys: |
             tau-store-macos-15-
 
-      - name: Install nanobind, spot, and coreutils for the test suites
-        run: brew install nanobind spot coreutils
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          # The venv carries the interpreter and nanobind, and the script
+          # appends TAU_PYTHON to the env for the build.
+          ./dev dep-python-venv
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras

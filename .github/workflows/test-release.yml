@@ -173,8 +173,8 @@ jobs:
 
   # The cross gate builds the same preset on x86 and runs it under qemu. The
   # host spot keeps ltlsynt off the arm64 store package, which this host cannot
-  # execute. It builds and runs the Python binding too, so the arm64 Python
-  # comes from the multiarch layout.
+  # execute. It builds and runs the Python binding too, so it registers qemu
+  # for the arm64 binaries and makes an arm64 venv for the interpreter.
   linux-arm64-cross:
     name: Linux arm64 cross tests
     needs: probe
@@ -212,16 +212,18 @@ jobs:
           EOF
           sudo apt-get update
 
-      - name: Install the cross toolchain and the arm64 Python
+      - name: Install the cross toolchain and the arm64 venv
         run: |
           ./dev setup-ubuntu-ci-deps.sh
-          # python3-dev, nanobind-dev and auditwheel are what the x86 job's
-          # image installs for the binding; auditwheel stays host-only, the rest
-          # is the arm64 twin. python3:arm64 is the interpreter the tests run
-          # under qemu.
+          # The arm64 toolchain seeds FindPython from the interpreter in
+          # TAU_PYTHON (cmake/toolchains/aarch64-linux-gnu.cmake), so no arm64
+          # Python headers are installed here.
           sudo apt-get install -y --no-install-recommends \
-            clang g++-aarch64-linux-gnu qemu-user python3-auditwheel \
-            libpython3-dev:arm64 python3:arm64 nanobind-dev:arm64
+            clang g++-aarch64-linux-gnu qemu-user
+          # The interpreter and nanobind come from the arm64 venv, which the
+          # binfmt registration above makes runnable. TAU_PYTHON arrives in
+          # later steps through GITHUB_ENV.
+          ./dev dep-python-venv -DTAU_PYTHON_ARCH=aarch64
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
@@ -390,8 +392,12 @@ jobs:
           restore-keys: |
             tau-store-macos-15-
 
-      - name: Install nanobind, spot, and coreutils for the test suites
-        run: brew install nanobind spot coreutils
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          # The venv carries the interpreter and nanobind, and the script
+          # appends TAU_PYTHON to the env for the build.
+          ./dev dep-python-venv
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
@@ -459,9 +465,10 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      # The venv carries the binding's interpreter and appends TAU_PYTHON for
+      # the build. It needs no cl.exe, so it runs before the dev prompt.
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
 
       # cl.exe is on PATH only inside a developer command prompt.
       - uses: ilammy/msvc-dev-cmd@v1

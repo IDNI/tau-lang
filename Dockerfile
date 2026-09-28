@@ -59,10 +59,13 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 ARG TARGETARCH
 
 # Install dependencies
+# python3-dev and python3-venv stay for the tau-testnet stage, whose venv is
+# made from the system interpreter. nanobind never reaches the system Python:
+# the deps stage makes the shared venv the binding builds against.
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
 	bash wget git gnupg nsis rpm ninja-build bison ccache curl unzip \
-	python3-pip python3-venv python3-dev nanobind-dev \
+	python3-pip python3-venv python3-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
@@ -119,9 +122,11 @@ FROM base AS deps
 ARG BUILD_JOBS=5
 
 # Dependencies resolve through the store at configure time
-# (cmake/tau-deps.cmake), never a pre-source dist layer. This stage only
-# installs oras, the pinned client configure uses to read a missing package
-# from the remote store; dep-oras.sh verifies the release by sha256.
+# (cmake/tau-deps.cmake), never a pre-source dist layer. This stage installs
+# oras, the pinned client configure uses to read a missing package from the
+# remote store, and the shared Python 3.12 venv the binding builds against.
+# dep-oras.sh verifies its release by sha256, dep-python-venv.sh pins its uv
+# and its packages.
 COPY ./dev /tau-lang/
 COPY ./external/parser/scripts/devrc \
 	./external/parser/scripts/dep-build \
@@ -129,7 +134,14 @@ COPY ./external/parser/scripts/devrc \
 COPY ./external/parser/cmake/tau-resolve.cmake /tau-lang/external/parser/cmake/
 COPY ./scripts/env /tau-lang/scripts/
 COPY ./scripts/dep-oras.sh /tau-lang/scripts/
+COPY ./scripts/dep-python-venv.sh /tau-lang/scripts/
 RUN cd /tau-lang && ./dev dep-oras
+RUN cd /tau-lang && ./dev dep-python-venv
+
+# Every stage that builds the binding takes the interpreter from here. The
+# shared prefix is /root/.tau in this image, so this is the venv the line
+# above created.
+ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 
 
 # ------------------------------------------------------------
@@ -264,6 +276,10 @@ ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release
 
 WORKDIR /tau-lang
+
+# This stage builds the binding against its own tau-testnet venv, which holds
+# the interpreter and nanobind that suite runs; the image's venv is not it.
+ENV TAU_PYTHON=
 
 # The tau-testnet requirements build fastecdsa from source, which needs gmp
 RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev

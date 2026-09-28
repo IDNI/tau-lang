@@ -23,7 +23,15 @@ if(POLICY CMP0190)
 	cmake_policy(SET CMP0190 NEW)
 endif()
 
-find_package(Python 3.9 COMPONENTS Interpreter ${DEV_MODULE} REQUIRED)
+# tau-testnet needs Python 3.12, and nanobind must come from that same
+# interpreter: a configure that takes nanobind from another Python links a
+# different version into one module.
+set(TAU_PYTHON_VERSION "3.12" CACHE STRING
+	"Python version the nanobind binding builds against")
+if(DEFINED ENV{TAU_PYTHON} AND NOT "$ENV{TAU_PYTHON}" STREQUAL "")
+	set(Python_EXECUTABLE "$ENV{TAU_PYTHON}")
+endif()
+find_package(Python ${TAU_PYTHON_VERSION} EXACT COMPONENTS Interpreter ${DEV_MODULE} REQUIRED)
 
 # A cross build runs the target interpreter under the emulator; FindPython does
 # this for its own queries, and the nanobind lookup and the tests must too.
@@ -32,13 +40,26 @@ if(CMAKE_CROSSCOMPILING AND CMAKE_CROSSCOMPILING_EMULATOR)
 	set(TAU_PYTHON_EMULATOR ${CMAKE_CROSSCOMPILING_EMULATOR})
 endif()
 
+# The interpreter names its own nanobind cmake dir, so nanobind cannot be
+# taken from another Python's copy. A cross build runs the probe through the
+# emulator, like every other query about the target interpreter.
 execute_process(
 	COMMAND ${TAU_PYTHON_EMULATOR} "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+	RESULT_VARIABLE _tau_nanobind_probe
 	OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
-find_package(nanobind CONFIG REQUIRED)
+if(NOT _tau_nanobind_probe EQUAL 0 OR nanobind_ROOT STREQUAL "")
+	message(FATAL_ERROR
+		"nanobind is not installed for ${Python_EXECUTABLE}. Install it with "
+		"'${Python_EXECUTABLE} -m pip install nanobind==3.0.1', or set "
+		"TAU_PYTHON to a Python ${TAU_PYTHON_VERSION} interpreter that has it.")
+endif()
+find_package(nanobind CONFIG REQUIRED NO_DEFAULT_PATH
+	PATHS "${nanobind_ROOT}" NO_CMAKE_FIND_ROOT_PATH)
 
 
-nanobind_add_module(${TAU_PYTHON_BINDING_MODULE} tau_nanobind.cpp)
+# nanobind's own headers trip tau's -Wfloat-equal; as system headers they
+# stay silent while this module's own code keeps every warning.
+nanobind_add_module(${TAU_PYTHON_BINDING_MODULE} tau_nanobind.cpp NB_SUPPRESS_WARNINGS)
 
 add_dependencies(${TAU_PYTHON_BINDING_MODULE} tau_header)
 # The wheel bundles the cvc5 runtime beside the module under tau_libs, so the

@@ -94,6 +94,8 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
+- `-DTAU_PYTHON_VERSION=<ver>` — Python version the nanobind binding builds against (default `3.12`, matched `EXACT`)
+- `TAU_PYTHON=<path>` — interpreter for the binding. The interpreter must be that version and carry nanobind. `./dev dep-python-venv` builds one (e.g. `$HOME/.tau/py312/bin/python3`) and hands it to a CI job through `$GITHUB_ENV`
 - `-DTAU_DEPS_FROM_STORE=OFF` — build against the in-tree parser and its cmake modules instead of the dependency store
 - WebAssembly-only options are listed under [WebAssembly](#webassembly).
 

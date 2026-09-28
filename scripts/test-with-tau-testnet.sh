@@ -158,7 +158,7 @@ if ! "${VENV_PYTHON}" -m pip install "${REQ_INSTALL_ARGS[@]}"; then
 fi
 # not in requirements.txt: needed to configure the binding, not to run it
 if [ -z "${TESTNET_WHEEL}" ]; then
-	"${VENV_PYTHON}" -m pip install nanobind
+	"${VENV_PYTHON}" -m pip install nanobind==3.0.1
 fi
 
 if [ -n "${TESTNET_WHEEL}" ]; then
