@@ -138,3 +138,57 @@ add_ltl_run_test(data_game_strategy_revision
 	"run (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o1[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nq\\nq\\n"
 	"Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 1\n.*o1\\[6\\] := 1"
 	"cannot follow|unsat|no strategy")
+
+# A qlt stream holds one point of the order at each step: every run below
+# prints rationals, never the type's 0 or 1 (bot, top) or an interval.
+set(QLT_NO_POINT ":= bot|:= top|:= [[(]|not executable|unsat")
+
+# the safety pipeline: a disequality with the previous step
+add_ltl_run_test(qlt_points_safety_disequality
+	"run 3 steps always o1[t]:qlt != o1[t-1]:qlt.\\nq\\n"
+	"o1\\[1\\] := -?[0-9/]+\n.*o1\\[2\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# the safety pipeline: two outputs equal to each other
+add_ltl_run_test(qlt_points_safety_equal_outputs
+	"run 3 steps always o1[t]:qlt = o2[t]:qlt && o2[t]:qlt != o2[t-1]:qlt.\\nq\\n"
+	"o1\\[1\\] := -?[0-9/]+\n.*o2\\[1\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# the safety pipeline: two outputs distinct from each other
+add_ltl_run_test(qlt_points_safety_distinct_outputs
+	"run 2 steps always o1[t]:qlt != o2[t]:qlt.\\nq\\n"
+	"o1\\[0\\] := -?[0-9/]+\n.*o2\\[0\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# the data game on streams only equalities read: order-type codes, not the
+# codes of 0 and 1
+add_ltl_run_test(qlt_points_data_game_equalities
+	"run 3 steps ((o2[t]:qlt = o2[t]:qlt) U (o1[t]:qlt = o2[t]:qlt)).\\nq\\n"
+	"o1\\[0\\] := -?[0-9/]+\n.*o2\\[0\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# a goal between two outputs beside a disequality over time
+add_ltl_run_test(qlt_points_goal_between_outputs
+	"run 3 steps G(F(o1[t]:qlt = o2[t]:qlt) && (o1[t]:qlt != o1[t-1]:qlt)).\\nq\\n"
+	"o1\\[2\\] := -?[0-9/]+\n.*o2\\[2\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# realizability decided by a strategy over bookkeeping bits, which cannot be
+# played: the run plays one over the data instead
+add_ltl_run_test(qlt_points_bookkeeping_strategy_runs
+	"run (G (i1[t]:qlt = i1[t]:qlt)) && (F (i1[t]:qlt > o1[t]:qlt)).\\n{1}\\n{2}\\n{0}\\nq\\nq\\n"
+	"o1\\[0\\] := -?[0-9/]+\n.*o1\\[1\\] := -?[0-9/]+\n.*o1\\[2\\] := -?[0-9/]+"
+	"${QLT_NO_POINT}")
+
+# the data game proves that no strategy exists: the run says so
+add_ltl_run_test(qlt_unrealizable_data_game
+	"run (G (o2[t-1]:qlt = i1[t-1]:qlt)) && (G (F (i1[t]:qlt = o2[t-1]:qlt))).\\nq\\n"
+	"not executable: it is unrealizable"
+	":= |no strategy was synthesised")
+
+# the algebra's own synthesis proves that no strategy exists
+add_ltl_run_test(qlt_unrealizable_propositional
+	"run (G ({0}:qlt < i1[t]:qlt)) && (G (F (({0}:qlt != i1[t]:qlt || {1}:qlt != o1[t]:qlt)))).\\nq\\n"
+	"not executable: it is unrealizable"
+	":= |no strategy was synthesised")
