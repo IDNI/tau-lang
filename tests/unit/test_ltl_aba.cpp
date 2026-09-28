@@ -41,6 +41,7 @@
 #ifdef DEBUG
 #  include "interpreter.h"
 #endif
+#include <chrono>
 #include <cstdlib>
 #include <sstream>
 #include <fstream>
@@ -4621,6 +4622,84 @@ static std::optional<bool> holds_at(tref body,
 		fm_at_time_point<node_t>(body, io, t), trace));
 }
 
+// Runs `spec_text` on the data game's strategy for `before` steps with every
+// input 0, revises it by `update_text` and runs `after` more steps. The
+// trace holds the values of every step; `accepted` whether the revision was.
+struct revised_run {
+	bool accepted = false;
+	bool data_game = false;
+	int_t revised_at = 0;
+	subtree_map<node_t, tref> trace;
+	std::vector<htref> keep;
+	double seconds = 0;
+};
+
+// A formula typed and read as a specification, without its spec wrapper.
+static tref io_formula(const std::string& s) {
+	tref f = spec((s + ".").c_str());
+	while (f && (tau::get(f).is(tau::spec) || tau::get(f).is(tau::main)))
+		f = tau::get(f).first();
+	return f;
+}
+
+static std::optional<revised_run> run_revised(const char* spec_text,
+	const char* update_text, int_t before, int_t after)
+{
+	tref fm = spec(spec_text);
+	tref up = io_formula(update_text);
+	if (!fm || !up) return std::nullopt;
+	revised_run run;
+	run.keep = { tau::geth(fm), tau::geth(up) };
+	io_context<node_t> ctx;
+	auto ir = interpreter<node_t>::make_interpreter(fm, ctx);
+	if (!ir.has_value()) return std::nullopt;
+	auto& in = ir.value();
+	run.data_game = in.plays_data_game();
+	auto play = [&](int_t steps) {
+		for (int_t k = 0; k < steps; ++k) {
+			// every input 0
+			assignment<node_t> vals;
+			for (auto& [var, _] : in.inputs) {
+				const size_t tid = in.ctx.type_of(var);
+				tref key = build_in_var_at_n<node_t>(
+					get_var_name<node_t>(var), (int_t)in.time_point, tid);
+				tref v = build_bf_f_type<node_t>(tid);
+				vals[key] = v;
+				run.trace[key] = v;
+				run.keep.push_back(tau::geth(key));
+			}
+			auto sr = in.step(vals);
+			if (!sr.has_value() || !sr.value().first) return false;
+			for (auto& [key, v] : *sr.value().first) {
+				run.trace[key] = v;
+				run.keep.push_back(tau::geth(key));
+				run.keep.push_back(tau::geth(v));
+			}
+		}
+		return true;
+	};
+	if (!play(before)) return std::nullopt;
+	run.revised_at = before;
+	auto t0 = std::chrono::steady_clock::now();
+	auto ur = in.update(up);
+	run.seconds = std::chrono::duration<double>(
+		std::chrono::steady_clock::now() - t0).count();
+	run.accepted = ur.has_value() && ur.value();
+	if (!play(after)) return std::nullopt;
+	return run;
+}
+
+// Whether `body` holds on the run at every step from `from` to `to`.
+static bool holds_from(const revised_run& run, const char* body, int_t from,
+	int_t to)
+{
+	tref b = io_formula(body);
+	if (!b) return false;
+	for (int_t t = from; t <= to; ++t)
+		if (!holds_at(b, run.trace, t).value_or(false)) return false;
+	return true;
+}
+
 TEST_SUITE("Data game strategy") {
 
 	// ltlsynt's strategy of the abstraction loses against the data here, so
@@ -4771,6 +4850,94 @@ TEST_SUITE("Data game strategy") {
 			without_i1 = without_i1 || !reads_i1;
 		}
 		CHECK(without_i1);
+	}
+
+	// The running goal o1[t-2] = 1 cannot be met once o1 stays 0; the
+	// revision keeps the update and lets the goal go, as pointwise
+	// revision does when the running goals are not executable along it.
+	TEST_CASE("a revision drops the running goals the update rules out") {
+		auto run = run_revised("(always o2[t] = o1[t-1]) "
+			"&& (sometimes o1[t-2] = 1).", "always o1[t] = 0", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run, "o1[t] = 0", 5, 10));
+	}
+
+	// The revision looks two steps back, further than the run keeps; the
+	// revised spec holds from its lookback on, with values of its own
+	// before.
+	TEST_CASE("a revision reading values the run does not keep starts afresh") {
+		auto run = run_revised("(always o1[t]:bv[1] != o1[t-1]:bv[1]) "
+			"&& (sometimes o2[t]:bv[1] = 1).",
+			"always o1[t-1]:bv[1] = o1[t-2]:bv[1]", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run,
+			"o1[t-1]:bv[1] = o1[t-2]:bv[1]", 7, 10));
+	}
+
+	// o3 is a stream the run has no values of.
+	TEST_CASE("a revision reading a new stream's past starts afresh") {
+		auto run = run_revised("(always o1[t]:bv[1] != o1[t-1]:bv[1]) "
+			"&& (sometimes o2[t]:bv[1] = 1).",
+			"always o3[t]:bv[1] != o3[t-1]:bv[1]", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run, "o3[t]:bv[1] != o3[t-1]:bv[1]", 6, 10));
+	}
+
+	// Deciding whether the running spec, goals included, implies the
+	// update took minutes here; the check reads its always part only.
+	TEST_CASE("a revision of a spec with goals is decided quickly") {
+		auto run = run_revised("(always o1[0] = 0 && (o1[t-1] = o2[t] "
+			"|| !(o1[t-2] = 1))) && (sometimes o1[t-1] = 0) "
+			"&& (sometimes !(o1[t-2] = o2[t-2])).",
+			"always o1[t] = 0", 5, 4);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(run->seconds < 30);
+		CHECK(holds_from(*run, "o1[t] = 0", 5, 8));
+	}
+
+	// Among the candidates of this revision is one the data game proves
+	// unrealizable; executing the abstraction's strategy for it instead
+	// did not finish.
+	TEST_CASE("a revision skips a candidate the data game proves unrealizable") {
+		auto run = run_revised("(always o1[0]:bv[1] = 1 && o3[0]:bv[1] = 0 "
+			"&& o3[t]:bv[1] = 1 && ((!(i1[t]:bv[1] = o3[t]:bv[1]) "
+			"&& i1[t-2]:bv[1] = o1[t-2]:bv[1]) || (!(i1[t-2]:bv[1] = 0) "
+			"|| o1[t]:bv[1] = o3[t-2]:bv[1]))) "
+			"&& (sometimes o2[t-1]:bv[1] = 0).",
+			"always o1[t]:bv[1] = 0", 5, 4);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(run->seconds < 30);
+		CHECK(holds_from(*run, "o1[t]:bv[1] = 0", 5, 8));
+	}
+
+	// Refining the abstraction's strategy for this spec, which the data
+	// game shows unrealizable, did not finish. The library keeps the types
+	// of the streams it has seen, so the names are this test's own.
+	TEST_CASE("a run the data game proves unrealizable is refused at once") {
+		auto t0 = std::chrono::steady_clock::now();
+		auto ir = api<node_t>::get_interpreter(std::string(
+			"(always o73[t]:bv[1]' = 0 && o71[t-2]:bv[1] = 0 "
+			"&& (o73[t-2]:bv[1] = o71[t]:bv[1] || i71[t-2]:bv[1] != 0 "
+			"|| i71[t]:bv[1]' != 0 && o71[t-2]:bv[1] = i71[t-2]:bv[1])) "
+			"&& (sometimes o72[t-1]:bv[1] = 0)."));
+		const double seconds = std::chrono::duration<double>(
+			std::chrono::steady_clock::now() - t0).count();
+		CHECK_FALSE(ir.has_value());
+		CHECK(seconds < 30);
+		std::ostringstream msg;
+		ir.report().print(msg);
+		INFO(msg.str());
+		CHECK(msg.str().find("unrealizable") != std::string::npos);
 	}
 }
 
