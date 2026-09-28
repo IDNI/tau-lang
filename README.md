@@ -791,8 +791,13 @@ the Mealy introspection (the cached solution, its current state) shows, and
 a step reads only the inputs its move depends on. A revision of the
 specification is made as in any run: the running specification is revised
 pointwise by the update, and the data game is solved again for the revised
-specification, starting from the values already played; the revision is
-refused when that game does not decide it or is not won from those values.
+specification. The game starts from the values already played when it is
+won from them; otherwise, and when the revision reads a stream the run has
+no values of, it starts from values of its own, as the revised
+specification of any run does (see [Pointwise revision](#pointwise-revision)).
+When the game shows that the running `sometimes` goals cannot be met along
+the update, they give way to it. The revision is refused only when the game
+does not decide the revised specification or shows that no strategy keeps it.
 Otherwise `run` executes the strategy of (4) and (5), as a safety formula
 (below). A specification whose `always` part reads a fixed step, such as
 `o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
