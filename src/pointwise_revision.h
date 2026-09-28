@@ -512,9 +512,9 @@ tref and_distribute(tref fm) {
 			if (d != c) changed = true;
 			result = result ? build_wff_and<node>(result, d) : d;
 		}
-		// Preserve identity when nothing distributed: `gather_top_conjuncts`
-		// flattens an n-ary wff_and, so rebuilding would hand back a
-		// differently-shaped tree for no reason.
+		// Preserve identity when nothing distributed: gather_top_conjuncts
+		// recurses into both children of every wff_and and drops the binary
+		// nodes, so a rebuild would change the tree shape for no reason.
 		return changed ? result : fm;
 	}
 
