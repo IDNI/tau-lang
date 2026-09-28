@@ -77,9 +77,9 @@ add_repl_test(adt-solve
 	"x\\.a := \\{ 1 \\}:sbf")
 
 # unknown member access on a registered ADT type is rejected.
-add_repl_test_fail(adt-unknown_member
+add_repl_test(adt-unknown_member
 	"type Point = {a: sbf, b: sbf}. n ex x:Point (x.c = 0)"
-	"ADT")
+	"ADT" NO_FAIL_REGEX)
 
 # --- session-stored types reaching a later, separately parsed line ---------
 # Session-stored types now reach later lines: the tuple equality expands
@@ -161,19 +161,16 @@ add_multiline_repl_test(adt-cross_line_redeclaration
 # An empty pending read on an ADT-typed stream must stay silent.
 # A plain stream already treats an empty read this way, with no error.
 # See tests/unit/test_io_context.cpp for the reader-level cases.
-add_test(NAME "test_repl-adt-run"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-run" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
-	FAIL_REGULAR_EXPRESSION "Error")
+add_multiline_repl_test(adt-run
+	"o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
+	STDIN "type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n")
 
 # A malformed ADT tuple literal must re-ask for the same time point.
 # test_repl-run_cmd-retry_on_bad_value covers the same contract for a
 # scalar value, and tests/unit/test_io_context.cpp covers the reader.
-add_test(NAME "test_repl-adt-run_retry_on_bad_tuple_value"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\nnot a tuple literal\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}")
+add_multiline_repl_test(adt-run_retry_on_bad_tuple_value
+	"o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
+	NO_FAIL_REGEX STDIN "type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\nnot a tuple literal\\n{ a: \"1\", b: \"0\" }\\nq\\n")
 
 # ANY get_applied()-driven REPL command after an ADT-typed `run` in the
 # same session used to crash: SIGABRT (Debug) / SIGSEGV (Release).
@@ -201,26 +198,17 @@ set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
 # + adt_wire_hint, repl_evaluator.tmpl.h/io_context.tmpl.h) -- the only
 # automated assertion on that code path. Transcript verified live 2026-08-17:
 # the prompt renders as `i[0] := { a: "", b: "" } `.
-add_test(NAME "test_repl-adt-run_prompt_hint"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-run_prompt_hint" PROPERTIES
-	PASS_REGULAR_EXPRESSION "i\\[0\\] := \\{ a: \"\", b: \"\" \\}"
-	FAIL_REGULAR_EXPRESSION "Error")
+add_multiline_repl_test(adt-run_prompt_hint
+	"i\\[0\\] := \\{ a: \"\", b: \"\" \\}"
+	STDIN "type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n")
 
 # R2: an alias-typed io def stays ONE plain stream through the REPL: the
 # def's typed rewrites to bv[8], run prompts per-value (`i[0] : bv[8] :=`,
 # no tuple hint) and the output prints as a single bv value (canonical
 # decimal), all verified live 2026-08-17.
-tau_repl_unsupported(_tau_skip "type byte = bv[8]")
-if(_tau_skip)
-	tau_repl_record_skip("test_repl-adt-run_alias_stream")
-else()
-	add_test(NAME "test_repl-adt-run_alias_stream"
-		COMMAND bash -c "printf 'type byte = bv[8]. i:byte := in console. o:byte := out console. run o[0] = i[0].\\n#b00000001\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-	set_tests_properties("test_repl-adt-run_alias_stream" PROPERTIES
-		PASS_REGULAR_EXPRESSION "o\\[0\\] := 1"
-		FAIL_REGULAR_EXPRESSION "Error")
-endif()
+add_multiline_repl_test(adt-run_alias_stream
+	"o\\[0\\] := 1"
+	STDIN "type byte = bv[8]. i:byte := in console. o:byte := out console. run o[0] = i[0].\\n#b00000001\\nq\\n")
 
 # R3: type_def echo with parents exercises the printer's type_parents
 # on_enter/on_between/on_leave (" of (" + ", "-separated + ")") -- canonical
@@ -247,17 +235,13 @@ add_repl_test(adt-normalize_io_member
 # member is OMITTED from the solution rather than defaulted (by design --
 # contrast with the interpreter's partial-copy defaulting, which emits the
 # BA's 0). Verified live 2026-08-17: the solution block lists x.a only.
-add_test(NAME "test_repl-adt-solve_omits_unconstrained"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1\" -S trace")
-set_tests_properties("test_repl-adt-solve_omits_unconstrained" PROPERTIES
-	PASS_REGULAR_EXPRESSION "x\\.a := \\{ 1 \\}:sbf"
-	FAIL_REGULAR_EXPRESSION "x\\.b :=;Error")
+add_repl_test(adt-solve_omits_unconstrained
+	"type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1"
+	"x\\.a := \\{ 1 \\}:sbf" FAIL_REGEX "x\\.b :=" "Error")
 
-add_test(NAME "test_repl-adt-run_then_normalize_then_run"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\ntype Point = {a: sbf, b: sbf}. n ex x:Point (x = 0)\\ntype Point = {a: sbf, b: sbf}. i2:Point := in console. o2:Point := out console. run o2[0] = i2[0].\\n{ a: \"0\", b: \"1\" }\\nq\\nquit\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-run_then_normalize_then_run" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o2\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
-	FAIL_REGULAR_EXPRESSION "Error")
+add_multiline_repl_test(adt-run_then_normalize_then_run
+	"o2\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
+	STDIN "type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\ntype Point = {a: sbf, b: sbf}. n ex x:Point (x = 0)\\ntype Point = {a: sbf, b: sbf}. i2:Point := in console. o2:Point := out console. run o2[0] = i2[0].\\n{ a: \"0\", b: \"1\" }\\nq\\nquit\\n")
 
 # A run spec whose `type` declaration was made on an EARLIER line: the
 # session-stored type must reach the run command's own parse, or `i[0].a`
@@ -271,8 +255,6 @@ set_tests_properties("test_repl-adt-run_then_normalize_then_run" PROPERTIES
 # b takes i.a (1). Both members are mentioned so the output is emitted at
 # all (see the "member mentioned at NO time point" case in
 # tests/integration/test_integration-adt.cpp).
-add_test(NAME "test_repl-adt-cross_line_run_crossed_members"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}\\ni:Point := in console. o:Point := out console. run (o[0].a = i[0].b) && (o[0].b = i[0].a).\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-cross_line_run_crossed_members" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
-	FAIL_REGULAR_EXPRESSION "Error")
+add_multiline_repl_test(adt-cross_line_run_crossed_members
+	"o\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
+	STDIN "type Point = {a: sbf, b: sbf}\\ni:Point := in console. o:Point := out console. run (o[0].a = i[0].b) && (o[0].b = i[0].a).\\n{ a: \"1\", b: \"0\" }\\nq\\n")

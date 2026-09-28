@@ -25,5 +25,5 @@ add_repl_test(enable_disable_roundtrip "disable status. enable status" "on")
 add_repl_test(disable_enable_roundtrip "enable status. disable status" "off")
 
 # invalid option for bool-only commands
-add_repl_test_fail(enable_cmd-invalid_severity "enable severity" "Invalid option")
-add_repl_test_fail(disable_cmd-invalid_severity "disable severity" "Invalid option")
+add_repl_test(enable_cmd-invalid_severity "enable severity" "Invalid option" NO_FAIL_REGEX)
+add_repl_test(disable_cmd-invalid_severity "disable severity" "Invalid option" NO_FAIL_REGEX)

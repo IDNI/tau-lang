@@ -337,6 +337,6 @@ add_repl_test(solver_cmd-bv_through_def_rev
 
 # solve takes a formula: a term argument is rejected instead of the whole line
 # being stored as a term (`solve x` used to print `%1: solvex`)
-add_repl_test_fail(solver_cmd-term_rejected "solve x" "Invalid formula")
-add_repl_test_fail(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula")
-add_repl_test_fail(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula")
+add_repl_test(solver_cmd-term_rejected "solve x" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula" NO_FAIL_REGEX)

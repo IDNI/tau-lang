@@ -29,9 +29,9 @@ add_repl_test(normalize_cmd_wff_mem_rel "T. normalize %-0" "T")
 add_repl_test(normalize_cmd_wff_mem_abs "T. normalize %1" "T")
 
 # AP-N3 regression: get_type_and_arg() used to deref a null child.
-add_repl_test_fail(normalize_cmd-multiindex_fixed_point_call
+add_repl_test(normalize_cmd-multiindex_fixed_point_call
 	"g[0, 0](Y) := Y = 0. g[n, 0](Y) := g[n - 1, 0](Y). normalize g(Y)"
-	"multiindex offset relations is not supported")
+	"multiindex offset relations is not supported" NO_FAIL_REGEX)
 
 # by_grammar parse-only cases (SHAPE-I/K/O): assert parse success only.
 add_repl_test(normalize_cmd-by_grammar-shape_i_01_f_f_f_fall_x_o1_and_x_eq_0 "normalize F (F (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])))." "%[0-9]+")
@@ -81,18 +81,18 @@ add_repl_test(normalize_cmd-quantifiers-all_ex_02_all_xy_ex_wz_x_eq_w_and_y_eq_z
 # forever with no output, no error and no interruption point. Here the
 # unfolding oscillates: each pass adds a negation that the simplifier folds
 # straight back, so no state is ever a fixpoint and none is ever new either.
-add_repl_test_fail(normalize_cmd-oscillating_definition
+add_repl_test(normalize_cmd-oscillating_definition
 	"f(x) := f(x)'. normalize f(1)"
-	"oscillates without reaching a normal form")
+	"oscillates without reaching a normal form" NO_FAIL_REGEX)
 
 # Issue 28's own script, and the wff spelling @pt7k gave in its thread. Both
 # are the same oscillation: `'` only works on sbf, hence the `!` variant.
-add_repl_test_fail(normalize_cmd-self_negating_recurrence_bf
+add_repl_test(normalize_cmd-self_negating_recurrence_bf
 	"g[0](y) := 0. g[n](y) := g[n](y)'. normalize g[5](1)"
-	"oscillates without reaching a normal form")
-add_repl_test_fail(normalize_cmd-self_negating_recurrence_wff
+	"oscillates without reaching a normal form" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-self_negating_recurrence_wff
 	"g[0](y) := F. g[n](y) := !g[n](y). normalize g[5](1)"
-	"oscillates without reaching a normal form")
+	"oscillates without reaching a normal form" NO_FAIL_REGEX)
 
 # The corrected form from the same thread, referring to the previous step,
 # normalizes to 1. It used to print "Failed to translate the formula to cvc5: 1"
@@ -156,13 +156,13 @@ add_repl_test(normalize_cmd-fp_call_after_unrelated_function_def
 # non-bitvector sibling, is rejected by type inference. Both used to reach
 # the solver's cast translation and abort the process (Debug: "bv type must
 # have explicit bitwidth"; Release: a core dump). The error IS the expected
-# output, so add_repl_test_fail.
-add_repl_test_fail(normalize_cmd-cast_of_sbf_operand_rejected
-	"n (bv[8]) x:sbf = y:bv[8]" "Incompatible type information")
-add_repl_test_fail(normalize_cmd-cast_of_tau_stream_rejected
-	"n (bv[8]) i1[t]:tau = o1[t]:bv[8]" "Incompatible type information")
-add_repl_test_fail(normalize_cmd-cast_result_meets_sbf_rejected
-	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information")
+# output, so NO_FAIL_REGEX.
+add_repl_test(normalize_cmd-cast_of_sbf_operand_rejected
+	"n (bv[8]) x:sbf = y:bv[8]" "Incompatible type information" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-cast_of_tau_stream_rejected
+	"n (bv[8]) i1[t]:tau = o1[t]:bv[8]" "Incompatible type information" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-cast_result_meets_sbf_rejected
+	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information" NO_FAIL_REGEX)
 add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 	"n (bv[8]) x:bv[4] = y" "y")
 

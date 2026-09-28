@@ -8,93 +8,92 @@ include(add_repl_test)
 
 # a data quantifier under a temporal operator has no proposition in the
 # skeleton (it used to become the constant 1: REALIZABLE)
-add_repl_test_fail(ltl_decisions-quantifier_under_temporal_undecided
-	"realizable G (all x (F (i1[t] = x)))" "could not be decided")
+add_repl_test(ltl_decisions-quantifier_under_temporal_undecided
+	"realizable G (all x (F (i1[t] = x)))" "could not be decided" NO_FAIL_REGEX)
 # a positional atom under F is refused, not an abort
-add_repl_test_fail(ltl_decisions-positional_under_F_no_abort
-	"realizable F (o1[0] = 1)" "could not be decided")
+add_repl_test(ltl_decisions-positional_under_F_no_abort
+	"realizable F (o1[0] = 1)" "could not be decided" NO_FAIL_REGEX)
 # ltl prints why the synthesis refuses the positional atom, then the verdict
 # of realizable, which cannot decide it either
-add_repl_test_fail(ltl_decisions-ltl_positional_under_F_refused
-	"ltl F (o1[0] = 1)" "REFUSED: positional atom under.*could not be decided")
+add_repl_test(ltl_decisions-ltl_positional_under_F_refused
+	"ltl F (o1[0] = 1)" "REFUSED: positional atom under.*could not be decided" NO_FAIL_REGEX)
 
 # input facts the environment cannot violate are assumed: tautologies over
 # three input atoms, and a valid single input atom
 add_repl_test(ltl_decisions-input_tautology_bv_three_atoms
-	"realizable F ((i1[t]:bv[2] = {0}) || (i1[t]:bv[2] = {1}) || (i1[t]:bv[2] > {1}))" ": T")
+	"realizable F ((i1[t]:bv[2] = {0}) || (i1[t]:bv[2] = {1}) || (i1[t]:bv[2] > {1}))" ": T" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-input_tautology_tau_three_atoms
-	"realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))" ": T")
+	"realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))" ": T" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-input_valid_single_atom
-	"realizable F (i1[t]:bv[2] + {1} != i1[t]:bv[2])" ": T")
+	"realizable F (i1[t]:bv[2] + {1} != i1[t]:bv[2])" ": T" REQUIRES ltlsynt)
 
 # ltl takes its verdict from the realizability procedure
-add_repl_test_fail(ltl_decisions-ltl_agrees_with_realizable
-	"ltl G ((o1[1] = 1) && (o1[t] = o1[t-1]) && F (o1[t]=0))" "\nUNREALIZABLE")
+add_repl_test(ltl_decisions-ltl_agrees_with_realizable
+	"ltl G ((o1[1] = 1) && (o1[t] = o1[t-1]) && F (o1[t]=0))" "\nUNREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
 # ltl merges the always statements into one always part, whose warm-up is
 # the deepest lookback among them, as realizable, sat and run do: o1 is
 # free at step 0, so the eventuality holds there
-add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up
+add_repl_test(ltl_decisions-ltl_merged_always_warm_up
 	"ltl (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
-	"\nREALIZABLE")
+	"\nREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-realizable_merged_always_warm_up
 	"realizable (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
-	": T")
-add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up_input
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-ltl_merged_always_warm_up_input
 	"ltl (G (o2[t-1] = 1)) && (G (i1[t-2] = o1[t])) && (T U (o2[t-1] = 0))"
-	"\nREALIZABLE")
-add_repl_test_fail(ltl_decisions-ltl_merged_always_warm_up_bv
+	"\nREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-ltl_merged_always_warm_up_bv
 	"ltl (G (o2[t-1]:bv[1] = 1)) && (G (o1[t]:bv[1] = o3[t-2]:bv[1])) && (G (o1[t]:bv[1] = 1)) && (T U (o1[t]:bv[1] = 0))"
-	"\nREALIZABLE")
+	"\nREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
 # the explanation shows the one always part: a single G over both bodies
-add_repl_test_fail(ltl_decisions-ltl_merged_always_one_clause
+add_repl_test(ltl_decisions-ltl_merged_always_one_clause
 	"ltl (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
-	"X\\(G\\(\\((\\(__step_ge1 -> p[0-9]\\) & p[0-9]|p[0-9] & \\(__step_ge1 -> p[0-9]\\))\\)\\)\\)")
+	"X\\(G\\(\\((\\(__step_ge1 -> p[0-9]\\) & p[0-9]|p[0-9] & \\(__step_ge1 -> p[0-9]\\))\\)\\)\\)" NO_FAIL_REGEX REQUIRES ltlsynt)
 # ltl keeps the warm-up a clause is written with, also where its literal
 # with that lookback is a tautology
-add_repl_test_fail(ltl_decisions-ltl_written_warm_up_tautology
+add_repl_test(ltl_decisions-ltl_written_warm_up_tautology
 	"ltl (G (o2[t] = 1 && o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))"
-	"\nREALIZABLE")
-add_repl_test_fail(ltl_decisions-ltl_written_warm_up_tautology_own_always
+	"\nREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-ltl_written_warm_up_tautology_own_always
 	"ltl (G (o2[t] = 1)) && (G (o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))"
-	"\nREALIZABLE")
+	"\nREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
 # a lookback-free always statement beside a sometimes with a lookback
 # still starts at step 0
-add_repl_test_fail(ltl_decisions-ltl_always_beside_sometimes_lookback
-	"ltl (G (o1[t] = 1)) && (T U (o1[t-2] = 0))" "\nUNREALIZABLE")
+add_repl_test(ltl_decisions-ltl_always_beside_sometimes_lookback
+	"ltl (G (o1[t] = 1)) && (T U (o1[t-2] = 0))" "\nUNREALIZABLE" NO_FAIL_REGEX REQUIRES ltlsynt)
 
 # validity of full LTL: F when the negation is satisfiable, never T for both
 add_repl_test(ltl_decisions-valid_until_F
-	"valid (o1[t] = 1) until (o2[t] = 1)" ": F")
+	"valid (o1[t] = 1) until (o2[t] = 1)" ": F" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_negated_until_F
-	"valid !((o1[t] = 1) until (o2[t] = 1))" ": F")
-add_repl_test(ltl_decisions-valid_G_F_no_abort "valid G (F o1[t] = 1)" ": F")
+	"valid !((o1[t] = 1) until (o2[t] = 1))" ": F" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-valid_G_F_no_abort "valid G (F o1[t] = 1)" ": F" REQUIRES ltlsynt)
 
 # valid is trace validity: F when some input sequence and some outputs
 # violate the formula, so valid never holds where sat answers F
 add_repl_test(ltl_decisions-valid_G_F_input_F
-	"valid G (F (i1[t] = 1))" ": F")
+	"valid G (F (i1[t] = 1))" ": F" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_until_input_F
-	"valid (o1[t] = 1) until (i1[t] = 1)" ": F")
+	"valid (o1[t] = 1) until (i1[t] = 1)" ": F" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_nested_implication_input_T
-	"valid (G (F (i1[t] = 1))) -> (F (i1[t] = 1))" ": T")
+	"valid (G (F (i1[t] = 1))) -> (F (i1[t] = 1))" ": T" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_until_implies_F_T
-	"valid ((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1))" ": T")
+	"valid ((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1))" ": T" REQUIRES ltlsynt)
 # the same holds for always / sometimes
 add_repl_test(ltl_decisions-valid_sometimes_input_F
-	"valid sometimes (i1[t]:bv[2] = {1}:bv[2])" ": F")
+	"valid sometimes (i1[t]:bv[2] = {1}:bv[2])" ": F" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_F_input_F
-	"valid F (i1[t] = 1)" ": F")
+	"valid F (i1[t] = 1)" ": F" REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-valid_sometimes_input_tautology_T
-	"valid sometimes (i1[t] = i1[t])" ": T")
+	"valid sometimes (i1[t] = i1[t])" ": T" REQUIRES ltlsynt)
 
 # normal forms keep U / R / W / S / T and CTL* scopes as opaque literals
 add_repl_test(ltl_decisions-dnf_keeps_until
 	"dnf (o1[t] = 1 || o2[t] = 1) until (o3[t] = 1)"
 	"\\(o1\\[t\\]:tau = 1 \\|\\| o2\\[t\\]:tau = 1\\) U o3")
-add_test(NAME "test_repl-ltl_decisions-dnf_keeps_semantic_negation"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. dnf (-(G o1[t] = 1)) && (G o2[t] = 1)\"")
-set_tests_properties("test_repl-ltl_decisions-dnf_keeps_semantic_negation"
-	PROPERTIES PASS_REGULAR_EXPRESSION "-\\(always o1")
+add_repl_test(ltl_decisions-dnf_keeps_semantic_negation
+	"fragment ctl_star. dnf (-(G o1[t] = 1)) && (G o2[t] = 1)"
+	"-\\(always o1" NO_FAIL_REGEX NO_TRACE)
 
 # U binds tighter than || in the grammar: the printer keeps the operand
 add_repl_test(ltl_decisions-print_until_operand
@@ -117,7 +116,7 @@ add_repl_test(ltl_decisions-per_literal_guard_realizable
 # tautology is decided on the data
 add_repl_test(ltl_decisions-consistency_cap_is_unknown
 	"set maxsubsets 1. realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))"
-	": T")
+	": T" REQUIRES ltlsynt)
 
 # a binary temporal or negated operand of U is wrapped, so the print
 # re-parses as the same tree
@@ -134,12 +133,12 @@ add_repl_test(ltl_decisions-normalize_keeps_negated_disjunction
 	"normalize !(((o1[t] = 1) until (o2[t] = 1)) || (G (o3[t] = 1)))"
 	"!\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1 \\|\\| \\(always o3\\[t\\]:tau = 1\\)\\)")
 add_repl_test(ltl_decisions-sat_negated_disjunction_F
-	"sat !((!((o1[t] = 1) until (o2[t] = 1))) || (F (o2[t] = 1)))" ": F")
+	"sat !((!((o1[t] = 1) until (o2[t] = 1))) || (F (o2[t] = 1)))" ": F" REQUIRES ltlsynt)
 
 # issue #131: `ltl` takes a formula; a term is rejected instead of aborting
 # on a cvc5 exception (bv) or answering UNREALIZABLE (sbf)
-add_repl_test_fail(ltl_decisions-issue131_bv_term "ltl x:bv[1]" "Invalid formula")
-add_repl_test_fail(ltl_decisions-issue131_bv_constant "ltl 0:bv[1]" "Invalid formula")
-add_repl_test_fail(ltl_decisions-issue131_bv_term_under_G "ltl G x:bv[1]" "Invalid formula")
-add_repl_test_fail(ltl_decisions-issue131_sbf_term "ltl x:sbf" "Invalid formula")
-add_repl_test(ltl_decisions-issue131_bv_formula_control "ltl x:bv[1] = x:bv[1]" "[^N]REALIZABLE")
+add_repl_test(ltl_decisions-issue131_bv_term "ltl x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(ltl_decisions-issue131_bv_constant "ltl 0:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(ltl_decisions-issue131_bv_term_under_G "ltl G x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(ltl_decisions-issue131_sbf_term "ltl x:sbf" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(ltl_decisions-issue131_bv_formula_control "ltl x:bv[1] = x:bv[1]" "[^N]REALIZABLE" REQUIRES ltlsynt)

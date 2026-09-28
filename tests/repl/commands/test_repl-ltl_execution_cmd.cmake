@@ -4,21 +4,14 @@
 # like the other LTL run tests.
 #
 
-include(tau_repl_pack)
+include(add_repl_test)
 
 function(add_ltl_run_test name input pass fail)
-	# Several inputs below annotate with bv[N]; gate them like add_repl_test
-	# does, or a pack without that algebra runs a spec it cannot type.
-	tau_repl_unsupported(_tau_skip "${input}")
-	if(_tau_skip)
-		tau_repl_record_skip("test_repl-ltl_execution-${name}")
-		return()
-	endif()
-	add_test(NAME "test_repl-ltl_execution-${name}"
-		COMMAND bash -c "printf '${input}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-	set_tests_properties("test_repl-ltl_execution-${name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${pass}"
-		FAIL_REGULAR_EXPRESSION "${fail}")
+	# The input carries printf escapes, so the helper pipes the exact bytes.
+	# The helper gates on PACK for a bv[N] annotation in a pack without that
+	# algebra, and on LTLSYNT because `run` needs the synthesized strategy.
+	add_multiline_repl_test(ltl_execution-${name} "${pass}"
+		STDIN "${input}" FAIL_REGEX "${fail}" REQUIRES ltlsynt)
 endfunction()
 
 # the strategy takes its initial transition once: o2 alternates from step 0

@@ -28,24 +28,15 @@ foreach(opt maxsplits maxrounds decisionpins fixpointsteps flagsteps squeezecap
 endforeach()
 
 # bv declares blastdepth as its own option, so bare `get` lists it after the
-# core options as bv-blastdepth. The command below is plain "get", so the gate
-# is applied by hand against a probe string naming bv.
-tau_repl_unsupported(_tau_skip "get bv-blastdepth")
-if(_tau_skip)
-	tau_repl_record_skip("get_cmd-all_lists_bv-blastdepth")
-else()
-	add_repl_test(get_cmd-all_lists_bv-blastdepth "get" "bv-blastdepth: ")
-endif()
+# core options as bv-blastdepth. The command is plain "get", so the pack gate
+# names bv through REQUIRES.
+add_repl_test(get_cmd-all_lists_bv-blastdepth "get" "bv-blastdepth: " REQUIRES bv)
 
 # bv declares case-split-max-tests as its own option, so bare `get` lists it
-# after the core options as bv-case-split-max-tests. Gated by hand the same
-# way as bv-blastdepth above.
-tau_repl_unsupported(_tau_skip "get bv-case-split-max-tests")
-if(_tau_skip)
-	tau_repl_record_skip("get_cmd-all_lists_bv-case-split-max-tests")
-else()
-	add_repl_test(get_cmd-all_lists_bv-case-split-max-tests "get" "bv-case-split-max-tests: ")
-endif()
+# after the core options as bv-case-split-max-tests. Same REQUIRES gate as
+# bv-blastdepth above.
+add_repl_test(get_cmd-all_lists_bv-case-split-max-tests "get"
+	"bv-case-split-max-tests: " REQUIRES bv)
 
 # LT-17 / LG-27: the two Batch-O3 caps ship FINITE (4096); 0 opts back into
 # unlimited/unbounded, same shape as the SO-1 temporal caps above.
@@ -82,15 +73,9 @@ add_repl_test(get_cmd-specsizewarn_off_roundtrip
 # Both knobs are listed by bare `get` and readable on their own; the mode is
 # off by default and the width cap defaults to 1024 (a hard ceiling, printed
 # as a plain number: unlike the limits above, 0 is never a valid value).
-# The bare-`get` cases below name no BA in their own command text, so they are
-# gated by hand the same way as bv-blastdepth above.
-tau_repl_unsupported(_tau_skip "get bv-widening")
-if(_tau_skip)
-	tau_repl_record_skip("get_cmd-all_lists_bv-widening")
-	tau_repl_record_skip("get_cmd-all_lists_bv-max-width")
-else()
-	add_repl_test(get_cmd-all_lists_bv-widening "get" "bv-widening: *off")
-	add_repl_test(get_cmd-all_lists_bv-max-width "get" "bv-max-width: *1024")
-endif()
+# The bare-`get` cases below name no BA in their own command text, so the pack
+# gate names bv through REQUIRES.
+add_repl_test(get_cmd-all_lists_bv-widening "get" "bv-widening: *off" REQUIRES bv)
+add_repl_test(get_cmd-all_lists_bv-max-width "get" "bv-max-width: *1024" REQUIRES bv)
 add_repl_test(get_cmd-bv-widening "get bv-widening" "bv-widening: *off")
 add_repl_test(get_cmd-bv-max-width "get bv-max-width" "bv-max-width: *1024")

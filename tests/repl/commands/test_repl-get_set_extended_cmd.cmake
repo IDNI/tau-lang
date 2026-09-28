@@ -32,7 +32,7 @@ add_repl_test(set_cmd-benchmarks_on  "set benchmarks on"  "on")
 add_repl_test(set_cmd-benchmarks_off "set benchmarks off" "off")
 
 # invalid severity value
-add_repl_test_fail(set_cmd-severity_invalid "set severity foobar" "Invalid severity value")
+add_repl_test(set_cmd-severity_invalid "set severity foobar" "Invalid severity value" NO_FAIL_REGEX)
 
 # get with equals-sign syntax
 add_repl_test(set_cmd-status_equals "set status = off" "off")
@@ -46,7 +46,7 @@ add_repl_test(get_cmd-ltlalg            "get ltlalg"            "ltlalg: *auto")
 add_repl_test(set_cmd-ltlalg_b          "set ltlalg B"          "ltlalg: *B")
 add_repl_test(set_cmd-ltlalg_lowercase  "set ltlalg d"          "ltlalg: *D")
 add_repl_test(set_cmd-ltlalg_auto       "set ltlalg B. set ltlalg auto. get ltlalg" "ltlalg: *auto")
-add_repl_test_fail(set_cmd-ltlalg_invalid "set ltlalg C"      "expected A, B, D or auto")
+add_repl_test(set_cmd-ltlalg_invalid "set ltlalg C"      "expected A, B, D or auto" NO_FAIL_REGEX)
 add_repl_test(get_cmd-ltlqemaxvars      "get ltlqemaxvars"      "ltlqemaxvars: *2")
 add_repl_test(set_cmd-ltlqemaxvars      "set ltlqemaxvars 3"    "ltlqemaxvars: *3")
 add_repl_test(get_cmd-ltlhoamaxstates   "get ltlhoamaxstates"   "ltlhoamaxstates: *4194304")

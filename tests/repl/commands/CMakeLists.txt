@@ -114,8 +114,8 @@ include(test_repl-compile_verb.cmake)
 
 # The Spot store package's bin dir, for every REPL case defined above. CTest
 # has no per-directory environment, and these cases are registered directly
-# through add_test(), so each test's existing ENVIRONMENT (TAU_EMULATOR on a
-# cross build) is extended rather than replaced.
+# through add_test(), so each test's existing ENVIRONMENT is extended rather
+# than replaced.
 if(TAU_SPOT_BIN)
 	get_property(_tau_repl_tests DIRECTORY PROPERTY TESTS)
 	foreach(_tau_repl_test ${_tau_repl_tests})

@@ -13,7 +13,7 @@ add_repl_test(substitution_cmd_bf2 "ax ^ bx'. y&z. s %1[x / %2]" ": ayz\\^b&\\(y
 
 add_repl_test(substitution_cmd_bf5 "(x | (w & z)) & z. b. s %1[ z / %2]" ": \\(x|wb\\)b")
 
-add_repl_test_fail(substitution_cmd_bf6 "x & y. T. s %1[x / %2]" "Invalid argument")
+add_repl_test(substitution_cmd_bf6 "x & y. T. s %1[x / %2]" "Invalid argument" NO_FAIL_REGEX)
 
 # WFF Substitution
 
@@ -27,7 +27,7 @@ add_repl_test(substitution_cmd_wff4 "ex x x=0 && y=0. x=0. s %1[y=0 / %2]" ": ex
 
 add_repl_test(substitution_cmd_wff6 "(x=0 || (w=0 && z=0)) && z=0. b=0. s %1[z=0 / %2]" ": \\(x=0 || w=0 && b=0\\) && b=0")
 
-add_repl_test_fail(substitution_cmd_wff7 "x=0 && y=0. 0. s %1[x=0 / %2]" "Argument has a wrong type")
+add_repl_test(substitution_cmd_wff7 "x=0 && y=0. 0. s %1[x=0 / %2]" "Argument has a wrong type" NO_FAIL_REGEX)
 
 add_repl_test(substitution_cmd_wff8 "s (ex x x=0 && y=0) && x=0 [y=0/x=0]" ": \\(ex b1 b1 = 0 && x = 0\\) && x = 0")
 
@@ -40,9 +40,9 @@ add_repl_test(substitution_cmd_wff11 "s ex x ex x x=0 && y=0 [y=0/x=0]" ": ex b2
 
 add_repl_test(substitution_cmd_wff12 "s (ex x x=0 && y=0) && x=0 [y/x]" ": \\(ex b1 b1 = 0 && x = 0\\) && x = 0")
 
-add_repl_test_fail(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "Invalid argument")
+add_repl_test(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "Invalid argument" NO_FAIL_REGEX)
 
-add_repl_test_fail(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "Invalid argument")
+add_repl_test(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "Invalid argument" NO_FAIL_REGEX)
 
 # Substituting into the result of another command
 #
@@ -136,16 +136,16 @@ add_repl_test(substitution_cmd_multi_mixed
 	"s x = 0 && a != 0 [x = 0 / y = 0, a / b]" ": y = 0 && b != 0")
 
 # A repeated match pattern is rejected instead of silently picking one
-add_repl_test_fail(substitution_cmd_multi_duplicate
-	"s x | y [x / a, x / b]" "[Dd]uplicate")
+add_repl_test(substitution_cmd_multi_duplicate
+	"s x | y [x / a, x / b]" "[Dd]uplicate" NO_FAIL_REGEX)
 
 # A type error in any pair rejects the whole command
-add_repl_test_fail(substitution_cmd_multi_badtype
-	"s x = 0 && y = 0 [x = 0 / a = 0, y = 0 / b]" "Invalid argument")
+add_repl_test(substitution_cmd_multi_badtype
+	"s x = 0 && y = 0 [x = 0 / a = 0, y = 0 / b]" "Invalid argument" NO_FAIL_REGEX)
 
 # A bf input cannot take a wff pair, even as a later pair
-add_repl_test_fail(substitution_cmd_multi_bf_wffpair
-	"s x | y [x / a, y = 0 / b = 0]" "wrong type")
+add_repl_test(substitution_cmd_multi_bf_wffpair
+	"s x | y [x / a, y = 0 / b = 0]" "wrong type" NO_FAIL_REGEX)
 
 # Type safety
 #
@@ -157,25 +157,25 @@ add_repl_test_fail(substitution_cmd_multi_bf_wffpair
 # annotations are rejected.
 
 # Replacing an sbf subterm by a bv one is rejected
-add_repl_test_fail(substitution_cmd_type_mismatch_sbf_bv
-	"s x:sbf & y:sbf = 0 [x:sbf / z:bv[16]]" "not well-typed")
+add_repl_test(substitution_cmd_type_mismatch_sbf_bv
+	"s x:sbf & y:sbf = 0 [x:sbf / z:bv[16]]" "not well-typed" NO_FAIL_REGEX)
 
 # Mismatched bitvector widths are rejected
-add_repl_test_fail(substitution_cmd_type_mismatch_bv_widths
-	"s x:bv[8] + y:bv[8] = 0 [x:bv[8] / z:bv[16]]" "not well-typed")
+add_repl_test(substitution_cmd_type_mismatch_bv_widths
+	"s x:bv[8] + y:bv[8] = 0 [x:bv[8] / z:bv[16]]" "not well-typed" NO_FAIL_REGEX)
 
 # An untyped input carries the default type, so a bv replacement conflicts
-add_repl_test_fail(substitution_cmd_type_mismatch_untyped_bv
-	"s x & y [x / z:bv[16]]" "not well-typed")
+add_repl_test(substitution_cmd_type_mismatch_untyped_bv
+	"s x & y [x / z:bv[16]]" "not well-typed" NO_FAIL_REGEX)
 
 # In a multi-pair command a single mismatching pair rejects the whole command
-add_repl_test_fail(substitution_cmd_type_mismatch_multi
+add_repl_test(substitution_cmd_type_mismatch_multi
 	"s x:bv[8] + y:bv[8] = 0 [x:bv[8] / z:bv[8], y:bv[8] / w:bv[16]]"
-	"not well-typed")
+	"not well-typed" NO_FAIL_REGEX)
 
 # inst delegates to subst and is protected identically
-add_repl_test_fail(substitution_cmd_type_mismatch_inst
-	"i x:bv[8] + y:bv[8] = 0 [x:bv[8] / z:bv[16]]" "not well-typed")
+add_repl_test(substitution_cmd_type_mismatch_inst
+	"i x:bv[8] + y:bv[8] = 0 [x:bv[8] / z:bv[16]]" "not well-typed" NO_FAIL_REGEX)
 
 # Controls: well-typed substitutions keep working
 add_repl_test(substitution_cmd_type_ok_sbf
@@ -204,8 +204,8 @@ add_repl_test(substitution_cmd_no_match_multi_applies
 # a pattern annotated with a type conflicting with the input's use of the
 # same variable never reaches substitution: the command line is inferred as
 # one tree first and rejected loudly there (not a silent no-op)
-add_repl_test_fail(substitution_cmd_no_match_wrong_type
-	"s x:sbf & y:sbf = 0 [x:bv[8] / z:bv[8]]" "Incompatible type")
+add_repl_test(substitution_cmd_no_match_wrong_type
+	"s x:sbf & y:sbf = 0 [x:bv[8] / z:bv[8]]" "Incompatible type" NO_FAIL_REGEX)
 
 # An input that cannot be type-inferred at all (bitvector arithmetic without
 # width annotations) is matched as parsed, so unannotated patterns substitute
@@ -237,8 +237,8 @@ add_repl_test(substitution_cmd_groups_wff
 # for), but a duplicate inside one group is still an error
 add_repl_test(substitution_cmd_groups_repeat_across
 	"s a | c [a / b] [a / d]" ": b\\|c")
-add_repl_test_fail(substitution_cmd_groups_dup_within
-	"s x | y [x / a, x / b] [y / c]" "[Dd]uplicate")
+add_repl_test(substitution_cmd_groups_dup_within
+	"s x | y [x / a, x / b] [y / c]" "[Dd]uplicate" NO_FAIL_REGEX)
 
 # a later group matches against the intermediate result, so a pattern the
 # earlier group consumed is reported as unmatched
@@ -246,8 +246,8 @@ add_repl_test(substitution_cmd_groups_stage_warn
 	"s a | c [a / b] [a / d]" "did not match")
 
 # type safety applies at every stage
-add_repl_test_fail(substitution_cmd_groups_type
-	"s x:sbf & y:sbf = 0 [x:sbf / z] [z / w:bv[8]]" "not well-typed")
+add_repl_test(substitution_cmd_groups_type
+	"s x:sbf & y:sbf = 0 [x:sbf / z] [z / w:bv[8]]" "not well-typed" NO_FAIL_REGEX)
 
 # a fully unannotated pattern matches modulo types, so a later group can
 # rewrite the z the first group introduced into an sbf context even though a

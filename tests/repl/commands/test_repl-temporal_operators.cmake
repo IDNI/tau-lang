@@ -51,7 +51,7 @@ add_repl_test(temporal_ops-sat_diamond "sat <> o1[t] = 1" ": T")
 add_repl_test(temporal_ops-valid_brackets "valid [] (o1[t] | o1[t]' = 1)" ": T")
 add_repl_test(temporal_ops-unsat_diamond "unsat <> (o1[t] = 1 && o1[t] = 0)" ": T")
 add_repl_test(temporal_ops-realizable_G "realizable G (o1[t] = 1)" ": T")
-add_repl_test(temporal_ops-unrealizable_F_input "unrealizable F (i1[t] = 1)" ": T")
+add_repl_test(temporal_ops-unrealizable_F_input "unrealizable F (i1[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(temporal_ops-normalize_brackets_prints_always
 	"normalize [] (o1[t] = 1 && o1[t] = 1)" "always o1\\[t\\]:tau' = 0")
 add_repl_test(temporal_ops-normalize_diamond_prints_F
@@ -59,20 +59,20 @@ add_repl_test(temporal_ops-normalize_diamond_prints_F
 
 # ── the binary operators through the deciding commands ──────────────────────
 
-add_repl_test(temporal_ops-realizable_until "realizable (o1[t] = 0) until (o1[t] = 1)" ": T")
-add_repl_test(temporal_ops-realizable_release "realizable (o1[t] = 1) release (o1[t] = 0)" ": T")
-add_repl_test(temporal_ops-realizable_weak_until "realizable (o1[t] = 0) weak_until (o1[t] = 1)" ": T")
-add_repl_test(temporal_ops-realizable_since "realizable (o1[t] = 1) since (o1[t] = 0)" ": T")
-add_repl_test(temporal_ops-realizable_trigger "realizable (o1[t] = 1) trigger (o1[t] = 0)" ": T")
-add_repl_test(temporal_ops-realizable_G_until "realizable G ((o1[t] = 0) until (o1[t] = 1))" ": T")
+add_repl_test(temporal_ops-realizable_until "realizable (o1[t] = 0) until (o1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_release "realizable (o1[t] = 1) release (o1[t] = 0)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_weak_until "realizable (o1[t] = 0) weak_until (o1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_since "realizable (o1[t] = 1) since (o1[t] = 0)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_trigger "realizable (o1[t] = 1) trigger (o1[t] = 0)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_G_until "realizable G ((o1[t] = 0) until (o1[t] = 1))" ": T" REQUIRES ltlsynt)
 
 # an input on the right of a strong operator cannot be forced; the weak
 # one is satisfied by holding the left side forever
-add_repl_test(temporal_ops-unrealizable_until_input "unrealizable (o1[t] = 0) until (i1[t] = 1)" ": T")
-add_repl_test(temporal_ops-unrealizable_release_input "unrealizable (o1[t] = 1) release (i1[t] = 1)" ": T")
-add_repl_test(temporal_ops-unrealizable_since_input "unrealizable (o1[t] = 1) since (i1[t] = 1)" ": T")
-add_repl_test(temporal_ops-unrealizable_trigger_input "unrealizable (o1[t] = 1) trigger (i1[t] = 1)" ": T")
-add_repl_test(temporal_ops-realizable_weak_until_input "realizable (o1[t] = 1) weak_until (i1[t] = 1)" ": T")
+add_repl_test(temporal_ops-unrealizable_until_input "unrealizable (o1[t] = 0) until (i1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-unrealizable_release_input "unrealizable (o1[t] = 1) release (i1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-unrealizable_since_input "unrealizable (o1[t] = 1) since (i1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-unrealizable_trigger_input "unrealizable (o1[t] = 1) trigger (i1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-realizable_weak_until_input "realizable (o1[t] = 1) weak_until (i1[t] = 1)" ": T" REQUIRES ltlsynt)
 
 # normalize keeps each binary operator and prints its letter
 add_repl_test(temporal_ops-normalize_until_prints_U
@@ -89,27 +89,27 @@ add_repl_test(temporal_ops-normalize_trigger_prints_T
 # ── the CTL* path quantifiers A and E ───────────────────────────────────────
 
 # the default fragment rejects them
-add_repl_test_fail(temporal_ops-sat_A_rejected_by_default
-	"sat A (G (o1[t] = 1))" "require the ctl_star")
-add_repl_test_fail(temporal_ops-sat_E_rejected_by_default
-	"sat E (F (o1[t] = 1))" "require the ctl_star")
+add_repl_test(temporal_ops-sat_A_rejected_by_default
+	"sat A (G (o1[t] = 1))" "require the ctl_star" NO_FAIL_REGEX)
+add_repl_test(temporal_ops-sat_E_rejected_by_default
+	"sat E (F (o1[t] = 1))" "require the ctl_star" NO_FAIL_REGEX)
 
 # every prefix spelling under A and E
 add_repl_test(temporal_ops-sat_A_brackets_output "fragment ctl_star. sat A ([] o1[t] = 1)" ": T")
 add_repl_test(temporal_ops-sat_A_G_output "fragment ctl_star. sat A (G (o1[t] = 1))" ": T")
 add_repl_test(temporal_ops-sat_A_sometimes_output "fragment ctl_star. sat A (sometimes o1[t] = 1)" ": T")
 add_repl_test(temporal_ops-sat_A_diamond_input "fragment ctl_star. sat A (<> i1[t] = 1)" ": F")
-add_repl_test(temporal_ops-sat_E_diamond_output "fragment ctl_star. sat E (<> o1[t] = 1)" ": T")
-add_repl_test(temporal_ops-sat_E_F_output "fragment ctl_star. sat E (F (o1[t] = 1))" ": T")
-add_repl_test(temporal_ops-sat_E_always_output "fragment ctl_star. sat E (always o1[t] = 1)" ": T")
+add_repl_test(temporal_ops-sat_E_diamond_output "fragment ctl_star. sat E (<> o1[t] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_E_F_output "fragment ctl_star. sat E (F (o1[t] = 1))" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_E_always_output "fragment ctl_star. sat E (always o1[t] = 1)" ": T" REQUIRES ltlsynt)
 
 # every binary operator under A and E
-add_repl_test(temporal_ops-sat_E_until_output "fragment ctl_star. sat E ((o1[t] = 0) until (o1[t] = 1))" ": T")
-add_repl_test(temporal_ops-sat_A_until_input "fragment ctl_star. sat A ((o1[t] = 0) until (i1[t] = 1))" ": F")
-add_repl_test(temporal_ops-sat_A_release_output "fragment ctl_star. sat A ((o1[t] = 1) release (o1[t] = 0))" ": T")
-add_repl_test(temporal_ops-sat_A_weak_until_input "fragment ctl_star. sat A ((o1[t] = 1) weak_until (i1[t] = 1))" ": T")
-add_repl_test(temporal_ops-sat_E_since_output "fragment ctl_star. sat E ((o1[t] = 1) since (o1[t] = 0))" ": T")
-add_repl_test(temporal_ops-sat_A_trigger_output "fragment ctl_star. sat A ((o1[t] = 1) trigger (o1[t] = 0))" ": T")
+add_repl_test(temporal_ops-sat_E_until_output "fragment ctl_star. sat E ((o1[t] = 0) until (o1[t] = 1))" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_A_until_input "fragment ctl_star. sat A ((o1[t] = 0) until (i1[t] = 1))" ": F" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_A_release_output "fragment ctl_star. sat A ((o1[t] = 1) release (o1[t] = 0))" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_A_weak_until_input "fragment ctl_star. sat A ((o1[t] = 1) weak_until (i1[t] = 1))" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_E_since_output "fragment ctl_star. sat E ((o1[t] = 1) since (o1[t] = 0))" ": T" REQUIRES ltlsynt)
+add_repl_test(temporal_ops-sat_A_trigger_output "fragment ctl_star. sat A ((o1[t] = 1) trigger (o1[t] = 0))" ": T" REQUIRES ltlsynt)
 
 # normalize and whatis keep the path quantifier
 add_repl_test(temporal_ops-normalize_A_prints_A_always

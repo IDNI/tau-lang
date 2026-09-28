@@ -7,8 +7,8 @@
 # command -- which is what the eval_cmd clear arm has to guarantee.
 #
 
-add_test(NAME "test_repl-clear_cmd"
-	COMMAND bash -c "printf 'clear\\nversion\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-clear_cmd" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Tau Language Framework"
-	FAIL_REGULAR_EXPRESSION "Error")
+include(add_repl_test)
+
+add_multiline_repl_test(clear_cmd
+	"Tau Language Framework"
+	STDIN "clear\\nversion\\nq\\n")

@@ -1,94 +1,153 @@
 include(tau_repl_pack)
 
-# include(add_repl_test) to use new tree
+# The options of every helper here that checks the output of tau.
+set(TAU_REPL_CHECK_OPTIONS NO_FAIL_REGEX)
+set(TAU_REPL_CHECK_ONE_VALUE TIMEOUT)
+set(TAU_REPL_CHECK_MULTI_VALUE ENV FAIL_REGEX REQUIRES)
 
-# A ltlsynt or hostfs case cannot run in the browser REPL page, but the browser
-# suite reads the node build's registration, where those cases are present; the
-# property carries the skip over to the browser instead of dropping the case.
-function(tau_repl_mark_browser_skip test_name requires)
-	if(requires)
-		set_tests_properties("${test_name}" PROPERTIES TAU_BROWSER_SKIP "${requires}")
+# The epilogue of a helper that checks the output of tau, over the _tau_<OPTION>
+# values its cmake_parse_arguments sets. The fail pattern is "Error" unless
+# FAIL_REGEX replaces it or NO_FAIL_REGEX drops it.
+function(tau_repl_check_case test regex)
+	if(_tau_FAIL_REGEX AND _tau_NO_FAIL_REGEX)
+		message(FATAL_ERROR "${test}: FAIL_REGEX and NO_FAIL_REGEX exclude each other")
 	endif()
-endfunction()
-function(add_repl_test test_name test_cmd test_regex)
-	tau_repl_unsupported(_tau_skip "${test_cmd}")
-	if(_tau_skip)
-		tau_repl_record_skip("${test_name}")
-		return()
+	if(NOT "${regex}" STREQUAL "")
+		set_tests_properties("${test}" PROPERTIES PASS_REGULAR_EXPRESSION "${regex}")
 	endif()
-	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"${test_cmd}\" -S trace")
-	set_tests_properties("test_repl-${test_name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${test_regex}"
-		FAIL_REGULAR_EXPRESSION "Error"
-	)
-	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
-endfunction()
-
-function(add_repl_test_fail test_name test_cmd test_regex)
-	tau_repl_unsupported(_tau_skip "${test_cmd}")
-	if(_tau_skip)
-		tau_repl_record_skip("${test_name}")
-		return()
+	if(_tau_FAIL_REGEX)
+		set_tests_properties("${test}" PROPERTIES FAIL_REGULAR_EXPRESSION "${_tau_FAIL_REGEX}")
+	elseif(NOT _tau_NO_FAIL_REGEX)
+		set_tests_properties("${test}" PROPERTIES FAIL_REGULAR_EXPRESSION "Error")
 	endif()
-	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"${test_cmd}\" -S trace")
-	set_tests_properties("test_repl-${test_name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${test_regex}"
-	)
-	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
-endfunction()
-
-function(add_echo_repl_test test_name test_cmd test_regex)
-	tau_repl_unsupported(_tau_skip "${test_cmd}")
-	if(_tau_skip)
-		tau_repl_record_skip("${test_name}")
-		return()
+	if(_tau_TIMEOUT)
+		set_tests_properties("${test}" PROPERTIES TIMEOUT "${_tau_TIMEOUT}")
 	endif()
-	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "echo \"${test_cmd}. q\" | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-	set_tests_properties("test_repl-${test_name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${test_regex}"
-		FAIL_REGULAR_EXPRESSION "Error"
-	)
-	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
+	# The browser suite reads the node build's registration, where a ltlsynt
+	# or hostfs case is present, so the property carries its skip over. It
+	# cannot reproduce the process environment of an ENV case either.
+	set(_browser_skip "")
+	if(_tau_ENV)
+		set_tests_properties("${test}" PROPERTIES ENVIRONMENT "${_tau_ENV}")
+		list(APPEND _browser_skip env)
+	endif()
+	foreach(_need ${_tau_REQUIRES})
+		if(_need MATCHES "^(ltlsynt|hostfs)$")
+			list(APPEND _browser_skip ${_need})
+		endif()
+	endforeach()
+	if(_browser_skip)
+		set_tests_properties("${test}" PROPERTIES TAU_BROWSER_SKIP "${_browser_skip}")
+	endif()
+	tau_repl_disable_skipped("${test}")
 endfunction()
 
-function(add_echo_repl_test_fail test_name test_cmd test_regex)
-	tau_repl_unsupported(_tau_skip "${test_cmd}")
-	if(_tau_skip)
-		tau_repl_record_skip("${test_name}")
-		return()
-	endif()
-	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "echo \"${test_cmd}. q\" | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-	set_tests_properties("test_repl-${test_name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${test_regex}"
-	)
-	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
+# Case strings escape quotes for `bash -c "..."` (`\"`). A direct argv must
+# see bare quotes, or Tau parses `file(\"` as a backslash.
+function(tau_repl_unescape_quotes out cmd)
+	string(REPLACE "\\\"" "\"" _cmd "${cmd}")
+	set(${out} "${_cmd}" PARENT_SCOPE)
 endfunction()
 
-# add_multiline_repl_test(<test_name> <test_regex> <line1> [<line2> ...])
+# add_repl_test(<name> <cmd> <regex> [FLAGS <arg>...] [NO_TRACE]
+#     [ENV <VAR=value>...] [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
+#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
 #
-# add_echo_repl_test pipes a single "<cmd>. q" line via `echo`, so it cannot
-# carry an embedded newline: every command in it lands in ONE parse. Use this
-# helper instead for a case that needs each argument on its OWN REPL line
-# (e.g. a `type` declaration on one line whose effect a LATER, separately
-# parsed line must see). Each of <line1>... is piped, one per line, via
-# `printf` into `tau -X` (interactive mode, like commands/test_repl-adt.cmake's
-# other raw printf-driven add_test entries, e.g. its lines 176/203/255/265/302),
-# followed by a trailing `q` to exit cleanly. Argument order is
-# (name, regex, lines...) -- unlike
-# add_repl_test/add_echo_repl_test's (name, cmd, regex) -- since CMake's
-# variadic tail (ARGN) must come last in the parameter list.
+# Runs `tau <flags> -e "<cmd>" -S trace`. NO_TRACE drops `-S trace`.
+function(add_repl_test test_name test_cmd test_regex)
+	cmake_parse_arguments(PARSE_ARGV 3 _tau "NO_TRACE;${TAU_REPL_CHECK_OPTIONS}"
+		"${TAU_REPL_CHECK_ONE_VALUE}" "FLAGS;${TAU_REPL_CHECK_MULTI_VALUE}")
+	tau_repl_gate_case("test_repl-${test_name}" test_cmd)
+	set(_trace -S trace)
+	if(_tau_NO_TRACE)
+		set(_trace "")
+	endif()
+	if(WIN32)
+		tau_repl_unescape_quotes(_cmd "${test_cmd}")
+		add_test(NAME "test_repl-${test_name}"
+			COMMAND ${TAU_LAUNCHER} ${_tau_FLAGS} -e "${_cmd}" ${_trace})
+	else()
+		string(JOIN " " _line "${TAU_RUN}" ${_tau_FLAGS} -e "\"${test_cmd}\"" ${_trace})
+		add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${_line}")
+	endif()
+	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
+endfunction()
+
+# add_echo_repl_test(<name> <cmd> <regex> [ENV <VAR=value>...]
+#     [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
+#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
+#
+# Pipes the single line "<cmd>. q" into the interactive REPL.
+function(add_echo_repl_test test_name test_cmd test_regex)
+	cmake_parse_arguments(PARSE_ARGV 3 _tau "${TAU_REPL_CHECK_OPTIONS}"
+		"${TAU_REPL_CHECK_ONE_VALUE}" "${TAU_REPL_CHECK_MULTI_VALUE}")
+	tau_repl_gate_case("test_repl-${test_name}" test_cmd)
+	if(WIN32)
+		tau_repl_unescape_quotes(_cmd "${test_cmd}")
+		add_test(NAME "test_repl-${test_name}"
+			COMMAND powershell -NoProfile -Command
+				"& { '${_cmd}. q' | & '${TAU_LAUNCHER}' }")
+	else()
+		add_test(NAME "test_repl-${test_name}"
+			COMMAND bash -c "echo \"${test_cmd}. q\" | ${TAU_RUN}")
+	endif()
+	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
+endfunction()
+
+# add_multiline_repl_test(<name> <regex> <line1> [<line2> ...]
+#     [STDIN <printf-payload>] [FLAGS <arg>...] [NO_X] [X_FIRST]
+#     [ENV <VAR=value>...] [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
+#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
+#
+# Pipes each line argument into `tau <flags> -X` as one REPL line, then a
+# trailing `q`, so a later line sees the effect of an earlier one. A case
+# that needs its exact stdin bytes passes STDIN instead of lines. NO_X drops
+# the legacy-REPL `-X` for a case that reads a spec from stdin, and X_FIRST
+# puts `-X` before the flags.
 function(add_multiline_repl_test test_name test_regex)
-	set(lines ${ARGN})
-	string(REPLACE ";" "\\n" joined_lines "${lines}")
-	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "printf '${joined_lines}\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-	set_tests_properties("test_repl-${test_name}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${test_regex}"
-		FAIL_REGULAR_EXPRESSION "Error"
-	)
-	tau_repl_mark_browser_skip("test_repl-${test_name}" "${_tau_requires}")
+	cmake_parse_arguments(PARSE_ARGV 2 _tau "NO_X;X_FIRST;${TAU_REPL_CHECK_OPTIONS}"
+		"STDIN;${TAU_REPL_CHECK_ONE_VALUE}" "FLAGS;${TAU_REPL_CHECK_MULTI_VALUE}")
+	if(_tau_STDIN)
+		set(_payload "${_tau_STDIN}")
+	else()
+		string(REPLACE ";" "\\n" _payload "${_tau_UNPARSED_ARGUMENTS}\\nq\\n")
+		set(_tau_UNPARSED_ARGUMENTS "")
+	endif()
+	tau_repl_gate_case("test_repl-${test_name}" _payload)
+	set(_args ${_tau_FLAGS})
+	if(NOT _tau_NO_X)
+		if(_tau_X_FIRST)
+			list(PREPEND _args -X)
+		else()
+			list(APPEND _args -X)
+		endif()
+	endif()
+	if(WIN32)
+		# PowerShell needs real newlines. It doubles a single quote inside a
+		# single-quoted string.
+		string(REPLACE "\\n" "\n" _ps_stdin "${_payload}")
+		string(REPLACE "'" "''" _ps_stdin "${_ps_stdin}")
+		string(JOIN " " _ps_args ${_args})
+		add_test(NAME "test_repl-${test_name}"
+			COMMAND powershell -NoProfile -Command
+				"& { '${_ps_stdin}' | & '${TAU_LAUNCHER}' ${_ps_args} }")
+	else()
+		string(JOIN " " _line "printf '${_payload}' |" "${TAU_RUN}" ${_args})
+		add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${_line}")
+	endif()
+	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
+endfunction()
+
+# add_raw_repl_test(<name> <command> <regex> [ENV <VAR=value>...]
+#     [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
+#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
+#
+# Runs `bash -c "<command>"`, for a case whose command line is not the shape
+# the other helpers build. An empty <regex> sets no pass pattern. POSIX only.
+function(add_raw_repl_test test_name command test_regex)
+	cmake_parse_arguments(PARSE_ARGV 3 _tau "${TAU_REPL_CHECK_OPTIONS}"
+		"${TAU_REPL_CHECK_ONE_VALUE}" "${TAU_REPL_CHECK_MULTI_VALUE}")
+	tau_repl_gate_case("test_repl-${test_name}" command)
+	add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${command}")
+	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
 endfunction()

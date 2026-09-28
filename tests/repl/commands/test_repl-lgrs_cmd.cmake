@@ -26,12 +26,12 @@ add_repl_test(lgrs_cmd-sbf_two_vars "lgrs x:sbf | y:sbf = 0"
 add_repl_test(lgrs_cmd-untyped_zero "lgrs x = 0" "x := \\{ F \\}:tau")
 
 # the non-Boolean screen is what was indexing the wrong node, so pin the
-# rejection it is there for (add_repl_test_fail: the expected output itself
-# contains "Error")
-add_repl_test_fail(lgrs_cmd-non_boolean
+# rejection it guards. This case needs NO_FAIL_REGEX, because the expected
+# output itself contains "Error".
+add_repl_test(lgrs_cmd-non_boolean
 	"lgrs x:bv[16] + y:bv[16] = { 0 }:bv[16]"
-	"Found non-Boolean operation in equation")
+	"Found non-Boolean operation in equation" NO_FAIL_REGEX)
 
 # lgrs takes an equation: a term argument is rejected instead of the whole
 # line being stored as a term (`lgrs x` used to print `%1: lgrsx`)
-add_repl_test_fail(lgrs_cmd-term_rejected "lgrs x" "Invalid formula")
+add_repl_test(lgrs_cmd-term_rejected "lgrs x" "Invalid formula" NO_FAIL_REGEX)

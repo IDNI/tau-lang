@@ -16,8 +16,8 @@ add_repl_test(history_store_cmd-tau "{T.}" "1")
 # The BA constant parser rejects `x`/`x = 0` for their declared type; the
 # generic "Parsing constant ... failed for type" report (tau_tree.tmpl.h)
 # replaced the old unconditional "Syntax Error" log line.
-add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "failed for type")
-add_repl_test_fail(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "failed for type")
+add_repl_test(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "failed for type" NO_FAIL_REGEX)
+add_repl_test(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "failed for type" NO_FAIL_REGEX)
 
 # history print command
 add_repl_test(history_print_cmd-empty_absolute "history %1" "history is empty")
@@ -28,8 +28,8 @@ add_repl_test(history_print_cmd-non_empty_last "1. T. history %-1" ": 1")
 
 # referencing a history location beyond the stored entries, absolute and
 # relative (the "%N does not exist" report and its TAU_LOG_ERROR companion)
-add_repl_test_fail(history_ref-absolute_missing "1. mnf %5" "does not exist")
-add_repl_test_fail(history_ref-relative_missing "1. dnf %-5" "does not exist")
+add_repl_test(history_ref-absolute_missing "1. mnf %5" "does not exist" NO_FAIL_REGEX)
+add_repl_test(history_ref-relative_missing "1. dnf %-5" "does not exist" NO_FAIL_REGEX)
 
 # bare-statement pretty-printer coverage, migrated from test_tau_tree_printers.cpp
 

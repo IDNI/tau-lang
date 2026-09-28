@@ -9,5 +9,5 @@
 # collect_hoist_conjuncts (ltl_aba_helpers.tmpl.h) refuses the positional
 # atom under F/U/R/W/S/T with this fixed-literal reason; solve_ltl_aba's
 # result<> failure is printed (not thrown) by ltl_to_safety_formula_full.
-add_repl_test_fail(run_cmd-no_crash_on_positional_under_temporal
-	"run F (o1[5]:bv[8] = {1}:bv[8])." "positional atom under")
+add_repl_test(run_cmd-no_crash_on_positional_under_temporal
+	"run F (o1[5]:bv[8] = {1}:bv[8])." "positional atom under" NO_FAIL_REGEX)

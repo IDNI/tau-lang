@@ -5,8 +5,8 @@
 
 include(add_repl_test)
 
-# These tests use add_repl_test (not add_repl_test_fail) so they correctly
-# FAIL until anf/pnf commands are properly implemented.
+# These tests want the default fail regex, so they correctly FAIL until
+# anf/pnf commands exist.
 # Marked WILL_FAIL so CTest reports them as expected failures.
 add_repl_test(anf_cmd-T         "anf T"       ".")
 add_repl_test(anf_cmd-F         "anf F"       ".")

@@ -62,15 +62,15 @@ add_repl_test(valid_cmd-hooks_wff_lt_lteq-02_lteq_expansion          "valid (x <
 # AP1-1: the same normalization failure, reached through valid_spec's
 # is_tau_impl call instead of is_tau_formula_sat. `valid` reports the
 # structured error instead of deciding a verdict.
-add_repl_test_fail(valid_cmd-oscillating_definition
-	"f(x) := f(x)'. valid f(1) = 0" "Definition expansion oscillates")
+add_repl_test(valid_cmd-oscillating_definition
+	"f(x) := f(x)'. valid f(1) = 0" "Definition expansion oscillates" NO_FAIL_REGEX)
 
 # issue #132: `valid` takes a formula; a term is rejected instead of aborting
 # on a cvc5 exception
-add_repl_test_fail(valid_cmd-issue132_bv1_term "valid x:bv[1]" "Invalid formula")
-add_repl_test_fail(valid_cmd-issue132_bv1_constant "valid 0:bv[1]" "Invalid formula")
-add_repl_test_fail(valid_cmd-issue132_bv64_term "valid x:bv[64]" "Invalid formula")
-add_repl_test_fail(valid_cmd-issue132_sbf_term "valid x:sbf" "Invalid formula")
+add_repl_test(valid_cmd-issue132_bv1_term "valid x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_bv1_constant "valid 0:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_bv64_term "valid x:bv[64]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_sbf_term "valid x:sbf" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(valid_cmd-issue132_bv_formula_control "valid x:bv[1] = x:bv[1]" ": T")
 
 # a top-level sometimes is decided, not rejected as a Boolean combination

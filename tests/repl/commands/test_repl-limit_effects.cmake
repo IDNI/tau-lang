@@ -1,3 +1,6 @@
+include(add_repl_test)
+include(tau_repl_pack)
+
 #
 # Limit options changing algorithm behavior (not just set/get round trips).
 # Each give-up branch is driven to fire with a cap of 1 on a workload that
@@ -15,54 +18,49 @@
 # a cap of 1 must give up (loudly) and still terminate. A give-up is no
 # verdict: the query must end in an error, never print `%1: T` or `%1: F`
 # (the partial phi used to be decided as if it were the continuation).
-add_test(NAME "test_repl-limit_effect-fixpointsteps_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 1 -e \"sat always o1[t] = o1[t-2]\" 2>&1")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_giveup" PROPERTIES
-	PASS_REGULAR_EXPRESSION "find_fixpoint_phi: exceeded 1 steps"
-	FAIL_REGULAR_EXPRESSION ": T|: F")
-add_test(NAME "test_repl-limit_effect-fixpointsteps_giveup_is_an_error"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 1 -e \"sat always o1[t] = o1[t-2]\" 2>&1")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_giveup_is_an_error" PROPERTIES
-	PASS_REGULAR_EXPRESSION "gave up before reaching a result")
+add_repl_test(limit_effect-fixpointsteps_giveup
+	"sat always o1[t] = o1[t-2]"
+	"find_fixpoint_phi: exceeded 1 steps" NO_TRACE
+	FLAGS --max-fixpoint-steps 1 FAIL_REGEX ": T|: F")
+add_repl_test(limit_effect-fixpointsteps_giveup_is_an_error
+	"sat always o1[t] = o1[t-2]"
+	"gave up before reaching a result" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-fixpoint-steps 1)
 
 # The verdict memo is keyed on the formula; a budget change between two
 # queries must drop it. With the cap raised back to unlimited the same
 # spec, asked again in the same session, must be decided (`: T`) instead
 # of answered from the first query's give-up.
-add_test(NAME "test_repl-limit_effect-fixpointsteps_memo_dropped_on_change"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set fixpointsteps 1. sat always o1[t] = o1[t-2]. set fixpointsteps 0. sat always o1[t] = o1[t-2]\" 2>&1")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_memo_dropped_on_change" PROPERTIES
-	PASS_REGULAR_EXPRESSION ": T")
+add_repl_test(limit_effect-fixpointsteps_memo_dropped_on_change
+	"set fixpointsteps 1. sat always o1[t] = o1[t-2]. set fixpointsteps 0. sat always o1[t] = o1[t-2]"
+	": T" NO_FAIL_REGEX NO_TRACE)
 
 # This workload needs a handful of steps, so it completes under the
 # shipped cap of 500 without ever reaching it.
-add_test(NAME "test_repl-limit_effect-fixpointsteps_default_completes"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat always o1[t] = o1[t-2]\"")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_default_completes" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "exceeded"
-	PASS_REGULAR_EXPRESSION ": T")
-add_test(NAME "test_repl-limit_effect-fixpointsteps_cli_zero_unlimited"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 0 -e \"get fixpointsteps\"")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_cli_zero_unlimited" PROPERTIES
-	PASS_REGULAR_EXPRESSION "fixpointsteps: *unlimited")
+add_repl_test(limit_effect-fixpointsteps_default_completes
+	"sat always o1[t] = o1[t-2]"
+	": T" NO_TRACE FAIL_REGEX "exceeded")
+add_repl_test(limit_effect-fixpointsteps_cli_zero_unlimited
+	"get fixpointsteps"
+	"fixpointsteps: *unlimited" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-fixpoint-steps 0)
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
-add_test(NAME "test_repl-limit_effect-fixpointsteps_via_set"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set fixpointsteps 1. sat always o1[t] = o1[t-2]\"")
-set_tests_properties("test_repl-limit_effect-fixpointsteps_via_set" PROPERTIES
-	PASS_REGULAR_EXPRESSION "find_fixpoint_phi: exceeded 1 steps")
+add_repl_test(limit_effect-fixpointsteps_via_set
+	"set fixpointsteps 1. sat always o1[t] = o1[t-2]"
+	"find_fixpoint_phi: exceeded 1 steps" NO_FAIL_REGEX NO_TRACE)
 
 # Definition expansion: g needs one pass per nesting level forever.
-add_test(NAME "test_repl-limit_effect-defpasses_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-def-passes 1 -e \"g(x) := h(g(x)). h(x) := x'. normalize g(0)\"")
-set_tests_properties("test_repl-limit_effect-defpasses_giveup" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Definition expansion did not settle after 1 passes")
+add_repl_test(limit_effect-defpasses_giveup
+	"g(x) := h(g(x)). h(x) := x'. normalize g(0)"
+	"Definition expansion did not settle after 1 passes" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-def-passes 1)
 
 # Fixed-point enumeration: the recurrence converges, but not within 1 step.
-add_test(NAME "test_repl-limit_effect-enumsteps_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-enum-steps 1 -e \"g[n](x) := g[n-1](x) || x = 0. g[0](x) := F. normalize g(y)\"")
-set_tests_properties("test_repl-limit_effect-enumsteps_giveup" PROPERTIES
-	PASS_REGULAR_EXPRESSION "no fixed point and no loop after 1 enumeration steps")
+add_repl_test(limit_effect-enumsteps_giveup
+	"g[n](x) := g[n-1](x) || x = 0. g[0](x) := F. normalize g(y)"
+	"no fixed point and no loop after 1 enumeration steps" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-enum-steps 1)
 
 # The untyped saturation probe cap (--max-probe-steps) has no REPL-level
 # effect test: the REPL's call-type validation rejects every type-blocked
@@ -72,17 +70,16 @@ set_tests_properties("test_repl-limit_effect-enumsteps_giveup" PROPERTIES
 # spec-size-warn: any accepted update trips a 1-char threshold. The update
 # stream u takes its value from i1; the interactive run is driven on stdin
 # (-X legacy REPL, the tty-free branch), same pattern as test_repl-run_cmd.
-add_test(NAME "test_repl-limit_effect-specsizewarn_fires"
-	COMMAND bash -c "printf 'run u[t] = i1[t] && o1[t] = 0.\\no1[t] = 0.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X --spec-size-warn 1")
-set_tests_properties("test_repl-limit_effect-specsizewarn_fires" PROPERTIES
-	PASS_REGULAR_EXPRESSION "exceeds the spec-size-warn threshold 1")
+add_multiline_repl_test(limit_effect-specsizewarn_fires
+	"exceeds the spec-size-warn threshold 1"
+	NO_FAIL_REGEX STDIN "run u[t] = i1[t] && o1[t] = 0.\\no1[t] = 0.\\nq\\nq\\n"
+	FLAGS --spec-size-warn 1 X_FIRST)
 
 # And the negative: without the flag (threshold 0 = off) no warning appears.
-add_test(NAME "test_repl-limit_effect-specsizewarn_off_by_default"
-	COMMAND bash -c "printf 'run u[t] = i1[t] && o1[t] = 0.\\no1[t] = 0.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-limit_effect-specsizewarn_off_by_default" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "spec-size-warn threshold"
-	PASS_REGULAR_EXPRESSION "o1\\[0\\] := ")
+add_multiline_repl_test(limit_effect-specsizewarn_off_by_default
+	"o1\\[0\\] := "
+	STDIN "run u[t] = i1[t] && o1[t] = 0.\\no1[t] = 0.\\nq\\nq\\n"
+	FAIL_REGEX "spec-size-warn threshold")
 
 # LT-17: the k-ary consistency-subset walk. Four same-type output atoms with
 # a pairwise-feasible but jointly-infeasible triple {o1|o2=1, o1&o2=0, o1=o2}
@@ -91,42 +88,40 @@ set_tests_properties("test_repl-limit_effect-specsizewarn_off_by_default" PROPER
 # o3=1 is dischargeable at t=0, and D3 = skip+log means a fired cap is at
 # worst a false UNREALIZABLE, never an error). Needs a live ltlsynt on PATH
 # (same as the other `sat`-on-full-LTL tests).
-add_test(NAME "test_repl-limit_effect-maxsubsets_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_giveup" PROPERTIES
-	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
+add_repl_test(limit_effect-maxsubsets_giveup
+	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
+	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
 
 # The cap only skips eager forbids; the per-edge oracle still refines the
 # chosen strategy afterward, so the verdict stays the true T even on the
 # spec that used to hit the capped-walk worst case.
-add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_recovered"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_recovered" PROPERTIES
-	PASS_REGULAR_EXPRESSION ": T")
+add_repl_test(limit_effect-maxsubsets_capped_verdict_recovered
+	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
+	": T" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
 
 # Correctness pin: when the skipped subsets are all feasible there was no
 # forbid to miss, so the capped verdict is provably unchanged -- the warning
 # fires and the answer is still T. Two tests on the same command line: a
 # single regex bridging both markers is the pinned ctest-backtracking trap.
-add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_correct"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_correct" PROPERTIES
-	PASS_REGULAR_EXPRESSION ": T")
-add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_correct_warns"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_correct_warns" PROPERTIES
-	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
+add_repl_test(limit_effect-maxsubsets_capped_verdict_correct
+	"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))"
+	": T" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
+add_repl_test(limit_effect-maxsubsets_capped_verdict_correct_warns
+	"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))"
+	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
+	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
 
 # Under the shipped default (4096) the same workload completes silently
 # with the same verdict.
-add_test(NAME "test_repl-limit_effect-maxsubsets_default_completes"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_default_completes" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "consistency walk capped"
-	PASS_REGULAR_EXPRESSION ": T")
+add_repl_test(limit_effect-maxsubsets_default_completes
+	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
+	": T" NO_TRACE FAIL_REGEX "consistency walk capped" REQUIRES ltlsynt)
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
-add_test(NAME "test_repl-limit_effect-maxsubsets_via_set"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set maxsubsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_via_set" PROPERTIES
-	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
+add_repl_test(limit_effect-maxsubsets_via_set
+	"set maxsubsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
+	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
+	REQUIRES ltlsynt)

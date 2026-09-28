@@ -35,10 +35,10 @@ add_repl_test(option_alias-benchmarking "get benchmarking" "benchmarks:")
 # that get_opt resolved the alias to debug_opt rather than falling through to
 # its invalid_opt arm.
 #
-# RE-2 (FIXED): that release answer used to be logged at ERROR level, which is
-# why these three needed add_repl_test_fail. Answering a query about an option
-# this build does not carry is not an error condition, so it is reported at
-# info level now and the plain helper -- which fails on "Error" -- applies.
+# RE-2 (FIXED): that release answer once went to ERROR level, so the three
+# cases needed a no-fail-regex helper. A query about an option this build does
+# not carry is not an error. It now reports at info level, so the plain helper
+# -- which fails on "Error" -- applies.
 add_repl_test(option_alias-d     "get d"     "debug-repl:|Debug option not available")
 add_repl_test(option_alias-debug "get debug" "debug-repl:|Debug option not available")
 add_repl_test(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not available")
@@ -48,9 +48,9 @@ add_repl_test(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not avail
 add_repl_test(option_alias-B_is_preprocessing "get B" "preprocessing:")
 add_repl_test(option_alias-b_is_benchmarks    "get b" "benchmarks:")
 
-# get_opt's error arm. add_repl_test_fail is required here: the plain helper
-# sets FAIL_REGULAR_EXPRESSION "Error", and the error IS the expected output.
-add_repl_test_fail(option_alias-invalid "get zzz" "Invalid option: zzz")
+# get_opt's error arm. This case needs NO_FAIL_REGEX. The plain helper sets
+# FAIL_REGULAR_EXPRESSION "Error", and the error IS the expected output.
+add_repl_test(option_alias-invalid "get zzz" "Invalid option: zzz" NO_FAIL_REGEX)
 
 # --- str2severity: one test per value arm -----------------------------------
 #
@@ -69,9 +69,9 @@ add_repl_test(severity_value-i     "set severity i. get severity"     "severity:
 add_repl_test(severity_value-info  "set severity info. get severity"  "severity: *info")
 
 # str2severity's error arm: the value is rejected and the level left untouched.
-add_repl_test_fail(severity_value-invalid
+add_repl_test(severity_value-invalid
 	"set severity zz. get severity"
-	"Invalid severity value: zz")
+	"Invalid severity value: zz" NO_FAIL_REGEX)
 
 # --- numeric limit option aliases (2026-08-17 unified limit options) ---------
 #
@@ -123,10 +123,10 @@ add_repl_test(option_alias-maxconsistencysubsets
 	"get maxconsistencysubsets" "maxsubsets:")
 
 # Numeric options take a count, not a flag: enable/disable/toggle must refuse.
-add_repl_test_fail(option_numeric-enable_refused
-	"enable fixpointsteps" "takes a count")
-add_repl_test_fail(option_numeric-toggle_refused
-	"toggle gcgrowth" "takes a count")
+add_repl_test(option_numeric-enable_refused
+	"enable fixpointsteps" "takes a count" NO_FAIL_REGEX)
+add_repl_test(option_numeric-toggle_refused
+	"toggle gcgrowth" "takes a count" NO_FAIL_REGEX)
 
 # bv's own options, addressed bv-widening / bv-max-width, with no core alias
 # and no short form, same shape as bv_blastdepth above.

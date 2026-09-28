@@ -1,45 +1,53 @@
+# Tests `tau compile <spec.tau>`. A successful compile exits 0. Every compile
+# failure exits 1. The report names the reason (UNREALIZABLE, a missing
+# backend, and so on).
+
+include(add_repl_test)
+
+# The case logic is a CMake script, so the case needs no bash, no mktemp and
+# no trap.
+set(TAU_CODEGEN_CLI_CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_codegen_cli.cmake")
+
+# `tau compile` reads its spec from a file. Each case hands its formula to
+# the script, which writes a scratch file and passes that path. The
+# backend-failure case hides ltlsynt with an empty PATH and TAU_SPOT_BIN.
+
+# add_codegen_cli_test(<name> <spec_text> <scratch_stem> <pass_regex>
+#     [FAIL_REGEX <re>] [NO_FAIL_REGEX] [NO_LTLSYNT <dir>])
 #
-# `tau compile <spec.tau>` exit-code contract (CG-N6 / CG-R1 successor).
-#
-# The standalone tau_codegen CLI this file used to drive is gone -- codegen
-# is now the `compile` verb on the `tau` binary itself (src/main.cpp), which
-# takes a spec FILE argument (not stdin) and drives compile_spec (see
-# src/tau_compile.tmpl.h). Its exit-code contract collapsed from the old
-# CLI's 0/3/4/5 spread to just two codes: main.cpp's compile branch returns
-# `error(...)` (== 1) on every failure --
-#   files.empty(), !ifs, src.empty(), or !res.has_value() (compile_spec
-#   returns a result<codegen_result>, whose codegen_result holds only
-#   exe_path; codegen_result::ok() means `!exe_path.empty()`) --
-# and 0 after `TAU_LOG_INFO << "compiled: " << res.value().exe_path;`. The
-# *reason* for a failure (parse error, UNREALIZABLE, backend failure, cmake
-# configure/build failure, ...) is now distinguished only by the report
-# `res.print();` writes, not by a dedicated exit code -- there is no more
-# UNKNOWN(4)/not-executable(5).
-#
+# `tau compile` writes its spec to a host path and spawns a host compiler
+# (src/tau_compile.tmpl.h), so a wasm node host cannot run these even with the
+# NODEFS filesystem. NO_LTLSYNT points PATH and TAU_SPOT_BIN at an empty folder.
+function(add_codegen_cli_test test_name spec_text scratch_stem pass_regex)
+	cmake_parse_arguments(PARSE_ARGV 4 _tau "NO_FAIL_REGEX" "NO_LTLSYNT"
+		"FAIL_REGEX;REQUIRES")
+	list(APPEND _tau_REQUIRES subprocess)
+	tau_repl_gate_case("${test_name}" spec_text)
+	set(_args "-DTAU=${TAU_LAUNCHER}" "-DSPEC_TEXT=${spec_text}")
+	if(_tau_NO_LTLSYNT)
+		list(APPEND _args "-DNO_LTLSYNT=${_tau_NO_LTLSYNT}")
+	endif()
+	list(APPEND _args "-DTMP=${CMAKE_BINARY_DIR}/${scratch_stem}")
+	add_test(NAME "${test_name}"
+		COMMAND ${CMAKE_COMMAND} ${_args} -P "${TAU_CODEGEN_CLI_CHECKER}")
+	tau_repl_check_case("${test_name}" "${pass_regex}")
+endfunction()
 
-include(tau_repl_pack)
+add_codegen_cli_test(test_codegen_cli-always_one_emits "always o1[t] = 1"
+	"test_codegen_cli-always_one.scratch"
+	"compiled:(.*\n)*.*EXIT=0" FAIL_REGEX "EXIT=1")
 
-# CG-R7 successor: `tau compile` reads its spec from a FILE, not stdin, so
-# each case below first writes the formula to a scratch file.
-
-add_test(NAME "test_codegen_cli-always_one_emits"
-	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'always o1[t] = 1' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
-set_tests_properties("test_codegen_cli-always_one_emits" PROPERTIES
-	PASS_REGULAR_EXPRESSION "compiled:.*EXIT=0"
-	FAIL_REGULAR_EXPRESSION "EXIT=1")
-
-add_test(NAME "test_codegen_cli-unrealizable_exit_3"
-	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'always (o1[t] = 1 && o1[t] = 0)' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
-set_tests_properties("test_codegen_cli-unrealizable_exit_3" PROPERTIES
-	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE.*EXIT=1")
+add_codegen_cli_test(test_codegen_cli-unrealizable_exit_3
+	"always (o1[t] = 1 && o1[t] = 0)"
+	"test_codegen_cli-unrealizable.scratch"
+	"compile: spec is UNREALIZABLE(.*\n)*.*EXIT=1" NO_FAIL_REGEX)
 
 # The message follows the three-valued verdict. A spec with no strategy that
 # `realizable` decides F keeps UNREALIZABLE...
-add_test(NAME "test_codegen_cli-unrealizable_full_ltl"
-	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'G (o1[t] = 0) && F (o1[t] = 1)' > \"$d/spec.tau\"; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
-set_tests_properties("test_codegen_cli-unrealizable_full_ltl" PROPERTIES
-	PASS_REGULAR_EXPRESSION "compile: spec is UNREALIZABLE.*EXIT=1"
-	FAIL_REGULAR_EXPRESSION "UNKNOWN")
+add_codegen_cli_test(test_codegen_cli-unrealizable_full_ltl
+	"G (o1[t] = 0) && F (o1[t] = 1)"
+	"test_codegen_cli-unrealizable_full_ltl.scratch"
+	"compile: spec is UNREALIZABLE(.*\n)*.*EXIT=1" FAIL_REGEX "UNKNOWN")
 
 # ...and one it leaves undecided is UNKNOWN, with the budget that stopped it.
 # The stub answers UNREALIZABLE for the abstraction and outlasts the 1 s
@@ -64,15 +72,13 @@ set_tests_properties("test_codegen_cli-compile_reads_the_ltl_timeout_option" PRO
 	PASS_REGULAR_EXPRESSION "compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	TIMEOUT 30)
 
-# CG-N6: ltlsynt stubbed to fail like an internal/usage error (exit 2, no
-# verdict line -- see tests/repl/stubs/ltlsynt). The synthesis layer must
-# surface this as a failure without ever claiming UNREALIZABLE (that verdict
-# means something specific and different: the spec was actually decided).
-add_test(NAME "test_codegen_cli-backend_failure_exit_4"
-	COMMAND bash -c "set -u; d=$(mktemp -d) || exit 1; trap 'rm -rf \"$d\"' EXIT; printf '%s' 'F (o1[t] = 1)' > \"$d/spec.tau\"; PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile \"$d/spec.tau\" -o \"$d/exe\"; echo EXIT=$?")
-set_tests_properties("test_codegen_cli-backend_failure_exit_4" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlsynt produced no verdict.*EXIT=1"
-	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|terminate called")
+# With no synthesis backend the verb must fail. It must not claim
+# UNREALIZABLE, which the solver returns only for a decided spec. An empty
+# PATH and TAU_SPOT_BIN hide ltlsynt on POSIX and on Windows without a stub.
+add_codegen_cli_test(test_codegen_cli-backend_failure_exit_4 "F (o1[t] = 1)"
+	"test_codegen_cli-backend_failure.scratch"
+	"ltlsynt not found(.*\n)*.*EXIT=1" FAIL_REGEX "UNREALIZABLE|terminate called"
+	NO_LTLSYNT "${CMAKE_BINARY_DIR}/test_codegen_cli-backend_failure.no-ltlsynt")
 
 # only the data game decides this spec: the program plays the Mealy view of
 # that game's strategy, as `run` does

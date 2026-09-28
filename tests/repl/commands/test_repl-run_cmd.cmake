@@ -26,95 +26,95 @@ set(BVONES "${TF}/bv-ones-length_10.in")
 # ── ADV-G: G(o=c) -- every output is c, regardless of adversarial input ───────
 add_repl_test(run_cmd-ltl_correctness-adv_g_01_o_eq_0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 0)."
-	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_g_02_o_eq_0_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 0)."
-	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_g_03_o_eq_0_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 0)."
-	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F.*o1\\[6\\] := F.*o1\\[7\\] := F" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_g_04_o_eq_1_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 1)."
-	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T")
+	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_g_05_o_eq_1_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 1)."
-	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T")
+	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_g_06_o_eq_1_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 8 steps G (o1[t] = 1)."
-	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T")
+	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T.*o1\\[6\\] := T.*o1\\[7\\] := T" REQUIRES hostfs)
 
 # ── ADV-MIR: G(o=i) -- output mirrors the input stream ────────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_mir_01_bottom_all_f
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_mir_02_top_all_t
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T")
+	"o1\\[0\\] := T.*o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_mir_03_alt_mirror
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 8 steps G (o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F.*o1\\[3\\] := T.*o1\\[4\\] := F.*o1\\[5\\] := T.*o1\\[6\\] := F.*o1\\[7\\] := T")
+	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F.*o1\\[3\\] := T.*o1\\[4\\] := F.*o1\\[5\\] := T.*o1\\[6\\] := F.*o1\\[7\\] := T" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_mir_04_named_mirror
 	"i1:tau := in file(\\\"${NAM}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:a> = 0.*o1\\[1\\] := <:a> = 0.*o1\\[2\\] := <:a> = 0.*o1\\[3\\] := <:a> = 0.*o1\\[4\\] := <:a> = 0.*o1\\[5\\] := <:a> = 0")
+	"o1\\[0\\] := <:a> = 0.*o1\\[1\\] := <:a> = 0.*o1\\[2\\] := <:a> = 0.*o1\\[3\\] := <:a> = 0.*o1\\[4\\] := <:a> = 0.*o1\\[5\\] := <:a> = 0" REQUIRES hostfs)
 
 # ── ADV-LB: G(o=i[t-1]) -- step 0 is warmup, steps 1+ equal the prior input ────
 add_repl_test(run_cmd-ltl_correctness-adv_lb_01_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F")
+	"o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F.*o1\\[4\\] := F.*o1\\[5\\] := F" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_lb_02_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T")
+	"o1\\[1\\] := T.*o1\\[2\\] := T.*o1\\[3\\] := T.*o1\\[4\\] := T.*o1\\[5\\] := T" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_lb_03_alt_shifted
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 7 steps G (o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[1\\] := F.*o1\\[2\\] := T.*o1\\[3\\] := F.*o1\\[4\\] := T.*o1\\[5\\] := F.*o1\\[6\\] := T")
+	"o1\\[1\\] := F.*o1\\[2\\] := T.*o1\\[3\\] := F.*o1\\[4\\] := T.*o1\\[5\\] := F.*o1\\[6\\] := T" REQUIRES hostfs)
 
 # ── ADV-F: F(o=c) -- c eventually appears (check_F) ───────────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_f_01_o_eq_0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 4 steps F (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_f_02_o_eq_0_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 4 steps F (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_f_03_o_eq_1_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 4 steps F (o1[t] = 1)."
-	"o1\\[[0-9]+\\] := T")
+	"o1\\[[0-9]+\\] := T" REQUIRES ltlsynt hostfs)
 
 # ── ADV-GF: G(F(o=c)) -- c appears (liveness; check_GF checks every 2-window) ──
 add_repl_test(run_cmd-ltl_correctness-adv_gf_01_o_eq_0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 8 steps G (F (o1[t] = 0))."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_gf_02_o_eq_0_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 8 steps G (F (o1[t] = 0))."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_gf_03_o_eq_0_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 8 steps G (F (o1[t] = 0))."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_gf_04_o_eq_1_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 8 steps G (F (o1[t] = 1))."
-	"o1\\[[0-9]+\\] := T")
+	"o1\\[[0-9]+\\] := T" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_gf_05_o_eq_1_named
 	"i1:tau := in file(\\\"${NAM}\\\"). o1:tau := out console. run 6 steps G (F (o1[t] = 1))."
-	"o1\\[[0-9]+\\] := T")
+	"o1\\[[0-9]+\\] := T" REQUIRES ltlsynt hostfs)
 
 # ── ADV-U: (o=1) U (o=0) -- right (F) eventually appears (check_U) ─────────────
 add_repl_test(run_cmd-ltl_correctness-adv_u_01_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_u_02_top
 	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_correctness-adv_u_03_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 
 # ── ADV-W: weak until -- right value appears (check_W) ────────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_w_01_o1_until_o0_bottom
 	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) weak_until (o1[t] = 0)."
-	"o1\\[[0-9]+\\] := F")
+	"o1\\[[0-9]+\\] := F" REQUIRES ltlsynt hostfs)
 # a weak until need not release: F at every step is a run of it
 add_repl_test(run_cmd-ltl_correctness-adv_w_02_o0_until_o1_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 0) weak_until (o1[t] = 1)."
-	"o1\\[5\\] := [TF]")
+	"o1\\[5\\] := [TF]" REQUIRES ltlsynt hostfs)
 
 # ── ADV-SBF / ADV-BV: no input; every output is non-empty ─────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_sbf_01_g_x_and_y
@@ -122,7 +122,7 @@ add_repl_test(run_cmd-ltl_correctness-adv_sbf_01_g_x_and_y
 	"o1\\[[0-9]+\\] := X Y")
 add_repl_test(run_cmd-ltl_correctness-adv_sbf_02_f_x_or_z
 	"o1:sbf := out console. run 4 steps F (o1[t]:sbf = {X | Z}:sbf)."
-	"o1\\[[0-9]+\\] := X ")
+	"o1\\[[0-9]+\\] := X " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_correctness-adv_bv_01_g_b10110101
 	"o1:bv[8] := out console. run 6 steps G (o1[t]:bv[8] = {#b10110101}:bv[8])."
 	"o1\\[[0-9]+\\] := 181")
@@ -130,7 +130,7 @@ add_repl_test(run_cmd-ltl_correctness-adv_bv_01_g_b10110101
 # every step must print a value for both outputs.
 add_repl_test(run_cmd-ltl_correctness-adv_bv_02_g_two_equal_outputs
 	"o1:bv[2] := out console. o2:bv[2] := out console. run 3 steps G (o1[t]:bv[2] = o2[t]:bv[2])."
-	"o1\\[0\\] := [0-3].*o2\\[0\\] := [0-3].*o1\\[1\\] := [0-3].*o2\\[1\\] := [0-3].*o1\\[2\\] := [0-3].*o2\\[2\\] := [0-3]")
+	"o1\\[0\\] := [0-3].*o2\\[0\\] := [0-3].*o1\\[1\\] := [0-3].*o2\\[1\\] := [0-3].*o1\\[2\\] := [0-3].*o2\\[2\\] := [0-3]" REQUIRES bv)
 
 # ── stop command ──────────────────────────────────────────────────────────────
 add_repl_test(stop_cmd-no_run_in_progress "stop" "no run in progress")
@@ -138,19 +138,19 @@ add_repl_test(stop_cmd-no_run_in_progress "stop" "no run in progress")
 # multi-io: two inputs, two outputs (test_integration-interpreter_ltl_multiio.cpp)
 add_repl_test(run_cmd-multiio-t01_dual_mirror_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau)."
-	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := <:p> = 0[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:q> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:r> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:s> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:t> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:u> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:v> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:w> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := <:p> = 0[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:q> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:r> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:s> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:t> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:u> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:v> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:w> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t02_swapped_mirror_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i2[t]:tau && o2[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := <:a> = 0[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := <:b> = 0[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := <:c> = 0[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := <:d> = 0[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := <:e> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := <:f> = 0[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := <:g> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := <:a> = 0[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := <:b> = 0[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := <:c> = 0[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := <:d> = 0[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := <:e> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := <:f> = 0[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := <:g> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t03_mirror_and_const_false_6steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 6 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 0)."
-	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z]")
+	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t04_mirror_and_const_true_6steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 6 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 1)."
-	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z]")
+	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t05_two_mirrors_one_g_9steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 9 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau)."
-	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := <:p> = 0[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:q> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:r> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:s> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:t> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:u> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:v> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:w> = 0[^0-9A-Za-z].*o1\\[8\\] := <:i> = 0[^0-9A-Za-z].*o2\\[8\\] := <:x> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := <:p> = 0[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:q> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:r> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:s> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:t> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:u> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:v> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:w> = 0[^0-9A-Za-z].*o1\\[8\\] := <:i> = 0[^0-9A-Za-z].*o2\\[8\\] := <:x> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t06_both_const_false_7steps
 	"o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = 0 && o2[t]:tau = 0)."
 	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := F[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := F[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := F[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := F[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z]")
@@ -159,73 +159,73 @@ add_repl_test(run_cmd-multiio-t07_both_const_true_6steps
 	"o1\\[0\\] := T[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := T[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := T[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := T[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := T[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := T[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z]")
 add_repl_test(run_cmd-multiio-t08_o1_copies_i2_o2_const_false_8steps
 	"i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i2[t]:tau && o2[t]:tau = 0)."
-	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z].*o1\\[7\\] := <:w> = 0[^0-9A-Za-z].*o2\\[7\\] := F[^0-9A-Za-z]")
+	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z].*o1\\[7\\] := <:w> = 0[^0-9A-Za-z].*o2\\[7\\] := F[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t09_swapped_mirrors_one_g_10steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 10 steps G (o1[t]:tau = i2[t]:tau && o2[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := <:a> = 0[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := <:b> = 0[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := <:c> = 0[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := <:d> = 0[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := <:e> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := <:f> = 0[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := <:g> = 0[^0-9A-Za-z].*o1\\[7\\] := <:w> = 0[^0-9A-Za-z].*o2\\[7\\] := <:h> = 0[^0-9A-Za-z].*o1\\[8\\] := <:x> = 0[^0-9A-Za-z].*o2\\[8\\] := <:i> = 0[^0-9A-Za-z].*o1\\[9\\] := <:y> = 0[^0-9A-Za-z].*o2\\[9\\] := <:j> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:p> = 0[^0-9A-Za-z].*o2\\[0\\] := <:a> = 0[^0-9A-Za-z].*o1\\[1\\] := <:q> = 0[^0-9A-Za-z].*o2\\[1\\] := <:b> = 0[^0-9A-Za-z].*o1\\[2\\] := <:r> = 0[^0-9A-Za-z].*o2\\[2\\] := <:c> = 0[^0-9A-Za-z].*o1\\[3\\] := <:s> = 0[^0-9A-Za-z].*o2\\[3\\] := <:d> = 0[^0-9A-Za-z].*o1\\[4\\] := <:t> = 0[^0-9A-Za-z].*o2\\[4\\] := <:e> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z].*o2\\[5\\] := <:f> = 0[^0-9A-Za-z].*o1\\[6\\] := <:v> = 0[^0-9A-Za-z].*o2\\[6\\] := <:g> = 0[^0-9A-Za-z].*o1\\[7\\] := <:w> = 0[^0-9A-Za-z].*o2\\[7\\] := <:h> = 0[^0-9A-Za-z].*o1\\[8\\] := <:x> = 0[^0-9A-Za-z].*o2\\[8\\] := <:i> = 0[^0-9A-Za-z].*o1\\[9\\] := <:y> = 0[^0-9A-Za-z].*o2\\[9\\] := <:j> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t10_mirror_and_const_true_one_g_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 1)."
-	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := T[^0-9A-Za-z]")
+	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := T[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t11_1step_delay_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 7 steps G (o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t12_2step_delay_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 8 steps G (o1[t]:tau = i1[t-2]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t13_3step_delay_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 8 steps G (o1[t]:tau = i1[t-3]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z].*o1\\[6\\] := <:d> = 0[^0-9A-Za-z].*o1\\[7\\] := <:e> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z].*o1\\[6\\] := <:d> = 0[^0-9A-Za-z].*o1\\[7\\] := <:e> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t14_crossed_1step_delay_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i2[t-1]:tau && o2[t]:tau = i1[t-1]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:p> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:q> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:r> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:s> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:t> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:u> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:p> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:q> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:r> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:s> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:t> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:u> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t15_mixed_delays_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = i2[t-2]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t16_reversed_mixed_delays_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i2[t-1]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t17_3step_delay_6steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t-3]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t18_crossed_2step_delay_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i2[t-2]:tau && o2[t]:tau = i1[t-2]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:p> = 0[^0-9A-Za-z].*o2\\[2\\] := <:a> = 0[^0-9A-Za-z].*o1\\[3\\] := <:q> = 0[^0-9A-Za-z].*o2\\[3\\] := <:b> = 0[^0-9A-Za-z].*o1\\[4\\] := <:r> = 0[^0-9A-Za-z].*o2\\[4\\] := <:c> = 0[^0-9A-Za-z].*o1\\[5\\] := <:s> = 0[^0-9A-Za-z].*o2\\[5\\] := <:d> = 0[^0-9A-Za-z].*o1\\[6\\] := <:t> = 0[^0-9A-Za-z].*o2\\[6\\] := <:e> = 0[^0-9A-Za-z].*o1\\[7\\] := <:u> = 0[^0-9A-Za-z].*o2\\[7\\] := <:f> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:p> = 0[^0-9A-Za-z].*o2\\[2\\] := <:a> = 0[^0-9A-Za-z].*o1\\[3\\] := <:q> = 0[^0-9A-Za-z].*o2\\[3\\] := <:b> = 0[^0-9A-Za-z].*o1\\[4\\] := <:r> = 0[^0-9A-Za-z].*o2\\[4\\] := <:c> = 0[^0-9A-Za-z].*o1\\[5\\] := <:s> = 0[^0-9A-Za-z].*o2\\[5\\] := <:d> = 0[^0-9A-Za-z].*o1\\[6\\] := <:t> = 0[^0-9A-Za-z].*o2\\[6\\] := <:e> = 0[^0-9A-Za-z].*o1\\[7\\] := <:u> = 0[^0-9A-Za-z].*o2\\[7\\] := <:f> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t19_1step_delay_xyzwvu_6steps
 	"i1:tau := in file(\\\"${XYZWVU}\\\"). o1:tau := out console. run 6 steps G (o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:w> = 0[^0-9A-Za-z].*o1\\[5\\] := <:v> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:w> = 0[^0-9A-Za-z].*o1\\[5\\] := <:v> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t20_cross_variable_3step_delay_8steps
 	"i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. run 8 steps G (o1[t]:tau = i2[t-3]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:p> = 0[^0-9A-Za-z].*o1\\[4\\] := <:q> = 0[^0-9A-Za-z].*o1\\[5\\] := <:r> = 0[^0-9A-Za-z].*o1\\[6\\] := <:s> = 0[^0-9A-Za-z].*o1\\[7\\] := <:t> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:p> = 0[^0-9A-Za-z].*o1\\[4\\] := <:q> = 0[^0-9A-Za-z].*o1\\[5\\] := <:r> = 0[^0-9A-Za-z].*o1\\[6\\] := <:s> = 0[^0-9A-Za-z].*o1\\[7\\] := <:t> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t21_delay_plus_const_false_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = 0)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t22_delay_plus_const_true_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = 1)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:a> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:b> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:c> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:d> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:e> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:f> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t23_current_plus_2step_delay_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t-2]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t24_both_constant_false_true_10steps
 	"o1:tau := out console. o2:tau := out console. run 10 steps G (o1[t]:tau = 0 && o2[t]:tau = 1)."
 	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := F[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := F[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := F[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := F[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z].*o1\\[7\\] := F[^0-9A-Za-z].*o2\\[7\\] := T[^0-9A-Za-z].*o1\\[8\\] := F[^0-9A-Za-z].*o2\\[8\\] := T[^0-9A-Za-z].*o1\\[9\\] := F[^0-9A-Za-z].*o2\\[9\\] := T[^0-9A-Za-z]")
 add_repl_test(run_cmd-multiio-t25_current_and_1step_delayed_same_input_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t-1]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:g> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:b> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:c> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:d> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:e> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:f> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:g> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z].*o1\\[7\\] := <:h> = 0[^0-9A-Za-z].*o2\\[7\\] := <:g> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t26_2step_delay_plus_const_true_8steps
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i1[t-2]:tau && o2[t]:tau = 1)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := T[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := T[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := T[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := T[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := T[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t27_cross_delayed_plus_current_7steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 7 steps G (o1[t]:tau = i2[t-1]:tau && o2[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:p> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:q> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:r> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:s> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:t> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:u> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:p> = 0[^0-9A-Za-z].*o2\\[1\\] := <:a> = 0[^0-9A-Za-z].*o1\\[2\\] := <:q> = 0[^0-9A-Za-z].*o2\\[2\\] := <:b> = 0[^0-9A-Za-z].*o1\\[3\\] := <:r> = 0[^0-9A-Za-z].*o2\\[3\\] := <:c> = 0[^0-9A-Za-z].*o1\\[4\\] := <:s> = 0[^0-9A-Za-z].*o2\\[4\\] := <:d> = 0[^0-9A-Za-z].*o1\\[5\\] := <:t> = 0[^0-9A-Za-z].*o2\\[5\\] := <:e> = 0[^0-9A-Za-z].*o1\\[6\\] := <:u> = 0[^0-9A-Za-z].*o2\\[6\\] := <:f> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t28_3step_delay_plus_current_9steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 9 steps G (o1[t]:tau = i1[t-3]:tau && o2[t]:tau = i2[t]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o2\\[3\\] := <:p> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o2\\[4\\] := <:q> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z].*o2\\[5\\] := <:r> = 0[^0-9A-Za-z].*o1\\[6\\] := <:d> = 0[^0-9A-Za-z].*o2\\[6\\] := <:s> = 0[^0-9A-Za-z].*o1\\[7\\] := <:e> = 0[^0-9A-Za-z].*o2\\[7\\] := <:t> = 0[^0-9A-Za-z].*o1\\[8\\] := <:f> = 0[^0-9A-Za-z].*o2\\[8\\] := <:u> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:a> = 0[^0-9A-Za-z].*o2\\[3\\] := <:p> = 0[^0-9A-Za-z].*o1\\[4\\] := <:b> = 0[^0-9A-Za-z].*o2\\[4\\] := <:q> = 0[^0-9A-Za-z].*o1\\[5\\] := <:c> = 0[^0-9A-Za-z].*o2\\[5\\] := <:r> = 0[^0-9A-Za-z].*o1\\[6\\] := <:d> = 0[^0-9A-Za-z].*o2\\[6\\] := <:s> = 0[^0-9A-Za-z].*o1\\[7\\] := <:e> = 0[^0-9A-Za-z].*o2\\[7\\] := <:t> = 0[^0-9A-Za-z].*o1\\[8\\] := <:f> = 0[^0-9A-Za-z].*o2\\[8\\] := <:u> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t29_both_delayed_9steps
 	"i1:tau := in file(\\\"${A2J}\\\"). i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 9 steps G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = i2[t-2]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z].*o1\\[8\\] := <:g> = 0[^0-9A-Za-z].*o2\\[8\\] := <:v> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:a> = 0[^0-9A-Za-z].*o2\\[2\\] := <:p> = 0[^0-9A-Za-z].*o1\\[3\\] := <:b> = 0[^0-9A-Za-z].*o2\\[3\\] := <:q> = 0[^0-9A-Za-z].*o1\\[4\\] := <:c> = 0[^0-9A-Za-z].*o2\\[4\\] := <:r> = 0[^0-9A-Za-z].*o1\\[5\\] := <:d> = 0[^0-9A-Za-z].*o2\\[5\\] := <:s> = 0[^0-9A-Za-z].*o1\\[6\\] := <:e> = 0[^0-9A-Za-z].*o2\\[6\\] := <:t> = 0[^0-9A-Za-z].*o1\\[7\\] := <:f> = 0[^0-9A-Za-z].*o2\\[7\\] := <:u> = 0[^0-9A-Za-z].*o1\\[8\\] := <:g> = 0[^0-9A-Za-z].*o2\\[8\\] := <:v> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-multiio-t30_cross_2step_delay_plus_const_false_8steps
 	"i2:tau := in file(\\\"${P2Y}\\\"). o1:tau := out console. o2:tau := out console. run 8 steps G (o1[t]:tau = i2[t-2]:tau && o2[t]:tau = 0)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:p> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:q> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:r> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:s> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:t> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z].*o1\\[7\\] := <:u> = 0[^0-9A-Za-z].*o2\\[7\\] := F[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:p> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := <:q> = 0[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := <:r> = 0[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z].*o1\\[5\\] := <:s> = 0[^0-9A-Za-z].*o2\\[5\\] := F[^0-9A-Za-z].*o1\\[6\\] := <:t> = 0[^0-9A-Za-z].*o2\\[6\\] := F[^0-9A-Za-z].*o1\\[7\\] := <:u> = 0[^0-9A-Za-z].*o2\\[7\\] := F[^0-9A-Za-z]" REQUIRES hostfs)
 
 # ── ltl_aba_execution (tests/integration/test_integration-ltl_aba_execution.cpp)
 
@@ -249,33 +249,33 @@ add_repl_test(run_cmd-ltl_aba_execution-g1_05_two_outputs_5steps
 # ── Group 2: G input mirroring (tau) ───────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g2_01_mirror_3vals
 	"i1:tau := in file(\\\"${XYZWVU}\\\"). o1:tau := out console. run 3 steps G(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g2_02_mirror_compound_4vals
 	"i1:tau := in file(\\\"${ABA_WXVY4}\\\"). o1:tau := out console. run 4 steps G(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:v> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:v> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g2_03_mirror_5vals_mixed
 	"i1:tau := in file(\\\"${ABA_XYZXY5}\\\"). o1:tau := out console. run 5 steps G(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g2_04_mirror_6vals_repeating
 	"i1:tau := in file(\\\"${ABA_WXVZYU6}\\\"). o1:tau := out console. run 6 steps G(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:v> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:v> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:u> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g2_05_mirror_8vals
 	"i1:tau := in file(\\\"${ABA_XYZXYZXY8}\\\"). o1:tau := out console. run 8 steps G(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:z> = 0[^0-9A-Za-z].*o1\\[6\\] := <:x> = 0[^0-9A-Za-z].*o1\\[7\\] := <:y> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:z> = 0[^0-9A-Za-z].*o1\\[6\\] := <:x> = 0[^0-9A-Za-z].*o1\\[7\\] := <:y> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 
 # ── Group 3: G two outputs (tau) ───────────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g3_01_mirror_and_const0_3steps
 	"i1:tau := in file(\\\"${XYZWVU}\\\"). o1:tau := out console. o2:tau := out console. run 3 steps G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 0)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g3_02_mirror_and_const1_4steps
 	"i1:tau := in file(\\\"${XYZWVU}\\\"). o1:tau := out console. o2:tau := out console. run 4 steps G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 1)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:w> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := <:w> = 0[^0-9A-Za-z].*o2\\[3\\] := T[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g3_03_const0_and_mirror_to_o2_4steps
 	"i1:tau := in file(\\\"${ABA_XYZX4}\\\"). o1:tau := out console. o2:tau := out console. run 4 steps G(o1[t]:tau = 0 && o2[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := F[^0-9A-Za-z].*o2\\[3\\] := <:x> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := F[^0-9A-Za-z].*o2\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o2\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o2\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := F[^0-9A-Za-z].*o2\\[3\\] := <:x> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g3_04_two_inputs_3steps
 	"i1:tau := in file(\\\"${XYZWVU}\\\"). i2:tau := in file(\\\"${ABA_WXY3}\\\"). o1:tau := out console. o2:tau := out console. run 3 steps G(o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := <:y> = 0[^0-9A-Za-z]")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := <:w> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := <:y> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g3_05_const_pair_5steps
 	"o1:tau := out console. o2:tau := out console. run 5 steps G(o1[t]:tau = 1 && o2[t]:tau = 0)."
 	"o1\\[0\\] := T[^0-9A-Za-z].*o2\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := T[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := T[^0-9A-Za-z].*o2\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := T[^0-9A-Za-z].*o2\\[3\\] := F[^0-9A-Za-z].*o1\\[4\\] := T[^0-9A-Za-z].*o2\\[4\\] := F[^0-9A-Za-z]")
@@ -283,53 +283,53 @@ add_repl_test(run_cmd-ltl_aba_execution-g3_05_const_pair_5steps
 # ── Group 4: G lookback inputs (tau) ───────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g4_01_lb1_5steps
 	"i1:tau := in file(\\\"${ABA_XYZXW5}\\\"). o1:tau := out console. run 5 steps G(o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:x> = 0[^0-9A-Za-z]")
+	"o1\\[1\\] := <:x> = 0[^0-9A-Za-z].*o1\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:x> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g4_02_lb2_6steps
 	"i1:tau := in file(\\\"${ABA_XYZXYW6}\\\"). o1:tau := out console. run 6 steps G(o1[t]:tau = i1[t-2]:tau)."
-	"o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z].*o1\\[4\\] := <:z> = 0[^0-9A-Za-z].*o1\\[5\\] := <:x> = 0[^0-9A-Za-z]")
+	"o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z].*o1\\[4\\] := <:z> = 0[^0-9A-Za-z].*o1\\[5\\] := <:x> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g4_03_lb3_7steps
 	"i1:tau := in file(\\\"${ABA_XYZWXYZ7}\\\"). o1:tau := out console. run 7 steps G(o1[t]:tau = i1[t-3]:tau)."
-	"o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:z> = 0[^0-9A-Za-z].*o1\\[6\\] := <:w> = 0[^0-9A-Za-z]")
+	"o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o1\\[5\\] := <:z> = 0[^0-9A-Za-z].*o1\\[6\\] := <:w> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g4_04_lb1_4steps_compound
 	"i1:tau := in file(\\\"${ABA_WXVZ4}\\\"). o1:tau := out console. run 4 steps G(o1[t]:tau = i1[t-1]:tau)."
-	"o1\\[1\\] := <:w> = 0[^0-9A-Za-z].*o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o1\\[3\\] := <:v> = 0[^0-9A-Za-z]")
+	"o1\\[1\\] := <:w> = 0[^0-9A-Za-z].*o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o1\\[3\\] := <:v> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g4_05_two_lookbacks_5steps
 	"i1:tau := in file(\\\"${ABA_XYZWX5}\\\"). o1:tau := out console. o2:tau := out console. run 5 steps G(o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i1[t-1]:tau)."
-	"o2\\[0\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o2\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z].*o2\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:z> = 0[^0-9A-Za-z].*o2\\[4\\] := <:w> = 0[^0-9A-Za-z]")
+	"o2\\[0\\] := F[^0-9A-Za-z].*o2\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := <:x> = 0[^0-9A-Za-z].*o2\\[2\\] := <:y> = 0[^0-9A-Za-z].*o1\\[3\\] := <:y> = 0[^0-9A-Za-z].*o2\\[3\\] := <:z> = 0[^0-9A-Za-z].*o1\\[4\\] := <:z> = 0[^0-9A-Za-z].*o2\\[4\\] := <:w> = 0[^0-9A-Za-z]" REQUIRES hostfs)
 
 # ── Group 5: F formulas (tau) ──────────────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g5_01_f_o_eq0_4steps
 	"o1:tau := out console. run 4 steps F(o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_02_f_o_eq1_4steps
 	"o1:tau := out console. run 4 steps F(o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_03_f_o_eq_i1_5steps
 	"i1:tau := in file(\\\"${NAM}\\\"). o1:tau := out console. run 5 steps F(o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g5_04_f_two_outputs_4steps
 	"o1:tau := out console. o2:tau := out console. run 4 steps F(o1[t]:tau = 0 && o2[t]:tau = 1)."
-	"o1\\[0\\] := .*o2\\[0\\] := .*o1\\[1\\] := .*o2\\[1\\] := .*o1\\[2\\] := .*o2\\[2\\] := .*o1\\[3\\] := .*o2\\[3\\] := ")
+	"o1\\[0\\] := .*o2\\[0\\] := .*o1\\[1\\] := .*o2\\[1\\] := .*o1\\[2\\] := .*o2\\[2\\] := .*o1\\[3\\] := .*o2\\[3\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_05_g_mirror_and_f_const_5steps
 	"i1:tau := in file(\\\"${ABA_XYZXY5}\\\"). o1:tau := out console. o2:tau := out console. run 5 steps G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := .*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := .*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := .*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o2\\[3\\] := .*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o2\\[4\\] := ")
+	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := .*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := .*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := .*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o2\\[3\\] := .*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o2\\[4\\] := " REQUIRES ltlsynt hostfs)
 
 # ── Group 6: U R W formulas (tau, no input) ────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g6_01_u_4steps
 	"o1:tau := out console. run 4 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_02_u_5steps
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_03_r_4steps
 	"o1:tau := out console. run 4 steps (o1[t]:tau = 0) release (o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_04_w_5steps
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) weak_until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_05_w_5steps_variant
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 0) weak_until (o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
 
 # ── Group 7: sbf G constant outputs (no input) ─────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g7_01_sbf_g_xandy_4steps
@@ -351,33 +351,33 @@ add_repl_test(run_cmd-ltl_aba_execution-g7_05_sbf_g_compound_4steps
 # ── Group 8: sbf G input mirroring (input value not asserted -> reuse ${SBFONES}) ──
 add_repl_test(run_cmd-ltl_aba_execution-g8_01_sbf_mirror_3steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 3 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_02_sbf_mirror_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_03_sbf_mirror_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_04_sbf_complement_mirror_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t]:sbf')."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_05_sbf_union_top_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf | i1[t]:sbf = 1)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 
 # ── Group 9: sbf G with lookback -- SHAPE-MINIMAL, individually probed live ──
 add_repl_test(run_cmd-ltl_aba_execution-g9_01_sbf_lb1_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t-1]:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_02_sbf_lb1_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t-1]:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_03_sbf_lb2_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t-2]:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_04_sbf_lb3_6steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 6 steps G (o1[t]:sbf = i1[t-3]:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_05_sbf_self_lookback_5steps
 	"o1:sbf := out console. run 5 steps G (o1[t]:sbf = o1[t-1]:sbf)."
 	"o1\\[0\\] := ")
@@ -385,19 +385,19 @@ add_repl_test(run_cmd-ltl_aba_execution-g9_05_sbf_self_lookback_5steps
 # ── Group 10: sbf F and U/W operators (no input) ───────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g10_01_sbf_f_xandy_4steps
 	"o1:sbf := out console. run 4 steps F (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_02_sbf_f_compound_5steps
 	"o1:sbf := out console. run 5 steps F (o1[t]:sbf = {X | (Y & Z)}:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_03_sbf_u_4steps
 	"o1:sbf := out console. run 4 steps (o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_04_sbf_w_5steps
 	"o1:sbf := out console. run 5 steps (o1[t]:sbf = {X | (Y & Z)}:sbf) weak_until (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_05_sbf_gf_6steps
 	"o1:sbf := out console. run 6 steps G (F (o1[t]:sbf = {X & Y}:sbf))."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 
 # Group 11: bv G constant outputs (g11_01 is size-only; do NOT assert 181)
 #   source -- see the "do NOT assert 181" note in the section comment above) ──
@@ -421,35 +421,35 @@ add_repl_test(run_cmd-ltl_aba_execution-g11_05_bv_g_dec255_7steps
 #   for 01..04 -> reuse ${BVONES}; g12_04 is SHAPE-MINIMAL, probed live) ────
 add_repl_test(run_cmd-ltl_aba_execution-g12_01_bv_mirror_3steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 3 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_02_bv_mirror_4steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 4 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_03_bv_mirror_5steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_04_bv_lb1_mirror_5steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = i1[t-1]:bv[8])."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_05_bv_f_b10110101_4steps
 	"o1:bv[8] := out console. run 4 steps F (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_06_bv_u_5steps
 	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8])."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_07_bv_gf_255_6steps
 	"o1:bv[8] := out console. run 6 steps G (F (o1[t]:bv[8] = {255}:bv[8]))."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_08_bv_w_4steps
 	"o1:bv[8] := out console. run 4 steps (o1[t]:bv[8] = {5}:bv[8]) weak_until (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_09_bv_r_5steps
 	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) release (o1[t]:bv[8] = {#b11110000}:bv[8])."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 # G12.10: unblocked by the scoped joint solve in step(); shape-nonempty.
 add_repl_test(run_cmd-ltl_aba_execution-g12_10_bv_alternating_6steps
 	"o1:bv[8] := out console. run 6 steps G (F (o1[t]:bv[8] = {#b10110101}:bv[8])) && G (F (!(o1[t]:bv[8] = {#b10110101}:bv[8])))."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := " REQUIRES ltlsynt)
 #
 # run command (repl_evaluator::run_cmd / continue_running / eval's pending resume)
 #
@@ -473,23 +473,20 @@ add_repl_test(run_cmd-ltl_aba_execution-g12_10_bv_alternating_6steps
 # --- the main step loop ------------------------------------------------------
 # `always` spec: every step needs an input, so this exercises the stream_value
 # pending path repeatedly and prints an output per step.
-add_test(NAME "test_repl-run_cmd-steps"
-	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-steps" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := T")
+add_multiline_repl_test(run_cmd-steps
+	"o\\[0\\] := T"
+	NO_FAIL_REGEX STDIN "run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n")
 
 # The per-step prompt carries the stream name, time point and BA type, built in
 # continue_running() from the awaiting repl_pending_input_stream.
-add_test(NAME "test_repl-run_cmd-prompt_label"
-	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-prompt_label" PROPERTIES
-	PASS_REGULAR_EXPRESSION "i\\[0\\] : tau :=")
+add_multiline_repl_test(run_cmd-prompt_label
+	"i\\[0\\] : tau :="
+	NO_FAIL_REGEX STDIN "run o[t] = i[t].\\nT.\\nq\\nq\\n")
 
 # Successive steps advance the time point in both the prompt and the output.
-add_test(NAME "test_repl-run_cmd-advances_time_point"
-	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-advances_time_point" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[1\\] := F")
+add_multiline_repl_test(run_cmd-advances_time_point
+	"o\\[1\\] := F"
+	NO_FAIL_REGEX STDIN "run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n")
 
 # --- more than one console input stream in a single step ---------------------
 # read() aborts the whole step at the FIRST stream with no value yet, so a step
@@ -498,54 +495,47 @@ set_tests_properties("test_repl-run_cmd-advances_time_point" PROPERTIES
 # pending stream must hand the same value out again for the same time point;
 # consuming it once made the run re-prompt i1 after i2 was given, burn 2^N-1
 # input lines per step and then use the wrong values.
-add_test(NAME "test_repl-run_cmd-two_input_streams"
-	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-two_input_streams" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o1\\[0\\] := T")
+add_multiline_repl_test(run_cmd-two_input_streams
+	"o1\\[0\\] := T"
+	NO_FAIL_REGEX STDIN "run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n")
 
-add_test(NAME "test_repl-run_cmd-two_input_streams-second_value"
-	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-two_input_streams-second_value" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o2\\[0\\] := F")
+add_multiline_repl_test(run_cmd-two_input_streams-second_value
+	"o2\\[0\\] := F"
+	NO_FAIL_REGEX STDIN "run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n")
 
 # Two streams, two steps: the re-delivered value must be dropped once the step
 # it belongs to completes, otherwise step 1 silently reuses step 0's inputs.
-add_test(NAME "test_repl-run_cmd-two_input_streams-next_step"
-	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nF.\\nT.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-two_input_streams-next_step" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o1\\[1\\] := F")
+add_multiline_repl_test(run_cmd-two_input_streams-next_step
+	"o1\\[1\\] := F"
+	NO_FAIL_REGEX STDIN "run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nF.\\nT.\\nq\\nq\\n")
 
 # --- rejected value re-asks the same step -----------------------------------
 # An unparseable value leaves the step unsatisfied. continue_running() is
 # re-entered with the previous request as `retry`, so the SAME time point is
 # prompted again rather than the run ending. No FAIL_REGULAR_EXPRESSION here:
 # the parse error is the expected output.
-add_test(NAME "test_repl-run_cmd-retry_on_bad_value"
-	COMMAND bash -c "printf 'run o[t] = i[t].\\nzzz.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-retry_on_bad_value" PROPERTIES
-	PASS_REGULAR_EXPRESSION "failed to parse the input value for the stream")
+add_multiline_repl_test(run_cmd-retry_on_bad_value
+	"failed to parse the input value for the stream"
+	NO_FAIL_REGEX STDIN "run o[t] = i[t].\\nzzz.\\nq\\nq\\n")
 
 # --- the continue-or-quit gate and finish_running ----------------------------
 # A spec constraining only time point 0 stops needing input, so the step loop
 # reaches the "no awaiting stream" case and asks whether to continue. Answering
 # q runs finish_running(), which prints the run's benchmark totals.
-add_test(NAME "test_repl-run_cmd-continue_or_quit_prompt"
-	COMMAND bash -c "printf 'run o[0] = i[0].\\nT.\\n\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-continue_or_quit_prompt" PROPERTIES
-	PASS_REGULAR_EXPRESSION "continue\\?")
+add_multiline_repl_test(run_cmd-continue_or_quit_prompt
+	"continue\\?"
+	NO_FAIL_REGEX STDIN "run o[0] = i[0].\\nT.\\n\\nq\\n")
 
-add_test(NAME "test_repl-run_cmd-quit_finishes_run"
-	COMMAND bash -c "printf 'run o[0] = i[0].\\nT.\\n\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-quit_finishes_run" PROPERTIES
-	PASS_REGULAR_EXPRESSION "run:")
+add_multiline_repl_test(run_cmd-quit_finishes_run
+	"run:"
+	NO_FAIL_REGEX STDIN "run o[0] = i[0].\\nT.\\n\\nq\\nq\\n")
 
 # --- a specification that cannot be run -------------------------------------
 # run_cmd returns early when the argument does not yield a formula or an
 # interpreter; the REPL must stay usable rather than crash or hang.
-add_test(NAME "test_repl-run_cmd-invalid_spec"
-	COMMAND bash -c "printf 'run x ) ( invalid\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-invalid_spec" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Quit")
+add_multiline_repl_test(run_cmd-invalid_spec
+	"Quit"
+	NO_FAIL_REGEX STDIN "run x ) ( invalid\\nq\\n")
 
 # --- issue 20: a definition whose head cannot bind its body's relative offset -
 # `f` declares no offset, so the `n` in `r[n](x)` is free. Unfolding `f(1)` then
@@ -554,17 +544,14 @@ set_tests_properties("test_repl-run_cmd-invalid_spec" PROPERTIES
 # already rejected ("Main ... cannot contain a relative offset"); hiding it
 # behind a definition must be rejected too, and at definition time, so the bad
 # definition never reaches the runner or the definition list.
-add_test(NAME "test_repl-run_cmd-unbindable_relative_offset"
-	COMMAND bash -c "printf 'r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf(x) := o1[n] = r[n](x).\\nrun f(1)\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-unbindable_relative_offset" PROPERTIES
-	PASS_REGULAR_EXPRESSION "its head declares no offset to bind it")
+add_multiline_repl_test(run_cmd-unbindable_relative_offset
+	"its head declares no offset to bind it"
+	NO_FAIL_REGEX STDIN "r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf(x) := o1[n] = r[n](x).\\nrun f(1)\\nq\\n")
 
 # The same definition with an offset on the head binds `n` and stays accepted.
-add_test(NAME "test_repl-run_cmd-bound_relative_offset_accepted"
-	COMMAND bash -c "printf 'r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf[n](x) := o1[n] = r[n](x).\\ndefs\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTIES
-	PASS_REGULAR_EXPRESSION "\\[3\\] f\\[n\\]\\(x\\)"
-	FAIL_REGULAR_EXPRESSION "Error")
+add_multiline_repl_test(run_cmd-bound_relative_offset_accepted
+	"\\[3\\] f\\[n\\]\\(x\\)"
+	STDIN "r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf[n](x) := o1[n] = r[n](x).\\ndefs\\nq\\n")
 
 # --- a genuine step failure (not an input wait) ends the run ----------------
 # An unwritable output file makes api::step fail with code::io_error, not
@@ -573,15 +560,16 @@ set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTI
 # interpreter::write's own per-stream refusal (interpreter.tmpl.h) replaced
 # api::step's old blanket "Failed to write outputs" wrapper, which the
 # refactor dropped in favor of merging write()'s report as-is.
-add_repl_test_fail(run_cmd-continue_running-genuine_step_error
+add_repl_test(run_cmd-continue_running-genuine_step_error
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
-	"failed to write to the output stream")
+	"failed to write to the output stream" NO_FAIL_REGEX REQUIRES hostfs)
+
 # GitHub #136: the same failure under a step budget ends the run too. `-b
 # false` because the benchmark report would print the error anyway.
-add_test(NAME "test_repl-run_cmd-continue_running-genuine_step_error_finite"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -b false -e \"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run 3 steps o1[t] = 1.\" -S trace")
-set_tests_properties("test_repl-run_cmd-continue_running-genuine_step_error_finite"
-	PROPERTIES PASS_REGULAR_EXPRESSION "failed to write to the output stream")
+add_repl_test(run_cmd-continue_running-genuine_step_error_finite
+	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run 3 steps o1[t] = 1."
+	"failed to write to the output stream" NO_FAIL_REGEX REQUIRES hostfs
+	FLAGS -b false)
 
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
 # The reporter's 7-line reproducer (two :tau streams, a cross-stream
@@ -590,10 +578,9 @@ set_tests_properties("test_repl-run_cmd-continue_running-genuine_step_error_fini
 # since deleted. Step 0 now completes in well under a second, so the guard is
 # simply that step 1 is reached before the timeout. `set charvar off` is what
 # lets multi-letter stream names like o0seal parse as one variable.
-add_test(NAME "test_repl-run_cmd-issue76_mixed_tau_streams"
-	COMMAND bash -c "printf 'set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0seal[0]:tau = { o1[t]=1 -> o2[t]=1 }) && (o0law[0]:tau = { o1[t]=1 -> o2[t]=1 }) && ( (i2[t]:tau != 0) ? ((o0seal[t]:tau = o0law[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) : ( ((o0law[t-1]:tau & i1[t]:tau) != 0) ? ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau & i1[t]:tau)) : ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) ) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-issue76_mixed_tau_streams" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Execution step: 1"
+add_multiline_repl_test(run_cmd-issue76_mixed_tau_streams
+	"Execution step: 1"
+	NO_FAIL_REGEX STDIN "set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0seal[0]:tau = { o1[t]=1 -> o2[t]=1 }) && (o0law[0]:tau = { o1[t]=1 -> o2[t]=1 }) && ( (i2[t]:tau != 0) ? ((o0seal[t]:tau = o0law[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) : ( ((o0law[t-1]:tau & i1[t]:tau) != 0) ? ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau & i1[t]:tau)) : ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) ) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n"
 	TIMEOUT 120)
 
 # --- GitHub #82: state accumulating N clauses in a :tau constant -------------
@@ -604,10 +591,9 @@ set_tests_properties("test_repl-run_cmd-issue76_mixed_tau_streams" PROPERTIES
 # constant's complement both fed a conjunction of variable-disjoint clauses to
 # one Boole decomposition (2^N). Now decided per component: ~2.3 s in Release,
 # ~42 s in a -O0 Debug build, hence the generous timeout.
-add_test(NAME "test_repl-run_cmd-issue82_accumulated_tau_constant"
-	COMMAND bash -c "printf 'set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0a[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && (o0b[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && ( (i2[t]:tau != 0) ? ((o0a[t]:tau = o0b[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau)) : ((o0a[t]:tau = o0a[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau & i1[t]:tau)) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-issue82_accumulated_tau_constant" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Execution step: 1"
+add_multiline_repl_test(run_cmd-issue82_accumulated_tau_constant
+	"Execution step: 1"
+	NO_FAIL_REGEX STDIN "set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0a[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && (o0b[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && ( (i2[t]:tau != 0) ? ((o0a[t]:tau = o0b[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau)) : ((o0a[t]:tau = o0a[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau & i1[t]:tau)) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n"
 	TIMEOUT 300)
 
 # --- GitHub #107: a ?: controller over a bitvector command --------------------
@@ -620,51 +606,43 @@ set_tests_properties("test_repl-run_cmd-issue82_accumulated_tau_constant" PROPER
 # and only the split budget kept it bounded. With the bitvector case split
 # (the default since this test) the command is eliminated by cells before any
 # block forms: 9 ms. The outputs are the ones --block-max-splits 1 gives.
-tau_repl_unsupported(_tau_skip "i2:bv[8] := in console.")
-if(_tau_skip)
-	tau_repl_record_skip("test_repl-run_cmd-issue107_bv_command_controller")
-else()
-	add_test(NAME "test_repl-run_cmd-issue107_bv_command_controller"
-		COMMAND bash -c "printf 'set charvar off\\n%s\\n(o9[t]=0)\\n0\\nq\\n' 'run ( (o2[0]:tau = { o5[t]=1 -> o6[t]=1 }) && (o1[0]:tau = { o5[t]=1 -> o6[t]=1 }) && ( (i2[t]:bv[8] = { #x01 }:bv[8]) ? ((o2[t]:tau = o1[t-1]:tau) && (o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x05 }:bv[8])) : ( (o2[t]:tau = o2[t-1]:tau) && ( (i2[t]:bv[8] = { #x02 }:bv[8]) ? ( ((o2[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o2[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x03 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) : ( ((o1[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o1[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x09 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) ) ) ) )' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-	set_tests_properties("test_repl-run_cmd-issue107_bv_command_controller" PROPERTIES
-		PASS_REGULAR_EXPRESSION "o3\\[0\\] := 0.*o3\\[1\\] := 9"
-		FAIL_REGULAR_EXPRESSION "unsat|Error"
-		TIMEOUT 120)
-endif()
+add_raw_repl_test(run_cmd-issue107_bv_command_controller
+	"printf 'set charvar off\\n%s\\n(o9[t]=0)\\n0\\nq\\n' 'run ( (o2[0]:tau = { o5[t]=1 -> o6[t]=1 }) && (o1[0]:tau = { o5[t]=1 -> o6[t]=1 }) && ( (i2[t]:bv[8] = { #x01 }:bv[8]) ? ((o2[t]:tau = o1[t-1]:tau) && (o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x05 }:bv[8])) : ( (o2[t]:tau = o2[t-1]:tau) && ( (i2[t]:bv[8] = { #x02 }:bv[8]) ? ( ((o2[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o2[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x03 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) : ( ((o1[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o1[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x09 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) ) ) ) )' | ${TAU_RUN} -X"
+	"o3\\[0\\] := 0.*o3\\[1\\] := 9"
+	FAIL_REGEX "unsat|Error" REQUIRES bv TIMEOUT 120)
 
 # --- sbf multiline value continuation ---------------------------------------
 # An incomplete sbf value ("x |") keeps the prompt open (the sbf-parser
 # unexpected-end check in awaiting_more_input); the next line completes it.
-add_test(NAME "test_repl-run_cmd-sbf_multiline_value"
-	COMMAND bash -c "printf 'run always o1[t]:sbf = i1[t]\\nx |\\ny\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-run_cmd-sbf_multiline_value" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o1\\[0\\] := x \\| x' y")
+add_multiline_repl_test(run_cmd-sbf_multiline_value
+	"o1\\[0\\] := x \\| x' y"
+	NO_FAIL_REGEX STDIN "run always o1[t]:sbf = i1[t]\\nx |\\ny\\nq\\nq\\n")
 
 # ── MIRROR: F and sometimes are one operator, so both spellings mirror ───────
 # The input alternates F and T: the goal is met at step 0, where o1 mirrors
 # the F, and the run goes on.
 add_repl_test(run_cmd-mirror_01_f_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps F (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[2\\] := ")
+	"o1\\[0\\] := F.*o1\\[2\\] := " REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-mirror_02_sometimes_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps sometimes (o1[t] = i1[t])."
-	"o1\\[0\\] := F.*o1\\[2\\] := ")
+	"o1\\[0\\] := F.*o1\\[2\\] := " REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-mirror_03_always_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
-	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F" REQUIRES hostfs)
 
 # ── Initial conditions with a delay chain and `sometimes` ─────────────────────
 # o2 repeats o1 one step late from the initial zeros, so o2[1] is 0 and o2
 # becomes 1 at a later step.
 add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes
 	"o1:tau := out console. o2:tau := out console. run 6 steps (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)."
-	"o1\\[0\\] := F.*o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[[2-5]\\] := T")
+	"o1\\[0\\] := F.*o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[[2-5]\\] := T" REQUIRES ltlsynt)
 add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes_bv
 	"o1:bv[2] := out console. o2:bv[2] := out console. run 6 steps (always o1[0]:bv[2] = 0 && o2[0]:bv[2] = 0 && o2[t]:bv[2] = o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] = 1)."
-	"o1\\[0\\] := 0.*o2\\[0\\] := 0.*o2\\[1\\] := 0.*o2\\[[2-5]\\] := 3")
+	"o1\\[0\\] := 0.*o2\\[0\\] := 0.*o2\\[1\\] := 0.*o2\\[[2-5]\\] := 3" REQUIRES ltlsynt bv)
 add_repl_test(run_cmd-initial_value_constant_stream_with_sometimes
 	"o1:tau := out console. o2:tau := out console. run 4 steps (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)."
-	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F")
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F" REQUIRES ltlsynt)
 
 # ── Warm-up of a literal normalization drops ──────────────────────────────────
 # o1[t-2] = o1[t-2] gives the always part a two-step warm-up, so o2 takes the
@@ -674,20 +652,20 @@ add_repl_test(run_cmd-warm_up_tautology
 	"o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[2\\] := T")
 add_repl_test(run_cmd-warm_up_tautology_sometimes
 	"o2:tau := out console. run 3 steps (always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes (o2[t-1] = 0))."
-	"o2\\[0\\] := .*o2\\[1\\] := .*o2\\[2\\] := T")
+	"o2\\[0\\] := .*o2\\[1\\] := .*o2\\[2\\] := T" REQUIRES ltlsynt)
 
 # Two outputs take the value of one input: the second commit of the same value
 # to the fresh-value ledger is a no-op (recomputing the region did not finish).
 add_repl_test(run_cmd-two_outputs_share_an_input_value
 	"i1:tau := in file(\\\"${TF}/tau-xyz_disjunction-length_1.in\\\"). o1:tau := out console. o2:tau := out console. run 1 steps (always (i1[t] = o2[t])) && (sometimes (i1[t] = o1[t]))."
-	"o1\\[0\\] := .*<:x>.*o2\\[0\\] := .*<:x>")
+	"o1\\[0\\] := .*<:x>.*o2\\[0\\] := .*<:x>" REQUIRES ltlsynt hostfs)
 # The values of this run grow with every step; past maxconstantsize the solver
 # gives up with a message instead of overflowing the stack.
-add_repl_test_fail(run_cmd-value_past_constant_size_budget
+add_repl_test(run_cmd-value_past_constant_size_budget
 	"i1:tau := in file(\\\"${TF}/tau-nonzero_a1_to_a10-length_10.in\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
-	"o1\\[6\\] := .*passed the constant size budget")
+	"o1\\[6\\] := .*passed the constant size budget" REQUIRES hostfs NO_FAIL_REGEX)
 # Over inputs pinned to 0 the values of the same run stay small DNFs: each
 # complement and conjunction drops its repeated and absorbed disjuncts.
 add_repl_test(run_cmd-values_stay_within_constant_size_budget
 	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
-	"o1\\[9\\] := ")
+	"o1\\[9\\] := " REQUIRES hostfs)

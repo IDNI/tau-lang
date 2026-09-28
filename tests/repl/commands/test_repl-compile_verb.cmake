@@ -2,33 +2,37 @@
 include(add_compile_test)
 
 add_compile_test(compile_verb-echo
-	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau")
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	REQUIRES hostfs)
 
 # Period-terminated spec: proves compile_spec parses via get_spec, not just
 # the bare-formula get_formula fallback (echo.tau above has no period).
 add_compile_test(compile_verb-echo_dot
-	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo_dot.tau")
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo_dot.tau"
+	REQUIRES hostfs)
 
 # A lookback atom under an eventuality drives a __step_ge<k> guard
 # (ltl_aba_helpers.tmpl.h's step_guard_prop) into the synthesized strategy;
 # this is the emit_main/table_step_provider path's own smoke test for it.
 add_compile_test(compile_verb-ltl_lookback_under_eventuality
-	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/ltl_lookback_under_eventuality.tau")
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/ltl_lookback_under_eventuality.tau"
+	REQUIRES hostfs)
 
 # --cxx names the compiler the nested cmake configure uses: an unusable
 # name must reach that configure (and fail it) instead of being replaced
 # by whatever clang++ is on PATH. The spec names no BA so every pack gets
 # as far as the configure; it is copied to a temp dir because the build
 # tree is placed beside the spec file.
-add_test(NAME "test_repl-compile_verb-cxx_override_is_used"
-	COMMAND bash -c "d=$(mktemp -d /tmp/tau_cxx_override.XXXXXX); cp ${CMAKE_SOURCE_DIR}/tests/codegen_specs/declare_open_codegen.tau $d/spec.tau; $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> compile --cxx /nonexistent/c++ $d/spec.tau -o $d/out; rc=$?; test $rc -ne 0 && grep -q 'nonexistent/c++' $d/spec.tau.build/configure.log && echo CXX_OVERRIDE_REACHED_CONFIGURE; rm -rf $d")
-set_tests_properties("test_repl-compile_verb-cxx_override_is_used" PROPERTIES
-	PASS_REGULAR_EXPRESSION "CXX_OVERRIDE_REACHED_CONFIGURE")
+add_compile_test(compile_verb-cxx_override_is_used
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/declare_open_codegen.tau"
+	CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_cxx_override.cmake"
+	PASS_REGEX "nonexistent/c\\+\\+")
 
 # A tautological literal still gives its clause a two-step warm-up, so the
 # spec is realizable and compiles (o2 may be 0 at steps 0 and 1).
 add_compile_test(compile_verb-warm_up_tautology
-	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/warm_up_tautology.tau")
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/warm_up_tautology.tau"
+	REQUIRES hostfs)
 
 # The program plays the strategy `run` plays. Over each of these specs the
 # data game decides, and the program used to play the abstraction's

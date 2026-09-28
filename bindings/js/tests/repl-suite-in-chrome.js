@@ -76,11 +76,11 @@ function unescapeQuoted(s) {
 	return s.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
 }
 
-// The invocation must be only <emulator> tau_repl.js plus exactly <extra>: a
-// shell prefix (an env assignment, a redirect) or an extra flag is a CLI the
-// page cannot reproduce.
+// The invocation must be only the node build's tau-run launcher plus exactly
+// <extra>: a shell prefix (an env assignment, a redirect) or an extra flag is
+// a CLI the page cannot reproduce.
 function plainReplTail(tail, extra) {
-	const m = tail.match(/^(?:\S+\s+)?\S*tau_repl\.js(?:\s(.*))?$/s);
+	const m = tail.match(/^\S*tau-run(?:\s(.*))?$/s);
 	return m !== null && (m[1] || '').trim() === extra;
 }
 
@@ -88,9 +88,9 @@ function plainReplTail(tail, extra) {
 // case needs something a browser page cannot give it (a CLI flag, an env
 // variable, a host process). Three forms, matching tests/repl/add_repl_test.cmake:
 //
-//   echo "<cmd>. q" | <emu><tau>                  -> one line, "<cmd>. q"
-//   printf '<line>\n...' | <emu><tau> -X          -> one line per printf line
-//   <emu><tau> -e "<cmd>" [-S trace] [2>&1]       -> one line, "<cmd>"
+//   echo "<cmd>. q" | <tau-run>                    -> one line, "<cmd>. q"
+//   printf '<line>\n...' | <tau-run> -X            -> one line per printf line
+//   <tau-run> -e "<cmd>" [-S trace] [2>&1]         -> one line, "<cmd>"
 //
 // `trace` reproduces -S trace: the page starts at the default (info)
 // severity, so the runner sends "set severity trace" first.
@@ -107,7 +107,7 @@ function parseReplCase(cmd) {
 		return { lines, trace: false };
 	}
 
-	m = cmd.match(/^(?:\S+\s+)?\S*tau_repl\.js\s+(.*)$/s);
+	m = cmd.match(/^\S*tau-run\s+(.*)$/s);
 	if (m) {
 		const args = m[1];
 		const e = args.match(/-e\s+"((?:[^"\\]|\\.)*)"/s);

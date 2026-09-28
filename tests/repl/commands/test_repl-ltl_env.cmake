@@ -10,249 +10,176 @@
 # other `ltl` REPL tests do).
 #
 
+include(add_repl_test)
+include(tau_repl_pack)
+
 # TAU_LTL_EXPORT_STRATEGY=hoa prints the strategy to stderr.
-add_test(NAME "test_repl-ltl_env-export_hoa"
-	COMMAND bash -c "TAU_LTL_EXPORT_STRATEGY=hoa $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-export_hoa" PROPERTIES
-	PASS_REGULAR_EXPRESSION "=== STRATEGY HOA ===")
+add_repl_test(ltl_env-export_hoa
+	"ltl F (o1[t] = 1)"
+	"=== STRATEGY HOA ===" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_EXPORT_STRATEGY=hoa REQUIRES ltlsynt)
 
 # TAU_LTL_EXPORT_STRATEGY=dot prints dot (or falls back to HOA when autfilt
 # is missing) -- either way a STRATEGY banner appears.
-add_test(NAME "test_repl-ltl_env-export_dot"
-	COMMAND bash -c "TAU_LTL_EXPORT_STRATEGY=dot $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-export_dot" PROPERTIES
-	PASS_REGULAR_EXPRESSION "=== STRATEGY (DOT|HOA \\(dot unavailable\\)) ===")
+add_repl_test(ltl_env-export_dot
+	"ltl F (o1[t] = 1)"
+	"=== STRATEGY (DOT|HOA \\(dot unavailable\\)) ===" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_EXPORT_STRATEGY=dot REQUIRES ltlsynt)
 
 # Without the variable nothing is exported.
-add_test(NAME "test_repl-ltl_env-export_off_by_default"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-export_off_by_default" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "=== STRATEGY"
-	PASS_REGULAR_EXPRESSION "REALIZABLE")
+add_repl_test(ltl_env-export_off_by_default
+	"ltl F (o1[t] = 1)"
+	"REALIZABLE" NO_TRACE
+	FAIL_REGEX "=== STRATEGY" REQUIRES ltlsynt)
 
 # TAU_LTL_WITNESS=1 on an UNREALIZABLE spec prints the environment's
 # counter-strategy (the negated, role-swapped game is realizable).
-add_test(NAME "test_repl-ltl_env-witness"
-	COMMAND bash -c "TAU_LTL_WITNESS=1 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (i1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-witness" PROPERTIES
-	PASS_REGULAR_EXPRESSION "=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===")
+add_repl_test(ltl_env-witness
+	"ltl F (i1[t] = 1)"
+	"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_WITNESS=1 REQUIRES ltlsynt)
 
 # A bad TAU_LTL_SIMPLIFICATION value is an ltlsynt usage error (exit 2):
 # no verdict, reported as UNKNOWN -- never REALIZABLE or UNREALIZABLE.
-add_test(NAME "test_repl-ltl_env-bad_simplification_is_unknown"
-	COMMAND bash -c "TAU_LTL_SIMPLIFICATION=definitely-not-a-level $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-bad_simplification_is_unknown" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "[^N]REALIZABLE|UNREALIZABLE"
-	PASS_REGULAR_EXPRESSION "UNKNOWN")
+add_repl_test(ltl_env-bad_simplification_is_unknown
+	"ltl F (o1[t] = 1)"
+	"UNKNOWN" NO_TRACE
+	FAIL_REGEX "[^N]REALIZABLE|UNREALIZABLE"
+	ENV TAU_LTL_SIMPLIFICATION=definitely-not-a-level REQUIRES ltlsynt)
 
 # TAU_LTL_TIMEOUT_SEC garbage keeps the default and says so.
-add_test(NAME "test_repl-ltl_env-timeout_garbage_warns"
-	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
-set_tests_properties("test_repl-ltl_env-timeout_garbage_warns" PROPERTIES
-	PASS_REGULAR_EXPRESSION "TAU_LTL_TIMEOUT_SEC='abc' is not a non-negative number")
+add_repl_test(ltl_env-timeout_garbage_warns
+	"ltl F (o1[t] = 1)"
+	"TAU_LTL_TIMEOUT_SEC='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_TIMEOUT_SEC=abc REQUIRES ltlsynt)
 
 # The environment variables are fallbacks of the runtime parameters: the
 # variable shows through `get` when the option is unset, and the CLI flag
 # wins when both are given.
-add_test(NAME "test_repl-ltl_env-timeout_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltltimeout\"")
-set_tests_properties("test_repl-ltl_env-timeout_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltltimeout: *5s")
-add_test(NAME "test_repl-ltl_env-timeout_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-timeout 9 -e \"get ltltimeout\"")
-set_tests_properties("test_repl-ltl_env-timeout_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltltimeout: *9s")
-add_test(NAME "test_repl-ltl_env-timeout_flag_rejects_garbage"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-timeout abc -e \"get ltltimeout\" 2>&1")
-set_tests_properties("test_repl-ltl_env-timeout_flag_rejects_garbage" PROPERTIES
-	PASS_REGULAR_EXPRESSION "expects a non-negative number")
-add_test(NAME "test_repl-ltl_env-alg_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_ALG=D $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlalg\"")
-set_tests_properties("test_repl-ltl_env-alg_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlalg: *D")
-add_test(NAME "test_repl-ltl_env-alg_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_ALG=D $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-alg A -e \"get ltlalg\"")
-set_tests_properties("test_repl-ltl_env-alg_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlalg: *A")
-add_test(NAME "test_repl-ltl_env-alg_garbage_reads_as_auto"
-	COMMAND bash -c "TAU_LTL_ALG=C $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlalg\" 2>&1")
-set_tests_properties("test_repl-ltl_env-alg_garbage_reads_as_auto" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlalg: *auto")
-add_test(NAME "test_repl-ltl_env-qe_env_is_validated"
-	COMMAND bash -c "TAU_LTL_OMCAT_QE_MAX_VARS=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlqemaxvars\" 2>&1")
-set_tests_properties("test_repl-ltl_env-qe_env_is_validated" PROPERTIES
-	PASS_REGULAR_EXPRESSION "keeping the default 2")
-add_test(NAME "test_repl-ltl_env-qe_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_OMCAT_QE_MAX_VARS=4 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-qe-max-vars 3 -e \"get ltlqemaxvars\"")
-set_tests_properties("test_repl-ltl_env-qe_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlqemaxvars: *3")
+add_repl_test(ltl_env-timeout_env_is_the_fallback
+	"get ltltimeout" "ltltimeout: *5s" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_TIMEOUT_SEC=5)
+add_repl_test(ltl_env-timeout_flag_beats_env
+	"get ltltimeout" "ltltimeout: *9s" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-timeout 9 ENV TAU_LTL_TIMEOUT_SEC=5)
+add_repl_test(ltl_env-timeout_flag_rejects_garbage
+	"get ltltimeout" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-timeout abc)
+add_repl_test(ltl_env-alg_env_is_the_fallback
+	"get ltlalg" "ltlalg: *D" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_ALG=D)
+add_repl_test(ltl_env-alg_flag_beats_env
+	"get ltlalg" "ltlalg: *A" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-alg A ENV TAU_LTL_ALG=D)
+add_repl_test(ltl_env-alg_garbage_reads_as_auto
+	"get ltlalg" "ltlalg: *auto" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_ALG=C)
+add_repl_test(ltl_env-qe_env_is_validated
+	"get ltlqemaxvars" "keeping the default 2" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)
+add_repl_test(ltl_env-qe_flag_beats_env
+	"get ltlqemaxvars" "ltlqemaxvars: *3" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_OMCAT_QE_MAX_VARS=4)
 # BA-declared knobs promoted from header constants. The option exists only
 # when its algebra is in the pack, so each is gated on its own BA.
-tau_repl_unsupported(_tau_skip "get qlt-t3-cap")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-qlt_t3_cap_option")
-else()
-	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_option"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-t3-cap 12 -e \"get qlt-t3-cap\"")
-	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_option" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *12")
-endif()
-tau_repl_unsupported(_tau_skip "set nlang-http-timeout")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-nlang_http_timeout_option")
-else()
-	add_test(NAME "test_repl-ltl_env-nlang_http_timeout_option"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set nlang-http-timeout 3\"")
-	set_tests_properties("test_repl-ltl_env-nlang_http_timeout_option" PROPERTIES
-		PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")
-endif()
-add_test(NAME "test_repl-ltl_env-refinement_rounds_flag"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-refinement-rounds 5 -e \"get ltlrefinementrounds\"")
-set_tests_properties("test_repl-ltl_env-refinement_rounds_flag" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlrefinementrounds: *5")
-add_test(NAME "test_repl-ltl_env-window_max_paths_flag"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-window-max-paths 0 -e \"get ltlwindowmaxpaths\"")
-set_tests_properties("test_repl-ltl_env-window_max_paths_flag" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *unlimited")
-add_test(NAME "test_repl-ltl_env-pwr_semantic_flag"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --pwr-semantic -e \"get pwrsemantic\"")
-set_tests_properties("test_repl-ltl_env-pwr_semantic_flag" PROPERTIES
-	PASS_REGULAR_EXPRESSION "pwrsemantic: *on")
-tau_repl_unsupported(_tau_skip "get qlt-const-output-max")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-qlt_const_output_max_flag")
-else()
-	add_test(NAME "test_repl-ltl_env-qlt_const_output_max_flag"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-const-output-max 3 -e \"get qlt-const-output-max\"")
-	set_tests_properties("test_repl-ltl_env-qlt_const_output_max_flag" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-const-output-max: *3")
-endif()
+add_repl_test(ltl_env-qlt_t3_cap_option
+	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
+	FLAGS --qlt-t3-cap 12)
+add_repl_test(ltl_env-nlang_http_timeout_option
+	"set nlang-http-timeout 3" "nlang-http-timeout: *3" NO_FAIL_REGEX NO_TRACE)
+add_repl_test(ltl_env-refinement_rounds_flag
+	"get ltlrefinementrounds" "ltlrefinementrounds: *5" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-refinement-rounds 5)
+add_repl_test(ltl_env-window_max_paths_flag
+	"get ltlwindowmaxpaths" "ltlwindowmaxpaths: *unlimited" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-window-max-paths 0)
+add_repl_test(ltl_env-pwr_semantic_flag
+	"get pwrsemantic" "pwrsemantic: *on" NO_FAIL_REGEX NO_TRACE
+	FLAGS --pwr-semantic)
+add_repl_test(ltl_env-qlt_const_output_max_flag
+	"get qlt-const-output-max" "qlt-const-output-max: *3" NO_FAIL_REGEX NO_TRACE
+	FLAGS --qlt-const-output-max 3)
 # The -K short flag belongs to --ba-component-factoring; --ltl-qe-max-vars is -k.
-add_test(NAME "test_repl-ltl_env-qe_short_flag_is_lowercase_k"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -k 3 -e \"get ltlqemaxvars\"")
-set_tests_properties("test_repl-ltl_env-qe_short_flag_is_lowercase_k" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlqemaxvars: *3")
+add_repl_test(ltl_env-qe_short_flag_is_lowercase_k
+	"get ltlqemaxvars" "ltlqemaxvars: *3" NO_FAIL_REGEX NO_TRACE
+	FLAGS -k 3)
 
 # Every runtime limit of the pipeline carries all three surfaces: a CLI flag,
 # a REPL option and a TAU_* environment fallback. The variable shows through
 # `get` when the flag is absent, the flag wins when both are given, and a
 # garbage value keeps the default and says so.
-add_test(NAME "test_repl-ltl_env-hoa_max_states_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_HOA_MAX_STATES=7 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlhoamaxstates\"")
-set_tests_properties("test_repl-ltl_env-hoa_max_states_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlhoamaxstates: *7")
-add_test(NAME "test_repl-ltl_env-hoa_max_states_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_HOA_MAX_STATES=7 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-hoa-max-states 9 -e \"get ltlhoamaxstates\"")
-set_tests_properties("test_repl-ltl_env-hoa_max_states_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlhoamaxstates: *9")
-add_test(NAME "test_repl-ltl_env-hoa_max_states_garbage_warns"
-	COMMAND bash -c "TAU_LTL_HOA_MAX_STATES=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlhoamaxstates\" 2>&1")
-set_tests_properties("test_repl-ltl_env-hoa_max_states_garbage_warns" PROPERTIES
-	PASS_REGULAR_EXPRESSION "TAU_LTL_HOA_MAX_STATES='abc' is not a non-negative number")
-add_test(NAME "test_repl-ltl_env-hoa_max_states_flag_rejects_garbage"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-hoa-max-states abc -e \"get ltlhoamaxstates\" 2>&1")
-set_tests_properties("test_repl-ltl_env-hoa_max_states_flag_rejects_garbage" PROPERTIES
-	PASS_REGULAR_EXPRESSION "expects a non-negative number")
-add_test(NAME "test_repl-ltl_env-guard_max_cubes_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_GUARD_MAX_CUBES=6 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlguardmaxcubes\"")
-set_tests_properties("test_repl-ltl_env-guard_max_cubes_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlguardmaxcubes: *6")
-add_test(NAME "test_repl-ltl_env-refinement_rounds_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_REFINEMENT_ROUNDS=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlrefinementrounds\"")
-set_tests_properties("test_repl-ltl_env-refinement_rounds_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlrefinementrounds: *5")
-add_test(NAME "test_repl-ltl_env-refinement_rounds_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_REFINEMENT_ROUNDS=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-refinement-rounds 8 -e \"get ltlrefinementrounds\"")
-set_tests_properties("test_repl-ltl_env-refinement_rounds_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlrefinementrounds: *8")
+add_repl_test(ltl_env-hoa_max_states_env_is_the_fallback
+	"get ltlhoamaxstates" "ltlhoamaxstates: *7" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_HOA_MAX_STATES=7)
+add_repl_test(ltl_env-hoa_max_states_flag_beats_env
+	"get ltlhoamaxstates" "ltlhoamaxstates: *9" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_HOA_MAX_STATES=7 FLAGS --ltl-hoa-max-states 9)
+add_repl_test(ltl_env-hoa_max_states_garbage_warns
+	"get ltlhoamaxstates" "TAU_LTL_HOA_MAX_STATES='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_HOA_MAX_STATES=abc)
+add_repl_test(ltl_env-hoa_max_states_flag_rejects_garbage
+	"get ltlhoamaxstates" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	FLAGS --ltl-hoa-max-states abc)
+add_repl_test(ltl_env-guard_max_cubes_env_is_the_fallback
+	"get ltlguardmaxcubes" "ltlguardmaxcubes: *6" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_GUARD_MAX_CUBES=6)
+add_repl_test(ltl_env-refinement_rounds_env_is_the_fallback
+	"get ltlrefinementrounds" "ltlrefinementrounds: *5" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_REFINEMENT_ROUNDS=5)
+add_repl_test(ltl_env-refinement_rounds_flag_beats_env
+	"get ltlrefinementrounds" "ltlrefinementrounds: *8" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_REFINEMENT_ROUNDS=5 FLAGS --ltl-refinement-rounds 8)
 # 0 is a value, not an absence: it means unlimited, and the variable can say so.
-add_test(NAME "test_repl-ltl_env-window_max_paths_env_is_the_fallback"
-	COMMAND bash -c "TAU_LTL_WINDOW_MAX_PATHS=0 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlwindowmaxpaths\"")
-set_tests_properties("test_repl-ltl_env-window_max_paths_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *unlimited")
-add_test(NAME "test_repl-ltl_env-window_max_paths_flag_beats_env"
-	COMMAND bash -c "TAU_LTL_WINDOW_MAX_PATHS=0 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-window-max-paths 12 -e \"get ltlwindowmaxpaths\"")
-set_tests_properties("test_repl-ltl_env-window_max_paths_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *12")
+add_repl_test(ltl_env-window_max_paths_env_is_the_fallback
+	"get ltlwindowmaxpaths" "ltlwindowmaxpaths: *unlimited" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_WINDOW_MAX_PATHS=0)
+add_repl_test(ltl_env-window_max_paths_flag_beats_env
+	"get ltlwindowmaxpaths" "ltlwindowmaxpaths: *12" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_WINDOW_MAX_PATHS=0 FLAGS --ltl-window-max-paths 12)
 # The same three surfaces for the caps an algebra declares about itself; each
-# exists only when its algebra is in the pack, so each is gated on its own BA.
-tau_repl_unsupported(_tau_skip "get qlt-t3-cap")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-qlt_t3_cap_env")
-else()
-	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_env_is_the_fallback"
-		COMMAND bash -c "TAU_QLT_T3_CAP=14 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get qlt-t3-cap\"")
-	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_env_is_the_fallback" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *14")
-	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_flag_beats_env"
-		COMMAND bash -c "TAU_QLT_T3_CAP=14 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-t3-cap 12 -e \"get qlt-t3-cap\"")
-	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_flag_beats_env" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *12")
-	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_garbage_warns"
-		COMMAND bash -c "TAU_QLT_T3_CAP=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get qlt-t3-cap\" 2>&1")
-	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_garbage_warns" PROPERTIES
-		PASS_REGULAR_EXPRESSION "TAU_QLT_T3_CAP='abc' is not a non-negative number")
-endif()
-tau_repl_unsupported(_tau_skip "get qlt-const-output-max")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-qlt_const_output_max_env")
-else()
-	add_test(NAME "test_repl-ltl_env-qlt_const_output_max_env_is_the_fallback"
-		COMMAND bash -c "TAU_QLT_CONST_OUTPUT_MAX=4 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get qlt-const-output-max\"")
-	set_tests_properties("test_repl-ltl_env-qlt_const_output_max_env_is_the_fallback" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-const-output-max: *4")
-	add_test(NAME "test_repl-ltl_env-qlt_const_output_max_flag_beats_env"
-		COMMAND bash -c "TAU_QLT_CONST_OUTPUT_MAX=4 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-const-output-max 3 -e \"get qlt-const-output-max\"")
-	set_tests_properties("test_repl-ltl_env-qlt_const_output_max_flag_beats_env" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-const-output-max: *3")
-endif()
-tau_repl_unsupported(_tau_skip "get nlang-http-timeout")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-nlang_http_timeout_env")
-else()
-	add_test(NAME "test_repl-ltl_env-nlang_http_timeout_env_is_the_fallback"
-		COMMAND bash -c "TAU_NLANG_HTTP_TIMEOUT=9 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get nlang-http-timeout\"")
-	set_tests_properties("test_repl-ltl_env-nlang_http_timeout_env_is_the_fallback" PROPERTIES
-		PASS_REGULAR_EXPRESSION "nlang-http-timeout: *9")
-	add_test(NAME "test_repl-ltl_env-nlang_http_timeout_flag_beats_env"
-		COMMAND bash -c "TAU_NLANG_HTTP_TIMEOUT=9 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --nlang-http-timeout 3 -e \"get nlang-http-timeout\"")
-	set_tests_properties("test_repl-ltl_env-nlang_http_timeout_flag_beats_env" PROPERTIES
-		PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")
-endif()
+# exists only when its algebra is in the pack, so the family gates each one.
+add_repl_test(ltl_env-qlt_t3_cap_env_is_the_fallback
+	"get qlt-t3-cap" "qlt-t3-cap: *14" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_T3_CAP=14)
+add_repl_test(ltl_env-qlt_t3_cap_flag_beats_env
+	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_T3_CAP=14 FLAGS --qlt-t3-cap 12)
+add_repl_test(ltl_env-qlt_t3_cap_garbage_warns
+	"get qlt-t3-cap" "TAU_QLT_T3_CAP='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_T3_CAP=abc)
+add_repl_test(ltl_env-qlt_const_output_max_env_is_the_fallback
+	"get qlt-const-output-max" "qlt-const-output-max: *4" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CONST_OUTPUT_MAX=4)
+add_repl_test(ltl_env-qlt_const_output_max_flag_beats_env
+	"get qlt-const-output-max" "qlt-const-output-max: *3" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CONST_OUTPUT_MAX=4 FLAGS --qlt-const-output-max 3)
+add_repl_test(ltl_env-nlang_http_timeout_env_is_the_fallback
+	"get nlang-http-timeout" "nlang-http-timeout: *9" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_NLANG_HTTP_TIMEOUT=9)
+add_repl_test(ltl_env-nlang_http_timeout_flag_beats_env
+	"get nlang-http-timeout" "nlang-http-timeout: *3" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_NLANG_HTTP_TIMEOUT=9 FLAGS --nlang-http-timeout 3)
 # A BA-declared count option left unset keeps the algebra's own default: the
 # CLI passes nothing, so an algebra's environment fallback is not shadowed.
-tau_repl_unsupported(_tau_skip "get qlt-t3-cap")
-if(_tau_skip)
-	tau_repl_record_skip("ltl_env-qlt_t3_cap_default_without_flag")
-else()
-	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_default_without_flag"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get qlt-t3-cap\"")
-	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_default_without_flag" PROPERTIES
-		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *20")
-endif()
+add_repl_test(ltl_env-qlt_t3_cap_default_without_flag
+	"get qlt-t3-cap" "qlt-t3-cap: *20" NO_FAIL_REGEX NO_TRACE)
 
 # TAU_TREF_BUDGET is the memory budget's environment form: it shows through
 # `get` when the flag is unset, and the flag wins when both are given.
-add_test(NAME "test_repl-tref_budget_env_is_the_fallback"
-	COMMAND bash -c "TAU_TREF_BUDGET=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get trefbudget\"")
-set_tests_properties("test_repl-tref_budget_env_is_the_fallback" PROPERTIES
-	PASS_REGULAR_EXPRESSION "trefbudget: *4096")
-
-add_test(NAME "test_repl-tref_budget_flag_beats_env"
-	COMMAND bash -c "TAU_TREF_BUDGET=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --tref-budget 8192 -e \"get trefbudget\"")
-set_tests_properties("test_repl-tref_budget_flag_beats_env" PROPERTIES
-	PASS_REGULAR_EXPRESSION "trefbudget: *8192")
+add_repl_test(tref_budget_env_is_the_fallback
+	"get trefbudget" "trefbudget: *4096" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_TREF_BUDGET=4096)
+add_repl_test(tref_budget_flag_beats_env
+	"get trefbudget" "trefbudget: *8192" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_TREF_BUDGET=4096 FLAGS --tref-budget 8192)
 
 # A budget no session can meet refuses the command instead of answering it,
 # and says which knob set the cap.
-add_test(NAME "test_repl-tref_budget_refuses_when_exhausted"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --tref-budget 1 -e \"dnf (x & y) | z\" 2>&1")
-set_tests_properties("test_repl-tref_budget_refuses_when_exhausted" PROPERTIES
-	PASS_REGULAR_EXPRESSION "memory budget exhausted.*--tref-budget")
+add_repl_test(tref_budget_refuses_when_exhausted
+	"dnf (x & y) | z" "memory budget exhausted.*--tref-budget" NO_FAIL_REGEX NO_TRACE
+	FLAGS --tref-budget 1)
 
 # Unlimited is the shipped default: the same command answers normally.
-add_test(NAME "test_repl-tref_budget_unlimited_by_default"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"dnf (x & y) | z\" 2>&1")
-set_tests_properties("test_repl-tref_budget_unlimited_by_default" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "memory budget exhausted"
-	PASS_REGULAR_EXPRESSION "xy\\|z")
+add_repl_test(tref_budget_unlimited_by_default
+	"dnf (x & y) | z" "xy\\|z" NO_TRACE
+	FAIL_REGEX "memory budget exhausted")

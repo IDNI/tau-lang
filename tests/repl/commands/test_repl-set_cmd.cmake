@@ -78,25 +78,20 @@ add_repl_test(set_cmd-decisionpins_zero_is_none
 	"set decisionpins 0. get decisionpins" "decisionpins: *0")
 
 # bv declares case-split-max-tests as its own option, addressed
-# bv-case-split-max-tests, present when bv is in the configured pack -- hence
-# gated by hand, as bv-blastdepth's family is.
-tau_repl_unsupported(_tau_skip "set bv-case-split-max-tests")
-if(_tau_skip)
-	tau_repl_record_skip("set_cmd-bv_case_split_max_tests_roundtrip")
-	tau_repl_record_skip("set_cmd-bv_case_split_max_tests_zero_unlimited")
-else()
-	add_repl_test(set_cmd-bv_case_split_max_tests_roundtrip
-		"set bv-case-split-max-tests 7. get bv-case-split-max-tests"
-		"bv-case-split-max-tests: *7")
-	add_repl_test(set_cmd-bv_case_split_max_tests_zero_unlimited
-		"set bv-case-split-max-tests 7. set bv-case-split-max-tests 0. get bv-case-split-max-tests"
-		"bv-case-split-max-tests: *unlimited")
-endif()
+# bv-case-split-max-tests, present when bv is in the configured pack. The
+# command names the option but not the BA, so REQUIRES bv carries the pack
+# gate, as bv-blastdepth's family does.
+add_repl_test(set_cmd-bv_case_split_max_tests_roundtrip
+	"set bv-case-split-max-tests 7. get bv-case-split-max-tests"
+	"bv-case-split-max-tests: *7" REQUIRES bv)
+add_repl_test(set_cmd-bv_case_split_max_tests_zero_unlimited
+	"set bv-case-split-max-tests 7. set bv-case-split-max-tests 0. get bv-case-split-max-tests"
+	"bv-case-split-max-tests: *unlimited" REQUIRES bv)
 # Numeric options reject flag values and non-numbers.
-add_repl_test_fail(set_cmd-fixpointsteps_flag_value_rejected
-	"set fixpointsteps on" "Invalid value")
-add_repl_test_fail(set_cmd-gcgrowth_bad_value_rejected
-	"set gcgrowth 1..5" "Invalid value")
+add_repl_test(set_cmd-fixpointsteps_flag_value_rejected
+	"set fixpointsteps on" "Invalid value" NO_FAIL_REGEX)
+add_repl_test(set_cmd-gcgrowth_bad_value_rejected
+	"set gcgrowth 1..5" "Invalid value" NO_FAIL_REGEX)
 
 # --- bv widening (exact bitvector arithmetic) -------------------------------
 # bv-widening is a flag, bv-max-width a count; each round-trips through the
@@ -112,10 +107,10 @@ add_repl_test(set_cmd-bvmaxwidth
 	"set bv-max-width 64. get bv-max-width" "bv-max-width: *64")
 add_repl_test(set_cmd-bvmaxwidth_zero_keeps_current
 	"set bv-max-width 64. set bv-max-width 0. get bv-max-width" "bv-max-width: *64")
-add_repl_test_fail(set_cmd-bvmaxwidth_flag_value_rejected
-	"set bv-max-width on" "Invalid value: expected a count")
-add_repl_test_fail(set_cmd-bvmaxwidth_enable_rejected
-	"enable bv-max-width" "takes a count, not a flag")
+add_repl_test(set_cmd-bvmaxwidth_flag_value_rejected
+	"set bv-max-width on" "Invalid value: expected a count" NO_FAIL_REGEX)
+add_repl_test(set_cmd-bvmaxwidth_enable_rejected
+	"enable bv-max-width" "takes a count, not a flag" NO_FAIL_REGEX)
 # The mode actually changes what the decision procedures answer: 16 * 16
 # wraps to 0 at 8 bits in the default mode and is 256 -- never 0 -- once the
 # exact mode is on, in the same session.
