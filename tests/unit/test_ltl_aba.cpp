@@ -41,6 +41,7 @@
 #ifdef DEBUG
 #  include "interpreter.h"
 #endif
+#include <chrono>
 #include <cstdlib>
 #include <sstream>
 #include <fstream>
@@ -4771,6 +4772,26 @@ TEST_SUITE("Data game strategy") {
 			without_i1 = without_i1 || !reads_i1;
 		}
 		CHECK(without_i1);
+	}
+
+	// Refining the abstraction's strategy for this spec, which the data
+	// game shows unrealizable, did not finish. The library keeps the types
+	// of the streams it has seen, so the names are this test's own.
+	TEST_CASE("a run the data game proves unrealizable is refused at once") {
+		auto t0 = std::chrono::steady_clock::now();
+		auto ir = api<node_t>::get_interpreter(std::string(
+			"(always o73[t]:bv[1]' = 0 && o71[t-2]:bv[1] = 0 "
+			"&& (o73[t-2]:bv[1] = o71[t]:bv[1] || i71[t-2]:bv[1] != 0 "
+			"|| i71[t]:bv[1]' != 0 && o71[t-2]:bv[1] = i71[t-2]:bv[1])) "
+			"&& (sometimes o72[t-1]:bv[1] = 0)."));
+		const double seconds = std::chrono::duration<double>(
+			std::chrono::steady_clock::now() - t0).count();
+		CHECK_FALSE(ir.has_value());
+		CHECK(seconds < 30);
+		std::ostringstream msg;
+		ir.report().print(msg);
+		INFO(msg.str());
+		CHECK(msg.str().find("unrealizable") != std::string::npos);
 	}
 }
 
