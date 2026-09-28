@@ -2847,15 +2847,18 @@ per conjunct, guard atoms per propositional check, clause-subset size and
 rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
 the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
 closed bitvector formula whose binders are all of one kind quantifier-free,
-off by default), `--bv-widening` (exact, widened bitvector arithmetic
+off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
+bitvectors of at most 16 bits may take when Tau decides it on the bits of
+its values, before the solver takes it instead; 1048576 by default, `0`
+leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
 1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
-`--bv-quantifier-free-decision`, `--bv-widening` and `--bv-max-width` are
-not recognized options at all.
+`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`, `--bv-widening`
+and `--bv-max-width` are not recognized options at all.
 
 ## `tau compile` — synthesis-to-executable compiler
 
@@ -3163,7 +3166,10 @@ it is read, and drop its binder, before the case split; mirroring
 `bv-defelim-max-rounds` (mirroring the command line options of the same
 names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose
 binders are all of one kind quantifier-free, mirroring
-`--bv-quantifier-free-decision`; off by default), `bv-widening` (the
+`--bv-quantifier-free-decision`; off by default), `bv-bitblast-max-nodes`
+(the BDD budget of the decision on the bits of values of at most 16 bits,
+mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
+question to the solver), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
 mirroring `--bv-widening`; off by default) and `bv-max-width` (cap on the
 width widening may compute at, mirroring `--bv-max-width`; 1024 by default,
