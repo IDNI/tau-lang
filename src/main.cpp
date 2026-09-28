@@ -234,10 +234,16 @@ cli::commands tau_commands() {
 	cli::commands cs;
 	cli::command gen("gen",
 		"generates the C++ artifact for a Tau spec file (no build)");
-gen.add_option(cli::option("output", 'o', "")
+	const cli::option gen_output = cli::option("output", 'o', "")
 		.set_description("output directory (default: <spec>.build; "
-			"only with a single spec file)"));
+			"only with a single spec file)");
+	gen.add_option(gen_output);
 	cs[gen.name()] = gen;
+	// `codegen` is a second key for the same command: the map is keyed by name
+	// and cli has no alias support.
+	cli::command codegen("codegen", "another name for gen");
+	codegen.add_option(gen_output);
+	cs[codegen.name()] = codegen;
 	cli::command compile("compile",
 		"compiles a Tau spec file into a standalone executable");
 	compile.add_option(cli::option("output", 'o', "")
@@ -515,18 +521,19 @@ int main(int argc, char** argv) {
 
 	// After the options, so a budget given with the verb (--ltl-timeout,
 	// --max-consistency-subsets, ...) applies to its synthesis too.
-	if (cmd.ok() && cmd.name() == "gen") {
+	if (cmd.ok() && (cmd.name() == "gen" || cmd.name() == "codegen")) {
 		if (files.empty())
-			return error("Usage: tau gen <spec.tau>... [-o out_dir]");
+			return error("Usage: tau " + cmd.name()
+				+ " <spec.tau>... [-o out_dir]");
 		size_t dash_count = 0;
 		for (const auto& f : files) if (f == "-") ++dash_count;
 		if (dash_count > 1)
-			return error("tau gen: '-' reads the spec from stdin and may "
-				"appear only once");
+			return error("tau " + cmd.name() + ": '-' reads the spec from stdin "
+				"and may appear only once");
 		std::string out_dir = cmd.get<std::string>("output");
 		if (!out_dir.empty() && files.size() > 1)
-			return error("tau gen: -o names one output directory, but "
-				"several spec files were given");
+			return error("tau " + cmd.name() + ": -o names one output "
+				"directory, but several spec files were given");
 		for (const auto& spec_file : files) {
 			std::string src;
 			if (!read_spec_file(spec_file, src))
@@ -537,7 +544,7 @@ int main(int argc, char** argv) {
 			// the same `a` a compiler gives an unnamed input.
 			std::string dir = !out_dir.empty() ? out_dir
 				: (spec_file == "-" ? "a.build" : spec_file + ".build");
-			TAU_LOG_INFO << "tau gen: " << spec_file;
+			TAU_LOG_INFO << "tau " << cmd.name() << ": " << spec_file;
 			auto res = gen_spec<node_t>(src, dir, "program", cmd.name());
 			if (!res.has_value()) {
 				res.print();

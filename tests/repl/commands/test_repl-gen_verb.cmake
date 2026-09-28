@@ -71,3 +71,9 @@ add_gen_test(refuse_nonempty_dir CASE nonempty_dir
 add_gen_test(reuse_artifact_dir CASE reuse_dir
 	SPEC "${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
 	REQUIRES hostfs)
+
+# `codegen` is the same command under a second key, so it must emit the
+# artifact `gen` emits.
+add_gen_test(codegen_alias CASE alias
+	SPEC "${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
+	REQUIRES hostfs)

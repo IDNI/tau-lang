@@ -279,17 +279,17 @@ Full [command-line reference](#command-line-interface).  The interpreter is
 the right choice when you want to iterate on a spec, inspect intermediate
 results, or run short jobs from the shell.
 
-## Generate and compile a spec (`tau gen`, `tau compile`)
+## Generate and compile a spec (`tau gen`, `tau codegen`, `tau compile`)
 
-A spec becomes a standalone program in two steps. `tau gen` parses the spec,
-prepares its execution exactly as the interpreter does, and writes a small
-CMake project next to the spec (`<spec>.build/`): one `main.cpp` that drives
-the strategy through the same run loop `tau <spec>` uses, plus a
-`CMakeLists.txt` that links the tau SDK and a `CMakePresets.json` with one
-preset per platform. `tau compile` runs `gen` and then configures and builds
-that project with the SDK script, and copies the program to the requested
-path. The program makes the moves `run` makes. When `run` plays the finite
-machine of the data game's strategy, the program carries that machine;
+A spec becomes a standalone program in two steps. `tau gen` (also spelled `tau
+codegen`) parses the spec, prepares its execution exactly as the interpreter
+does, and writes a small CMake project next to the spec (`<spec>.build/`): one
+`main.cpp` that drives the strategy through the same run loop `tau <spec>`
+uses, plus a `CMakeLists.txt` that links the tau SDK and a `CMakePresets.json`
+with one preset per platform. `tau compile` runs `gen` and then configures and
+builds that project with the SDK script, and copies the program to the
+requested path. The program makes the moves `run` makes. When `run` plays the
+finite machine of the data game's strategy, the program carries that machine;
 otherwise `run` solves as it goes, and the program executes the embedded
 specification the same way.
 
@@ -298,7 +298,7 @@ specification the same way.
 echo 'G(o1[t]:bv = i1[t]:bv).' > spec.tau
 
 # 2. Emit the artifact only, or emit and build in one command.
-tau gen spec.tau
+tau gen spec.tau          # `tau codegen spec.tau` is the same command
 tau compile spec.tau -o sim
 
 # 3. Run it: it reads inputs and prints outputs like the interpreter does
@@ -306,13 +306,13 @@ tau compile spec.tau -o sim
 ./sim
 ```
 
-A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` file
-list.
+A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` or `tau
+codegen` file list.
 
-`tau gen <spec.tau>... [-o <dir>]` takes one or more spec files. Each spec
-writes its own `<spec>.build/`. A spec from stdin has no name, so it writes
-`a.build/`. `-o` names one output directory. It is an error with more than one
-spec file.
+`tau gen <spec.tau>... [-o <dir>]` (also `tau codegen`) takes one or more spec
+files. Each spec writes its own `<spec>.build/`. A spec from stdin has no name,
+so it writes `a.build/`. `-o` names one output directory. It is an error with
+more than one spec file.
 
 `tau compile -` reads the spec from stdin. With no `-o`, it writes the
 artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
@@ -356,13 +356,12 @@ preset build the script configures with the artifact preset, uses the SDK box
 of the target platform, and checks its toolchain record against the host
 toolchain, so a cross build names the toolchain it needs.
 
-The emitted project's `CMakePresets.json` carries one preset per platform and
-no path of the machine that ran `tau gen`. The project finds its box at
-configure time: `TAU_SDK_DIR` names the SDK box (the directory holding
-`TauConfig.cmake`), and `tau compile` and `./dev compile` pass a source-tree
-box as `-DTau_DIR`. A missing box fails with
-`no SDK for <platform>; install tau-sdk-<suffix> or build it with ./dev preset
-<platform>`.
+The emitted project's `CMakePresets.json` carries one preset per platform and no
+path of the machine that ran `tau gen` (`tau codegen`). The project finds its
+box at configure time: `TAU_SDK_DIR` names the SDK box (the directory holding
+`TauConfig.cmake`), and `tau compile` and `./dev compile` pass a source-tree box
+as `-DTau_DIR`. A missing box fails with `no SDK for <platform>; install
+tau-sdk-<suffix> or build it with ./dev preset <platform>`.
 
 No build, store or source path goes into `tau`.
 
@@ -2805,11 +2804,11 @@ Tau-lang ships one executable, `tau`, with two roles:
 - **interpreter / REPL** — runs a specification by solving each time step
   through the core solver pipeline.  Best for REPL use, spec authoring, and
   executing specifications dynamically.
-- **`tau gen` / `tau compile`** — the ahead-of-time compiler.  `tau gen`
-  reads a specification file, invokes the synthesis pipeline once, and writes
-  a standalone CMake project.  `tau compile` does the same and then builds it
-  into an executable that steps the synthesized strategy (see
-  [`tau gen` and `tau compile`](#generate-and-compile-a-spec-tau-gen-tau-compile)).
+- **`tau gen` / `tau codegen` / `tau compile`** — the ahead-of-time compiler.
+  `tau gen` reads a specification file, invokes the synthesis pipeline once,
+  and writes a standalone CMake project.  `tau compile` does the same and then
+  builds it into an executable that steps the synthesized strategy (see
+  [`tau gen` and `tau compile`](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).
 
 Both roles share the same spec format.  Use whichever matches your deployment
 story.
@@ -2929,22 +2928,24 @@ and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`, `--bv-widening`
 and `--bv-max-width` are not recognized options at all.
 
-## `tau gen` and `tau compile` — synthesis-to-executable compiler
+## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
 
 ```bash
 tau gen <spec.tau>... [ -o <dir> ]
+tau codegen <spec.tau>... [ -o <dir> ]
 tau compile <spec.tau> [ -o <exe> ] [ -c <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ]
 ```
 
-`tau gen` parses each spec file, prepares its execution exactly as the
-interpreter does, and emits `<spec.tau>.build/` (a `main.cpp` driving the
-strategy plus a `CMakeLists.txt` that finds the tau SDK and links `TAU::TAU`,
-one preset per platform in `CMakePresets.json`, and the `platforms.json` and
-toolchain that file names).  A spec file may be `-` (stdin, once per list).  It
-emits `a.build/`.  `-o` names one output directory.  It is an error with
-several spec files.  `tau compile` runs `gen`.  Then the SDK script
-`cmake/tau-compile.cmake` configures and builds the project for this machine
-by default, or for the `--preset` platform, and copies the program to `-o <exe>`
+`tau gen` (also spelled `tau codegen`) parses each spec file, prepares its
+execution exactly as the interpreter does, and emits `<spec.tau>.build/` (a
+`main.cpp` driving the strategy plus a `CMakeLists.txt` that finds the tau SDK
+and links `TAU::TAU`, one preset per platform in `CMakePresets.json`, and the
+`platforms.json` and toolchain that file names).  A spec file may be `-`
+(stdin, once per list).  It emits `a.build/`.  `-o` names one output
+directory.  It is an error with several spec files.  `tau compile` runs `gen`.
+Then the SDK script `cmake/tau-compile.cmake` configures and builds the project
+for this machine by default, or for the `--preset` platform, and copies the
+program to `-o <exe>`
 (default: the spec path without its extension, or `a.out` / `a.exe` on Windows
 for stdin).  `tau compile -` writes the artifact to `a.build/`.  `--preset`
 names a platform or a `./dev preset` name.  `-D` and `-G` reach the emitted
@@ -2952,14 +2953,14 @@ project configure.  The program behaves like `tau <spec.tau>`: it reads inputs,
 prints outputs, and exits when its input closes.  Exit code `0` on success, `1`
 on every failure, with the reason in the `compile failed:` message (see
 [Generate and compile a
-spec](#generate-and-compile-a-spec-tau-gen-tau-compile)).  The program makes
-the moves `run` makes, because `tau compile` asks the interpreter what it
-executes.  When `run` plays the Mealy machine of the data game's strategy, the
-program carries that machine.  Otherwise `run` solves as it goes: each step
-through the safety pipeline, and, for a strategy of the abstraction or of a
-data game with no such machine, that game or synthesis when it starts.  The
-program then executes the embedded spec the same way, with the same solver, so
-it needs `ltlsynt` where `run` does.
+spec](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).  The
+program makes the moves `run` makes, because `tau compile` asks the
+interpreter what it executes.  When `run` plays the Mealy machine of the data
+game's strategy, the program carries that machine.  Otherwise `run` solves as
+it goes: each step through the safety pipeline, and, for a strategy of the
+abstraction or of a data game with no such machine, that game or synthesis
+when it starts.  The program then executes the embedded spec the same way,
+with the same solver, so it needs `ltlsynt` where `run` does.
 
 ## When to use which
 
@@ -2968,7 +2969,7 @@ it needs `ltlsynt` where `run` does.
 | Interactive spec authoring / debugging                  | `tau` REPL  |
 | One-off running of a spec against inputs                | `tau`       |
 | Checking satisfiability / realizability of a spec       | `tau`       |
-| Inspecting or editing the generated C++ project         | `tau gen`   |
+| Inspecting or editing the generated C++ project         | `tau gen` / `tau codegen` |
 | Deploying a realized spec as one binary                 | `tau compile` |
 | Integrating the synthesized behaviour into a C++ project | the `cpp_codegen.h` library API (`emit_program`) |
 | Specs with data atoms requiring runtime witness search  | both: the compiled program solves witnesses per step through libTAU, as the interpreter does |

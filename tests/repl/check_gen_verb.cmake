@@ -1,7 +1,8 @@
 # `tau gen` cases: emit the artifact for one or more specs and never build it.
 # A CMake script so the cases need no shell and no mktemp.
 # Usage: cmake -DTAU=<tau> -DSPEC=<spec> [-DSPEC2=<spec2>] -DTMP=<scratch>
-#               -DCASE=<one|two|two_with_output|cmake_names|stdin|stdin_twice>
+#               -DCASE=<one|two|two_with_output|cmake_names|stdin|stdin_twice
+#                      |reuse_dir|nonempty_dir|alias>
 #               -P this.
 if(NOT TAU OR NOT SPEC OR NOT TMP OR NOT CASE)
 	message(FATAL_ERROR "usage: -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch> "
@@ -89,6 +90,40 @@ elseif(CASE STREQUAL "nonempty_dir")
 	if(EXISTS "${TMP}/out/CMakeLists.txt")
 		message(FATAL_ERROR "tau gen -o <nonempty> wrote CMakeLists.txt")
 	endif()
+elseif(CASE STREQUAL "alias")
+	# `codegen` is the same verb under a second key, so the artifact it writes
+	# must match the one `gen` writes byte for byte.
+	execute_process(COMMAND "${TAU}" gen "${_s1}" -o "${TMP}/gen"
+		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err
+		TIMEOUT 300)
+	if(NOT _rc STREQUAL "0")
+		message(FATAL_ERROR "tau gen exited ${_rc}\n${_out}${_err}")
+	endif()
+	execute_process(COMMAND "${TAU}" codegen "${_s1}" -o "${TMP}/codegen"
+		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err
+		TIMEOUT 300)
+	if(NOT _rc STREQUAL "0")
+		message(FATAL_ERROR "tau codegen exited ${_rc}\n${_out}${_err}")
+	endif()
+	set(_artifacts
+		main.cpp CMakeLists.txt CMakePresets.json platforms.json
+		.tau-artifact
+		cmake/toolchains/mingw-w64-x86_64.cmake
+		cmake/toolchains/aarch64-linux-gnu.cmake)
+	foreach(_f IN LISTS _artifacts)
+		foreach(_verb gen codegen)
+			if(NOT EXISTS "${TMP}/${_verb}/${_f}")
+				message(FATAL_ERROR
+					"tau ${_verb} wrote no ${_f}\n${_out}${_err}")
+			endif()
+		endforeach()
+		file(READ "${TMP}/gen/${_f}" _gen_text)
+		file(READ "${TMP}/codegen/${_f}" _codegen_text)
+		if(NOT _gen_text STREQUAL _codegen_text)
+			message(FATAL_ERROR
+				"tau codegen ${_f} differs from tau gen")
+		endif()
+	endforeach()
 else()
 	# Every other case runs one spec (and a second for `two`).
 	set(_gen_args "${_s1}")

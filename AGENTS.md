@@ -95,16 +95,16 @@ Notes:
 - Legacy wrappers (`./dev debug`, `./dev release`, `./dev test-debug`, … →
   `build-Debug/`, `build-Release/`) still exist but should not be used for new work.
 
-`tau gen` writes an artifact folder with its own `CMakePresets.json`. `tau
-compile` builds it. Without `--preset` the build is native: it uses the SDK of
-the running tau (`<build>/sdk` for a build tree, else the installed box beside
-the binary), cmake's compiler and a `Release` build type unless a
-`-DCMAKE_BUILD_TYPE` is given. `./dev compile <dir>` builds an artifact the same
-way, native without `--preset` from `build/release/sdk`. `--cxx` or `TAU_CXX`
-names the compiler, and the flag wins. `--preset` takes a platform name or any
-`./dev preset` name, which
-maps to the platform of its build folder, and builds with that platform's SDK
-box and toolchain. A **platform** is the build folder name `./dev preset`
+`tau gen` (also spelled `tau codegen`) writes an artifact folder with its own
+`CMakePresets.json`. `tau compile` builds it. Without `--preset` the build is
+native: it uses the SDK of the running tau (`<build>/sdk` for a build tree,
+else the installed box beside the binary), cmake's compiler and a `Release`
+build type unless a `-DCMAKE_BUILD_TYPE` is given. `./dev compile <dir>`
+builds an artifact the same way, native without `--preset` from
+`build/release/sdk`. `--cxx` or `TAU_CXX` names the compiler, and the flag
+wins. `--preset` takes a platform name or any `./dev preset` name, which maps
+to the platform of its build folder, and builds with that platform's SDK box
+and toolchain. A **platform** is the build folder name `./dev preset`
 uses: `release`, `devel`, `debug` and their `-gcc`, `-w64`, `-arm64`, `-msvc`,
 `-msvc-clang-cl`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
 at `build/<platform>/sdk/`, so a cross-platform artifact needs that platform
