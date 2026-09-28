@@ -4852,6 +4852,43 @@ TEST_SUITE("Data game strategy") {
 		CHECK(without_i1);
 	}
 
+	// The running goal o1[t-2] = 1 cannot be met once o1 stays 0; the
+	// revision keeps the update and lets the goal go, as pointwise
+	// revision does when the running goals are not executable along it.
+	TEST_CASE("a revision drops the running goals the update rules out") {
+		auto run = run_revised("(always o2[t] = o1[t-1]) "
+			"&& (sometimes o1[t-2] = 1).", "always o1[t] = 0", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run, "o1[t] = 0", 5, 10));
+	}
+
+	// The revision looks two steps back, further than the run keeps; the
+	// revised spec holds from its lookback on, with values of its own
+	// before.
+	TEST_CASE("a revision reading values the run does not keep starts afresh") {
+		auto run = run_revised("(always o1[t]:bv[1] != o1[t-1]:bv[1]) "
+			"&& (sometimes o2[t]:bv[1] = 1).",
+			"always o1[t-1]:bv[1] = o1[t-2]:bv[1]", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run,
+			"o1[t-1]:bv[1] = o1[t-2]:bv[1]", 7, 10));
+	}
+
+	// o3 is a stream the run has no values of.
+	TEST_CASE("a revision reading a new stream's past starts afresh") {
+		auto run = run_revised("(always o1[t]:bv[1] != o1[t-1]:bv[1]) "
+			"&& (sometimes o2[t]:bv[1] = 1).",
+			"always o3[t]:bv[1] != o3[t-1]:bv[1]", 5, 6);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(holds_from(*run, "o3[t]:bv[1] != o3[t-1]:bv[1]", 6, 10));
+	}
+
 	// Deciding whether the running spec, goals included, implies the
 	// update took minutes here; the check reads its always part only.
 	TEST_CASE("a revision of a spec with goals is decided quickly") {
@@ -4864,6 +4901,23 @@ TEST_SUITE("Data game strategy") {
 		CHECK(run->accepted);
 		CHECK(run->seconds < 30);
 		CHECK(holds_from(*run, "o1[t] = 0", 5, 8));
+	}
+
+	// Among the candidates of this revision is one the data game proves
+	// unrealizable; executing the abstraction's strategy for it instead
+	// did not finish.
+	TEST_CASE("a revision skips a candidate the data game proves unrealizable") {
+		auto run = run_revised("(always o1[0]:bv[1] = 1 && o3[0]:bv[1] = 0 "
+			"&& o3[t]:bv[1] = 1 && ((!(i1[t]:bv[1] = o3[t]:bv[1]) "
+			"&& i1[t-2]:bv[1] = o1[t-2]:bv[1]) || (!(i1[t-2]:bv[1] = 0) "
+			"|| o1[t]:bv[1] = o3[t-2]:bv[1]))) "
+			"&& (sometimes o2[t-1]:bv[1] = 0).",
+			"always o1[t]:bv[1] = 0", 5, 4);
+		REQUIRE(run.has_value());
+		REQUIRE(run->data_game);
+		CHECK(run->accepted);
+		CHECK(run->seconds < 30);
+		CHECK(holds_from(*run, "o1[t]:bv[1] = 0", 5, 8));
 	}
 
 	// Refining the abstraction's strategy for this spec, which the data
