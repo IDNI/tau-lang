@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 #include <functional>
+#include <map>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -2323,6 +2324,151 @@ tref inputs_as_outputs(tref fm) {
 	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
 }
 
+// Whether the paths of `fm` can be enumerated by for_each_static_path: no io
+// variable (so no lookback decides when a conjunct is enforced), no temporal
+// operator, and no disjunction below a node other than a conjunction,
+// disjunction or quantifier.
+template <NodeType node>
+bool has_static_paths(tref fm) {
+	using tau = tree<node>;
+	if (tau::get(fm).find_top([](tref n) {
+		return is_io_var<node>(n) || is_temporal_quantifier<node>(n);
+	})) return false;
+	std::vector<tref> todo{ fm };
+	while (!todo.empty()) {
+		tref n = todo.back();
+		todo.pop_back();
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			todo.push_back(t[0].first());
+			todo.push_back(t[0].second());
+		} else if (!is_child_quantifier<node>(n)
+			&& t.find_top(is<node, tau::wff_or>))
+			return false;
+	}
+	return true;
+}
+
+// Calls `f` on the paths of `fm`, a conjunction of literals each, until `f`
+// returns false; returns false then, true otherwise. The disjunction of the
+// paths is equivalent to `fm`, as with expression_paths, but no path holds a
+// literal and its negation, no literal twice, and no path is made for a
+// disjunction one of whose disjuncts the path already holds (those paths
+// would be absorbed by the one that takes that disjunct). Expects
+// has_static_paths(fm).
+template <NodeType node>
+bool for_each_static_path(tref fm, const auto& f) {
+	using tau = tree<node>;
+	const subtree_less<node> less;
+	auto same = [&](tref a, tref b) { return !less(a, b) && !less(b, a); };
+	auto negates = [&](tref a, tref b) {
+		const auto& x = tau::get(a);
+		const auto& y = tau::get(b);
+		if (x.child_is(tau::wff_neg)) return same(tau::trim2(a), b);
+		if (y.child_is(tau::wff_neg)) return same(tau::trim2(b), a);
+		auto eq_neq = [&](const tau& e, const tau& n) {
+			return e.child_is(tau::bf_eq) && n.child_is(tau::bf_neq)
+				&& same(e[0].first(), n[0].first())
+				&& same(e[0].second(), n[0].second());
+		};
+		return eq_neq(x, y) || eq_neq(y, x);
+	};
+	// The and/or skeleton of fm, with its leaves numbered by literal
+	enum kind_t { AND, OR, LIT, TRUE, FALSE };
+	struct part { kind_t kind; std::vector<size_t> sub; size_t lit = 0; };
+	std::vector<part> parts;
+	trefs lits;
+	std::map<tref, size_t, subtree_less<node>> lit_ids;
+	std::function<size_t(tref)> build = [&](tref g) -> size_t {
+		const auto& t = tau::get(g);
+		part p;
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			p.kind = t.child_is(tau::wff_and) ? AND : OR;
+			for (tref c : t.child_is(tau::wff_and)
+					? get_cnf_wff_clauses<node>(g)
+					: get_dnf_wff_clauses<node>(g))
+				p.sub.push_back(build(c));
+		} else if (t.equals_T()) p.kind = TRUE;
+		else if (t.equals_F()) p.kind = FALSE;
+		else {
+			p.kind = LIT;
+			auto [it, fresh] = lit_ids.emplace(g, lits.size());
+			if (fresh) lits.push_back(g);
+			p.lit = it->second;
+		}
+		parts.push_back(std::move(p));
+		return parts.size() - 1;
+	};
+	const size_t root = build(fm);
+	std::vector<std::vector<size_t>> negations(lits.size());
+	for (size_t i = 0; i < lits.size(); ++i)
+		for (size_t j = i + 1; j < lits.size(); ++j)
+			if (negates(lits[i], lits[j]))
+				negations[i].push_back(j),
+				negations[j].push_back(i);
+	std::vector<size_t> held(lits.size(), 0);
+	std::vector<size_t> path, todo{ root };
+	std::function<bool()> go = [&]() -> bool {
+		if (todo.empty()) {
+			if (path.empty()) return f(tau::_T());
+			trefs conj;
+			for (size_t l : path) conj.push_back(lits[l]);
+			return f(conj.size() == 1 ? conj[0]
+				: tau::build_wff_and(conj));
+		}
+		const size_t g = todo.back();
+		todo.pop_back();
+		const part& p = parts[g];
+		bool cont = true;
+		switch (p.kind) {
+		case AND:
+			todo.insert(todo.end(), p.sub.rbegin(), p.sub.rend());
+			cont = go();
+			todo.resize(todo.size() - p.sub.size());
+			break;
+		case OR:
+			if (std::ranges::any_of(p.sub, [&](size_t c) {
+				return parts[c].kind == TRUE
+					|| (parts[c].kind == LIT
+						&& held[parts[c].lit]);
+			})) cont = go();
+			else for (size_t c : p.sub) {
+				todo.push_back(c);
+				cont = go();
+				todo.pop_back();
+				if (!cont) break;
+			}
+			break;
+		case LIT:
+			if (held[p.lit]) cont = go();
+			else if (std::ranges::none_of(negations[p.lit],
+				[&](size_t n) { return held[n] > 0; }))
+			{
+				++held[p.lit], path.push_back(p.lit);
+				cont = go();
+				--held[p.lit], path.pop_back();
+			}
+			break;
+		case TRUE: cont = go(); break;
+		case FALSE: break;
+		}
+		todo.push_back(g);
+		return cont;
+	};
+	return go();
+}
+
+// Calls `f` on the paths of `fm` until `f` returns false; returns false
+// then, true otherwise. Static formulas take for_each_static_path, the rest
+// expression_paths.
+template <NodeType node>
+bool for_each_path(tref fm, const auto& f) {
+	if (has_static_paths<node>(fm))
+		return for_each_static_path<node>(fm, f);
+	for (tref c : expression_paths<node>(fm)) if (!f(c)) return false;
+	return true;
+}
+
 template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	const bool output)
@@ -2467,20 +2613,22 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// still decides the disjunction -- but it keeps "no disjunct
 		// satisfiable" from reading as F.
 		std::optional<result<tref>> undecided_path;
-		for (tref clause : expression_paths<node>(normalized_fm)) {
+		// true while no disjunct is satisfiable
+		auto unsat_path = [&](tref clause) {
 			auto val = transform_to_execution<node>(
 				clause, start_time, output);
 			if (!val.has_value()) {
 				if (!undecided_path) undecided_path.emplace(
 					std::move(val));
-				continue;
+				return true;
 			}
-			if (!tau::get(val.value()).equals_F()) {
-				LOG_DEBUG << "End is_tau_formula_sat: true";
-				memoize(true);
-				DBG(assert(r.is_well_formed());)
-				return r;
-			}
+			return tau::get(val.value()).equals_F();
+		};
+		if (!for_each_path<node>(normalized_fm, unsat_path)) {
+			LOG_DEBUG << "End is_tau_formula_sat: true";
+			memoize(true);
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		if (undecided_path) {
 			TAU_TRY_OR(tref unused, std::move(*undecided_path),
@@ -2539,17 +2687,18 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	// is undecided; an undecided one only matters when no disjunct is
 	// satisfiable, and then it is the result.
 	std::optional<result<tref>> undecided_path;
-	for (tref c : expression_paths<node>(imp_check)) {
+	// true while no path is satisfiable
+	auto unsat_path = [&](tref c) {
 		auto val = transform_to_execution<node>(c, 0, false,
 			sometimes_inputs::guarded);
 		if (!val.has_value()) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
-			continue;
+			return true;
 		}
-		if (!tau::get(val.value()).equals_F()) {
-			return r.with_assert_check_value(false);
-		}
-	}
+		return tau::get(val.value()).equals_F();
+	};
+	if (!for_each_path<node>(imp_check, unsat_path))
+		return r.with_assert_check_value(false);
 	if (undecided_path) {
 		TAU_TRY(tref unused, std::move(*undecided_path));
 		(void)unused;
@@ -2660,20 +2809,32 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// Check satisfiability of each clause -- unit-wise where exact
 	{
 		auto _s = r.open("expression_paths");
-		for (tref clause: expression_paths<node>(normalized_fm)) {
-			bool keep;
+		// the report of the first clause that could not be decided
+		std::optional<result<tref>> failed;
+		auto keep_sat = [&](tref clause) {
 			int fs = factor ? factored_tau_sat<node>(clause) : -1;
-			if (fs >= 0) keep = (fs == 1);
-			else {
-				TAU_TRY_OR(tref val, transform_to_execution<node>(
-					clause, start_time, output),
-					code::internal_error,
-					"transform_to_execution returned "
-					"neither a value nor an error while "
-					"simplifying a disjunct");
-				keep = !tau::get(val).equals_F();
+			if (fs >= 0) {
+				if (fs == 1) clauses.push_back(clause);
+				return true;
 			}
-			if (keep) clauses.push_back(clause);
+			auto val = transform_to_execution<node>(clause,
+				start_time, output);
+			if (!val.has_value()) {
+				failed.emplace(std::move(val));
+				return false;
+			}
+			if (!tau::get(val.value()).equals_F())
+				clauses.push_back(clause);
+			return true;
+		};
+		for_each_path<node>(normalized_fm, keep_sat);
+		if (failed) {
+			TAU_TRY_OR(tref unused, std::move(*failed),
+				code::internal_error,
+				"transform_to_execution returned neither a "
+				"value nor an error while simplifying a "
+				"disjunct");
+			(void)unused;
 		}
 	}
 	r = tau::build_wff_or(clauses);

@@ -981,6 +981,66 @@ TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
 
 } // TEST_SUITE no memo on a full bdd node table
 
+// ============================================================================
+// The decisions on Tau constants skip the paths that hold a literal and its
+// negation.
+TEST_SUITE("tau_ba — pruned paths") {
+// ============================================================================
+
+static tref wff(const std::string& src) {
+	tref fm = tau::get(src, parse_wff()).value_or(nullptr);
+	assert(fm != nullptr);
+	return fm;
+}
+
+static std::vector<std::string> paths(const std::string& src) {
+	std::vector<std::string> out;
+	tref fm = wff(src);
+	REQUIRE( has_static_paths<node_t>(fm) );
+	for_each_static_path<node_t>(fm, [&](tref p) {
+		out.push_back(tau::get(p).to_str());
+		return true;
+	});
+	return out;
+}
+
+TEST_CASE("no path holds a literal and its negation") {
+	auto ps = paths("(<:a> = 0 || <:b> = 0) && (<:a> != 0 || <:c> = 0)");
+	CHECK( ps.size() == 3 );
+	for (const auto& p : ps)
+		CHECK_FALSE( (p.find("<:a> = 0") != std::string::npos
+			&& p.find("<:a> != 0") != std::string::npos) );
+}
+
+TEST_CASE("a disjunction a path already satisfies is not split") {
+	auto ps = paths("<:b> = 0 && (<:a> = 0 || <:b> = 0)");
+	REQUIRE( ps.size() == 1 );
+	CHECK( ps[0] == "<:b> = 0" );
+}
+
+TEST_CASE("a formula with an io variable is not static") {
+	CHECK_FALSE( has_static_paths<node_t>(wff("o1[t] = 0 || <:a> = 0")) );
+	CHECK_FALSE( has_static_paths<node_t>(wff("always <:a> = 0")) );
+}
+
+// Every minterm over four constants: valid, while the negation has 4^16
+// paths before the contradictory ones are cut.
+TEST_CASE("a valid DNF of minterms is one") {
+	std::string src;
+	for (int m = 0; m < 16; ++m) {
+		if (m) src += " || ";
+		for (int k = 0; k < 4; ++k)
+			src += std::string(k ? " && " : "") + "<:m" +
+				std::to_string(k) + ">" +
+				((m >> k) & 1 ? " = 0" : " != 0");
+	}
+	test_ba v(wff(src));
+	CHECK( v.is_one().value() );
+	CHECK_FALSE( v.is_zero().value() );
+}
+
+} // TEST_SUITE pruned paths
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

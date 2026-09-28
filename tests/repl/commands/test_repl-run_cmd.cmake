@@ -684,5 +684,5 @@ add_repl_test(run_cmd-two_outputs_share_an_input_value
 # The values of this run grow with every step; past maxconstantsize the solver
 # gives up with a message instead of overflowing the stack.
 add_repl_test_fail(run_cmd-value_past_constant_size_budget
-	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 3 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
-	"o1\\[1\\] := .*passed the constant size budget")
+	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 5 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"o1\\[3\\] := .*passed the constant size budget")
