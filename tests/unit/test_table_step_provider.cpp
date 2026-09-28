@@ -113,7 +113,9 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(r.has_value()); // undecided is not "unrealizable"
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 		CHECK(bounds.first == 0);   // no lookback in this spec
 
@@ -151,7 +153,9 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(r.has_value()); // undecided is not "unrealizable"
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 
 		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, 3);
@@ -192,7 +196,9 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(r.has_value());
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 
 		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, 5);
@@ -234,7 +240,9 @@ TEST_SUITE("table_step_provider") {
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		REQUIRE(sol->atoms.size() == 1);
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 
 		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, 5);
@@ -284,7 +292,9 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(r.has_value());
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 		REQUIRE(bounds.first == 1);  // one step of lookback baked
 
@@ -303,14 +313,12 @@ TEST_SUITE("table_step_provider") {
 			CHECK(table_vals[k] == solve_vals[k]);
 	}
 
-	// Regression: an edge whose guard carries a __step_ge<k> literal (no
-	// atom of its own, see make_table_provider) used to throw out of
-	// make_table_provider's atom lookup, and, once that's skipped, would
-	// still risk matching the wrong edge unless __step_ge<k> is tracked
-	// like an extra input (time_point >= k). o1's own past value is the
-	// lookback here, not an input's.
+	// o1's own past value is the lookback here, not an input's: the table
+	// plays the data game's Mealy view (playable_table_solution), from
+	// step 0 on, and agrees with the solve provider from the spec's
+	// lookback on.
 	TEST_CASE("output-lookback spec: table provider matches the solve "
-	          "provider from step `lookback` onward (__step_ge guard)"
+	          "provider from step `lookback` onward"
 		* doctest::skip(!ltlsynt_available()))
 	{
 		bdd_init<Bool>();
@@ -329,9 +337,11 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(r.has_value());
 		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
-		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
-		REQUIRE(bounds.first == 1);  // one step of lookback baked
+		CHECK(provider->strategy_state().has_value());
 
 		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, steps);
 
@@ -343,8 +353,73 @@ TEST_SUITE("table_step_provider") {
 
 		REQUIRE(solve_vals.size() == steps);
 		REQUIRE(table_vals.size() == steps);
-		for (size_t k = (size_t)bounds.first; k < steps; ++k)
+		for (size_t k = 1; k < steps; ++k)
 			CHECK(table_vals[k] == solve_vals[k]);
+	}
+
+	// The abstraction's strategy chose o1 at each step on its own and broke
+	// o2[t] = o1[t-1] at step 1; the table now plays the data game's Mealy
+	// view, which keeps it.
+	TEST_CASE("atoms over earlier outputs: the table keeps the spec"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		const size_t steps = 6;
+		std::string spec =
+			"(always o2[t] = o1[t-1]) && (sometimes o1[t-2] = 1).";
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto nfm = normalizer<node_t>(fm);
+		REQUIRE(nfm.has_value());
+		auto r = solve_ltl_aba<node_t>(nfm.value());
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		auto table = make_table_provider<node_t>(*r.value());
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
+		REQUIRE(provider != nullptr);
+		run_table_o1(provider, ctx, o1, steps, bounds.first, bounds.second);
+		auto v1 = o1->get_values(), v2 = o2->get_values();
+		REQUIRE(v1.size() == steps);
+		REQUIRE(v2.size() == steps);
+		for (size_t k = 1; k < steps; ++k) CHECK(v2[k] == v1[k - 1]);
+	}
+
+	TEST_CASE("atoms over earlier outputs without a Mealy view: no table"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		std::string spec = "always o2[t]" + ct + " = o1[t-1]" + ct
+			+ " && o3[t]" + ct + " = o2[t-1]" + ct
+			+ " && o3[t-1]" + ct + " = {0}" + ct + ".";
+		io_context<node_t> ctx;
+		for (const char* o : { "o1", "o2", "o3" })
+			ctx.add_output(o, carrier_tid,
+				std::make_shared<vector_output_stream>());
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto nfm = normalizer<node_t>(fm);
+		REQUIRE(nfm.has_value());
+		auto r = solve_ltl_aba<node_t>(nfm.value());
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		// no view within a bound of 0 states
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		auto table = make_table_provider<node_t>(*r.value());
+		data_game_mealy_max_states = saved;
+		CHECK_FALSE(table.has_value());
+		std::ostringstream oss;
+		table.print(oss);
+		CHECK(oss.str().find("makes a claim the outputs of a step cannot always meet")
+			!= std::string::npos);
 	}
 
 #ifdef TAU_PACK_HAS_BA_QLT
