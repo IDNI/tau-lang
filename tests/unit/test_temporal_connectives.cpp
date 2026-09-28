@@ -85,6 +85,14 @@ bool sat_str_with_io_def(const char* spec) {
 	return r.value();
 }
 
+// Names of the io_vars a formula mentions.
+std::set<std::string> var_names(tref fm) {
+	std::set<std::string> names;
+	for (tref v : tau::get(fm).select_top(is_child<node_t, tau::io_var>))
+		names.insert(get_var_name<node_t>(v));
+	return names;
+}
+
 } // namespace
 
 TEST_SUITE("temporal connectives — original bug repro") {
@@ -213,6 +221,32 @@ TEST_SUITE("temporal connectives — three-or-more-G conjunctions") {
 		CHECK(sat_str(
 		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o3[t] = 0))"
 		    " && (G (o4[t] = 1))."));
+	}
+
+	TEST_CASE("every top-level G conjunct reaches the merged body") {
+		// o3 occurs only in the third conjunct, so dropping that
+		// conjunct from the merge shows up as a missing variable.
+		tref fm = parse_spec(
+		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o3[t] = 0)).");
+		REQUIRE(fm != nullptr);
+		CHECK(var_names(flatten_always_conjuncts<node_t>(fm))
+			== var_names(fm));
+	}
+
+	TEST_CASE("a parenthesised third G conjunct reaches the merged body") {
+		tref fm = parse_spec(
+		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && ((G (o3[t] = 0))).");
+		REQUIRE(fm != nullptr);
+		CHECK(var_names(flatten_always_conjuncts<node_t>(fm))
+			== var_names(fm));
+	}
+
+	TEST_CASE("the third G conjunct carries its own contradiction") {
+		// The first two conjuncts are jointly satisfiable, so only
+		// the third can make the conjunction unsat.
+		CHECK(unsat_str(
+		    "(G (o1[t] = 0)) && (G (o2[t] = 1))"
+		    " && (G ((o3[t] = 0) && (o3[t] = 1)))."));
 	}
 }
 
