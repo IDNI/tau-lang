@@ -1514,6 +1514,10 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 				if (n.has_value() && n.value()
 					&& tau::get(n.value()).equals_T())
 						{ value = c; break; }
+				// a candidate that did not normalize is a rejected candidate
+				report cand_rep = std::move(n).report();
+				cand_rep.demote_errors_to_warnings();
+				r.append(std::move(cand_rep));
 			}
 		}
 		if (!value && !sys.empty()) {
@@ -1537,8 +1541,10 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 		sol.emplace(tau::get(tau::bf, var), value);
 	}
 	auto n = normalize_non_temp<node>(rewriter::replace<node>(fm, sol));
-	if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T())
+	if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T()) {
+		r.merge(std::move(n));
 		return r.with_value(std::nullopt);
+	}
 	for (const auto& [_, v] : sol) {
 		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
 		ledger.pin(tree<node>::geth(v));

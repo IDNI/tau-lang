@@ -2438,6 +2438,8 @@ template <NodeType node>
 struct data_quantifier {
 	using tau = tree<node>;
 	std::map<size_t, bool> two_element;
+	// Reports of the checks that answer through a value; a caller merges it.
+	report rep;
 
 	bool is_two_element(tref v) {
 		size_t tid = find_ba_type<node>(v);
@@ -2454,6 +2456,7 @@ struct data_quantifier {
 				build_bf_t_type<node>(tid)))));
 		bool two = third.has_value() && !third.value()
 			&& !pack_type_output_always_satisfiable<node>(tid);
+		rep.append(std::move(third).report());
 		two_element.emplace(tid, two);
 		return two;
 	}
@@ -2473,11 +2476,14 @@ struct data_quantifier {
 			: tau::build_wff_and(lo, hi);
 	}
 
-	static tref eliminate(tref fm) {
+	tref eliminate(tref fm) {
 		auto n = normalize_non_temp<node>(fm);
 		if (!n.has_value() || !n.value()
 			|| tau::get(n.value()).find_top(is_quantifier<node>))
-				return nullptr;
+		{
+			rep.append(std::move(n).report());
+			return nullptr;
+		}
 		return n.value();
 	}
 
@@ -2505,8 +2511,11 @@ struct data_quantifier {
 		if (tau::get(n).equals_T()) return true;
 		if (tau::get(n).equals_F()) return false;
 		auto sat = is_non_temp_nso_satisfiable<node>(n);
-		if (!sat.has_value()) return std::nullopt;
-		return sat.value();
+		bool decided = sat.has_value();
+		bool value = decided && sat.value();
+		rep.append(std::move(sat).report());
+		if (!decided) return std::nullopt;
+		return value;
 	}
 
 	// The io_vars of `fm` read at the current step, inputs and outputs.

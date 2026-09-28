@@ -140,6 +140,8 @@ struct formula_regions {
 	const arena& a;
 	bool failed = false;
 	data_quantifier<node> dq;
+	// Reports of the checks that answer through `failed`; merged by the caller.
+	report rep;
 	std::map<tref, tref> normal;
 
 	explicit formula_regions(const arena& ar) : a(ar) {}
@@ -149,7 +151,9 @@ struct formula_regions {
 		const auto& t = tau::get(f);
 		if (t.equals_T() || t.equals_F()) return f;
 		if (auto it = normal.find(f); it != normal.end()) return it->second;
-		tref n = data_quantifier<node>::eliminate(f);
+		tref n = dq.eliminate(f);
+		rep.append(std::move(dq.rep));
+		dq.rep.clear();
 		if (!n) { failed = true; return tau::_F(); }
 		normal.emplace(f, n);
 		return n;
@@ -177,11 +181,18 @@ struct formula_regions {
 		if (qlt_order_conj_unsat<node>(f)) return true;
 		// an undecided check is no emptiness: the game fails instead
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
-		if (!sat.has_value()) { failed = true; return true; }
+		if (!sat.has_value()) {
+			failed = true;
+			rep.append(std::move(sat).report());
+			return true;
+		}
 		return !sat.value();
 	}
 	std::optional<bool> reached(tref f) {
-		return dq.reached_before_start(f);
+		auto v = dq.reached_before_start(f);
+		rep.append(std::move(dq.rep));
+		dq.rep.clear();
+		return v;
 	}
 	// The positions from which the chooser of vertex `i` takes edge `j`
 	// into `Y`.
@@ -437,15 +448,18 @@ static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
 // codes can take: `n` values distinct from 0, 1 and one another, and with
 // `orbits` from each other's complements, none its own complement.
 template <NodeType node>
-static bool codes_realized(size_t tid, size_t n, bool orbits) {
+static bool codes_realized(size_t tid, size_t n, bool orbits, report& rep) {
 	using tau = tree<node>;
 	auto var = [&](size_t j) {
 		return build_out_var_at_t<node>(build_var_name<node>(
 			"o__code" + std::to_string(j)), tid);
 	};
-	auto decided_false = [](tref f) {
+	auto decided_false = [&](tref f) {
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
-		return sat.has_value() && !sat.value();
+		bool decided = sat.has_value();
+		bool value = decided && !sat.value();
+		rep.append(std::move(sat).report());
+		return value;
 	};
 	if (orbits) {
 		tref x = var(0);
@@ -471,14 +485,19 @@ static bool codes_realized(size_t tid, size_t n, bool orbits) {
 		fresh.push_back(x);
 	}
 	auto sat = is_non_temp_nso_satisfiable<node>(all);
-	return sat.has_value() && sat.value();
+	bool decided = sat.has_value();
+	bool value = decided && sat.value();
+	rep.append(std::move(sat).report());
+	return value;
 }
 
 // The elements of type `tid` when it has at most `max` of them, a power of
 // two, and its constants of the values 0, 1, ... name them: element 0 is 0,
 // no two are equal and no other value exists.
 template <NodeType node>
-static std::optional<trefs> finite_elements(size_t tid, size_t max) {
+static std::optional<trefs> finite_elements(size_t tid, size_t max,
+	report& rep)
+{
 	using tau = tree<node>;
 	// the number of elements per type and bound, 0 for too many; the
 	// checks call the solver
@@ -497,9 +516,12 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max) {
 		known.emplace(std::pair{ name, max }, els ? els->size() : 0);
 		return els;
 	};
-	auto decided_false = [](tref f) {
+	auto decided_false = [&](tref f) {
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
-		return sat.has_value() && !sat.value();
+		bool decided = sat.has_value();
+		bool value = decided && !sat.value();
+		rep.append(std::move(sat).report());
+		return value;
 	};
 	trefs els;
 	for (size_t n = 2; n <= max; n *= 2) {
@@ -558,14 +580,20 @@ static size_t order_point(const code_window& w, tref operand) {
 // through order comparisons; at most `max_vars` variables.
 template <NodeType node>
 static std::optional<code_window> make_code_window(
-	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars)
+	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars,
+	report& rep)
 {
 	using tau = tree<node>;
 	data_quantifier<node> dq;
+	// The window's checks answer through `nullopt`; their reports merge here.
+	auto fail = [&]() -> std::optional<code_window> {
+		rep.append(std::move(dq.rep));
+		return std::nullopt;
+	};
 	code_window w;
 	for (auto& [atom, _] : atoms)
 		for (tref v : tau::get(atom).select_top(is_child<node, tau::io_var>)) {
-			if (is_io_initial<node>(v)) return std::nullopt;
+			if (is_io_initial<node>(v)) return fail();
 			const size_t k = (size_t)get_io_var_shift<node>(v);
 			w.depth = std::max(w.depth, k);
 			auto [it, fresh] = w.index.emplace(get_var_name<node>(v),
@@ -620,14 +648,14 @@ static std::optional<code_window> make_code_window(
 			if (s.modular <= 4)
 				for (size_t v = 0; v < (size_t{1} << s.modular); ++v) {
 					tref e = pack_value_constant<node>(s.tid, v);
-					if (!e) return std::nullopt;
+					if (!e) return fail();
 					s.values.push_back(tau::geth(e));
 				}
 		} else if (order_types.contains(s.tid)) s.order = true;
 	}
 	for (size_t tid : value_types) {
-		auto els = finite_elements<node>(tid, 16);
-		if (!els) return std::nullopt;
+		auto els = finite_elements<node>(tid, 16, rep);
+		if (!els) return fail();
 		for (auto& s : w.streams)
 			if (s.tid == tid && !s.two)
 				for (tref e : *els) s.values.push_back(tau::geth(e));
@@ -654,7 +682,7 @@ static std::optional<code_window> make_code_window(
 				if (!b.is(tau::bf) || b.children_size() != 1
 					|| !tau::get(b.first()).is_ba_constant()
 					|| !pack_dense_order_compare<node>(tid, x, x))
-						return std::nullopt;
+						return fail();
 				w.points.push_back({ SIZE_MAX, 0, tid, tau::geth(x) });
 			}
 		}
@@ -665,7 +693,7 @@ static std::optional<code_window> make_code_window(
 			if (p == q || a.slot() || b.slot() || a.tid != b.tid) continue;
 			auto c = pack_dense_order_compare<node>(a.tid,
 				a.constant->get(), b.constant->get());
-			if (!c) return std::nullopt;
+			if (!c) return fail();
 			w.fixed[{ p, q }] = *c;
 		}
 	// Each other type needs as many values as a window holds, plus 0 and 1.
@@ -679,7 +707,7 @@ static std::optional<code_window> make_code_window(
 		size_t bits = 1;
 		while ((size_t{1} << bits) < n + (orbits ? 1 : 2)) ++bits;
 		width[tid] = bits + (orbits ? 1 : 0);
-		if (!codes_realized<node>(tid, n, orbits)) return std::nullopt;
+		if (!codes_realized<node>(tid, n, orbits, rep)) return fail();
 	}
 	for (auto& x : w.streams) {
 		x.orbit = !x.finite() && !x.order && orbit_types.contains(x.tid);
@@ -691,7 +719,8 @@ static std::optional<code_window> make_code_window(
 		w.max_width = std::max(w.max_width, x.width);
 	}
 	w.layout();
-	if (w.vars() > max_vars) return std::nullopt;
+	if (w.vars() > max_vars) return fail();
+	rep.append(std::move(dq.rep));
 	return w;
 }
 
@@ -777,6 +806,8 @@ struct code_regions {
 	const code_window& w;
 	data_bdd bdd;
 	bool failed = false;
+	// Reports of the checks that answer through `failed`; merged by the caller.
+	report rep;
 	std::vector<region> labels;           // per vertex, per edge
 	std::vector<size_t> edge_base;
 	std::map<std::vector<size_t>, region> consistent;
@@ -914,7 +945,10 @@ struct code_regions {
 						c >> b & 1));
 			}
 			auto n = normalize_non_temp<node>(rewriter::replace<node>(cmp, m));
-			if (!n.has_value() || !n.value()) return std::nullopt;
+			if (!n.has_value() || !n.value()) {
+				rep.append(std::move(n).report());
+				return std::nullopt;
+			}
 			const auto& t = tau::get(n.value());
 			if (!t.equals_T() && !t.equals_F()) return std::nullopt;
 			if (t.equals_T()) r = bdd.disj(r, cube);
@@ -1400,6 +1434,8 @@ struct data_game_strategy {
 	// outputs, -1: nobody (a coloured vertex or a sink)
 	std::vector<vertex> v;
 	int init = 0;
+	// Reports of the checks that answer through a value; merged by the caller.
+	report rep;
 
 	// The Mealy view (code_strategy::build_mealy), which `step` then
 	// plays: a machine over the atoms of the view, each edge a guard on
@@ -1625,9 +1661,12 @@ protected:
 					if (!n.has_value() || !n.value()
 						|| (!tau::get(n.value()).equals_T()
 						&& !tau::get(n.value()).equals_F()))
-							return r.with_error(code::solver_error,
-								"the data game strategy cannot compare "
-								"the values");
+					{
+						r.merge(std::move(n));
+						return r.with_error(code::solver_error,
+							"the data game strategy cannot compare "
+							"the values");
+					}
 					it = truth.emplace(a,
 						tau::get(n.value()).equals_T()).first;
 				}
@@ -1714,6 +1753,7 @@ struct code_strategy : data_game_strategy<node> {
 	using typename base::values;
 	using typename base::solver_fn;
 	using base::streams;
+	using base::rep;
 
 	code_window w;
 	data_bdd bdd;
@@ -1754,7 +1794,10 @@ protected:
 	std::optional<bool> same(tref x, tref y) {
 		if (tau::subtree_equals(x, y)) return true;
 		auto n = normalize_non_temp<node>(tau::build_bf_eq(x, y));
-		if (!n.has_value() || !n.value()) return std::nullopt;
+		if (!n.has_value() || !n.value()) {
+			rep.append(std::move(n).report());
+			return std::nullopt;
+		}
 		const auto& t = tau::get(n.value());
 		if (t.equals_T()) return true;
 		if (t.equals_F()) return false;
@@ -1781,6 +1824,8 @@ protected:
 	// points of an order gets their order.
 	result<std::optional<std::vector<int>>> encode(const window& win) {
 		result<std::optional<std::vector<int>>> r;
+		// `same` answers through a value; its report is merged here.
+		auto drop = [&]() { r.append(std::move(rep)); rep.clear(); };
 		std::vector<int> bits(w.vars(), -1);
 		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
 		for (size_t k = 0; k < win[0].size(); ++k)
@@ -1802,7 +1847,7 @@ protected:
 					c = ws.values.size();
 					for (size_t j = 0; j < ws.values.size(); ++j) {
 						auto eq = same(x, ws.values[j]->get());
-						if (!eq) return r.with_value(std::nullopt);
+						if (!eq) { drop(); return r.with_value(std::nullopt); }
 						if (*eq) { c = j; break; }
 					}
 					if (c == ws.values.size()) return r.with_value(std::nullopt);
@@ -1811,12 +1856,12 @@ protected:
 					continue;
 				}
 				auto one = same(x, build_bf_t_type<node>(tid));
-				if (!one) return r.with_value(std::nullopt);
+				if (!one) { drop(); return r.with_value(std::nullopt); }
 				if (ws.two) c = *one ? 1 : 0;
 				else if (*one) c = ws.orbit ? size_t{1} << (ws.width - 1) : 1;
 				else {
 					auto zero = same(x, build_bf_f_type<node>(tid));
-					if (!zero) return r.with_value(std::nullopt);
+					if (!zero) { drop(); return r.with_value(std::nullopt); }
 					if (*zero) c = 0;
 					else {
 						auto& reps = seen[tid];
@@ -1825,12 +1870,12 @@ protected:
 						c = fresh;
 						for (auto& [y, cy] : reps) {
 							auto eq = same(x, y);
-							if (!eq) return r.with_value(std::nullopt);
+							if (!eq) { drop(); return r.with_value(std::nullopt); }
 							if (*eq) { c = cy; break; }
 							if (!ws.orbit) continue;
 							TAU_TRY(tref neg_y, complement(y));
 							auto neq = same(x, neg_y);
-							if (!neq) return r.with_value(std::nullopt);
+							if (!neq) { drop(); return r.with_value(std::nullopt); }
 							if (*neq) {
 								c = cy | size_t{1} << (ws.width - 1);
 								break;
@@ -2661,6 +2706,7 @@ struct formula_strategy : data_game_strategy<node> {
 	using typename base::solver_fn;
 	using base::streams;
 	using base::index;
+	using base::rep;
 
 	std::vector<std::vector<htref>> labels, moves;
 	htref won_init;
@@ -2685,7 +2731,10 @@ protected:
 
 	std::optional<bool> truth(tref f, const window& win) {
 		auto n = normalize_non_temp<node>(at_step(f, win, 0));
-		if (!n.has_value() || !n.value()) return std::nullopt;
+		if (!n.has_value() || !n.value()) {
+			rep.append(std::move(n).report());
+			return std::nullopt;
+		}
 		const auto& t = tau::get(n.value());
 		if (t.equals_T()) return true;
 		if (t.equals_F()) return false;
@@ -2694,21 +2743,30 @@ protected:
 
 	result<std::optional<bool>> won_from(const window& win) override {
 		result<std::optional<bool>> r;
-		return r.with_value(truth(won_init->get(), win));
+		auto v = truth(won_init->get(), win);
+		r.append(std::move(rep));
+		rep.clear();
+		return r.with_value(v);
 	}
 
 	result<std::optional<bool>> holds_label(int i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
-		return r.with_value(truth(labels[i][j]->get(), win));
+		auto v = truth(labels[i][j]->get(), win);
+		r.append(std::move(rep));
+		rep.clear();
+		return r.with_value(v);
 	}
 
 	result<std::optional<bool>> holds_move(int i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
-		return r.with_value(truth(moves[i][j]->get(), win));
+		auto v = truth(moves[i][j]->get(), win);
+		r.append(std::move(rep));
+		rep.clear();
+		return r.with_value(v);
 	}
 
 	result<tref> constraint(int i, const window& win, int_t t) override {
@@ -2717,9 +2775,12 @@ protected:
 		for (const auto& m : moves[i])
 			any = tau::build_wff_or(any, m->get());
 		auto n = normalize_non_temp<node>(at_step(any, win, t));
-		if (!n.has_value() || !n.value()) return r.with_error(
-			code::solver_error, "the data game strategy cannot read "
-			"its move");
+		if (!n.has_value() || !n.value()) {
+			r.merge(std::move(n));
+			return r.with_error(
+				code::solver_error, "the data game strategy cannot read "
+				"its move");
+		}
 		return r.with_value(n.value());
 	}
 
@@ -2797,9 +2858,15 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			if (is_io_initial<node>(var)
 				|| io_var_direction<node>(tau::trim(var)) == 0)
 					return r.with_value(data_game_verdict::undecided);
-	const auto window = make_code_window<node>(atoms, 1024);
-	if (!window && !formulas)
+	// Reports of the deciders this call tries; a caller that decides demotes
+	// the rest to warnings.
+	report drops;
+	const auto window = make_code_window<node>(atoms, 1024, drops);
+	if (!window && !formulas) {
+		r.append(std::move(drops));
+		if (r.report().has_error()) return r;
 		return r.with_value(data_game_verdict::undecided);
+	}
 	// ACD usually gives the smallest game and a parity condition, but may
 	// name it Rabin or Streett, which the solver does not read; the
 	// determinized game then comes with a parity condition.
@@ -2811,7 +2878,11 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 		if ((built = build_data_arena<node>(arena, game, atoms))) break;
 		arena = {};
 	}
-	if (!built) return r.with_value(data_game_verdict::undecided);
+	if (!built) {
+		r.append(std::move(drops));
+		if (r.report().has_error()) return r;
+		return r.with_value(data_game_verdict::undecided);
+	}
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
@@ -2841,6 +2912,7 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 				*strategy = st;
 			}
 		}
+		drops.append(std::move(codes.rep));
 	}
 	// codes the BDD cannot hold leave the game to the formulas
 	if (!wins && formulas) {
@@ -2863,11 +2935,19 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			st->won_init = tau::geth(w->sys[arena.init]);
 			*strategy = st;
 		}
+		drops.append(std::move(regions.rep));
 	}
 	LOG_DEBUG << "[ltl_aba] data game: " << arena.v.size() << " vertices, "
 		<< (wins ? (*wins ? "system wins" : "environment wins")
 			: "undecided");
-	if (!wins) return r.with_value(data_game_verdict::undecided);
+	if (!wins) {
+		r.append(std::move(drops));
+		if (r.report().has_error()) return r;
+		return r.with_value(data_game_verdict::undecided);
+	}
+	// the game is decided: a decider that lost is only history
+	drops.demote_errors_to_warnings();
+	r.append(std::move(drops));
 	return r.with_value(*wins ? data_game_verdict::realizable
 		: data_game_verdict::unrealizable);
 }
