@@ -60,6 +60,7 @@ set(TESTS
 	algorithm_a
 	algorithm_b
 	algorithm_d
+	ltl_aba_open_points
 	cli_options
 	codegen_parity
 	cpp_codegen
