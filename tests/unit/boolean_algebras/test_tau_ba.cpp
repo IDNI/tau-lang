@@ -982,15 +982,20 @@ TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
 } // TEST_SUITE no memo on a full bdd node table
 
 // ============================================================================
-// The decisions on Tau constants skip the paths that hold a literal and its
-// negation.
-TEST_SUITE("tau_ba — pruned paths") {
+// The complement and the conjunction of Tau constants keep a DNF without
+// repeated or absorbed disjuncts, and their decisions skip the paths that
+// hold a literal and its negation.
+TEST_SUITE("tau_ba — simplified normal forms") {
 // ============================================================================
 
 static tref wff(const std::string& src) {
 	tref fm = tau::get(src, parse_wff()).value_or(nullptr);
 	assert(fm != nullptr);
 	return fm;
+}
+
+static size_t disjuncts(const test_ba& b) {
+	return get_dnf_wff_clauses<node_t>(b.nso_rr.main->get()).size();
 }
 
 static std::vector<std::string> paths(const std::string& src) {
@@ -1002,6 +1007,29 @@ static std::vector<std::string> paths(const std::string& src) {
 		return true;
 	});
 	return out;
+}
+
+TEST_CASE("repeated conjuncts and disjuncts are dropped") {
+	trefs out = simplify_dnf_clauses<node_t>({
+		wff("<:a> = 0 && <:b> = 0 && <:a> = 0"),
+		wff("<:b> = 0 && <:a> = 0"),
+		wff("<:c> = 0") });
+	REQUIRE( out.size() == 2 );
+	CHECK( get_cnf_wff_clauses<node_t>(out[0]).size() == 2 );
+}
+
+TEST_CASE("a disjunct holding another one is dropped") {
+	trefs out = simplify_dnf_clauses<node_t>({
+		wff("<:a> = 0 && <:b> != 0"), wff("<:b> != 0") });
+	REQUIRE( out.size() == 1 );
+	CHECK( tau::get(out[0]).to_str() == "<:b> != 0" );
+}
+
+// o2[t-1] makes the first disjunct start one step later than the second.
+TEST_CASE("a disjunct with an io variable absorbs nothing") {
+	trefs out = simplify_dnf_clauses<node_t>({
+		wff("o1[t] = 0 && o2[t-1] = 0"), wff("o1[t] = 0") });
+	CHECK( out.size() == 2 );
 }
 
 TEST_CASE("no path holds a literal and its negation") {
@@ -1023,6 +1051,17 @@ TEST_CASE("a formula with an io variable is not static") {
 	CHECK_FALSE( has_static_paths<node_t>(wff("always <:a> = 0")) );
 }
 
+TEST_CASE("the complement of a constant over three constants") {
+	test_ba v(wff("<:y> = 0 && <:x> != 0 && <:z> != 0 "
+		"|| <:y> != 0 && <:x> != 0 || <:x> = 0 && <:z> != 0"));
+	test_ba c = normalize_tau(~v);
+	CHECK( disjuncts(c) == 2 );
+	test_ba d = normalize_tau(c & ~v);
+	CHECK( disjuncts(d) == 2 );
+	CHECK( (d & v).is_zero().value() );
+	CHECK( (d | v).is_one().value() );
+}
+
 // Every minterm over four constants: valid, while the negation has 4^16
 // paths before the contradictory ones are cut.
 TEST_CASE("a valid DNF of minterms is one") {
@@ -1039,7 +1078,7 @@ TEST_CASE("a valid DNF of minterms is one") {
 	CHECK_FALSE( v.is_zero().value() );
 }
 
-} // TEST_SUITE pruned paths
+} // TEST_SUITE simplified normal forms
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

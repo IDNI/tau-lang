@@ -279,6 +279,28 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( ledger.fresh_region->get() == region );
 	}
 
+	// The region a commit leaves, and the one a second commit of the same
+	// value computes from it (as without the ledger's repeat check), stay
+	// small DNFs; the second did not finish when the first kept repeated
+	// and absorbed disjuncts.
+	TEST_CASE("ledger: the region of a repeated commit stays small") {
+		using tau = tree<node_t>;
+		using tt = tau::traverser;
+		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
+		tref eq = get_nso_rr<node_t>(tau::get("o9[t]:tau = {<:y> = 0 "
+			"&& <:x> != 0 && <:z> != 0 || <:y> != 0 && <:x> != 0 || <:x> = 0 "
+			"&& <:z> != 0}:tau.").value_or(nullptr)).value().main->get();
+		tref v = tau::get(tau::get(eq).first()).second();
+		auto exclude = [&](tref region) {
+			return tt(tau::get(region) & ~tau::get(v))
+				| bf_reduce_canonical<node_t>() | tt::ref;
+		};
+		tref once = exclude(tau::_1(type_id));
+		REQUIRE( generated_constant_size<node_t>(once) < 60 );
+		tref twice = exclude(once);
+		CHECK( generated_constant_size<node_t>(twice) < 60 );
+	}
+
 	// Ledger contract: three successive calls sharing a ledger each exclude
 	// every earlier call's witness, pinning cross-call distinctness and its
 	// transitivity across the third call.

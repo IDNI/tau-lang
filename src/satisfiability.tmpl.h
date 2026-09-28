@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -2469,6 +2470,57 @@ bool for_each_path(tref fm, const auto& f) {
 	return true;
 }
 
+// Keeps the first occurrence of each conjunct within a disjunct and of each
+// disjunct, and drops a disjunct that holds every conjunct of another
+// (A || A && B = A). A disjunct with an io variable is neither dropped nor
+// used to drop another this way: the lookbacks of a disjunct set the time
+// from which each of its conjuncts is enforced, so A && B need not imply A.
+// Each complement or conjunction of Tau constants is normalized through
+// here, and every repeated or absorbed disjunct it keeps multiplies the
+// paths of the next complement.
+template <NodeType node>
+trefs simplify_dnf_clauses(const trefs& clauses) {
+	using tau = tree<node>;
+	const subtree_less<node> less;
+	auto same = [&](tref a, tref b) { return !less(a, b) && !less(b, a); };
+	struct disjunct { tref fm; trefs lits; bool timed; };
+	std::vector<disjunct> ds;
+	std::set<trefs, decltype([](const trefs& a, const trefs& b) {
+		return std::ranges::lexicographical_compare(a, b,
+			subtree_less<node>{}); })> seen;
+	for (tref c : clauses) {
+		if (tau::get(c).equals_F()) continue;
+		trefs conj = get_cnf_wff_clauses<node>(c);
+		trefs lits;
+		for (tref l : conj)
+			if (std::ranges::none_of(lits,
+				[&](tref k) { return same(k, l); }))
+				lits.push_back(l);
+		trefs key = lits;
+		std::ranges::sort(key, less);
+		if (!seen.insert(key).second) continue;
+		bool timed = tau::get(c).find_top(is<node, tau::io_var>) != nullptr;
+		tref fm = lits.size() == conj.size() ? c
+			: lits.size() == 1 ? lits[0] : tau::build_wff_and(lits);
+		ds.push_back({ fm, std::move(key), timed });
+	}
+	std::vector<bool> absorbed(ds.size(), false);
+	for (size_t i = 0; i < ds.size(); ++i) {
+		if (ds[i].timed) continue;
+		for (size_t j = 0; j < ds.size() && !absorbed[i]; ++j)
+			if (j != i && !absorbed[j] && !ds[j].timed
+				&& ds[j].lits.size() < ds[i].lits.size()
+				&& std::ranges::includes(ds[i].lits, ds[j].lits,
+					less))
+				absorbed[i] = true;
+	}
+	trefs out;
+	for (size_t i = 0; i < ds.size(); ++i)
+		if (!absorbed[i]) out.push_back(ds[i].fm);
+	if (out.empty()) out.push_back(tau::_F());
+	return out;
+}
+
 template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	const bool output)
@@ -2837,7 +2889,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 			(void)unused;
 		}
 	}
-	r = tau::build_wff_or(clauses);
+	r = tau::build_wff_or(simplify_dnf_clauses<node>(clauses));
 	LOG_DEBUG << "End simp_tau_unsat_valid: " << LOG_FM(r.value());
 	DBG(assert(r.is_well_formed());)
 	return r;
