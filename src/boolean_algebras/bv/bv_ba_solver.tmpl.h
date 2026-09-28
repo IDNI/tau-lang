@@ -709,6 +709,14 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 		return memo(std::nullopt);
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+	// Exact on the bits of narrow values, where cvc5's quantifier
+	// instantiation can run for minutes; what the BDD cannot hold goes on
+	// to cvc5.
+	if (bv_bitblast_max_nodes)
+		if (auto v = cvc5_bitblast_sat(expr.value(),
+			bv_bitblast_max_width, bv_bitblast_max_nodes))
+				return memo(*v ? bv_sat_status::sat
+					: bv_sat_status::unsat);
 	solver.assertFormula(expr.value());
 	auto result = solver.checkSat();
 	if (result.isSat()) return memo(bv_sat_status::sat);
