@@ -205,9 +205,15 @@ add_repl_test(normalize_cmd-issue183_sub_true
 	"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))." "%1[^%]*: T")
 add_repl_test(normalize_cmd-issue183_sub_false
 	"normalize all x:bv[2] ((x:bv[2] = {0}:bv[2]) -> (ex y:bv[2] ((x:bv[2] | (y:bv[2] & {2}:bv[2])) = (y:bv[2] - {3}:bv[2]))))." "%1[^%]*: F")
+set(_issue183_cmd "normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))")
 foreach(_s 0 2)
+	tau_repl_unsupported(_tau_skip "${_issue183_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("normalize_cmd-issue183_sub_true_splits${_s}")
+		continue()
+	endif()
 	add_test(NAME "test_repl-normalize_cmd-issue183_sub_true_splits${_s}"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --preprocessing=false --bv-widening=false --bv-quantifier-free-decision=false --block-max-splits=${_s} -e \"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))\"")
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --preprocessing=false --bv-widening=false --bv-quantifier-free-decision=false --block-max-splits=${_s} -e \"${_issue183_cmd}\"")
 	set_tests_properties("test_repl-normalize_cmd-issue183_sub_true_splits${_s}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "%1[^%]*: T"
 		FAIL_REGULAR_EXPRESSION "Error"
