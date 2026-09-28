@@ -119,16 +119,18 @@ add_repl_test(solver_cmd-qlt-solve_system-relational
 
 add_repl_test(solver_cmd-qlt-solve-neq0
 	"solve x : qlt != 0." "solution: \\{") # qlt.cpp:105-107
+# The typed 0 and 1 are the ends of the qlt order, not points, so `x != 0`
+# and `x != 1` constrain nothing and every mode solves them.
 add_repl_test(solver_cmd-qlt-solve-neq0-min
-	"solve --min (x : qlt != 0)." "no solution") # qlt.cpp:108
+	"solve --min (x : qlt != 0)." "solution: \\{") # qlt.cpp:108
 add_repl_test(solver_cmd-qlt-solve-neq0-max
 	"solve --max (x : qlt != 0)." "solution: \\{") # qlt.cpp:109
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1
 	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{") # qlt.cpp:112-114
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
-	"solve --min (x : qlt != 0 && x : qlt != 1)." "no solution") # qlt.cpp:115
+	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:115
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
-	"solve --max (x : qlt != 0 && x : qlt != 1)." "no solution") # qlt.cpp:116
+	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:116
 add_repl_test(solver_cmd-qlt-solve-two_vars
 	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:119-121
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable

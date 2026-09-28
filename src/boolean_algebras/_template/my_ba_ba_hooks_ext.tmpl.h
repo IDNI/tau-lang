@@ -37,6 +37,8 @@ namespace idni::tau_lang {
 // 		return tau::get(/* l < rr */ true ? tau::_T() : tau::_F(), r);
 // 	}
 // 	// ... wff_nlt, wff_lteq, wff_nlteq, wff_gt, wff_ngt, wff_gteq, wff_ngteq
+// 	// wff_eq / wff_neq may decide an equation too; declining them lets
+// 	// core's Boolean equality rules go on, since every algebra has `=`.
 // };
 
 // Term hooks. `term_cast` retypes the constant inside a cast node; return

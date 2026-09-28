@@ -49,10 +49,12 @@ TEST_SUITE("solve_inequality_system") {
 		}) );
 	}
 
-	TEST_CASE("x : qlt != 0 && (x : qlt)' != 0.") {
+	// The typed 0 is the order's lower end, not a point, so `x != 0` is no
+	// constraint; two excluded points are.
+	TEST_CASE("x : qlt != {0}:qlt && x : qlt != {1}:qlt.") {
 		CHECK( test_solve_inequality_system({
-			"x : qlt != 0.",
-			"(x : qlt)' != 0."
+			"x : qlt != {0}:qlt.",
+			"x : qlt != {1}:qlt."
 		}) );
 	}
 }
@@ -102,18 +104,21 @@ TEST_SUITE("solve") {
 		return ::test_solve_max(system, type);
 	}
 
+	// The typed 0 and 1 are the ends of the order, not points: a variable
+	// never equals either, so these systems constrain nothing and every mode
+	// solves them.
 	TEST_CASE("x : qlt != 0") {
 		const char* system = "x : qlt != 0.";
 		CHECK( test_solve(system) );
-		CHECK( !test_solve_min(system) );
+		CHECK( test_solve_min(system) );
 		CHECK( test_solve_max(system) );
 	}
 
 	TEST_CASE("x : qlt != 0 && x : qlt != 1") {
 		const char* system = "x : qlt != 0 && x : qlt != 1.";
 		CHECK( test_solve(system) );
-		CHECK( !test_solve_min(system) );
-		CHECK( !test_solve_max(system) );
+		CHECK( test_solve_min(system) );
+		CHECK( test_solve_max(system) );
 	}
 
 	TEST_CASE("{(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0") {
@@ -385,9 +390,11 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 	}
 
 	TEST_CASE("atoms against the typed 0 / 1 are decided for every point") {
-		// Construction folds `x <= 1`, `0 <= x`, `x > 1` and `x < 0`
-		// to T / F, so the non-strict and violated forms are reached
-		// through negations, which it keeps.
+		// Construction folds `x <= 1`, `0 <= x`, `x > 1`, `x < 0`,
+		// `x != 1` and `x = 1` to T / F, so the non-strict and violated
+		// forms are reached through negations, which it keeps.
+		CHECK( tau::get(tau::build_bf_neq(x(), q1())).equals_T() );
+		CHECK( tau::get(tau::build_bf_eq(x(), q1())).equals_F() );
 		// holding ones add no constraint
 		CHECK( solved_and_satisfied({ tau::build_bf_lt(x(), q1()),
 			atom("x : qlt > {5}:qlt.") }) );
@@ -395,12 +402,10 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 		CHECK( solved_and_satisfied({ tau::build_bf_nlteq(x(), q0()) }) );
 		CHECK( solved_and_satisfied({ tau::build_bf_ngteq(x(), q1()) }) );
 		CHECK( solved_and_satisfied({ neg(tau::build_bf_lteq(q1(), x())) }) );
-		CHECK( solved_and_satisfied({ tau::build_bf_neq(x(), q1()) }) );
 		// violated ones decline: the value would be the typed end itself
 		CHECK( !dlo({ tau::build_bf_nlt(x(), q1()) }).has_value() );
 		CHECK( !dlo({ tau::build_bf_nlt(q0(), x()) }).has_value() );
 		CHECK( !dlo({ neg(tau::build_bf_lt(x(), q1())) }).has_value() );
-		CHECK( !dlo({ tau::build_bf_eq(x(), q1()) }).has_value() );
 	}
 
 	TEST_CASE("constants other than finite singletons decline") {
@@ -492,5 +497,59 @@ TEST_SUITE("qlt residual elimination") {
 		// the variable inside a compound term
 		CHECK( residual("a : qlt < x : qlt' && x : qlt < b : qlt.")
 			== nullptr );
+	}
+}
+
+// The interval collector behind omcat_qe reads a conjunction of bounds on one
+// variable. What it may not do is read a bound off a compound term, drop a
+// closed conjunct it cannot read, or take an end of the order for a point.
+TEST_SUITE("qlt interval collector") {
+
+	tref wff(const char* src) {
+		return get_nso_rr<node_t>(tau::get(src).value_or(nullptr))
+			.value().main->get();
+	}
+	// the variable node of `x : qlt`
+	tref var_x() {
+		return tau::get(tau::get(wff("x : qlt < y : qlt."))[0].first())
+			.first();
+	}
+	std::optional<bool> sat(const char* body) {
+		return qlt_omcat_qe<node_t>(var_x(), wff(body));
+	}
+
+	// GitHub #187
+	TEST_CASE("a compound term holding the variable is no bound on it") {
+		CHECK( !sat("(x : qlt & {3}:qlt) < {1}:qlt && x : qlt > {5}:qlt.") );
+		CHECK( !sat("x : qlt' < {1}:qlt && x : qlt > {5}:qlt.") );
+		CHECK( sat("x : qlt < {1}:qlt && x : qlt > {5}:qlt.") == false );
+		CHECK( sat("x : qlt < {7}:qlt && x : qlt > {5}:qlt.") == true );
+	}
+
+	// GitHub #189
+	TEST_CASE("a closed conjunct without the variable declines") {
+		CHECK( !sat("x : qlt > {5}:qlt && ex y : qlt (y < {0}:qlt && y > {1}:qlt).") );
+		CHECK( !sat("x : qlt > {5}:qlt && all y : qlt (y > {1}:qlt).") );
+	}
+	TEST_CASE("a conjunct on another free variable is the caller's") {
+		CHECK( sat("x : qlt > {5}:qlt && a : qlt < {0}:qlt.") == true );
+		CHECK( sat("x : qlt > {5}:qlt && x : qlt < {3}:qlt && a : qlt < {0}:qlt.")
+			== false );
+	}
+
+	// GitHub #188: the typed 0 and 1 are the ends of the order, not points.
+	TEST_CASE("a variable never equals an end of the order") {
+		CHECK( tau::get(wff("x : qlt = 1.")).equals_F() );
+		CHECK( tau::get(wff("x : qlt = 0.")).equals_F() );
+		CHECK( tau::get(wff("1 = x : qlt.")).equals_F() );
+		CHECK( tau::get(wff("x : qlt != 1.")).equals_T() );
+		CHECK( tau::get(wff("x : qlt != 0.")).equals_T() );
+	}
+	TEST_CASE("a compound term against an end stays an equation") {
+		tref f = wff("(x : qlt & y : qlt) = 1.");
+		CHECK( !tau::get(f).equals_F() );
+		CHECK( !tau::get(f).equals_T() );
+		CHECK( tau::get(wff("x : qlt = {1}:qlt.")).find_top(
+			is<node_t, tau::bf_eq>) != nullptr );
 	}
 }

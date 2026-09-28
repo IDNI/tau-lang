@@ -20,7 +20,10 @@ namespace idni::tau_lang {
 // DLO interval computation for (Q,<).
 // Collects the satisfying interval I for ∃var. body where body is a
 // conjunction of DLO comparison atoms "var op {c}:qlt" (c finite singleton).
-// Returns the interval if determined, nullopt if undetermined.
+// Returns the interval if determined, nullopt if undetermined. A conjunct
+// that does not mention var is the caller's when it has a free variable and
+// declines the whole computation when it has none: a closed conjunct (a
+// nested binder, an unfolded constant atom) may be false.
 //   ∃var. body satisfiable  ↔  !result.is_empty()
 //   ∀var. body tautology    ↔   result.is_full()
 template<NodeType node>
@@ -50,32 +53,37 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			collect(t[0].second());
 			return;
 		}
+		if (!contains<node>(n, var)) {
+			if (get_free_vars<node>(n).empty()) undetermined = true;
+			return;
+		}
 		// Helper lambda: given (raw_op, lhs, rhs, negate), accumulate the
 		// corresponding DLO interval into acc. raw_op is the comparison
 		// operator before direction-flip and optional negation.
 		auto accumulate_interval = [&](size_t raw_op, tref lhs_t, tref rhs_t, bool negate) {
 			bool var_in_lhs = contains<node>(lhs_t, var);
 			bool var_in_rhs = contains<node>(rhs_t, var);
-			if (!var_in_lhs && !var_in_rhs) return;
 			if (var_in_lhs && var_in_rhs) { undetermined = true; return; }
-			// var must be the only free variable on its side.
-			// A compound like (o1 & i1) introduces i1 as an extra free var
-			// and cannot be treated as a simple DLO constraint on o1.
-			tref var_side = var_in_lhs ? lhs_t : rhs_t;
-			for (tref sv : get_free_vars<node>(var_side))
-				if (tau::get(sv) != tau::get(var)) { undetermined = true; return; }
+			// The side holding var must be var itself: a compound such
+			// as `x & {3}` is no bound on x.
+			const auto& var_side = tau::get(var_in_lhs ? lhs_t : rhs_t);
+			if (!var_side.is(tau::bf) || !var_side.has_child()
+				|| tau::get(var_side.first()) != tau::get(var)) {
+				undetermined = true; return;
+			}
 			const auto& cst = tau::get(var_in_lhs ? rhs_t : lhs_t)[0];
 			if (!cst.is_ba_constant()) {
 				// Handle typed zero (bf_f = -∞) and typed one (bf_t = +∞) as DLO bounds
 				if (cst.is(tau::bf_f) || cst.is(tau::bf_t)) {
 					bool cst_is_min = cst.is(tau::bf_f); // bf_f = -∞, bf_t = +∞
-					// bf_eq / bf_neq against a sentinel (bf_f/bf_t) don't fit the
-					// open-interval DLO model — they assert the variable IS (or
-					// ISN'T) the sentinel.  Return undetermined so the caller
-					// falls through to BA-level satisfiability, which can
-					// correctly discharge var = bf_t / var = bf_f by ∃-substitution.
+					// No point is an end of the order: var = 1 never
+					// holds, var != 1 always does (qlt's wff_eq hook
+					// folds a bare variable's case before it gets here).
 					if (raw_op == tau::bf_eq || raw_op == tau::bf_neq) {
-						undetermined = true; return;
+						bool holds = raw_op == tau::bf_neq;
+						if (negate) holds = !holds;
+						if (holds) return;
+						acc = qlt::bottom(); return;
 					}
 					// Determine if constraint is trivially satisfied (i.e., no restriction on x)
 					// x > -∞, x >= -∞ are trivially true; x < +∞, x <= +∞ are trivially true
@@ -192,8 +200,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			tref inner = t[0].first();
 			const auto& ti = tau::get(inner);
 			if (!ti.is(tau::wff) || !ti.has_child()) {
-				if (contains<node>(n, var)) undetermined = true;
-				return;
+				undetermined = true; return;
 			}
 			auto iop = ti[0].value.nt;
 			// Normalize NNF negated-comparison variants (bf_nXxx → positive)
@@ -204,8 +211,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			if (iop != tau::bf_lt  && iop != tau::bf_lteq &&
 			    iop != tau::bf_gt  && iop != tau::bf_gteq &&
 			    iop != tau::bf_eq  && iop != tau::bf_neq) {
-				if (contains<node>(n, var)) undetermined = true;
-				return;
+				undetermined = true; return;
 			}
 			accumulate_interval(iop, ti[0].first(), ti[0].second(), true);
 			return;
@@ -218,8 +224,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 		if (op != tau::bf_lt  && op != tau::bf_lteq  &&
 		    op != tau::bf_gt  && op != tau::bf_gteq  &&
 		    op != tau::bf_eq  && op != tau::bf_neq) {
-			if (contains<node>(n, var)) undetermined = true;
-			return;
+			undetermined = true; return;
 		}
 		// Comparison atom: wff(bf_op(lhs_bf, rhs_bf))
 		accumulate_interval(op, t[0].first(), t[0].second(), false);

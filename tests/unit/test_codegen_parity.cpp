@@ -480,13 +480,22 @@ TEST_SUITE("codegen_parity") {
 		const std::string spec_src =
 			"G (o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {42}:bv[8]).";
 
-		// CLI's rendering of the witness: o1 prints as "bot".
+		// CLI's rendering of the witness: o1 prints as "0".
 		auto cli_trace = trace_is_admissible(spec_src,
-			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
+			{ {"o1", 0, "0"}, {"o2", 0, "0"} });
 		REQUIRE_MESSAGE(cli_trace.has_value(),
 			"admissibility check could not decide the CLI-style trace");
 		CHECK_MESSAGE(*cli_trace,
-			"CLI-style trace (o1=bot, o2=0) should be admissible");
+			"CLI-style trace (o1=0, o2=0) should be admissible");
+
+		// "bot" is the order's lower end, not a point a stream can hold.
+		auto end_trace = trace_is_admissible(spec_src,
+			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
+		REQUIRE_MESSAGE(end_trace.has_value(),
+			"admissibility check could not decide the end-valued trace");
+		CHECK_MESSAGE(!*end_trace,
+			"trace (o1=bot, o2=0) puts a qlt stream at the order's end "
+			"and must be inadmissible");
 
 		// artifact's rendering of the same witness: o1 prints as "-1/2".
 		auto artifact_trace = trace_is_admissible(spec_src,

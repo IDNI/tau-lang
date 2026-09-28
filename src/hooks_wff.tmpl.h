@@ -37,10 +37,27 @@ TAU_HOOKS_DEFINE_WFF_TRY(gt, wff_gt)
 TAU_HOOKS_DEFINE_WFF_TRY(ngt, wff_ngt)
 TAU_HOOKS_DEFINE_WFF_TRY(gteq, wff_gteq)
 TAU_HOOKS_DEFINE_WFF_TRY(ngteq, wff_ngteq)
+TAU_HOOKS_DEFINE_WFF_TRY(eq, wff_eq)
+TAU_HOOKS_DEFINE_WFF_TRY(neq, wff_neq)
 
 #undef TAU_HOOKS_DEFINE_WFF_TRY
 
 } // namespace hooks_detail
+
+/**
+ * @brief The type whose BA answers for a comparison of @p ch.
+ *
+ * The left operand's type normally decides, but a non-aba omega-categorical BA
+ * answers from either side: its constants may sit on the right of an otherwise
+ * untyped comparison.
+ */
+template <NodeType node>
+static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
+	const size_t tl = a1.get_ba_type();
+	if (pack_type_is_non_aba_omcat<node>(tl)) return tl;
+	const size_t tr = a2.get_ba_type();
+	return pack_type_is_non_aba_omcat<node>(tr) ? tr : tl;
+}
 
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
@@ -376,6 +393,13 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
 			}
 
+	// The owning BA may decide the equation
+	if (auto hook_r = hooks_detail::try_wff_eq<node>(ch, r,
+		comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch)))) {
+		HOOK_LOGGING(applied("Using the BA's own definition for =.");)
+		return *hook_r;
+	}
+
 	// Rule X = X ::= T
 	if (arg1_fm(ch) == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("X = X ::= T");)
@@ -464,6 +488,13 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 				build_bf_xor<node>(
 					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
 		}
+
+	// The owning BA may decide the disequation
+	if (auto hook_r = hooks_detail::try_wff_neq<node>(ch, r,
+		comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch)))) {
+		HOOK_LOGGING(applied("Using the BA's own definition for !=.");)
+		return *hook_r;
+	}
 
 	//Rule X != X ::= F
 	if (arg1_fm(ch) == arg2_fm(ch)) {

@@ -249,21 +249,6 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_equiv(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
-/**
- * @brief The type whose BA answers for a comparison of @p ch.
- *
- * The left operand's type normally decides, but a non-aba omega-categorical BA
- * answers from either side: its constants may sit on the right of an otherwise
- * untyped comparison.
- */
-template <NodeType node>
-static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
-	const size_t tl = a1.get_ba_type();
-	if (pack_type_is_non_aba_omcat<node>(tl)) return tl;
-	const size_t tr = a2.get_ba_type();
-	return pack_type_is_non_aba_omcat<node>(tr) ? tr : tl;
-}
-
 template <NodeType node>
 tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)

@@ -2929,12 +2929,12 @@ TEST_CASE("qlt: ((o1=i1[t-2]) weak_until (o2=i2[t])) until (o1={0} && o2={1}) is
     CHECK(sat(fm));
 }
 
-TEST_CASE("qlt: (o1={top}) weak_until (o2={bot}) && F(o1={3} && o2=i1[t-1]) is REALIZABLE") {
-    // Strategy: at t=0 output o2={bot} (releases W), at t=1 output o1={3} and o2=i1[0].
-    // F satisfied at t=1. W released at t=0 with o1={top} vacuously (W fires immediately).
+TEST_CASE("qlt: (o1={top}) weak_until (o2={bot}) && F(o1={3} && o2=i1[t-1]) is UNSATISFIABLE") {
+    // {top} and {bot} are the ends of the order, not points, so neither
+    // equality ever holds: the weak-until is G F, which nothing releases.
     tref fm = spec("(o1[t]:qlt = {top}:qlt) weak_until (o2[t]:qlt = {bot}:qlt) && F(o1[t]:qlt = {3}:qlt && o2[t]:qlt = i1[t-1]:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("qlt: (o1=i2[t-1]) until ((o2=i1[t]) weak_until (i1={[0,1]})) is REALIZABLE") {

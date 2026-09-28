@@ -226,14 +226,18 @@ template <typename BA, typename Node> struct ba_wff_hooks {};
 *defined and empty*, unlike `ba_descriptor` — so specialize neither, one, or
 both, in your own `<id>_ba_hooks_ext.tmpl.h` (see `_template/`), included from
 your descriptor header. `ba_wff_hooks` takes `wff_lt`, `wff_nlt`, `wff_lteq`,
-`wff_nlteq`, `wff_gt`, `wff_ngt`, `wff_gteq`, `wff_ngteq`; `ba_term_hooks` takes
-`term_cast`.
+`wff_nlteq`, `wff_gt`, `wff_ngt`, `wff_gteq`, `wff_ngteq`, `wff_eq`, `wff_neq`;
+`ba_term_hooks` takes `term_cast`.
 
 Each returns `nullptr` to decline. **Declining is not the same as having no
-hook**: core asks `pack_ba_type_has_wff_lt_hook` separately, and when your type
-owns the operator but you declined, it preserves the comparison as an atom
-rather than falling through to the generic Boolean definition. So return
-`nullptr` freely for operands you cannot fold — the atom survives for the solver.
+hook**: for an ordering operator core asks `pack_ba_type_has_wff_lt_hook`
+separately, and when your type owns the operator but you declined, it preserves
+the comparison as an atom rather than falling through to the generic Boolean
+definition. So return `nullptr` freely for operands you cannot fold — the atom
+survives for the solver. `wff_eq` and `wff_neq` differ: every algebra has the
+Boolean equation, so when you decline core's own equality rules go on (qlt
+uses them to decide `v = 1` for a point variable, since its typed 0 and 1 are
+the order's ends rather than points).
 
 A hook keeps a fixed signature too, so it cannot carry a report. A hook
 that meets a failure there declines with `nullptr` and names the blocking
