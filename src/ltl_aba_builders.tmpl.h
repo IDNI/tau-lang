@@ -220,12 +220,12 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	std::string shift_chain_input_assumptions;
 	if (ltl_input_twins)
 		add_input_twins<node>(sol.atoms, sol.input_props);
-	add_shift_chain_constraints<node>(sol.atoms, sol.skeleton,
-		shift_chain_input_assumptions, &sol.shift_chain_constraints);
+	TAU_TRY_VOID(add_shift_chain_constraints<node>(sol.atoms, sol.skeleton,
+		shift_chain_input_assumptions, &sol.shift_chain_constraints));
 
-	add_consistency_constraints<node>(sol.atoms, sol.skeleton,
+	TAU_TRY_VOID(add_consistency_constraints<node>(sol.atoms, sol.skeleton,
 		&sol.consistency_constraints, has_past /*polarity_complete*/,
-		std::move(shift_chain_input_assumptions));
+		std::move(shift_chain_input_assumptions)));
 	if (ltl_observed_abstraction)
 		add_present_twins<node>(sol.atoms, sol.output_props, sol.skeleton);
 	const size_t constraints_end = sol.skeleton.size();
@@ -259,7 +259,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	}
 
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
-	gate_counter_props<node>(sol);
+	TAU_TRY_VOID(gate_counter_props<node>(sol));
 	return r.with_value(std::move(sol));
 }
 
@@ -310,9 +310,11 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			for (size_t ei = 0; ei < sol.aut.edges[s].size(); ++ei) {
 				auto& e = sol.aut.edges[s][ei];
 				LOG_DEBUG << "[ltl_aba] checking edge " << s << "->[" << e.guard_label << "]->" << e.dst;
-				if (!guard_is_aba_feasible<node>(
-				        e.guard_label, sol.aut.aps, sol.atoms))
-					return std::make_pair(s, ei);
+				auto feas_r = guard_is_aba_feasible<node>(
+				        e.guard_label, sol.aut.aps, sol.atoms);
+				bool feasible = feas_r.has_value() && feas_r.value();
+				r.append(std::move(feas_r).report());
+				if (!feasible) return std::make_pair(s, ei);
 			}
 		return std::nullopt;
 	};
@@ -338,8 +340,9 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			auto& e = sol.aut.edges[rejected->first][rejected->second];
 			LOG_DEBUG << "[ltl_aba] ABA infeasible edge " << rejected->first
 			          << "→" << e.dst << " guard=[" << e.guard_label << "]";
-			for (auto& product : guard_infeasible_products<node>(
-					e.guard_label, sol.aut.aps, sol.atoms))
+			TAU_TRY(auto products, guard_infeasible_products<node>(
+					e.guard_label, sol.aut.aps, sol.atoms));
+			for (auto& product : products)
 				if (!product.empty())
 					clauses.push_back("G(!(" + product_clause_text(product) + "))");
 		} else {
@@ -348,16 +351,17 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			// oracle, then play the strategy against the data.
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
 			if (W > 1) {
-				auto wres = window_infeasible_paths<node>(sol, W,
-					ltl_window_max_paths());
+				TAU_TRY(auto wres, window_infeasible_paths<node>(sol, W,
+					ltl_window_max_paths()));
 				if (wres.path_cap_reached)
 					return undecided("window oracle path cap");
 				clauses = std::move(wres.blocking_clauses);
 			}
 			if (clauses.empty()) {
 				size_t rounds = 0;
-				switch (strategy_wins_on_data<node>(sol,
-					max_refinement_rounds, rounds))
+				TAU_TRY(auto dverdict, strategy_wins_on_data<node>(sol,
+					max_refinement_rounds, rounds));
+				switch (dverdict)
 				{
 				case strategy_data_verdict::wins:
 					return realizable_now();
@@ -375,13 +379,15 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 				for (int_t w = W + 1; clauses.empty()
 					&& w <= W + (int_t)rounds + 1; ++w)
 				{
-					auto wres = window_infeasible_paths<node>(sol, w,
-						ltl_window_max_paths());
+					TAU_TRY(auto wres, window_infeasible_paths<node>(sol, w,
+						ltl_window_max_paths()));
 					if (wres.path_cap_reached) break;
 					clauses = std::move(wres.blocking_clauses);
 				}
-				if (clauses.empty() && sol.observed)
-					clauses = add_forceability_observations<node>(sol);
+				if (clauses.empty() && sol.observed) {
+					TAU_TRY(auto obs, add_forceability_observations<node>(sol));
+					clauses = std::move(obs);
+				}
 				if (clauses.empty()) {
 					if (lost) *lost = true;
 					return undecided("the strategy loses against the "
@@ -417,7 +423,7 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		auto aut_opt = r.merge_take(parse_hoa(hoa));
 		if (!aut_opt) return backend_failed();
 		sol.aut = std::move(*aut_opt);
-		gate_counter_props<node>(sol);
+		TAU_TRY_VOID(gate_counter_props<node>(sol));
 	}
 }
 
@@ -528,7 +534,19 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// them itself.  Without the guard, this fast-path would route back.
 	auto no_bool_combs = [&] {
 		auto nbc = has_no_boolean_combs_of_models<node>(fm);
-		return nbc.has_value() && nbc.value();
+		if (nbc.has_value()) {
+			bool v = nbc.value();
+			r.merge(std::move(nbc));
+			return v;
+		}
+		// the six-phase pipeline is the fallback: a rejected candidate
+		auto sc = r.open("rejected candidate");
+		r.info("the formula could not be checked for Boolean "
+			"combinations of models");
+		report cand = std::move(nbc).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+		return false;
 	};
 	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
@@ -945,12 +963,23 @@ ltl_to_safety_formula_full(tref fm,
 		auto again = solve_ltl_aba<node>(fm, &partial);
 		ltl_propositional_synthesis = true;
 		if (again.has_value()) maybe_r = std::move(again);
+		else {
+			// the re-solve could not decide: a rejected candidate
+			auto sc = r.open("rejected candidate");
+			r.info("the spec could not be solved again without "
+				"bookkeeping bits");
+			report cand = std::move(again).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
 	}
 	if (!maybe_r.has_value()) {
 		r.merge(std::move(maybe_r));
 		return r;
 	}
-	auto& maybe = maybe_r.value();
+	auto maybe_opt = std::move(maybe_r.value());
+	r.merge(std::move(maybe_r));
+	auto& maybe = maybe_opt;
 	// With `data_strategy`, execution plays the strategy of the data game
 	// whenever that game decides the formula, in the order the
 	// realizability check asks it: on codes before the abstraction, on
@@ -963,11 +992,22 @@ ltl_to_safety_formula_full(tref fm,
 		auto game = solve_data_game<node>(game_source.game_skeleton,
 			game_source.atoms, game_source.input_props,
 			game_source.output_props, formulas, data_strategy);
-		data_decided = game.has_value()
-			&& game.value() != data_game_verdict::undecided;
-		if (unrealizable && game.has_value()
-			&& game.value() == data_game_verdict::unrealizable)
-				*unrealizable = true;
+		if (game.has_value()) {
+			data_decided = game.value()
+				!= data_game_verdict::undecided;
+			if (unrealizable
+				&& game.value()
+					== data_game_verdict::unrealizable)
+					*unrealizable = true;
+			r.merge(std::move(game));
+		} else {
+			// the data game could not be built: a rejected candidate
+			auto sc = r.open("rejected candidate");
+			r.info("the data game could not be built");
+			report cand = std::move(game).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
 		return *data_strategy != nullptr;
 	};
 	auto none = [&]() -> full_t {
@@ -996,10 +1036,15 @@ ltl_to_safety_formula_full(tref fm,
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "
 				"survives the ABA refinement";
 			auto out = none();
-			// the data game is the other candidate; when it decided,
-			// this refusal is only the losing candidate
-			if (!refined.has_value() && !(data_strategy && *data_strategy))
-				r.merge(std::move(refined));
+			if (!refined.has_value()
+				&& (data_strategy && *data_strategy)) {
+				// the data game is the other candidate and it decided
+				auto sc = r.open("rejected candidate");
+				r.info("no strategy survives the ABA refinement");
+				report cand = std::move(refined).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+			} else r.merge(std::move(refined));
 			return r.with_value(std::move(out));
 		}
 	}
@@ -1075,7 +1120,9 @@ ltl_to_safety_formula_full(tref fm,
 				"[ltl_aba] ltl_to_safety_formula_full: "
 				"normalization of a guard formula failed");
 		}
-		combined = tau::build_wff_or(combined, norm_guard_r.value());
+		tref norm_guard = norm_guard_r.value();
+		r.merge(std::move(norm_guard_r));
+		combined = tau::build_wff_or(combined, norm_guard);
 	}
 	auto simplified_r = normalize_non_temp<node>(combined);
 	if (!simplified_r.has_value()) {
@@ -1085,6 +1132,7 @@ ltl_to_safety_formula_full(tref fm,
 			"final normalization failed");
 	}
 	tref simplified = simplified_r.value();
+	r.merge(std::move(simplified_r));
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
 	          << LOG_FM(simplified) << ")";
 	return r.with_value(full_t{tau::build_wff_always(simplified),
@@ -1138,8 +1186,22 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	// The always statements form one always part with one warm-up, as in
 	// every other decision procedure.
 	fm = flatten_always_conjuncts<node>(fm);
-	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
-		fm = nf.value();
+	{
+		auto nf = normalize<node>(fm);
+		if (nf.has_value()) {
+			if (nf.value()) fm = nf.value();
+			r.merge(std::move(nf));
+		} else {
+			// the explanation goes on with the unnormalized formula
+			auto sc = r.open("rejected candidate");
+			r.info("the formula could not be normalized",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
+			report cand = std::move(nf).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
+	}
 	if (has_ctl_star_operators<node>(fm)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
 		if (!reduction_r.has_value()) {
@@ -1167,6 +1229,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				messages::unknown_realizability_no_verdict);
 		}
 		bool sat = sat_r.value();
+		r.merge(std::move(sat_r));
 		out << (sat ? "REALIZABLE" : "UNREALIZABLE") << "\n";
 		return r.with_value(sat);
 	}
@@ -1184,7 +1247,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; realizability could not be decided");
 		}
-		if (!decide && !real.value() && !exact_reduction) {
+		bool realizable = real.value();
+		r.merge(std::move(real));
+		if (!decide && !realizable && !exact_reduction) {
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the CTL* reduction is unrealizable, but an E "
 				"witness over a past operator ranges over every input "
@@ -1192,7 +1257,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				"not be decided");
 		}
 		// what `run` executes
-		if (real.value()) {
+		if (realizable) {
 			std::shared_ptr<data_game_strategy<node>> data;
 			auto full =
 				ltl_to_safety_formula_full<node>(fm, &data);
@@ -1215,9 +1280,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				else out << "\nThe strategy is not executable\n";
 			}
 		}
-		out << "\n" << (real.value() ? "REALIZABLE" : "UNREALIZABLE")
+		out << "\n" << (realizable ? "REALIZABLE" : "UNREALIZABLE")
 			<< "\n";
-		return r.with_value(real.value());
+		return r.with_value(realizable);
 	};
 
 	// sol stays populated even when solve_ltl_aba returns std::nullopt.
@@ -1240,6 +1305,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 			messages::unknown_realizability_timed_out);
 	}
 	maybe = std::move(maybe_r.value());
+	r.merge(std::move(maybe_r));
 	if (maybe) sol = std::move(*maybe);
 
 	out << "\nData atoms (" << sol.atoms.size() << "):\n";
@@ -1317,8 +1383,10 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				// per-BA-type partition) -- the plain
 				// existential check printed the opposite
 				// verdict on dead catch-all edges.
-				bool feasible = guard_is_aba_feasible<node>(
+				auto feas_r = guard_is_aba_feasible<node>(
 					e.guard_label, aut.aps, sol.atoms);
+				bool feasible = feas_r.has_value() && feas_r.value();
+				r.append(std::move(feas_r).report());
 				out << "  state " << s << " --[" << e.guard_label
 				    << "]--> " << e.dst << " : ";
 				if (feasible) {
@@ -1555,6 +1623,8 @@ static result<tref> translate_ctl_star(tref fm,
 		auto next_r = inputs.empty() ? result<tref>{}
 			: shift_one_step<node>(translated_inner);
 		if (!inputs.empty() && next_r.has_value()) {
+			tref next = next_r.value();
+			r.merge(std::move(next_r));
 			tref follow = tau::_T();
 			for (const auto& [iname, itype] : inputs) {
 				std::string dname = wname + "_d_" + iname;
@@ -1575,8 +1645,17 @@ static result<tref> translate_ctl_star(tref fm,
 				tau::build_wff_imply(w_prev,
 					tau::build_wff_imply(
 						tau::build_wff_always(follow),
-						next_r.value()))));
+						next))));
 			return r.with_value(witness_wff);
+		}
+		if (!inputs.empty()) {
+			// the witness path has no one-step unfolding: the
+			// all-paths encoding below is the fallback
+			auto sc = r.open("rejected candidate");
+			r.info("the witness path has no one-step unfolding");
+			report cand = std::move(next_r).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
 		}
 		// No input to steer (the tree is a single path, so A χ and
 		// E χ agree), or χ has no one-step unfolding (a past operator
@@ -1773,8 +1852,22 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	// formula has: a contradiction the atoms still spell out separately
 	// (`o1 = i1`, `o1 = 0`, `i1 = 1`) is one the oracle need not catch, so
 	// normalize first, as api::realizable does before calling here.
-	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
-		fm = nf.value();
+	{
+		auto nf = normalize<node>(fm);
+		if (nf.has_value()) {
+			if (nf.value()) fm = nf.value();
+			r.merge(std::move(nf));
+		} else {
+			// the reduction runs on the unnormalized formula
+			auto sc = r.open("rejected candidate");
+			r.info("the formula could not be normalized",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
+			report cand = std::move(nf).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
+	}
 	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
 	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
 		start_time, output));
@@ -1835,6 +1928,15 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
 				witnesses, witness_types, inputs, exact);
 			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
+			else {
+				// the NNF form failed too: a rejected candidate
+				auto sc = r.open("rejected candidate");
+				r.info("the NNF form has no sound reduction "
+					"either");
+				report cand = std::move(nnf_r).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+			}
 		}
 	}
 	if (!translated_r.has_value()) {
@@ -1843,6 +1945,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 			"the CTL* formula has no sound reduction to LTL");
 	}
 	tref translated = translated_r.value();
+	r.merge(std::move(translated_r));
 
 	// Build the conjunction: translated_root ∧ constraint_1 ∧ ... ∧ constraint_n
 	tref result = translated;

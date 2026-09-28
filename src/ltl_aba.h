@@ -525,10 +525,12 @@ static result<std::optional<ltl_aba_solution<node>>> solve_ltl_aba(tref fm,
  * @param fm Data conjunction to check.
  * @param pure_input Whether @p fm mentions only input variables.
  * @param has_input Whether @p fm mentions any input variable.
- * @return `true` iff the conjunction is feasible under the chosen check.
+ * @return `true` iff the conjunction is feasible under the chosen check, or
+ * an error when the check could not be decided.
  */
 template <NodeType node>
-static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
+static result<bool> aba_feasible_dispatch(tref fm, bool pure_input,
+	bool has_input);
 
 /**
  * @brief Multi-state Mealy strategy -> always(phi) with one-hot auxiliary

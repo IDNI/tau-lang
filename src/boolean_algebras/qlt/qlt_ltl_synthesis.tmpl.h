@@ -73,7 +73,7 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm);
 // "redefinition of default argument" diagnostic; the one call site here
 // passes all four arguments explicitly.
 template <NodeType node>
-static void add_consistency_constraints(
+static result<void> add_consistency_constraints(
 	const std::vector<std::pair<tref, std::string>>& atoms,
 	std::string& skeleton,
 	std::vector<std::string>* out_constraints,
@@ -793,9 +793,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		for (int i = 0; i < K; ++i)
 			sol.atoms[i].second = "d_" + std::to_string(i);
 		std::string strategy_skeleton = phi_star;
-		add_consistency_constraints<node>(sol.atoms, strategy_skeleton,
-			nullptr, /*polarity_complete=*/false,
-			/*seed_input_assumptions=*/"");
+		TAU_TRY_VOID(add_consistency_constraints<node>(sol.atoms,
+			strategy_skeleton, nullptr, /*polarity_complete=*/false,
+			/*seed_input_assumptions=*/""));
 		std::vector<std::string> D_outs;
 		for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 		TAU_TRY(auto ltlsynt_out, call_ltlsynt(strategy_skeleton, {}, D_outs));

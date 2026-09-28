@@ -833,7 +833,11 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
 	auto impl = [&](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
-		if (ir.has_value()) return ir.value();
+		if (ir.has_value()) {
+			bool v = ir.value();
+			r.merge(std::move(ir));
+			return v;
+		}
 		// an undecided implication leaves the step unrolled: a rejected
 		// candidate, not a verdict
 		auto sc = r.open("rejected candidate");
@@ -945,7 +949,11 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	};
 	auto impl = [&](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
-		if (ir.has_value()) return ir.value();
+		if (ir.has_value()) {
+			bool v = ir.value();
+			r.merge(std::move(ir));
+			return v;
+		}
 		// an undecided implication leaves the step unrolled: a rejected
 		// candidate, not a verdict
 		auto sc = r.open("rejected candidate");
@@ -2620,8 +2628,10 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// same reason as in is_ctl_star_realizable: the witness
 		// constraints are decided over the formula's own atoms
 		auto nf = normalize<node>(fm);
-		if (nf.has_value() && nf.value()) fm = nf.value();
-		else {
+		if (nf.has_value()) {
+			if (nf.value()) fm = nf.value();
+			r.merge(std::move(nf));
+		} else {
 			// the reduction runs on the unnormalized formula: a rejected
 			// candidate, not a verdict
 			auto sc = r.open("rejected candidate");
@@ -2647,13 +2657,16 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		auto reduced = is_tau_formula_sat<node>(
 			reduction->ltl_formula, start_time, output);
 		if (!reduced.has_value()) r.merge(std::move(reduced));
-		else if (reduced.value() || reduction->exact)
-			memoize(reduced.value());
 		else {
+			bool rv = reduced.value();
+			r.merge(std::move(reduced));
+			if (rv || reduction->exact) memoize(rv);
+			else {
 #ifdef TAU_CACHE
-			undecided.emplace(std::make_pair(fm, start_time), true);
+				undecided.emplace(std::make_pair(fm, start_time), true);
 #endif // TAU_CACHE
-			mark_undecided();
+				mark_undecided();
+			}
 		}
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -2718,7 +2731,9 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 					std::move(val));
 				return true;
 			}
-			return tau::get(val.value()).equals_F();
+			bool unsat = tau::get(val.value()).equals_F();
+			r.merge(std::move(val));
+			return unsat;
 		};
 		if (!for_each_path<node>(normalized_fm, unsat_path)) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
@@ -2791,7 +2806,9 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
 			return true;
 		}
-		return tau::get(val.value()).equals_F();
+		bool unsat = tau::get(val.value()).equals_F();
+		r.merge(std::move(val));
+		return unsat;
 	};
 	if (!for_each_path<node>(imp_check, unsat_path))
 		return r.with_assert_check_value(false);
@@ -2853,7 +2870,9 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
 			continue;
 		}
-		if (!tau::get(val.value()).equals_F()) {
+		bool is_f = tau::get(val.value()).equals_F();
+		r.merge(std::move(val));
+		if (!is_f) {
 			return r.with_assert_check_value(false);
 		}
 	}
@@ -2894,15 +2913,21 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	if (fv < 0) {
 		// an undecided validity only means no simplification here
 		auto v = is_tau_impl<node>(tau::_T(), fm);
-		if (v.has_value() && v.value())
-			return r.with_assert_check_value(tau::_T());
-		// the simplification keeps its answer: a rejected candidate
-		auto sc = r.open("rejected candidate");
-		r.info("the validity of the formula could not be decided",
-			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
-		report cand = std::move(v).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		if (v.has_value()) {
+			bool valid = v.value();
+			r.merge(std::move(v));
+			if (valid) return r.with_assert_check_value(tau::_T());
+		} else {
+			// the simplification keeps its answer: a rejected
+			// candidate
+			auto sc = r.open("rejected candidate");
+			r.info("the validity of the formula could not be "
+				"decided", {{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
+			report cand = std::move(v).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
 	}
 	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");
@@ -2924,8 +2949,9 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 				failed.emplace(std::move(val));
 				return false;
 			}
-			if (!tau::get(val.value()).equals_F())
-				clauses.push_back(clause);
+			bool is_f = tau::get(val.value()).equals_F();
+			r.merge(std::move(val));
+			if (!is_f) clauses.push_back(clause);
 			return true;
 		};
 		for_each_path<node>(normalized_fm, keep_sat);

@@ -102,6 +102,24 @@ static std::optional<ltl_aba_solution<node_t>> solve_ltl(tref fm) {
 	return r.value();
 }
 
+// Unwraps aba_existential_feasible. A failure in the report fails the test
+// rather than reading as infeasible.
+static bool aba_feasible(tref fm) {
+	auto r = aba_existential_feasible<node_t>(fm);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
+// Unwraps guard_is_aba_feasible the same way.
+static bool guard_feasible(const std::string& guard,
+	const std::vector<std::string>& aps,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	auto r = guard_is_aba_feasible<node_t>(guard, aps, atoms);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 // ── 1. Parser tests ───────────────────────────────────────────────────────────
 
 TEST_SUITE("LTL parser") {
@@ -449,7 +467,7 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 		// (o1[t]/o2[t] each compared to {T.} and {F.}).
 		tref atom = wff("o1[t]:tau = {T.}:tau");
 		REQUIRE(atom != nullptr);
-		bool solver_answer = aba_existential_feasible<node_t>(atom);
+		bool solver_answer = aba_feasible(atom);
 		CHECK(solver_answer == true);
 
 		auto match = match_ocltl_swap_shape<node_t>(atom);
@@ -5215,9 +5233,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
-		CHECK(guard_is_aba_feasible<node_t>("0", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("1", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1", aps, atoms));
+		CHECK(guard_feasible("0", aps, atoms));
+		CHECK(guard_feasible("1", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&1", aps, atoms));
 	}
 
 	// A sum of products is feasible iff SOME product is.  The old lexer kept
@@ -5227,8 +5245,8 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
-		CHECK(guard_is_aba_feasible<node_t>("0&1 | 0", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&1 | !0&!1", aps, atoms));
+		CHECK(guard_feasible("0&1 | 0", aps, atoms));
+		CHECK(guard_feasible("0&1 | !0&!1", aps, atoms));
 	}
 
 	// ... and infeasible when EVERY product is.
@@ -5236,7 +5254,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1 | 1&0", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&1 | 1&0", aps, atoms));
 	}
 
 	// A leading '(' made the old lexer emit an EMPTY literal list, which the
@@ -5246,10 +5264,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("(0&1)", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("(0)&(1)", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("(0|1)", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("(0|1)&0", aps, atoms));
+		CHECK_FALSE(guard_feasible("(0&1)", aps, atoms));
+		CHECK_FALSE(guard_feasible("(0)&(1)", aps, atoms));
+		CHECK(guard_feasible("(0|1)", aps, atoms));
+		CHECK(guard_feasible("(0|1)&0", aps, atoms));
 	}
 
 	// Constant labels keep their meaning: `t` fires unconditionally, `f`
@@ -5257,9 +5275,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	TEST_CASE("[GF-04] constant guard labels") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
-		CHECK(guard_is_aba_feasible<node_t>("t", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("f", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("", aps, atoms));
+		CHECK(guard_feasible("t", aps, atoms));
+		CHECK(guard_feasible("f", aps, atoms));
+		CHECK(guard_feasible("", aps, atoms));
 	}
 
 	// APs that are not user atoms (Algorithm A's R-bits, Algorithm B's
@@ -5269,9 +5287,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		aps.push_back("r_0");   // index 2: no matching atom
-		CHECK(guard_is_aba_feasible<node_t>("0&2", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&!2", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2", aps, atoms));
+		CHECK(guard_feasible("0&2", aps, atoms));
+		CHECK(guard_feasible("0&!2", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&1&2", aps, atoms));
 	}
 
 	// ── LA-R1 / LA-R2 / LA-N5 / LA-RT1: per-input-class semantics ─────────
@@ -5308,12 +5326,12 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(is_pure_input_atom<node_t>(atoms[1].first));
 		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[2].first));
 		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
-		CHECK(guard_is_aba_feasible<node_t>("0", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("1", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("2", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("!2", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3", aps, atoms));
+		CHECK(guard_feasible("0", aps, atoms));
+		CHECK(guard_feasible("1", aps, atoms));
+		CHECK(guard_feasible("2", aps, atoms));
+		CHECK(guard_feasible("!2", aps, atoms));
+		CHECK_FALSE(guard_feasible("2&3", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&2&3", aps, atoms));
 	}
 
 	// LA-R2: the edge fires under input class p0 (only product 0&2&3,
@@ -5324,12 +5342,12 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("1 | 0&2&3", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0 | 1&2&3", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&2&3 | 1", aps, atoms));
+		CHECK_FALSE(guard_feasible("1 | 0&2&3", aps, atoms));
+		CHECK_FALSE(guard_feasible("0 | 1&2&3", aps, atoms));
 		// Both classes served by a feasible product: accepted.
-		CHECK(guard_is_aba_feasible<node_t>("0&!2 | 1", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&2 | 1&3", aps, atoms));
+		CHECK(guard_feasible("0&!2 | 1", aps, atoms));
+		CHECK(guard_feasible("0&2 | 1&3", aps, atoms));
 	}
 
 	// LA-R1: a dead input class (p0&p1 is input-contradictory) must skip
@@ -5340,11 +5358,11 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2 | 2&3", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&1&2", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&1&2 | 2&3", aps, atoms));
+		CHECK_FALSE(guard_feasible("2&3 | 0&1&2", aps, atoms));
 		// Every product input-dead: the edge can never fire → vacuous.
-		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3 | 1&0&!2", aps, atoms));
+		CHECK(guard_feasible("0&1&2&3", aps, atoms));
+		CHECK(guard_feasible("0&1&2&3 | 1&0&!2", aps, atoms));
 	}
 
 	// A product with a WEAKER input part covers the stronger class: under
@@ -5353,10 +5371,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
-		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | !2", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | 0&!2", aps, atoms));
+		CHECK(guard_feasible("0&2&3 | !2", aps, atoms));
+		CHECK(guard_feasible("0&2&3 | 0&!2", aps, atoms));
 		// ... but a STRONGER input part does not cover the weaker class.
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&!2", aps, atoms));
+		CHECK_FALSE(guard_feasible("2&3 | 0&!2", aps, atoms));
 	}
 
 	// Negated input literals split the classes semantically: `!0` and `0`
@@ -5367,8 +5385,8 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | !0&!2", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&2&3 | !0&!2", aps, atoms));
+		CHECK(guard_feasible("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
 	// ── Batch O8: exact mixed-type coverage ───────────────────────────────
@@ -5404,8 +5422,8 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
 		// Different BA types are independent variables: p0 ∧ p1 is
 		// feasible, the qlt output pair is not.
-		CHECK(guard_is_aba_feasible<node_t>("0&1", aps, atoms));
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
+		CHECK(guard_feasible("0&1", aps, atoms));
+		CHECK_FALSE(guard_feasible("2&3", aps, atoms));
 	}
 
 	// The plan's flip fixture: the input-unconstrained product 2&3 is
@@ -5417,7 +5435,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		CHECK(guard_is_aba_feasible<node_t>("2&3 | 1&!2 | !1&!2", aps, atoms));
+		CHECK(guard_feasible("2&3 | 1&!2 | !1&!2", aps, atoms));
 	}
 
 	// Exactness in the other direction: with only the p1 class feasible,
@@ -5428,7 +5446,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1&!2", aps, atoms));
+		CHECK_FALSE(guard_feasible("0&2&3 | 1&!2", aps, atoms));
 	}
 
 	// Mixed-type version of GF-14: complementary sbf literals under a
@@ -5440,7 +5458,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		CHECK(guard_is_aba_feasible<node_t>(
+		CHECK(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
 	}
 
@@ -5456,10 +5474,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		REQUIRE(atoms.size() == 4);
 		const size_t saved = max_cover_products;
 		max_cover_products = 1;
-		CHECK_FALSE(guard_is_aba_feasible<node_t>(
+		CHECK_FALSE(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
 		max_cover_products = saved;
-		CHECK(guard_is_aba_feasible<node_t>(
+		CHECK(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
 	}
 
@@ -5479,11 +5497,11 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		REQUIRE(r != nullptr);
 		CHECK_FALSE(tau::get(r).equals_F());
 		// ¬(p0 ∨ p1) is feasible (o1 = 1/2 satisfies neither atom) ...
-		CHECK(guard_is_aba_feasible<node_t>("!(0|1)", aps, atoms));
+		CHECK(guard_feasible("!(0|1)", aps, atoms));
 		// ... and ¬(p0 ∨ p1) ∧ p0 is not.
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(0|1)&0", aps, atoms));
+		CHECK_FALSE(guard_feasible("!(0|1)&0", aps, atoms));
 		// The group is CONSUMED: what follows it still parses.
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(1)&0&1", aps, atoms));
+		CHECK_FALSE(guard_feasible("!(1)&0&1", aps, atoms));
 	}
 
 	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
@@ -5492,11 +5510,11 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms)).equals_F());
 		CHECK(tau::get(guard_to_aba<node_t>("!f", aps, atoms)).equals_T());
 		// `!f` is an unconditional edge, `!t` a dead one; both "feasible".
-		CHECK(guard_is_aba_feasible<node_t>("!f", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("!t", aps, atoms));
+		CHECK(guard_feasible("!f", aps, atoms));
+		CHECK(guard_feasible("!t", aps, atoms));
 		// Combined with a real atom the constants keep their meaning.
-		CHECK_FALSE(guard_is_aba_feasible<node_t>("!t|0&1", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("!f&0", aps, atoms));
+		CHECK_FALSE(guard_feasible("!t|0&1", aps, atoms));
+		CHECK(guard_feasible("!f&0", aps, atoms));
 	}
 
 	// LA-N6: std::stoi threw out of the oracle on a ≥10-digit AP index.
@@ -5506,7 +5524,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_NOTHROW(guard_to_aba<node_t>("99999999999", aps, atoms));
 		CHECK(tau::get(guard_to_aba<node_t>("99999999999", aps, atoms)).equals_T());
 		CHECK_NOTHROW(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
-		CHECK(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
+		CHECK(guard_feasible("0&99999999999999", aps, atoms));
 	}
 
 } // TEST_SUITE("[LT-3] ABA oracle guard parsing")
@@ -5530,7 +5548,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+		CHECK_FALSE(aba_feasible(fm));
 	}
 
 	// The consistent chain must stay feasible — the guard must not turn into
@@ -5540,7 +5558,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(aba_existential_feasible<node_t>(fm));
+		CHECK(aba_feasible(fm));
 	}
 
 	// Two-variable guards keep using the qlt fast path and keep their answers.
@@ -5548,10 +5566,10 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		bdd_init<Bool>();
 		tref ok = spec("(o1[t]:qlt < o2[t]:qlt).");
 		REQUIRE(ok != nullptr);
-		CHECK(aba_existential_feasible<node_t>(ok));
+		CHECK(aba_feasible(ok));
 		tref bad = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o1[t]:qlt).");
 		REQUIRE(bad != nullptr);
-		CHECK_FALSE(aba_existential_feasible<node_t>(bad));
+		CHECK_FALSE(aba_feasible(bad));
 	}
 
 	// Longer chain: the cycle only closes after three transitive steps.
@@ -5561,7 +5579,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		               "&& (o3[t]:qlt < o4[t]:qlt) "
 		               "&& !(o1[t]:qlt < o4[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+		CHECK_FALSE(aba_feasible(fm));
 	}
 
 	// The joint check must only ever fire on a CONJUNCTION.  A disjunction
@@ -5574,7 +5592,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		               "&& !(o1[t]:qlt < o3[t]:qlt)) "
 		               "|| (o1[t]:qlt < o2[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(aba_existential_feasible<node_t>(fm));
+		CHECK(aba_feasible(fm));
 	}
 
 	// Localiser for the joint check itself, so a future failure separates
@@ -5622,7 +5640,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		               "&& (o4[t]:qlt >= o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
-		CHECK(aba_existential_feasible<node_t>(fm));
+		CHECK(aba_feasible(fm));
 	}
 
 	// The `>=` spelling of the closing literal must be ingested too — it is
@@ -5633,7 +5651,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		               "&& (o1[t]:qlt >= o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(qlt_order_conj_unsat<node_t>(fm));
-		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+		CHECK_FALSE(aba_feasible(fm));
 	}
 
 	// The oracle never sees a parsed spec — `guard_is_aba_feasible` builds its
@@ -5653,7 +5671,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		    build_wff_neg<node_t>(lt13));
 		REQUIRE(fm != nullptr);
 		CHECK(qlt_order_conj_unsat<node_t>(fm));
-		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+		CHECK_FALSE(aba_feasible(fm));
 	}
 
 	// Non-strict edges alone are consistent: o1 <= o2 <= o1 just means
@@ -5662,7 +5680,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		bdd_init<Bool>();
 		tref fm = spec("!(o1[t]:qlt > o2[t]:qlt) && !(o2[t]:qlt > o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(aba_existential_feasible<node_t>(fm));
+		CHECK(aba_feasible(fm));
 	}
 
 } // TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable")

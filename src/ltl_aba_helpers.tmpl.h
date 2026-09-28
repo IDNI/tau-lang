@@ -713,7 +713,9 @@ static result<std::string> skeleton_wff_with_testers(
 			return r.with_error(code::solver_error,
 				"skeleton_wff_with_testers: normalization failed");
 		}
-		return r.with_value(tree<node>::get(normalized.value()).equals_F() ? "0" : "1");
+		bool is_f = tree<node>::get(normalized.value()).equals_F();
+		r.merge(std::move(normalized));
+		return r.with_value(is_f ? "0" : "1");
 	}
 	}
 }

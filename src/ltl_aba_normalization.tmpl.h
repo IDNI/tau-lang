@@ -320,10 +320,11 @@ static bool qlt_order_conj_unsat(tref fm) {
 }
 
 template <NodeType node>
-static bool aba_existential_feasible(tref fm) {
+static result<bool> aba_existential_feasible(tref fm) {
 	using tau = tree<node>;
-	if (tau::get(fm).equals_T()) return true;
-	if (tau::get(fm).equals_F()) return false;
+	result<bool> r;
+	if (tau::get(fm).equals_T()) return r.with_value(true);
+	if (tau::get(fm).equals_F()) return r.with_value(false);
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
@@ -335,7 +336,8 @@ static bool aba_existential_feasible(tref fm) {
 	if (const size_t fp = ltl_verdict_budget_fingerprint(
 			pack_ba_options_fingerprint<node>());
 		fp != cache_budget) { cache.clear(); cache_budget = fp; }
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	if (auto it = cache.find(fm); it != cache.end())
+		return r.with_value(it->second);
 #endif // TAU_CACHE
 	auto compute = [&]() -> bool {
 		// Over a non-aba omcat theory, ask that theory per free variable
@@ -414,9 +416,12 @@ static bool aba_existential_feasible(tref fm) {
 					warned = true;
 					auto nm = get_ba_type_name<node>(
 						tree<node>::get(v).get_ba_type());
-					// TODO (HIGH) dropped error: get_ba_type_name's report -- a LOG_WARNING stream chain cannot abort the line.
-					TAU_LOG_WARNING << "[ltl_aba] a "
-						<< (nm.has_value() ? nm.value() : std::string("INVALID"))
+					std::string type_s = nm.has_value()
+						? nm.value() : std::string("INVALID");
+					report cand = std::move(nm).report();
+					cand.demote_errors_to_warnings();
+					r.append(std::move(cand));
+					TAU_LOG_WARNING << "[ltl_aba] a " << type_s
 						<< " output atom is taken as feasible: the "
 						"algebra declares its outputs always "
 						"satisfiable, so the emptiness of its "
@@ -425,7 +430,16 @@ static bool aba_existential_feasible(tref fm) {
 				return true;
 			}
 		auto sat = is_non_temp_nso_satisfiable<node>(fm);
-		return sat.has_value() && sat.value();
+		if (sat.has_value()) {
+			bool v = sat.value();
+			r.append(std::move(sat).report());
+			return v;
+		}
+		// an undecided check is no feasibility: a rejected candidate
+		report cand = std::move(sat).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+		return false;
 	};
 	ocltl_swap_stats().total_calls.fetch_add(1, std::memory_order_relaxed);
 	bool result = compute();
@@ -433,7 +447,7 @@ static bool aba_existential_feasible(tref fm) {
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
-	return result;
+	return r.with_value(result);
 }
 
 // Per-step feasibility under an adversarial input: each free stream/time
@@ -442,17 +456,19 @@ static bool aba_existential_feasible(tref fm) {
 // instance may depend on an earlier one, never the reverse. Under
 // ltl_observed_abstraction every instance is existential.
 template <NodeType node>
-static bool aba_synthesis_feasible(tref fm) {
+static result<bool> aba_synthesis_feasible(tref fm) {
 	using tau = tree<node>;
-	if (tau::get(fm).equals_T()) return true;
-	if (tau::get(fm).equals_F()) return false;
+	result<bool> r;
+	if (tau::get(fm).equals_T()) return r.with_value(true);
+	if (tau::get(fm).equals_F()) return r.with_value(false);
 	const bool observed = ltl_observed_abstraction;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& strict_cache = tau::template create_cache<cache_t>();
 	static cache_t& observed_cache = tau::template create_cache<cache_t>();
 	cache_t& cache = observed ? observed_cache : strict_cache;
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	if (auto it = cache.find(fm); it != cache.end())
+		return r.with_value(it->second);
 #endif // TAU_CACHE
 	auto is_input = [](tref v) {
 		return tau::get(v).child_is(tau::io_var) && tau::get(v)[0].is_input_variable();
@@ -478,9 +494,18 @@ static bool aba_synthesis_feasible(tref fm) {
 	// through its own quantifier support instead of DNF/Shannon case-split.
 	// A nullopt (cvc5 unknown or translation failure) is not a "no": fall
 	// through to the general solver rather than reading it as infeasible.
-	auto sat_nt = [](tref f) {
+	auto sat_nt = [&](tref f) {
 		auto sr = is_non_temp_nso_satisfiable<node>(f);
-		return sr.has_value() && sr.value();
+		if (sr.has_value()) {
+			bool v = sr.value();
+			r.append(std::move(sr).report());
+			return v;
+		}
+		// an undecided check is no feasibility: a rejected candidate
+		report cand = std::move(sr).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+		return false;
 	};
 	bool result;
 	if (pack_can_solve<node>(q_fm)) {
@@ -490,7 +515,7 @@ static bool aba_synthesis_feasible(tref fm) {
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
-	return result;
+	return r.with_value(result);
 }
 
 // Unified feasibility dispatch (code_restruct_suggestion #6).
@@ -510,7 +535,8 @@ static bool aba_synthesis_feasible(tref fm) {
 // different fast path: single-atom uses is_pure_input_atom; pair uses both),
 // so this helper takes them as parameters.  Keeps the core policy in one place.
 template <NodeType node>
-static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input) {
+static result<bool> aba_feasible_dispatch(tref fm, bool pure_input,
+	bool has_input) {
 	if (pure_input) return aba_existential_feasible<node>(fm);
 	size_t ti = find_ba_type<node>(fm);
 	if (pack_type_is_non_aba_omcat<node>(ti) && !has_input)
@@ -579,9 +605,10 @@ struct guard_product {
 // guard_lit overload below handles the pick-and-classify-by-atom shape most
 // other callers have.
 template <NodeType node>
-static bool guard_conj_feasible(const trefs& fs, bool single_type)
+static result<bool> guard_conj_feasible(const trefs& fs, bool single_type)
 {
 	using tau = tree<node>;
+	result<bool> r;
 	if (single_type) {
 		tref conj = tau::_T();
 		for (tref f : fs) conj = tau::build_wff_and(conj, f);
@@ -593,18 +620,21 @@ static bool guard_conj_feasible(const trefs& fs, bool single_type)
 			find_ba_type<node>(f), tau::_T());
 		it->second = tau::build_wff_and(it->second, f);
 	}
-	for (auto& [tid, conj] : per_type)
-		if (!aba_existential_feasible<node>(conj)) return false;
-	return true;
+	for (auto& [tid, conj] : per_type) {
+		TAU_TRY(bool ok, aba_existential_feasible<node>(conj));
+		if (!ok) return r.with_value(false);
+	}
+	return r.with_value(true);
 }
 
 // Conjunction of literals, partitioned by BA type unless the whole atom
 // set is single-typed.  `pick` selects which literals participate.
 template <NodeType node, typename Pick>
-static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
+static result<bool> guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
     Pick&& pick, bool single_type)
 {
 	using tau = tree<node>;
+	result<bool> r;
 	if (single_type) {
 		tref conj = tau::_T();
 		for (auto& gl : lits)
@@ -618,9 +648,11 @@ static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
 			find_ba_type<node>(gl.atom), tau::_T());
 		it->second = tau::build_wff_and(it->second, gl.lit);
 	}
-	for (auto& [tid, conj] : per_type)
-		if (!aba_existential_feasible<node>(conj)) return false;
-	return true;
+	for (auto& [tid, conj] : per_type) {
+		TAU_TRY(bool ok, aba_existential_feasible<node>(conj));
+		if (!ok) return r.with_value(false);
+	}
+	return r.with_value(true);
 }
 
 // LT-3: this used to hand-lex the label, accepting only '!', digits and
@@ -642,7 +674,7 @@ static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
 // full-literal feasibility. `dead_guard`, when given, reports a guard that
 // parsed to FALSE outright -- a vacuously feasible edge, not a product.
 template <NodeType node>
-static std::vector<guard_product<node>> build_guard_live_products(
+static result<std::vector<guard_product<node>>> build_guard_live_products(
     const std::string& guard_label,
     const std::vector<std::string>& aps,
     const std::vector<std::pair<tref, std::string>>& atoms,
@@ -650,11 +682,12 @@ static std::vector<guard_product<node>> build_guard_live_products(
     bool* dead_guard = nullptr)
 {
 	using tau = tree<node>;
+	result<std::vector<guard_product<node>>> r;
 	tref guard_fm = guard_to_aba<node>(guard_label, aps, atoms);
 
 	if (tau::get(guard_fm).equals_F()) {
 		if (dead_guard) *dead_guard = true;
-		return {};
+		return r.with_value(std::vector<guard_product<node>>{});
 	}
 	if (dead_guard) *dead_guard = false;
 
@@ -684,17 +717,21 @@ static std::vector<guard_product<node>> build_guard_live_products(
 		if (product_is_false) continue;         // dead product
 
 		// Input-dead product: the environment can never trigger it.
-		if (!p.input_lits.empty()
-		    && !guard_conj_feasible<node>(p.lits, [](const guard_lit<node>& gl) {
-		           return gl.pure_input; }, single_type))
-			continue;
+		if (!p.input_lits.empty()) {
+			TAU_TRY(bool input_feasible, guard_conj_feasible<node>(
+				p.lits, [](const guard_lit<node>& gl) {
+					return gl.pure_input; }, single_type));
+			if (!input_feasible) continue;
+		}
 
-		p.feasible = guard_conj_feasible<node>(p.lits, [](const guard_lit<node>&) {
-			return true; }, single_type);
+		TAU_TRY(bool feasible, guard_conj_feasible<node>(
+			p.lits, [](const guard_lit<node>&) {
+				return true; }, single_type));
+		p.feasible = feasible;
 		std::sort(p.input_lits.begin(), p.input_lits.end());
 		live.push_back(std::move(p));
 	}
-	return live;
+	return r.with_value(std::move(live));
 }
 
 // Maps a guard literal to its user-facing (proposition name, positive?) pair,
@@ -732,16 +769,17 @@ static std::string product_clause_text(
 // Each entry is one live, infeasible product of `guard_label`: its data-atom
 // literals as (proposition name, positive?) pairs. Empty means the edge passes.
 template <NodeType node>
-static std::vector<std::vector<std::pair<std::string, bool>>>
+static result<std::vector<std::vector<std::pair<std::string, bool>>>>
 guard_infeasible_products(const std::string& guard_label,
     const std::vector<std::string>& aps,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
+	result<std::vector<std::vector<std::pair<std::string, bool>>>> r;
 	auto types_seen = formula_type_set<node>::from_atoms(atoms);
 	const bool single_type = types_seen.single_type();
 
-	std::vector<guard_product<node>> live = build_guard_live_products<node>(
-		guard_label, aps, atoms, single_type);
+	TAU_TRY(auto live, build_guard_live_products<node>(
+		guard_label, aps, atoms, single_type));
 
 	std::vector<std::vector<std::pair<std::string, bool>>> out;
 	for (auto& p : live) {
@@ -752,16 +790,17 @@ guard_infeasible_products(const std::string& guard_label,
 				lits.push_back(std::move(*named));
 		out.push_back(std::move(lits));
 	}
-	return out;
+	return r.with_value(std::move(out));
 }
 
 template <NodeType node>
-static bool guard_is_aba_feasible(
+static result<bool> guard_is_aba_feasible(
     const std::string& guard_label,
     const std::vector<std::string>& aps,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	using tau = tree<node>;
+	result<bool> r;
 
 	auto types_seen = formula_type_set<node>::from_atoms(atoms);
 	const bool single_type = types_seen.single_type();
@@ -788,24 +827,24 @@ static bool guard_is_aba_feasible(
 	// semantically: I_k ∧ ¬(∨_{j feasible} I_j) is infeasible.  No live
 	// product at all (every product input-dead) is a vacuous edge.
 	bool dead_guard = false;
-	std::vector<guard_product<node>> live = build_guard_live_products<node>(
-		guard_label, aps, atoms, single_type, &dead_guard);
+	TAU_TRY(auto live, build_guard_live_products<node>(
+		guard_label, aps, atoms, single_type, &dead_guard));
 
 	// A label that parses to FALSE ('f', or a product containing both an atom
 	// and its negation after bookkeeping APs drop out) is a DEAD edge: the
 	// environment can never trigger it, so it is not evidence of
 	// infeasibility.  Same convention as the input-dead-product check.
-	if (dead_guard) return true;
+	if (dead_guard) return r.with_value(true);
 
 	// Every product input-dead (or the label was `f`): vacuous edge.
-	if (live.empty()) return true;
+	if (live.empty()) return r.with_value(true);
 
 	// Coverage.  A feasible product with NO input literals covers every
 	// class; otherwise try syntactic subset, then the semantic check.
 	tref feasible_inputs_disj = nullptr;   // ∨_{j feasible} I_j (single type)
 	for (auto& pj : live) {
 		if (!pj.feasible) continue;
-		if (pj.input_lits.empty()) return true;
+		if (pj.input_lits.empty()) return r.with_value(true);
 		if (single_type) {
 			tref ij = tau::_T();
 			for (tref l : pj.input_lits) ij = tau::build_wff_and(ij, l);
@@ -829,7 +868,8 @@ static bool guard_is_aba_feasible(
 			for (tref l : pk.input_lits) ik = tau::build_wff_and(ik, l);
 			tref uncovered = tau::build_wff_and(ik,
 				tau::build_wff_neg(feasible_inputs_disj));
-			covered = !aba_existential_feasible<node>(uncovered);
+			TAU_TRY(bool feas, aba_existential_feasible<node>(uncovered));
+			covered = !feas;
 		}
 		if (!covered && !single_type) {
 			// Batch O8: exact coverage for MIXED-type guards.
@@ -903,9 +943,10 @@ static bool guard_is_aba_feasible(
 							atom = lt[0].first();
 						lits.push_back({l, atom, true});
 					}
-					if (guard_conj_feasible<node>(lits,
+					TAU_TRY(bool feas, guard_conj_feasible<node>(lits,
 						[](const guard_lit<node>&) {
-							return true; }, single_type)) {
+							return true; }, single_type));
+					if (feas) {
 						some_feasible = true;
 						break;
 					}
@@ -913,9 +954,9 @@ static bool guard_is_aba_feasible(
 				covered = !some_feasible;
 			}
 		}
-		if (!covered) return false;
+		if (!covered) return r.with_value(false);
 	}
-	return true;
+	return r.with_value(true);
 }
 
 
@@ -1033,7 +1074,7 @@ static bool ground_eq_pair_syntactically_infeasible(tref a, tref b) {
 // the number of FEASIBLE subsets visited, not just infeasible ones. Fallback
 // for groups too large for the mus enumeration's explored bitset.
 template <NodeType node>
-static void extend_consistency_positive_k_ary_walk(
+static result<void> extend_consistency_positive_k_ary_walk(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
     std::vector<std::string>* out_constraints,
@@ -1041,6 +1082,7 @@ static void extend_consistency_positive_k_ary_walk(
     const std::function<bool(const std::vector<int>&)>& is_subsumed)
 {
 	using tau = tree<node>;
+	result<void> r;
 	const int n = static_cast<int>(atoms.size());
 
 	// LT-17: the walk performs Θ(2^n) synthesis checks when the atoms are
@@ -1087,7 +1129,10 @@ static void extend_consistency_positive_k_ary_walk(
 				return;
 			}
 			++checks_spent;
-			if (!aba_synthesis_feasible<node>(prefix_body)) {
+			auto feas_r = aba_synthesis_feasible<node>(prefix_body);
+			bool feasible = feas_r.has_value() && feas_r.value();
+			r.append(std::move(feas_r).report());
+			if (!feasible) {
 				std::string pat;
 				for (int i : sel) {
 					if (!pat.empty()) pat += " && ";
@@ -1113,13 +1158,14 @@ static void extend_consistency_positive_k_ary_walk(
 	};
 	std::vector<int> sel;
 	walk(0, tau::_T(), sel);
+	return r;
 }
 
 // MARCO-style enumeration of minimal infeasible k-subsets (k>=3): cost
 // scales with the number of infeasible subsets found (grows to a maximal
 // feasible witness instead of exhaustive descent). Requires n <= 22.
 template <NodeType node>
-static void extend_consistency_positive_k_ary_mus(
+static result<void> extend_consistency_positive_k_ary_mus(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
     std::vector<std::string>* out_constraints,
@@ -1127,6 +1173,7 @@ static void extend_consistency_positive_k_ary_mus(
     const std::function<bool(const std::vector<int>&)>& is_subsumed)
 {
 	using tau = tree<node>;
+	result<void> r;
 	const int n = static_cast<int>(atoms.size());
 	const uint32_t universe = (1u << n) - 1;
 
@@ -1173,7 +1220,10 @@ static void extend_consistency_positive_k_ary_mus(
 	};
 	auto feasible_checked = [&](tref t) {
 		++checks_spent;
-		return aba_synthesis_feasible<node>(t);
+		auto fr = aba_synthesis_feasible<node>(t);
+		bool v = fr.has_value() && fr.value();
+		r.append(std::move(fr).report());
+		return v;
 	};
 
 	auto process_seed = [&](uint32_t seed) {
@@ -1271,18 +1321,20 @@ static void extend_consistency_positive_k_ary_mus(
 			existing_forbid_sets.push_back(sel);
 		}
 	}
+	return r;
 }
 
 template <NodeType node>
-static void extend_consistency_positive_k_ary(
+static result<void> extend_consistency_positive_k_ary(
     const std::vector<std::pair<tref, std::string>>& group,
     std::string& skeleton,
     std::vector<std::string>* out_constraints)
 {
 	using tau = tree<node>;
+	result<void> r;
 	const std::vector<std::pair<tref, std::string>>& atoms = group;
 	const int n = static_cast<int>(atoms.size());
-	if (n < 3) return;  // pairwise already handled by caller
+	if (n < 3) return r;  // pairwise already handled by caller
 
 	// Collect existing forbid patterns (as sets of atom indices) so we can
 	// skip subsumed k-subsets.
@@ -1348,12 +1400,19 @@ static void extend_consistency_positive_k_ary(
 		tref all = tau::_T();
 		for (const auto& a : atoms)
 			all = tau::build_wff_and(all, a.first);
-		if (aba_synthesis_feasible<node>(all)) return;
-		extend_consistency_positive_k_ary_walk<node>(
-		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
-	} else
-		extend_consistency_positive_k_ary_mus<node>(
-		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
+		auto feas_r = aba_synthesis_feasible<node>(all);
+		bool feasible = feas_r.has_value() && feas_r.value();
+		r.append(std::move(feas_r).report());
+		if (feasible) return r;
+		if (!r.merge_ok(extend_consistency_positive_k_ary_walk<node>(
+		    atoms, skeleton, out_constraints, existing_forbid_sets,
+		    is_subsumed))) return r;
+	} else {
+		if (!r.merge_ok(extend_consistency_positive_k_ary_mus<node>(
+		    atoms, skeleton, out_constraints, existing_forbid_sets,
+		    is_subsumed))) return r;
+	}
+	return r;
 }
 
 // Ties shifted instances of one signal together (group_shift_families).
@@ -1361,14 +1420,21 @@ static void extend_consistency_positive_k_ary(
 // SAT(lo&hi/lo&!hi/!lo&hi/!lo&!hi) pick equivalent/complementary/lo=>hi/
 // hi=>lo/exclusion. Input-only pairs go to input_assumptions, else skeleton.
 template <NodeType node>
-static void add_shift_chain_constraints(
+static result<void> add_shift_chain_constraints(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
     std::string& input_assumptions,
     std::vector<std::string>* out_constraints = nullptr)
 {
 	using tau = tree<node>;
+	result<void> r;
 	int solver_calls = 0, emitted = 0;
+	auto feas = [&](tref f) {
+		auto fr = aba_existential_feasible<node>(f);
+		bool v = fr.has_value() && fr.value();
+		r.append(std::move(fr).report());
+		return v;
+	};
 
 	auto families = group_shift_families<node>(atoms);
 	for (auto& [key, idxs] : families) {
@@ -1404,10 +1470,10 @@ static void add_shift_chain_constraints(
 				tref not_lo = tau::build_wff_neg(lo_aligned);
 				tref not_hi = tau::build_wff_neg(hi);
 
-				bool pp = aba_existential_feasible<node>(tau::build_wff_and(lo_aligned, hi));
-				bool pn = aba_existential_feasible<node>(tau::build_wff_and(lo_aligned, not_hi));
-				bool np = aba_existential_feasible<node>(tau::build_wff_and(not_lo, hi));
-				bool nn = aba_existential_feasible<node>(tau::build_wff_and(not_lo, not_hi));
+				bool pp = feas(tau::build_wff_and(lo_aligned, hi));
+				bool pn = feas(tau::build_wff_and(lo_aligned, not_hi));
+				bool np = feas(tau::build_wff_and(not_lo, hi));
+				bool nn = feas(tau::build_wff_and(not_lo, not_hi));
 				solver_calls += 4;
 
 				std::string x_hi = hi_prop;
@@ -1440,10 +1506,11 @@ static void add_shift_chain_constraints(
 	}
 	LOG_DEBUG << "[ltl_aba] shift-chain constraints: " << emitted
 	          << " emitted, " << solver_calls << " solver call(s)";
+	return r;
 }
 
 template <NodeType node>
-static void add_consistency_constraints(
+static result<void> add_consistency_constraints(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
     std::vector<std::string>* out_constraints = nullptr,
@@ -1451,6 +1518,13 @@ static void add_consistency_constraints(
     std::string seed_input_assumptions = "")
 {
 	using tau = tree<node>;
+	result<void> r;
+	auto feas = [&](tref f) {
+		auto fr = aba_existential_feasible<node>(f);
+		bool v = fr.has_value() && fr.value();
+		r.append(std::move(fr).report());
+		return v;
+	};
 
 	// Snapshot original skeleton to detect G(!atom) constraints from the
 	// actual formula (not from constraints we are about to add).
@@ -1479,9 +1553,14 @@ static void add_consistency_constraints(
 				    && !is_mixed;
 				// LT-18: this block is only entered when the atom
 				// is NOT pure-input, so pass false directly.
-				bool feasible = pure_out_lookback
-				    || aba_feasible_dispatch<node>(atoms[i].first,
-				                                   /*pure_input=*/false, is_mixed);
+				bool feasible = pure_out_lookback;
+				if (!feasible) {
+					auto fr = aba_feasible_dispatch<node>(
+						atoms[i].first,
+						/*pure_input=*/false, is_mixed);
+					feasible = fr.has_value() && fr.value();
+					r.append(std::move(fr).report());
+				}
 				if (!feasible) {
 					std::string c = "G(!" + atoms[i].second + ")";
 					skeleton += " && " + c;
@@ -1509,7 +1588,11 @@ static void add_consistency_constraints(
 				    is_pure_input_atom<node>(atoms[j].first);
 				bool has_input = atom_has_any_input<node>(atoms[i].first)
 				              || atom_has_any_input<node>(atoms[j].first);
-				infeasible = !aba_feasible_dispatch<node>(conj, pure_input, has_input);
+				auto fr = aba_feasible_dispatch<node>(conj, pure_input,
+					has_input);
+				bool feasible = fr.has_value() && fr.value();
+				r.append(std::move(fr).report());
+				infeasible = !feasible;
 			}
 			if (infeasible) {
 				bool both_pure_input = is_pure_input_atom<node>(atoms[i].first)
@@ -1566,7 +1649,7 @@ static void add_consistency_constraints(
 					if (skeleton.find(c) != std::string::npos
 					    || input_assumptions.find(c) != std::string::npos)
 						return;
-					if (aba_existential_feasible<node>(combo)) return;
+					if (feas(combo)) return;
 					if (in_i) {
 						if (!input_assumptions.empty())
 							input_assumptions += " && ";
@@ -1607,7 +1690,10 @@ static void add_consistency_constraints(
 			if (find_ba_type<node>(atoms[i].first) != find_ba_type<node>(atoms[j].first))
 				continue;
 			tref conj = tau::build_wff_and(atoms[i].first, neg_pj);
-			if (!aba_synthesis_feasible<node>(conj)) {
+			auto feas_r = aba_synthesis_feasible<node>(conj);
+			bool feasible = feas_r.has_value() && feas_r.value();
+			r.append(std::move(feas_r).report());
+			if (!feasible) {
 				std::string c = "G(!" + atoms[i].second + ")";
 				if (skeleton.find(c) == std::string::npos) {
 					skeleton += " && " + c;
@@ -1633,10 +1719,9 @@ static void add_consistency_constraints(
 		for (size_t i = 0; i < atoms.size(); ++i) {
 			if (!is_pure_input_atom<node>(atoms[i].first)) continue;
 			const auto& p = atoms[i].second;
-			if (!aba_existential_feasible<node>(atoms[i].first))
+			if (!feas(atoms[i].first))
 				assume("G(!" + p + ")");
-			else if (!aba_existential_feasible<node>(
-					tau::build_wff_neg(atoms[i].first)))
+			else if (!feas(tau::build_wff_neg(atoms[i].first)))
 				assume("G(" + p + ")");
 			groups[find_ba_type<node>(atoms[i].first)].push_back(i);
 		}
@@ -1667,12 +1752,12 @@ static void add_consistency_constraints(
 				// needs no clause of its own
 				bool covered = false;
 				for (size_t a = 0; a < n && !covered; ++a) {
-					if (!aba_existential_feasible<node>(lit(a, v >> a & 1)))
+					if (!feas(lit(a, v >> a & 1)))
 						covered = true;
 					for (size_t b = a + 1; b < n && !covered; ++b)
-						if (!aba_existential_feasible<node>(
-							tau::build_wff_and(lit(a, v >> a & 1),
-								lit(b, v >> b & 1))))
+						if (!feas(tau::build_wff_and(
+							lit(a, v >> a & 1),
+							lit(b, v >> b & 1))))
 							covered = true;
 				}
 				if (covered) continue;
@@ -1685,7 +1770,7 @@ static void add_consistency_constraints(
 					text += " && " + (pos ? atoms[g[k]].second
 						: "!(" + atoms[g[k]].second + ")");
 				}
-				if (!aba_existential_feasible<node>(all))
+				if (!feas(all))
 					assume("G(!(" + text + "))");
 			}
 		}
@@ -1714,11 +1799,13 @@ static void add_consistency_constraints(
 		}
 		for (auto& [ti, grp] : by_type) {
 			if (grp.size() >= 3)
-				extend_consistency_positive_k_ary<node>(grp, skeleton, out_constraints);
+				if (!r.merge_ok(extend_consistency_positive_k_ary<node>(
+					grp, skeleton, out_constraints))) return r;
 		}
 	}
 	LOG_DEBUG << "[ltl_aba] pairwise consistency: " << fast_path_pairs
 	          << " pair(s) decided by the ground-equality fast path (no solver call)";
+	return r;
 }
 
 // ── step-counter encoding of positional atoms (max-position hoisting) ──
@@ -2165,8 +2252,10 @@ struct ltl_aba_solution {
 // and the executed strategy then read the labels alike. A label with
 // parentheses, or a cube leaving the step open, keeps its literals.
 template <NodeType node>
-static void gate_counter_props(ltl_aba_solution<node>& sol) {
-	if (sol.counter_gated_props.empty() || sol.counter_bits.empty()) return;
+static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
+	result<void> r;
+	if (sol.counter_gated_props.empty() || sol.counter_bits.empty())
+		return r;
 	const auto& aps = sol.aut.aps;
 	std::map<int, int> bit_of; // ap index -> counter bit
 	std::map<int, const std::set<int_t>*> gated; // ap index -> its steps
@@ -2176,7 +2265,7 @@ static void gate_counter_props(ltl_aba_solution<node>& sol) {
 		if (auto g = sol.counter_gated_props.find(aps[i]);
 			g != sol.counter_gated_props.end()) gated[i] = &g->second;
 	}
-	if (gated.empty()) return;
+	if (gated.empty()) return r;
 	const size_t w = sol.counter_bits.size();
 	auto strip = [](std::string x) {
 		size_t a = x.find_first_not_of(" \t"), b = x.find_last_not_of(" \t");
@@ -2243,9 +2332,11 @@ static void gate_counter_props(ltl_aba_solution<node>& sol) {
 						tref other = lits[i].second
 							? tree<node>::build_wff_neg(a) : a;
 						// kept only when the rest of the cube forces it
-						if (aba_existential_feasible<node>(
-							tree<node>::build_wff_and(rest_fm, other)))
-								continue;
+						auto fr = aba_existential_feasible<node>(
+							tree<node>::build_wff_and(rest_fm, other));
+						bool feasible = fr.has_value() && fr.value();
+						r.append(std::move(fr).report());
+						if (feasible) continue;
 					}
 					cube += (cube.empty() ? "" : "&") + keep[i];
 				}
@@ -2254,6 +2345,7 @@ static void gate_counter_props(ltl_aba_solution<node>& sol) {
 			}
 			if (!out.empty()) e.guard_label = out;
 		}
+	return r;
 }
 
 // ── Window oracle (cross-step ABA feasibility) ───────────────────────────────
@@ -2298,19 +2390,20 @@ struct window_oracle_result {
 // still reach (its pure-input part alone stays feasible) is reported as a
 // `G(!(...))` blocking clause for the caller to add and re-synthesize with.
 template <NodeType node>
-static window_oracle_result window_infeasible_paths(
+static result<window_oracle_result> window_infeasible_paths(
     const ltl_aba_solution<node>& sol, int_t W, size_t cap)
 {
 	using tau = tree<node>;
-	window_oracle_result result;
-	if (W <= 1) return result;
+	result<window_oracle_result> r;
+	window_oracle_result wor;
+	if (W <= 1) return r.with_value(std::move(wor));
 
 	auto types_seen = formula_type_set<node>::from_atoms(sol.atoms);
 	const bool single_type = types_seen.single_type();
 
 	// Conjoin a set of position formulas, partitioned per BA type unless
 	// every atom shares one type (see guard_conj_feasible's trefs overload).
-	auto conj_feasible = [&](const trefs& fs) -> bool {
+	auto conj_feasible = [&](const trefs& fs) -> result<bool> {
 		return guard_conj_feasible<node>(fs, single_type);
 	};
 
@@ -2332,22 +2425,25 @@ static window_oracle_result window_infeasible_paths(
 	bool cap_hit = false;
 	std::vector<const hoa_edge*> path;
 
-	auto check_path = [&](const std::vector<const hoa_edge*>& edges) {
+	auto check_path = [&](const std::vector<const hoa_edge*>& edges)
+		-> result<void> {
+		result<void> cr;
 		trefs feasibility_terms, input_only_terms;
 		std::vector<std::string> label_terms(edges.size());
 		bool any_data = false;
 
 		for (size_t s = 0; s < edges.size(); ++s) {
 			bool dead_guard = false;
-			auto live = build_guard_live_products<node>(
+			auto live = cr.merge_take(build_guard_live_products<node>(
 				edges[s]->guard_label, sol.aut.aps, sol.atoms,
-				single_type, &dead_guard);
-			if (dead_guard) return; // guard parses to F -- whole path is dead
+				single_type, &dead_guard));
+			if (!live) return cr;
+			if (dead_guard) return cr; // guard parses to F -- path is dead
 
 			std::vector<trefs> kept, kept_input;
 			std::vector<std::string> product_strs;
-			bool position_vacuous = live.empty();
-			for (auto& p : live) {
+			bool position_vacuous = live->empty();
+			for (auto& p : *live) {
 				trefs lits, input_lits;
 				std::vector<std::pair<std::string, bool>> named;
 				for (auto& gl : p.lits) {
@@ -2383,13 +2479,22 @@ static window_oracle_result window_infeasible_paths(
 			}
 		}
 
-		if (!any_data) return; // no data constraint anywhere in this window
-		if (conj_feasible(feasibility_terms)) return; // window is fine
+		if (!any_data) return cr; // no data constraint in this window
+		{
+			auto fine = cr.merge_take(conj_feasible(feasibility_terms));
+			if (!fine) return cr;
+			if (*fine) return cr; // window is fine
+		}
 
 		// Jointly infeasible; but if the environment itself can never
 		// drive the path (its pure-input part is already infeasible),
 		// the path is dead, not evidence against the strategy.
-		if (!conj_feasible(input_only_terms)) return;
+		{
+			auto input_ok = cr.merge_take(
+				conj_feasible(input_only_terms));
+			if (!input_ok) return cr;
+			if (!*input_ok) return cr;
+		}
 
 		std::string body;
 		for (size_t s = 0; s < label_terms.size(); ++s) {
@@ -2398,36 +2503,40 @@ static window_oracle_result window_infeasible_paths(
 			for (size_t k = 0; k < s; ++k) term = "X(" + term + ")";
 			body += body.empty() ? term : " && " + term;
 		}
-		if (body.empty()) return;
-		result.blocking_clauses.push_back("G(!(" + body + "))");
+		if (body.empty()) return cr;
+		wor.blocking_clauses.push_back("G(!(" + body + "))");
+		return cr;
 	};
 
-	std::function<void(int, size_t)> dfs = [&](int state, size_t depth) {
-		if (cap_hit) return;
+	std::function<result<void>(int, size_t)> dfs =
+		[&](int state, size_t depth) -> result<void> {
+		result<void> dr;
+		if (cap_hit) return dr;
 		if (depth == (size_t)W) {
 			// cap == 0 means unlimited (ltl_window_max_paths).
-			if (cap && examined >= cap) { cap_hit = true; return; }
+			if (cap && examined >= cap) { cap_hit = true; return dr; }
 			++examined;
-			check_path(path);
-			return;
+			return check_path(path);
 		}
 		for (auto& e : sol.aut.edges[state]) {
-			if (cap_hit) return;
+			if (cap_hit) return dr;
 			path.push_back(&e);
-			dfs(e.dst, depth + 1);
+			auto sub = dr.merge_ok(dfs(e.dst, depth + 1));
 			path.pop_back();
-			if (cap_hit) return;
+			if (!sub) return dr;
+			if (cap_hit) return dr;
 		}
+		return dr;
 	};
 	for (int s0 = 0; s0 < sol.aut.num_states && !cap_hit; ++s0)
-		dfs(s0, 0);
+		if (!r.merge_ok(dfs(s0, 0))) return r;
 
 	if (cap_hit) {
 		LOG_DEBUG << "[ltl_aba] window oracle: path cap reached";
-		result.blocking_clauses.clear();
-		result.path_cap_reached = true;
+		wor.blocking_clauses.clear();
+		wor.path_cap_reached = true;
 	}
-	return result;
+	return r.with_value(std::move(wor));
 }
 
 // Quantifies the io_vars of one step for the data checks below. A variable
@@ -2484,7 +2593,9 @@ struct data_quantifier {
 			rep.append(std::move(n).report());
 			return nullptr;
 		}
-		return n.value();
+		tref out = n.value();
+		rep.append(std::move(n).report());
+		return out;
 	}
 
 	// Whether some play of the steps before step 0 reaches `fm`, a formula
@@ -2558,15 +2669,16 @@ enum class strategy_data_verdict { wins, loses, undecided };
 // `rounds` receives the number of fixpoint rounds run; max_rounds 0 is
 // unlimited.
 template <NodeType node>
-static strategy_data_verdict strategy_wins_on_data(
+static result<strategy_data_verdict> strategy_wins_on_data(
     const ltl_aba_solution<node>& sol, size_t max_rounds, size_t& rounds)
 {
 	using tau = tree<node>;
+	result<strategy_data_verdict> r;
 	rounds = 0;
 	const auto& aut = sol.aut;
 	const int k = aut.num_states;
 	if (k <= 0 || aut.initial_state < 0 || aut.initial_state >= k)
-		return strategy_data_verdict::undecided;
+		return r.with_value(strategy_data_verdict::undecided);
 
 	auto io_vars_of = [](tref fm) {
 		return tau::get(fm).select_top(is_child<node, tau::io_var>);
@@ -2575,7 +2687,8 @@ static strategy_data_verdict strategy_wins_on_data(
 	for (auto& [a, _] : sol.atoms)
 		for (tref v : io_vars_of(a))
 			if (is_io_initial<node>(v))
-				return strategy_data_verdict::undecided;
+				return r.with_value(
+					strategy_data_verdict::undecided);
 
 	auto shift_vars = [](tref fm, int_t delta) {
 		return shift_io_vars<node>(fm, delta);
@@ -2586,13 +2699,17 @@ static strategy_data_verdict strategy_wins_on_data(
 	std::vector<std::vector<std::pair<tref, int>>> guards(k);
 	for (int s = 0; s < k; ++s)
 		for (const auto& e : aut.edges[s]) {
-			if (e.dst < 0 || e.dst >= k) return strategy_data_verdict::undecided;
+			if (e.dst < 0 || e.dst >= k)
+				return r.with_value(
+					strategy_data_verdict::undecided);
 			tref g = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-			if (!g) return strategy_data_verdict::undecided;
+			if (!g) return r.with_value(
+				strategy_data_verdict::undecided);
 			guards[s].emplace_back(shift_vars(g, 0), e.dst);
 		}
 
 	data_quantifier<node> dq;
+	auto drain = [&]() { r.append(std::move(dq.rep)); dq.rep.clear(); };
 
 	std::vector<tref> R(k, tau::_T());
 	for (rounds = 0; !max_rounds || rounds < max_rounds; ) {
@@ -2611,22 +2728,32 @@ static strategy_data_verdict strategy_wins_on_data(
 			for (tref v : outs) q = dq.quantify(v, q, true);
 			for (tref v : ins) q = dq.quantify(v, q, false);
 			tref n = dq.eliminate(q);
-			if (!n) return strategy_data_verdict::undecided;
+			drain();
+			if (!n) return r.with_value(
+				strategy_data_verdict::undecided);
 			next[s] = n;
 			// next[s] implies R[s], so they differ only if R[s] admits a
 			// history next[s] rules out.
-			if (!tau::subtree_equals(n, R[s])
-				&& aba_existential_feasible<node>(tau::build_wff_and(
-					R[s], tau::build_wff_neg(n))))
-					changed = true;
+			if (!tau::subtree_equals(n, R[s])) {
+				auto fr = aba_existential_feasible<node>(
+					tau::build_wff_and(R[s],
+						tau::build_wff_neg(n)));
+				bool feasible = fr.has_value() && fr.value();
+				r.append(std::move(fr).report());
+				if (feasible) changed = true;
+			}
 		}
 		R = std::move(next);
 		auto reached = dq.reached_before_start(R[aut.initial_state]);
-		if (!reached) return strategy_data_verdict::undecided;
-		if (!*reached) return strategy_data_verdict::loses;
-		if (!changed) return strategy_data_verdict::wins;
+		drain();
+		if (!reached) return r.with_value(
+			strategy_data_verdict::undecided);
+		if (!*reached) return r.with_value(
+			strategy_data_verdict::loses);
+		if (!changed) return r.with_value(
+			strategy_data_verdict::wins);
 	}
-	return strategy_data_verdict::undecided;
+	return r.with_value(strategy_data_verdict::undecided);
 }
 
 // The observations are functions of the data, so a combination of their
@@ -2635,13 +2762,14 @@ static strategy_data_verdict strategy_wins_on_data(
 // around the skeleton. Beyond `max_observations` props nothing is assumed,
 // which only leaves the environment more choices.
 template <NodeType node>
-static void assume_observation_consistency(ltl_aba_solution<node>& sol,
-	size_t max_observations = 8)
+static result<void> assume_observation_consistency(
+	ltl_aba_solution<node>& sol, size_t max_observations = 8)
 {
 	using tau = tree<node>;
+	result<void> r;
 	const auto& obs = sol.observation_props;
 	const size_t n = obs.size();
-	if (n == 0 || n > max_observations) return;
+	if (n == 0 || n > max_observations) return r;
 	std::vector<tref> fm(n);
 	for (size_t i = 0; i < n; ++i)
 		for (auto& [a, name] : sol.atoms)
@@ -2671,7 +2799,10 @@ static void assume_observation_consistency(ltl_aba_solution<node>& sol,
 						pos ? fm[i] : tau::build_wff_neg(fm[i]));
 					lits.emplace_back(obs[i], pos);
 				}
-				if (aba_existential_feasible<node>(conj)) continue;
+				auto fr = aba_existential_feasible<node>(conj);
+				bool feasible = fr.has_value() && fr.value();
+				r.append(std::move(fr).report());
+				if (feasible) continue;
 				infeasible.emplace_back(mask, val);
 				std::string c = "G(!(" + product_clause_text(lits) + "))";
 				if (sol.skeleton.find(c) != std::string::npos) continue;
@@ -2680,6 +2811,7 @@ static void assume_observation_consistency(ltl_aba_solution<node>& sol,
 		}
 	if (!assumptions.empty())
 		sol.skeleton = "(" + assumptions + ") -> (" + sol.skeleton + ")";
+	return r;
 }
 
 // A product of a strategy edge claims values for the atoms of one step; its
@@ -2695,10 +2827,11 @@ static void assume_observation_consistency(ltl_aba_solution<node>& sol,
 // observed whole only when each of its literals can be forced alone.
 // Returns the constraints, none when every claim can be forced.
 template <NodeType node>
-static std::vector<std::string> add_forceability_observations(
+static result<std::vector<std::string>> add_forceability_observations(
     ltl_aba_solution<node>& sol)
 {
 	using tau = tree<node>;
+	result<std::vector<std::string>> r;
 	std::vector<std::string> clauses;
 	const bool single_type =
 		formula_type_set<node>::from_atoms(sol.atoms).single_type();
@@ -2722,9 +2855,14 @@ static std::vector<std::string> add_forceability_observations(
 		tref forceable = claim;
 		for (tref v : outs) forceable = dq.quantify(v, forceable, true);
 		forceable = dq.eliminate(forceable);
+		r.append(std::move(dq.rep));
+		dq.rep.clear();
 		if (!forceable) return true;
-		if (!aba_existential_feasible<node>(tau::build_wff_and(
-			trigger, tau::build_wff_neg(forceable)))) return true;
+		auto fr = aba_existential_feasible<node>(tau::build_wff_and(
+			trigger, tau::build_wff_neg(forceable)));
+		bool feasible = fr.has_value() && fr.value();
+		r.append(std::move(fr).report());
+		if (feasible) return true;
 		if (!seen.insert(text).second) return false;
 		if (sol.skeleton.find("G(" + text + " -> ") != std::string::npos)
 			return false;
@@ -2738,8 +2876,10 @@ static std::vector<std::string> add_forceability_observations(
 	const std::vector<std::pair<tref, std::string>> atoms = sol.atoms;
 	for (int s = 0; s < sol.aut.num_states; ++s)
 		for (const auto& e : sol.aut.edges[s])
-			for (auto& p : build_guard_live_products<node>(e.guard_label,
-				sol.aut.aps, atoms, single_type))
+		{
+		TAU_TRY(auto live, build_guard_live_products<node>(
+			e.guard_label, sol.aut.aps, atoms, single_type));
+		for (auto& p : live)
 		{
 			tref claim = tau::_T(), trigger = tau::_T();
 			std::vector<std::pair<tref, std::pair<std::string, bool>>> own;
@@ -2764,8 +2904,11 @@ static std::vector<std::string> add_forceability_observations(
 			if (each_forceable)
 				observe(claim, trigger, product_clause_text(named));
 		}
-	if (!clauses.empty()) assume_observation_consistency<node>(sol);
-	return clauses;
+		}
+	if (!clauses.empty())
+		if (!r.merge_ok(assume_observation_consistency<node>(sol)))
+			return r;
+	return r.with_value(std::move(clauses));
 }
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────

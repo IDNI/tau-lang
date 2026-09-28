@@ -186,7 +186,9 @@ struct formula_regions {
 			rep.append(std::move(sat).report());
 			return true;
 		}
-		return !sat.value();
+		bool empty = !sat.value();
+		rep.append(std::move(sat).report());
+		return empty;
 	}
 	std::optional<bool> reached(tref f) {
 		auto v = dq.reached_before_start(f);
@@ -503,8 +505,12 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 	// checks call the solver
 	static std::map<std::pair<std::string, size_t>, size_t> known;
 	auto type_name = get_ba_type_name<node>(tid);
-	if (!type_name.has_value()) return std::nullopt;
+	if (!type_name.has_value()) {
+		rep.append(std::move(type_name).report());
+		return std::nullopt;
+	}
 	const std::string name = type_name.value();
+	rep.append(std::move(type_name).report());
 	if (auto it = known.find({ name, max }); it != known.end()) {
 		if (!it->second) return std::nullopt;
 		trefs els;
@@ -949,7 +955,9 @@ struct code_regions {
 				rep.append(std::move(n).report());
 				return std::nullopt;
 			}
-			const auto& t = tau::get(n.value());
+			tref normed = n.value();
+			rep.append(std::move(n).report());
+			const auto& t = tau::get(normed);
 			if (!t.equals_T() && !t.equals_F()) return std::nullopt;
 			if (t.equals_T()) r = bdd.disj(r, cube);
 		}
@@ -1667,8 +1675,9 @@ protected:
 							"the data game strategy cannot compare "
 							"the values");
 					}
-					it = truth.emplace(a,
-						tau::get(n.value()).equals_T()).first;
+					bool is_t = tau::get(n.value()).equals_T();
+					r.append(std::move(n).report());
+					it = truth.emplace(a, is_t).first;
 				}
 				if (it->second != (sign > 0)) { holds = false; break; }
 			}
@@ -1799,9 +1808,11 @@ protected:
 			return std::nullopt;
 		}
 		const auto& t = tau::get(n.value());
-		if (t.equals_T()) return true;
-		if (t.equals_F()) return false;
-		return std::nullopt;
+		std::optional<bool> out;
+		if (t.equals_T()) out = true;
+		else if (t.equals_F()) out = false;
+		rep.append(std::move(n).report());
+		return out;
 	}
 
 	static result<tref> complement(tref x) {
@@ -2736,9 +2747,11 @@ protected:
 			return std::nullopt;
 		}
 		const auto& t = tau::get(n.value());
-		if (t.equals_T()) return true;
-		if (t.equals_F()) return false;
-		return std::nullopt;
+		std::optional<bool> out;
+		if (t.equals_T()) out = true;
+		else if (t.equals_F()) out = false;
+		rep.append(std::move(n).report());
+		return out;
 	}
 
 	result<std::optional<bool>> won_from(const window& win) override {
@@ -2781,7 +2794,9 @@ protected:
 				code::solver_error, "the data game strategy cannot read "
 				"its move");
 		}
-		return r.with_value(n.value());
+		tref out = n.value();
+		r.merge(std::move(n));
+		return r.with_value(out);
 	}
 
 	result<bool> choose_before(const solver_fn& solve) override {

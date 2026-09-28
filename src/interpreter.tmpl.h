@@ -927,7 +927,9 @@ post_normalization:
 					std::move(ubd_ctn_part).report());
 				executable = false; break;
 			}
-			ubt_ctn.push_back({ tree<node>::geth(ubd_ctn_part.value()) });
+			tref part = ubd_ctn_part.value();
+			r.merge(std::move(ubd_ctn_part));
+			ubt_ctn.push_back({ tree<node>::geth(part) });
 		}
 		if (!executable) continue;
 		// All parts of spec are realizable; each starts with a single
@@ -1240,7 +1242,9 @@ result<tref> propagate_step_definitions(tref part_at_t,
 			r.append(std::move(rep));
 			break;
 		}
-		part_at_t = pn.value();
+		tref normed = pn.value();
+		r.merge(std::move(pn));
+		part_at_t = normed;
 		subtree_map<node, tref> consts;
 		std::vector<tref> st{part_at_t};
 		while (!st.empty()) {
@@ -1356,7 +1360,9 @@ struct solve_step_provider : step_provider<node> {
 							std::move(normalized).report());
 						continue;
 					}
-					current = normalized.value();
+					tref normed = normalized.value();
+					r.merge(std::move(normalized));
+					current = normed;
 				}
 				// The solver must never bind an input variable directly; a
 				// leftover free input here means memory substitution or
@@ -1380,10 +1386,12 @@ struct solve_step_provider : step_provider<node> {
 					current, time_point);
 				if (path_solution.has_value()) {
 					solved = true;
+					auto path_sol = std::move(path_solution.value());
+					r.merge(std::move(path_solution));
 					for (const auto& [pv, pval] : propagated)
-						if (!path_solution.value().contains(pv))
-							path_solution.value().emplace(pv, pval);
-					for (const auto& [var, value] : path_solution.value()) {
+						if (!path_sol.contains(pv))
+							path_sol.emplace(pv, pval);
+					for (const auto& [var, value] : path_sol) {
 						// Unfiltered: step()'s commit block decides what of
 						// this actually reaches the interpreter's memory/output.
 						result.emplace(var, value);
@@ -1511,13 +1519,18 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 			for (tref c : candidates) {
 				auto n = normalize_non_temp<node>(rewriter::replace<node>(
 					all, tau::get(tau::bf, var), c));
-				if (n.has_value() && n.value()
-					&& tau::get(n.value()).equals_T())
-						{ value = c; break; }
-				// a candidate that did not normalize is a rejected candidate
-				report cand_rep = std::move(n).report();
-				cand_rep.demote_errors_to_warnings();
-				r.append(std::move(cand_rep));
+				if (n.has_value()) {
+					bool is_t = n.value()
+						&& tau::get(n.value()).equals_T();
+					r.merge(std::move(n));
+					if (is_t) { value = c; break; }
+				} else {
+					// a candidate that did not normalize is a
+					// rejected candidate
+					report cand_rep = std::move(n).report();
+					cand_rep.demote_errors_to_warnings();
+					r.append(std::move(cand_rep));
+				}
 			}
 		}
 		if (!value && !sys.empty()) {
@@ -1541,10 +1554,10 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 		sol.emplace(tau::get(tau::bf, var), value);
 	}
 	auto n = normalize_non_temp<node>(rewriter::replace<node>(fm, sol));
-	if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T()) {
-		r.merge(std::move(n));
-		return r.with_value(std::nullopt);
-	}
+	bool is_t = n.has_value() && n.value()
+		&& tau::get(n.value()).equals_T();
+	if (n.has_value()) r.merge(std::move(n));
+	if (!is_t) return r.with_value(std::nullopt);
 	for (const auto& [_, v] : sol) {
 		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
 		ledger.pin(tree<node>::geth(v));
@@ -1567,15 +1580,39 @@ result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
 	result<std::optional<solution<node>>> r;
 	TAU_TRY(auto d, solve_equality_cube<node>(fm, found, ledger));
 	if (d) return r.with_value(std::move(d));
-	auto n = normalize_non_temp<node>(fm);
-	if (!n.has_value() || !n.value()) return r.with_value(std::nullopt);
-	for (tref path : expression_paths<node>(n.value())) {
+	TAU_TRY(tref n, normalize_non_temp<node>(fm));
+	if (!n) return r.with_value(std::nullopt);
+	for (tref path : expression_paths<node>(n)) {
 		auto p = normalize_non_temp<node>(path);
 		if (!p.has_value() || !p.value()
-			|| tau::get(p.value()).equals_F()) continue;
-		auto sol = solution_with_max_update<node>(p.value(),
+			|| tau::get(p.value()).equals_F())
+		{
+			// a path that does not normalize is skipped: a rejected
+			// candidate
+			if (!p.has_value()) {
+				auto sc = r.open("rejected candidate");
+				r.info("the path could not be normalized");
+				report cand = std::move(p).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+			}
+			continue;
+		}
+		tref path_fm = p.value();
+		r.merge(std::move(p));
+		auto sol = solution_with_max_update<node>(path_fm,
 			(size_t)std::max<int_t>(t, 0));
-		if (sol.has_value()) return r.with_value(std::move(sol.value()));
+		if (sol.has_value()) {
+			auto out = std::move(sol.value());
+			r.merge(std::move(sol));
+			return r.with_value(std::move(out));
+		}
+		// a path with no solution stays a value: a rejected candidate
+		auto sc = r.open("rejected candidate");
+		r.info("the path has no solution");
+		report cand = std::move(sol).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
 	}
 	return r.with_value(std::nullopt);
 }
@@ -1974,7 +2011,9 @@ interpreter<node>::step(const assignment<node>& values)
 					std::move(normalized).report());
 				direct_decode_ok = false; break;
 			}
-			direct_parts.push_back(normalized.value());
+			tref normed = normalized.value();
+			r.merge(std::move(normalized));
+			direct_parts.push_back(normed);
 		}
 		if (direct_decode_ok) {
 			direct_conj = direct_parts.size() == 1 ? direct_parts.front()
@@ -2385,9 +2424,11 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		// pushing an un-eliminated formula when normalization fails (e.g.
 		// a bv-widening cap violation, already logged by the pass).
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
-		if (normalized.has_value())
-			part_alts.push_back(normalized.value());
-		else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
+		if (normalized.has_value()) {
+			tref normed = normalized.value();
+			r.merge(std::move(normalized));
+			part_alts.push_back(normed);
+		} else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
 		}
 		if (!part.empty() && part_alts.empty()) part_exhausted = true;
 		upd_ubt_ctn.push_back(std::move(part_alts));
@@ -2537,8 +2578,9 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 		r.append(std::move(normalized).report());
 		return r;
 	}
-	return r.with_assert_check_value(
-		tau::get(normalized.value()).equals_T());
+	bool is_t = tau::get(normalized.value()).equals_T();
+	r.merge(std::move(normalized));
+	return r.with_assert_check_value(is_t);
 }
 
 template <NodeType node>
@@ -2740,7 +2782,9 @@ result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs&
 		}
 		// get_executable_spec may rewrite its tref& clause arg.
 		kept.push_back(tree<node>::geth(clause_t));
-		ctns.push_back(tree<node>::geth(ctn_r.value()));
+		tref ctn_v = ctn_r.value();
+		r.merge(std::move(ctn_r));
+		ctns.push_back(tree<node>::geth(ctn_v));
 	}
 	if (kept.empty()) {
 		for (auto& [candidate, rep] : dropped) {
@@ -3028,8 +3072,10 @@ result<typename interpreter<node>::update_plan>
 				update_valid = false;
 				break;
 			}
+			tref new_ubd = new_ubd_ctn_r.value();
+			r.merge(std::move(new_ubd_ctn_r));
 			current_ubd_ctn.push_back(
-				{ tree<node>::geth(new_ubd_ctn_r.value()) });
+				{ tree<node>::geth(new_ubd) });
 			current_spec.emplace_back(htrefs{ upd.first },
 				upd.second);
 		}
@@ -3234,6 +3280,7 @@ result<typename interpreter<node>::update_plan>
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
 			continue;
 		}
+		r.merge(std::move(full));
 		if (time_point > 0) {
 			auto prior = dg->prior_values(*next, memory,
 				(int_t)time_point);
@@ -3682,14 +3729,32 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 				// nor the update. One that needs the inputs'
 				// cooperation stays, as the preferred choice at
 				// the steps where they cooperate.
-				if (auto live = is_tau_formula_sat<node>(
-					inputs_as_outputs<node>(alt), start_time);
-					live.has_value() && !live.value())
 				{
-					LOG_DEBUG << "pwr: alternative with no "
-						"execution under any input dropped: "
-						<< LOG_FM(alt) << "\n";
-					continue;
+					auto live = is_tau_formula_sat<node>(
+						inputs_as_outputs<node>(alt), start_time);
+					if (live.has_value()) {
+						bool alive = live.value();
+						r.merge(std::move(live));
+						if (!alive) {
+							LOG_DEBUG << "pwr: alternative with "
+								"no execution under any "
+								"input dropped: "
+								<< LOG_FM(alt) << "\n";
+							continue;
+						}
+					} else {
+						// an undecided check leaves the
+						// alternative in place: a rejected
+						// candidate
+						auto sc = r.open("rejected candidate");
+						r.info("an alternative's execution "
+							"over inputs could not be "
+							"checked");
+						report cand =
+							std::move(live).report();
+						cand.demote_errors_to_warnings();
+						r.append(std::move(cand));
+					}
 				}
 				TAU_TRY(tref alt_kept,
 					with_spec_sometimes(alt, alt_sometimes[i]));
@@ -3810,8 +3875,11 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 					std::move(normalized).report());
 				continue;
 			}
-			auto sol = solution_with_max_update(normalized.value());
+			tref normed = normalized.value();
+			r.merge(std::move(normalized));
+			auto sol = solution_with_max_update(normed);
 			if (sol.has_value()) {
+				r.merge(std::move(sol));
 				for (auto& [candidate, rep] : probe_diag) {
 					auto sc = r.open("rejected candidate");
 					r.info("the alternative's probe path did not solve",
@@ -4122,8 +4190,11 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			static_cast<int_t>(formula_time_point)));
 		updated = rewriter::replace<node>(updated, memory);
 		auto normalized = normalize_non_temp<node>(updated);
-		if (normalized.has_value()) updated = normalized.value();
-		else probe_diag.emplace_back(updated,
+		if (normalized.has_value()) {
+			tref normed = normalized.value();
+			r.merge(std::move(normalized));
+			updated = normed;
+		} else probe_diag.emplace_back(updated,
 			std::move(normalized).report());
 		current_form = tau::build_wff_and(current_form, updated);
 	}
@@ -4242,6 +4313,7 @@ result<std::string> interpreter<node>::accumulator_state(const std::string& name
 				skipped.emplace_back(var, std::move(ser).report());
 				continue;
 			}
+			r.merge(std::move(ser));
 			std::string s = ss.str();
 			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
 				s.pop_back();
@@ -4455,11 +4527,19 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 		tref max_u = build_bf_neg<node>(f1);
 		tref max_u_spec = rewriter::replace<node>(path, u, max_u);
 		// A failed solve on this path is not terminal -- another path of
-		// spec may still admit a maximal update, so its report is not
-		// merged into r; only the final fallback below is terminal.
+		// spec may still admit a maximal update, so its report rides
+		// along demoted; only the final fallback below is terminal.
 		auto sol_r = solve<node>(max_u_spec, options);
-		if (!sol_r.has_value()) continue;
+		if (!sol_r.has_value()) {
+			auto sc = r.open("rejected candidate");
+			r.info("the path admits no maximal update");
+			report cand = std::move(sol_r).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+			continue;
+		}
 		assignment<node> sol = std::move(sol_r.value());
+		r.merge(std::move(sol_r));
 		// Now we need to add solution for u[t]
 		max_u = rewriter::replace<node>(max_u, sol);
 		TAU_TRY(max_u, bf_reduced_dnf<node>(
@@ -4716,7 +4796,9 @@ result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 			r.merge(std::move(step_r));
 			return r;
 		}
-		auto& [output, auto_continue] = step_r.value();
+		auto step_val = std::move(step_r.value());
+		r.merge(std::move(step_r));
+		auto& [output, auto_continue] = step_val;
 
 		DBG(LOG_TRACE << "run[output]: ";
 			if (output.has_value()) {
