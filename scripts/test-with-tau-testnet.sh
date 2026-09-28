@@ -200,7 +200,7 @@ if [ ! -f "${TESTNET_DIR}/data/genesis.json" ]; then
 fi
 
 # normalize_args keeps the `--` itself at the head of DEV_PROGRAM
-PYTEST_ARGS=("${DEV_PROGRAM[@]}")
+PYTEST_ARGS=(${DEV_PROGRAM[@]+"${DEV_PROGRAM[@]}"})
 [[ ${PYTEST_ARGS[0]:-} == -- ]] && PYTEST_ARGS=("${PYTEST_ARGS[@]:1}")
 # README's recommended invocation: the suite is Trio-based, and pytest.ini
 # keeps pytest-asyncio in strict mode rather than letting it claim every

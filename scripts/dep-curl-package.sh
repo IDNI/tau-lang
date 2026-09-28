@@ -105,7 +105,7 @@ _dep_curl_producer() {
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_CURL_CMAKE" -S "$src" -B "$build" \
 		"${_DEP_CURL_CONFIGURE_ARGS[@]}" \
-		"${_DEP_CURL_TOOLCHAIN_ARGS[@]}" \
+		${_DEP_CURL_TOOLCHAIN_ARGS[@]+"${_DEP_CURL_TOOLCHAIN_ARGS[@]}"} \
 		-DCMAKE_C_COMPILER="$DEP_CURL_CC" \
 		-DCMAKE_CXX_COMPILER="$DEP_CURL_CXX" \
 		"-DCMAKE_C_FLAGS=${DEP_CURL_CFLAGS} ${prefix_map}" \

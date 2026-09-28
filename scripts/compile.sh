@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # The shared loop preset.sh uses decides -D, -G and the positionals.
-normalize_args "${args[@]}"
+normalize_args ${args[@]+"${args[@]}"}
 if [[ ${#DEV_POSITIONAL[@]} -lt 1 ]]; then
 	usage
 	exit 2
@@ -141,12 +141,12 @@ else
 fi
 
 # TAU_EXTRA_ARGS reaches the script as one cmake list.
-extra=("${DEV_CMAKE[@]}")
+extra=(${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"})
 if [[ -n "$GENERATOR_EXPLICIT" ]]; then
 	extra+=("-G" "$GENERATOR")
 fi
 tauextra=""
-for a in "${extra[@]}"; do
+for a in ${extra[@]+"${extra[@]}"}; do
 	[[ -n "$tauextra" ]] && tauextra+=";"
 	tauextra+="$a"
 done

@@ -130,7 +130,7 @@ EOF
 	else
 		( cd "$src" && env -u CPPFLAGS -u LDFLAGS \
 			CC="$DEP_SPOT_CC" CXX="$DEP_SPOT_CXX" \
-			"${_DEP_SPOT_CROSS_ENV[@]}" \
+			${_DEP_SPOT_CROSS_ENV[@]+"${_DEP_SPOT_CROSS_ENV[@]}"} \
 			./configure --prefix="$staging_prefix" --disable-python \
 				--disable-shared --disable-devel ) \
 			> "${work}/configure.log" 2>&1 \

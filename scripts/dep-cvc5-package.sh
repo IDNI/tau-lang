@@ -256,11 +256,11 @@ _dep_cvc5_producer() {
 	# configure.sh must run from the cvc5 base directory. The prefix is added
 	# here, not part of the recorded args.
 	( cd "$work" && env -u CPPFLAGS -u LDFLAGS \
-		"${_DEP_CVC5_COMPILER_ENV[@]}" \
+		${_DEP_CVC5_COMPILER_ENV[@]+"${_DEP_CVC5_COMPILER_ENV[@]}"} \
 		CXXFLAGS="${DEP_CVC5_CXXFLAGS} ${prefix_map}" \
 		CFLAGS="${DEP_CVC5_CFLAGS} ${prefix_map}" \
 		./configure.sh --no-gpl --auto-download \
-			"${_DEP_CVC5_TARGET_ARGS[@]}" \
+			${_DEP_CVC5_TARGET_ARGS[@]+"${_DEP_CVC5_TARGET_ARGS[@]}"} \
 			-DSKIP_SET_RPATH=ON \
 			-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH" \
 			-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH" \
@@ -438,7 +438,7 @@ _DEP_CVC5_CONFIGURE_ARGS=(
 	-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH"
 	-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH"
 	-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
-	"${_DEP_CVC5_TARGET_ARGS[@]}"
+	${_DEP_CVC5_TARGET_ARGS[@]+"${_DEP_CVC5_TARGET_ARGS[@]}"}
 )
 
 block="$(_dep_cvc5_field_block)" || {

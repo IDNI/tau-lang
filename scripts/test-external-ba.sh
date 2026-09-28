@@ -31,7 +31,7 @@ fi
 
 echo "== configuring $build with the out-of-tree BA using $generator"
 cmake --fresh -S "$root" -B "$build" -G "$generator" \
-	"${compiler_args[@]}" \
+	${compiler_args[@]+"${compiler_args[@]}"} \
 	-DCMAKE_BUILD_TYPE=Devel \
 	-DTAU_BUILD_EXECUTABLE=ON \
 	-DTAU_BUILD_TESTS=ON \

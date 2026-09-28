@@ -17,4 +17,4 @@ for arg in "$@"; do
 			;;
 	esac
 done
-preset_entry "${preset_args[@]}"
+preset_entry ${preset_args[@]+"${preset_args[@]}"}

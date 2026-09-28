@@ -81,7 +81,7 @@ done
 
 # dep_entry initializes DEP_VARS so dep_shared_prefix can resolve any
 # -DTAU_SHARED_PREFIX=... passed above; falls back to $TAU_SHARED_PREFIX / ~/.tau
-dep_entry "${DEP_ARGS[@]}"
+dep_entry ${DEP_ARGS[@]+"${DEP_ARGS[@]}"}
 
 # ---------------------------------------------------------------------------
 # Profile name — resolve in order: argument > ~/.tau/profile > prompt
