@@ -937,6 +937,14 @@ add_repl_test(realizable_cmd-data_game_bv_bits_product_by_constant
 # against i1 = 4094 only o1 = 4095 is above it, one more than i1
 add_repl_test(realizable_cmd-data_game_bv_bits_difference_with_past_input
 	"realizable (always o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12]) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F")
+# o1 cannot fall forever through 8-bit values; the unrolling that finds it
+# out is decided on the bits of the values
+add_repl_test(realizable_cmd-bv_falling_output
+	"realizable (G ((o1[t]:bv[8] < o1[t-1]:bv[8]) && (({4}:bv[8] * o1[t-1]:bv[8]) < o1[t]:bv[8]))) && (F (({7}:bv[8] * o1[t-1]:bv[8]) != {7}:bv[8]))" ": F")
+if(TEST "test_repl-realizable_cmd-bv_falling_output")
+	set_tests_properties("test_repl-realizable_cmd-bv_falling_output"
+		PROPERTIES TIMEOUT 120)
+endif()
 
 # Streams of a dense order read through order comparisons are played on the
 # order type of the window: how its values and the constants compare.

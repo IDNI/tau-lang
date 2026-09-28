@@ -294,6 +294,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_qf_decision_option(bool enabled) {
 		bv_quantifier_free_decision = enabled;
 	}
+	static size_t get_bitblast_max_nodes_option() {
+		return bv_bitblast_max_nodes;
+	}
+	static void set_bitblast_max_nodes_option(size_t n) {
+		bv_bitblast_max_nodes = n;
+	}
 	static bool get_widening_option() { return bv_widening; }
 	static void set_widening_option(bool enabled) { bv_widening = enabled; }
 	static size_t get_max_width_option() { return bv_max_width; }
@@ -308,7 +314,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `bv-definitional-elimination`, `bv-defelim-max-clauses`,
 	 * `bv-defelim-max-atoms`, `bv-defelim-max-subset`,
 	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
-	 * `bv-widening` and `bv-max-width`.
+	 * `bv-bitblast-max-nodes`, `bv-widening` and `bv-max-width`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -323,11 +329,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * the four `defelim-max-*` caps mirror `bv_definitional_elimination`
 	 * and its caps (heuristics/bv_definitional_elimination.h), read by
 	 * @ref eliminate_definitional_existentials. `quantifier-free-decision`
-	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h).
+	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h), and
+	 * `bitblast-max-nodes` its `bv_bitblast_max_nodes` budget.
 	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
 	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 12> options() {
+	static std::array<ba_option, 13> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -385,6 +392,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				"decide a closed bitvector formula whose binders are all "
 				"of one kind quantifier-free (off by default)" },
+			{ "bitblast-max-nodes", ba_option_kind::count,
+				nullptr, nullptr,
+				get_bitblast_max_nodes_option,
+				set_bitblast_max_nodes_option,
+				"cap the BDD nodes a bitvector formula of at most 16 "
+				"bits is decided with before cvc5 takes it (default "
+				"1048576, 0 = always cvc5)" },
 			{ "widening", ba_option_kind::flag,
 				get_widening_option, set_widening_option,
 				nullptr, nullptr,

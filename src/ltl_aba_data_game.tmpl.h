@@ -215,134 +215,6 @@ struct formula_regions {
 	}
 };
 
-// A reduced ordered BDD without complement edges for the regions over the
-// codes of a code_window; node 0 is false and node 1 true. A table grown
-// past `max_nodes` sets `full`, and the game is then undecided.
-struct data_bdd {
-	using id = uint32_t;
-	static constexpr id F = 0, T = 1;
-	static constexpr uint32_t leaf = UINT32_MAX;
-	struct nd { uint32_t var; id lo, hi; };
-	struct key_hash {
-		size_t operator()(const std::array<uint32_t, 3>& k) const {
-			uint64_t h = k[0];
-			h = h * 0x9E3779B97F4A7C15ull + k[1];
-			h = h * 0x9E3779B97F4A7C15ull + k[2];
-			return (size_t)(h ^ (h >> 29));
-		}
-	};
-	std::vector<nd> nodes{ { leaf, F, F }, { leaf, T, T } };
-	std::unordered_map<std::array<uint32_t, 3>, id, key_hash> unique, memo;
-	size_t max_nodes;
-	bool full = false;
-
-	explicit data_bdd(size_t cap) : max_nodes(cap) {}
-
-	id mk(uint32_t v, id lo, id hi) {
-		if (lo == hi) return lo;
-		std::array<uint32_t, 3> k{ v, lo, hi };
-		if (auto it = unique.find(k); it != unique.end()) return it->second;
-		if (nodes.size() >= max_nodes) { full = true; return F; }
-		nodes.push_back({ v, lo, hi });
-		const id n = (id)(nodes.size() - 1);
-		unique.emplace(k, n);
-		return n;
-	}
-	id var(uint32_t v, bool pos = true) {
-		return pos ? mk(v, F, T) : mk(v, T, F);
-	}
-	// op 0 conjunction, 1 disjunction, 3 exclusive or
-	id apply(uint32_t op, id a, id b) {
-		if (op == 0) {
-			if (a == F || b == F) return F;
-			if (a == T) return b;
-			if (b == T || a == b) return a;
-		} else if (op == 1) {
-			if (a == T || b == T) return T;
-			if (a == F) return b;
-			if (b == F || a == b) return a;
-		} else {
-			if (a == b) return F;
-			if (a == F) return b;
-			if (b == F) return a;
-			if (a == T) return neg(b);
-			if (b == T) return neg(a);
-		}
-		if (a > b) std::swap(a, b);
-		std::array<uint32_t, 3> k{ op, a, b };
-		if (auto it = memo.find(k); it != memo.end()) return it->second;
-		const nd x = nodes[a], y = nodes[b];
-		const uint32_t v = std::min(x.var, y.var);
-		const id lo = apply(op, x.var == v ? x.lo : a, y.var == v ? y.lo : b);
-		const id hi = apply(op, x.var == v ? x.hi : a, y.var == v ? y.hi : b);
-		const id r = mk(v, lo, hi);
-		memo.emplace(k, r);
-		return r;
-	}
-	id conj(id a, id b) { return apply(0, a, b); }
-	id disj(id a, id b) { return apply(1, a, b); }
-	id exor(id a, id b) { return apply(3, a, b); }
-	id iff(id a, id b) { return neg(exor(a, b)); }
-	id ite(id c, id a, id b) { return disj(conj(c, a), conj(neg(c), b)); }
-	id neg(id a) {
-		if (a <= T) return a == T ? F : T;
-		std::array<uint32_t, 3> k{ 2, a, 0 };
-		if (auto it = memo.find(k); it != memo.end()) return it->second;
-		const nd x = nodes[a];
-		const id r = mk(x.var, neg(x.lo), neg(x.hi));
-		memo.emplace(k, r);
-		return r;
-	}
-	// Quantifies the variables flagged in `qs`.
-	id quantify(id a, const std::vector<bool>& qs, bool exists) {
-		std::unordered_map<id, id> seen;
-		std::function<id(id)> go = [&](id n) -> id {
-			if (n <= T) return n;
-			if (auto it = seen.find(n); it != seen.end()) return it->second;
-			const nd x = nodes[n];
-			const id lo = go(x.lo), hi = go(x.hi);
-			const id r = x.var < qs.size() && qs[x.var]
-				? apply(exists ? 1 : 0, lo, hi) : mk(x.var, lo, hi);
-			seen.emplace(n, r);
-			return r;
-		};
-		return go(a);
-	}
-	// Every variable v of `a` renamed to[v]; false in `ok` when to[v] is
-	// `leaf`. The renaming must keep the order of the variables it meets.
-	id rename(id a, const std::vector<uint32_t>& to, bool& ok) {
-		std::unordered_map<id, id> seen;
-		std::function<id(id)> go = [&](id n) -> id {
-			if (n <= T) return n;
-			if (auto it = seen.find(n); it != seen.end()) return it->second;
-			const nd x = nodes[n];
-			if (x.var >= to.size() || to[x.var] == leaf) {
-				ok = false;
-				return F;
-			}
-			const id r = mk(to[x.var], go(x.lo), go(x.hi));
-			seen.emplace(n, r);
-			return r;
-		};
-		return go(a);
-	}
-	// The variables `a` reads.
-	std::set<uint32_t> support(id a) const {
-		std::set<uint32_t> vs;
-		std::unordered_set<id> seen;
-		std::vector<id> todo{ a };
-		while (!todo.empty()) {
-			const id n = todo.back();
-			todo.pop_back();
-			if (n <= T || !seen.insert(n).second) continue;
-			vs.insert(nodes[n].var);
-			todo.push_back(nodes[n].lo);
-			todo.push_back(nodes[n].hi);
-		}
-		return vs;
-	}
-};
-
 // The window of code_regions. A stream of a two-element type takes one bit;
 // a stream of another type read only through equalities with its own type,
 // 0 and 1 takes a code of `width` bits, code 0 standing for 0, code 1 for
@@ -1050,54 +922,22 @@ struct code_regions {
 		return r;
 	}
 
-	using bits = std::vector<region>;
+	using bits = bit_circuits::bits;
 
-	// x + y + carry, modulo 2^n.
-	bits add(const bits& x, const bits& y, region carry = data_bdd::F) {
-		bits out(x.size());
-		for (size_t i = 0; i < x.size(); ++i) {
-			const region h = bdd.exor(x[i], y[i]);
-			out[i] = bdd.exor(h, carry);
-			carry = bdd.disj(bdd.conj(x[i], y[i]), bdd.conj(carry, h));
-		}
-		return out;
+	bits add(const bits& x, const bits& y) {
+		return bit_circuits::add(bdd, x, y);
 	}
-	// x < y, unsigned.
 	region less(const bits& x, const bits& y) {
-		region lt = data_bdd::F;
-		for (size_t i = 0; i < x.size(); ++i)
-			lt = bdd.disj(bdd.conj(bdd.neg(x[i]), y[i]),
-				bdd.conj(bdd.iff(x[i], y[i]), lt));
-		return lt;
+		return bit_circuits::less(bdd, x, y);
 	}
 	region same(const bits& x, const bits& y) {
-		region r = data_bdd::T;
-		for (size_t i = 0; i < x.size(); ++i)
-			r = bdd.conj(r, bdd.iff(x[i], y[i]));
-		return r;
+		return bit_circuits::same(bdd, x, y);
 	}
 	bits select(region c, const bits& x, const bits& y) {
-		bits out(x.size());
-		for (size_t i = 0; i < x.size(); ++i) out[i] = bdd.ite(c, x[i], y[i]);
-		return out;
+		return bit_circuits::select(bdd, c, x, y);
 	}
-	// x shifted by y: left towards the high bits, else right, logically;
-	// by n or more, 0.
 	bits shifted(const bits& x, const bits& y, bool left) {
-		const size_t n = x.size();
-		bits r = x;
-		for (size_t j = 0; j < n; ++j) {
-			bits moved(n, data_bdd::F);
-			if (j < 63 && (size_t{1} << j) < n) {
-				const size_t d = size_t{1} << j;
-				for (size_t i = 0; i < n; ++i) {
-					if (left && i >= d) moved[i] = r[i - d];
-					if (!left && i + d < n) moved[i] = r[i + d];
-				}
-			}
-			r = select(y[j], moved, r);
-		}
-		return r;
+		return bit_circuits::shifted(bdd, x, y, left);
 	}
 
 	// The bits of `term`, a term over streams of modular type `tid` and
@@ -1162,25 +1002,14 @@ struct code_regions {
 		case tau::bf_xnor: return bitwise([&](region p, region q) {
 			return bdd.iff(p, q); });
 		case tau::bf_add: return add(*x, *y);
-		case tau::bf_sub: {
-			bits ny(n);
-			for (size_t i = 0; i < n; ++i) ny[i] = bdd.neg((*y)[i]);
-			return add(*x, ny, data_bdd::T);
-		}
+		case tau::bf_sub: return bit_circuits::sub(bdd, *x, *y);
 		case tau::bf_mul: {
-			// shift and add; a product may grow the BDD exponentially,
-			// so it gets a quarter of the table
-			const size_t cap = bdd.nodes.size() + bdd.max_nodes / 4;
-			bits acc(n, data_bdd::F);
-			for (size_t i = 0; i < n; ++i) {
-				if ((*y)[i] == data_bdd::F) continue;
-				bits part(n, data_bdd::F);
-				for (size_t j = i; j < n; ++j)
-					part[j] = bdd.conj((*x)[j - i], (*y)[i]);
-				acc = add(acc, part);
-				if (bdd.full || bdd.nodes.size() > cap) return std::nullopt;
-			}
-			return acc;
+			// a product may grow the BDD exponentially, so it gets a
+			// quarter of the table
+			if (!bit_circuits::mul(bdd, *x, *y,
+				bdd.nodes.size() + bdd.max_nodes / 4, out))
+					return std::nullopt;
+			return out;
 		}
 		case tau::bf_shl: return shifted(*x, *y, true);
 		case tau::bf_shr: return shifted(*x, *y, false);

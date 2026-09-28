@@ -241,3 +241,17 @@ add_repl_test(sat_cmd-warm_up_merged_always_valid_negation "valid !((always o2[t
 # a negated sometimes is asked from its own warm-up on: o2 may be 0 at step 0
 add_repl_test(sat_cmd-warm_up_tautology_sat_negation "sat !(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])) && (sometimes o2[t] = 0)" ": T")
 add_repl_test(sat_cmd-warm_up_tautology_sometimes_realizable "realizable (always o2[t] = 1 && o3[t-1] = 0) && (sometimes (o2[t] = 0 && o1[t-1] = o1[t-1]))" ": F")
+
+# An 8-bit output that falls every step and stays above four times its last
+# value runs out of values only after a long unrolling, whose fixpoint checks
+# nest one quantifier per step: the bits of the values decide them.
+add_repl_test(sat_cmd-bv_falling_output "sat always o1[t]:bv[8] < o1[t-1]:bv[8] && {4}:bv[8] * o1[t-1]:bv[8] < o1[t]:bv[8]" ": F")
+# A product under alternating quantifiers: whatever r is, s = -r leaves no u
+# with s - u < s + r = 0.
+add_repl_test(sat_cmd-bv_alternating_product "sat all p:bv[8] ex q:bv[8] ex r:bv[8] all s:bv[8] ex u:bv[8] (r * q != p && s - u < s + r)" ": F")
+foreach(_t bv_falling_output bv_alternating_product)
+	if(TEST "test_repl-sat_cmd-${_t}")
+		set_tests_properties("test_repl-sat_cmd-${_t}"
+			PROPERTIES TIMEOUT 120)
+	endif()
+endforeach()
