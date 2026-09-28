@@ -171,3 +171,19 @@ add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 # assignments by dependency).
 add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
+
+# GitHub #183: Boole's elimination law does not hold for arithmetic, so a
+# bitvector variable under `-` keeps its binder for the solver paths
+add_repl_test(normalize_cmd-issue183_sub_true
+	"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue183_sub_false
+	"normalize all x:bv[2] ((x:bv[2] = {0}:bv[2]) -> (ex y:bv[2] ((x:bv[2] | (y:bv[2] & {2}:bv[2])) = (y:bv[2] - {3}:bv[2]))))." "%1[^%]*: F")
+foreach(_s 0 2)
+	add_test(NAME "test_repl-normalize_cmd-issue183_sub_true_splits${_s}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --preprocessing=false --bv-widening=false --bv-quantifier-free-decision=false --block-max-splits=${_s} -e \"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))\"")
+	set_tests_properties("test_repl-normalize_cmd-issue183_sub_true_splits${_s}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "%1[^%]*: T"
+		FAIL_REGULAR_EXPRESSION "Error"
+		TIMEOUT 60)
+endforeach()
+
