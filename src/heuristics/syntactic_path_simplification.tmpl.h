@@ -105,7 +105,7 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 			// A marked node must yield no assumption: every conjunct
 			// of its flattening is a disjunction (the only conjuncts
 			// the loop below skips).
-			DBG(for (tref l : get_cnf_wff_clauses<node>(n))
+			DBG(for ([[maybe_unused]] tref l : get_cnf_wff_clauses<node>(n))
 				assert(tau::get(l).child_is(tau::wff_or));)
 			return n;
 		}

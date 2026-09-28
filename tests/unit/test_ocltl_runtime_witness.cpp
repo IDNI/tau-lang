@@ -283,7 +283,7 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): randomized cases") {
 	// "concrete committed values" are structurally related (as real runs
 	// would produce) rather than mutually independent free variables.
 	sbf_t random_term(std::mt19937& rng, const std::vector<sbf_t>& pool) {
-		std::uniform_int_distribution<int> pick(0, (int)pool.size() - 1);
+		std::uniform_int_distribution<size_t> pick(0, pool.size() - 1);
 		std::uniform_int_distribution<int> op(0, 2);
 		sbf_t t = pool[pick(rng)];
 		int ops = std::uniform_int_distribution<int>(0, 3)(rng);

@@ -70,7 +70,7 @@ struct field_desc {
  */
 struct edge_desc {
 	std::vector<std::int8_t> guard;
-	int dst = 0;
+	size_t dst = 0;
 	std::vector<std::pair<std::string, std::string>> witness_ctors;
 	// Props of this edge's positive atoms whose value must be solved at
 	// runtime (their trees are program_desc::atoms entries); consumed by the
@@ -129,8 +129,8 @@ struct stream_desc {
  */
 struct program_desc {
 	std::string class_name;
-	int num_states = 0;
-	int initial_state = 0;
+	size_t num_states = 0;
+	size_t initial_state = 0;
 	std::vector<field_desc> inputs, outputs;
 	std::vector<std::vector<edge_desc>> edges;  // edges[state] = outgoing
 	bool revisable = false;    // strategy table runtime-replaceable (PWR revise())

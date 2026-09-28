@@ -210,8 +210,8 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 {
 	using tau = tree<node>;
 	// This map is needed in order to get the minimal shift for streams with same name
-	std::set<int_t> quantifiable_o_vars;
-	for (int_t i = 0; i < (int_t) io_vars.size(); ++i) {
+	std::set<size_t> quantifiable_o_vars;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
 		// Skip input streams. An io_var classified as neither (see
 		// transform_io_var) would be quantified existentially below as if it
 		// were an output; make that loud instead of defaulting silently.
@@ -223,7 +223,7 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 		quantifiable_o_vars.insert(i);
 	}
 	subtree_set<node> cache;
-	for (int_t pos : quantifiable_o_vars) {
+	for (size_t pos : quantifiable_o_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
@@ -266,8 +266,8 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 {
 	using tau = tree<node>;
 	// This map is needed in order to get the minimal shift for streams with same name
-	std::set<int_t> quantifiable_i_vars;
-	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
+	std::set<size_t> quantifiable_i_vars;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
 		// SO-10: fail loudly on an unclassified io_var, like the
 		// existential sibling does.
 		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
@@ -279,7 +279,7 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 		quantifiable_i_vars.insert(i);
 	}
 	subtree_set<node> cache;
-	for (int_t pos : quantifiable_i_vars) {
+	for (size_t pos : quantifiable_i_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
@@ -1037,14 +1037,15 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 		if (time_point <= highest_init_cond) continue;
 		tref transformed_var;
 		size_t type = tau::get(io_var).get_ba_type();
-		if (time_point - lookback != 0)
+		if (time_point - lookback != 0) {
+			// The shift argument is a size_t; abs makes it non-negative here.
+			const size_t shift = static_cast<size_t>(abs(time_point - lookback));
 			transformed_var = tau::get(io_var).is_input_variable()
 				? tau::trim(build_in_var_at_t_minus<node>(
-					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), type,"t"))
+					get_var_name_node<node>(io_var), shift, type, "t"))
 				: tau::trim(build_out_var_at_t_minus<node>(
-					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), type,"t"));
+					get_var_name_node<node>(io_var), shift, type, "t"));
+		}
 		else
 			transformed_var = tau::get(io_var).is_input_variable()
 				? tau::trim(build_in_var_at_t<node>(
@@ -1080,8 +1081,9 @@ tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
 	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	// The shift argument is a size_t; the branch above makes lookback - 1 non-negative.
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
-		var_name_node, lookback - 1, flag_type, var);
+		var_name_node, static_cast<size_t>(lookback - 1), flag_type, var);
 	else return build_out_var_at_t<node>(var_name_node, flag_type, var);
 }
 
@@ -1106,8 +1108,10 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
 	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	// The shift argument is a size_t; the branch above makes lookback non-negative.
 	if (lookback >= 2)
-		return build_out_var_at_t_minus<node>(io_var_node, lookback, flag_type, var);
+		return build_out_var_at_t_minus<node>(
+			io_var_node, static_cast<size_t>(lookback), flag_type, var);
 	else return build_out_var_at_t_minus<node>(io_var_node, 1, flag_type, var);
 }
 
@@ -1328,7 +1332,7 @@ result<tref> always_to_unbounded_continuation(tref fm,
 
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
-	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
+	for (size_t i = 0; i < io_vars.size(); ++i)
             if (is_io_initial<node>(io_vars[i]))
                 initials.emplace(get_var_name<node>(io_vars[i]),
                     get_io_time_point<node>(io_vars[i]));
@@ -1802,7 +1806,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
 
-	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
+	for (size_t i = 0; i < io_vars.size(); ++i)
 		if (is_io_initial<node>(io_vars[i]))
 			initials.emplace(get_var_name<node>(io_vars[i]),
 				get_io_time_point<node>(io_vars[i]));

@@ -228,7 +228,7 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 		if (cs.size() != 1) return r.with_value(atom_verdict::undecided);
 		int j = -1;
 		for (int k = 0; k < (int)constants.size(); ++k)
-			if (omcat::cmp(constants[k], cs[0]) == 0) { j = k; break; }
+			if (omcat::cmp(constants[(size_t) k], cs[0]) == 0) { j = k; break; }
 		if (j < 0) return r.with_value(atom_verdict::undecided);
 		auto eff = op;
 		if (!io_is_lhs) {
@@ -394,8 +394,8 @@ static result<atom_verdict> eval_pure_output_atom_at(
 			if (omcat::cmp(a, b) > 0) std::swap(a, b);
 			int ja = -1, jb = -1;
 			for (int k = 0; k < (int)constants.size(); ++k) {
-				if (omcat::cmp(constants[k], a) == 0) ja = k;
-				if (omcat::cmp(constants[k], b) == 0) jb = k;
+				if (omcat::cmp(constants[(size_t) k], a) == 0) ja = k;
+				if (omcat::cmp(constants[(size_t) k], b) == 0) jb = k;
 			}
 			if (ja < 0 || jb < 0) return r.with_value(atom_verdict::undecided);
 			// Membership: pos_y ∈ [2*ja+1, 2*jb+1] (point-at-a through point-at-b).
@@ -415,7 +415,7 @@ static result<atom_verdict> eval_pure_output_atom_at(
 		if (cs.size() != 1) return r.with_value(atom_verdict::undecided);
 		int j = -1;
 		for (int k = 0; k < (int)constants.size(); ++k)
-			if (omcat::cmp(constants[k], cs[0]) == 0) { j = k; break; }
+			if (omcat::cmp(constants[(size_t) k], cs[0]) == 0) { j = k; break; }
 		if (j < 0) return r.with_value(atom_verdict::undecided);
 		auto eff = op;
 		if (!io_is_lhs) {
@@ -488,13 +488,13 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 	for (long long combo = 0; combo < total; ++combo) {
 		std::map<std::string, int> var_pos;
 		unsigned long long rem = (unsigned long long)combo;
-		for (int i = 0; i < n_out; ++i) {
+		for (size_t i = 0; i < out_vec.size(); ++i) {
 			var_pos[out_vec[i]] = (int)(rem % (unsigned long long)T1_size);
 			rem /= (unsigned long long)T1_size;
 		}
 
 		std::string phi = phi_star_base;
-		for (int i = (int)atoms.size(); i-- > 0; ) {
+		for (size_t i = atoms.size(); i-- > 0; ) {
 			TAU_TRY(auto val, eval_pure_output_atom_at<node>(
 				atoms[i].first, var_pos, constants));
 			if (val == atom_verdict::undecided) continue;
@@ -556,9 +556,9 @@ static result<std::vector<int>> qlt_type_A_bitmasks(
 	result<std::vector<int>> r;
 	std::vector<int> type_A(T3.size(), 0);
 	for (int i = 0; i < (int)atoms.size(); ++i)
-		for (int t = 0; t < (int)T3.size(); ++t) {
+		for (size_t t = 0; t < T3.size(); ++t) {
 			TAU_TRY(auto h, qlt_atom_holds_in_type3<node>(
-				atoms[i].first, T3[t], constants));
+				atoms[(size_t) i].first, T3[t], constants));
 			if (h != atom_verdict::fails) type_A[t] |= (1 << i);
 		}
 	return r.with_value(std::move(type_A));
@@ -600,7 +600,7 @@ solve_ltl_aba_algorithm_a(
 
 	TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 	auto T3 = omcat::enumerate_qlt_T3(constants);
-	int n_types = (int)T3.size();
+	const size_t n_types = T3.size();
 	LOG_DEBUG << "[ltl_aba:algA] T3 count=" << n_types
 	          << " constants=" << constants.size();
 	if (n_types == 0) return r.with_value(synthesis_declined<node>());
@@ -612,7 +612,7 @@ solve_ltl_aba_algorithm_a(
 	int T1_size = 2 * (int)constants.size() + 1;
 	std::vector<std::tuple<int,int,int>> feasible_set;
 	feasible_set.reserve(n_types);
-	for (int t = 0; t < n_types; ++t)
+	for (size_t t = 0; t < n_types; ++t)
 		feasible_set.emplace_back(T3[t].pos_m, T3[t].pos_y, type_A[t]);
 
 	// Build phi* skeleton and rename p_i → D_i.
@@ -672,7 +672,7 @@ solve_ltl_aba_algorithm_b(
 	auto T2 = omcat::enumerate_qlt_T2(constants);
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int T2_size = (int)T2.size();
-	int n_types = (int)T3.size();
+	const size_t n_types = T3.size();
 	if (n_types == 0 || T2_size == 0) return r.with_value(synthesis_declined<node>());
 
 	int K       = (int)atoms.size();
@@ -684,13 +684,16 @@ solve_ltl_aba_algorithm_b(
 
 	// Build T₂ lookup: (pos_m, pos_x, rel_mx) → T₂ index.
 	std::map<std::tuple<int,int,int>, int> t2_lookup;
-	for (int s = 0; s < T2_size; ++s)
-		t2_lookup[{ T2[s].pos_m, T2[s].pos_x, (int)T2[s].rel }] = s;
+	for (int s = 0; s < T2_size; ++s) {
+		// The lookup value keeps the T₂ index as an int.
+		const auto& t2 = T2[(size_t) s];
+		t2_lookup[{ t2.pos_m, t2.pos_x, (int) t2.rel }] = s;
+	}
 
 	// Build feasible_set_b: (T2_idx, rho, A).
 	std::vector<std::tuple<int,int,int>> feasible_set_b;
 	feasible_set_b.reserve(n_types);
-	for (int t = 0; t < n_types; ++t) {
+	for (size_t t = 0; t < n_types; ++t) {
 		auto key = std::make_tuple(T3[t].pos_m, T3[t].pos_x, (int)T3[t].rel_mx);
 		auto it  = t2_lookup.find(key);
 		if (it == t2_lookup.end()) continue;
@@ -698,8 +701,8 @@ solve_ltl_aba_algorithm_b(
 	}
 
 	// t2_pos_m[σ] = pos_m of T₂[σ].
-	std::vector<int> t2_pos_m(T2_size);
-	for (int s = 0; s < T2_size; ++s) t2_pos_m[s] = T2[s].pos_m;
+	std::vector<int> t2_pos_m(T2.size());
+	for (size_t s = 0; s < t2_pos_m.size(); ++s) t2_pos_m[s] = T2[s].pos_m;
 
 	// Build phi* skeleton and rename p_i → d_i (LT-16: shared helper).
 	TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, atoms));
@@ -751,7 +754,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 		auto T3 = omcat::enumerate_qlt_T3(constants);
 		int K = (int)sol.atoms.size();
-		int T1_size = 2 * (int)constants.size() + 1;
+		size_t T1_size = 2 * constants.size() + 1;
 
 		// Compute D-bitmask for each T3 type.
 		TAU_TRY(auto type_A,
@@ -791,7 +794,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		// excluded from the strategy instead of being scored by the
 		// oracle afterwards.  (Batch 5 of the 2026-08-18 review.)
 		for (int i = 0; i < K; ++i)
-			sol.atoms[i].second = "d_" + std::to_string(i);
+			sol.atoms[(size_t) i].second = "d_" + std::to_string(i);
 		std::string strategy_skeleton = phi_star;
 		TAU_TRY_VOID(add_consistency_constraints<node>(sol.atoms,
 			strategy_skeleton, nullptr, /*polarity_complete=*/false,
@@ -804,7 +807,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			// Propositional call disagrees — fall through to default path
 			LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
 			for (int i = 0; i < K; ++i)
-				sol.atoms[i].second = "p" + std::to_string(i);
+				sol.atoms[(size_t) i].second = "p" + std::to_string(i);
 		} else {
 			sol.skeleton = strategy_skeleton;
 			sol.output_props = D_outs;

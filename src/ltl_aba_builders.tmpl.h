@@ -305,8 +305,8 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 	// A rejection means only THIS strategy is bad, not that none exists:
 	// block the edge's infeasible atom combinations as system-side
 	// conjuncts (sound -- the ABA rules them out) and re-synthesize, bounded.
-	auto check_edges = [&]() -> std::optional<std::pair<int, size_t>> {
-		for (int s = 0; s < sol.aut.num_states; ++s)
+	auto check_edges = [&]() -> std::optional<std::pair<size_t, size_t>> {
+		for (size_t s = 0; s < sol.aut.edges.size(); ++s)
 			for (size_t ei = 0; ei < sol.aut.edges[s].size(); ++ei) {
 				auto& e = sol.aut.edges[s][ei];
 				LOG_DEBUG << "[ltl_aba] checking edge " << s << "->[" << e.guard_label << "]->" << e.dst;
@@ -725,13 +725,13 @@ static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 template <NodeType node>
 static tref mealy_one_hot(const std::vector<std::string>& sv) {
 	using tau = tree<node>;
-	const int k = (int)sv.size();
+	const size_t k = sv.size();
 	tref at_least = tau::_F();
-	for (int i = 0; i < k; ++i)
+	for (size_t i = 0; i < k; ++i)
 		at_least = tau::build_wff_or(at_least, build_state_bit_eq<node>(sv[i], 0, true));
 	tref at_most = tau::_T();
-	for (int i = 0; i < k; ++i)
-		for (int j = i + 1; j < k; ++j)
+	for (size_t i = 0; i < k; ++i)
+		for (size_t j = i + 1; j < k; ++j)
 			at_most = tau::build_wff_and(at_most,
 			    tau::build_wff_neg(
 			        tau::build_wff_and(build_state_bit_eq<node>(sv[i], 0, true),
@@ -745,12 +745,12 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 	using tau = tree<node>;
 	result<tref> r;
 	const auto& aut = sol.aut;
-	int k = aut.num_states;
+	const size_t k = aut.num_states;
 
 	// Auxiliary output state variable names. Use "ms" (Mealy-state) prefix to
 	// avoid collision with compile-away S-operator variables (o__ltl_sN__).
 	std::vector<std::string> sv;
-	for (int i = 0; i < k; ++i)
+	for (size_t i = 0; i < k; ++i)
 		sv.push_back("o__ltl_ms" + std::to_string(i) + "__");
 
 	// ── (a) One-hot constraint at the current step ────────────────────────
@@ -760,11 +760,11 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 	// For each source state s:
 	//   si[t-1]=1  →  ∨_edges_from_s (guard_formula ∧ s_{dst}[t]=1)
 	tref trans = tau::_T();
-	for (int s = 0; s < k; ++s) {
+	for (size_t s = 0; s < aut.edges.size(); ++s) {
 		tref prev_s = build_state_bit_eq<node>(sv[s], -1, true);
 		tref edges_disj = tau::_F();
 		for (const auto& e : aut.edges[s]) {
-			if (e.dst < 0 || e.dst >= k) {
+			if (e.dst >= k) {
 				return r.with_error(code::internal_error,
 					"[ltl_aba] HOA edge dst "
 					+ std::to_string(e.dst)
@@ -775,7 +775,8 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 			}
 			tref guard_fm = guard_to_aba<node>(
 			    e.guard_label, aut.aps, sol.atoms);
-			tref next_d = build_state_bit_eq<node>(sv[e.dst], 0, true);
+			tref next_d = build_state_bit_eq<node>(
+				sv[e.dst], 0, true);
 			edges_disj = tau::build_wff_or(edges_disj,
 			    tau::build_wff_and(guard_fm, next_d));
 		}
@@ -814,9 +815,9 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 	using tau = tree<node>;
 	result<tref> r;
 	const auto& aut = sol.aut;
-	const int k      = (int)sv.size();
-	const int init_s = aut.initial_state;
-	if (init_s < 0 || init_s >= k) return r.with_value(nullptr);
+	const size_t k = sv.size();
+	const size_t init_s = aut.initial_state;
+	if (init_s >= k) return r.with_value(nullptr);
 	auto at = [](tref fm, int_t t) -> result<tref> {
 		auto io = tau::get(fm).select_top(is_child<node, tau::io_var>);
 		return fm_at_time_point<node>(fm, io, t);
@@ -826,19 +827,23 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 		std::vector<std::pair<tref, std::string>> atoms_t;
 		for (const auto& a : sol.atoms)
 			if (max_atom_lookback<node>({a}) <= t) atoms_t.push_back(a);
-		auto edges_from = [&](int s) {
+		auto edges_from = [&](size_t s) {
 			tref d = tau::_F();
 			for (const auto& e : aut.edges[s]) {
-				if (e.dst < 0 || e.dst >= k) continue;
+				if (e.dst >= k) continue;
 				d = tau::build_wff_or(d, tau::build_wff_and(
 					guard_to_aba<node>(e.guard_label, aut.aps, atoms_t),
-					build_state_bit_eq<node>(sv[e.dst], 0, true)));
+					// e.dst was range-checked against k just
+					// above.
+					build_state_bit_eq<node>(
+						sv[e.dst], 0, true)));
 			}
 			return d;
 		};
 		tref step = tau::_T();
+		// init_s was range-checked against k before the loop.
 		if (t == 0) step = edges_from(init_s);
-		else for (int s = 0; s < k; ++s)
+		else for (size_t s = 0; s < sv.size(); ++s)
 			step = tau::build_wff_and(step, tau::build_wff_or(
 				tau::build_wff_neg(
 					build_state_bit_eq<node>(sv[s], -1, true)),
@@ -1359,7 +1364,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	if (aut.aps.empty()) out << "(none)";
 	out << "\n";
 
-	for (int s = 0; s < aut.num_states; ++s) {
+	for (size_t s = 0; s < aut.edges.size(); ++s) {
 		out << "  state " << s;
 		if (aut.state_accepting[s]) out << " [accepting]";
 		out << ":\n";
@@ -1376,7 +1381,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	if (!sol.atoms.empty()) {
 		out << "\nABA oracle checks:\n";
 		bool all_feasible = true;
-		for (int s = 0; s < aut.num_states; ++s) {
+		for (size_t s = 0; s < aut.edges.size(); ++s) {
 			for (auto& e : aut.edges[s]) {
 				// LT-20: use the SAME oracle as the real
 				// pipeline (dead-edge pure-input check +

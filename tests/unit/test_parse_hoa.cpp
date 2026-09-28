@@ -108,16 +108,15 @@ TEST_SUITE("parse_hoa") {
 		CHECK(!r.has_value());
 	}
 
-	TEST_CASE("[HOA-08] out-of-range states and edges are dropped, not indexed (LT-10)") {
-		auto r = parse_hoa(
+	TEST_CASE("[HOA-08] out-of-range states and edges are refused (LT-10)") {
+		// An edge to a state outside the table is a fault of the tool,
+		// not a reason to drop the edge silently.
+		CHECK(parse_hoa(
 			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n--BODY--\n"
-			"State: 0\n[0] 5\n[!0] 0\nState: 3\n[t] 0\n--END--\n");
-		REQUIRE(r.has_value());
-		hoa_automaton aut = r.value();
-		CHECK(aut.num_states == 1);
-		REQUIRE(aut.edges.size() == 1);
-		CHECK(aut.edges[0].size() == 1);
-		CHECK(aut.edges[0][0].dst == 0);
+			"State: 0\n[0] 5\n--END--\n").has_error());
+		CHECK(parse_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n--BODY--\n"
+			"State: 3\n[t] 0\n--END--\n").has_error());
 	}
 
 	TEST_CASE("[HOA-09] a 1-state strategy with no edge is not executable (LA-R6)") {

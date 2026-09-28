@@ -180,13 +180,19 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 					{{label::value, std::string(
 						st | hoa::num | tt::terminals)}});
 			}
-			aut.num_states = (int) n;
+			aut.num_states = static_cast<size_t>(n);
 			seen_states = true;
 			aut.edges.assign(aut.num_states, {});
 			aut.state_accepting.assign(aut.num_states, false);
 		} else if (auto sl = tt(h) | hoa::start_line; sl.has_value()) {
 			long n = num_of(sl);
-			aut.initial_state = n < 0 ? 0 : (int) n;
+			if (n < 0)
+				return r.with_error(code::parse_error,
+					"the HOA strategy has a malformed start "
+					"state",
+					{{label::value, truncate_for_message(
+						sl | tt::terminals)}});
+			aut.initial_state = static_cast<size_t>(n);
 		} else if (auto ap = tt(h) | hoa::ap_line; ap.has_value()) {
 			long n = num_of(ap);
 			long taken = 0;
@@ -208,36 +214,45 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 		return r.with_error(code::parse_error,
 			"the HOA strategy has no `States:` header");
 	}
+	if (aut.initial_state >= aut.num_states) {
+		return r.with_error(code::parse_error,
+			"the HOA strategy has a start state outside the state table",
+			{{label::value, std::to_string(aut.initial_state)}});
+	}
 
-	int cur_state = -1;
+	std::optional<size_t> cur_state;
 	auto body = root | hoa::body;
 	for (auto& be : (body || hoa::belem)()) {
 		if (auto st = tt(be) | hoa::state_line; st.has_value()) {
 			long n = num_of(st);
-			// LT-10: bound the state number before indexing
-			if (n < 0 || n >= (long) aut.num_states) {
-				cur_state = -1;
-				continue;
-			}
-			cur_state = (int) n;
+			if (n < 0 || static_cast<size_t>(n) >= aut.num_states)
+				return r.with_error(code::parse_error,
+					"the HOA strategy has a state number outside "
+					"the state table",
+					{{label::value, truncate_for_message(
+						st | tt::terminals)}});
+			cur_state = static_cast<size_t>(n);
 			if ((st | hoa::acc).has_value())
-				aut.state_accepting[cur_state] = true;
+				aut.state_accepting[*cur_state] = true;
 		} else if (auto ed = tt(be) | hoa::edge_line; ed.has_value()) {
-			if (cur_state < 0) continue;
+			if (!cur_state) continue;
 			long dst = num_of(ed);
-			// LT-10: an edge to an out-of-range destination is
-			// dropped
-			if (dst < 0 || dst >= (long) aut.num_states) continue;
+			if (dst < 0 || static_cast<size_t>(dst) >= aut.num_states)
+				return r.with_error(code::parse_error,
+					"the HOA strategy has a transition to a state "
+					"outside the state table",
+					{{label::value, truncate_for_message(
+						ed | tt::terminals)}});
 			hoa_edge e;
 			e.guard_label = ed | hoa::guard | tt::terminals;
-			e.dst = (int) dst;
+			e.dst = static_cast<size_t>(dst);
 			e.accepting = (ed | hoa::acc).has_value();
-			aut.edges[cur_state].push_back(e);
+			aut.edges[*cur_state].push_back(e);
 		}
 	}
 
 	// Propagate state-based acceptance to edges (for Büchi with state marks)
-	for (int s = 0; s < aut.num_states; ++s)
+	for (size_t s = 0; s < aut.edges.size(); ++s)
 		for (auto& e : aut.edges[s])
 			if (aut.state_accepting[e.dst])
 				e.accepting = true;

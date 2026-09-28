@@ -26,14 +26,14 @@ namespace idni::tau_lang {
 /** @brief One transition of a strategy automaton as Spot's HOA spells it. */
 struct hoa_edge {
 	std::string guard_label;  // Boolean formula over AP indices, e.g. "0&!1"
-	int dst = 0;
+	size_t dst = 0;
 	bool accepting = false;   // true if this edge carries an acceptance mark
 };
 
 /** @brief A strategy automaton parsed out of Spot's HOA output. */
 struct hoa_automaton {
-	int num_states = 0;
-	int initial_state = 0;
+	size_t num_states = 0;
+	size_t initial_state = 0;
 	std::vector<std::string> aps;       // atomic proposition names
 	std::vector<std::vector<hoa_edge>> edges; // edges[src] = outgoing edges
 	std::vector<bool> state_accepting;  // true if state has acceptance mark

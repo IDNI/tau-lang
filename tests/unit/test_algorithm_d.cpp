@@ -1039,7 +1039,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.trans[1].emplace_back("t", 0, -1); // unmarked edge
 		g.edge_priority = {{1}, {-1}};
 
-		int T1_size = 1;
+		size_t T1_size = 1;
 		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // pattern 1 (d_0 = true) feasible
@@ -1047,12 +1047,12 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		auto pg_r = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
 		REQUIRE(pg_r.has_value());
 		auto pg = pg_r.value();
-		int base_n = g.num_states * T1_size;
+		size_t base_n = g.num_states * T1_size;
 		CHECK(pg.n_states > base_n);
 		// The sys base state (0,rho=0) = index 0 must reach a stub with the
 		// edge's priority (1), and that stub must have exactly one successor.
 		REQUIRE(!pg.succs[0].empty());
-		int stub = pg.succs[0][0];
+		size_t stub = pg.succs[0][0];
 		REQUIRE(stub >= base_n);
 		CHECK(pg.priority[stub] == 1);
 		CHECK(pg.succs[stub].size() == 1);
@@ -1071,7 +1071,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.trans[0].emplace_back("0", 0, -1); // self-loop, requires d_0 = true
 		g.edge_priority = {{-1}};
 
-		int T1_size = 1;
+		size_t T1_size = 1;
 		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // D-pattern 1 feasible at (rho=0,rho'=0)
@@ -1096,7 +1096,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.trans[0].emplace_back("0", 0, -1); // requires d_0 = true (pattern 1)
 		g.edge_priority = {{-1}};
 
-		int T1_size = 1;
+		size_t T1_size = 1;
 		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {0}; // only pattern 0 feasible — guard needs 1
@@ -1130,7 +1130,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.trans[2].emplace_back("t", 2, -1);   // env even sink
 		g.edge_priority = {{-1, -1}, {-1}, {-1}};
 
-		int T1_size = 1;
+		size_t T1_size = 1;
 		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1};         // only pattern 1 feasible
@@ -1210,7 +1210,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		// Constants conceptually {0}: positions 0 = (-inf,0), 1 = {0},
 		// 2 = (0,+inf).  d_0 = "previous output > 0" is realisable only
 		// from m-position 2, staying there (y stays > 0).
-		const int T1_size = 3;
+		const size_t T1_size = 3;
 		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 2; T3[0].pos_y = 2;
 		std::vector<int> type_A = {1};
@@ -1257,7 +1257,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		using omcat::rational;
 		const std::vector<rational> constants = {rational(0, 1)};
 		auto T3 = omcat::enumerate_qlt_T3(constants);
-		const int T1_size = 3;
+		const size_t T1_size = 3;
 		// d_0 = "current output > 0": true exactly in the types whose
 		// y-component is the interval (0, +inf) = position 2.
 		std::vector<int> type_A(T3.size(), 0);
@@ -1271,7 +1271,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		CHECK(r->realizable);
 		CHECK(r->init_rho == rho0);
 		CHECK(r->product_game.init
-			== r->synth_game.init * T1_size + rho0);
+			== r->synth_game.init * T1_size + stream_pos(rho0));
 		CHECK(r->winning_region.count(r->product_game.init) == 1);
 	}
 

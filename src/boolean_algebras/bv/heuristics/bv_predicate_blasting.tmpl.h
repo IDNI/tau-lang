@@ -438,8 +438,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	int_t id = find_biggest_quant_id<node>(subformula);
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s)
-			if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	auto f = [&](tref n) {

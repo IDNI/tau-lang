@@ -741,7 +741,8 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 	trefs& A = assms.back();
 	for (size_t i = 0; i < A.size(); ++i) {
 		if (excluded.contains(A[i])) {
-			A.erase(A.begin()+i);
+			// The loop bound keeps i below A.size().
+			erase_at(A, i);
 			DBG(assert(i > 0);)
 			--i;
 			continue;
@@ -847,7 +848,8 @@ tref squeeze_absorb(tref formula) {
 					// Squeeze overlapping terms
 					if (uf.connected(fv1[0], fv2[0])) {
 						conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-						conjs.erase(conjs.begin()+j);
+						// j is below pos_eq_idx, itself below conjs.size().
+						erase_at(conjs, j);
 						--j;
 						--pos_eq_idx;
 						--eq_idx;
@@ -923,7 +925,8 @@ tref squeeze_absorb(tref formula) {
 					// Squeeze overlapping terms
 					if (uf.connected(fv1[0], fv2[0])) {
 						disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-						disjs.erase(disjs.begin()+j);
+						// j is below neg_eq_idx, itself below disjs.size().
+						erase_at(disjs, j);
 						--j;
 						--neg_eq_idx;
 						--eq_idx;
@@ -1078,7 +1081,8 @@ tref squeeze_absorb(tref formula, tref var) {
 						continue;
 					// Squeeze overlapping terms
 					conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-					conjs.erase(conjs.begin()+j);
+					// j is below pos_eq_idx, itself below conjs.size().
+					erase_at(conjs, j);
 					--j;
 					--pos_eq_idx;
 					--eq_idx;
@@ -1154,7 +1158,8 @@ tref squeeze_absorb(tref formula, tref var) {
 						continue;
 					// Squeeze overlapping terms
 					disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-					disjs.erase(disjs.begin()+j);
+					// j is below neg_eq_idx, itself below disjs.size().
+					erase_at(disjs, j);
 					--j;
 					--neg_eq_idx;
 					--eq_idx;

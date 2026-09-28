@@ -124,7 +124,7 @@ result<adt_registry<node>> adt_registry<node>::build(tref spec,
 			// chain.
 			if (tref parents = tt(def) | tau::type_parents | tt::ref; parents) {
 				for (tref pn : (tt(parents) || tau::type_name).values()) {
-					size_t pname = tau::get(pn).data();
+					size_t pname = tau::get(pn).get_string_id();
 					if (!defs.contains(pname)) {
 						r.error(code::type_error,
 							"type inherits from an unknown type",
@@ -190,7 +190,7 @@ result<adt_registry<node>> adt_registry<node>::build(tref spec,
 			// Alias case: type_body's children are [type, subtype?]
 			// directly (no `typed` wrapper -- see grammar note above).
 			tref type_child = tt(body) | tau::type | tt::ref;
-			size_t tname = tau::get(type_child).data();
+			size_t tname = tau::get(type_child).get_string_id();
 			tref subtype_child = tt(body) | tau::subtype | tt::ref;
 
 			if (defs.contains(tname)) {

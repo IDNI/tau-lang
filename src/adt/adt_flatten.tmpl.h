@@ -76,9 +76,9 @@ template <NodeType node>
 size_t adt_flatten_var_key(tref head) {
 	using tau = tree<node>;
 	auto t = tau::get(head);
-	if (t.is(tau::io_var)) return tau::get(t.first()).data();
-	if (t.is(tau::uconst)) return tau::get(t.only_child()).data();
-	return t.data();
+	if (t.is(tau::io_var)) return tau::get(t.first()).get_string_id();
+	if (t.is(tau::uconst)) return tau::get(t.only_child()).get_string_id();
+	return t.get_string_id();
 }
 
 // Spelling of a variable head's scope key (see adt_flatten_var_key).
@@ -95,7 +95,7 @@ std::string adt_flatten_describe_var(tref var_node) {
 	std::string s = adt_flatten_head_str<node>(tau::get(var_node).first());
 	if (tref mp = adt_flatten_find_child<node>(var_node, tau::member_path); mp)
 		for (tref c : tau::get(mp).get_children())
-			s += "." + dict(tau::get(c).data());
+			s += "." + tau::get(c).get_string();
 	return s;
 }
 
@@ -154,7 +154,7 @@ result<adt_resolution<node>> adt_resolve_var(tref var_node,
 	std::vector<size_t> path_sids;
 	if (member_path_node)
 		for (tref c : tau::get(member_path_node).get_children())
-			path_sids.push_back(tau::get(c).data());
+			path_sids.push_back(tau::get(c).get_string_id());
 
 	size_t adt_sid = 0; bool have = false;
 	if (typed_node) {
@@ -247,7 +247,9 @@ result<adt_resolution<node>> adt_resolve_var(tref var_node,
 	for (auto* m : cands) {
 		std::string name = hs;
 		for (size_t sid : m->path) name += "." + dict(sid);
-		std::vector<size_t> suffix(m->path.begin() + path_sids.size(), m->path.end());
+		// A vector offset is signed; the count below stays below path.size().
+		std::vector<size_t> suffix(m->path.begin()
+			+ static_cast<std::ptrdiff_t>(path_sids.size()), m->path.end());
 		r.members.push_back({ std::move(name), m->base_type, std::move(suffix) });
 	}
 	return rep.with_value(std::move(r));
@@ -332,7 +334,7 @@ result<bool> adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 		if (tref typed_node = adt_flatten_find_child<node>(n, tau::typed); typed_node) {
 			size_t tname = tt(typed_node) | tau::type | tt::data;
 			if (reg.defines(tname)) {
-				size_t key = tau::get(t.first()).data(); // io def's var_name
+				size_t key = tau::get(t.first()).get_string_id(); // io def's var_name
 				auto [it, inserted] = local.try_emplace(key, adt_scope_entry{ tname, false });
 				if (!inserted && it->second.adt_sid != tname) {
 					return r.with_error(code::type_error,
@@ -803,7 +805,7 @@ result<tref> adt_flatten_rewrite_io_def(tref n,
 
 	result<tref> r;
 	tref head = tau::get(n).first(); // io def's own var_name (bare, no `variable` wrapper)
-	size_t root_sid = tau::get(head).data();
+	size_t root_sid = tau::get(head).get_string_id();
 	// A redefinition of this SAME root name under a non-tuple annotation (or
 	// none at all) retires any STALE ctx->adt_streams entry a PRIOR
 	// tuple-typed declaration of the same root left behind (C2/minor #8).
@@ -1068,7 +1070,7 @@ result<bool> adt_flatten_check_io_def_file_name(tref n) {
 	tref f = tt(n) | tau::stream | tau::q_file_name | tau::file_name
 		| tt::ref;
 	if (!f) return r.with_value(true);
-	std::string name = dict(tau::get(f).data());
+	std::string name = tau::get(f).get_string();
 	if (name.find('"') == std::string::npos) return r.with_value(true);
 	return r.with_error(code::parse_error,
 		"a stream file name captured a quote; two file stream definitions "

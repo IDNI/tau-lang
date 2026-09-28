@@ -9,7 +9,11 @@
 
 namespace {
 
-cvc5::Sort bv_sort(size_t w) { return cvc5_term_manager.mkBitVectorSort(w); }
+// cvc5 takes a sort width as a 32-bit value; the widths here stay a few bits
+cvc5::Sort bv_sort(size_t w) {
+	DBG(assert(w >= 1 && w <= 0xffffffffu);)
+	return cvc5_term_manager.mkBitVectorSort(static_cast<uint32_t>(w));
+}
 
 // cvc5's verdict on a Boolean term, as bv_formula_sat_status configures it
 std::optional<bool> cvc5_sat(const cvc5::Term& f) {

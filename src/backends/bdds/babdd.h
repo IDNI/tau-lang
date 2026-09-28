@@ -41,6 +41,15 @@ template<typename T> using sp = std::shared_ptr<T>;
  */
 inline bool bdd_node_table_exhausted = false;
 
+// A BDD literal is a signed variable id: positive = the variable, negative
+// = its complement. These two convert across that boundary once.
+inline uint_t lit_var(int_t lit) {
+	return static_cast<uint_t>(lit > 0 ? lit : -lit);
+}
+inline int_t signed_lit(uint_t v, bool neg) {
+	return neg ? -static_cast<int_t>(v) : static_cast<int_t>(v);
+}
+
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -139,10 +148,13 @@ struct bdd_reference {
 	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(static_cast<ref_type>(id)) {}
-	bdd_reference(auto in, auto out, auto shift, auto id) : in(in), out(out),
-								shift(shift),
-								id(static_cast<ref_type>(id)) {}
+	// in/out are 0/1 inverter flags; the bitfields hold ref_type.
+	bdd_reference(auto in, auto out, auto id)
+		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
+		  id(static_cast<ref_type>(id)) {}
+	bdd_reference(auto in, auto out, auto shift, auto id)
+		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
+		  shift(shift), id(static_cast<ref_type>(id)) {}
 
 	// id indexes the universe vector V; ID_WIDTH never exceeds size_t's
 	// range, checked once here rather than at each V[n.id] use.
@@ -236,7 +248,10 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(static_cast<ref_type>(id)) {}
+	// in/out are 0/1 inverter flags; the bitfields hold ref_type.
+	bdd_reference(auto in, auto out, auto id)
+		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
+		  id(static_cast<ref_type>(id)) {}
 
 	bool operator==(const bdd_reference x) const {
 		return in == x.in && out == x.out && id == x.id;
@@ -385,7 +400,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// Variable-order comparator: var_cmp(a, b) is true when a comes
 	// strictly before b in the BDD order (ascending by default,
 	// descending with INV_ORDER)
-	static bool (*var_cmp)(int, int);
+	static bool (*var_cmp)(uint_t, uint_t);
 
 	// Static-init hook: constructing I runs bdd_init<B, o>() once
 	struct initializer { initializer(); };
@@ -698,7 +713,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		// Avoid later name clash by adding any new variable to dictionary
 		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
 		var_dict(v>0?v:-v);
-		return v > 0 ? add(v, T, F) : add(-v, F, T);
+		const uint_t av = lit_var(v);
+		return v > 0 ? add(av, T, F) : add(av, F, T);
 	}
 
 	// Complement: O(1) out-bit flip with output inverters, otherwise
@@ -903,9 +919,10 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 			return true;
 		}
 		const bdd_node_t& n = std::get<bdd_node_t>(xx);
-		v.push_back(n.v);
+		// Literal indices are non-negative; the sign carries the polarity.
+		v.push_back(signed_lit(n.v, false));
 		if (!dnf(n.h, v, f)) return false;
-		v.back() = -n.v;
+		v.back() = signed_lit(n.v, true);
 		if (!dnf(n.l, v, f)) return false;
 		v.pop_back();
 		return true;
@@ -917,8 +934,10 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		const bdd& xx = get(x);
 		if (xx.leaf()) return;
 		const bdd_node_t& n = std::get<bdd_node_t>(xx);
-		if (s.find(n.v) != s.end()) return;
-		s.insert(n.v), get_vars(n.h, s), get_vars(n.l, s);
+		// Variable indices are non-negative.
+		const int_t vi = signed_lit(n.v, false);
+		if (s.find(vi) != s.end()) return;
+		s.insert(vi), get_vars(n.h, s), get_vars(n.l, s);
 	}
 
 	// if-then-else: x ? y : z
@@ -1028,14 +1047,14 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// Find a variable not present in x
 	static bdd_ref split_clause(bdd_ref x) {
 		if constexpr (!o.has_inv_order()) {
-			// First variable is smallest
+			// First variable is smallest; the new variable's index is non-negative.
 			if(leaf(x)) return bdd_and(x, bit(1));
-			return bdd_and(x, bit(highest_var(x) + 1));
+			return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
 		} else {
-			// First variable is highest
+			// First variable is highest; the new variable's index is non-negative.
 			if(leaf(x)) return bdd_and(x, bit(1));
 			const bdd_node_t& n = get_node(x);
-			return bdd_and(x, bit(n.v + 1));
+			return bdd_and(x, bit(signed_lit(n.v + 1, false)));
 		}
 	}
 };
@@ -1064,7 +1083,7 @@ result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 }
 
 template<typename B, bdd_options o>
-bool(*bdd<B, o>::var_cmp)(int_t, int_t) = [](int_t vl, int_t vr){
+bool(*bdd<B, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
 	if constexpr (!o.has_inv_order()) return vl < vr;
 	else return vl > vr;
 };
@@ -1103,7 +1122,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		else return x.id < 2;
 	}
 
-	static bool (*var_cmp)(int, int);
+	static bool (*var_cmp)(uint_t, uint_t);
 	// Coarse reference order for bdd_and_many operand lists: by id,
 	// with the out-inverted twin first, so duplicates and complement
 	// pairs end up adjacent after sorting (see am_sort)
@@ -1339,7 +1358,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		// Avoid later name clash by adding any new variable to dictionary
 		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
 		var_dict(v>0?v:-v);
-		return v > 0 ? add(v, T, F) : add(-v, F, T);
+		const uint_t av = lit_var(v);
+		return v > 0 ? add(av, T, F) : add(av, F, T);
 	}
 
 	static bdd_ref bdd_not(bdd_ref x) {
@@ -1600,9 +1620,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if (x == F) return true;
 		if (x == T) return f({Bool(true), v});
 		const bdd& n = get(x);
-		v.push_back(n.v);
+		// Literal indices are non-negative; the sign carries the polarity.
+		v.push_back(signed_lit(n.v, false));
 		if (!dnf(n.h, v, f)) return false;
-		v.back() = -n.v;
+		v.back() = signed_lit(n.v, true);
 		if (!dnf(n.l, v, f)) return false;
 		v.pop_back();
 		return true;
@@ -1611,8 +1632,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static void get_vars(bdd_ref x, std::set<int_t>& s) {
 		if (leaf(x)) return;
 		const bdd& n = get(x);
-		if (s.find(n.v) != s.end()) return;
-		s.insert(n.v), get_vars(n.h, s), get_vars(n.l, s);
+		// Variable indices are non-negative.
+		const int_t vi = signed_lit(n.v, false);
+		if (s.find(vi) != s.end()) return;
+		s.insert(vi), get_vars(n.h, s), get_vars(n.l, s);
 	}
 
 	static bdd_ref ite(bdd_ref x, bdd_ref y, bdd_ref z) {
@@ -1736,20 +1759,20 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	// Find a variable not present in x
 	static bdd_ref split_clause(bdd_ref x) {
 		if constexpr (!o.has_inv_order()) {
-			// First variable is smallest
+			// First variable is smallest; the new variable's index is non-negative.
 			if(leaf(x)) return bdd_and(x, bit(1));
-			return bdd_and(x, bit(highest_var(x) + 1));
+			return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
 		} else {
-			// First variable is highest
+			// First variable is highest; the new variable's index is non-negative.
 			if(leaf(x)) return bdd_and(x, bit(1));
 			const bdd& n = get(x);
-			return bdd_and(x, bit(n.v + 1));
+			return bdd_and(x, bit(signed_lit(n.v + 1, false)));
 		}
 	}
 };
 
 template<bdd_options o>
-bool(*bdd<Bool, o>::var_cmp)(int_t, int_t) = [](int_t vl, int_t vr){
+bool(*bdd<Bool, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
 	if constexpr (!o.has_inv_order()) return vl < vr;
 	else return vl > vr;
 };

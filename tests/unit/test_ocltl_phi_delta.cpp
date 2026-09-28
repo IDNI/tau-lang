@@ -81,13 +81,13 @@ void check_pointwise(const ocltl_phi_delta_dims& dims,
 			bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 		for (size_t b = 0; b < result.sigma_vars.size(); ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((sigma >> b) & 1) != 0, result.sigma_vars[b]);
+				((sigma >> b) & 1) != 0, lit_var(result.sigma_vars[b]));
 		for (size_t b = 0; b < result.rho_vars.size(); ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((rho >> b) & 1) != 0, result.rho_vars[b]);
+				((rho >> b) & 1) != 0, lit_var(result.rho_vars[b]));
 		for (size_t b = 0; b < result.delta_vars.size(); ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((d >> b) & 1) != 0, result.delta_vars[b]);
+				((d >> b) & 1) != 0, lit_var(result.delta_vars[b]));
 
 		bool actual = (result.relation & point) != false;
 		++checked;
@@ -158,13 +158,13 @@ void check_direct_against_bdd(const ocltl_phi_delta_dims& dims,
 			bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 		for (size_t b = 0; b < b_count; ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((sigma >> b) & 1) != 0, result.sigma_vars[b]);
+				((sigma >> b) & 1) != 0, lit_var(result.sigma_vars[b]));
 		for (size_t b = 0; b < c_count; ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((rho >> b) & 1) != 0, result.rho_vars[b]);
+				((rho >> b) & 1) != 0, lit_var(result.rho_vars[b]));
 		for (size_t b = 0; b < result.delta_vars.size(); ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((d >> b) & 1) != 0, result.delta_vars[b]);
+				((d >> b) & 1) != 0, lit_var(result.delta_vars[b]));
 		bool expected = (result.relation & point) != false;
 
 		bool actual = ocltl_phi_delta_direct(dims, atoms,
@@ -382,7 +382,7 @@ result build(const ocltl_phi_delta_dims& dims,
 	for (size_t i = 0; i < n_atoms; ++i) delta_ids[i] = var_dict(tag + "delta$" + std::to_string(i));
 
 	auto bit_var = [](bool v, int_t id) {
-		return bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(v, id);
+		return bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(v, lit_var(id));
 	};
 	bddT T = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 	bddT F = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::hfalse;
@@ -984,13 +984,13 @@ void spot_check_stage1_vs_direct(const ocltl_phi_delta_dims& dims,
 		stage1::bddT point = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 		for (size_t B = 0; B < sigma_n; ++B)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				sigma_bits[B], result.sigma_vars[B]);
+				sigma_bits[B], lit_var(result.sigma_vars[B]));
 		for (size_t C = 0; C < rho_n; ++C)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				rho_bits[C], result.rho_vars[C]);
+				rho_bits[C], lit_var(result.rho_vars[C]));
 		for (size_t b = 0; b < result.delta_vars.size(); ++b)
 			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((d >> b) & 1) != 0, result.delta_vars[b]);
+				((d >> b) & 1) != 0, lit_var(result.delta_vars[b]));
 		bool actual = (result.relation & point) != false;
 		if (actual != expected) {
 			++mismatches;
@@ -1025,13 +1025,13 @@ TEST_SUITE("ocltl_phi_delta: stage1 symbolic (sigma/rho/D only) correctness") {
 			stage1::bddT point = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 			for (size_t b = 0; b < result.sigma_vars.size(); ++b)
 				point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-					((sigma >> b) & 1) != 0, result.sigma_vars[b]);
+					((sigma >> b) & 1) != 0, lit_var(result.sigma_vars[b]));
 			for (size_t b = 0; b < result.rho_vars.size(); ++b)
 				point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-					((rho >> b) & 1) != 0, result.rho_vars[b]);
+					((rho >> b) & 1) != 0, lit_var(result.rho_vars[b]));
 			for (size_t b = 0; b < result.delta_vars.size(); ++b)
 				point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-					((d >> b) & 1) != 0, result.delta_vars[b]);
+					((d >> b) & 1) != 0, lit_var(result.delta_vars[b]));
 			bool actual = (result.relation & point) != false;
 			++checked;
 			if (actual != expected) {

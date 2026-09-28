@@ -52,23 +52,24 @@ tref build_win_formula(
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;
-	const int T1_size = result.T1_size;
+	const size_t T1_size = result.T1_size;
 
 	// Only base product-game states encode valid (q, ρ) pairs.
 	// Stub states (for transition-based edge acceptance) have indices
 	// >= base_n and must be skipped.
-	const int base_n = result.synth_game.num_states * T1_size;
+	const size_t base_n = result.synth_game.num_states * T1_size;
 
 	std::set<int> winning_rhos;
-	for (int s : result.winning_region) {
+	for (size_t s : result.winning_region) {
 		if (s >= base_n) continue;
-		int rho = s % T1_size;
+		// The memory index is the low T₁ part of the product state.
+		int rho = static_cast<int>(s % T1_size);
 		winning_rhos.insert(rho);
 	}
 
 	// Collect all D-patterns reachable from winning ρ values.
 	std::set<int> winning_patterns;
-	for (int t = 0; t < (int)T3.size(); ++t) {
+	for (size_t t = 0; t < T3.size(); ++t) {
 		if (winning_rhos.count(T3[t].pos_m))
 			winning_patterns.insert(type_A[t]);
 	}
@@ -81,9 +82,11 @@ tref build_win_formula(
 		// Build conjunction of atom literals for this pattern.
 		tref conj = nullptr;
 		for (int i = 0; i < K; ++i) {
+			// i is a loop index, so it is a valid atom index here.
+			const auto& atom = atoms[(size_t) i];
 			tref literal = (pat & (1 << i))
-				? atoms[i].first
-				: build_wff_neg<node>(atoms[i].first);
+				? atom.first
+				: build_wff_neg<node>(atom.first);
 			conj = conj ? build_wff_and<node>(conj, literal) : literal;
 		}
 		if (!conj) continue;
@@ -112,16 +115,17 @@ tref build_win0_formula(
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;
-	const int T1_size = result.T1_size;
-	const int q_init = result.synth_game.init;
+	const size_t T1_size = result.T1_size;
+	const size_t q_init = result.synth_game.init;
 	const int rho0 = result.init_rho;
-	if (rho0 < 0 || rho0 >= T1_size) return nullptr;
-	if (!result.winning_region.count(q_init * T1_size + rho0))
+	if (rho0 < 0 || static_cast<size_t>(rho0) >= T1_size) return nullptr;
+	if (!result.winning_region.count(q_init * T1_size
+			+ static_cast<size_t>(rho0)))
 		return nullptr;
 
 	// Collect D-patterns reachable from the fixed initial ρ₀.
 	std::set<int> init_patterns;
-	for (int t = 0; t < (int)T3.size(); ++t) {
+	for (size_t t = 0; t < T3.size(); ++t) {
 		if (T3[t].pos_m == rho0)
 			init_patterns.insert(type_A[t]);
 	}
@@ -133,9 +137,11 @@ tref build_win0_formula(
 	for (int pat : init_patterns) {
 		tref conj = nullptr;
 		for (int i = 0; i < K; ++i) {
+			// i is a loop index, so it is a valid atom index here.
+			const auto& atom = atoms[(size_t) i];
 			tref literal = (pat & (1 << i))
-				? atoms[i].first
-				: build_wff_neg<node>(atoms[i].first);
+				? atom.first
+				: build_wff_neg<node>(atom.first);
 			conj = conj ? build_wff_and<node>(conj, literal) : literal;
 		}
 		if (!conj) continue;
@@ -213,12 +219,12 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 		omcat::collect_qlt_constants<node>(clause_and_update));
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int K = (int)atoms.size();
-	int T1_size = 2 * (int)constants.size() + 1;
+	size_t T1_size = 2 * constants.size() + 1;
 	// LS-11: named cap + a log line when it trips (the silent gate hid
 	// why optimal mode never ran for >= 21 atoms). The cap is qlt's
 	// runtime option `qlt-t3-cap` (qlt_t3_encoding_cap, qlt.h).
 	const int semantic_pwr_max_atoms = qlt_t3_encoding_cap_effective();
-	if (T1_size <= 0 || K <= 0 || K > semantic_pwr_max_atoms) {
+	if (T1_size == 0 || K <= 0 || K > semantic_pwr_max_atoms) {
 		if (K > semantic_pwr_max_atoms)
 			TAU_LOG_DEBUG << "[semantic_pwr] optimal mode skipped: "
 				<< K << " atoms exceed the cap ("

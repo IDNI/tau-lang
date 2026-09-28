@@ -160,7 +160,8 @@ struct bdd_handle {
 
 	static hbdd<B, o> bit(bool b, uint_t v) {
 		DBG(assert(v > 0);)
-		hbdd<B, o> r = get(bdd<B, o>::bit(b ? v : -v));
+		hbdd<B, o> r = get(bdd<B, o>::bit(
+			signed_lit(v, !b)));
 		DBG(assert(r);)
 		return r;
 	}
@@ -224,12 +225,12 @@ struct bdd_handle {
 
 	// Existential quantification of variable v
 	hbdd<B, o> ex(int_t v) const {
-		return get(bdd<B, o>::ex(b, v));
+		return get(bdd<B, o>::ex(b, lit_var(v)));
 	}
 
 	// Universal quantification of variable v
 	hbdd<B, o> all(int_t v) const {
-		return get(bdd<B, o>::all(b, v));
+		return get(bdd<B, o>::all(b, lit_var(v)));
 	}
 
 	// Substitute the function x for variable v
@@ -423,7 +424,8 @@ struct bdd_handle<Bool, o> {
 
 	static hbdd<Bool, o> bit(bool b, uint_t v) {
 		DBG(assert(v > 0);)
-		hbdd<Bool, o> r = get(bdd<Bool, o>::bit(b ? v : -v));
+		hbdd<Bool, o> r = get(bdd<Bool, o>::bit(
+			signed_lit(v, !b)));
 		DBG(assert(r);)
 		return r;
 	}
@@ -452,11 +454,11 @@ struct bdd_handle<Bool, o> {
 	}
 
 	hbdd<Bool, o> ex(int_t v) const {
-		return get(bdd<Bool, o>::ex(b, v));
+		return get(bdd<Bool, o>::ex(b, lit_var(v)));
 	}
 
 	hbdd<Bool, o> all(int_t v) const {
-		return get(bdd<Bool, o>::all(b, v));
+		return get(bdd<Bool, o>::all(b, lit_var(v)));
 	}
 
 	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {

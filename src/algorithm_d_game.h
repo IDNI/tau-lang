@@ -46,15 +46,15 @@ namespace idni::tau_lang::alg_d {
 
 /// @brief Synthesis parity game parsed from `ltlsynt --print-game-hoa`.
 struct synth_game {
-	int num_states = 0;
-	int init       = 0;
+	size_t num_states = 0;
+	size_t init = 0;
 	// player[q]: 0 = env (uncontrollable), 1 = sys (controller)
 	std::vector<int> player;
 	// state_color[q]: color for state-based acceptance (-1 if none)
 	std::vector<int> state_color;
 	// trans[q]: list of (guard_string, next_state, edge_color)
 	// edge_color = -1 if no acceptance mark on this transition
-	std::vector<std::vector<std::tuple<std::string,int,int>>> trans;
+	std::vector<std::vector<std::tuple<std::string,size_t,int>>> trans;
 	std::vector<std::string> aps;
 	std::vector<bool> controllable;
 	// Acceptance info
@@ -216,7 +216,7 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 // back to a partial reading silently widens the guard to `true`.
 
 /// @brief One literal of a guard cube: AP index and polarity.
-struct lit { int ap; bool pos; };
+struct lit { size_t ap; bool pos; };
 /// @brief A cube is a conjunction of literals; the empty cube is true. A DNF
 /// is a vector of cubes; an empty vector == false.
 using cube = std::vector<lit>;   // conjunction; empty cube == true
@@ -307,7 +307,9 @@ struct parser {
 			// Bounded digit run (see eval_atom): a garbled index fails
 			// the parse instead of throwing out of it.
 			if (j - i > 9) { failed = true; return {}; }
-			int ap = std::stoi(s.substr(i, j - i));
+			size_t ap = 0;
+			for (size_t k = i; k < j; ++k)
+				ap = ap * 10 + static_cast<size_t>(s[k] - '0');
 			i = j;
 			return { cube{ lit{ ap, true } } };
 		}
@@ -448,17 +450,33 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 	std::istringstream ss(joined);
 	std::string line;
 	bool in_body = false;
-	int cur_state = -1;
+	// The state whose body block is being read; empty before the first
+	// `State:` line and after a malformed one.
+	std::optional<size_t> cur_state;
 	bool is_buchi = false, is_cobuchi = false, is_all = false;
 	bool is_parity = false, parity_min = false, parity_even = false;
 	std::string acc_cond;   // the condition after the colour count
 
-	auto parse_int_list = [](const std::string& s) {
+	auto parse_int_list = [](const std::string& s) -> result<std::vector<int>> {
+		result<std::vector<int>> pr;
 		std::vector<int> out;
 		std::istringstream is(s);
-		int x;
-		while (is >> x) out.push_back(x);
-		return out;
+		std::string tok;
+		while (is >> tok) {
+			char* end = nullptr;
+			errno = 0;
+			long v = std::strtol(tok.c_str(), &end, 10);
+			// One token is one list entry; a trailing suffix or an
+			// overflow is not an integer.
+			if (end == tok.c_str() || *end != '\0' || errno == ERANGE
+				|| v < INT_MIN || v > INT_MAX)
+				return pr.with_error(code::parse_error,
+					"the synthesis game HOA has a non-integer "
+					"or out-of-range value in a header list",
+					{{label::value, truncate_for_message(tok)}});
+			out.push_back(static_cast<int>(v));
+		}
+		return pr.with_value(std::move(out));
 	};
 
 	while (std::getline(ss, line)) {
@@ -477,7 +495,8 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 						{{label::value, truncate_for_message(
 							line.substr(7))}});
 				}
-				g.num_states = (int) n;
+				// The range check above makes the count fit the id type.
+				g.num_states = static_cast<size_t>(n);
 				g.player.assign(g.num_states, 0);
 				g.state_color.assign(g.num_states, -1);
 				g.state_priority.assign(g.num_states, 0);
@@ -492,7 +511,7 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 						{{label::value, truncate_for_message(
 							line.substr(6))}});
 				}
-				g.init = (int) n;
+				g.init = static_cast<size_t>(n);
 			} else if (line.substr(0,3) == "AP:") {
 				std::istringstream apl(line.substr(3));
 				int n = -1; apl >> n;
@@ -508,16 +527,28 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 						{{label::limit, ltl_max_game_aps},
 						 {label::value, std::to_string(n)}});
 				}
-				g.aps.resize(n);
-				g.controllable.resize(n, false);
-				for (int i = 0; i < n; ++i) {
+				// n passed the range check above; it is the AP count.
+				const size_t n_aps = static_cast<size_t>(n);
+				g.aps.resize(n_aps);
+				g.controllable.resize(n_aps, false);
+				for (size_t i = 0; i < n_aps; ++i) {
 					std::string ap; apl >> ap;
 					if (!ap.empty() && ap.front() == '"') ap = ap.substr(1, ap.size()-2);
 					g.aps[i] = ap;
 				}
 			} else if (line.substr(0,16) == "controllable-AP:") {
-				auto idxs = parse_int_list(line.substr(16));
-				for (int i : idxs) if (i < (int)g.controllable.size()) g.controllable[i] = true;
+				TAU_TRY(auto idxs, parse_int_list(line.substr(16)));
+				for (int i : idxs) {
+					if (i < 0
+						|| static_cast<size_t>(i) >= g.controllable.size())
+						return r.with_error(code::parse_error,
+							"the synthesis game HOA has a "
+							"controllable AP index outside the "
+							"AP table",
+							{{label::value, truncate_for_message(
+								line)}});
+					g.controllable[static_cast<size_t>(i)] = true;
+				}
 			} else if (line.substr(0,17) == "spot.state-player"
 				|| line.substr(0,17) == "spot-state-player") {
 				// "spot.state-player: 0 1 0 1 ..."
@@ -527,8 +558,11 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 				// leaves every state env-owned.
 				size_t colon = line.find(':');
 				if (colon != std::string::npos) {
-					auto players = parse_int_list(line.substr(colon+1));
-					for (int q = 0; q < (int)players.size() && q < g.num_states; ++q)
+					TAU_TRY(auto players,
+						parse_int_list(line.substr(colon+1)));
+					// A player list shorter than the state table is
+					// ordinary; fill only the states it covers.
+					for (size_t q = 0; q < players.size() && q < g.player.size(); ++q)
 						g.player[q] = players[q];
 				}
 			} else if (line.find("acc-name:") != std::string::npos) {
@@ -558,26 +592,41 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 		if (line.substr(0,6) == "State:") {
 			// "State: N" or "State: N {k}" or "State: N {k1 k2}"
 			std::istringstream sl(line.substr(6));
-			sl >> cur_state;
+			long n = -1;
+			sl >> n;
+			const size_t state = static_cast<size_t>(n);
+			if (n < 0 || state >= g.num_states)
+				return r.with_error(code::parse_error,
+					"the synthesis game HOA has a state number "
+					"outside the state table",
+					{{label::value, truncate_for_message(line)}});
+			cur_state = state;
 			// Check for color marks
 			size_t lb = line.find('{');
 			size_t rb = line.find('}');
 			if (lb != std::string::npos && rb != std::string::npos) {
 				std::istringstream cl(line.substr(lb+1, rb-lb-1));
 				int c; cl >> c;
-				if (cur_state < g.num_states) g.state_color[cur_state] = c;
+				g.state_color[*cur_state] = c;
 				if (int more; cl >> more) g.multi_colored = true;
 			}
 			continue;
 		}
-		if (cur_state < 0 || line.front() != '[') continue;
+		if (!cur_state || line.front() != '[') continue;
 
 		// Parse transition: [guard] next_state {optional_color}
 		size_t rb = line.find(']');
 		if (rb == std::string::npos) continue;
 		std::string guard = line.substr(1, rb - 1);
 		std::istringstream tl(line.substr(rb+1));
-		int next; tl >> next;
+		long next_raw = -1;
+		tl >> next_raw;
+		const size_t next = static_cast<size_t>(next_raw);
+		if (next_raw < 0 || next >= g.num_states)
+			return r.with_error(code::parse_error,
+				"the synthesis game HOA has a transition to a "
+				"state outside the state table",
+				{{label::value, truncate_for_message(line)}});
 		// Check for edge acceptance mark
 		int edge_color = -1;
 		size_t elb = line.find('{', rb);
@@ -587,8 +636,7 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 			cl >> edge_color;
 			if (int more; cl >> more) g.multi_colored = true;
 		}
-		if (cur_state < g.num_states)
-			g.trans[cur_state].emplace_back(guard, next, edge_color);
+		g.trans[*cur_state].emplace_back(guard, next, edge_color);
 	}
 
 	// Compute state_priority from acceptance type and colors.
@@ -632,7 +680,10 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 		g.acc_known = empty.has_value();
 		g.acc_accepts_uncolored = empty.value_or(false);
 	}
-	for (int q = 0; q < g.num_states; ++q) {
+	// The state count is non-negative (checked at parse), so it sizes the
+	// priority tables and bounds the loops.
+	const size_t n_states = g.num_states;
+	for (size_t q = 0; q < n_states; ++q) {
 		int c = g.state_color[q];
 		if (is_all)
 			g.state_priority[q] = 1;
@@ -644,10 +695,10 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 			g.state_priority[q] = (c >= 0) ? parity_prio(c) : 0;
 	}
 	// Compute edge priorities similarly
-	g.edge_priority.resize(g.num_states);
-	for (int q = 0; q < g.num_states; ++q) {
+	g.edge_priority.resize(n_states);
+	for (size_t q = 0; q < n_states; ++q) {
 		g.edge_priority[q].resize(g.trans[q].size(), -1);
-		for (int j = 0; j < (int)g.trans[q].size(); ++j) {
+		for (size_t j = 0; j < g.trans[q].size(); ++j) {
 			int ec = std::get<2>(g.trans[q][j]);
 			if (ec < 0) {
 				g.edge_priority[q][j] = -1;
@@ -715,11 +766,11 @@ result<synth_game> call_ltlsynt_game(
 /// @brief Product of the synthesis game with the T_1 memory types (state
 /// index q * T1_size + rho, plus edge stubs for transition acceptance).
 struct product_game {
-	int  n_states = 0;
-	int  init     = 0;
+	size_t n_states = 0;
+	size_t init = 0;
 	std::vector<int> player;
 	std::vector<int> priority;      // state-based (after intermediate conversion)
-	std::vector<std::vector<int>> succs;
+	std::vector<std::vector<size_t>> succs;
 };
 
 /// @brief Parse the disjunct index N from a `d_N` atomic-proposition name.
@@ -737,13 +788,13 @@ inline int d_index_from_ap_name(const std::string& ap) {
 /// @brief Project an AP assignment (bit `i` = truth of AP index `i`) onto the
 /// controllable `d_N` APs: bit `N` of the result is set iff `d_N` is true
 /// in @p assignment. @p K bounds the accepted disjunct indices.
-inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K) {
-	int pat = 0;
-	for (int ap = 0; ap < (int)G.aps.size(); ++ap) {
-		if (ap >= (int)G.controllable.size() || !G.controllable[ap]) continue;
+inline size_t d_pattern_from_assignment(const synth_game& G, int assignment, int K) {
+	size_t pat = 0;
+	for (size_t ap = 0; ap < G.aps.size(); ++ap) {
+		if (ap >= G.controllable.size() || !G.controllable[ap]) continue;
 		if (((assignment >> ap) & 1) == 0) continue;
 		int d = d_index_from_ap_name(G.aps[ap]);
-		if (0 <= d && d < K) pat |= (1 << d);
+		if (0 <= d && d < K) pat |= (size_t{1} << d);
 	}
 	return pat;
 }
@@ -759,26 +810,29 @@ inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K)
  * @param K Number of D propositions.
  * @return Every (D_pattern, assignment) pair the system may pick.
  */
-inline std::vector<std::pair<int,int>> sys_choices(const synth_game& G, int K) {
-	const int n_aps = (int)G.aps.size();
-	std::vector<int> ap_of_d(K, -1);
-	std::vector<int> other_aps;
-	for (int ap = 0; ap < n_aps; ++ap) {
-		const bool ctrl = ap < (int)G.controllable.size() && G.controllable[ap];
+inline std::vector<std::pair<size_t,int>> sys_choices(const synth_game& G, int K) {
+	// K is a non-negative proposition count, so it sizes the table.
+	const size_t K_sz = static_cast<size_t>(K);
+	std::vector<std::optional<size_t>> ap_of_d(K_sz);
+	std::vector<size_t> other_aps;
+	for (size_t ap = 0; ap < G.aps.size(); ++ap) {
+		const bool ctrl = ap < G.controllable.size()
+			&& G.controllable[ap];
 		const int d = ctrl ? d_index_from_ap_name(G.aps[ap]) : -1;
-		if (0 <= d && d < K) ap_of_d[d] = ap;
+		// d is a D-pattern bit position; the table takes its index form.
+		if (0 <= d && d < K) ap_of_d[static_cast<size_t>(d)] = ap;
 		else other_aps.push_back(ap);
 	}
 	const int n_other = (int)other_aps.size();
-	std::vector<std::pair<int,int>> out;
-	out.reserve((size_t)(1 << K) << n_other);
-	for (int D_pat = 0; D_pat < (1 << K); ++D_pat)
+	std::vector<std::pair<size_t,int>> out;
+	out.reserve((size_t{1} << K) << n_other);
+	for (size_t D_pat = 0; D_pat < (size_t{1} << K); ++D_pat)
 		for (int o = 0; o < (1 << n_other); ++o) {
 			int a = 0;
-			for (int i = 0; i < K; ++i)
-				if (((D_pat >> i) & 1) && ap_of_d[i] >= 0)
-					a |= 1 << ap_of_d[i];
-			for (int t = 0; t < n_other; ++t)
+			for (size_t i = 0; i < K_sz; ++i)
+				if (((D_pat >> i) & 1) && ap_of_d[i])
+					a |= 1 << *ap_of_d[i];
+			for (size_t t = 0; t < other_aps.size(); ++t)
 				if ((o >> t) & 1) a |= 1 << other_aps[t];
 			out.emplace_back(D_pat, a);
 		}
@@ -849,13 +903,16 @@ inline int initial_memory(const std::vector<omcat::rational>& sorted_constants) 
  */
 inline result<product_game> build_product_game(
 	const synth_game& G,
-	int T1_size,
+	size_t T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,   // D-bitmask per T3 type
 	int K,                             // number of D propositions
-	int init_rho)                      // initial memory, from initial_memory()
+	int_t init_rho)                    // initial memory, from initial_memory()
 {
 	result<product_game> r;
+	// The product state id is q * T1_size + rho, so |T_1| and the memory
+	// position share the state id's size_t. A D-pattern is a bitmask and
+	// stays int.
 	const int n_aps = (int)G.aps.size();
 	// The assignment loops below shift `1 << n_aps`; the parser already
 	// refuses such a game, this guards games built by hand (tests, the
@@ -871,13 +928,27 @@ inline result<product_game> build_product_game(
 	// Fast feasibility lookup: given (pos_m, pos_y, D_pattern), does any T3 type match?
 	// Index: rho * T1_size * (2^K) + rho_prime * (2^K) + D_pattern  → bool
 	const int A_max = 1 << K;
+	const size_t a_max = static_cast<size_t>(A_max);
 	std::vector<std::vector<std::vector<bool>>> feasible(
 		T1_size,
-		std::vector<std::vector<bool>>(T1_size, std::vector<bool>(A_max, false)));
-	for (int t = 0; t < (int)T3.size(); ++t) {
-		int pm = T3[t].pos_m, py = T3[t].pos_y;
-		if (pm < T1_size && py < T1_size && type_A[t] < A_max)
-			feasible[pm][py][type_A[t]] = true;
+		std::vector<std::vector<bool>>(T1_size,
+			std::vector<bool>(a_max, false)));
+	// A qlt position and a D-pattern are non-negative by construction; the
+	// table index takes that form here once.
+	auto feasible_at = [&](size_t pos_m, size_t pos_y, size_t d_pat) {
+		return feasible[pos_m][pos_y][d_pat];
+	};
+	for (size_t t = 0; t < T3.size(); ++t) {
+		// A qlt position and a D-pattern are non-negative by
+		// construction; reject a negative one before the conversion.
+		const int_t pm = T3[t].pos_m;
+		const int_t py = T3[t].pos_y;
+		if (pm < 0 || py < 0
+			|| !std::cmp_less(pm, T1_size) || !std::cmp_less(py, T1_size)
+			|| type_A[t] < 0 || type_A[t] >= A_max)
+				continue;
+		feasible_at(static_cast<size_t>(pm), static_cast<size_t>(py),
+			static_cast<size_t>(type_A[t])) = true;
 	}
 
 	// Batch O7: precise environment edges.  An env edge exists only when its
@@ -888,12 +959,13 @@ inline result<product_game> build_product_game(
 	// Filter: an env edge from (q, ρ) exists iff its guard admits an
 	// assignment whose D-pattern is feasible from ρ to SOME ρ' (the memory
 	// still updates on sys moves only, so the env target keeps ρ).
-	auto env_edge_reachable = [&](int rho, const std::string& guard) {
+	auto env_edge_reachable = [&](size_t rho, const std::string& guard) {
 		for (int a = 0; a < (1 << n_aps); ++a) {
 			if (!eval_guard(guard, a, n_aps)) continue;
-			int D_pat = d_pattern_from_assignment(G, a, K);
-			for (int rp = 0; rp < T1_size; ++rp)
-				if (feasible[rho][rp][D_pat]) return true;
+			const size_t D_pat = d_pattern_from_assignment(G, a, K);
+			for (size_t rp = 0; rp < T1_size; ++rp)
+				if (feasible_at(rho, rp, D_pat))
+					return true;
 		}
 		return false;
 	};
@@ -906,28 +978,32 @@ inline result<product_game> build_product_game(
 	// For simplicity: if all trans have edge_priority = -1 (state-based acceptance),
 	// we skip the intermediate layer entirely.
 	bool need_edge_layer = false;
-	for (int q = 0; q < G.num_states && !need_edge_layer; ++q)
+	for (size_t q = 0; q < G.num_states && !need_edge_layer; ++q)
 		for (int p : G.edge_priority[q])
 			if (p >= 0) { need_edge_layer = true; break; }
 
 	// Count intermediate states: one per (q, rho, trans_idx) with edge priority
 	// Intermediate state id = base + offset
 	struct edge_stub {
-		int q, rho, trans_idx, next_q, next_rho;
+		size_t q;
+		size_t rho;
+		size_t trans_idx;
+		size_t next_q;
+		size_t next_rho;
 		int priority;
 		int player; // pass-through to next_q's player (doesn't matter, single succ)
 	};
 	std::vector<edge_stub> stubs;
 	// Map (q, rho, trans_idx) → stub_id
-	std::map<std::tuple<int,int,int>, int> stub_map;
+	std::map<std::tuple<size_t,size_t,size_t>, size_t> stub_map;
 
-	const int base_n = G.num_states * T1_size;
-	int stub_base = base_n;
+	const size_t base_n = G.num_states * T1_size;
+	size_t stub_base = base_n;
 
 	if (need_edge_layer) {
-		for (int q = 0; q < G.num_states; ++q) {
-			for (int rho = 0; rho < T1_size; ++rho) {
-				for (int j = 0; j < (int)G.trans[q].size(); ++j) {
+		for (size_t q = 0; q < G.num_states; ++q) {
+			for (size_t rho = 0; rho < T1_size; ++rho) {
+				for (size_t j = 0; j < G.trans[q].size(); ++j) {
 					int ep = G.edge_priority[q][j];
 					if (ep < 0) continue; // no edge color, skip
 					const auto& [guard, next_q, edge_col] = G.trans[q][j];
@@ -946,7 +1022,7 @@ inline result<product_game> build_product_game(
 						if (stub_map.find(key)
 							== stub_map.end()) {
 							stub_map[key] = stub_base
-								+ (int)stubs.size();
+								+ stubs.size();
 							stubs.push_back({q, rho,
 								j, next_q, rho,
 								ep, 0});
@@ -956,11 +1032,12 @@ inline result<product_game> build_product_game(
 					// Sys: picks D_pattern by AP name, picks rho'.
 					for (const auto& [D_pat, a] : sys_choices(G, K)) {
 						if (!eval_guard(guard, a, n_aps)) continue;
-						for (int rp = 0; rp < T1_size; ++rp) {
-							if (!feasible[rho][rp][D_pat]) continue;
+						for (size_t rp = 0; rp < T1_size; ++rp) {
+							if (!feasible_at(rho, rp, D_pat))
+								continue;
 							auto key = std::make_tuple(q * T1_size + rho, j, rp);
 							if (stub_map.find(key) == stub_map.end()) {
-								stub_map[key] = stub_base + (int)stubs.size();
+								stub_map[key] = stub_base + stubs.size();
 								stubs.push_back({q, rho, j, next_q, rp, ep, 0});
 							}
 						}
@@ -972,57 +1049,58 @@ inline result<product_game> build_product_game(
 	}
 
 	product_game pg;
-	pg.n_states = base_n + (int)stubs.size();
+	pg.n_states = base_n + stubs.size();
 	// LG-12: the initial memory is the caller-supplied fixed convention
 	// (see initial_memory above) — not position 0, not a solver choice.
 	// Out of range is a caller bug (assert); in Release the bad index is
 	// left as-is, which downstream membership tests read as UNREALIZABLE —
 	// fail-safe, unlike a silent clamp back to the old position-0 phantom.
-	assert(0 <= init_rho && init_rho < T1_size);
-	pg.init = G.init * T1_size + init_rho;
+	assert(0 <= init_rho && static_cast<size_t>(init_rho) < T1_size);
+	pg.init = G.init * T1_size + static_cast<size_t>(init_rho);
 	pg.player.assign(pg.n_states, 0);
 	pg.priority.assign(pg.n_states, 0);
 	pg.succs.resize(pg.n_states);
 
 	// Fill base states
-	for (int q = 0; q < G.num_states; ++q) {
-		for (int rho = 0; rho < T1_size; ++rho) {
-			int s = q * T1_size + rho;
+	for (size_t q = 0; q < G.num_states; ++q) {
+		for (size_t rho = 0; rho < T1_size; ++rho) {
+			const size_t s = q * T1_size + rho;
 			pg.player[s]   = G.player[q];
 			pg.priority[s] = G.state_priority[q]; // overridden by edge stubs if needed
 		}
 	}
 
 	// Fill intermediate (stub) states
-	for (int i = 0; i < (int)stubs.size(); ++i) {
-		int s = stub_base + i;
+	for (size_t i = 0; i < stubs.size(); ++i) {
+		const size_t s = stub_base + i;
 		pg.player[s]   = 0; // pass-through: single successor, player irrelevant
 		pg.priority[s] = stubs[i].priority;
 	}
 
 	// Build transitions
-	for (int q = 0; q < G.num_states; ++q) {
-		for (int rho = 0; rho < T1_size; ++rho) {
-			int s = q * T1_size + rho;
+	for (size_t q = 0; q < G.num_states; ++q) {
+		for (size_t rho = 0; rho < T1_size; ++rho) {
+			const size_t s = q * T1_size + rho;
 
 			if (G.player[q] == 1) {
 				// Sys: enumerate D-patterns, not raw AP assignments
 				for (const auto& [D_pat, a] : sys_choices(G, K)) {
 					// Find matching transition in game
-					for (int j = 0; j < (int)G.trans[q].size(); ++j) {
+					for (size_t j = 0; j < G.trans[q].size(); ++j) {
 						const auto& [guard, nq, ec] = G.trans[q][j];
 						if (!eval_guard(guard, a, n_aps)) continue;
 
 						int ep = G.edge_priority[q][j];
-						for (int rp = 0; rp < T1_size; ++rp) {
-							if (!feasible[rho][rp][D_pat]) continue;
-							int dest = nq * T1_size + rp;
+						for (size_t rp = 0; rp < T1_size; ++rp) {
+							if (!feasible_at(rho, rp, D_pat))
+								continue;
+							size_t dest = nq * T1_size + rp;
 							if (ep >= 0) {
 								// Use stub for edge priority
 								auto key = std::make_tuple(q * T1_size + rho, j, rp);
 								auto it = stub_map.find(key);
 								if (it != stub_map.end()) {
-									int stub = it->second;
+									size_t stub = it->second;
 									// s → stub → dest (if not already added)
 									auto& succs_s = pg.succs[s];
 									if (std::find(succs_s.begin(), succs_s.end(), stub) == succs_s.end())
@@ -1046,7 +1124,7 @@ inline result<product_game> build_product_game(
 				// output APs, and its edges are filtered by the
 				// same T3 feasibility the sys edges use, since a
 				// guard's data content is player-independent.
-				for (int j = 0; j < (int)G.trans[q].size(); ++j) {
+				for (size_t j = 0; j < G.trans[q].size(); ++j) {
 					const auto& [guard, nq, ec] = G.trans[q][j];
 					// Only edges whose D-content is
 					// feasible from rho exist for the real
@@ -1054,12 +1132,12 @@ inline result<product_game> build_product_game(
 					if (!env_edge_reachable(rho, guard))
 						continue;
 					int ep = G.edge_priority[q][j];
-					int dest = nq * T1_size + rho;
+					size_t dest = nq * T1_size + rho;
 					if (ep >= 0) {
 						auto key = std::make_tuple(q * T1_size + rho, j, rho);
 						auto it = stub_map.find(key);
 						if (it != stub_map.end()) {
-							int stub = it->second;
+							size_t stub = it->second;
 							auto& ss = pg.succs[s];
 							if (std::find(ss.begin(), ss.end(), stub) == ss.end())
 								ss.push_back(stub);
@@ -1086,31 +1164,31 @@ inline result<product_game> build_product_game(
 namespace zielonka_impl {
 
 /// @brief Set of product-game state indices.
-using StateSet = std::set<int>;
+using StateSet = std::set<size_t>;
 
 /// @brief Attractor of @p T for player @p p over the given successor
 /// relation (standard backward closure).
 static StateSet attractor(
 	int p,               // attracting player (0 or 1)
 	const StateSet& T,
-	int n,
+	size_t n,
 	const std::vector<int>& plr,
-	const std::vector<std::vector<int>>& succs)
+	const std::vector<std::vector<size_t>>& succs)
 {
 	// Build predecessor lists
-	std::vector<std::vector<int>> preds(n);
-	for (int u = 0; u < n; ++u)
-		for (int v : succs[u]) preds[v].push_back(u);
+	std::vector<std::vector<size_t>> preds(n);
+	for (size_t u = 0; u < n; ++u)
+		for (size_t v : succs[u]) preds[v].push_back(u);
 
 	// degree[u] = number of successors of u NOT yet in the attractor
-	std::vector<int> deg(n);
-	for (int u = 0; u < n; ++u) deg[u] = (int)succs[u].size();
+	std::vector<size_t> deg(n);
+	for (size_t u = 0; u < n; ++u) deg[u] = succs[u].size();
 
 	StateSet attr(T);
-	std::vector<int> queue(T.begin(), T.end());
+	std::vector<size_t> queue(T.begin(), T.end());
 	while (!queue.empty()) {
-		int v = queue.back(); queue.pop_back();
-		for (int u : preds[v]) {
+		size_t v = queue.back(); queue.pop_back();
+		for (size_t u : preds[v]) {
 			if (attr.count(u)) continue;
 			if (plr[u] == p) {
 				// p can choose to go to v ∈ attr
@@ -1133,17 +1211,17 @@ static StateSet attractor(
 /// are decided by the caller, not here (see the NOTE in the body).
 static std::pair<StateSet,StateSet> solve(
 	const StateSet& V,
-	int n,
+	size_t n,
 	const std::vector<int>& plr,
 	const std::vector<int>& pri,
-	const std::vector<std::vector<int>>& succs)
+	const std::vector<std::vector<size_t>>& succs)
 {
 	if (V.empty()) return {{},{}};
 
 	// Restrict game to V
-	std::vector<std::vector<int>> succs_V(n);
-	for (int u : V)
-		for (int v : succs[u])
+	std::vector<std::vector<size_t>> succs_V(n);
+	for (size_t u : V)
+		for (size_t v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
 	// NOTE on dead ends (LG-32 / Batch O7): they are decided ONCE, BEFORE
@@ -1155,17 +1233,17 @@ static std::pair<StateSet,StateSet> solve(
 	// game handed to the top-level solve call has no dead ends at all.
 
 	int c_max = -1;
-	for (int u : V) c_max = std::max(c_max, pri[u]);
+	for (size_t u : V) c_max = std::max(c_max, pri[u]);
 	if (c_max < 0) return {{},{}};
 
 	StateSet A;
-	for (int u : V) if (pri[u] == c_max) A.insert(u);
+	for (size_t u : V) if (pri[u] == c_max) A.insert(u);
 
 	int beneficiary = c_max % 2; // 0=even→env wins, 1=odd→sys wins
 	StateSet X = attractor(beneficiary, A, n, plr, succs_V);
 	// Sub-game on V \ X
 	StateSet V2;
-	for (int u : V) if (!X.count(u)) V2.insert(u);
+	for (size_t u : V) if (!X.count(u)) V2.insert(u);
 	auto [W0p, W1p] = solve(V2, n, plr, pri, succs);
 
 	// W_{1-b} in the sub-game
@@ -1177,23 +1255,23 @@ static std::pair<StateSet,StateSet> solve(
 	}
 	StateSet Y = attractor(1 - beneficiary, Wl, n, plr, succs_V);
 	StateSet V3;
-	for (int u : V) if (!Y.count(u)) V3.insert(u);
+	for (size_t u : V) if (!Y.count(u)) V3.insert(u);
 	auto [W0pp, W1pp] = solve(V3, n, plr, pri, succs);
 	// Standard Zielonka: the opponent (player 1-b) wins on Y — the states from
 	// which it can force the play into its sub-game winning set W'_{1-b} — plus
 	// whatever it wins in the remaining sub-game V \ Y.  The beneficiary keeps
 	// only its own share of that sub-game.
 	StateSet W_1b_full = Y;
-	for (int u : Wl) W_1b_full.insert(u);
+	for (size_t u : Wl) W_1b_full.insert(u);
 	// W_1b_full is the opponent's region, so it collects the opponent's wins
 	// in the residual subgame and is returned in the opponent's slot
 	if (beneficiary == 1) {
 		// opponent is player 0
-		for (int u : W0pp) W_1b_full.insert(u);
+		for (size_t u : W0pp) W_1b_full.insert(u);
 		return {W_1b_full, W1pp};
 	} else {
 		// opponent is player 1
-		for (int u : W1pp) W_1b_full.insert(u);
+		for (size_t u : W1pp) W_1b_full.insert(u);
 		return {W0pp, W_1b_full};
 	}
 }
@@ -1223,19 +1301,19 @@ static std::pair<StateSet,StateSet> solve(
  * @param pg Product game to solve.
  * @return Indices of the product states won by player 1.
  */
-inline std::set<int> zielonka_win_player1(const product_game& pg) {
-	std::set<int> V;
-	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
+inline std::set<size_t> zielonka_win_player1(const product_game& pg) {
+	std::set<size_t> V;
+	for (size_t s = 0; s < pg.n_states; ++s) V.insert(s);
 
 	// Attractor of `target` for player `p` within the CURRENT V.
-	auto attractor = [&](int p, std::set<int> target) {
+	auto attractor = [&](int p, std::set<size_t> target) {
 		for (bool changed = true; changed; ) {
 			changed = false;
-			for (int u : V) {
+			for (size_t u : V) {
 				if (target.count(u)) continue;
 				bool add = false;
 				if (pg.player[u] == p) {
-					for (int v : pg.succs[u])
+					for (size_t v : pg.succs[u])
 						if (V.count(v)
 							&& target.count(v)) {
 							add = true;
@@ -1243,7 +1321,7 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 						}
 				} else {
 					bool any = false, all = true;
-					for (int v : pg.succs[u]) {
+					for (size_t v : pg.succs[u]) {
 						if (!V.count(v)) continue;
 						any = true;
 						if (!target.count(v)) {
@@ -1262,12 +1340,12 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 		return target;
 	};
 
-	std::set<int> W1acc;   // sys wins (env dead ends + sys attractor)
+	std::set<size_t> W1acc;   // sys wins (env dead ends + sys attractor)
 	for (;;) {
-		std::set<int> d_sys, d_env;
-		for (int u : V) {
+		std::set<size_t> d_sys, d_env;
+		for (size_t u : V) {
 			bool any = false;
-			for (int v : pg.succs[u])
+			for (size_t v : pg.succs[u])
 				if (V.count(v)) { any = true; break; }
 			if (!any)
 				(pg.player[u] == 1 ? d_sys : d_env).insert(u);
@@ -1276,10 +1354,10 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 		if (!d_sys.empty()) {
 			// Sys stuck: env wins the attractor.  (Not accumulated:
 			// only W1 is returned.)
-			for (int u : attractor(0, d_sys)) V.erase(u);
+			for (size_t u : attractor(0, d_sys)) V.erase(u);
 			continue;   // removal may create new dead ends
 		}
-		for (int u : attractor(1, d_env)) {
+		for (size_t u : attractor(1, d_env)) {
 			W1acc.insert(u);
 			V.erase(u);
 		}
@@ -1320,14 +1398,14 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
  */
 inline result<bool> solve_algorithm_d(
 	const std::string& phi_star,
-	int T1_size,
+	size_t T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K,
-	int init_rho)
+	int_t init_rho)
 {
 	result<bool> r;
-	if (phi_star.empty() || T1_size <= 0) { return r.with_value(false); }
+	if (phi_star.empty() || T1_size == 0) { return r.with_value(false); }
 
 	// Build list of D propositions as output
 	std::vector<std::string> D_outs;
@@ -1355,16 +1433,16 @@ inline result<bool> solve_algorithm_d(
 /// the games it was computed on (consumed by semantic PWR).
 struct alg_d_result {
 	bool realizable = false;
-	std::set<int> winning_region;     // W1 state indices in product game
+	std::set<size_t> winning_region; // W1 state indices in product game
 	struct product_game product_game;
 	struct synth_game synth_game;
-	int T1_size = 0;
+	size_t T1_size = 0;
 	int K = 0;                        // number of D propositions
 	// The FIXED initial memory type (LG-12 convention (F), equal to the
 	// initial_memory() argument) when realizable; -1 if unrealizable.
 	// Consistent with product_game.init by construction:
 	// product_game.init == synth_game.init * T1_size + init_rho.
-	int init_rho = -1;
+	int_t init_rho = -1;
 };
 
 /**
@@ -1386,18 +1464,18 @@ struct alg_d_result {
  */
 inline result<alg_d_result> solve_algorithm_d_full(
 	const std::string& phi_star,
-	int T1_size,
+	size_t T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K,
-	int init_rho)
+	int_t init_rho)
 {
 	result<alg_d_result> r;
 	alg_d_result result;
 	result.T1_size = T1_size;
 	result.K = K;
 
-	if (phi_star.empty() || T1_size <= 0) { return r.with_value(std::move(result)); }
+	if (phi_star.empty() || T1_size == 0) { return r.with_value(std::move(result)); }
 
 	std::vector<std::string> D_outs;
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));

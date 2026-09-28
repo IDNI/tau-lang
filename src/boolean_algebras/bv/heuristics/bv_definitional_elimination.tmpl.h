@@ -314,10 +314,13 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 				if (prop_unsat(Ds)) { chosen = idx; break; }
 				// next combination
 				int k = static_cast<int>(s) - 1;
-				while (k >= 0 && idx[k] == n - s + k) --k;
+				// k is non-negative at each idx access; the vector is indexed by size_t.
+				while (k >= 0 && idx[static_cast<size_t>(k)]
+						== n - s + static_cast<size_t>(k)) --k;
 				if (k < 0) break;
-				++idx[k];
-				for (size_t j = k + 1; j < s; ++j) idx[j] = idx[j - 1] + 1;
+				++idx[static_cast<size_t>(k)];
+				for (size_t j = static_cast<size_t>(k) + 1; j < s; ++j)
+					idx[j] = idx[j - 1] + 1;
 			}
 		}
 		// no total definition in this scope
@@ -430,8 +433,9 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 		}
 		// every remaining definition mentions another one: nothing to do
 		if (pick < 0) break;
-		const binder bx = defs[pick].first;
-		const def d = defs[pick].second;
+		// pick is in range after the guard above; defs is indexed by size_t.
+		const binder bx = defs[static_cast<size_t>(pick)].first;
+		const def d = defs[static_cast<size_t>(pick)].second;
 		auto decline = [&](const char* why) {
 			LOG_DEBUG << "[bv_definitional_elimination] " << why << ", keeping "
 				<< LOG_FM(bx.var) << "\n";

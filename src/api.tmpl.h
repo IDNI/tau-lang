@@ -44,7 +44,7 @@ void tau_init() {
 template <NodeType node>
 tref get_update(interpreter<node>& i, const assignment<node>& output) {
 	auto update_stream = build_out_var_at_n<node>(
-		"u", static_cast<int_t>(i.time_point - 1), get_ba_type_id<node>(tau_type<node>()));
+		"u", i.time_point - 1, get_ba_type_id<node>(tau_type<node>()));
 	// Update only if u is of type tau
 	if (size_t t = i.ctx.type_of(update_stream);
 		t != 0 && t == get_ba_type_id<node>(tau_type<node>()))

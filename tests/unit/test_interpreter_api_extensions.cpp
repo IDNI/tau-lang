@@ -114,7 +114,7 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		REQUIRE(first.has_value());
 		auto s1_r = i->current_state();
 		REQUIRE(s1_r.has_value());
-		const int s1 = s1_r.value();
+		const size_t s1 = s1_r.value();
 		REQUIRE(i->reset().has_value());
 		REQUIRE(i->time_point == 0);
 		CHECK(i->memory.empty());
@@ -177,7 +177,7 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
 		auto traces = i->boundary_traces(5);
-		REQUIRE((int)traces.size() <= 5);
+		REQUIRE(traces.size() <= 5);
 		// Each trace is non-empty.
 		for (const auto& t : traces) REQUIRE_FALSE(t.empty());
 	}

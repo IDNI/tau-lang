@@ -770,7 +770,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 			bv cte = solver.getValue(bv_var);
 			s.emplace(tau::get(tau::bf, tau_var),
 				tau::get(tau::bf, tau::get_ba_constant(cte,
-					bv_type<node>(static_cast<unsigned short>(cte.getSort().getBitVectorSize())))));
+					bv_type<node>(cte.getSort().getBitVectorSize()))));
 		}
 		return s;
 	}

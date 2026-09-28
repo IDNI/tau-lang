@@ -42,7 +42,7 @@ tref term_boole_decomposition(tref term, tref var) {
 using boole_memo_t = std::vector<std::unordered_map<tref, tref>>;
 
 template<NodeType node>
-result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs, boole_memo_t& memo);
 
 // Note: Recursion depth is bound by the number of variables, which should
@@ -58,21 +58,21 @@ result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const in
  * @return The resulting Boole decomposition
  */
 template<NodeType node>
-result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs = false) {
 	boole_memo_t memo(vars.size() + 1);
 	return rec_term_boole_decomposition<node>(term, vars, idx, free_funcs, memo);
 }
 
 template<NodeType node>
-result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs, boole_memo_t& memo) {
 	using tau = tree<node>;
 	result<tref> r;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
 	if (tau::get(term).equals_0()) return r.with_value(term);
 	if (tau::get(term).equals_1()) return r.with_value(term);
-	if (idx == (int_t)vars.size()) {
+	if (idx == vars.size()) {
 		if (!free_funcs) {
 			TAU_TRY(tref nterm, normalize_ba<node>(term));
 			term = nterm;
@@ -130,7 +130,7 @@ result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, con
 // same sub-term recurs at the same level whenever the function has shared
 // cofactors (x1 ^ ... ^ xn has only two distinct ones per level).
 template<NodeType node>
-result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs, boole_memo_t& memo) {
 	using tau = tree<node>;
 	result<tref> r;
@@ -245,21 +245,21 @@ result<tref> term_boole_decomposition(tref term) {
  * @return The resulting Boole decomposition
  */
 template<NodeType node>
-tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx,
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
 	boole_memo_t& memo);
 
 template<NodeType node>
-tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx) {
 	boole_memo_t memo(vars.size() + 1);
 	return rec_boole_decomposition<node>(formula, vars, idx, memo);
 }
 
 template<NodeType node>
-tref rec_boole_decomposition_step(tref formula, const trefs& vars, const int_t idx,
+tref rec_boole_decomposition_step(tref formula, const trefs& vars, const size_t idx,
 	boole_memo_t& memo) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(formula) << "\n";)
-	if (idx == (int_t)vars.size()) {
+	if (idx == vars.size()) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
 		return formula;
 	}
@@ -296,7 +296,7 @@ tref rec_boole_decomposition_step(tref formula, const trefs& vars, const int_t i
 
 // Memoized on (formula, idx); see rec_term_boole_decomposition.
 template<NodeType node>
-tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx,
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
 	boole_memo_t& memo) {
 	using tau = tree<node>;
 	if (tau::get(formula).equals_F()) return formula;

@@ -50,7 +50,7 @@ result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(augend));
 
-	auto carry = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto carry = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_carry = tau::get(tau::bf, carry);
 	aux.push_back(carry);
 
@@ -121,7 +121,7 @@ result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(minuend));
 	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
-	auto borrow = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_borrow = tau::get(tau::bf, borrow);
 	aux.push_back(borrow);
 
@@ -194,7 +194,7 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
 
 	auto shift_count = [&](size_t i) {
 		typename node::constant c = { make_bitvector_value(bitwidth, i) };
-		return tau::build_bf_ba_constant(c, bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+		return tau::build_bf_ba_constant(c, bv_type_id<node>(bitwidth));
 	};
 
 	// single summand: constrain the product directly
@@ -213,7 +213,7 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
 	trefs terms;
 	for (size_t i : bits) {
 		if (i == 0) { terms.push_back(multiplicand); continue; }
-		auto shifted = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+		auto shifted = tau::build_variable(bv_type_id<node>(bitwidth));
 		auto bf_shifted = tau::get(tau::bf, shifted);
 		aux.push_back(shifted);
 		TAU_TRY(auto shifted_c, bvshl<node>(multiplicand, shift_count(i),
@@ -230,7 +230,7 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
 		if (k + 1 == terms.size()) out = product;
 		else {
 			auto partial = tau::build_variable(
-				bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+				bv_type_id<node>(bitwidth));
 			out = tau::get(tau::bf, partial);
 			aux.push_back(partial);
 		}
@@ -297,7 +297,7 @@ static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 	// division by zero falls back to the solver semantics
 	if (!divisor_value || *divisor_value == 0) return r.with_value(nullptr);
 
-	auto exact = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_exact = tau::get(tau::bf, exact);
 	aux.push_back(exact);
 
@@ -332,7 +332,7 @@ static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 		typename node::constant c =
 			{ make_bitvector_value(bitwidth, bound) };
 		auto bound_cte = tau::build_bf_ba_constant(c,
-			bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+			bv_type_id<node>(bitwidth));
 		TAU_TRY(auto q_gt_bound, bvgt<node>(quotient, bound_cte));
 		if (!q_gt_bound) return r.with_value(nullptr);
 		conjoin(tau::build_wff_neg(q_gt_bound));
@@ -346,7 +346,7 @@ result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
-	auto remainder = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_remainder = tau::get(tau::bf, remainder);
 	aux.push_back(remainder);
 	return bv_euclidean_constraints<node>(dividend, divisor, quotient,
@@ -362,7 +362,7 @@ result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
-	auto quotient = tau::build_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_quotient = tau::get(tau::bf, quotient);
 	aux.push_back(quotient);
 	return bv_euclidean_constraints<node>(dividend, divisor, bf_quotient,

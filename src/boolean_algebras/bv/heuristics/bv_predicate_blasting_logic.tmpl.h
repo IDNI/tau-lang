@@ -28,7 +28,7 @@ static tref bit_mask_cte(size_t bit, size_t bitwidth) {
 	return tau::get(tau::bf,
 		tau::get_ba_constant(
 			make_bitvector_value(bitwidth, mask),
-			bv_type_id<node>(static_cast<unsigned short>(bitwidth))));
+			bv_type_id<node>(bitwidth)));
 }
 
 //
@@ -91,9 +91,11 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 		return it->second;
 	}
 
-	auto cte = bit_mask_cte<node>(bit, bitwidth);
-	auto base = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
-	auto head = make_bit_call_from_index<node>(base, bit);
+	// bit is a non-negative bit index; both helpers take a size_t.
+	const size_t bit_idx = static_cast<size_t>(bit);
+	auto cte = bit_mask_cte<node>(bit_idx, bitwidth);
+	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bit_call_from_index<node>(base, bit_idx);
 	auto body = tau::build_bf_and( base, cte);
 	auto rule = make_rule<node>(head, body);
 
@@ -142,7 +144,8 @@ result<tref> bit(tref operand, int_t bit) {
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(operand));
 	auto rules = bit_rules<node>(bitwidth);
-	auto call = make_bit_call_from_index<node>(operand, bit);
+	// bit is a non-negative bit index; the helper takes a size_t.
+	auto call = make_bit_call_from_index<node>(operand, static_cast<size_t>(bit));
 	auto rr = make_rr<node>(rules, call);
 	TAU_TRY(auto applied, nso_rr_apply(rr));
 	return r.with_value(applied);
@@ -195,8 +198,8 @@ static result<rewriter::rule> bvshl_by_one_rule(size_t bitwidth) {
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto base = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
-	auto shifted = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto header = make_bvshl_by_one_call<node>(base, shifted);
 	// the rightest bit is zero, the rest of the bits are the same as the
 	// original variable shifted by one. Note that bit<node>(x, static_cast<int_t>(i)) yields the
@@ -274,8 +277,8 @@ static result<rewriter::rule> bvshr_by_one_rule(size_t bitwidth) {
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto base = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
-	auto shifted = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto header = make_bvshr_by_one_call<node>(base, shifted);
 	// the leftest bit is zero, the rest of the bits are the same as the
 	// original variable shifted by one. Bits at different positions are
@@ -375,7 +378,7 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 	}
 
 	auto cte = bit_mask_cte<node>(bit, bitwidth);
-	auto var = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_is_bit_zero_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, cte));
 	auto rule = make_rule<node>(head, body);
@@ -480,7 +483,7 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	}
 
 	auto cte = bit_mask_cte<node>(bit, bitwidth);
-	auto var = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_is_bit_one_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq(tau::build_bf_and(var, cte), cte);
 	auto rule = make_rule<node>(head, body);
@@ -587,8 +590,8 @@ static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
 	// If the shift is greater or equal to the bitwidth, the result is always zero
-	auto base = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
-	auto shifted = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bvshl_call<node>(base, count, shifted);
 	if (offset >= bitwidth) {
 		auto body = tau::build_bf_eq_0(shifted);
@@ -704,8 +707,8 @@ static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 	auto key = std::make_pair(bitwidth, offset);
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
-	auto base = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
-	auto shifted = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bvshr_call<node>(base, count, shifted);
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	if (offset >= bitwidth) {
@@ -828,8 +831,8 @@ static result<rewriter::rule> bvcast_rule(size_t src_width, size_t target_width)
 		return result<rewriter::rule>(it->second);
 	}
 
-	auto src = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(src_width)));
-	auto res = tau::build_bf_variable(bv_type_id<node>(static_cast<unsigned short>(target_width)));
+	auto src = tau::build_bf_variable(bv_type_id<node>(src_width));
+	auto res = tau::build_bf_variable(bv_type_id<node>(target_width));
 	auto head = make_bvcast_call<node>(src, res);
 	auto min_width = std::min(src_width, target_width);
 	tref body = nullptr;

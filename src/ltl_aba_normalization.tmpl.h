@@ -74,8 +74,9 @@ static tref parse_guard_expr(
 		// drop, `[d_0 & r_0 & !r_1]` would parse to
 		// `(d_0_atom) ∧ ⊤ ∧ ¬⊤ = FALSE`, which is exactly the bug
 		// QE-03 / QE-09 / QE-15 etc. tripped over.
-		if (idx >= 0 && idx < (int)aps.size()) {
-			const std::string& ap_name = aps[idx];
+		if (idx >= 0 && std::cmp_less(idx, aps.size())) {
+			// idx was range-checked just above.
+			const std::string& ap_name = aps[static_cast<size_t>(idx)];
 			for (auto& [f, name] : atoms)
 				if (name == ap_name)
 					return neg ? tau::build_wff_neg(f) : f;
@@ -293,8 +294,12 @@ static bool qlt_order_conj_unsat(tref fm) {
 	if (n == 0 || rels.empty()) return false;
 
 	// best[i][j]: 0 = no known relation, 1 = i <= j, 2 = i < j.
-	std::vector<int> best((size_t)n * n, 0);
-	auto at = [&](int i, int j) -> int& { return best[(size_t)i * n + j]; };
+	const size_t n_sz = static_cast<size_t>(n);
+	std::vector<int> best(n_sz * n_sz, 0);
+	auto at = [&](int i, int j) -> int& {
+		// i and j come from idx_of, so both are in [0, n).
+		return best[static_cast<size_t>(i) * n_sz + static_cast<size_t>(j)];
+	};
 	for (auto& [i, j, rel] : rels) {
 		if (rel == 3) {                       // i == j: both directions, ≤
 			at(i, j) = std::max(at(i, j), 1);
@@ -1084,6 +1089,11 @@ static result<void> extend_consistency_positive_k_ary_walk(
 	using tau = tree<node>;
 	result<void> r;
 	const int n = static_cast<int>(atoms.size());
+	// An atom index is always in [0, atoms.size()); this is the one place
+	// it becomes unsigned.
+	auto atom_at = [&](int i) -> const std::pair<tref, std::string>& {
+		return atoms[static_cast<size_t>(i)];
+	};
 
 	// LT-17: the walk performs Θ(2^n) synthesis checks when the atoms are
 	// mostly jointly feasible (supersets of an infeasible set are pruned,
@@ -1108,8 +1118,8 @@ static result<void> extend_consistency_positive_k_ary_walk(
 			// matches the pairwise check's skip condition.
 			bool any_pure_out_lb = false;
 			for (int i : sel) {
-				bool is_mixed = atom_has_any_input<node>(atoms[i].first);
-				bool pure_out_lb = atom_has_lookback<node>(atoms[i].first) && !is_mixed;
+				bool is_mixed = atom_has_any_input<node>(atom_at(i).first);
+				bool pure_out_lb = atom_has_lookback<node>(atom_at(i).first) && !is_mixed;
 				if (pure_out_lb) { any_pure_out_lb = true; break; }
 			}
 			if (any_pure_out_lb) return;
@@ -1136,7 +1146,7 @@ static result<void> extend_consistency_positive_k_ary_walk(
 				std::string pat;
 				for (int i : sel) {
 					if (!pat.empty()) pat += " && ";
-					pat += atoms[i].second;
+					pat += atom_at(i).second;
 				}
 				std::string c = "G(!(" + pat + "))";
 				skeleton += " && " + c;
@@ -1151,7 +1161,7 @@ static result<void> extend_consistency_positive_k_ary_walk(
 		// Skip atom idx.
 		walk(idx + 1, prefix_body, sel);
 		// Include atom idx (positive only).
-		tref new_prefix = tau::build_wff_and(prefix_body, atoms[idx].first);
+		tref new_prefix = tau::build_wff_and(prefix_body, atom_at(idx).first);
 		sel.push_back(idx);
 		walk(idx + 1, new_prefix, sel);
 		sel.pop_back();
@@ -1176,11 +1186,16 @@ static result<void> extend_consistency_positive_k_ary_mus(
 	result<void> r;
 	const int n = static_cast<int>(atoms.size());
 	const uint32_t universe = (1u << n) - 1;
+	// An atom index is always in [0, atoms.size()); this is the one place
+	// it becomes unsigned.
+	auto atom_at = [&](int i) -> const std::pair<tref, std::string>& {
+		return atoms[static_cast<size_t>(i)];
+	};
 
 	auto build_conj = [&](uint32_t mask) {
 		tref body = tau::_T();
 		for (int i = 0; i < n; ++i)
-			if (mask & (1u << i)) body = tau::build_wff_and(body, atoms[i].first);
+			if (mask & (1u << i)) body = tau::build_wff_and(body, atom_at(i).first);
 		return body;
 	};
 	auto for_each_submask = [](uint32_t mask, auto&& f) {
@@ -1240,7 +1255,7 @@ static result<void> extend_consistency_positive_k_ary_mus(
 			for (int i = 0; i < n; ++i) {
 				if (max_set & (1u << i)) continue;
 				if (over_cap()) { warn_capped(); break; }
-				tref grown = tau::build_wff_and(max_conj, atoms[i].first);
+				tref grown = tau::build_wff_and(max_conj, atom_at(i).first);
 				if (feasible_checked(grown)) {
 					max_set |= (1u << i);
 					max_conj = grown;
@@ -1304,15 +1319,15 @@ static result<void> extend_consistency_positive_k_ary_mus(
 		// is F at t=0, which makes such atoms spuriously infeasible under G-wrap.
 		bool any_pure_out_lb = false;
 		for (int i : sel) {
-			bool is_mixed = atom_has_any_input<node>(atoms[i].first);
-			bool pure_out_lb = atom_has_lookback<node>(atoms[i].first) && !is_mixed;
+			bool is_mixed = atom_has_any_input<node>(atom_at(i).first);
+			bool pure_out_lb = atom_has_lookback<node>(atom_at(i).first) && !is_mixed;
 			if (pure_out_lb) { any_pure_out_lb = true; break; }
 		}
 		if (any_pure_out_lb) continue;
 		std::string pat;
 		for (int i : sel) {
 			if (!pat.empty()) pat += " && ";
-			pat += atoms[i].second;
+			pat += atom_at(i).second;
 		}
 		std::string c = "G(!(" + pat + "))";
 		skeleton += " && " + c;
@@ -1368,7 +1383,8 @@ static result<void> extend_consistency_positive_k_ary(
 			};
 			std::vector<int> idxs;
 			for (int i = 0; i < n; ++i) {
-				if (contains_name(c, atoms[i].second))
+				// i is bounded by n, which is atoms.size().
+				if (contains_name(c, atoms[static_cast<size_t>(i)].second))
 					idxs.push_back(i);
 			}
 			if (idxs.size() >= 2) existing_forbid_sets.push_back(std::move(idxs));
@@ -1850,18 +1866,18 @@ static result<std::string> apply_step_counter_encoding(
 	out_max_pos = max_pos;
 
 	const int_t clamp = max_pos + 1; // parked state, held forever past the trace
-	int w = 1;
+	size_t w = 1;
 	while ((int_t(1) << w) < clamp + 1) ++w;
 
 	std::vector<std::string> bits(w);
-	for (int b = 0; b < w; ++b)
+	for (size_t b = 0; b < w; ++b)
 		bits[b] = "o__ltl_ctr" + std::to_string(b) + "__";
 	for (auto& b : bits) output_props.push_back(b);
 	counter_bits = bits;
 
 	auto minterm = [&](int_t value) {
 		std::string body;
-		for (int b = 0; b < w; ++b) {
+		for (size_t b = 0; b < w; ++b) {
 			if (!body.empty()) body += " & ";
 			body += ((value >> b) & 1) ? bits[b] : ("!" + bits[b]);
 		}
@@ -1874,9 +1890,9 @@ static result<std::string> apply_step_counter_encoding(
 
 	// Ripple-carry +1, frozen once the counter reaches `clamp`.
 	std::string is_clamped = minterm(clamp);
-	for (int b = 0; b < w; ++b) {
+	for (size_t b = 0; b < w; ++b) {
 		std::string carry = "1";
-		for (int k = 0; k < b; ++k) carry += " & " + bits[k];
+		for (size_t k = 0; k < b; ++k) carry += " & " + bits[k];
 		std::string incr_bit = "(" + bits[b] + " ^ (" + carry + "))";
 		std::string next_bit = "((" + is_clamped + " & " + bits[b] + ") | "
 		                        "(!(" + is_clamped + ") & " + incr_bit + "))";
@@ -2257,11 +2273,11 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 	if (sol.counter_gated_props.empty() || sol.counter_bits.empty())
 		return r;
 	const auto& aps = sol.aut.aps;
-	std::map<int, int> bit_of; // ap index -> counter bit
-	std::map<int, const std::set<int_t>*> gated; // ap index -> its steps
-	for (int i = 0; i < (int)aps.size(); ++i) {
+	std::map<size_t, size_t> bit_of; // ap index -> counter bit
+	std::map<size_t, const std::set<int_t>*> gated; // ap index -> its steps
+	for (size_t i = 0; i < aps.size(); ++i) {
 		for (size_t b = 0; b < sol.counter_bits.size(); ++b)
-			if (aps[i] == sol.counter_bits[b]) bit_of[i] = (int)b;
+			if (aps[i] == sol.counter_bits[b]) bit_of[i] = b;
 		if (auto g = sol.counter_gated_props.find(aps[i]);
 			g != sol.counter_gated_props.end()) gated[i] = &g->second;
 	}
@@ -2284,7 +2300,7 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 			if (e.guard_label.find('(') != std::string::npos) continue;
 			std::string out;
 			for (auto& cube_txt : split(e.guard_label, '|')) {
-				std::vector<std::pair<int, bool>> lits;
+				std::vector<std::pair<size_t, bool>> lits;
 				std::vector<std::string> keep;
 				bool ok = true;
 				for (auto& l : split(cube_txt, '&')) {
@@ -2294,9 +2310,10 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 					if (num.empty() || !std::all_of(num.begin(), num.end(),
 						[](unsigned char c) { return std::isdigit(c); }))
 							{ if (num != "t" && num != "f") ok = false;
-							  lits.emplace_back(-1, pos); keep.push_back(t);
+							  lits.emplace_back(SIZE_MAX, pos); keep.push_back(t);
 							  continue; }
-					lits.emplace_back(std::stoi(num), pos);
+					lits.emplace_back(
+						static_cast<size_t>(std::stoi(num)), pos);
 					keep.push_back(t);
 				}
 				if (!ok) { out.clear(); break; }
@@ -2327,7 +2344,8 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 					if (free_here[i]) {
 						tref a = nullptr;
 						for (auto& [fm, name] : sol.atoms)
-							if (name == aps[lits[i].first]) { a = fm; break; }
+							if (name == aps[lits[i].first])
+							{ a = fm; break; }
 						if (!a || !rest_fm) continue;
 						tref other = lits[i].second
 							? tree<node>::build_wff_neg(a) : a;
@@ -2508,8 +2526,8 @@ static result<window_oracle_result> window_infeasible_paths(
 		return cr;
 	};
 
-	std::function<result<void>(int, size_t)> dfs =
-		[&](int state, size_t depth) -> result<void> {
+	std::function<result<void>(size_t, size_t)> dfs =
+		[&](size_t state, size_t depth) -> result<void> {
 		result<void> dr;
 		if (cap_hit) return dr;
 		if (depth == (size_t)W) {
@@ -2528,7 +2546,7 @@ static result<window_oracle_result> window_infeasible_paths(
 		}
 		return dr;
 	};
-	for (int s0 = 0; s0 < sol.aut.num_states && !cap_hit; ++s0)
+	for (size_t s0 = 0; s0 < sol.aut.num_states && !cap_hit; ++s0)
 		if (!r.merge_ok(dfs(s0, 0))) return r;
 
 	if (cap_hit) {
@@ -2676,8 +2694,8 @@ static result<strategy_data_verdict> strategy_wins_on_data(
 	result<strategy_data_verdict> r;
 	rounds = 0;
 	const auto& aut = sol.aut;
-	const int k = aut.num_states;
-	if (k <= 0 || aut.initial_state < 0 || aut.initial_state >= k)
+	const size_t k = aut.num_states;
+	if (k == 0 || aut.initial_state >= k)
 		return r.with_value(strategy_data_verdict::undecided);
 
 	auto io_vars_of = [](tref fm) {
@@ -2696,10 +2714,10 @@ static result<strategy_data_verdict> strategy_wins_on_data(
 
 	// The edge guards over the atoms, in the same io_var spelling as the
 	// shifted invariants.
-	std::vector<std::vector<std::pair<tref, int>>> guards(k);
-	for (int s = 0; s < k; ++s)
+	std::vector<std::vector<std::pair<tref, size_t>>> guards(k);
+	for (size_t s = 0; s < k; ++s)
 		for (const auto& e : aut.edges[s]) {
-			if (e.dst < 0 || e.dst >= k)
+			if (e.dst >= k)
 				return r.with_value(
 					strategy_data_verdict::undecided);
 			tref g = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
@@ -2716,7 +2734,7 @@ static result<strategy_data_verdict> strategy_wins_on_data(
 		++rounds;
 		std::vector<tref> next(k);
 		bool changed = false;
-		for (int s = 0; s < k; ++s) {
+		for (size_t s = 0; s < k; ++s) {
 			tref body = tau::_F();
 			for (auto& [g, d] : guards[s])
 				body = tau::build_wff_or(body,
@@ -2874,7 +2892,7 @@ static result<std::vector<std::string>> add_forceability_observations(
 		return false;
 	};
 	const std::vector<std::pair<tref, std::string>> atoms = sol.atoms;
-	for (int s = 0; s < sol.aut.num_states; ++s)
+	for (size_t s = 0; s < sol.aut.num_states; ++s)
 		for (const auto& e : sol.aut.edges[s])
 		{
 		TAU_TRY(auto live, build_guard_live_products<node>(

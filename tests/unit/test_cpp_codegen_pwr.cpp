@@ -191,7 +191,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "pwr_step");
 		REQUIRE(generated.has_value());
 		CHECK(has(*generated, "outputs step(const inputs&"));
-		CHECK(has(*generated, "int state() const"));
+		CHECK(has(*generated, "size_t state() const"));
 		CHECK(has(*generated, "const tau_codegen_detail::strategy& strategy() const"));
 	}
 
@@ -387,7 +387,7 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "  PwrNdebug::inputs in;\n"
 			     "  auto o0 = c.step(in);\n"
 			     "  if (!o0.ok) { std::printf(\"FAIL step0\\n\"); return 1; }\n"
-			     "  int state_before = c.state();\n"
+			     "  size_t state_before = c.state();\n"
 			     "  // initial_state=99 is out of range for a 1-state strategy.\n"
 			     "  PwrNdebug::strategy_type bad;\n"
 			     "  bad.num_states = 1;\n"
@@ -395,7 +395,7 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "  bad.edges.resize(1);\n"
 			     "  if (c.revise(std::move(bad))) { std::printf(\"ACCEPTED_INVALID\\n\"); return 1; }\n"
 			     "  if (c.revision_count() != 0) { std::printf(\"FAIL revcount\\n\"); return 1; }\n"
-			     "  if (c.state() != state_before) { std::printf(\"FAIL state_changed %d\\n\", c.state()); return 1; }\n"
+			     "  if (c.state() != state_before) { std::printf(\"FAIL state_changed %zu\\n\", c.state()); return 1; }\n"
 			     "  auto o1 = c.step(in);\n"
 			     "  if (!o1.ok) { std::printf(\"FAIL step_after_refusal\\n\"); return 1; }\n"
 			     "  // An out-of-range edge dst is refused too (the old asserts\n"

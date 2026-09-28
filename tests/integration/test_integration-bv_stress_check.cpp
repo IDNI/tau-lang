@@ -135,8 +135,11 @@ strings choose_exprs_for_iteration(rng_t& rng, size_t idx,
 {
 	size_t count = base_patterns.size();
 	if (idx <= count) return { base_patterns[idx - 1] };
+	// The offset is non-negative; the iterator takes a difference_type.
 	if (idx <= 2 * count) return strings(base_patterns.begin(),
-		base_patterns.begin() + std::min(idx - count + 1, count));
+		base_patterns.begin()
+			+ static_cast<std::ptrdiff_t>(
+				std::min(idx - count + 1, count)));
 	size_t rand_len = rand_index(rng, std::max<size_t>(3, count / 3), count);
 	return rand_sample(rng, base_patterns, rand_len);
 }
@@ -161,12 +164,14 @@ std::string apply_lookback(rng_t& rng, const std::string& rule,
 	size_t last = 0;
 	for (auto it = begin; it != end; ++it) {
 		const std::smatch& m = *it;
-		out.append(rule, last, m.position() - last);
+		// Both positions are non-negative offsets into `rule`.
+		out.append(rule, last, static_cast<size_t>(
+			m.position() - static_cast<std::ptrdiff_t>(last)));
 		uint64_t k = rand_int(rng, 0, max_lookback);
 		if (k == 0) out.append(m.str());
 		else out.append("i" + m[1].str() + "[t-" + std::to_string(k)
 			+ "]" + m[2].str());
-		last = m.position() + m.length();
+		last = static_cast<size_t>(m.position() + m.length());
 	}
 	out.append(rule, last, std::string::npos);
 	return out;
@@ -218,7 +223,8 @@ std::string build_template_rule(rng_t& rng, strings exprs, size_t idx,
 
 	std::string folded = build_folded_expr(rng, exprs);
 	strings alt_src(exprs.begin(), exprs.begin()
-		+ std::max<size_t>(2, std::min<size_t>(6, exprs.size())));
+		+ static_cast<std::ptrdiff_t>(
+			std::max<size_t>(2, std::min<size_t>(6, exprs.size()))));
 	std::reverse(alt_src.begin(), alt_src.end());
 	std::string alt_folded = build_folded_expr(rng, alt_src);
 
@@ -401,7 +407,7 @@ stress_result run_stress(const stress_config& cfg) {
 	if (!interpreter.has_value()) return res;
 
 	res.started = true;
-	res.steps_executed = interpreter.value().time_point;
+	res.steps_executed = stream_pos(interpreter.value().time_point);
 	res.o1_values = o1->get_values();
 	return res;
 }
@@ -443,7 +449,7 @@ stress_result run_single_rule(const std::string& rule, unsigned short width) {
 	res.rules = { rule };
 	if (!interpreter.has_value()) return res;
 	res.started = true;
-	res.steps_executed = interpreter.value().time_point;
+	res.steps_executed = stream_pos(interpreter.value().time_point);
 	res.o1_values = o1->get_values();
 	return res;
 }

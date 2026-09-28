@@ -386,8 +386,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 	for (auto& fld : d.outputs)
 		if (fld.kind == field_kind::witness)
 			witness_var_of_cpp_name[fld.cpp_name] = fld.prop;
-	for (int s = 0; s < d.num_states; ++s) {
-		if ((size_t)s >= d.edges.size()) break;
+	for (size_t s = 0; s < d.num_states; ++s) {
+		if (s >= d.edges.size()) break;
 		for (auto& e : d.edges[s]) {
 			f << "\tstrat.edges[" << s << "].push_back({{";
 			for (size_t k = 0; k < e.guard.size(); ++k)

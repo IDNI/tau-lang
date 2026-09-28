@@ -123,6 +123,26 @@ size_t node<BAs...>::get_nt() const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+size_t node<BAs...>::get_string_id() const {
+	DBG(assert(tree<node_t>::is_string_nt(nt));)
+	const uint64_t sid = get_data();
+	DBG(assert(sid <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(sid);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t node<BAs...>::get_ba_constant_id() const {
+	DBG(assert(nt == type::ba_constant);)
+	const uint64_t id = get_data();
+	DBG(assert(id <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(id);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
 
 template <typename... BAs>
@@ -159,10 +179,7 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// only option left for ba_constant. This is a determinism fix, not a
 	// hash-primitive choice, so it applies under every policy.
 	if (tree<node>::is_string_nt(nt)) {
-		// dict indexes the string pool with size_t.
-		const size_t lhs = static_cast<size_t>(get_data());
-		const size_t rhs = static_cast<size_t>(that.get_data());
-		return dict(lhs) <=> dict(rhs);
+		return dict(get_string_id()) <=> dict(that.get_string_id());
 	}
 	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
@@ -274,14 +291,11 @@ uint64_t node<BAs...>::hashit() const {
 	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
 	if (nt == type::ba_constant && data != 0) {
 		// A ba_constant payload is a pool index; ba_constants uses size_t.
-		const size_t id = static_cast<size_t>(get_data());
-		hash_ba_constant_data<BAs...>(seed, id);
+		hash_ba_constant_data<BAs...>(seed, get_ba_constant_id());
 	}
 	// Get string from pool
 	else if (tree<node>::is_string_nt(nt)) {
-		// dict indexes the string pool with size_t.
-		const size_t sid = static_cast<size_t>(get_data());
-		hash_combine(seed, dict(sid));
+		hash_combine(seed, dict(get_string_id()));
 	}
 	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;

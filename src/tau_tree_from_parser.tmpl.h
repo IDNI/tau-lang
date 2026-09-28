@@ -141,8 +141,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		auto process_integer = [&ptr, &m_get]() -> int_t {
 			trefs ch = ptr.get_children(); // 1 or 2
 			bool neg = ch.size() == 2;
-			int_t i = static_cast<int_t>( // get data from child 0 or 1)
-				m_get(ch[static_cast<size_t>(neg)]).data());
+			int_t i = get_payload_int<node>( // get data from child 0 or 1
+				m_get(ch[neg]));
 			return neg ? -i : i;
 		};
 
@@ -153,7 +153,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 			const auto& io_definition = tau::get(x);
 			if (auto filename = tt(x) | tau::stream | tau::q_file_name
 					| tau::file_name | tt::ref; filename) {
-				stream_id = tau::get(filename).data();
+				// The stream id is a string-pool id.
+				stream_id = tau::get(filename).get_string_id();
 			}
 
 			DBG(assert(options.context != nullptr));
@@ -226,7 +227,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				// one string.
 				trefs ch;
 				for (tref c : ptr.children()) ch.push_back(c);
-				size_t name_data = m_get(ch[0]).data();
+				// type_name's interned data is a string-pool id.
+				size_t name_data = m_get(ch[0]).get_string_id();
 				x = ch.size() == 2
 					? get(node(nt, name_data, is_term, ba_type),
 						m_ref(ch[1]))

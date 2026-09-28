@@ -117,8 +117,8 @@ TEST_SUITE("[Algorithm B: skeleton builder]") {
 		auto T2 = enumerate_qlt_T2({});
 		auto T3 = enumerate_qlt_T3({});
 		// Build T2 lookup.
-		std::map<std::tuple<int,int,int>, int> t2_lookup;
-		for (int s = 0; s < (int)T2.size(); ++s)
+		std::map<std::tuple<int,int,int>, size_t> t2_lookup;
+		for (size_t s = 0; s < T2.size(); ++s)
 			t2_lookup[{T2[s].pos_m, T2[s].pos_x, (int)T2[s].rel}] = s;
 		// Every T3 type should match some T2 type via (pos_m, pos_x, rel_mx).
 		for (const auto& t3 : T3) {

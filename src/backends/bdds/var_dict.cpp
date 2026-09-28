@@ -55,7 +55,8 @@ result<std::string> var_dict(sym_t n) {
 			++n;
 		} while (true);
 	}
-	return r.with_assert_check_value(v[n]);
+	// The two guards above leave n in range; v is indexed by size_t.
+	return r.with_assert_check_value(v[static_cast<size_t>(n)]);
 }
 
 // std::string convenience overload of the interning function above

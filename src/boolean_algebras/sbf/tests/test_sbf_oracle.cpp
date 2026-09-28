@@ -45,7 +45,7 @@ struct truth_table_solver {
 			out_bits.push_back(tm.mkConst(bs, "o_r" + std::to_string(i)));
 	}
 	// Build the constant Boolean corresponding to the V-expression at this row.
-	static bool eval(int row, const std::vector<int>& term_tt) {
+	static bool eval(size_t row, const std::vector<int>& term_tt) {
 		return term_tt[row] != 0;
 	}
 	// Helper: returns the 8-row truth table of a Boolean expression over V.
@@ -53,7 +53,7 @@ struct truth_table_solver {
 	template<class F>
 	std::vector<int> tt(F fn) {
 		std::vector<int> v(8);
-		for (int r = 0; r < 8; ++r) {
+		for (size_t r = 0; r < 8; ++r) {
 			bool x = (r>>0)&1, y = (r>>1)&1, z = (r>>2)&1;
 			v[r] = fn(x, y, z) ? 1 : 0;
 		}
@@ -62,7 +62,7 @@ struct truth_table_solver {
 	// Constraint: output(V) == expr truth-table.
 	Term output_equals(const std::vector<int>& tt) {
 		std::vector<Term> cs;
-		for (int r = 0; r < 8; ++r) {
+		for (size_t r = 0; r < 8; ++r) {
 			Term rhs = tt[r] ? tm.mkBoolean(true) : tm.mkBoolean(false);
 			cs.push_back(tm.mkTerm(Kind::EQUAL, {out_bits[r], rhs}));
 		}

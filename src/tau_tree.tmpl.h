@@ -984,9 +984,17 @@ const std::string& tree<node>::get_type_name() const {
 template <NodeType node>
 const std::string& tree<node>::get_string() const {
 	DBG(assert(is_string());)
-	// dict indexes the string pool with size_t.
-	const size_t sid = static_cast<size_t>(this->data());
-	return dict(sid);
+	return dict(get_string_id());
+}
+
+template <NodeType node>
+size_t tree<node>::get_string_id() const {
+	DBG(assert(is_string());)
+	// The pool id is stored at full width; size_t indexes the pool.
+	const uint64_t sid = this->data();
+	DBG(assert(sid <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(sid);
 }
 
 template <NodeType node>

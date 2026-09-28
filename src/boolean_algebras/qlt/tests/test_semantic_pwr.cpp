@@ -217,7 +217,7 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 		// T1_size = 1 (one constant: 0), T3 = trivial
 		// This is a basic sanity check for the extended interface.
 		std::string phi_star = "G(d_0)";
-		int T1_size = 1;
+		size_t T1_size = 1;
 		int K = 1;
 		std::vector<omcat::qlt_type3> T3;
 		std::vector<int> type_A;

@@ -351,8 +351,9 @@ static int factored_tau_sat(tref fm) {
 				cn[c].begin(), cn[c].end());
 			cc[base].insert(cc[base].end(),
 				cc[c].begin(), cc[c].end());
-			cn.erase(cn.begin() + c);
-			cc.erase(cc.begin() + c);
+			// c is a bounded container index.
+			erase_at(cn, c);
+			erase_at(cc, c);
 		}
 	}
 	if (cc.size() < 2) return -1;

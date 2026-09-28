@@ -145,7 +145,7 @@ struct fresh_element_ledger {
 	// the generator's mint-time disjoint-from set.
 	void consult([[maybe_unused]] size_t index,
 			[[maybe_unused]] const trefs& exclusion) const {
-		DBG(for (tref e : generators.at(index).disjoint_from)
+		DBG(for ([[maybe_unused]] tref e : generators.at(index).disjoint_from)
 			assert(std::find(exclusion.begin(), exclusion.end(), e)
 				!= exclusion.end());)
 	}

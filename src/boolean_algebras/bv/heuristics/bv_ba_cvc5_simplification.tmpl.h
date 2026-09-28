@@ -39,9 +39,9 @@ tref cvc5_tree_to_tau_tree(bv n,
 		// return the original tau node (bf-wrapped) if it was registered in the var_map
 		if (auto it = var_map.find(cvc5_var); it != var_map.end())
 			return tau::get_typed(tau::bf, it->second,
-				get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(bv_size))));
+				get_ba_type_id<node>(bv_type<node>(bv_size)));
 		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/bv_size: " << bv_size << "\n";)
-		auto result = build_bf_variable<node>(cvc5_var, get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(bv_size))));
+		auto result = build_bf_variable<node>(cvc5_var, get_ba_type_id<node>(bv_type<node>(bv_size)));
 		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/result: " << tau::get(result).tree_to_str() << "\n";)
 		return result;
 	};
@@ -112,7 +112,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 		}
 		case Kind::CONSTANT: return get_var(n);
 		case Kind::CONST_BITVECTOR: return build_bf_ba_constant<node>(n,
-			get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(n.getSort().getBitVectorSize()))));
+			get_ba_type_id<node>(bv_type<node>(n.getSort().getBitVectorSize())));
 
 		case Kind::BITVECTOR_NOT: {
 			auto operand = rec(n[0]);
@@ -125,7 +125,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 			size_t bitwidth = n[0].getSort().getBitVectorSize();
 			typename node::constant one = { make_bitvector_value(bitwidth, 1) };
 			tref one_term = build_bf_ba_constant<node>(one,
-				get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(bitwidth))));
+				get_ba_type_id<node>(bv_type<node>(bitwidth)));
 			return build_bf_add<node>(build_bf_neg<node>(operand), one_term);
 		}
 		case Kind::BITVECTOR_AND: return from_collection(n, build_bf_and<node>);
@@ -163,7 +163,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 			uint32_t extra_bits = n.getOp()[0].getUInt32Value();
 			size_t src_size = n[0].getSort().getBitVectorSize();
 			size_t target_size = src_size + extra_bits;
-			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(target_size))));
+			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 		case Kind::BITVECTOR_EXTRACT: {
 			tref operand = rec(n[0]);
@@ -177,10 +177,10 @@ tref cvc5_tree_to_tau_tree(bv n,
 				size_t src_size = n[0].getSort().getBitVectorSize();
 				typename node::constant shift = { make_bitvector_value(src_size, lo) };
 				tref shift_term = build_bf_ba_constant<node>(shift,
-					get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(src_size))));
+					get_ba_type_id<node>(bv_type<node>(src_size)));
 				operand = build_bf_shr<node>(operand, shift_term);
 			}
-			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(target_size))));
+			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 
 		case Kind::BITVECTOR_CONCAT: {
@@ -193,7 +193,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 			if (!b) return nullptr;
 			uint32_t bw = n[1].getSort().getBitVectorSize();
 			uint32_t rw = n.getSort().getBitVectorSize();
-			size_t tid = get_ba_type_id<node>(bv_type<node>(static_cast<unsigned short>(rw)));
+			size_t tid = get_ba_type_id<node>(bv_type<node>(rw));
 			// If the upper (left) operand is an all-zero constant, this concat is
 			// simply a zero-extension of the lower part to the result width.
 			if (n[0].getKind() == Kind::CONST_BITVECTOR &&

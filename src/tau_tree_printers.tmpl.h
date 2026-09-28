@@ -94,17 +94,20 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 		auto tn = get_ba_type_name<node>(n.ba_type);
 		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
+		// ba_constants indexes its pool with size_t.
+		const size_t cid = n.get_ba_constant_id();
 		if (n.data == 0)
 			os << " { UNPARSED } : " << type_name;
-		else if (auto c = ba_constants<node>::get(n.get_data()); c.has_value())
+		else if (auto c = ba_constants<node>::get(cid); c.has_value())
 			os << " { " << c.value() << " } : " << type_name;
 		// TODO (HIGH) dropped error: ba_constants::get's report -- the stream printer cannot abort the line.
 		else os << " { INVALID } : " << type_name;
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
-	else if (n.nt == tau::uconst_name)
-		os << "<" << dict(n.get_data()) << ">";
-	else if (tau::is_string_nt(n.nt))
-		os << " { \"" << dict(n.get_data()) << "\" }";
+	else if (n.nt == tau::uconst_name) {
+		os << "<" << dict(n.get_string_id()) << ">";
+	} else if (tau::is_string_nt(n.nt)) {
+		os << " { \"" << dict(n.get_string_id()) << "\" }";
+	}
  	// else if (n.ext) os << "{EXT}";
 	if (n.nt == tau::io_var) {
 		if (n.data == 1) os << " IN";
@@ -362,7 +365,8 @@ int_t get_max_var_name_b_id(tref fm) {
 	using tau = tree<node>;
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	int_t id = 0;
@@ -408,7 +412,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	// nt: the child's type, pt: the parent's type, right: the child is the
@@ -775,13 +780,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;*/
 			case source: break; // is printed from bf_constant
-			case member_name:
+			case member_name: {
 				// Each segment of a member_path is written `.name` (the
 				// grammar's own separator); inside a type_def's `tuple`
 				// `member` (member_name typed), there is no leading dot.
 				if (pnt == member_path) out(".");
-				out(dict(t.data()));
+				out(t.get_string());
 				break;
+			}
 			case var_name:
 				// Only bound variable names are numbers
 				if (is_number(t.get_string())) {
@@ -810,7 +816,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");
-					out(dict(t.data()));
+					out(t.get_string());
 					if (nt == uconst_name) out(">");
 				}
 				else if (is_digital_nt(nt)) out(t.data());

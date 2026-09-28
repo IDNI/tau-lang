@@ -577,7 +577,10 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		= tau::get(fm).select_top(is<node, tau::uconst_name>);
 	auto is_number = [](const std::string& s) static {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (const char c : s)
+			// isdigit wants the value as an unsigned char, so a
+			// negative char does not reach it as a negative int.
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	// build_bf_uconst("", name + id, type) stores the name as ":" + name + id
@@ -954,11 +957,13 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
 	DBG(
-		auto no_bool_combs = [](tref n) {
-			auto nr = has_no_boolean_combs_of_models<node>(n);
-			return nr.has_value() && nr.value();
-		};
-		assert(no_bool_combs(n1) && no_bool_combs(n2));
+		assert([&] {
+			auto no_bool_combs = [](tref n) {
+				auto nr = has_no_boolean_combs_of_models<node>(n);
+				return nr.has_value() && nr.value();
+			};
+			return no_bool_combs(n1) && no_bool_combs(n2);
+		}());
 	)
 
 	const auto& t1 = tau::get(n1);
@@ -1063,11 +1068,13 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 	LOG_TRACE << "n2 " << LOG_FM(n2);
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
 	DBG(
-		auto no_bool_combs = [](tref n) {
-			auto nr = has_no_boolean_combs_of_models<node>(n);
-			return nr.has_value() && nr.value();
-		};
-		assert(no_bool_combs(n1) && no_bool_combs(n2));
+		assert([&] {
+			auto no_bool_combs = [](tref n) {
+				auto nr = has_no_boolean_combs_of_models<node>(n);
+				return nr.has_value() && nr.value();
+			};
+			return no_bool_combs(n1) && no_bool_combs(n2);
+		}());
 	)
 
 	const auto& t1 = tau::get(n1);

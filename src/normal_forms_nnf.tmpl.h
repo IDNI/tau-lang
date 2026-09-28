@@ -313,13 +313,16 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 	for (tref io_var : io_vars) {
 		// Skip initial conditions
 		if (is_io_initial<node>(io_var)) continue;
-		int_t var_shift = get_io_var_shift<node>(io_var);
+		// shift is positive here and get_io_var_shift is a lookback
+		// magnitude, so their sum is a valid size_t shift.
+		const size_t new_shift = static_cast<size_t>(
+			get_io_var_shift<node>(io_var) + shift);
 		size_t type = tau::get(io_var).get_ba_type();
 		changes[io_var] = tau::get(io_var).is_input_variable()
 			? tau::trim(build_in_var_at_t_minus<node>(get_var_name_node<node>(
-				io_var), var_shift + shift, type))
+				io_var), new_shift, type))
 			: tau::trim(build_out_var_at_t_minus<node>(get_var_name_node<node>(
-				io_var), var_shift + shift, type));
+				io_var), new_shift, type));
 	}
 	return rewriter::replace<node>(fm, changes);
 }
@@ -406,8 +409,7 @@ tref squeeze_positives(tref n, size_t type_id) {
 
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
-	DBG(using tau = tree<node>;)
-	DBG(assert(!is<node>(val, tau::bf));)
+	DBG(assert(!is<node>(val, tree<node>::bf));)
 	const trefs& free_vars = get_free_vars<node>(fm);
 	if (free_vars.size()) {
 		subtree_map<node, tref> free_var_assgm;

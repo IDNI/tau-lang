@@ -164,12 +164,14 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 	// G( r_encode(ρ) → X(∨_{σ: t2_pos_m[σ]=ρ} p_encode(σ)) )
 	for (int rho = 0; rho < T1_size; ++rho) {
 		std::vector<int> matching;
-		for (int sigma = 0; sigma < T2_size && sigma < (int)t2_pos_m.size(); ++sigma)
-			if (t2_pos_m[sigma] == rho) matching.push_back(sigma);
+		for (size_t sigma = 0; sigma < t2_pos_m.size()
+				&& sigma < (size_t)T2_size; ++sigma)
+			if (t2_pos_m[sigma] == rho)
+				matching.push_back(static_cast<int>(sigma));
 		if (matching.empty()) continue;
 
 		std::string disj;
-		for (int i = 0; i < (int)matching.size(); ++i) {
+		for (size_t i = 0; i < matching.size(); ++i) {
 			if (i > 0) disj += " | ";
 			disj += "(" + p_encode(matching[i], n_pbits) + ")";
 		}
@@ -207,7 +209,7 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 	// ── Assemble: (∧assume) → (∧guarantee) ───────────────────────────────
 	auto join = [](const std::vector<std::string>& v) {
 		std::string s;
-		for (int i = 0; i < (int)v.size(); ++i) {
+		for (size_t i = 0; i < v.size(); ++i) {
 			if (i) s += " & ";
 			s += v[i];
 		}

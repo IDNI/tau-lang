@@ -157,7 +157,7 @@ std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	DBG(assert(tau::get(func).is(tau::ref)));
 
 	const tau& ref_head = tau::get(func);
-	size_t sym = ref_head[0].data();
+	size_t sym = ref_head[0].get_string_id();
 	int_t offset_args = 0;
 	if (auto o = tt(ref_head) | tau::offsets; o)
 		offset_args = static_cast<int_t>(tau::get(o | tt::ref).children_size());
@@ -578,7 +578,7 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 			auto saved_hooks = tau::use_hooks;
 			tau::use_hooks = true;
 			auto parsed = tau::get_ba_constant_from_source(
-				tau::get(n).child_data(), type.value());
+				tau::get(n).first_tree().get_string_id(), type.value());
 			tau::use_hooks = saved_hooks;
 			// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- parse_error carries only the element and type id.
 			if (!parsed.has_value() || parsed.value() == nullptr) return parse_error{canonized, type.value()};
@@ -882,7 +882,7 @@ tref type_annotated_operands(tref n) {
 					tref typed = x;
 					if (tau::get(typed).data() == 0) {
 						auto parsed = tau::get_ba_constant_from_source(
-							tau::get(typed).child_data(), type);
+							tau::get(typed).first_tree().get_string_id(), type);
 						// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the local typed tref cannot carry it.
 						typed = parsed.has_value() ? parsed.value() : nullptr;
 					}
@@ -1992,7 +1992,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									tref typed = x;
 									if (tau::get(typed).data() == 0) {
 										auto parsed = tau::get_ba_constant_from_source(
-											tau::get(typed).child_data(), cast_type);
+											tau::get(typed).first_tree().get_string_id(), cast_type);
 										// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the on_leave callback returns a fixed shape.
 										typed = parsed.has_value() ? parsed.value() : nullptr;
 									}

@@ -121,7 +121,8 @@ template <NodeType node>
 size_t io_var_direction(tref n) {
 	const auto& t = tree<node>::get(n);
 	if (!t.is(node::type::io_var)) return 0;
-	size_t dir = t.data();
+	// data() is a 64-bit payload; the direction tag is a size_t.
+	size_t dir = static_cast<size_t>(t.data());
 	if (dir == 1 || dir == 2) return dir;
 	const std::string& nm = get_var_name<node>(n);
 	if (nm.empty()) return 0;

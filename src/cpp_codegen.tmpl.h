@@ -98,7 +98,9 @@ inline std::vector<std::string> label_aps(
 }
 
 // A cube: one product of the guard's sum-of-products, as (AP index, polarity).
-using guard_cube = std::vector<std::pair<int,bool>>;
+using guard_cube = std::vector<std::pair<size_t,bool>>;
+// An AP no cube names: a prop the automaton does not carry.
+inline constexpr size_t no_ap_index = SIZE_MAX;
 
 // Parse an HOA guard label into its DNF cubes.
 //
@@ -575,8 +577,7 @@ namespace codegen_detail {
 
 // One cube's literal-at-AP lookup, shared by build_edge_guard and
 // build_program_desc's per-cube witness grouping.
-inline std::int8_t cube_lit_at(const guard_cube& cube, int ap) {
-	if (ap < 0) return 0;
+inline std::int8_t cube_lit_at(const guard_cube& cube, size_t ap) {
 	for (const auto& [idx, pos] : cube) if (idx == ap) return pos ? 1 : -1;
 	return 0;
 }
@@ -588,7 +589,7 @@ inline std::int8_t cube_lit_at(const guard_cube& cube, int ap) {
 // variable's value, so a flag whose atom is `var = 0` (flag_out_negated)
 // takes the complement of its prop's literal.
 inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
-    const std::vector<int>& in_ap_idx, const std::vector<int>& flag_out_ap_idx,
+    const std::vector<size_t>& in_ap_idx, const std::vector<size_t>& flag_out_ap_idx,
     const std::vector<bool>& flag_out_negated = {})
 {
 	std::vector<std::int8_t> guard(
@@ -616,8 +617,8 @@ inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
 // not parse -- the caller omits the edge rather than emit a partial guard.
 inline std::vector<std::vector<std::int8_t>> build_edge_guard(
     const std::string& guard_label,
-    const std::vector<int>& in_ap_idx,
-    const std::vector<int>& flag_out_ap_idx)
+    const std::vector<size_t>& in_ap_idx,
+    const std::vector<size_t>& flag_out_ap_idx)
 {
 	auto cubes = parse_guard_cubes(guard_label);
 	if (!cubes) return {};
@@ -669,17 +670,22 @@ inline program_desc build_program_desc_prop(
 		if (!have) d.outputs.push_back({ap, sanitize(ap), field_kind::flag});
 	}
 
-	std::map<std::string, int> prop_to_ap;
-	for (int i = 0; i < (int)aut.aps.size(); ++i) prop_to_ap[aut.aps[i]] = i;
-	std::vector<int> in_ap_idx, out_ap_idx;
+	std::map<std::string, size_t> prop_to_ap;
+	for (size_t i = 0; i < aut.aps.size(); ++i)
+		prop_to_ap[aut.aps[i]] = i;
+	std::vector<size_t> in_ap_idx, out_ap_idx;
 	for (auto& f : d.inputs)
-		in_ap_idx.push_back(prop_to_ap.count(f.prop) ? prop_to_ap[f.prop] : -1);
+		in_ap_idx.push_back(prop_to_ap.count(f.prop)
+			? prop_to_ap[f.prop] : no_ap_index);
 	for (auto& f : d.outputs)
-		out_ap_idx.push_back(prop_to_ap.count(f.prop) ? prop_to_ap[f.prop] : -1);
+		out_ap_idx.push_back(prop_to_ap.count(f.prop)
+			? prop_to_ap[f.prop] : no_ap_index);
 
-	d.edges.resize(aut.num_states);
-	for (int s = 0; s < aut.num_states; ++s) {
-		const auto& edges = aut.edges.size() > (size_t)s
+	// num_states is a non-negative state count.
+	const size_t n_states = aut.num_states;
+	d.edges.resize(n_states);
+	for (size_t s = 0; s < n_states; ++s) {
+		const auto& edges = aut.edges.size() > s
 		                  ? aut.edges[s] : std::vector<hoa_edge>{};
 		for (auto& e : edges) {
 			// LG-4: one edge_desc per cube of a (possibly disjunctive)
@@ -828,19 +834,21 @@ result<program_desc> build_program_desc(
 	// internal bookkeeping, never part of the emitted program's public
 	// surface -- excluded the same way the interpreter excludes them from
 	// its own output streams (interpreter.tmpl.h's is_excluded_output).
-	std::map<std::string, int> prop_to_ap;
+	std::map<std::string, size_t> prop_to_ap;
 	std::map<std::string, tref> prop_to_atom;
-	for (int i = 0; i < (int)sol.aut.aps.size(); ++i) prop_to_ap[sol.aut.aps[i]] = i;
+	for (size_t i = 0; i < sol.aut.aps.size(); ++i)
+		prop_to_ap[sol.aut.aps[i]] = i;
 	for (auto& [atom_ref, prop] : sol.atoms) prop_to_atom[prop] = atom_ref;
 
 	// __step_ge<k> props (see is_internal_ltl_output_prop) carry no atom,
 	// so they're pulled out of the same skip rather than joining d.outputs;
 	// their thresholds come straight from sol.step_guard_ks, ascending,
 	// each resolved to the AP index matched_ap_idx appends below.
-	std::vector<int> step_guard_ap_idx;
+	std::vector<size_t> step_guard_ap_idx;
 	for (int_t k : sol.step_guard_ks) {
 		const std::string& g = step_guard_prop(k);
-		step_guard_ap_idx.push_back(prop_to_ap.count(g) ? prop_to_ap.at(g) : -1);
+		step_guard_ap_idx.push_back(prop_to_ap.count(g)
+			? prop_to_ap.at(g) : no_ap_index);
 	}
 	for (auto& p : sol.output_props) {
 		if (is_internal_ltl_output_prop(p)) continue;
@@ -903,7 +911,7 @@ result<program_desc> build_program_desc(
 	TAU_TRY(d.ba_type_table, snapshot_ba_type_registry<node>());
 	d.step_guard_ks = sol.step_guard_ks;
 
-	std::vector<int> in_ap_idx, flag_out_ap_idx;
+	std::vector<size_t> in_ap_idx, flag_out_ap_idx;
 	std::vector<bool> flag_out_negated;
 	for (auto& f : d.inputs) in_ap_idx.push_back(prop_to_ap.at(f.prop));
 	for (auto& f : d.outputs) {
@@ -921,13 +929,15 @@ result<program_desc> build_program_desc(
 	// Step guards are matched like inputs (mirroring make_table_provider's
 	// matched_ap_idx): appended after the real inputs, before flag outputs,
 	// in both the guard layout and num_inputs.
-	std::vector<int> matched_ap_idx = in_ap_idx;
+	std::vector<size_t> matched_ap_idx = in_ap_idx;
 	matched_ap_idx.insert(matched_ap_idx.end(),
 		step_guard_ap_idx.begin(), step_guard_ap_idx.end());
 
-	d.edges.resize(sol.aut.num_states);
-	for (int s = 0; s < sol.aut.num_states; ++s) {
-		const auto& edges = sol.aut.edges.size() > (size_t)s
+	// num_states is a non-negative state count.
+	const size_t n_states = sol.aut.num_states;
+	d.edges.resize(n_states);
+	for (size_t s = 0; s < n_states; ++s) {
+		const auto& edges = sol.aut.edges.size() > s
 		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
 		for (auto& e : edges) {
 			// A guard is a sum of products; each cube becomes its own
@@ -944,7 +954,8 @@ result<program_desc> build_program_desc(
 				std::map<std::string, std::vector<std::pair<tref, bool>>>
 					var_atoms;
 				for (auto& [ap_idx, positive] : cube) {
-					if (ap_idx < 0 || ap_idx >= (int)sol.aut.aps.size()) continue;
+					if (ap_idx >= sol.aut.aps.size())
+						continue;
 					const auto& prop = sol.aut.aps[ap_idx];
 					auto it = ameta.find(prop);
 					if (it == ameta.end()) continue;
@@ -1100,23 +1111,23 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 			// at compile time -- see codegen_strategy.h, whose shape this
 			// mirrors exactly.
 			out << "namespace tau_codegen_detail {\n";
-			out << "struct edge { std::vector<std::int8_t> guard; int dst = 0; };\n";
+			out << "struct edge { std::vector<std::int8_t> guard; size_t dst = 0; };\n";
 			out << "struct strategy {\n";
-			out << "\tint num_states = 0;\n";
-			out << "\tint initial_state = 0;\n";
-			out << "\tint num_inputs = 0;\n";
+			out << "\tsize_t num_states = 0;\n";
+			out << "\tsize_t initial_state = 0;\n";
+			out << "\tsize_t num_inputs = 0;\n";
 			out << "\tstd::vector<std::vector<edge>> edges;\n";
 			out << "\tstd::vector<std::string> aps;\n";
 			out << "};\n";
 			out << "inline const edge* strategy_step(\n";
-			out << "    const strategy& s, int src, const bool* ap) {\n";
-			out << "\tif (src < 0 || static_cast<std::size_t>(src) >= s.edges.size())\n";
+			out << "    const strategy& s, size_t src, const bool* ap) {\n";
+			out << "\tif (src >= s.edges.size())\n";
 			out << "\t\treturn nullptr;\n";
 			out << "\tfor (const auto& e : s.edges[src]) {\n";
 			out << "\t\tbool match = true;\n";
-			out << "\t\tconst int n = s.num_inputs < (int)e.guard.size()\n";
-			out << "\t\t            ? s.num_inputs : (int)e.guard.size();\n";
-			out << "\t\tfor (int i = 0; i < n; ++i) {\n";
+			out << "\t\tconst size_t n = s.num_inputs < e.guard.size()\n";
+			out << "\t\t            ? s.num_inputs : e.guard.size();\n";
+			out << "\t\tfor (size_t i = 0; i < n; ++i) {\n";
 			out << "\t\t\tif (e.guard[i] == 1 && !ap[i]) { match = false; break; }\n";
 			out << "\t\t\tif (e.guard[i] == -1 && ap[i]) { match = false; break; }\n";
 			out << "\t\t}\n";
@@ -1159,7 +1170,7 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		// propositional and PWR-capable shapes (revisable only changes
 		// whether revise()/revision_count()/strategy() are exposed).
 		out << "\t" << d.class_name << "() { load_initial_strategy(); }\n\n";
-		out << "\tint state() const noexcept { return state_; }\n\n";
+		out << "\tsize_t state() const noexcept { return state_; }\n\n";
 
 		// Order (inputs, then step guards, then flag outputs) must match
 		// codegen_strategy.h's edge::guard -- revise() checks a strategy's
@@ -1219,10 +1230,9 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 			out << "\tusing strategy_type = tau_codegen_detail::strategy;\n";
 			out << "\tbool revise(tau_codegen_detail::strategy new_strat) noexcept {\n";
 			out << "\t\tbool valid = new_strat.num_states > 0\n";
-			out << "\t\t\t&& new_strat.initial_state >= 0\n";
 			out << "\t\t\t&& new_strat.initial_state < new_strat.num_states\n";
 			out << "\t\t\t&& new_strat.num_inputs == " << d.inputs.size() + nstepg << "\n";
-			out << "\t\t\t&& (int)new_strat.edges.size() == new_strat.num_states\n";
+			out << "\t\t\t&& new_strat.edges.size() == new_strat.num_states\n";
 			out << "\t\t\t// Empty aps means \"unset\"; only a non-empty, mismatching\n";
 			out << "\t\t\t// list is refused.\n";
 			out << "\t\t\t&& (new_strat.aps.empty() || new_strat.aps == program_aps());\n";
@@ -1230,9 +1240,8 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 			out << "\t\t\tfor (const auto& sv : new_strat.edges)\n";
 			out << "\t\t\t\tfor (const auto& e : sv)\n";
 			out << "\t\t\t\t\tvalid = valid\n";
-			out << "\t\t\t\t\t\t&& (int)e.guard.size() == "
+			out << "\t\t\t\t\t\t&& e.guard.size() == "
 			    << d.inputs.size() + nstepg + nflag << "\n";
-			out << "\t\t\t\t\t\t&& e.dst >= 0\n";
 			out << "\t\t\t\t\t\t&& e.dst < new_strat.num_states;\n";
 			out << "\t\tassert(valid && \"revise(): malformed strategy refused\");\n";
 			out << "\t\tif (!valid) return false;\n";
@@ -1247,7 +1256,7 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		}
 
 		out << "\nprivate:\n";
-		out << "\tint state_ = " << d.initial_state << ";\n";
+		out << "\tsize_t state_ = " << d.initial_state << ";\n";
 		if (nstepg) out << "\tstd::size_t step_ = 0;\n";
 		if (d.revisable) out << "\tint revision_count_ = 0;\n";
 		out << "\ttau_codegen_detail::strategy strat_;\n\n";
@@ -1257,9 +1266,10 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		out << "\t\tstrat_.num_inputs = " << d.inputs.size() + nstepg << ";\n";
 		out << "\t\tstrat_.aps = program_aps();\n";
 		out << "\t\tstrat_.edges.resize(" << d.num_states << ");\n";
-		for (int s = 0; s < d.num_states; ++s) {
-			const auto& edges = (size_t)s < d.edges.size()
-			                   ? d.edges[s] : std::vector<edge_desc>{};
+		for (size_t s = 0; s < d.num_states; ++s) {
+			const auto& edges = s < d.edges.size()
+			                   ? d.edges[s]
+			                   : std::vector<edge_desc>{};
 			for (auto& e : edges) {
 				out << "\t\tstrat_.edges[" << s << "].push_back({{";
 				for (size_t k = 0; k < e.guard.size(); ++k) {
@@ -1275,16 +1285,17 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		// ── Witness-bearing: a per-edge unrolled step() (revise()/
 		// table-driven is refused for this shape at build_program_desc()).
 		out << "\t" << d.class_name << "() = default;\n\n";
-		out << "\tint state() const noexcept { return state_; }\n\n";
+		out << "\tsize_t state() const noexcept { return state_; }\n\n";
 
 		out << "\toutputs step(const inputs& in) noexcept {\n";
 		out << "\t\toutputs o;\n";
 		if (d.inputs.empty()) out << "\t\t(void)in;\n";
 		out << "\n\t\tswitch (state_) {\n";
-		for (int s = 0; s < d.num_states; ++s) {
+		for (size_t s = 0; s < d.num_states; ++s) {
 			out << "\t\tcase " << s << ": {\n";
-			const auto& edges = (size_t)s < d.edges.size()
-			                   ? d.edges[s] : std::vector<edge_desc>{};
+			const auto& edges = s < d.edges.size()
+			                   ? d.edges[s]
+			                   : std::vector<edge_desc>{};
 			bool first = true;
 			size_t edge_idx = 0;
 			for (auto& e : edges) {
@@ -1341,7 +1352,7 @@ inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 		out << "\t}\n\n";
 
 		out << "\nprivate:\n";
-		out << "\tint state_ = " << d.initial_state << ";\n";
+		out << "\tsize_t state_ = " << d.initial_state << ";\n";
 		if (nstepg) out << "\tstd::size_t step_ = 0;\n";
 	}
 

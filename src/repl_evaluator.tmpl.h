@@ -60,7 +60,14 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	auto is_relative = (mem_type == tau::rel_history);
 	auto mem_id = n | mem_type | tau::history_id;
 	size_t idx = 0;
-	if (mem_id) idx = mem_id.value_tree().get_num();
+	if (mem_id) {
+		const uint64_t n = mem_id.value_tree().get_num();
+		// Narrow only after the full-width value provably fits; a
+		// larger one reads as out of range on every target.
+		idx = n <= std::numeric_limits<size_t>::max()
+			? static_cast<size_t>(n)
+			: std::numeric_limits<size_t>::max();
+	}
 	// TAU_LOG_TRACE << "get_history_index idx: " << idx
 	// 	<< "       relative? " << is_relative << "    "
 	// 	<< TAU_LOG_FM(n.value());
@@ -317,7 +324,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		// resolves its base type -- a tuple-typed def has nothing left to
 		// contribute here, so it is skipped outright rather than spliced.
 		tref head = tt(d) | tt::first | tt::ref;
-		size_t root_sid = head ? tau::get(head).data() : 0;
+		size_t root_sid = head ? tau::get(head).get_string_id() : 0;
 		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
 			continue;
 		spec.add(d);
@@ -895,7 +902,7 @@ void repl_evaluator<BAs...>::continue_running(
 		}
 		// time_point advances iff a step produced output; api::step reports
 		// an error both when it needs input and when auto_continue is false.
-		const size_t tp_before = running->interp.time_point;
+		const int_t tp_before = running->interp.time_point;
 		// IN-R4: a mid-run pointwise-revision update can reach ltlsynt
 		// (through update() -> pointwise_revision); a backend failure
 		// there is a result<T> error on `st`, ended below by the same
@@ -1339,13 +1346,16 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
-	size_t i = num.value_tree().get_num();
-	if (i && i <= rr_defs.size()) {
-		out << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
+	const uint64_t n = num.value_tree().get_num();
+	// Check the full-width value against the def count before it
+	// narrows; only an in-range index reaches the table.
+	if (n && n <= rr_defs.size()) {
+		out << tau::get(rr_defs[static_cast<size_t>(n) - 1]->get())
+				.to_str() << "\n";
 		return;
 	}
 	print_error(code::invalid_argument, "Definition does not exist",
-		{{label::name, std::to_string(i)}});
+		{{label::name, std::to_string(n)}});
 	return;
 }
 

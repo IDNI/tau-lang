@@ -178,7 +178,10 @@ inline const std::string& phi_delta_namespace() {
 }
 
 inline ocltl_phi_delta_bdd bit_var(int_t id) {
-	return bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(true, id);
+	// var_dict allocates symbols from zero upward, so the id is in range
+	// for bit()'s unsigned index.
+	return bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(true,
+		lit_var(id));
 }
 
 // The live node count of phi_delta's own BDD instantiation.

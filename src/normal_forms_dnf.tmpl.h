@@ -20,18 +20,19 @@ namespace idni::tau_lang {
 
 // Reduce current dnf due to update by coeff and variable assignment i
 inline bool reduce_paths(std::vector<int_t>& i,
-	std::vector<std::vector<int_t>>& paths, int_t p, bool surface = true)
+	std::vector<std::vector<int_t>>& paths, size_t p, bool surface = true)
 {
 	for (size_t j = 0; j < paths.size(); ++j) {
 		if (paths[j].empty()) continue;
 		// Get Hamming distance between i and path and position of last difference
 		// while different irrelevant variables make assignments incompatible
-		int_t dist = 0, pos = 0;
-		for (int_t k = 0; k < p; ++k) {
+		int_t dist = 0;
+		size_t pos = 0;
+		for (size_t k = 0; k < p; ++k) {
 			if (i[k] == paths[j][k]) continue;
 			else if (dist == 2) break;
 			else if (i[k] == 2 || paths[j][k] == 2) { dist = 2; break; }
-			else dist += 1, pos = static_cast<int_t>(k);
+			else dist += 1, pos = k;
 		}
 		if (dist == 1) {
 			// Remove i from paths if recursion depth is greater 0
@@ -61,28 +62,33 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 	for (int_t i = 0; i < (int_t)paths.size(); ++i) {
 		for (int_t j = 0; j < (int_t)paths.size(); ++j) {
 			if (i == j) continue;
-			int_t dist = 0, pos = 0;
+			// i and j stay signed for the erase offsets below, so each
+			// subscript into paths is converted once here.
+			const size_t i_pos = static_cast<size_t>(i),
+				j_pos = static_cast<size_t>(j);
+			int_t dist = 0;
+			size_t pos = 0;
 			bool subset_relation_decided = false, is_i_subset_of_j = true,
 				subset_check = true, equal = true;
-			for (size_t k=0; k < paths[i].size(); ++k) {
-			if (paths[i][k] == paths[j][k]) continue;
+			for (size_t k=0; k < paths[i_pos].size(); ++k) {
+			if (paths[i_pos][k] == paths[j_pos][k]) continue;
 			else if (dist == 2) break;
-			else if (paths[i][k] == 2) {
+			else if (paths[i_pos][k] == 2) {
 				if (!subset_relation_decided) {
 					subset_relation_decided = true;
 					is_i_subset_of_j = true;
-					if (paths[j][k] != 2)
+					if (paths[j_pos][k] != 2)
 						equal = false;
 				} else {
 					if (!is_i_subset_of_j) {
 						subset_check = false;
 						break;
 					}
-					if (paths[j][k] != 2)
+					if (paths[j_pos][k] != 2)
 						equal = false;
 				}
 			}
-			else if (paths[j][k] == 2) {
+			else if (paths[j_pos][k] == 2) {
 				if (!subset_relation_decided) {
 					subset_relation_decided = true;
 					is_i_subset_of_j = false;
@@ -97,12 +103,12 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 					}
 				}
 			}
-			else dist += 1, pos = static_cast<int_t>(k);
+			else dist += 1, pos = k;
 		}
 		if (subset_check && dist == 1) {
 			if (is_i_subset_of_j) {
 				// Resovle variable in paths
-				paths[j][pos] = 2;
+				paths[j_pos][pos] = 2;
 				if (equal) {
 					paths.erase(paths.begin()+i);
 					--i;
@@ -110,7 +116,7 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 				}
 			} else {
 				// Resolve variable in i
-				paths[i][pos] = 2;
+				paths[i_pos][pos] = 2;
 			}
 		} else if (subset_check && dist == 0) {
 			// True subset relation between i and j
@@ -135,7 +141,7 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template <NodeType node>
 void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
-	const int_t p, const auto& is_var)
+	const size_t p, const auto& is_var)
 {
 	using tau = tree<node>;
 	// auto is_var = [](tref n){return
@@ -156,7 +162,7 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
 result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
-	auto& dnf, const auto& is_var, int_t p, bool is_wff)
+	auto& dnf, const auto& is_var, size_t p, bool is_wff)
 {
 	using tau = tree<node>;
 	result<bool> r;
@@ -174,7 +180,7 @@ result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i
 	};
 
 	// Check if all variables are assigned
-	if((int_t) vars.size() == p) {
+	if(vars.size() == p) {
 		tref fm_simp = nullptr;
 		if (!is_wff) {
 			// Do not add to dnf if the coefficient is 0
@@ -485,8 +491,8 @@ result<std::vector<std::vector<int_t>>> collect_paths(tref new_fm, bool wff,
 	result<std::vector<std::vector<int_t>>> r;
 	std::vector<std::vector<int_t>> paths;
 	// unordered_tau_map<int_t, BAs...> var_pos;
-	subtree_map<node, int_t> var_pos;
-	for (int_t k = 0; k < (int_t) vars.size(); ++k)
+	subtree_map<node, size_t> var_pos;
+	for (size_t k = 0; k < vars.size(); ++k)
 		var_pos.emplace(vars[k], k);
 	for (tref clause : get_leaves<node>(new_fm, is_cnf
 					? (wff ? tau::wff_and : tau::bf_and)
@@ -500,7 +506,7 @@ result<std::vector<std::vector<int_t>>> collect_paths(tref new_fm, bool wff,
 		if (std::ranges::all_of(i, [](const auto el) {return el == 2;}))
 			return r.with_value(std::vector<std::vector<int_t>>{});
 		if (all_reductions) {
-			if (!reduce_paths(i, paths, static_cast<int_t>(vars.size())))
+			if (!reduce_paths(i, paths, vars.size()))
 				paths.emplace_back(std::move(i));
 			else {
 				std::erase_if(paths,

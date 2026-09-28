@@ -392,8 +392,8 @@ TEST_SUITE("table_step_provider") {
 		strat.edges.resize(sol->aut.num_states);
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>
 			edge_witnesses(sol->aut.num_states);
-		for (int s = 0; s < sol->aut.num_states; ++s) {
-			edge_witnesses[s].resize(sol->aut.edges.size() > (size_t)s
+		for (size_t s = 0; s < sol->aut.num_states; ++s) {
+			edge_witnesses[s].resize(sol->aut.edges.size() > s
 				? sol->aut.edges[s].size() : 0);
 			size_t ei = 0;
 			for (auto& e : sol->aut.edges[s]) {

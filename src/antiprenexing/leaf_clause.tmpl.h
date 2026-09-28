@@ -216,7 +216,7 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 								_F<node>());
 						rem = std::move(rest);
 					}
-					vars.erase(vars.begin() + vi);
+					erase_at(vars, vi);
 					progress = true;
 				}
 			}

@@ -57,6 +57,13 @@
 // Sorting of x using comparator f
 #define sortc(x, f) (std::sort(x.begin(), x.end(), f))
 
+// Erase the element at @p index: a vector offset is signed, so the index
+// converts once here instead of at each call site.
+template <typename V>
+void erase_at(V& v, size_t index) {
+	v.erase(v.begin() + static_cast<std::ptrdiff_t>(index));
+}
+
 // -----------------------------------------------------------------------------
 // helper macros for printing
 

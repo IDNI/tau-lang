@@ -193,6 +193,11 @@ struct node {
 	/** @brief Return this node's nonterminal id narrowed to `size_t`. */
 	size_t get_nt() const;
 
+	/** @brief Return this node's string pool id narrowed to `size_t`. */
+	size_t get_string_id() const;
+	/** @brief Return this node's BA-constant registry id narrowed to `size_t`. */
+	size_t get_ba_constant_id() const;
+
 	/** @brief Reinterpret the inline `data` field as `int_t`. */
 	int_t as_int() const;
 
@@ -508,6 +513,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	const std::string& get_type_name() const;
 	/** @brief Return the string stored in this terminal node. */
 	const std::string& get_string() const;
+	/** @brief Return this node's string pool id narrowed to `size_t`. */
+	size_t get_string_id() const;
 	/** @brief Return the integer stored in this terminal node. */
 	int_t get_integer() const;
 	/** @brief Return the full 64-bit payload of this num literal. */

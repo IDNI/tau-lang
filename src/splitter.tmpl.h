@@ -506,11 +506,14 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 	// Fm is temporal, therefore the temporal layer is in DNF
 	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	for (int_t i = 0; i < (int_t) clauses.size(); ++i) {
+		// i stays signed for the erase offset below, so the clause
+		// subscripts are converted once here.
+		const size_t i_pos = static_cast<size_t>(i);
 		// First check redundancy between current clause and rest
 		bool is_redundant = false;
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
-			auto impl = is_tau_impl<node>(clauses[j], clauses[i]);
+			auto impl = is_tau_impl<node>(clauses[j], clauses[i_pos]);
 			if (impl.has_value() && impl.value()) {
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
@@ -518,11 +521,11 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 			}
 		}
 		if (is_redundant) continue;
-		auto clause = r.merge_take(splitter_of_clause(clauses[i]));
+		auto clause = r.merge_take(splitter_of_clause(clauses[i_pos]));
 		if (!clause.has_value()) return r;
 		auto [splitter, type] = *clause;
 		if (type != splitter_type::bad) {
-			clauses[i] = splitter;
+			clauses[i_pos] = splitter;
 			return r.with_value(tau::build_wff_or(clauses));
 		}
 	}

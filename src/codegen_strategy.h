@@ -35,18 +35,18 @@ namespace idni::tau_lang::codegen {
 // One outgoing transition from some state.
 struct edge {
 	std::vector<std::int8_t> guard;  // see file comment for the layout
-	int dst = 0;
+	size_t dst = 0;
 };
 
 // A full Mealy strategy: which state to start in, and each state's edges.
 struct strategy {
-	int num_states = 0;
-	int initial_state = 0;
+	size_t num_states = 0;
+	size_t initial_state = 0;
 	// Number of leading `guard` entries that are matched against `ap[]`;
 	// the rest are flag-output assignment slots. Needed because `edge`
 	// carries both kinds of entry in one array and `strategy_step` cannot
 	// otherwise tell them apart without naming the source spec's I/O split.
-	int num_inputs = 0;
+	size_t num_inputs = 0;
 	std::vector<std::vector<edge>> edges;  // edges[src] = outgoing edges
 	// Atomic-proposition names in guard order (inputs, then flag outputs).
 	// Empty means "unset"; revise() only compares this against the
@@ -61,14 +61,13 @@ struct strategy {
 // the caller's synthesis invariant says that should never happen for a
 // complete strategy, but a revised (PWR) one is only checked by
 // `revise()`'s asserts, not proven complete.
-inline const edge* strategy_step(const strategy& s, int src, const bool* ap) {
-	if (src < 0 || static_cast<std::size_t>(src) >= s.edges.size())
-		return nullptr;
+inline const edge* strategy_step(const strategy& s, size_t src, const bool* ap) {
+	if (src >= s.edges.size()) return nullptr;
 	for (const auto& e : s.edges[src]) {
 		bool match = true;
-		const int n = s.num_inputs < static_cast<int>(e.guard.size())
-			? s.num_inputs : static_cast<int>(e.guard.size());
-		for (int i = 0; i < n; ++i) {
+		const size_t n = s.num_inputs < e.guard.size()
+			? s.num_inputs : e.guard.size();
+		for (size_t i = 0; i < n; ++i) {
 			if (e.guard[i] == 1 && !ap[i]) { match = false; break; }
 			if (e.guard[i] == -1 && ap[i]) { match = false; break; }
 		}

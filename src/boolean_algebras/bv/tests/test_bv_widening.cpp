@@ -331,7 +331,7 @@ void check_truncating_assignment_shape(tref w, tref bare_ref, size_t base_w) {
 	const auto& rhs_op = tree<node_t>::get(cast_side)[0];
 	CHECK(rhs_op.value.nt == tau::bf_cast);
 	CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()).value() == base_w);
-	CHECK(wn.get_ba_type() == bv_type_id<node_t>(static_cast<unsigned short>(base_w)));
+	CHECK(wn.get_ba_type() == bv_type_id<node_t>(base_w));
 }
 
 } // namespace

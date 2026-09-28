@@ -43,7 +43,7 @@ enum class data_game_verdict { realizable, unrealizable, undecided };
 template <NodeType node>
 struct data_arena {
 	enum class chooser { none, inputs, outputs };
-	struct edge { tref label; int dst; bool shift; };
+	struct edge { tref label; size_t dst; bool shift; };
 	struct vertex {
 		int owner = 0;        // 0 environment, 1 system
 		int priority = 0;     // max parity, odd favours the system
@@ -51,7 +51,7 @@ struct data_arena {
 		std::vector<edge> edges;
 	};
 	std::vector<vertex> v;
-	int init = 0;
+	size_t init = 0;
 };
 
 // Builds the arena of `game` over `atoms`; false when a label cannot be read
@@ -65,7 +65,7 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 	using chooser = typename arena::chooser;
 	if (!game.acc_known || game.multi_colored || game.num_states <= 0)
 		return false;
-	if ((int)game.player.size() != game.num_states || game.init < 0
+	if (game.player.size() != game.num_states || game.init < 0
 		|| game.init >= game.num_states || game.player[game.init] != 0)
 			return false;
 	std::vector<tref> atom_of(game.aps.size(), nullptr);
@@ -77,15 +77,15 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 	auto prio = [&](int color, int priority) {
 		return color < 0 ? uncolored : priority + 2;
 	};
-	const int n = game.num_states;
-	const int sys_sink = n, env_sink = n + 1;
+	const size_t n = game.num_states;
+	const size_t sys_sink = n, env_sink = n + 1;
 	// one vertex per coloured target: it reads its target's region
-	std::map<std::pair<int, int>, int> colored;
+	std::map<std::pair<int, int>, size_t> colored;
 	a.v.resize(n + 2);
 	a.init = game.init;
 	a.v[sys_sink] = { 0, 1, chooser::none, { { tau::_T(), sys_sink, false } } };
 	a.v[env_sink] = { 0, 0, chooser::none, { { tau::_T(), env_sink, false } } };
-	for (int q = 0; q < n; ++q) {
+	for (size_t q = 0; q < n; ++q) {
 		const int owner = game.player[q] == 1 ? 1 : 0;
 		a.v[q].owner = owner;
 		a.v[q].priority = prio(game.state_color[q], game.state_priority[q]);
@@ -94,7 +94,7 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 		tref covered = tau::_F();
 		for (size_t j = 0; j < game.trans[q].size(); ++j) {
 			const auto& [guard, next, color] = game.trans[q][j];
-			if (next < 0 || next >= n) return false;
+			if (next >= n) return false;
 			auto cubes = alg_d::hoa_guard::to_dnf(guard);
 			if (!cubes) return false;
 			tref label = tau::_F();
@@ -102,10 +102,11 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 				tref conj = tau::_T();
 				for (const auto& l : c) {
 					// a label reads its owner's props only
-					if (l.ap < 0 || l.ap >= (int)atom_of.size()
-						|| l.ap >= (int)game.controllable.size()
-						|| game.controllable[l.ap] != (owner == 1))
+					if (l.ap >= atom_of.size()
+						|| l.ap >= game.controllable.size())
 							return false;
+					if (game.controllable[l.ap] != (owner == 1))
+						return false;
 					if (!atom_of[l.ap]) continue;
 					conj = tau::build_wff_and(conj, l.pos ? atom_of[l.ap]
 						: tau::build_wff_neg(atom_of[l.ap]));
@@ -114,11 +115,11 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 			}
 			label = shift_io_vars<node>(label, 0);
 			covered = tau::build_wff_or(covered, label);
-			int dst = next;
+			size_t dst = next;
 			const int ep = game.edge_priority[q][j];
 			if (color >= 0 && ep >= 0) {
 				auto [it, fresh] = colored.emplace(
-					std::pair{ next, ep }, (int)a.v.size());
+					std::pair{ next, ep }, a.v.size());
 				if (fresh) a.v.push_back({ 0, prio(color, ep),
 					chooser::none, { { tau::_T(), next, false } } });
 				dst = it->second;
@@ -198,13 +199,13 @@ struct formula_regions {
 	}
 	// The positions from which the chooser of vertex `i` takes edge `j`
 	// into `Y`.
-	tref move(int i, size_t j, const std::vector<tref>& Y) {
+	tref move(size_t i, size_t j, const std::vector<tref>& Y) {
 		const auto& e = a.v[i].edges[j];
 		tref tgt = e.shift ? shift_io_vars<node>(Y[e.dst], 1) : Y[e.dst];
 		return norm(tau::build_wff_and(e.label, tgt));
 	}
 
-	tref pre(int p, int i, const std::vector<tref>& Y,
+	tref pre(int p, size_t i, const std::vector<tref>& Y,
 		const std::vector<tref>& G)
 	{
 		const auto& x = a.v[i];
@@ -1210,7 +1211,7 @@ struct code_regions {
 		return true;
 	}
 
-	region pre(int p, int i, const std::vector<region>& Y,
+	region pre(int p, size_t i, const std::vector<region>& Y,
 		const std::vector<region>& G)
 	{
 		const auto& x = a.v[i];
@@ -1234,7 +1235,7 @@ struct code_regions {
 		return check(body);
 	}
 
-	region move(int i, size_t j, const std::vector<region>& Y) {
+	region move(size_t i, size_t j, const std::vector<region>& Y) {
 		const auto& e = a.v[i].edges[j];
 		region tgt = Y[e.dst];
 		if (e.shift) {
@@ -1273,7 +1274,7 @@ struct data_game_solver {
 	size_t n;
 	size_t max_rounds;
 	bool record;
-	std::vector<std::vector<int>> preds;
+	std::vector<std::vector<size_t>> preds;
 	std::vector<int> priority, owner;
 	std::vector<size_t> edges;
 
@@ -1288,8 +1289,8 @@ struct data_game_solver {
 			edges.push_back(arena.v[i].edges.size());
 			for (const auto& e : arena.v[i].edges)
 				if (std::find(preds[e.dst].begin(), preds[e.dst].end(),
-					(int)i) == preds[e.dst].end())
-						preds[e.dst].push_back((int)i);
+					i) == preds[e.dst].end())
+						preds[e.dst].push_back(i);
 		}
 	}
 
@@ -1333,16 +1334,16 @@ struct data_game_solver {
 				dirty[i] = false;
 				if (r.empty(G[i])) continue;
 				region grown = r.disj(Y[i],
-					r.conj(G[i], r.pre(p, (int)i, Y, G)));
+					r.conj(G[i], r.pre(p, i, Y, G)));
 				region added = r.minus(grown, Y[i]);
 				if (r.empty(added)) continue;
 				if (moves && owner[i] == 1)
 					for (size_t j = 0; j < edges[i]; ++j)
 						(*moves)[i][j] = r.disj((*moves)[i][j],
-							r.conj(added, r.move((int)i, j, Y)));
+							r.conj(added, r.move(i, j, Y)));
 				Y[i] = std::move(grown);
 				changed = true;
-				for (int j : preds[i]) dirty[j] = true;
+				for (size_t j : preds[i]) dirty[j] = true;
 			}
 			if (!changed) break;
 		}
@@ -1383,7 +1384,7 @@ struct data_game_solver {
 					if (owner[i] == 1 && !r.empty(U[i]))
 						for (size_t j = 0; j < edges[i]; ++j)
 							all.moves[i][j] = r.disj(all.moves[i][j],
-								r.conj(U[i], r.move((int)i, j, G)));
+								r.conj(U[i], r.move(i, j, G)));
 			}
 			return all;
 		}
@@ -1433,7 +1434,7 @@ struct data_game_strategy {
 		int_t)>;
 
 	struct stream { std::string name; size_t tid = 0; bool input = false; };
-	struct vertex { int picks = -1; std::vector<int> dst; };
+	struct vertex { int picks = -1; std::vector<size_t> dst; };
 
 	std::vector<stream> streams;
 	std::map<std::string, size_t> index;
@@ -1441,7 +1442,7 @@ struct data_game_strategy {
 	// picks 0: the environment chooses the inputs, 1: the system the
 	// outputs, -1: nobody (a coloured vertex or a sink)
 	std::vector<vertex> v;
-	int init = 0;
+	size_t init = 0;
 	// Reports of the checks that answer through a value; merged by the caller.
 	report rep;
 
@@ -1452,7 +1453,7 @@ struct data_game_strategy {
 	struct mealy_edge {
 		std::vector<std::pair<size_t, int8_t>> guard;
 		std::vector<size_t> out;
-		int dst = 0;
+		size_t dst = 0;
 	};
 	std::shared_ptr<ltl_aba_solution<node>> view;
 	std::vector<std::vector<mealy_edge>> machine;
@@ -1500,7 +1501,7 @@ struct data_game_strategy {
 	}
 
 	// The state of the Mealy view, when the strategy plays one.
-	std::optional<int> state() const {
+	std::optional<size_t> state() const {
 		if (!view) return std::nullopt;
 		return state_;
 	}
@@ -1552,16 +1553,16 @@ struct data_game_strategy {
 				w[s][k] = x;
 			}
 		if (v[at].picks == 0) {
-			int next = -1;
-			for (size_t j = 0; j < v[at].dst.size() && next < 0; ++j) {
+			std::optional<size_t> next;
+			for (size_t j = 0; j < v[at].dst.size() && !next; ++j) {
 				TAU_TRY(auto holds, holds_label(at, j, w));
 				if (!holds) return r.with_error(code::solver_error,
 					"the data game strategy cannot read an edge label");
 				if (*holds) next = follow(v[at].dst[j]);
 			}
-			if (next < 0) return r.with_error(code::internal_error,
+			if (!next) return r.with_error(code::internal_error,
 				"the data game strategy has no edge for the inputs");
-			at = next;
+			at = *next;
 		}
 		values out;
 		// a sink: the play is decided and no output matters
@@ -1598,9 +1599,9 @@ protected:
 	// w[s][k]: the value of stream s at step t-k, nullptr for an output of
 	// step t before it is chosen
 	using window = std::vector<std::vector<tref>>;
-	int at = 0;
+	size_t at = 0;
 	bool ready = false;
-	int state_ = 0;
+	size_t state_ = 0;
 
 	// One step of the Mealy view: the values before step 0 solve the
 	// view's history, the first edge whose guard the inputs meet gives
@@ -1720,18 +1721,18 @@ protected:
 	virtual result<bool> restart_view(const window& w)
 		{ (void)w; return result<bool>{true}; }
 	// whether the label of edge `j` of environment vertex `i` holds
-	virtual result<std::optional<bool>> holds_label(int i, size_t j,
+	virtual result<std::optional<bool>> holds_label(size_t i, size_t j,
 		const window& w) = 0;
 	// whether move `j` of system vertex `i` holds
-	virtual result<std::optional<bool>> holds_move(int i, size_t j,
+	virtual result<std::optional<bool>> holds_move(size_t i, size_t j,
 		const window& w) = 0;
 	// a formula over the outputs of step `t` whose solutions are the
 	// moves of system vertex `i`
-	virtual result<tref> constraint(int i, const window& w, int_t t) = 0;
+	virtual result<tref> constraint(size_t i, const window& w, int_t t) = 0;
 	// fills `before`
 	virtual result<bool> choose_before(const solver_fn& solve) = 0;
 
-	int follow(int x) const {
+	size_t follow(size_t x) const {
 		while (v[x].picks < 0 && v[x].dst.size() == 1 && v[x].dst[0] != x)
 			x = v[x].dst[0];
 		return x;
@@ -2104,7 +2105,7 @@ protected:
 		return r.with_value(f);
 	}
 
-	result<std::optional<bool>> holds_label(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_label(size_t i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
@@ -2113,7 +2114,7 @@ protected:
 		return r.with_value(eval(labels[i][j], *bits));
 	}
 
-	result<std::optional<bool>> holds_move(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_move(size_t i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
@@ -2122,7 +2123,7 @@ protected:
 		return r.with_value(eval(moves[i][j], *bits));
 	}
 
-	result<tref> constraint(int i, const window& win, int_t t) override {
+	result<tref> constraint(size_t i, const window& win, int_t t) override {
 		result<tref> r;
 		TAU_TRY(auto bits, encode(win));
 		if (!bits) return r.with_error(code::solver_error,
@@ -2343,17 +2344,17 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 	struct medge {
 		std::map<size_t, int8_t> guard;  // input atom -> 1 or -1
 		std::vector<size_t> out;         // output atoms, all positive
-		int dst = 0;
+		size_t dst = 0;
 	};
-	using skey = std::pair<int, std::vector<int>>;
-	std::map<skey, int> state_of;
+	using skey = std::pair<size_t, std::vector<int>>;
+	std::map<skey, size_t> state_of;
 	std::vector<skey> states;
 	std::vector<std::vector<medge>> edges;
 	size_t edge_count = 0;
-	auto state = [&](int vx, std::vector<int> bits) {
+	auto state = [&](size_t vx, std::vector<int> bits) {
 		if (vs[vx].picks != 0) bits.assign(w.vars(), 0);
 		skey key{ vx, std::move(bits) };
-		auto [it, fresh] = state_of.emplace(key, (int)states.size());
+		auto [it, fresh] = state_of.emplace(key, states.size());
 		if (fresh) states.push_back(it->first), edges.emplace_back();
 		return it->second;
 	};
@@ -2368,16 +2369,16 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 					for (size_t b = 0; b < w.streams[s].width; ++b)
 						start[w.var(s, k, b)] = -1;
 	if (!pick(won_init, start)) return false;
-	const int first = state(this->follow(this->init), canonical(start));
+	const size_t first = state(this->follow(this->init), canonical(start));
 
 	for (size_t q = 0; q < states.size(); ++q) {
 		if (states.size() > max_states || edge_count > max_edges)
 			return false;
-		const int vx = states[q].first;
+		const size_t vx = states[q].first;
 		const std::vector<int> cbits = states[q].second;
 		if (vs[vx].picks != 0) {
 			// a sink: the play is decided
-			edges[q].push_back({ {}, {}, (int)q });
+			edges[q].push_back({ {}, {}, q });
 			++edge_count;
 			continue;
 		}
@@ -2397,7 +2398,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			};
 			for (size_t j = 0; j < vs[vx].dst.size(); ++j) {
 				scan(labels[vx][j]);
-				const int u = this->follow(vs[vx].dst[j]);
+				const size_t u = this->follow(vs[vx].dst[j]);
 				if (vs[u].picks == 1) for (auto m : moves[u]) scan(m);
 			}
 			for (size_t s = 0; s < S; ++s)
@@ -2421,7 +2422,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 							e.guard[atom(true, 1, s, 0, 0, val)]
 								= c == val ? 1 : -1;
 					else {
-						for (size_t val : { 0, 1 })
+						for (size_t val = 0; val < 2; ++val)
 							e.guard[atom(true, 0, s, 0, 0, val)]
 								= constant(s, c) == (int)val ? 1 : -1;
 						for (auto [s2, k2] : partners(s, need)) {
@@ -2433,13 +2434,13 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 						}
 					}
 				}
-				int next = -1;
-				for (size_t j = 0; j < vs[vx].dst.size() && next < 0; ++j)
+				std::optional<size_t> next;
+				for (size_t j = 0; j < vs[vx].dst.size() && !next; ++j)
 					if (eval(labels[vx][j], bits).value_or(false))
 						next = this->follow(vs[vx].dst[j]);
-				if (next < 0 || vs[next].picks == 0) return false;
-				if (vs[next].picks != 1) {
-					e.dst = state(next, {});
+				if (!next || vs[*next].picks == 0) return false;
+				if (vs[*next].picks != 1) {
+					e.dst = state(*next, {});
 					edges[q].push_back(std::move(e));
 					++edge_count;
 					return true;
@@ -2450,14 +2451,14 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 						for (size_t b = 0; b < w.streams[s].width; ++b)
 							full[w.var(s, 0, b)] = -1;
 				data_bdd::id any = data_bdd::F;
-				for (auto m : moves[next]) any = bdd.disj(any, m);
+				for (auto m : moves[*next]) any = bdd.disj(any, m);
 				if (bdd.full || !pick(any, full)) return false;
-				int after = -1;
-				for (size_t j = 0; j < vs[next].dst.size() && after < 0; ++j)
-					if (eval(moves[next][j], full).value_or(false))
-						after = this->follow(vs[next].dst[j]);
-				if (after < 0 || (vs[after].picks != 0
-					&& vs[after].picks != -1)) return false;
+				std::optional<size_t> after;
+				for (size_t j = 0; j < vs[*next].dst.size() && !after; ++j)
+					if (eval(moves[*next][j], full).value_or(false))
+						after = this->follow(vs[*next].dst[j]);
+				if (!after || (vs[*after].picks != 0
+					&& vs[*after].picks != -1)) return false;
 				// the outputs: an equality cube
 				std::vector<bool> current = need;
 				for (size_t s = 0; s < S; ++s) {
@@ -2484,7 +2485,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 							}
 						}
 						if (!found) {
-							for (size_t val : { 0, 1 })
+							for (size_t val = 0; val < 2; ++val)
 								e.out.push_back(atom(false, 0, s, 0, 0,
 									val));
 							for (auto [s2, k2] : ps) {
@@ -2504,7 +2505,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 						if (kept(s, k + 1))
 							set_code(shifted, s, k + 1,
 								code_of(full, s, k));
-				e.dst = state(after, canonical(shifted));
+				e.dst = state(*after, canonical(shifted));
 				std::sort(e.out.begin(), e.out.end());
 				edges[q].push_back(std::move(e));
 				++edge_count;
@@ -2558,20 +2559,21 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 		return false;
 
 	// minimization: states with the same edges into the same blocks
-	std::vector<int> block(states.size(), 0);
+	std::vector<size_t> block(states.size(), 0);
 	for (size_t blocks = 1;;) {
 		using sig_t = std::vector<std::tuple<std::vector<std::pair<size_t,
-			int8_t>>, std::vector<size_t>, int>>;
-		std::map<std::pair<int, sig_t>, int> ids;
-		std::vector<int> nb(states.size());
+			int8_t>>, std::vector<size_t>, size_t>>;
+		std::map<std::pair<size_t, sig_t>, size_t> ids;
+		std::vector<size_t> nb(states.size());
 		for (size_t q = 0; q < states.size(); ++q) {
 			sig_t sig;
 			for (const auto& e : edges[q])
 				sig.emplace_back(std::vector<std::pair<size_t, int8_t>>(
-					e.guard.begin(), e.guard.end()), e.out, block[e.dst]);
+					e.guard.begin(), e.guard.end()), e.out,
+					block[e.dst]);
 			std::sort(sig.begin(), sig.end());
 			auto [it, _] = ids.emplace(std::pair{ block[q], std::move(sig) },
-				(int)ids.size());
+				ids.size());
 			nb[q] = it->second;
 		}
 		block = std::move(nb);
@@ -2596,8 +2598,8 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			sol.aut.aps.push_back(atoms[i].second);
 			sol.output_props.push_back(atoms[i].second);
 		}
-	int blocks = 0;
-	for (int b : block) blocks = std::max(blocks, b + 1);
+	size_t blocks = 0;
+	for (size_t b : block) blocks = std::max(blocks, b + 1);
 	sol.aut.num_states = blocks;
 	sol.aut.initial_state = block[first];
 	sol.aut.edges.resize(blocks);
@@ -2642,7 +2644,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			}
 			if (agree) es = std::move(merged);
 		}
-	for (int q = 0; q < blocks; ++q)
+	for (size_t q = 0; q < blocks; ++q)
 		for (const auto& e : machine[q]) {
 			std::string label;
 			auto lit = [&](size_t a, bool pos) {
@@ -2762,7 +2764,7 @@ protected:
 		return r.with_value(v);
 	}
 
-	result<std::optional<bool>> holds_label(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_label(size_t i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
@@ -2772,7 +2774,7 @@ protected:
 		return r.with_value(v);
 	}
 
-	result<std::optional<bool>> holds_move(int i, size_t j, const window& win)
+	result<std::optional<bool>> holds_move(size_t i, size_t j, const window& win)
 		override
 	{
 		result<std::optional<bool>> r;
@@ -2782,7 +2784,7 @@ protected:
 		return r.with_value(v);
 	}
 
-	result<tref> constraint(int i, const window& win, int_t t) override {
+	result<tref> constraint(size_t i, const window& win, int_t t) override {
 		result<tref> r;
 		tref any = tau::_F();
 		for (const auto& m : moves[i])
@@ -2915,9 +2917,11 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 				describe_strategy<node>(*st, arena, atoms);
 				for (size_t i = 0; i < arena.v.size(); ++i) {
 					st->labels.emplace_back(
-						codes.labels.begin() + codes.edge_base[i],
-						codes.labels.begin() + codes.edge_base[i]
-							+ arena.v[i].edges.size());
+						codes.labels.begin()
+							+ static_cast<std::ptrdiff_t>(codes.edge_base[i]),
+						codes.labels.begin()
+							+ static_cast<std::ptrdiff_t>(codes.edge_base[i]
+								+ arena.v[i].edges.size()));
 					st->moves.push_back(w->moves[i]);
 				}
 				st->won_init = w->sys[arena.init];

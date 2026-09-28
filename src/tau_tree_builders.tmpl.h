@@ -306,7 +306,8 @@ int_t find_biggest_quant_id(tref fm) {
 	int_t id = 0;
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	auto f = [&](tref n) {
@@ -333,7 +334,8 @@ int_t find_biggest_quant_id(tref fm) {
 // carries its source name.
 inline bool is_bound_var_name(const std::string& s) {
 	if (s.empty()) return false;
-	for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+	for (const char c : s)
+		if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 	return true;
 }
 
@@ -409,7 +411,7 @@ template <NodeType node>
 tref build_wff_all_many(const trefs& bound_vars, tref subformula) {
 	using tau = tree<node>;
 #ifdef DEBUG
-	for (tref bv : bound_vars)
+	for ([[maybe_unused]] tref bv : bound_vars)
 		assert(bv != nullptr && tau::get(bv).is(tau::variable));
 	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
 #endif
@@ -451,7 +453,7 @@ template <NodeType node>
 tref build_wff_ex_many(const trefs& bound_vars, tref subformula) {
 	using tau = tree<node>;
 #ifdef DEBUG
-	for (tref bv : bound_vars)
+	for ([[maybe_unused]] tref bv : bound_vars)
 		assert(bv != nullptr && tau::get(bv).is(tau::variable));
 	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
 #endif

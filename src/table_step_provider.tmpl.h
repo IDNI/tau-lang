@@ -70,7 +70,7 @@ static bool ocltl_is_output_coord(tref v) {
 template <NodeType node>
 static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	const trefs& tmpls, const assignment<node>& memory,
-	size_t time_point, size_t formula_time_point,
+	int_t time_point, int_t formula_time_point,
 	fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
@@ -81,7 +81,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	grounded.reserve(tmpls.size());
 	for (tref tmpl : tmpls) {
 		TAU_TRY(tref updated,
-			update_to_time_point<node>(tmpl, (int_t)time_point));
+			update_to_time_point<node>(tmpl, time_point));
 		// an atom the committed values decide is no disequality left to
 		// solve: a false one makes the edge unsat for this history
 		tref g = rewriter::replace<node>(updated, memory);
@@ -103,7 +103,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	for (tref g : grounded)
 		for (tref v : get_free_vars<node>(g))
 			if (ocltl_is_output_coord<node>(v)
-				&& get_io_time_point<node>(v) == (int_t)time_point)
+				&& get_io_time_point<node>(v) == time_point)
 				coord_index(v);
 
 	solution<node> sol;
@@ -255,7 +255,7 @@ trefs table_step_provider<node>::live_probe_atoms() const {
 template <NodeType node>
 result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	const trefs&, const assignment<node>& memory,
-	size_t time_point, size_t formula_time_point)
+	int_t time_point, int_t formula_time_point)
 {
 	using tau = tree<node>;
 	result<std::optional<solution<node>>> r;
@@ -288,12 +288,12 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		for (const auto& [k, v] : before_) merged.emplace(k->get(), v->get());
 		mem = &merged;
 	}
-	const size_t at = from_start_ ? time_point : formula_time_point;
+	const int_t at = from_start_ ? time_point : formula_time_point;
 	const size_t n = input_atoms_.size();
 	const size_t m = step_guard_ks_.size();
 	// the atoms the state's guards compare; the others are not read
 	std::vector<bool> compared(n, !from_start_);
-	if (from_start_ && state_ >= 0 && state_ < (int)strat_.edges.size())
+	if (from_start_ && state_ < strat_.edges.size())
 		for (const auto& e : strat_.edges[state_])
 			for (size_t k = 0; k < n && k < e.guard.size(); ++k)
 				if (e.guard[k]) compared[k] = true;
@@ -311,7 +311,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		ap[k] = *ev;
 	}
 	for (size_t k = 0; k < m; ++k)
-		ap[n + k] = time_point >= (size_t)step_guard_ks_[k];
+		ap[n + k] = time_point >= step_guard_ks_[k];
 	const codegen::edge* e = codegen::strategy_step(strat_, state_, ap.get());
 	if (!e) return r.with_assert_check_value(std::nullopt);
 
@@ -325,7 +325,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		if (g == 0) continue;  // don't-care: interpreter default-zeros it
 		tref val = pack_value_constant<node>(carrier_tid, g == 1 ? 1 : 0);
 		tref key = build_out_var_at_n<node>(
-			flag_outputs_[k], (int_t)time_point, carrier_tid);
+			flag_outputs_[k], time_point, carrier_tid);
 		result.emplace(key, val);
 	}
 
@@ -333,13 +333,13 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	const size_t edge_idx = (size_t)(e - state_edges.data());
 
 	// Witness/data outputs baked for this specific edge.
-	if (state_ >= 0 && state_ < (int)edge_witnesses_.size()
+	if (state_ < edge_witnesses_.size()
 		&& edge_idx < edge_witnesses_[state_].size())
 		for (auto& [name, val] : edge_witnesses_[state_][edge_idx]) {
 			tref v = val->get();
 			size_t vt = tau::get(v).get_ba_type();
 			tref key = build_out_var_at_n<node>(
-				name, (int_t)time_point, vt);
+				name, time_point, vt);
 			result.emplace(key, v);
 		}
 
@@ -347,7 +347,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	// ground the edge's atom conjunction and solve for what remains, the
 	// same way the solve provider does; step()'s shared commit block
 	// decides what reaches memory/output.
-	if (state_ >= 0 && state_ < (int)edge_witness_templates_.size()
+	if (state_ < edge_witness_templates_.size()
 		&& edge_idx < edge_witness_templates_[state_].size()
 		&& !edge_witness_templates_[state_][edge_idx].empty())
 	{
@@ -356,7 +356,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		tmpls.reserve(htmpls.size());
 		for (auto& h : htmpls) tmpls.push_back(h->get());
 
-		bool eligible = state_ < (int)edge_direct_decode_eligible_.size()
+		bool eligible = state_ < edge_direct_decode_eligible_.size()
 			&& edge_idx < edge_direct_decode_eligible_[state_].size()
 			&& edge_direct_decode_eligible_[state_][edge_idx];
 
@@ -387,7 +387,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 			// (time_point), everything else means formula_time_point --
 			// they only diverge during lookback warmup (time_point <
 			// formula_time_point), so this is a no-op split otherwise.
-			const auto& is_counter = state_ < (int)edge_witness_template_is_counter_.size()
+			const auto& is_counter = state_ < edge_witness_template_is_counter_.size()
 				&& edge_idx < edge_witness_template_is_counter_[state_].size()
 				? edge_witness_template_is_counter_[state_][edge_idx]
 				: std::vector<bool>{};
@@ -395,7 +395,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 			for (size_t k = 0; k < tmpls.size(); ++k) {
 				bool is_ctr = k < is_counter.size() && is_counter[k];
 				TAU_TRY(tref grounded, update_to_time_point<node>(tmpls[k],
-					is_ctr ? (int_t)time_point : (int_t)formula_time_point));
+					is_ctr ? time_point : formula_time_point));
 				conj = conj ? tau::build_wff_and(conj, grounded) : grounded;
 			}
 			tref current = rewriter::replace<node>(conj, memory);
@@ -457,13 +457,13 @@ std::optional<trefs> table_step_provider<node>::read_set(const trefs& vars)
 					names.insert(get_var_name<node>(v));
 	};
 	// the inputs the state's guards compare and its outputs are solved with
-	if (state_ >= 0 && state_ < (int)strat_.edges.size())
+	if (state_ < strat_.edges.size())
 		for (size_t j = 0; j < strat_.edges[state_].size(); ++j) {
 			const auto& e = strat_.edges[state_][j];
 			for (size_t k = 0; k < input_atoms_.size()
 				&& k < e.guard.size(); ++k)
 				if (e.guard[k]) add(input_atoms_[k].second->get());
-			if (state_ < (int)edge_witness_templates_.size()
+			if (state_ < edge_witness_templates_.size()
 				&& j < edge_witness_templates_[state_].size())
 				for (const auto& h : edge_witness_templates_[state_][j])
 					add(h->get());
@@ -475,7 +475,7 @@ std::optional<trefs> table_step_provider<node>::read_set(const trefs& vars)
 }
 
 template <NodeType node>
-std::optional<int> table_step_provider<node>::strategy_state() const {
+std::optional<size_t> table_step_provider<node>::strategy_state() const {
 	if (!from_start_) return std::nullopt;
 	return state_;
 }
@@ -502,28 +502,28 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 
 	std::map<std::string, tref> prop_to_atom;
 	for (auto& [atom_ref, prop] : sol.atoms) prop_to_atom[prop] = atom_ref;
-	std::map<std::string, int> prop_to_ap;
-	for (int i = 0; i < (int)sol.aut.aps.size(); ++i)
+	std::map<std::string, size_t> prop_to_ap;
+	for (size_t i = 0; i < sol.aut.aps.size(); ++i)
 		prop_to_ap[sol.aut.aps[i]] = i;
 
-	std::vector<int> in_ap_idx;
+	std::vector<size_t> in_ap_idx;
 	std::vector<std::pair<std::string, tref>> input_atoms;
 	for (auto& p : sol.input_props) {
-		in_ap_idx.push_back(prop_to_ap.count(p) ? prop_to_ap.at(p) : -1);
+		in_ap_idx.push_back(prop_to_ap.count(p) ? prop_to_ap.at(p) : no_ap_index);
 		input_atoms.emplace_back(p, prop_to_atom.at(p));
 	}
 
 	// Flag outputs keep a guard slot; a prop with no atom is synthesis
 	// bookkeeping and is skipped, except __step_ge<k> (sol.step_guard_ks):
 	// a deterministic time_point >= k check, matched as an extra input slot.
-	std::vector<int> flag_out_ap_idx;
+	std::vector<size_t> flag_out_ap_idx;
 	std::vector<bool> flag_out_negated;
 	std::vector<std::string> flag_outputs;
 	std::set<std::string> template_props;
-	std::vector<int> step_guard_ap_idx;
+	std::vector<size_t> step_guard_ap_idx;
 	for (int_t k : sol.step_guard_ks) {
 		const std::string& g = step_guard_prop(k);
-		step_guard_ap_idx.push_back(prop_to_ap.count(g) ? prop_to_ap.at(g) : -1);
+		step_guard_ap_idx.push_back(prop_to_ap.count(g) ? prop_to_ap.at(g) : no_ap_index);
 	}
 	for (auto& p : sol.output_props) {
 		auto it = prop_to_atom.find(p);
@@ -546,26 +546,27 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 			continue;
 		}
 		flag_out_negated.push_back(*negated);
-		flag_out_ap_idx.push_back(prop_to_ap.count(p) ? prop_to_ap.at(p) : -1);
+		flag_out_ap_idx.push_back(prop_to_ap.count(p) ? prop_to_ap.at(p) : no_ap_index);
 		flag_outputs.push_back(get_var_name<node>(fvars[0]));
 	}
 
 	// Step guards are matched like inputs (see the loop above): appended
 	// after the real inputs, before the flag-output slots, in both the
 	// guard layout (guard_from_cube's in_ap_idx) and num_inputs.
-	std::vector<int> matched_ap_idx = in_ap_idx;
+	std::vector<size_t> matched_ap_idx = in_ap_idx;
 	matched_ap_idx.insert(matched_ap_idx.end(),
 		step_guard_ap_idx.begin(), step_guard_ap_idx.end());
 
 	codegen::strategy strat;
 	strat.num_states = sol.aut.num_states;
 	strat.initial_state = sol.aut.initial_state;
-	strat.num_inputs = (int)matched_ap_idx.size();
-	strat.edges.resize(sol.aut.num_states);
-	std::vector<std::vector<trefs>> templates(sol.aut.num_states);
-	std::vector<std::vector<std::vector<bool>>> template_is_counter(sol.aut.num_states);
-	for (int s = 0; s < sol.aut.num_states; ++s) {
-		const auto& edges = sol.aut.edges.size() > (size_t)s
+	strat.num_inputs = matched_ap_idx.size();
+	const size_t n_states = sol.aut.num_states;
+	strat.edges.resize(n_states);
+	std::vector<std::vector<trefs>> templates(n_states);
+	std::vector<std::vector<std::vector<bool>>> template_is_counter(n_states);
+	for (size_t s = 0; s < n_states; ++s) {
+		const auto& edges = sol.aut.edges.size() > s
 		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
 		for (auto& e : edges) {
 			// One edge per cube; an unparsable guard label refuses the edge.
@@ -580,8 +581,8 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 				std::vector<bool> is_counter;
 				for (auto& [ap_idx, positive] : cube) {
 					if (!positive) continue;
-					if (ap_idx < 0
-						|| ap_idx >= (int)sol.aut.aps.size()) continue;
+					if (ap_idx >= sol.aut.aps.size())
+						continue;
 					const auto& prop = sol.aut.aps[ap_idx];
 					if (template_props.count(prop)) {
 						tmpls.push_back(prop_to_atom.at(prop));

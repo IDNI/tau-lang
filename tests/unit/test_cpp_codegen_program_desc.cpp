@@ -418,7 +418,6 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		s.num_inputs = 0;
 		s.edges.resize(1);
 		CHECK(codegen::strategy_step(s, 5, nullptr) == nullptr);
-		CHECK(codegen::strategy_step(s, -1, nullptr) == nullptr);
 	}
 
 	// ── (d) revisable prop emission exposes revise() ─────────────────────
@@ -432,7 +431,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		std::string s = os.str();
 		CHECK(has(s, "bool revise("));
 		CHECK(has(s, "revision_count"));
-		CHECK(has(s, "int state() const"));
+		CHECK(has(s, "size_t state() const"));
 		CHECK(has(s, "struct strategy"));
 	}
 
@@ -631,7 +630,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(d.has_value());
 		CHECK(d->needs_tau_link);
 		REQUIRE(d->edges.size() == 4);
-		for (int s = 0; s < 3; ++s) {
+		for (size_t s = 0; s < 3; ++s) {
 			REQUIRE(d->edges[s].size() == 1);
 			CHECK(d->edges[s][0].witness_ctors.size() == 1);
 			CHECK(d->edges[s][0].dst == s + 1);
@@ -719,8 +718,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		// Exactly one state branches (more than one outgoing edge): the
 		// k_max step, decided by the input AP -- everywhere else the
 		// counter's own deterministic recurrence is the only transition.
-		int branch_state = -1, branch_count = 0;
-		for (int s = 0; s < d->num_states; ++s)
+		size_t branch_state = 0, branch_count = 0;
+		for (size_t s = 0; s < d->num_states; ++s)
 			if (d->edges[s].size() > 1) { ++branch_count; branch_state = s; }
 		REQUIRE(branch_count == 1);
 		REQUIRE(d->edges[branch_state].size() == 2);
@@ -786,9 +785,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		codegen::strategy strat;
 		strat.num_states = d->num_states;
 		strat.initial_state = d->initial_state;
-		strat.num_inputs = (int)d->inputs.size();
+		strat.num_inputs = d->inputs.size();
 		strat.edges.resize(d->num_states);
-		for (int s = 0; s < d->num_states; ++s)
+		for (size_t s = 0; s < d->num_states; ++s)
 			for (auto& e : d->edges[s])
 				strat.edges[s].push_back({e.guard, e.dst});
 
@@ -797,7 +796,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		// whole way reaches k_max deterministically either way.
 		auto witness_at_k3 = [&](bool i_is_one) -> const edge_desc* {
 			bool ap[1] = { i_is_one };
-			int state = strat.initial_state;
+			size_t state = strat.initial_state;
 			const edge_desc* last = nullptr;
 			for (int t = 0; t <= 3; ++t) {
 				auto* e = codegen::strategy_step(strat, state, ap);
@@ -894,7 +893,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			"72", "101", "108", "108", "111", "32",
 			"87", "111", "114", "108", "100", "33"
 		};
-		for (int s = 0; s < 12; ++s) {
+		for (size_t s = 0; s < 12; ++s) {
 			REQUIRE(d->edges[s].size() == 1);
 			REQUIRE(d->edges[s][0].witness_ctors.size() == 1);
 			CHECK(d->edges[s][0].witness_ctors[0].first == "o");
@@ -902,7 +901,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			CHECK(has(d->edges[s][0].witness_ctors[0].second,
 				std::string("\"") + constants[s] + "\""));
 		}
-		int final_state = d->num_states - 1;
+		size_t final_state = d->num_states - 1;
 		REQUIRE(d->edges[final_state].size() == 1);
 		CHECK(d->edges[final_state][0].witness_ctors.empty());
 		CHECK(d->edges[final_state][0].dst == final_state);

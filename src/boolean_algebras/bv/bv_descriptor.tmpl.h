@@ -67,7 +67,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return is_bv_type_family<node_t>(type_tree);
 	}
 
-	static tref type_tree() { return bv_type<node_t>(static_cast<unsigned short>(default_bv_size)); }
+	static tref type_tree() { return bv_type<node_t>(default_bv_size); }
 
 	static bool owns_type(size_t ba_type_id) {
 		return is_bv_type_family<node_t>(ba_type_id);
@@ -84,7 +84,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		using tt = tau::traverser;
 		auto subtype = tt(type_tree) | tau::type | tau::subtype | tt::ref;
 		if (!subtype) return std::nullopt;
-		return static_cast<unsigned short>(tau::get(subtype)[0].get_num());
+		const uint64_t width = tau::get(subtype)[0].get_num();
+		// An out-of-range width is not a parameter of the bv family.
+		if (width < 1 || width > 0xffff) return std::nullopt;
+		return static_cast<unsigned short>(width);
 	}
 
 	static size_t type_id_for(unsigned short bitwidth) {

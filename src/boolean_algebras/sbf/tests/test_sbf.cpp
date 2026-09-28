@@ -21,13 +21,13 @@ static sbf_ba szero() { init_bdd(); return bdd_handle<Bool>::hfalse; }
 // positive literal for variable v (v > 0)
 static sbf_ba svar(int_t v) {
 	init_bdd();
-	return bdd_handle<Bool>::bit(true, v);
+	return bdd_handle<Bool>::bit(true, lit_var(v));
 }
 
 // negative literal for variable v
 static sbf_ba sneg(int_t v) {
 	init_bdd();
-	return bdd_handle<Bool>::bit(false, v);
+	return bdd_handle<Bool>::bit(false, lit_var(v));
 }
 
 // parse an sbf expression string and extract the sbf_ba value

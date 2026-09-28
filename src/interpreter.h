@@ -54,7 +54,7 @@ struct step_provider {
 	 */
 	virtual result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
-		size_t time_point, size_t formula_time_point) = 0;
+		int_t time_point, int_t formula_time_point) = 0;
 
 	/**
 	 * @brief The inputs of a step the provider reads.
@@ -68,7 +68,7 @@ struct step_provider {
 	}
 
 	/// @brief The state of the strategy the provider plays, when it has one.
-	virtual std::optional<int> strategy_state() const { return std::nullopt; }
+	virtual std::optional<size_t> strategy_state() const { return std::nullopt; }
 
 	/// @brief Past steps the provider reads beyond the spec's own lookback.
 	virtual int_t lookback() const { return 0; }
@@ -329,7 +329,7 @@ struct interpreter {
 	// one-hot bit `o__ltl_ms<i>__` is set in `memory` at the most-recently
 	// committed time step. For single-state Mealy or pure-safety specs
 	// (no auxiliary bits), this returns 0.
-	result<int> current_state() const;
+	result<size_t> current_state() const;
 
 	// Per-revision realisability pre-check: would PWR-merging `psi` with
 	// the current spec keep the result realisable?
@@ -431,7 +431,7 @@ struct interpreter {
 	//
 	// Each trace is a sequence of state indices (length ≥ 1, starting
 	// at initial_state). Returns empty when no Mealy was synthesised.
-	std::vector<std::vector<int>>
+	std::vector<std::vector<size_t>>
 	boundary_traces(int n, int max_length = 100) const;
 
 	// Cryptographic-approval commit for Approach A3 (operator-approved
@@ -486,7 +486,7 @@ struct interpreter {
 	/// representative for its set of output streams.
 	std::vector<std::pair<htrefs, htref>> original_spec;
 	assignment<node> memory;
-	size_t time_point = 0;
+	int_t time_point = 0;
 	input_streams<node>     inputs;
 	output_streams<node>    outputs;
 	io_context<node> ctx;
@@ -534,7 +534,7 @@ private:
 	bool final_system = false;
 	/// Time point step_spec was last (re)computed for; -1 means stale.
 	int_t step_spec_time_point_ = -1;
-	size_t formula_time_point = 0;
+	int_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 	/// Inputs the spec names at a fixed time position, by name and time.
@@ -654,7 +654,7 @@ private:
 	/// result carries no value; the report says why, including any
 	/// child diagnostic (e.g. from ba_constants<node>::get).
 	result<std::pair<std::optional<assignment<node>>, bool>> read(
-		const trefs& in_vars, size_t time_step);
+		const trefs& in_vars, int_t time_step);
 	/// @brief Write output assignments to the output context.
 	/// @return An error and nothing written when a bdd node table filled
 	/// while the outputs were computed (`bdd_node_table_exhausted`), or
@@ -711,7 +711,7 @@ private:
 	result<bool> calculate_initial_spec();
 
 	/// @brief Build the input variable assignments required for step @p t.
-	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
+	std::pair<trefs, bool> build_inputs_for_step(const int_t t);
 
 	/** @brief Return `true` if a tau-typed `this` input stream is registered. */
 	bool has_this_input_stream() const;
@@ -731,10 +731,10 @@ private:
 	/// @brief Evict memory entries that no future step can read.
 	/// @param completed_time_point Value of `time_point` for the step
 	///        that was just completed, before it was advanced.
-	void prune_memory(size_t completed_time_point);
+	void prune_memory(int_t completed_time_point);
 
 	/// @brief Find an executable specification clause from DNF.
-	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0);
+	static result<tref> get_executable_spec(tref& clause, const int_t start_time = 0);
 
 	/// @brief Recompute the executable continuations of a part's ordered
 	/// alternatives. Alternatives that are not executable are dropped from
@@ -742,7 +742,7 @@ private:
 	/// @return An error when no alternative survives; the report carries
 	/// why each dropped alternative was rejected either way.
 	static result<bool> compute_part_continuations(htrefs& alts, htrefs& ctns,
-		const size_t start_time);
+		const int_t start_time);
 
 	/// @brief Apply the pointwise revision algorithm to a part's ordered
 	/// alternatives (I1). Conjoins @p update into every alternative; when
@@ -837,7 +837,7 @@ result<tref> update_to_time_point(tref f, const int_t t);
 // Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point. A normalization failure yields false, not an error; the report carries why.
 template <NodeType node>
 result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
-	size_t formula_time_point);
+	int_t formula_time_point);
 
 /**
  * @brief Find the maximal update-stream solution for @p spec.
@@ -847,7 +847,7 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
  * @tparam node Tree node type.
  */
 template <NodeType node>
-result<assignment<node>> solution_with_max_update(tref spec, size_t time_point);
+result<assignment<node>> solution_with_max_update(tref spec, int_t time_point);
 
 /**
  * @brief Run a Tau specification for at most @p steps time steps.

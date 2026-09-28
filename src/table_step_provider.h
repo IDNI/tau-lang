@@ -66,10 +66,10 @@ struct table_step_provider : step_provider<node> {
 
 	result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
-		size_t time_point, size_t formula_time_point) override;
+		int_t time_point, int_t formula_time_point) override;
 
 	std::optional<trefs> read_set(const trefs& vars) const override;
-	std::optional<int> strategy_state() const override;
+	std::optional<size_t> strategy_state() const override;
 	int_t lookback() const override;
 	void reset() override;
 
@@ -114,7 +114,7 @@ private:
 	// execution -- not reset between produce() calls, so a committed
 	// witness from an earlier step keeps its ledger identity later.
 	fresh_element_ledger ledger_;
-	int state_;
+	size_t state_;
 	// Set in the from_start mode.
 	bool from_start_ = false;
 	std::vector<htref> history_;

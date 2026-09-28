@@ -6,16 +6,20 @@
 namespace idni::tau_lang {
 
 template<NodeType node>
-tref bv_type(unsigned short bitwidth) {
+tref bv_type(size_t bitwidth) {
 	using tau = tree<node>;
 
+	// A width outside the unsigned-short range is a caller bug; the node
+	// payload stores the width at full width, and get_bv_width checks it
+	// again when a spec supplies the number.
+	DBG(assert(bitwidth >= 1 && bitwidth <= 0xffff);)
 	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
 	tref type = tau::get(node(tau::type, dict("bv")), subtype);
 	return tau::get(tau::typed, type);
 }
 
 template<NodeType node>
-size_t bv_type_id(unsigned short bitwidth) {
+size_t bv_type_id(size_t bitwidth) {
 	return ba_types<node>::id(bv_type<node>(bitwidth));
 }
 

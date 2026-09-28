@@ -690,7 +690,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	quants v_rev (v.rbegin(), v.rend());
 	// Assert that v is ordered correctly according to o
 #ifdef DEBUG
-	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
+	[[maybe_unused]] auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
 	for (size_t i = 1; i < v_rev.size(); ++i)
 		assert(cmp(v_rev[i-1].first, v_rev[i].first));
 #endif
@@ -834,11 +834,14 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 			am_cmp);
 	am_sort(x);
 	if (x.size() > 1) {
+		// n is a bounded container index.
 		for (size_t n = 0; n < h.size();)
-			if (hasbc(x, h[n], am_cmp)) h.erase(h.begin() + n);
+			if (hasbc(x, h[n], am_cmp))
+				erase_at(h, n);
 			else ++n;
 		for (size_t n = 0; n < l.size();)
-			if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
+			if (hasbc(x, l[n], am_cmp))
+				erase_at(l, n);
 			else ++n;
 		h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
 		ref r = bdd_and_many(std::move(x), o, memo);
@@ -881,8 +884,9 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 			if (v[n] < v[k]) x = v[n], y = v[k];
 			else x = v[k], y = v[n];
 			if (auto jt = and_memo.find({x, y}); jt != and_memo.end()) {
-				v.erase(v.begin()+k);
-				v.erase(v.begin()+n-1);
+				// k and n are bounded container indices.
+				erase_at(v, k);
+				erase_at(v, n - 1);
 				v.push_back(jt->second);
 				n = n - 2;
 				break;
@@ -938,15 +942,18 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or_many(refs v, const order& o) 
 template<NodeType node>
 void tau_term_bdd<node>::am_sort(refs& b) {
 	sortc(b, am_cmp);
+	// n is a bounded container index.
 	for (size_t n = 0; n < b.size();)
-		if (b[n] == T) b.erase(b.begin() + n);
+		if (b[n] == T)
+			erase_at(b, n);
 		else if (b[n] == F) { b = {F}; return; }
 		else if (!n) { ++n; continue; }
-		else if (b[n] == b[n-1]) b.erase(b.begin() + n);
+		else if (b[n] == b[n-1])
+			erase_at(b, n);
 		else if (b[n] == bdd_not(b[n-1])) { b = {F}; return; }
 		else if (leaf(b[n]) && leaf(b[n-1])) {
 			b[n-1] = bdd_and(b[n-1], get_var(b[n]));
-			b.erase(b.begin() + n);
+			erase_at(b, n);
 		}
 		else ++n;
 }
@@ -959,9 +966,10 @@ bool tau_term_bdd<node>::am_simplify(refs& v,
 	for (auto x : memo)
 		if (subset(x.first, v)) {
 			if (x.second == F) return v={F}, true;
+			// n is a bounded container index.
 			for (size_t n = 0; n < v.size();)
 				if (!hasbc(x.first, v[n], am_cmp)) ++n;
-				else v.erase(v.begin() + n);
+				else erase_at(v, n);
 			if (!hasbc(v, x.second, am_cmp)) v.push_back(x.second);
 			return true;
 		}

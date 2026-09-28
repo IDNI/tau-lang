@@ -119,9 +119,11 @@ struct qlt_type1 {
 	 * when there are no constants at all.
 	 */
 	rational realize() const {
-		int k = (int)constants.size();
-		if (is_point()) return constants[pos >> 1];
-		int i = pos >> 1;
+		const size_t k = constants.size();
+		// A 1-type position encodes a constant count, so the half it names
+		// is always a valid constant index.
+		const size_t i = (size_t)(pos >> 1);
+		if (is_point()) return constants[i];
 		if (i == 0) {
 			if (k == 0) return rational(0, 1);
 			rational c = constants[0];
@@ -174,7 +176,7 @@ inline std::vector<qlt_type1> enumerate_qlt_T1(std::vector<rational> constants) 
 	    constants.end());
 	const int k = (int)constants.size();
 	std::vector<qlt_type1> out;
-	out.reserve(2 * k + 1);
+	out.reserve(2 * constants.size() + 1);
 	for (int pos = 0; pos <= 2 * k; ++pos) {
 		qlt_type1 t;
 		t.pos = pos;
@@ -192,13 +194,14 @@ inline std::vector<qlt_type1> enumerate_qlt_T1(std::vector<rational> constants) 
  * every constant.
  */
 inline int qlt_type_of(const rational& v, const std::vector<rational>& sorted_consts) {
-	const int k = (int)sorted_consts.size();
-	for (int i = 0; i < k; ++i) {
-		int c = cmp(v, sorted_consts[i]);
+	int i = 0;
+	for (const rational& cst : sorted_consts) {
+		int c = cmp(v, cst);
 		if (c < 0)  return 2 * i;
 		if (c == 0) return 2 * i + 1;
+		++i;
 	}
-	return 2 * k;
+	return 2 * i;
 }
 
 /// @brief Order relation between two free variables.
@@ -422,8 +425,13 @@ inline std::vector<int> Pre_over_T1(
 {
 	// Index W for fast membership.
 	std::vector<char> in_W(T1.size(), 0);
-	for (int w : W_indices)
-		if (w >= 0 && (size_t)w < in_W.size()) in_W[w] = 1;
+	for (int w : W_indices) {
+		if (w < 0) continue;
+		// A 1-type position is non-negative, so the table index is its
+		// unsigned form.
+		const size_t pos = (size_t) w;
+		if (pos < in_W.size()) in_W[pos] = 1;
+	}
 	std::vector<int> result;
 	for (const auto& b : T1) {
 		bool forceable = true;
@@ -433,9 +441,10 @@ inline std::vector<int> Pre_over_T1(
 			// admissible_next(σ) ∩ W.
 			auto admissible = admissible_next(s);
 			bool ok = false;
-			for (int rho_prime : admissible) {
-				if (in_W[rho_prime]) { ok = true; break; }
-			}
+			// Reachable next-memory types are 1-type positions, which index
+			// the membership table directly.
+			for (int rho_prime : admissible)
+				if (in_W[(size_t) rho_prime]) { ok = true; break; }
 			if (!ok) { forceable = false; break; }
 		}
 		if (forceable) result.push_back(b.pos);
@@ -531,14 +540,17 @@ inline std::vector<int> reachable_from(
 {
 	std::vector<char> seen(T1.size(), 0);
 	std::vector<int> queue{b0};
-	seen[b0] = 1;
+	// b0 is a 1-type position, so the table index is its unsigned form.
+	seen[(size_t) b0] = 1;
 	while (!queue.empty()) {
 		int b = queue.back(); queue.pop_back();
 		for (const auto& s : T2) {
 			if (s.pos_m != b) continue;
 			for (int rho : next(s)) {
-				if (rho >= 0 && rho < (int)T1.size() && !seen[rho]) {
-					seen[rho] = 1;
+				// The guard keeps a foreign index out of the table.
+				const size_t pos = (size_t) rho;
+				if (rho >= 0 && pos < T1.size() && !seen[pos]) {
+					seen[pos] = 1;
 					queue.push_back(rho);
 				}
 			}

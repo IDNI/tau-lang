@@ -136,7 +136,7 @@ struct compiled_result {
 static compiled_result compiled_seconds(const char* formula_str,
                                const strings& input_vars,
                                const std::string& tag,
-                               long N) {
+                               size_t N) {
     stdfs::path bdir = suite_scratch_dir() / ("_tau_bench_" + tag + ".build");
     std::error_code ec;
     stdfs::remove_all(bdir, ec);
@@ -155,7 +155,7 @@ static compiled_result compiled_seconds(const char* formula_str,
     // a given step (order among them does not matter since they agree), matching
     // interp_seconds' own fill pattern below.
     std::string tape;
-    for (long t = 0; t < N; ++t) {
+    for (size_t t = 0; t < N; ++t) {
         const char* v = (t & 1) ? "T." : "F.";
         for (size_t k = 0; k < input_vars.size(); ++k) {
             tape += v;
@@ -177,11 +177,11 @@ static compiled_result compiled_seconds(const char* formula_str,
 static double interp_seconds(const char* formula_str,
                               const strings& input_vars,
                               const strings& output_vars,
-                              long N) {
+                              size_t N) {
     // Pre-fill input streams: alternate T./F. for each input variable.
     strings vals;
     vals.reserve(N);
-    for (long i = 0; i < N; ++i) vals.push_back((i & 1) ? "T." : "F.");
+    for (size_t i = 0; i < N; ++i) vals.push_back((i & 1) ? "T." : "F.");
 
     io_context<node_t> ctx;
     for (size_t k = 0; k < input_vars.size(); ++k)
@@ -200,7 +200,7 @@ static double interp_seconds(const char* formula_str,
 
     try {
         auto t0 = clk::now();
-        run<node_t>(fm, ctx, (size_t)N);
+        run<node_t>(fm, ctx, N);
         auto t1 = clk::now();
         return std::chrono::duration<double>(t1 - t0).count();
     } catch (...) { return -1.0; }
@@ -234,8 +234,8 @@ TEST_SUITE("cpp_codegen_bench") {
             const char* formula;
             strings     input_vars;
             strings     output_vars;
-            long        N_compiled;
-            long        N_interp;
+            size_t      N_compiled;
+            size_t      N_interp;
         };
 
         // Both N_compiled and N_interp are steps, not millions: every step

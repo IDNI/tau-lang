@@ -283,7 +283,8 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 	auto l = ifs.tellg();
 	// A spec file's length fits streamsize, which is 32 bits on wasm32.
 	auto len = static_cast<std::streamsize>(l);
-	src.resize(len);
+	// A successfully opened file's tellg is non-negative; resize takes a size_t.
+	src.resize(static_cast<size_t>(len));
 	if (len > 0) ifs.seekg(0), ifs.read(&src[0], len);
 	return true;
 }
@@ -302,7 +303,9 @@ void expand_attached_short_values(std::vector<std::string>& args) {
 		// a aliases args[i]: keep the tail before the element is overwritten.
 		std::string value = a.substr(2);
 		args[i] = a.substr(0, 2);
-		args.insert(args.begin() + i + 1, std::move(value));
+		// i is a bounded index; the iterator offset is a difference_type.
+		args.insert(args.begin() + static_cast<std::ptrdiff_t>(i + 1),
+			std::move(value));
 		++i;
 	}
 }
