@@ -3458,8 +3458,18 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 
 		// An update already implied by the running spec is a no-op;
 		// conjoining it anyway re-embeds it verbatim and feeds the
-		// per-update growth (review I3).
-		tref spec_fm = tau::build_wff_or(alts);
+		// per-update growth (review I3). Only the always parts are
+		// read: they imply no more than the whole spec, which keeps
+		// the check sound, while the negated update next to the
+		// spec's sometimes clauses can take the temporal decision
+		// minutes.
+		trefs spec_always;
+		for (tref alt : alts) {
+			tref aw = tau::get(alt).find_top(
+				is_child<node, tau::wff_always>);
+			spec_always.push_back(aw ? aw : tau::_T());
+		}
+		tref spec_fm = tau::build_wff_or(spec_always);
 		bool spec_implies_clause = false;
 		if (!alts.empty()
 			&& !pwr_contains_arith_content<node>(spec_fm)
