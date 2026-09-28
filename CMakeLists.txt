@@ -538,7 +538,11 @@ if(TAU_DEPS_FROM_STORE)
 	message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
 endif()
 
-# cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
+# Newer CMake drops the FindBoost module in favor of Boost's config package,
+# which the store package installs.
+if(POLICY CMP0167)
+	cmake_policy(SET CMP0167 NEW)
+endif()
 set(Boost_USE_STATIC_LIBS ON)
 file(GLOB _boost_config "${BOOST_LIBDIR}/cmake/Boost-*/BoostConfig.cmake")
 if (_boost_config)
@@ -550,13 +554,13 @@ if(CMAKE_CROSSCOMPILING)
 	get_filename_component(_boost_root "${BOOST_LIBDIR}/.." ABSOLUTE)
 	list(APPEND CMAKE_FIND_ROOT_PATH "${_boost_root}")
 endif()
-find_package(Boost REQUIRED COMPONENTS log)
+find_package(Boost REQUIRED CONFIG COMPONENTS log)
 # MSVC autolink wants a tagged libboost_log_setup-vc143-...lib; the store Boost
 # installs layout=system (libboost_log_setup.lib), so disable autolink and ask
 # for the component explicitly.
 if(MSVC)
 	add_compile_definitions(BOOST_ALL_NO_LIB)
-	find_package(Boost REQUIRED COMPONENTS log_setup)
+	find_package(Boost REQUIRED CONFIG COMPONENTS log_setup)
 endif()
 set(TAU_BOOST_LIBS Boost::log)
 if(TARGET Boost::log_setup)

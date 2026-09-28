@@ -20,12 +20,12 @@ endif()
 
 # Match the static Boost the library linked.
 set(Boost_USE_STATIC_LIBS ON)
-find_dependency(Boost COMPONENTS log)
+find_dependency(Boost CONFIG COMPONENTS log)
 if(MSVC)
 	# MSVC autolink wants a tagged libboost_log_setup-vc143-...lib; the SDK's
 	# Boost uses layout=system, so disable autolink and ask for the component.
 	add_compile_definitions(BOOST_ALL_NO_LIB)
-	find_dependency(Boost COMPONENTS log_setup)
+	find_dependency(Boost CONFIG COMPONENTS log_setup)
 endif()
 
 # cvc5 is a dependency only when the pack this library was built for links it.
