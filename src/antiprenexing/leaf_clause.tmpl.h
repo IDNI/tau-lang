@@ -497,6 +497,46 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(with_kept(tau::build_wff_ex(v, scoped, false)));
 	}
 
+	// ---- Arithmetic over a live variable ----------------------------------
+	//
+	// Both squeezes below rest on Boole's law `ex x (f(x) = 0)` iff
+	// `f(0) f(1) = 0`, which holds only when f is a Boolean function of x.
+	// Arithmetic carries information between bits: `ex y (s = y - 2)` holds
+	// for every s, yet the law answers `s = 0 && s = 1`, i.e. F (GitHub
+	// #183). The live variables under such an operator keep their binders
+	// for the solver paths; arithmetic free of them is a constant of the
+	// squeeze and stays sound. A cast is bitwise and keeps the squeeze.
+	if (clause_type == 0 || pack_type_has_arith_ops<node>(clause_type)) {
+		auto is_arith = [](tref n) {
+			const tau& t = tau::get(n);
+			return t.is(tau::bf_add) || t.is(tau::bf_sub)
+				|| t.is(tau::bf_mul) || t.is(tau::bf_div)
+				|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
+				|| t.is(tau::bf_shr) || t.is(tau::bf_min)
+				|| t.is(tau::bf_max);
+		};
+		bool live_under_arith = false;
+		for (tref a : tau::get(scoped).select_top(is_arith)) {
+			for (tref v : still_live)
+				if (contains<node>(a, v)) {
+					live_under_arith = true;
+					break;
+				}
+			if (live_under_arith) break;
+		}
+		if (live_under_arith) {
+			DBG(LOG_TRACE << "eliminate_block_over_clause: a live "
+				"variable under arithmetic, keeping the block: "
+				<< LOG_FM(scoped) << "\n";)
+			tref keep = scoped;
+			for (auto v = still_live.rbegin(); v != still_live.rend();
+				++v)
+				keep = build_wff_ex<node>(*v, keep, false);
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(keep)));
+		}
+	}
+
 	// ---- The squeeze -----------------------------------------------------
 	if (still_live.size() == 1) {
 		// Single variable: the `f_0 * f_1 = 0` construction, which also

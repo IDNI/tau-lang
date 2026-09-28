@@ -198,3 +198,35 @@ add_repl_test(normalize_cmd-qlt_nested_xor_unsat
 # `x < {1}` and contradicting `x > {5}`; the binder stays.
 add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
 	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")
+
+# GitHub #183: Boole's elimination law does not hold for arithmetic, so a
+# bitvector variable under `-` keeps its binder for the solver paths
+add_repl_test(normalize_cmd-issue183_sub_true
+	"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue183_sub_false
+	"normalize all x:bv[2] ((x:bv[2] = {0}:bv[2]) -> (ex y:bv[2] ((x:bv[2] | (y:bv[2] & {2}:bv[2])) = (y:bv[2] - {3}:bv[2]))))." "%1[^%]*: F")
+foreach(_s 0 2)
+	add_test(NAME "test_repl-normalize_cmd-issue183_sub_true_splits${_s}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --preprocessing=false --bv-widening=false --bv-quantifier-free-decision=false --block-max-splits=${_s} -e \"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))\"")
+	set_tests_properties("test_repl-normalize_cmd-issue183_sub_true_splits${_s}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "%1[^%]*: T"
+		FAIL_REGULAR_EXPRESSION "Error"
+		TIMEOUT 60)
+endforeach()
+
+# GitHub #185: min/max are built-ins under a cast, a complement and a
+# juxtaposed conjunction, and their printed form reads back the same
+add_repl_test(normalize_cmd-issue185_cast_max_sat
+	"sat ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_cast_max_valid
+	"valid ((bv[4]) max(y:bv[3], {1}:bv[3])) != {2}:bv[4]." "%1[^%]*: F")
+add_repl_test(normalize_cmd-issue185_cast_max_solve
+	"solve ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "y := \\{ 2 \\}:bv\\[3\\]")
+add_repl_test(normalize_cmd-issue185_complement_min_sat
+	"sat min(x:bv[2], {2}:bv[2])' = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_printed_complement_min_sat
+	"sat min(x, { 2 }:bv[2])' = { 2 }:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_printed
+	"normalize x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "x min\\(x")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_sat
+	"sat x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
