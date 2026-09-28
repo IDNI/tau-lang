@@ -91,6 +91,12 @@ inline size_t bv_defelim_max_rounds = 256;
 template <NodeType node>
 tref bv_definitional_block_elimination(tref root);
 
+// As above; when no binder of the block holds a definition any more and
+// none was declined, every binder of the block goes into @p settled: as a
+// block of its own it would be returned unchanged.
+template <NodeType node>
+tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled);
+
 // Apply `bv_definitional_block_elimination` to every existential block of
 // `fm`, outermost first (pre-order continues into the rewritten node).
 template <NodeType node>
