@@ -98,7 +98,8 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         | ("max" _ '(' _ bf _ ',' _ bf _ ')') :bf_max
                         | ref                                :bf_ref
                         | ('(' _ type _ ')' _
-                           (bf_parenthesis | ba_constant | variable | bf_ref
+                           (bf_parenthesis | ba_constant | variable
+                           | bf_min | bf_max | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture
                            | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
@@ -119,16 +120,16 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | ba_constant
-                          | variable | bf_ref
+                          | variable | bf_min | bf_max | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                           | bf_ref | bf_neg
+                           | bf_min | bf_max | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | ba_constant
-                           | variable | bf_ref
+                           | variable | bf_min | bf_max | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.

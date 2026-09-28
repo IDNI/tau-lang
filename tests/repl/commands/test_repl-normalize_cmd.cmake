@@ -187,3 +187,19 @@ foreach(_s 0 2)
 		TIMEOUT 60)
 endforeach()
 
+# GitHub #185: min/max are built-ins under a cast, a complement and a
+# juxtaposed conjunction, and their printed form reads back the same
+add_repl_test(normalize_cmd-issue185_cast_max_sat
+	"sat ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_cast_max_valid
+	"valid ((bv[4]) max(y:bv[3], {1}:bv[3])) != {2}:bv[4]." "%1[^%]*: F")
+add_repl_test(normalize_cmd-issue185_cast_max_solve
+	"solve ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "y := \\{ 2 \\}:bv\\[3\\]")
+add_repl_test(normalize_cmd-issue185_complement_min_sat
+	"sat min(x:bv[2], {2}:bv[2])' = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_printed_complement_min_sat
+	"sat min(x, { 2 }:bv[2])' = { 2 }:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_printed
+	"normalize x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "x min\\(x")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_sat
+	"sat x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
