@@ -305,9 +305,11 @@ not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
 only when `realizable` would answer F; when realizability is undecided the
 message says UNKNOWN and names the budget or the reason that stopped it.
 The global options, the budgets among them, are given before the verb
-(`tau --ltl-timeout 120 compile spec.tau`).  A spec `run` cannot execute (an
-Algorithm-B verdict over the `qlt` type, see the synthesis algorithms below)
-is refused the same way.
+(`tau --ltl-timeout 120 compile spec.tau`).  A spec `run` cannot execute is
+refused the same way.  An Algorithm-B verdict over the `qlt` type (see the
+synthesis algorithms below), whose strategy is over bookkeeping bits rather
+than the data, is not such a spec: `run` and `tau compile` solve it again by
+the default path and play the strategy of its abstraction or data game.
 
 Full worked example: `examples/reactive_program/` (the `Makefile` runs
 `tau compile`; its `main.cpp` documents the shape of the emitted
@@ -754,7 +756,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    over them), or has a dense order (`qlt`) read through `=`, `!=`, `<`,
    `<=`, `>` and `>=` (each history then only matters up to its *order
    type*, how its values and the constants of the formula compare, of
-   which there are finitely many), a region is a BDD over codes of those
+   which there are finitely many; a stream of a dense order takes these
+   codes even when only equalities read it, since the order has no
+   element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
    values and the game runs before (4) and (5); otherwise, or when the BDD grows
    past its node limit, a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
@@ -2168,6 +2172,13 @@ Endpoints are exact rationals.  The special symbols `-inf` and `+inf`
 represent the extended line endpoints.  Parentheses `(`, `)` exclude the
 endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
 (`0.d…`) literal syntaxes are accepted.
+
+A `qlt` variable or stream stands for one point of the order, so `run` (and a
+program of `tau compile`) gives every `qlt` output a rational at every step,
+never `top`, `bot` or an interval: the step solver asks qlt's own ordering
+solver for the values (`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`,
+`o2 := 0`).  When no strategy exists, `run` says the specification is
+unrealizable.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 

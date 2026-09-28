@@ -608,6 +608,9 @@ tref ltl_to_safety_formula(tref fm);
  * @param data_strategy Optional sink for the strategy of the data game.
  * @param synthesize Synthesize a strategy also for a formula without future
  * operators, which is otherwise returned as its own safety formula.
+ * @param unrealizable Optional sink, set when a procedure deciding the
+ * formula exactly (the data game, or an algebra's own synthesis) proves
+ * that no strategy exists.
  * @return {safety formula or nullptr, optional solution, unanchored
  * auxiliary output names}.
  */
@@ -615,7 +618,7 @@ template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm,
 	std::shared_ptr<data_game_strategy<node>>* data_strategy = nullptr,
-	bool synthesize = false);
+	bool synthesize = false, bool* unrealizable = nullptr);
 
 } // namespace idni::tau_lang
 

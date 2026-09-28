@@ -282,6 +282,14 @@ inline thread_local bool ltl_observed_abstraction = false;
  */
 inline thread_local bool ltl_input_twins = false;
 
+/**
+ * @brief Cleared while execution solves again a formula whose algebra
+ * synthesised it propositionally with a strategy that names no data (a
+ * strategy over bookkeeping bits): the default path then builds the
+ * abstraction and the data game, whose strategies can be played.
+ */
+inline thread_local bool ltl_propositional_synthesis = true;
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__LTL_ABA_LIMITS_H__

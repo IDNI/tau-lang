@@ -122,7 +122,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// which those fast paths do not have, so they are not offered the formula.
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
-	if (!has_past && collect_step_guards<node>(fm).empty()) {
+	if (ltl_propositional_synthesis && !has_past
+		&& collect_step_guards<node>(fm).empty())
+	{
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
 			fm, sol.atoms));
 		if (claim) {
@@ -840,7 +842,8 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm,
-	std::shared_ptr<data_game_strategy<node>>* data_strategy, bool synthesize)
+	std::shared_ptr<data_game_strategy<node>>* data_strategy, bool synthesize,
+	bool* unrealizable)
 {
 	using tau = tree<node>;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
@@ -921,6 +924,18 @@ ltl_to_safety_formula_full(tref fm,
 		fm = wrap_always(fm);
 	ltl_aba_solution<node> partial;
 	auto maybe_r = solve_ltl_aba<node>(fm, &partial);
+	// A strategy over bookkeeping bits cannot be played: solve again by
+	// the default path, whose abstraction and data game give strategies
+	// over the data.
+	if (maybe_r.has_value() && maybe_r.value()
+		&& !maybe_r.value()->executable)
+	{
+		ltl_propositional_synthesis = false;
+		partial = {};
+		auto again = solve_ltl_aba<node>(fm, &partial);
+		ltl_propositional_synthesis = true;
+		if (again.has_value()) maybe_r = std::move(again);
+	}
 	if (!maybe_r.has_value()) {
 		// This function's tuple return has no report channel of its
 		// own, and every other internal failure below already answers
@@ -944,6 +959,9 @@ ltl_to_safety_formula_full(tref fm,
 			game_source.output_props, formulas, data_strategy);
 		data_decided = game.has_value()
 			&& game.value() != data_game_verdict::undecided;
+		if (unrealizable && game.has_value()
+			&& game.value() == data_game_verdict::unrealizable)
+				*unrealizable = true;
 		return *data_strategy != nullptr;
 	};
 	using full_t = std::tuple<tref, std::optional<ltl_aba_solution<node>>,
@@ -955,6 +973,12 @@ ltl_to_safety_formula_full(tref fm,
 	if (on_data(false)) return {nullptr, std::nullopt, {}};
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
+		// only the default path has a game skeleton; the others decide
+		// their own abstraction exactly, as the realizability check
+		// takes them
+		if (unrealizable && game_source.game_skeleton.empty()
+			&& !ltl_verdict_incomplete)
+				*unrealizable = true;
 		return none();
 	}
 
