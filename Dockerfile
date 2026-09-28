@@ -64,7 +64,7 @@ ARG TARGETARCH
 # the deps stage makes the shared venv the binding builds against.
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git gnupg nsis rpm ninja-build bison ccache curl unzip \
+	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip \
 	python3-pip python3-venv python3-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
