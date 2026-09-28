@@ -1,5 +1,8 @@
 # Checks tau_repl_unsupported against a pack of sbf and tau.
 # Run as: cmake -P test_repl_pack_gate.cmake
+# Script mode reads no project minimum, so without this line CMake 3.x parses
+# IN_LIST as an unknown argument.
+cmake_minimum_required(VERSION 3.22.1)
 include(${CMAKE_CURRENT_LIST_DIR}/tau_repl_pack.cmake)
 
 set(TAU_REGISTERED_BA_IDS sbf tau qint qlt bv hsb nlang)
