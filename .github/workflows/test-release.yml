@@ -7,10 +7,13 @@ on:
     branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
 
+# This workflow resolves the store. A resolving job publishes what it built
+# when the guard job allows it, so those jobs ask for packages: write. The
+# publish runs inline, so a red test cannot strand a package and a branch run
+# can fill the store. A pull request never publishes. A maintainer who
+# updates a branch inside the repository does publish.
 permissions:
   contents: read
-  # Normal CI only reads the store packages; the trusted deps-store.yml owns
-  # packages: write.
   packages: read
 
 env:
