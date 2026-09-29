@@ -21,28 +21,37 @@ using idni::tau_lang::normalize_qint;
 using idni::tau_lang::splitter_type;
 using idni::tau_lang::qint_eval_parse_tree;
 
+using idni::tau_lang::qint_rational;
+
 static constexpr double POS_INF =  std::numeric_limits<double>::infinity();
 static constexpr double NEG_INF = -std::numeric_limits<double>::infinity();
-static constexpr double DBL_MAXV = std::numeric_limits<double>::max();
+
+// The exact endpoint of a double. Every finite value used here is dyadic, so
+// doubling reaches an integer.
+static qint_rational R(double d) {
+	if (d == POS_INF) return qint_rational::pos_inf();
+	if (d == NEG_INF) return qint_rational::neg_inf();
+	long long den = 1;
+	while (d != static_cast<double>(static_cast<long long>(d))) d *= 2, den *= 2;
+	return qint_rational(static_cast<long long>(d), den);
+}
 
 // Construct a single-interval qint [lo, hi)
 static qint qi(double lo, double hi) {
+	return qint{{ {R(lo), R(hi)} }};
+}
+static qint qi(qint_rational lo, qint_rational hi) {
 	return qint{{ {lo, hi} }};
 }
 
 // Get lo and hi of the i-th interval (0-indexed) in the sorted map
-static std::pair<double,double> piece(const qint& q, size_t i) {
+static std::pair<qint_rational, qint_rational> piece(const qint& q, size_t i) {
 	auto it = q.intervals.begin();
 	std::advance(it, i);
 	return {it->first, it->second};
 }
 
-// Exact double equality without triggering -Wfloat-equal.
-// Uses <= and >= so that CHECK(deq(a, b)) receives a bool and doctest never
-// generates a double == double comparison.
-static bool deq(double a, double b) {
-	return !(a < b) && !(b < a);
-}
+static bool deq(const qint_rational& a, double b) { return a == R(b); }
 
 // ============================================================================
 TEST_SUITE("qint — basic construction") {
@@ -64,9 +73,9 @@ TEST_CASE("top is full") {
 	CHECK(top == true);
 	CHECK(top != false);
 	CHECK(top.intervals.size() == 1);
-	CHECK(std::isinf(piece(top, 0).first));
+	CHECK(piece(top, 0).first.is_inf());
 	CHECK(piece(top, 0).first  < 0);
-	CHECK(std::isinf(piece(top, 0).second));
+	CHECK(piece(top, 0).second.is_inf());
 	CHECK(piece(top, 0).second > 0);
 }
 
@@ -169,11 +178,11 @@ TEST_CASE("double complement of bottom") {
 TEST_CASE("complement of [0, 1) is [-inf, 0) | [1, +inf)") {
 	auto c = ~qi(0.0, 1.0);
 	CHECK(c.intervals.size() == 2);
-	CHECK(std::isinf(piece(c, 0).first));
+	CHECK(piece(c, 0).first.is_inf());
 	CHECK(piece(c, 0).first < 0);
 	CHECK(deq(piece(c, 0).second, 0.0));
 	CHECK(deq(piece(c, 1).first,  1.0));
-	CHECK(std::isinf(piece(c, 1).second));
+	CHECK(piece(c, 1).second.is_inf());
 	CHECK(piece(c, 1).second > 0);
 }
 
@@ -181,14 +190,14 @@ TEST_CASE("complement of [-inf, 0) is [0, +inf)") {
 	auto c = ~qi(NEG_INF, 0.0);
 	CHECK(c.intervals.size() == 1);
 	CHECK(deq(piece(c, 0).first,  0.0));
-	CHECK(std::isinf(piece(c, 0).second));
+	CHECK(piece(c, 0).second.is_inf());
 	CHECK(piece(c, 0).second > 0);
 }
 
 TEST_CASE("complement of [0, +inf) is [-inf, 0)") {
 	auto c = ~qi(0.0, POS_INF);
 	CHECK(c.intervals.size() == 1);
-	CHECK(std::isinf(piece(c, 0).first));
+	CHECK(piece(c, 0).first.is_inf());
 	CHECK(piece(c, 0).first < 0);
 	CHECK(deq(piece(c, 0).second, 0.0));
 }
@@ -210,13 +219,13 @@ TEST_CASE("complement of two-piece union") {
 	auto c = ~u;
 	// complement of [0,1)|[2,3) is [-inf,0)|[1,2)|[3,+inf)
 	CHECK(c.intervals.size() == 3);
-	CHECK(std::isinf(piece(c, 0).first));
+	CHECK(piece(c, 0).first.is_inf());
 	CHECK(piece(c, 0).first < 0);
 	CHECK(deq(piece(c, 0).second, 0.0));
 	CHECK(deq(piece(c, 1).first,  1.0));
 	CHECK(deq(piece(c, 1).second, 2.0));
 	CHECK(deq(piece(c, 2).first,  3.0));
-	CHECK(std::isinf(piece(c, 2).second));
+	CHECK(piece(c, 2).second.is_inf());
 	CHECK(piece(c, 2).second > 0);
 }
 
@@ -628,10 +637,11 @@ TEST_CASE("splitter of [0, +inf) is subset of [0, +inf)") {
 	CHECK(is_qint_zero(s & ~a));
 }
 
-TEST_CASE("splitter of [-inf, -DBL_MAX) is the input, not a degenerate interval") {
-	// hi - 1.0 saturates at hi == -DBL_MAX: no proper sub-element exists,
-	// so the splitter must return the input unchanged
-	auto a = qi(NEG_INF, -DBL_MAXV);
+TEST_CASE("splitter of [-inf, LLONG_MIN) is the input, not a degenerate interval") {
+	// hi - 1 does not fit at hi == LLONG_MIN: no proper sub-element is
+	// representable, so the splitter must return the input unchanged
+	auto a = qi(qint_rational::neg_inf(),
+		qint_rational(std::numeric_limits<long long>::min()));
 	auto s = qint_splitter(a, splitter_type::upper);
 	CHECK(s == a);
 	CHECK_FALSE(s.is_empty());
@@ -639,10 +649,11 @@ TEST_CASE("splitter of [-inf, -DBL_MAX) is the input, not a degenerate interval"
 	CHECK(piece(s, 0).first < piece(s, 0).second); // non-degenerate
 }
 
-TEST_CASE("splitter of [DBL_MAX, +inf) is the input, not a degenerate interval") {
-	// lo + 1.0 saturates at lo == DBL_MAX: no proper sub-element exists,
-	// so the splitter must return the input unchanged
-	auto a = qi(DBL_MAXV, POS_INF);
+TEST_CASE("splitter of [LLONG_MAX, +inf) is the input, not a degenerate interval") {
+	// lo + 1 does not fit at lo == LLONG_MAX: no proper sub-element is
+	// representable, so the splitter must return the input unchanged
+	auto a = qi(qint_rational(std::numeric_limits<long long>::max()),
+		qint_rational::pos_inf());
 	auto s = qint_splitter(a, splitter_type::upper);
 	CHECK(s == a);
 	CHECK_FALSE(s.is_empty());
@@ -861,3 +872,68 @@ TEST_CASE("simplify_qint_symbol/term are identities") {
 	CHECK(idni::tau_lang::simplify_qint_symbol(nullptr) == nullptr);
 	CHECK(idni::tau_lang::simplify_qint_term(nullptr) == nullptr);
 }
+
+// ============================================================================
+TEST_SUITE("qint — exact endpoints") {
+// ============================================================================
+
+static qint_rational ep(const char* s) {
+	qint_rational r;
+	REQUIRE(idni::tau_lang::qint_detail::parse_endpoint(s, r));
+	return r;
+}
+static bool rejects(const char* s) {
+	qint_rational r;
+	return !idni::tau_lang::qint_detail::parse_endpoint(s, r);
+}
+
+// GitHub #186
+TEST_CASE("a fraction and its decimal rounding stay distinct") {
+	CHECK(ep("1/3") != ep("0.3333333333333333"));
+	CHECK(ep("0.3333333333333333") < ep("1/3"));
+	auto a = qi(qint_rational(0), ep("1/3"));
+	auto b = qi(qint_rational(0), ep("0.3333333333333333"));
+	CHECK(a != b);
+	CHECK_FALSE((a & ~b).is_empty());
+}
+
+TEST_CASE("decimals, exponents and fractions parse exactly") {
+	CHECK(ep("0.25") == qint_rational(1, 4));
+	CHECK(ep(".5") == qint_rational(1, 2));
+	CHECK(ep("5.") == qint_rational(5));
+	CHECK(ep("-1.5") == qint_rational(-3, 2));
+	CHECK(ep("2e-3") == qint_rational(1, 500));
+	CHECK(ep("1.25E+2") == qint_rational(125));
+	CHECK(ep("2/4") == qint_rational(1, 2));
+	CHECK(ep("1/-3") == qint_rational(-1, 3));
+	CHECK(ep("0.5/3") == qint_rational(1, 6));
+	CHECK(ep("-inf").is_neg_inf());
+	CHECK(ep("+inf").is_pos_inf());
+}
+
+TEST_CASE("a value that does not fit exactly is rejected, not rounded") {
+	CHECK(rejects("1/0"));
+	CHECK(rejects("1e40"));
+	CHECK(rejects("0.00000000000000000000000000000000000000001"));
+	CHECK(rejects("99999999999999999999"));
+	CHECK(rejects("1.2.3"));
+	CHECK(rejects("abc"));
+}
+
+TEST_CASE("endpoints print as integers, terminating decimals or p/q") {
+	using idni::tau_lang::qint_detail::endpoint_to_string;
+	CHECK(endpoint_to_string(qint_rational(3)) == "3");
+	CHECK(endpoint_to_string(qint_rational(-1, 4)) == "-0.25");
+	CHECK(endpoint_to_string(qint_rational(1, 500)) == "0.002");
+	CHECK(endpoint_to_string(qint_rational(1, 3)) == "1/3");
+	CHECK(endpoint_to_string(qint_rational(-5, 6)) == "-5/6");
+	CHECK(qi(qint_rational(0), ep("1/3")).to_string() == "[0, 1/3)");
+}
+
+TEST_CASE("the midpoint split is exact") {
+	auto s = qint_splitter(qi(qint_rational(0), ep("1/3")),
+		splitter_type::upper);
+	CHECK(s == qi(qint_rational(0), qint_rational(1, 6)));
+}
+
+} // TEST_SUITE qint — exact endpoints
