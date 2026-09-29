@@ -525,19 +525,26 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 					for (int q = 0; q < (int)players.size() && q < g.num_states; ++q)
 						g.player[q] = players[q];
 				}
-			} else if (line.find("acc-name:") != std::string::npos) {
-				if (line.find(" all") != std::string::npos) is_all = true;
-				else if (line.find("Buchi") != std::string::npos &&
-				         line.find("co-Buchi") == std::string::npos) is_buchi = true;
-				else if (line.find("co-Buchi") != std::string::npos) is_cobuchi = true;
-				else if (line.find("parity") != std::string::npos) {
+			} else if (size_t at = line.find("acc-name:");
+				at != std::string::npos)
+			{
+				// by the exact name: generalized-Buchi and
+				// generalized-co-Buchi contain the plain names, and
+				// any other condition (Streett, Rabin, ...) is left
+				// unknown, so the game is refused
+				std::istringstream nl(line.substr(at + 9));
+				std::string name;
+				nl >> name;
+				if (name == "all") is_all = true;
+				else if (name == "Buchi") is_buchi = true;
+				else if (name == "co-Buchi") is_cobuchi = true;
+				else if (name == "parity") {
 					// LG-3: capture the flavor; normalized to
 					// max-odd (the solver's convention) below.
 					is_parity   = true;
 					parity_min  = line.find(" min")  != std::string::npos;
 					parity_even = line.find(" even") != std::string::npos;
 				}
-				// else: Streett acceptance (handled via n_colors)
 			} else if (line.substr(0,11) == "Acceptance:") {
 				std::istringstream al(line.substr(11));
 				al >> g.n_colors;
@@ -680,7 +687,8 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
  * @param phi_prop Propositional LTL formula in Spot syntax.
  * @param ins Input proposition names.
  * @param outs Output proposition names.
- * @param algo ltlsynt's `--algo=` value; empty keeps its default.
+ * @param algo ltlsynt's `--algo=` value; empty asks for a parity game
+ * (`acd`, then `sd`), since the default construction may give a Streett one.
  * @return The parsed synthesis game, or an error result.
  */
 result<synth_game> call_ltlsynt_game(
@@ -853,6 +861,19 @@ inline product_game build_product_game(
 			<< " the assignment enumeration supports; refusing";
 		return product_game{};
 	}
+	// Colours of a condition other than all, Buchi, co-Buchi or parity
+	// (Streett, generalized Buchi, ...) are not priorities.
+	if (G.multi_colored || (!G.acc_known && G.n_colors > 0))
+		return product_game{};
+	// A parsed game's colours sit two above the priority of a run that
+	// sees none, as in build_data_arena. A game built by hand, with no
+	// acceptance declared, keeps the priorities it was given.
+	const bool lift = G.acc_known;
+	const int uncolored = G.acc_accepts_uncolored ? 1 : 0;
+	auto state_prio = [&](int q) {
+		if (!lift) return G.state_priority[q];
+		return G.state_color[q] < 0 ? uncolored : G.state_priority[q] + 2;
+	};
 
 	// Fast feasibility lookup: given (pos_m, pos_y, D_pattern), does any T3 type match?
 	// Index: rho * T1_size * (2^K) + rho_prime * (2^K) + D_pattern  → bool
@@ -975,7 +996,7 @@ inline product_game build_product_game(
 		for (int rho = 0; rho < T1_size; ++rho) {
 			int s = q * T1_size + rho;
 			pg.player[s]   = G.player[q];
-			pg.priority[s] = G.state_priority[q]; // overridden by edge stubs if needed
+			pg.priority[s] = state_prio(q); // overridden by edge stubs if needed
 		}
 	}
 
@@ -983,7 +1004,7 @@ inline product_game build_product_game(
 	for (int i = 0; i < (int)stubs.size(); ++i) {
 		int s = stub_base + i;
 		pg.player[s]   = 0; // pass-through: single successor, player irrelevant
-		pg.priority[s] = stubs[i].priority;
+		pg.priority[s] = lift ? stubs[i].priority + 2 : stubs[i].priority;
 	}
 
 	// Build transitions

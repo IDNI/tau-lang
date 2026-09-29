@@ -261,6 +261,18 @@ inline result<synth_game> call_ltlsynt_game(
 	const std::vector<std::string>& outs,
 	const std::string& algo)
 {
+	// ltlsynt's default construction may name the condition Streett, which
+	// is no parity game. ACD usually gives the smallest parity game; the
+	// determinized one always gives one.
+	if (algo.empty()) {
+		result<synth_game> game;
+		for (const char* a : { "acd", "sd" }) {
+			game = call_ltlsynt_game(phi_prop, ins, outs, a);
+			if (!game.has_value() || (game.value().acc_known
+				&& !game.value().multi_colored)) break;
+		}
+		return game;
+	}
 	result<synth_game> r;
 
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).

@@ -732,8 +732,12 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	bool alg_d_has_input = false;
 	for (auto& [f, _] : sol.atoms)
 		if (atom_has_any_input<node>(f)) { alg_d_has_input = true; break; }
+	// D shares A's T_3 encoding, so it needs A's guards too: one output
+	// slot, and every atom decided by some T_3 type
 	if (alg_d_mode && !alg_d_has_input
-	    && is_algorithm_a_applicable<node>(sol.atoms)) {
+	    && is_algorithm_a_applicable<node>(sol.atoms)
+	    && count_distinct_output_vars<node>(sol.atoms) <= 1
+	    && alg_a_can_classify<node>(fm, sol.atoms)) {
 		auto constants = omcat::collect_qlt_constants<node>(fm);
 		auto T3 = omcat::enumerate_qlt_T3(constants);
 		int K = (int)sol.atoms.size();
@@ -797,7 +801,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			return r.with_value(synthesis_solved(sol));
 		}
 	} else if (alg_d_mode) {
-		LOG_DEBUG << "[ltl_aba:algD] not applicable (input variables, non-qlt, or large lookback);"
+		LOG_DEBUG << "[ltl_aba:algD] not applicable (input variables, non-qlt, "
+		             "large lookback, several outputs or an atom outside T_3);"
 		             " falling through to default";
 	}
 

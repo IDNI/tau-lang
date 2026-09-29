@@ -266,10 +266,8 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 	// with Streett acceptance `Fin(0) | Inf(1)`. With `d_1` infeasible on
 	// data, the system wins by never raising `d_0`, a play whose edges
 	// carry no colour.
-	// Defect: D maps Streett colours to priorities directly and scores
-	// uncoloured edges for the environment.
 	TEST_CASE("Algorithm D wins a Streett game through its uncoloured edges"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		auto g = alg_d::call_ltlsynt_game("G F d_0 -> G F d_1", {},
 			{"d_0", "d_1"});
@@ -281,10 +279,8 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 		CHECK(alg_d_product_wins(G, 2, {0, 1}));
 	}
 
-	// Defect: D answers UNREALIZABLE, final, for ltlsynt's Streett game of
-	// this spec.
 	TEST_CASE("Algorithm D realizes a spec won by never raising a premise"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// o14 <= 0 forever falsifies the premise; the conclusion's atoms
 		// can never hold together
@@ -299,10 +295,7 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 		CHECK(r.value());
 	}
 
-	// Defect: D reads a generalized Buchi condition as plain Buchi.
-	TEST_CASE("Algorithm D refuses a generalized Buchi game"
-		* doctest::should_fail())
-	{
+	TEST_CASE("Algorithm D refuses a generalized Buchi game") {
 		// Only colour 0 is ever seen, so Inf(1) fails and the system
 		// cannot win; reading the condition as plain Buchi says it can.
 		auto G = alg_d::parse_synth_game_hoa(
@@ -314,16 +307,17 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 			"State: 0\n[t] 1\n"
 			"State: 1\n[0] 0 {0}\n[!0] 0 {0}\n--END--\n");
 		REQUIRE(G.num_states == 2);
+		CHECK_FALSE(G.acc_known);
 		CHECK_FALSE(alg_d_product_wins(G, 1, {0, 1}));
 	}
 }
 
 TEST_SUITE("LTL(ABA) open points: Algorithm D gates") {
 
-	// Defect: D skips the one-output guard, so o11 > 0 && o12 < 0 reads as
+	// D's single output slot would read o11 > 0 && o12 < 0 as
 	// Y > 0 && Y < 0.
 	TEST_CASE("Algorithm D keeps two output streams apart"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		for (const char* s : {
 			"F (o10[t]:qlt > {0}:qlt && o12[t]:qlt < {0}:qlt).",
