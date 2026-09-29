@@ -316,6 +316,65 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The MinGW gate builds the Windows pack in the w64 image and runs its
+  # suite under wine. It runs the default pack only.
+  linux-mingw64-wine:
+    name: MinGW-w64 release tests (wine)
+    needs: [guard, deps]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-ubuntu-24.04-mingw64-wine-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-24.04-mingw64-wine-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker w64-build-publish \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-w64-build,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the MinGW tests and run them under wine
+        run: |
+          ./dev docker w64-build \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TESTS=yes \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-w64-build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   testnet:
     name: tau-testnet suite
     needs: linux
