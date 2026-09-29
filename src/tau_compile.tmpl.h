@@ -394,9 +394,14 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 				f << (k ? ", " : "") << (int)e.guard[k];
 			f << "}, " << e.dst << "});\n";
 			f << "\ttemplates[" << s << "].push_back({";
-			for (size_t k = 0; k < e.witness_template_props.size(); ++k)
-				f << (k ? ", " : "") << "atoms.at(\""
-				  << e.witness_template_props[k] << "\")";
+			for (size_t k = 0; k < e.witness_template_props.size(); ++k) {
+				const bool neg = k < e.witness_template_negated.size()
+					&& e.witness_template_negated[k];
+				f << (k ? ", " : "")
+				  << (neg ? "tree<node_t>::build_wff_neg(" : "")
+				  << "atoms.at(\"" << e.witness_template_props[k] << "\")"
+				  << (neg ? ")" : "");
+			}
 			f << "});\n";
 			f << "\ttemplate_is_counter[" << s << "].push_back({";
 			for (size_t k = 0; k < e.witness_template_is_counter.size(); ++k)

@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 
 #include "normalizer.h"
 #include "normal_forms.h"
@@ -367,6 +368,7 @@ result<tref> normalize(tref form) {
 	if (!form) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	form = eliminate_functional_quantifiers<node>(form);
 	// This entry cache (and normalize_non_temp's below) dedupes
 	// whole-formula calls; the leaf passes (to_nnf,
 	// normalize_atomic_formula_operators, syntactic_path_simplification,
@@ -446,17 +448,28 @@ result<tref> normalize(tref form) {
 	return r.with_assert_check_value(result);
 }
 
-// Evaluates the functional quantifiers: for a Boolean function f, Boole's
-// expansion f(x) = x f(1) | x' f(0) makes the join of f over all x (`fex x f`)
-// f(0) | f(1) and the meet (`fall x f`) f(0) & f(1). The rewrite is exact only
-// for a Boolean body; arithmetic, casts, min/max and function references
-// (whose bodies are not visible here) keep the quantifier, and the closed
-// residue is then reported undecided. Post-order, so an inner fex/fall is gone
-// before its enclosing one is checked.
+// For a Boolean function f, Boole's expansion f(x) = x f(1) | x' f(0) makes
+// the join of f over all x (`fex x f`) f(0) | f(1) and the meet (`fall x f`)
+// f(0) & f(1). The rewrite is exact only for a Boolean body; arithmetic,
+// casts, min/max and function references (whose bodies are not visible here)
+// keep the quantifier, and the closed residue is then reported undecided.
+// Post-order, so an inner fex/fall is gone before its enclosing one is checked.
+/** @internal @copydoc eliminate_functional_quantifiers @endinternal */
 template <NodeType node>
 tref eliminate_functional_quantifiers(tref fm) {
 	using tau = tree<node>;
 	if (!tau::get(fm).find_top(is_functional_quantifier<node>)) return fm;
+	std::set<std::string> taken;
+	for (tref v : tau::get(fm).select_all(is<node, tau::variable>))
+		taken.insert(get_var_name<node>(v));
+	size_t next = 0;
+	auto fresh = [&](tref var) {
+		std::string name;
+		do name = "fq" + std::to_string(++next);
+		while (taken.contains(name));
+		taken.insert(name);
+		return tau::build_variable(name, tau::get(var).get_ba_type());
+	};
 	auto is_non_boolean = [](tref n) {
 		switch (tau::get(n).get_type()) {
 		case tau::bf_ref: case tau::bf_add: case tau::bf_sub:
@@ -475,7 +488,19 @@ tref eliminate_functional_quantifiers(tref fm) {
 		const bool ex = q.is(tau::bf_fex);
 		if (!ex && !q.is(tau::bf_fall)) return n;
 		tref var = q.first(), body = q.second();
-		if (tau::get(body).find_top(is_non_boolean)) return n;
+		if (tau::get(body).find_top(is_non_boolean)) {
+			// Only a name that also occurs outside this binder can be
+			// captured; leaving the rest alone keeps the pass idempotent.
+			auto count = [&](tref in) {
+				return tau::get(in).select_all([&](tref m) {
+					return tau::get(m) == tau::get(var); }).size();
+			};
+			if (count(fm) == count(n)) return n;
+			tref nv = fresh(var);
+			tref nb = tau::get(body).replace(var, nv);
+			return ex ? tau::build_bf_fex(nv, nb)
+				: tau::build_bf_fall(nv, nb);
+		}
 		const size_t type = find_ba_type<node>(var);
 		tref at1 = tau::get(body).replace(var, tau::_1_trimmed(type));
 		tref at0 = tau::get(body).replace(var, tau::_0_trimmed(type));
@@ -1686,6 +1711,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		return r.with_assert_check_error(code::internal_error,
 			messages::temp_normalization_produced_no_formula);
 	}
+	fm = eliminate_functional_quantifiers<node>(fm);
 	// Merge top-level (G A) && (G B) → G(A && B) before any further
 	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
 	// downstream pipeline (transform_to_execution, ltl_aba) only finds

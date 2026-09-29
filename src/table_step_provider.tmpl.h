@@ -495,10 +495,14 @@ void table_step_provider<node>::reset() {
 }
 
 template <NodeType node>
-std::pair<std::shared_ptr<table_step_provider<node>>, std::pair<int, int>>
-make_table_provider(const ltl_aba_solution<node>& sol)
+result<std::pair<std::shared_ptr<table_step_provider<node>>,
+	std::pair<int, int>>>
+make_table_provider(const ltl_aba_solution<node>& given)
 {
 	using namespace codegen_detail;
+	result<std::pair<std::shared_ptr<table_step_provider<node>>,
+		std::pair<int, int>>> r;
+	TAU_TRY(const auto sol, playable_table_solution<node>(given));
 
 	std::map<std::string, tref> prop_to_atom;
 	for (auto& [atom_ref, prop] : sol.atoms) prop_to_atom[prop] = atom_ref;
@@ -537,7 +541,11 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 			continue;
 		}
 		trefs fvars = get_free_vars<node>(atom_ref);
-		if (fvars.size() != 1) return {nullptr, {0, 0}};
+		if (fvars.size() != 1) return r.with_error(
+			code::unsupported_operation, "a carrier-typed output atom "
+			"over several variables has no flag slot to play it by",
+			{ { label::value, truncate_for_message(
+				tree<node>::get(atom_ref).to_str()) } });
 		// a carrier atom whose prop truth does not decide the variable's
 		// value is solved per edge like a data atom
 		auto negated = carrier_flag_negated<node>(atom_ref, fvars[0]);
@@ -585,7 +593,9 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 						continue;
 					const auto& prop = sol.aut.aps[ap_idx];
 					if (template_props.count(prop)) {
-						tmpls.push_back(prop_to_atom.at(prop));
+						tref atom = prop_to_atom.at(prop);
+						tmpls.push_back(positive ? atom
+							: tree<node>::build_wff_neg(atom));
 						is_counter.push_back(
 							sol.counter_relativized_props.count(prop) > 0);
 					}
@@ -610,7 +620,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>{},
 		std::move(templates), std::move(template_is_counter),
 		sol.step_guard_ks, std::move(start));
-	return {provider, {lookback, hip}};
+	return r.with_value(std::pair{ provider, std::pair{ lookback, hip } });
 }
 
 } // namespace idni::tau_lang

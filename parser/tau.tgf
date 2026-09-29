@@ -16,7 +16,7 @@ definitions            => (_ (rec_relation | input_def | output_def | type_def) 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
 spec_part              => rec_relation | input_def | output_def | type_def | main.
 
-rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
+rec_relation           => ref _ ":=" _ (capture | (ref & ~bf_min & ~bf_max) | wff | bf).
 input_def              => io_var_name [ member_path ] [ typed ] _ ":=" _ "in"    __ stream.
 output_def             => io_var_name [ member_path ] [ typed ] _ ":=" _ "out"   __ stream.
 stream                 => "file" _ '(' _ q_file_name  _ ')'
@@ -36,7 +36,7 @@ member_path            => '.' member_name ('.' member_name)*.
 
 ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
-                        | capture | ref | wff | bf.
+                        | capture | (ref & ~bf_min & ~bf_max) | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 # wff and bf expressions
@@ -98,7 +98,8 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         | ("max" _ '(' _ bf _ ',' _ bf _ ')') :bf_max
                         | ref                                :bf_ref
                         | ('(' _ type _ ')' _
-                           (bf_parenthesis | ba_constant | variable | bf_ref
+                           (bf_parenthesis | ba_constant | variable
+                           | bf_min | bf_max | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture
                            | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
@@ -119,16 +120,16 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | ba_constant
-                          | variable | bf_ref
+                          | variable | bf_min | bf_max | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                           | bf_ref | bf_neg
+                           | bf_min | bf_max | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | ba_constant
-                           | variable | bf_ref
+                           | variable | bf_min | bf_max | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.

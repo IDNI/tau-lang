@@ -22,21 +22,15 @@ template <NodeType node> tref qint_type();
 template <NodeType node> size_t qint_type_id();
 
 
-// Type definitions for qint — atomless BA of rational intervals [x, y)
-// (right-closed, left-open).  Constant syntax accepts both rationals (1/4)
-// and decimals (0.25).
-
-
 // -----------------------------------------------------------------------------
 // qint — atomless Boolean algebra of left-closed right-open intervals [a, b)
-// on the extended real line.
+// on the extended rational line. Constant syntax accepts rationals (1/3),
+// decimals (0.25, 1e3) and integers; every endpoint is kept exactly.
 //
-// Represented as std::map<double, double> where each entry {lo -> hi} encodes
-// the interval [lo, hi).  The map is kept sorted by lo and normalised
-// (no overlapping or adjacent entries).
+// Represented as std::map<qint_rational, qint_rational> where each entry
+// {lo -> hi} encodes the interval [lo, hi).  The map is kept sorted by lo and
+// normalised (no overlapping or adjacent entries).
 //
-// Special endpoints: ±std::numeric_limits<double>::infinity() represent the
-// extended real line boundaries.
 // Top element:    single entry { -inf -> +inf }
 // Bottom element: empty map
 //
@@ -47,17 +41,43 @@ template <NodeType node> size_t qint_type_id();
 // explicit intervals instead.
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief An exact endpoint: p/q in lowest terms with q > 0, or an infinity,
+ * encoded as q == 0 with p = +1 or -1.
+ *
+ * A literal or a split whose exact value does not fit a 64-bit numerator and
+ * denominator is rejected rather than rounded.
+ */
+struct qint_rational {
+	long long p = 0, q = 1;
+
+	qint_rational() = default;
+	qint_rational(long long n) : p(n), q(1) {}
+	/// @p den must not be 0; use pos_inf() / neg_inf() for the infinities.
+	qint_rational(long long num, long long den);
+
+	static qint_rational pos_inf() { qint_rational r; r.p = 1; r.q = 0; return r; }
+	static qint_rational neg_inf() { qint_rational r; r.p = -1; r.q = 0; return r; }
+
+	bool is_inf()     const noexcept { return q == 0; }
+	bool is_pos_inf() const noexcept { return q == 0 && p > 0; }
+	bool is_neg_inf() const noexcept { return q == 0 && p < 0; }
+
+	bool operator==(const qint_rational& o) const noexcept {
+		return p == o.p && q == o.q;
+	}
+	std::strong_ordering operator<=>(const qint_rational& o) const noexcept;
+};
+
 namespace qint_detail {
 
-static constexpr double POS_INF =  std::numeric_limits<double>::infinity();
-static constexpr double NEG_INF = -std::numeric_limits<double>::infinity();
+// Parse an endpoint exactly. Accepts: +inf/-inf, integers, decimals with an
+// optional exponent (1.5, .5, 2e-3), and a fraction of two such numbers.
+bool parse_endpoint(const std::string& s, qint_rational& out);
 
-// Parse an endpoint string to double.
-// Accepts: +inf/-inf, p/q fractions (all rationals), decimals, integers.
-bool parse_endpoint(const std::string& s, double& out);
-
-// Format a double endpoint for display ("+inf"/"-inf" for infinities).
-std::string endpoint_to_string(double v);
+// Format an endpoint for display: "+inf"/"-inf", an integer, a terminating
+// decimal, or p/q.
+std::string endpoint_to_string(const qint_rational& v);
 
 } // namespace qint_detail
 
@@ -67,7 +87,7 @@ std::string endpoint_to_string(double v);
 // -----------------------------------------------------------------------------
 
 struct qint {
-	std::map<double, double> intervals; // key=lo, value=hi
+	std::map<qint_rational, qint_rational> intervals; // key=lo, value=hi
 
 	// --- factories ---
 	static qint bottom();
@@ -94,7 +114,7 @@ struct qint {
 
 private:
 	// Merge overlapping/adjacent intervals in an already-sorted map
-	static qint normalize_map(std::map<double, double> m);
+	static qint normalize_map(std::map<qint_rational, qint_rational> m);
 };
 
 // --- stream output ---

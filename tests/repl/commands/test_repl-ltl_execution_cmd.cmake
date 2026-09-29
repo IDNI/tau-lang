@@ -132,6 +132,20 @@ add_ltl_run_test(data_game_strategy_revision
 	"Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 1\n.*o1\\[6\\] := 1"
 	"cannot follow|unsat|no strategy")
 
+# the revision keeping the running goal o1[t-2] = 1 is unrealizable once o1
+# stays 0: the goal gives way to the update
+add_ltl_run_test(data_game_strategy_revision_drops_goal
+	"run (always u[t] = i1[t] && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes o1[t-2]:bv[1] = 1).\\nF.\\nF.\\nalways o1[t]:bv[1] = 0.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*\n.*o1\\[4\\] := 0\n.*o1\\[5\\] := 0\n.*o1\\[6\\] := 0"
+	"cannot follow|unsat|no strategy")
+
+# the revision reads o3, which the run has no values of: its game starts
+# from values of its own, and o3 alternates
+add_ltl_run_test(data_game_strategy_revision_new_stream
+	"run (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o3[t]:bv[1] != o3[t-1]:bv[1].\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*\n.*o3\\[4\\] := 0\n.*o3\\[5\\] := 1\n.*o3\\[6\\] := 0|Updated specification[^\n]*\n.*o3\\[4\\] := 1\n.*o3\\[5\\] := 0\n.*o3\\[6\\] := 1"
+	"cannot follow|unsat|no strategy")
+
 # A qlt stream holds one point of the order at each step: every run below
 # prints rationals, never the type's 0 or 1 (bot, top) or an interval.
 set(QLT_NO_POINT ":= bot|:= top|:= [[(]|not executable|unsat")

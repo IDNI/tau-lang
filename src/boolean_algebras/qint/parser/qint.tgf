@@ -1,18 +1,18 @@
 # To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-# Grammar for qint: finite unions of dyadic-rational left-closed right-open
-# intervals [lo, hi) on the extended real line.
+# Grammar for qint: finite unions of left-closed right-open intervals
+# [lo, hi) with rational endpoints on the extended line.
 #
 # Supported top-level literals:
 #   top | bot | bottom
 #   0 (bottom), 1 (top), n (bare integer: maps to [n, n+1))
 #   [lo, hi) | [lo, hi) | [lo2, hi2) | ...   (union of intervals)
 #
-# Endpoint syntax (validated semantically by qint_rational::parse()):
+# Endpoint syntax (validated and read exactly by qint_detail::parse_endpoint):
 #   +inf  +infinity  inf  infinity  -inf  -infinity
-#   p/q   (q must be a power of 2)
-#   d.dd  (decimal, must be dyadic)
 #   n     (integer)
+#   d.dd  (decimal, optionally with an exponent: 2e-3)
+#   a/b   (a fraction of two such numbers)
 
 @use char classes space, digit, alpha.
 

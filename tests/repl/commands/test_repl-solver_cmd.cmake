@@ -340,3 +340,18 @@ add_repl_test(solver_cmd-bv_through_def_rev
 add_repl_test(solver_cmd-term_rejected "solve x" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula" NO_FAIL_REGEX)
+
+# GitHub #181: --min/--max compare the solutions of every alternative, not
+# only the first alternative that has one
+add_repl_test(solver_cmd-issue181_min_bv
+	"solve --min (x:bv[2] = {0}:bv[2] || x:bv[2] = {1}:bv[2])" "x := \\{ 0 \\}:bv\\[2\\]")
+add_repl_test(solver_cmd-issue181_min_bv_reversed
+	"solve --min (x:bv[2] = {1}:bv[2] || x:bv[2] = {0}:bv[2])" "x := \\{ 0 \\}:bv\\[2\\]")
+add_repl_test(solver_cmd-issue181_max_bv
+	"solve --max (x:bv[4] = {8}:bv[4] || x:bv[4] = {15}:bv[4])" "x := \\{ 15 \\}:bv\\[4\\]")
+add_repl_test(solver_cmd-issue181_max_bv_reversed
+	"solve --max (x:bv[4] = {15}:bv[4] || x:bv[4] = {8}:bv[4])" "x := \\{ 15 \\}:bv\\[4\\]")
+add_repl_test(solver_cmd-issue181_max_tau
+	"solve --max (x = 0 || x = 1)" "x := \\{ T \\}:tau")
+add_repl_test(solver_cmd-issue181_min_sbf
+	"solve --min (x = {a}:sbf || x = {a & b}:sbf)" "x := \\{ a b \\}:sbf")

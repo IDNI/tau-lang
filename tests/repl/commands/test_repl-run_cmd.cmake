@@ -662,7 +662,9 @@ add_repl_test(run_cmd-value_past_constant_size_budget
 	"i1:tau := in file(\\\"${TF}/tau-nonzero_a1_to_a10-length_10.in\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
 	"o1\\[6\\] := .*passed the constant size budget" REQUIRES hostfs NO_FAIL_REGEX)
 # Over inputs pinned to 0 the values of the same run stay small DNFs: each
-# complement and conjunction drops its repeated and absorbed disjuncts.
+# complement and conjunction drops its repeated and absorbed disjuncts. Which
+# values the solver picks depends on the platform, so the budget is set
+# explicitly above the default; the case above checks the default one.
 add_repl_test(run_cmd-values_stay_within_constant_size_budget
-	"i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
-	"o1\\[9\\] := " REQUIRES hostfs)
+	"set maxconstantsize 4096. i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"o1\\[9\\] := " FAIL_REGEX "Error|passed the constant size budget" REQUIRES hostfs)

@@ -1,11 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include <charconv>
-#include <cmath>
-#include <iomanip>
 #include <limits>
 #include <ostream>
-#include <sstream>
 #include <vector>
 
 #include "qint.h"
@@ -13,12 +10,139 @@
 namespace idni::tau_lang {
 
 // =============================================================================
+// qint_rational — exact endpoints
+// =============================================================================
+
+// Pedantic-clean 128-bit alias: products of two 64-bit parts are exact in it.
+__extension__ typedef __int128 int128_t_;
+
+namespace {
+
+int128_t_ abs128(int128_t_ v) { return v < 0 ? -v : v; }
+
+int128_t_ gcd128(int128_t_ a, int128_t_ b) {
+	a = abs128(a), b = abs128(b);
+	while (b) { int128_t_ t = a % b; a = b; b = t; }
+	return a ? a : 1;
+}
+
+bool fits(int128_t_ v) {
+	return v >= std::numeric_limits<long long>::min()
+		&& v <= std::numeric_limits<long long>::max();
+}
+
+// The exact rational num/den, or nullopt when den is 0 or the reduced value
+// does not fit a 64-bit numerator and denominator.
+std::optional<qint_rational> make_rational(int128_t_ num, int128_t_ den) {
+	if (den == 0) return std::nullopt;
+	if (den < 0) num = -num, den = -den;
+	int128_t_ g = gcd128(num, den);
+	num /= g, den /= g;
+	if (!fits(num) || !fits(den)) return std::nullopt;
+	qint_rational r;
+	r.p = (long long) num, r.q = (long long) den;
+	return r;
+}
+
+// a + b for finite a and an integer b, exactly.
+std::optional<qint_rational> add_int(const qint_rational& a, long long b) {
+	return make_rational((int128_t_) a.p + (int128_t_) b * a.q, a.q);
+}
+
+// The midpoint of two finite rationals, exactly.
+std::optional<qint_rational> midpoint(const qint_rational& a,
+	const qint_rational& b)
+{
+	// The reduced denominators are at most 2^63, so the doubled product of
+	// two of them could overflow; reduce the sum over lcm(a.q, b.q) instead.
+	int128_t_ g = gcd128(a.q, b.q);
+	int128_t_ l = (int128_t_) a.q / g * b.q;
+	int128_t_ num = (int128_t_) a.p * (l / a.q) + (int128_t_) b.p * (l / b.q);
+	if (num % 2 == 0) return make_rational(num / 2, l);
+	if (l > std::numeric_limits<int128_t_>::max() / 2) return std::nullopt;
+	return make_rational(num, l * 2);
+}
+
+} // namespace
+
+qint_rational::qint_rational(long long num, long long den) {
+	auto r = make_rational(num, den);
+	if (r) *this = *r;
+}
+
+std::strong_ordering qint_rational::operator<=>(
+	const qint_rational& o) const noexcept
+{
+	if (is_inf() || o.is_inf()) {
+		// -inf < finite < +inf; an infinity's p is its sign
+		const int a = is_inf() ? (p > 0 ? 1 : -1) : 0;
+		const int b = o.is_inf() ? (o.p > 0 ? 1 : -1) : 0;
+		return a <=> b;
+	}
+	return (int128_t_) p * o.q <=> (int128_t_) o.p * q;
+}
+
+// =============================================================================
 // qint_detail — endpoint parsing and formatting
 // =============================================================================
 
 namespace qint_detail {
 
-bool parse_endpoint(const std::string& s, double& out) {
+namespace {
+
+// A decimal number with an optional sign, fraction and exponent, exactly:
+// "12", "-1.5", ".5", "5.", "2e-3", "1.25E+2".
+std::optional<qint_rational> parse_decimal(const std::string& t) {
+	size_t i = 0;
+	bool negative = false;
+	if (i < t.size() && (t[i] == '+' || t[i] == '-'))
+		negative = t[i++] == '-';
+	int128_t_ mant = 0;
+	int scale = 0; // value = mant * 10^(exp - scale)
+	bool digits = false, dot = false;
+	const int128_t_ cap = (int128_t_) 1 << 100;
+	for (; i < t.size(); ++i) {
+		const char c = t[i];
+		if (c == '.') {
+			if (dot) return std::nullopt;
+			dot = true;
+		} else if (c >= '0' && c <= '9') {
+			digits = true;
+			mant = mant * 10 + (c - '0');
+			if (mant > cap) return std::nullopt;
+			if (dot) ++scale;
+		} else break;
+	}
+	if (!digits) return std::nullopt;
+	long long exp = 0;
+	if (i < t.size() && (t[i] == 'e' || t[i] == 'E')) {
+		++i;
+		bool eneg = false;
+		if (i < t.size() && (t[i] == '+' || t[i] == '-'))
+			eneg = t[i++] == '-';
+		if (i == t.size()) return std::nullopt;
+		for (; i < t.size(); ++i) {
+			if (t[i] < '0' || t[i] > '9') return std::nullopt;
+			exp = exp * 10 + (t[i] - '0');
+			if (exp > 40) return std::nullopt;
+		}
+		if (eneg) exp = -exp;
+	}
+	if (i != t.size()) return std::nullopt;
+	long long shift = exp - scale;
+	if (shift > 38 || shift < -38) return std::nullopt;
+	int128_t_ num = negative ? -mant : mant, den = 1;
+	for (; shift > 0; --shift) {
+		if (abs128(num) > cap) return std::nullopt;
+		num *= 10;
+	}
+	for (; shift < 0; ++shift) den *= 10;
+	return make_rational(num, den);
+}
+
+} // namespace
+
+bool parse_endpoint(const std::string& s, qint_rational& out) {
 	std::string t = s;
 	auto trim = [](std::string& x) {
 		x.erase(0, x.find_first_not_of(" \t\n\r"));
@@ -29,39 +153,49 @@ bool parse_endpoint(const std::string& s, double& out) {
 	if (t.empty()) return false;
 
 	if (t == "+inf" || t == "inf" || t == "+infinity" || t == "infinity")
-		{ out = POS_INF; return true; }
+		{ out = qint_rational::pos_inf(); return true; }
 	if (t == "-inf" || t == "-infinity")
-		{ out = NEG_INF; return true; }
+		{ out = qint_rational::neg_inf(); return true; }
 
-	// fraction p/q — accepts all rationals (not just dyadic)
 	auto slash = t.find('/');
-	if (slash != std::string::npos) {
-		std::string ps = t.substr(0, slash), qs = t.substr(slash + 1);
-		trim(ps); trim(qs);
-		try {
-			size_t pp, qp;
-			double p = std::stod(ps, &pp), q = std::stod(qs, &qp);
-			if (pp != ps.size() || qp != qs.size()) return false;
-			if (std::fpclassify(q) == FP_ZERO) return false;
-			out = p / q;
-			return true;
-		} catch (...) { return false; }
+	if (slash == std::string::npos) {
+		auto r = parse_decimal(t);
+		if (!r) return false;
+		out = *r;
+		return true;
 	}
-
-	// decimal or integer
-	try {
-		size_t pos;
-		out = std::stod(t, &pos);
-		while (pos < t.size() && (t[pos] == ' ' || t[pos] == '\t')) ++pos;
-		return pos == t.size();
-	} catch (...) { return false; }
+	std::string ps = t.substr(0, slash), qs = t.substr(slash + 1);
+	trim(ps); trim(qs);
+	auto a = parse_decimal(ps), b = parse_decimal(qs);
+	if (!a || !b || b->p == 0) return false;
+	auto r = make_rational((int128_t_) a->p * b->q, (int128_t_) a->q * b->p);
+	if (!r) return false;
+	out = *r;
+	return true;
 }
 
-std::string endpoint_to_string(double v) {
-	if (std::isinf(v)) return v > 0 ? "+inf" : "-inf";
-	std::ostringstream os;
-	os << std::setprecision(17) << v;
-	return os.str();
+std::string endpoint_to_string(const qint_rational& v) {
+	if (v.is_inf()) return v.p > 0 ? "+inf" : "-inf";
+	if (v.q == 1) return std::to_string(v.p);
+	// A denominator of the form 2^a 5^b terminates in decimal.
+	long long d = v.q;
+	int twos = 0, fives = 0;
+	while (d % 2 == 0) d /= 2, ++twos;
+	while (d % 5 == 0) d /= 5, ++fives;
+	if (d != 1) return std::to_string(v.p) + "/" + std::to_string(v.q);
+	// p / (2^twos 5^fives) == p 2^(digits-twos) 5^(digits-fives) / 10^digits
+	const int digits = std::max(twos, fives);
+	int128_t_ scaled = (int128_t_) v.p;
+	for (int i = twos; i < digits; ++i) scaled *= 2;
+	for (int i = fives; i < digits; ++i) scaled *= 5;
+	// scaled / 10^digits == v; print it with the point placed.
+	const bool negative = scaled < 0;
+	int128_t_ mag = abs128(scaled);
+	std::string s;
+	while (mag > 0) { s.insert(s.begin(), char('0' + (int) (mag % 10))); mag /= 10; }
+	while ((int) s.size() <= digits) s.insert(s.begin(), '0');
+	s.insert(s.end() - digits, '.');
+	return negative ? "-" + s : s;
 }
 
 } // namespace qint_detail
@@ -73,14 +207,13 @@ std::string endpoint_to_string(double v) {
 qint qint::bottom() { return {}; }
 
 qint qint::top() {
-	return qint{{ {qint_detail::NEG_INF, qint_detail::POS_INF} }};
+	return qint{{ {qint_rational::neg_inf(), qint_rational::pos_inf()} }};
 }
 
 bool qint::is_full() const noexcept {
 	if (intervals.size() != 1) return false;
 	auto it = intervals.begin();
-	return std::isinf(it->first)  && it->first  < 0
-	    && std::isinf(it->second) && it->second > 0;
+	return it->first.is_neg_inf() && it->second.is_pos_inf();
 }
 
 bool qint::operator==(const qint& o) const noexcept {
@@ -100,7 +233,7 @@ std::strong_ordering qint::operator<=>(const qint& o) const noexcept {
 }
 
 qint qint::operator|(const qint& o) const {
-	std::map<double,double> merged = intervals;
+	auto merged = intervals;
 	for (auto& [lo, hi] : o.intervals) {
 		auto it = merged.find(lo);
 		if (it != merged.end()) it->second = std::max(it->second, hi);
@@ -110,11 +243,11 @@ qint qint::operator|(const qint& o) const {
 }
 
 qint qint::operator&(const qint& o) const {
-	std::map<double,double> result;
+	std::map<qint_rational, qint_rational> result;
 	auto i = intervals.begin(), j = o.intervals.begin();
 	while (i != intervals.end() && j != o.intervals.end()) {
-		double lo = std::max(i->first,  j->first);
-		double hi = std::min(i->second, j->second);
+		qint_rational lo = std::max(i->first,  j->first);
+		qint_rational hi = std::min(i->second, j->second);
 		if (lo < hi) result[lo] = hi;
 		if      (i->second < j->second) ++i;
 		else if (j->second < i->second) ++j;
@@ -125,13 +258,13 @@ qint qint::operator&(const qint& o) const {
 
 qint qint::operator~() const {
 	if (intervals.empty()) return top();
-	std::map<double,double> result;
-	double cur = qint_detail::NEG_INF;
+	std::map<qint_rational, qint_rational> result;
+	qint_rational cur = qint_rational::neg_inf();
 	for (auto& [lo, hi] : intervals) {
 		if (cur < lo) result[cur] = lo;
 		cur = hi;
 	}
-	if (cur < qint_detail::POS_INF) result[cur] = qint_detail::POS_INF;
+	if (!cur.is_pos_inf()) result[cur] = qint_rational::pos_inf();
 	return qint{std::move(result)};
 }
 
@@ -153,10 +286,10 @@ std::string qint::to_string() const {
 	return s;
 }
 
-qint qint::normalize_map(std::map<double,double> m) {
+qint qint::normalize_map(std::map<qint_rational, qint_rational> m) {
 	if (m.empty()) return {};
-	std::map<double,double> result;
-	double cur_lo = m.begin()->first, cur_hi = m.begin()->second;
+	std::map<qint_rational, qint_rational> result;
+	qint_rational cur_lo = m.begin()->first, cur_hi = m.begin()->second;
 	for (auto it = std::next(m.begin()); it != m.end(); ++it) {
 		if (it->first <= cur_hi) { cur_hi = std::max(cur_hi, it->second); }
 		else { result[cur_lo] = cur_hi; cur_lo = it->first; cur_hi = it->second; }
@@ -181,26 +314,27 @@ tref simplify_qint_term(tref t) { return t; }
 
 qint qint_splitter(const qint& x, splitter_type /*st*/) {
 	if (x.is_empty()) return qint::bottom();
-	auto& [lo, hi] = *x.intervals.begin();
-	using namespace qint_detail;
-	if (std::isinf(lo) && std::isinf(hi)) return qint{{ {NEG_INF, 0.0} }};
-	if (std::isinf(lo)) {
-		double cut = hi - 1.0;
-		if (!(cut < hi)) return qint{{ {lo, hi} }}; // saturated (degenerate)
-		return qint{{ {NEG_INF, cut} }};
+	const auto& [lo, hi] = *x.intervals.begin();
+	if (lo.is_inf() && hi.is_inf()) return qint{{ {lo, qint_rational(0)} }};
+	// A cut that does not fit leaves no smaller piece to return: the element
+	// comes back unchanged, as the contract above allows.
+	if (lo.is_inf()) {
+		auto cut = add_int(hi, -1);
+		if (!cut) return qint{{ {lo, hi} }};
+		return qint{{ {lo, *cut} }};
 	}
-	if (std::isinf(hi)) {
-		double cut = lo + 1.0;
-		if (!(cut > lo)) return qint{{ {lo, hi} }}; // saturated (degenerate)
-		return qint{{ {lo, cut} }};
+	if (hi.is_inf()) {
+		auto cut = add_int(lo, 1);
+		if (!cut) return qint{{ {lo, hi} }};
+		return qint{{ {lo, *cut} }};
 	}
-	double mid = lo / 2.0 + hi / 2.0;
-	if (mid <= lo || mid >= hi) return qint{{ {lo, hi} }}; // degenerate
-	return qint{{ {lo, mid} }};
+	auto mid = midpoint(lo, hi);
+	if (!mid) return qint{{ {lo, hi} }};
+	return qint{{ {lo, *mid} }};
 }
 
 qint qint_splitter_one() {
-	return qint{{ {0.0, 0.5} }};
+	return qint{{ {qint_rational(0), qint_rational(1, 2)} }};
 }
 
 // =============================================================================
@@ -221,7 +355,7 @@ std::optional<qint> qint_eval_interval(
 
 	if (endpoints.size() < 2) return std::nullopt;
 
-	double lo, hi;
+	qint_rational lo, hi;
 	if (!qint_detail::parse_endpoint(endpoints[0], lo) ||
 	    !qint_detail::parse_endpoint(endpoints[1], hi))
 		return std::nullopt;
@@ -258,10 +392,9 @@ result<qint> qint_eval_parse_tree(
 		if (val == 0) return r.with_value(qint::bottom());
 		if (val == 1) return r.with_value(qint::top());
 
-		double lo = static_cast<double>(val);
-		double hi = lo + 1.0;
-		if (!(hi > lo)) return r;
-		return r.with_value(qint{{ {lo, hi} }});
+		auto hi = add_int(qint_rational(val), 1);
+		if (!hi) return r;
+		return r.with_value(qint{{ {qint_rational(val), *hi} }});
 	}
 
 	case type::qint_single: {
@@ -301,10 +434,8 @@ result<qint> qint_eval_parse_tree(
 size_t std::hash<idni::tau_lang::qint>::operator()(
 	const idni::tau_lang::qint& d) const noexcept
 {
-	size_t h = 0;
-	for (auto& [lo, hi] : d.intervals) {
-		h ^= std::hash<double>{}(lo) * 2654435761ULL;
-		h ^= std::hash<double>{}(hi) * 2246822519ULL;
-	}
-	return h;
+	std::uint64_t seed = d.intervals.size();
+	for (auto& [lo, hi] : d.intervals)
+		idni::hash_combine(seed, lo.p, lo.q, hi.p, hi.q);
+	return static_cast<size_t>(seed);
 }

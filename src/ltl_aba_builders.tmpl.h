@@ -990,22 +990,20 @@ ltl_to_safety_formula_full(tref fm,
 	// realizability check asks it: on codes before the abstraction, on
 	// formulas only once the abstraction gives no strategy to execute.
 	const ltl_aba_solution<node> game_source = maybe ? *maybe : partial;
-	bool data_decided = false;
+	bool data_decided = false, data_unrealizable = false;
 	auto on_data = [&](bool formulas) {
 		if (!data_strategy || data_decided
 			|| game_source.game_skeleton.empty()) return false;
 		auto game = solve_data_game<node>(game_source.game_skeleton,
 			game_source.atoms, game_source.input_props,
 			game_source.output_props, formulas, data_strategy);
-		if (game.has_value()) {
-			data_decided = game.value()
-				!= data_game_verdict::undecided;
-			if (unrealizable
-				&& game.value()
-					== data_game_verdict::unrealizable)
-					*unrealizable = true;
-			r.merge(std::move(game));
-		} else {
+		data_decided = game.has_value()
+			&& game.value() != data_game_verdict::undecided;
+		data_unrealizable = game.has_value()
+			&& game.value() == data_game_verdict::unrealizable;
+		if (unrealizable && data_unrealizable) *unrealizable = true;
+		if (game.has_value()) r.merge(std::move(game));
+		else {
 			// the data game could not be built: a rejected candidate
 			auto sc = r.open("rejected candidate");
 			r.info("the data game could not be built");
@@ -1020,6 +1018,11 @@ ltl_to_safety_formula_full(tref fm,
 		return {nullptr, std::nullopt, {}};
 	};
 	if (on_data(false))
+		return r.with_value(full_t{nullptr, std::nullopt, {}});
+	// The data game decides exactly: no strategy of the abstraction is
+	// executed once it has shown that none exists, and refining one can
+	// take minutes.
+	if (data_unrealizable)
 		return r.with_value(full_t{nullptr, std::nullopt, {}});
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";

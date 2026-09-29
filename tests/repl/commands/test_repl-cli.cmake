@@ -231,3 +231,10 @@ add_multiline_repl_test(cli-bv_widening_spec_file_mode
 	"o1\\[0\\] := 200"
 	NO_FAIL_REGEX STDIN "i1:bv[8] := in console.\\ni2:bv[8] := in console.\\nrun always o1[t]:bv[8] = min(i1[t] + i2[t], {200}:bv[8]).\\n200\\n100\\nq\\nq\\n"
 	FLAGS --bv-widening TIMEOUT 120)
+
+# With multi-character names `xy` is one variable, so a printed conjunction
+# must keep its `&` to read back as the same formula.
+add_repl_test(cli-no_charvar_prints_conjunction
+	"normalize (ab:sbf & c_:sbf) = 0:sbf." "(ab&c_|c_&ab) = 0"
+	FLAGS --charvar=false --color=false -S error NO_TRACE
+	FAIL_REGEX "Error|abc_|c_ab")

@@ -2929,6 +2929,67 @@ static result<std::vector<std::string>> add_forceability_observations(
 	return r.with_value(std::move(clauses));
 }
 
+// The first claim of `sol`'s strategy that the system cannot force every
+// time its edge fires, nullopt when it can force each one. A claim is the
+// conjunction of a product's literals over the output props; the literals
+// over the input props, which the data decides, are what fires the edge.
+// It is forced when, whatever the inputs of the step and the earlier values
+// that fire it, some current outputs satisfy it. A claim whose quantifiers
+// are not eliminated counts as not forced.
+template <NodeType node>
+static result<std::optional<tref>> first_unforced_claim(
+    const ltl_aba_solution<node>& sol)
+{
+	using tau = tree<node>;
+	result<std::optional<tref>> r;
+	const bool single_type =
+		formula_type_set<node>::from_atoms(sol.atoms).single_type();
+	const std::set<std::string> inputs(sol.input_props.begin(),
+		sol.input_props.end());
+	// with no atom over the outputs, no edge claims anything
+	if (std::ranges::all_of(sol.atoms, [&](const auto& a) {
+		return inputs.contains(a.second); }))
+			return r.with_value(std::optional<tref>{});
+	data_quantifier<node> dq;
+	for (size_t s = 0; s < sol.aut.num_states
+		&& s < sol.aut.edges.size(); ++s)
+		for (const auto& e : sol.aut.edges[s])
+		{
+			TAU_TRY(auto live, build_guard_live_products<node>(
+				e.guard_label, sol.aut.aps, sol.atoms, single_type));
+			for (auto& p : live)
+			{
+				tref claim = tau::_T(), trigger = tau::_T();
+				bool claims = false;
+				for (auto& gl : p.lits) {
+					auto nl = name_literal<node>(gl, sol.atoms);
+					if (gl.pure_input || (nl && inputs.contains(nl->first)))
+						trigger = tau::build_wff_and(trigger, gl.lit);
+					else {
+						claim = tau::build_wff_and(claim, gl.lit);
+						claims = true;
+					}
+				}
+				if (!claims) continue;
+				auto [_, outs] = data_quantifier<node>::current_vars(claim);
+				tref forced = claim;
+				for (tref v : outs) forced = dq.quantify(v, forced, true);
+				forced = dq.eliminate(forced);
+				// not eliminated: the claim counts as not forced
+				if (!forced)
+					return r.with_value(
+						std::optional<tref>{ claim });
+				TAU_TRY(bool feasible, aba_existential_feasible<node>(
+					tau::build_wff_and(trigger,
+						tau::build_wff_neg(forced))));
+				if (feasible)
+					return r.with_value(
+						std::optional<tref>{ claim });
+			}
+		}
+	return r.with_value(std::optional<tref>{});
+}
+
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
 //
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:

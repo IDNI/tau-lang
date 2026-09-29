@@ -112,6 +112,7 @@ void api<node>::set_charvar(bool charvar) {
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	pack_set_charvar<node>(charvar);
+	pretty_printer_charvar = charvar;
 }
 
 template <NodeType node>
@@ -1149,6 +1150,7 @@ result<tref> api<node>::eliminate_quantifiers(tref fm) {
 		}
 		TAU_TRY(auto simplified, simplify(fm));
 		TAU_TRY(auto applied, apply_all_defs(simplified));
+		applied = eliminate_functional_quantifiers<node>(applied);
 		TAU_TRY(auto prenexed, tau_lang::anti_prenex<node>(applied));
 		TAU_TRY(auto e, resolve_quantifiers<node>(prenexed));
 		r = e;

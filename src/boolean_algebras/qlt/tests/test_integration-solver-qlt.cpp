@@ -480,10 +480,97 @@ TEST_SUITE("qlt residual elimination") {
 			"a : qlt < b : qlt.") );
 	}
 
+	// GitHub #148: a variable pinned to one term is replaced by it, so a
+	// disequality next to the pin is kept instead of dropped.
+	TEST_CASE("a pinned variable is replaced by its pin") {
+		CHECK( eliminates_to("a : qlt < x : qlt && x : qlt = b : qlt.",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to(
+			"a : qlt <= x : qlt && x : qlt <= a : qlt && x : qlt != b : qlt.",
+			"a : qlt != b : qlt.") );
+		CHECK( eliminates_to(
+			"{1}:qlt <= x : qlt && x : qlt <= {1}:qlt && x : qlt != a : qlt.",
+			"{1}:qlt != a : qlt.") );
+	}
+
+	// Density: finitely many disequalities cannot exhaust an interval with
+	// an interior point, so only the single-point case depends on them.
+	TEST_CASE("disequalities beside two bounds are eliminated by density") {
+		CHECK( eliminates_to(
+			"a : qlt <= x : qlt && x : qlt <= b : qlt && x : qlt != c : qlt.",
+			"a : qlt < b : qlt || a : qlt = b : qlt && a : qlt != c : qlt.") );
+		// two exclusions: checked by value in the ordering test below
+		CHECK( residual(
+			"a : qlt <= x : qlt && x : qlt <= b : qlt && x : qlt != c : qlt"
+			" && x : qlt != d : qlt.") != nullptr );
+		// a strict bound leaves an interior point whenever L < U
+		CHECK( eliminates_to(
+			"a : qlt < x : qlt && x : qlt <= b : qlt && x : qlt != c : qlt.",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to(
+			"a : qlt < x : qlt && x : qlt < b : qlt && x : qlt != c : qlt"
+			" && x : qlt != d : qlt.",
+			"a : qlt < b : qlt.") );
+		// a constant bound and a constant exclusion
+		CHECK( eliminates_to(
+			"{1}:qlt <= x : qlt && x : qlt <= b : qlt && x : qlt != {2}:qlt.",
+			"{1}:qlt < b : qlt || {1}:qlt = b : qlt && {1}:qlt != {2}:qlt.") );
+	}
+
+	TEST_CASE("disequalities beside several bounds on one side are left alone") {
+		CHECK( residual(
+			"a : qlt <= x : qlt && e : qlt <= x : qlt && x : qlt <= b : qlt"
+			" && x : qlt != c : qlt.") == nullptr );
+	}
+
+	// The residual of each shape, with points for its free variables, must
+	// agree with the direct answer for every ordering of L, U and two
+	// excluded values over three points, in each strictness.
+	TEST_CASE("the density rule agrees with a direct check on every ordering") {
+		auto operand = [&](const char* src, bool first) {
+			const auto& t = tau::get(wff(src))[0];
+			return first ? t.first() : t.second();
+		};
+		const char* names[] = { "a", "b", "c", "d" };
+		tref vars[4], pts[3];
+		for (int i = 0; i < 4; ++i) {
+			std::string src = std::string(names[i]) + " : qlt < {7}:qlt.";
+			vars[i] = operand(src.c_str(), true);
+		}
+		for (int v = 0; v < 3; ++v) {
+			std::string src = "y : qlt < {" + std::to_string(v) + "}:qlt.";
+			pts[v] = operand(src.c_str(), false);
+		}
+		size_t checked = 0;
+		for (int ls = 0; ls < 2; ++ls) for (int us = 0; us < 2; ++us) {
+			std::string body = std::string("a : qlt ") + (ls ? "<" : "<=")
+				+ " x : qlt && x : qlt " + (us ? "<" : "<=")
+				+ " b : qlt && x : qlt != c : qlt && x : qlt != d : qlt.";
+			tref res = residual(body.c_str());
+			REQUIRE( res != nullptr );
+			for (int L = 0; L < 3; ++L) for (int U = 0; U < 3; ++U)
+			for (int c1 = 0; c1 < 3; ++c1) for (int c2 = 0; c2 < 3; ++c2) {
+				subtree_map<node_t, tref> at{ { vars[0], pts[L] },
+					{ vars[1], pts[U] }, { vars[2], pts[c1] },
+					{ vars[3], pts[c2] } };
+				tref inst = rewriter::replace<node_t>(res, at);
+				auto n = normalizer<node_t>(inst);
+				REQUIRE( n.has_value() );
+				const bool expected = L < U || (L == U && !ls && !us
+					&& L != c1 && L != c2);
+				CAPTURE(body); CAPTURE(L); CAPTURE(U);
+				CAPTURE(c1); CAPTURE(c2);
+				CHECK( tau::get(n.value()).equals_T() == expected );
+				CHECK( tau::get(n.value()).equals_F() == !expected );
+				++checked;
+			}
+		}
+		CHECK( checked == 324 );
+	}
+
 	TEST_CASE("bodies outside the fragment are left alone") {
-		// an equality needs no elimination, a disequality a case split
-		CHECK( residual("a : qlt < x : qlt && x : qlt = b : qlt.")
-			== nullptr );
+		// a disequality beside a one-sided bound is the interval
+		// computation's, which decides it
 		CHECK( residual("a : qlt < x : qlt && x : qlt != b : qlt.")
 			== nullptr );
 		// a conjunct without the variable

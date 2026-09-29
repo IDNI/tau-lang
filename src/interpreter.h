@@ -749,11 +749,15 @@ private:
 	/// the plain conjunction is unsat, appends the update clause as a
 	/// last-resort alternative instead of embedding the guarded
 	/// ¬∃outs.(S∧U) disjunction into a stored formula.
+	/// @param check_goals Keep an alternative's sometimes clauses only
+	/// when they stay satisfiable with it; false keeps them unchecked, for
+	/// a caller that decides each alternative itself and falls back to
+	/// the one without them.
 	/// @return The revised ordered alternatives, or a value of
 	/// `std::nullopt` when no update clause yields a satisfiable
 	/// revision; the report carries the probes tried along the way.
 	result<std::optional<htrefs>> pointwise_revision(const htrefs& alts,
-		tref update, const int_t start_time);
+		tref update, const int_t start_time, bool check_goals = true);
 
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	result<trefs> appear_within_lookback(const trefs& vars);

@@ -198,3 +198,92 @@ add_repl_test(normalize_cmd-qlt_nested_xor_unsat
 # `x < {1}` and contradicting `x > {5}`; the binder stays.
 add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
 	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")
+
+# GitHub #183: Boole's elimination law does not hold for arithmetic, so a
+# bitvector variable under `-` keeps its binder for the solver paths
+add_repl_test(normalize_cmd-issue183_sub_true
+	"normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue183_sub_false
+	"normalize all x:bv[2] ((x:bv[2] = {0}:bv[2]) -> (ex y:bv[2] ((x:bv[2] | (y:bv[2] & {2}:bv[2])) = (y:bv[2] - {3}:bv[2]))))." "%1[^%]*: F")
+set(_issue183_cmd "normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] ((x:bv[3] & {1}:bv[3]) = (y:bv[3] - {2}:bv[3]))))")
+foreach(_s 0 2)
+	tau_repl_unsupported(_tau_skip "${_issue183_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("normalize_cmd-issue183_sub_true_splits${_s}")
+		continue()
+	endif()
+	add_test(NAME "test_repl-normalize_cmd-issue183_sub_true_splits${_s}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --preprocessing=false --bv-widening=false --bv-quantifier-free-decision=false --block-max-splits=${_s} -e \"${_issue183_cmd}\"")
+	set_tests_properties("test_repl-normalize_cmd-issue183_sub_true_splits${_s}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "%1[^%]*: T"
+		FAIL_REGULAR_EXPRESSION "Error"
+		TIMEOUT 60)
+endforeach()
+
+# GitHub #185: min/max are built-ins under a cast, a complement and a
+# juxtaposed conjunction, and their printed form reads back the same
+add_repl_test(normalize_cmd-issue185_cast_max_sat
+	"sat ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_cast_max_valid
+	"valid ((bv[4]) max(y:bv[3], {1}:bv[3])) != {2}:bv[4]." "%1[^%]*: F")
+add_repl_test(normalize_cmd-issue185_cast_max_solve
+	"solve ((bv[4]) max(y:bv[3], {1}:bv[3])) = {2}:bv[4]." "y := \\{ 2 \\}:bv\\[3\\]")
+add_repl_test(normalize_cmd-issue185_complement_min_sat
+	"sat min(x:bv[2], {2}:bv[2])' = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_printed_complement_min_sat
+	"sat min(x, { 2 }:bv[2])' = { 2 }:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_printed
+	"normalize x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "x min\\(x")
+add_repl_test(normalize_cmd-issue185_juxtaposed_min_sat
+	"sat x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+
+# GitHub #148: a disequality next to a qlt variable pinned to one value is kept,
+# not dropped as harmless over a dense order.
+add_repl_test(normalize_cmd-qlt_pinned_neq_sat
+	"sat a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_valid
+	"valid ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_solve
+	"solve a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" "no solution")
+add_repl_test(normalize_cmd-qlt_pinned_neq_closed
+	"normalize ex a:qlt ex b:qlt ex c:qlt ((((a <= c) && (c <= a) && (b <= c)) || ((a <= c) && (c <= a) && (b < c))) && (c != a))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_residual
+	"normalize ex x:qlt (a:qlt <= x && x <= a && x != b:qlt)" ": a != b")
+
+# GitHub #149: fex / fall are evaluated before any substitution can cross their
+# binder, on every command, so a binder never captures a variable of the same
+# name outside it.
+add_repl_test(normalize_cmd-fall_binder_not_captured
+	"normalize ((fall y (x | y)) & y) = 0" ": (xy|yx) = 0")
+add_repl_test(normalize_cmd-fex_binder_solve
+	"solve b = 0 && (fex b (a & b)) != 0" "a := \\{ T \\}")
+add_repl_test(normalize_cmd-fex_equals_body
+	"normalize (fex y (x & y)) = x" ": T")
+
+# GitHub #148 follow-up: disequalities beside one lower and one upper bound are
+# eliminated by density, ex x (L <= x <= U && x != c) being
+# L < U || (L = U && L != c), and L < U when a bound is strict.
+add_repl_test(normalize_cmd-qlt_density_residual
+	"normalize ex x:qlt (a:qlt <= x && x <= b:qlt && x != c:qlt)" ": a < b \\|\\| a = b && [ab] != c")
+add_repl_test(normalize_cmd-qlt_density_strict
+	"normalize ex x:qlt (a:qlt < x && x <= b:qlt && x != c:qlt && x != d:qlt)" ": a < b\n")
+add_repl_test(normalize_cmd-qlt_density_closed_some
+	"normalize ex a:qlt ex b:qlt ex x:qlt (a <= x && x <= b && x != a && x != b)" ": T")
+add_repl_test(normalize_cmd-qlt_density_closed_all
+	"normalize all a:qlt all b:qlt ex x:qlt (a <= x && x <= b && x != a && x != b)" ": F")
+add_repl_test(normalize_cmd-qlt_density_point_excluded
+	"sat a:qlt = b:qlt && c:qlt = a:qlt && (ex x:qlt (a <= x && x <= b && x != c))" ": F")
+add_repl_test(normalize_cmd-qlt_density_point_kept
+	"sat a:qlt = b:qlt && (ex x:qlt (a <= x && x <= b && x != c:qlt))" ": T")
+add_repl_test(normalize_cmd-qlt_density_equivalence
+	"valid all a:qlt all b:qlt all c:qlt ((ex x:qlt (a <= x && x <= b && x != c)) <-> (a < b || (a = b && a != c)))" ": T")
+# GitHub #185: a bare min/max is the built-in, not a function call, as the
+# whole right-hand side of a definition and as a fixed-point fallback
+add_repl_test(normalize_cmd-issue185_definition_max
+	"g(x:bv[2]) := max(x:bv[2], {2}:bv[2]). normalize g({0}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_definition_min
+	"g(x:bv[2]) := min(x:bv[2], {2}:bv[2]). normalize g({3}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_definition_ref_kept
+	"f(x, y) := x | y. g(x) := f(x, x). normalize g(a) = 0." "%1[^%]*: a = 0")
+add_repl_test(normalize_cmd-issue185_fallback_max
+	"g[0](x:bv[2]) := {0}:bv[2]. g[n](x:bv[2]) := g[n-1](x:bv[2])'. normalize (g({1}:bv[2]) fallback max({0}:bv[2], {2}:bv[2])) = {2}:bv[2]." "%1[^%]*: T")

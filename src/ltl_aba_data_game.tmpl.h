@@ -812,6 +812,8 @@ struct code_regions {
 	const arena& a;
 	const code_window& w;
 	data_bdd bdd;
+	// failed, for a reason other than a full table
+	bool declined = false;
 	bool failed = false;
 	// Reports of the checks that answer through `failed`; merged by the caller.
 	report rep;
@@ -833,6 +835,28 @@ struct code_regions {
 	region check(region r) {
 		if (bdd.full) failed = true;
 		return r;
+	}
+
+	// Whether the last work failed only for want of nodes, so that it may
+	// be redone after a collect() that makes room for it.
+	bool out_of_nodes() const { return bdd.full && !declined; }
+	bool wants_collect() const { return bdd.wants_collect(); }
+
+	// Frees the nodes that neither the labels nor the regions `each_root`
+	// marks reach. After a full table the cached order extensions go too,
+	// as they may have been computed while full, and `failed` is cleared:
+	// the caller redoes the work that ran out, or fails.
+	template <typename Roots>
+	void collect(Roots&& each_root) {
+		if (bdd.full) {
+			consistent.clear();
+			failed = declined;
+		}
+		bdd.collect([&](auto&& mark) {
+			for (region l : labels) mark(l);
+			for (const auto& [_, c] : consistent) mark(c);
+			each_root(mark);
+		});
 	}
 
 	// Whether point p is a slot of the chooser's streams at step t-k.
@@ -1050,7 +1074,7 @@ struct code_regions {
 			// a product may grow the BDD exponentially, so it gets a
 			// quarter of the table
 			if (!bit_circuits::mul(bdd, *x, *y,
-				bdd.nodes.size() + bdd.max_nodes / 4, out))
+				bdd.size() + bdd.max_nodes / 4, out))
 					return std::nullopt;
 			return out;
 		}
@@ -1203,7 +1227,14 @@ struct code_regions {
 		for (const auto& x : a.v) {
 			edge_base.push_back(labels.size());
 			for (const auto& e : x.edges) {
-				auto r = eval(e.label);
+				std::optional<region> r;
+				for (;;) {
+					const size_t room = bdd.room();
+					r = eval(e.label);
+					if (!out_of_nodes()) break;
+					collect([](auto&&) {});
+					if (!bdd.worth_redoing(room)) return false;
+				}
 				if (!r || bdd.full) return false;
 				labels.push_back(*r);
 			}
@@ -1223,7 +1254,7 @@ struct code_regions {
 			if (e.shift) {
 				bool ok = true;
 				tgt = bdd.rename(tgt, w.shift, ok);
-				if (!ok) { failed = true; return data_bdd::F; }
+				if (!ok) { failed = declined = true; return data_bdd::F; }
 			}
 			const region l = labels[edge_base[i] + j];
 			body = mine ? bdd.disj(body, bdd.conj(l, tgt))
@@ -1241,7 +1272,7 @@ struct code_regions {
 		if (e.shift) {
 			bool ok = true;
 			tgt = bdd.rename(tgt, w.shift, ok);
-			if (!ok) { failed = true; return data_bdd::F; }
+			if (!ok) { failed = declined = true; return data_bdd::F; }
 		}
 		return check(bdd.conj(labels[edge_base[i] + j], tgt));
 	}
@@ -1299,6 +1330,43 @@ struct data_game_solver {
 		moves_t moves;   // of the system, over its region
 	};
 
+	// Regions whose nodes can be freed: code_regions.
+	static constexpr bool collects = requires (R& x) { x.out_of_nodes(); };
+
+	// The regions the frames of solve() still need; each frame pushes its
+	// own and pops them when it returns.
+	std::vector<const std::vector<region>*> held;
+	std::vector<const moves_t*> held_moves;
+	struct frame {
+		data_game_solver& s;
+		size_t regions, moves;
+		~frame() {
+			s.held.resize(regions);
+			s.held_moves.resize(moves);
+		}
+	};
+	frame enter() { return { *this, held.size(), held_moves.size() }; }
+
+	// Frees the nodes that neither the held regions nor those of the
+	// attractor under way reach.
+	void collect(const std::vector<region>& Y, const std::vector<region>& G,
+		const moves_t* moves)
+	{
+		if constexpr (collects) r.collect([&](auto&& mark) {
+			auto all = [&](const std::vector<region>& X) {
+				for (region x : X) mark(x);
+			};
+			auto all_moves = [&](const moves_t& m) {
+				for (const auto& x : m) all(x);
+			};
+			for (const auto* X : held) all(*X);
+			for (const auto* m : held_moves) all_moves(*m);
+			all(Y);
+			all(G);
+			if (moves) all_moves(*moves);
+		});
+	}
+
 	moves_t no_moves() const {
 		moves_t m(n);
 		if (record) for (size_t i = 0; i < n; ++i)
@@ -1318,13 +1386,16 @@ struct data_game_solver {
 
 	// The attractor of `Y` for player `p` in the subgame `G`; with `moves`,
 	// the system's moves of each position it adds into the part added
-	// before it.
+	// before it. Between the steps of a vertex, the nodes nothing needs
+	// are freed once the table fills, and a step that runs out of nodes is
+	// redone after freeing them when that more than doubled its room.
 	std::vector<region> attractor(int p, std::vector<region> Y,
 		const std::vector<region>& G, moves_t* moves = nullptr)
 	{
 		std::vector<bool> dirty(n, true);
 		for (size_t round = 0; !r.failed; ++round) {
 			if (max_rounds && round >= max_rounds) {
+				if constexpr (collects) r.declined = true;
 				r.failed = true;
 				break;
 			}
@@ -1333,14 +1404,36 @@ struct data_game_solver {
 				if (!dirty[i]) continue;
 				dirty[i] = false;
 				if (r.empty(G[i])) continue;
-				region grown = r.disj(Y[i],
-					r.conj(G[i], r.pre(p, i, Y, G)));
-				region added = r.minus(grown, Y[i]);
+				const bool recorded = moves && owner[i] == 1;
+				std::vector<region> before;
+				if constexpr (collects) {
+					if (r.wants_collect()) collect(Y, G, moves);
+					if (recorded) before = (*moves)[i];
+				}
+				region grown, added;
+				for (;;) {
+					size_t room = 0;
+					if constexpr (collects) room = r.bdd.room();
+					grown = r.disj(Y[i],
+						r.conj(G[i], r.pre(p, i, Y, G)));
+					added = r.minus(grown, Y[i]);
+					if (!r.empty(added) && recorded)
+						for (size_t j = 0; j < edges[i]; ++j)
+							(*moves)[i][j] = r.disj((*moves)[i][j],
+								r.conj(added, r.move(i, j, Y)));
+					if constexpr (collects) {
+						if (r.out_of_nodes()) {
+							if (recorded) (*moves)[i] = before;
+							collect(Y, G, moves);
+							if (r.bdd.worth_redoing(room)) continue;
+							// the step's regions may name freed nodes
+							r.failed = true;
+							added = r.bottom();
+						}
+					}
+					break;
+				}
 				if (r.empty(added)) continue;
-				if (moves && owner[i] == 1)
-					for (size_t j = 0; j < edges[i]; ++j)
-						(*moves)[i][j] = r.disj((*moves)[i][j],
-							r.conj(added, r.move(i, j, Y)));
 				Y[i] = std::move(grown);
 				changed = true;
 				for (size_t j : preds[i]) dirty[j] = true;
@@ -1361,6 +1454,8 @@ struct data_game_solver {
 	// The regions of the subgame `G` won by the environment and by the
 	// system, with the system's strategy when recording.
 	won solve(const std::vector<region>& G) {
+		auto held_here = enter();
+		held.push_back(&G);
 		const std::vector<region> none(n, r.bottom());
 		int top = -1;
 		for (size_t i = 0; i < n; ++i)
@@ -1371,9 +1466,14 @@ struct data_game_solver {
 		for (size_t i = 0; i < n; ++i)
 			if (priority[i] == top) U[i] = G[i];
 		moves_t attracted = no_moves();
+		held.push_back(&U);
+		held_moves.push_back(&attracted);
 		auto A = attractor(p, U, G, record && p ? &attracted : nullptr);
 		auto sub = solve(minus(G, A));
 		if (r.failed) return { none, none, no_moves() };
+		held.push_back(&sub.env);
+		held.push_back(&sub.sys);
+		held_moves.push_back(&sub.moves);
 		auto& lost = p ? sub.env : sub.sys;
 		if (empty(lost)) {
 			if (!p) return { G, none, no_moves() };
@@ -1389,6 +1489,7 @@ struct data_game_solver {
 			return all;
 		}
 		moves_t kept = no_moves();
+		held_moves.push_back(&kept);
 		auto B = attractor(1 - p, lost, G,
 			record && !p ? &kept : nullptr);
 		auto rest = solve(minus(G, B));
@@ -1749,6 +1850,11 @@ protected:
 		return it != sol.end() ? it->second : build_bf_f_type<node>(tid);
 	}
 };
+
+// Most nodes live at once in the BDD of a game over codes. A product of two
+// bitvector streams wider than 4 bits needs millions of them; 2^23 nodes and
+// their tables take about 1 GB.
+inline size_t data_game_max_nodes = size_t{1} << 23;
 
 // The bounds of a Mealy view (code_strategy::build_mealy).
 inline size_t data_game_mealy_max_states = 4096;
@@ -2903,9 +3009,7 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
-		// 2^23 nodes take about 1.5 GB; a product of two bitvector streams
-		// wider than 4 bits needs millions of them
-		code_regions<node> codes(arena, *window, size_t{1} << 23);
+		code_regions<node> codes(arena, *window, data_game_max_nodes);
 		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
 			data_game_solver solver(codes, arena, 0, keep);

@@ -72,10 +72,13 @@ struct edge_desc {
 	std::vector<std::int8_t> guard;
 	size_t dst = 0;
 	std::vector<std::pair<std::string, std::string>> witness_ctors;
-	// Props of this edge's positive atoms whose value must be solved at
-	// runtime (their trees are program_desc::atoms entries); consumed by the
+	// Props of this edge's atoms whose value must be solved at runtime
+	// (their trees are program_desc::atoms entries); consumed by the
 	// table_step_provider path, unsupported by the standalone baked step().
 	std::vector<std::string> witness_template_props;
+	// Parallel to witness_template_props: true where the edge asks for the
+	// atom to be false.
+	std::vector<bool> witness_template_negated;
 	// Parallel to witness_template_props: true where that prop is a hoisted
 	// positional atom's step-counter relativization, grounded at the
 	// counter's own absolute step rather than formula_time_point.
@@ -158,13 +161,44 @@ struct program_desc {
 };
 
 /**
+ * @brief The solution a table plays without breaking its spec.
+ *
+ * A table (build_program_desc, make_table_provider) picks each step's
+ * values from the edge that step takes and nothing else. That keeps the
+ * spec only when every claim the strategy makes about a step's outputs can
+ * be met at that step, whatever the inputs and the earlier values: an atom
+ * over an earlier output (`o2[t] = o1[t-1]`) otherwise ties a later step to
+ * a value the abstraction's strategy never sees. Nor does a table play the
+ * steps before the deepest lookback, where a part of the spec with a
+ * shallower one (a step guard) already holds. A solution with a claim that
+ * cannot always be met, or with such a step guard, is refined the way `run`
+ * refines it: the data game is solved on the solution's game skeleton, and
+ * the Mealy view of its strategy is returned instead.
+ *
+ * Returns `sol` itself when it is a Mealy view of the data game, or when it
+ * has no step guard below its deepest lookback and each of its claims can
+ * always be met. The report carries an error when the data game then gives
+ * no Mealy view (it does not decide the skeleton, the machine exceeds its
+ * bounds, or the solution came from a route without a game skeleton); `run`
+ * executes such a spec by solving each step.
+ * @tparam node Tree node type.
+ * @param sol Solved LTL(ABA) strategy.
+ * @return The solution to play, or an error report naming the claim.
+ */
+template <NodeType node>
+result<ltl_aba_solution<node>> playable_table_solution(
+    const ltl_aba_solution<node>& sol);
+
+/**
  * @brief Builds a program_desc from a solved LTL(ABA) strategy.
  *
  * Builds a program_desc from a solved LTL(ABA) strategy via
  * classify_output_field(); witness values come from codegen_witness,
  * atom templates from codegen_constant_expr (real, non-carrier BAs only).
+ * The strategy described is `playable_table_solution(sol)`.
  *
- * The report carries an error when `revisable` combines with a witness-kind
+ * The report carries an error when `playable_table_solution` refuses the
+ * solution, when `revisable` combines with a witness-kind
  * output, a witness owner declines codegen_witness for a feasible edge, an
  * atom's operand is an unsupported shape or declines codegen_constant_expr,
  * or an io variable is untyped.

@@ -3236,8 +3236,12 @@ result<typename interpreter<node>::update_plan>
 	};
 	tref running = played(dg->spec->get());
 	std::vector<std::pair<tref, report>> failures;
+	// The data game decides each candidate below, the running goals
+	// included, and the candidates without them follow; deciding their
+	// satisfiability first can take minutes.
 	auto revision_r = pointwise_revision(
-		htrefs{ tree<node>::geth(running) }, shifted_update, time_point);
+		htrefs{ tree<node>::geth(running) }, shifted_update, time_point,
+		false);
 	const bool revised = revision_r.has_value()
 		&& revision_r.value().has_value();
 	htrefs revision;
@@ -3271,10 +3275,47 @@ result<typename interpreter<node>::update_plan>
 			r.append(std::move(rep));
 		}
 	};
-	// the first alternative of the revision the data game plays from the
-	// values of the steps already played
-	for (const htref& alt_h : revision) {
-		tref alt = alt_h->get();
+	// The candidates in order of preference: each alternative of the
+	// revision, then, for one that keeps goals of the running
+	// specification, the same alternative with the update's goals only.
+	// The running goals give way only when the data game shows that the
+	// alternative keeping them is unrealizable.
+	struct candidate { tref fm; tref keeps_goals; };
+	std::vector<candidate> candidates;
+	{
+		trefs update_goals = tau::get(shifted_update).select_top(
+			is_child<node, tau::wff_sometimes>);
+		std::unordered_set<tref> seen;
+		auto add = [&](tref c, tref source) {
+			if (c && seen.insert(c).second)
+				candidates.push_back({ c, source });
+		};
+		for (const htref& alt_h : revision) add(alt_h->get(), nullptr);
+		for (const htref& alt_h : revision) {
+			tref alt = alt_h->get();
+			if (tau::get(alt).select_top(is_child<node,
+				tau::wff_sometimes>).size() == update_goals.size())
+					continue;
+			tref aw = tau::get(alt).find_top(
+				is_child<node, tau::wff_always>);
+			trefs parts;
+			if (aw) parts.push_back(aw);
+			parts.insert(parts.end(), update_goals.begin(),
+				update_goals.end());
+			if (!parts.empty())
+				add(build_wff_and<node>(parts), alt);
+		}
+	}
+	std::unordered_set<tref> refuted;
+	// the first candidate whose data game is won
+	for (const auto& [alt, keeps_goals] : candidates) {
+		if (keeps_goals && !refuted.contains(keeps_goals)) {
+			r.info("the running goals are kept: the data game does not "
+				"show that the revision keeping them is unrealizable; "
+				"the alternative without them is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
 		tref rebased = rebase(alt);
 		if (!rebased) {
 			r.info("the revised specification reads a fixed step "
@@ -3283,33 +3324,44 @@ result<typename interpreter<node>::update_plan>
 			continue;
 		}
 		std::shared_ptr<data_game_strategy<node>> next;
-		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true);
+		bool unrealizable = false;
+		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true,
+			&unrealizable);
 		if (!full.has_value() || !next) {
 			failures.emplace_back(alt, std::move(full).report());
-			r.info("the data game does not decide the revised "
-				"specification; the alternative is skipped",
+			if (unrealizable) refuted.insert(alt);
+			r.info(unrealizable
+				? "the revised specification is unrealizable from "
+					"the revision step; the alternative is skipped"
+				: "the data game does not decide the revised "
+					"specification; the alternative is skipped",
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
 			continue;
 		}
 		r.merge(std::move(full));
+		// The revised specification holds from the revision step on;
+		// its values before that step are its own, as in any revised
+		// run. The game starts from the values already played when it
+		// is won from them, which keeps the run continuous; otherwise
+		// it chooses them as at step 0.
 		if (time_point > 0) {
 			auto prior = dg->prior_values(*next, memory,
 				(int_t)time_point);
-			if (!prior) {
+			if (!prior)
 				r.info("the revised specification reads values the "
-					"run no longer keeps; the alternative is skipped",
+					"run does not keep; it starts from values of "
+					"its own",
 					{{label::value, truncate_for_message(
 						TAU_TO_STR(alt))}});
-				continue;
-			}
-			TAU_TRY(bool started, next->start_from(*prior));
-			if (!started) {
-				r.info("the data game of the revised specification is "
-					"not won from the values already played; the "
-					"alternative is skipped",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(alt))}});
-				continue;
+			else {
+				TAU_TRY(bool started, next->start_from(*prior));
+				if (!started)
+					r.info("the data game of the revised "
+						"specification is not won from the "
+						"values already played; it starts "
+						"from values of its own",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(alt))}});
 			}
 		}
 		subtree_map<node, size_t> out_ids, in_ids;
@@ -3432,7 +3484,8 @@ result<bool> interpreter<node>::can_extend(tref psi) {
 
 template <NodeType node>
 result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
-	const htrefs& alts_in, tref update, const int_t start_time)
+	const htrefs& alts_in, tref update, const int_t start_time,
+	bool check_goals)
 {
 	result<std::optional<htrefs>> r;
 	// One report per revision probe, kept with the clause it was tried
@@ -3570,8 +3623,18 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 
 		// An update already implied by the running spec is a no-op;
 		// conjoining it anyway re-embeds it verbatim and feeds the
-		// per-update growth (review I3).
-		tref spec_fm = tau::build_wff_or(alts);
+		// per-update growth (review I3). Only the always parts are
+		// read: they imply no more than the whole spec, which keeps
+		// the check sound, while the negated update next to the
+		// spec's sometimes clauses can take the temporal decision
+		// minutes.
+		trefs spec_always;
+		for (tref alt : alts) {
+			tref aw = tau::get(alt).find_top(
+				is_child<node, tau::wff_always>);
+			spec_always.push_back(aw ? aw : tau::_T());
+		}
+		tref spec_fm = tau::build_wff_or(spec_always);
 		bool spec_implies_clause = false;
 		if (!alts.empty()
 			&& !pwr_contains_arith_content<node>(spec_fm)
@@ -3618,6 +3681,7 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 			if (sts.empty()) return r.with_value(base);
 			tref with = build_wff_and<node>(base,
 				build_wff_and<node>(sts));
+			if (!check_goals) return r.with_value(with);
 			TAU_TRY(bool sat, pwr_memo_sat<node>(with,
 				start_time, &memo));
 			return r.with_value(sat ? with : base);

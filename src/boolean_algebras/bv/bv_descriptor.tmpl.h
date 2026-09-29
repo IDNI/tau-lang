@@ -403,9 +403,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				get_bitblast_max_nodes_option,
 				set_bitblast_max_nodes_option,
-				"cap the BDD nodes a bitvector formula of at most 16 "
-				"bits is decided with before cvc5 takes it (default "
-				"1048576, 0 = always cvc5)" },
+				"cap the BDD nodes in use at once when a bitvector "
+				"formula of at most 16 bits is decided on its bits, "
+				"before cvc5 takes it (default 1048576, 0 = always "
+				"cvc5)" },
 			{ "widening", ba_option_kind::flag,
 				get_widening_option, set_widening_option,
 				nullptr, nullptr,

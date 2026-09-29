@@ -142,6 +142,18 @@ template <NodeType node>
 result<tref> normalize_non_temp(tref fm);
 
 /**
+ * @brief Evaluates `fex x f` to `f[x:=0] | f[x:=1]` and `fall x f` to
+ * `f[x:=0] & f[x:=1]` wherever the body is Boolean, and gives every binder it
+ * must keep a name that occurs nowhere else in @p fm.
+ *
+ * Every normalization entry runs it first: the Boole decomposition that
+ * follows substitutes a variable without regard to a functional binder of the
+ * same name.
+ */
+template <NodeType node>
+tref eliminate_functional_quantifiers(tref fm);
+
+/**
  * @brief Build a fresh uninterpreted constant of the given BA type not present in `fm`.
  *
  * Scans all `uconst_name` nodes in `fm` whose name starts with `name` and

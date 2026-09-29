@@ -826,8 +826,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    which there are finitely many; a stream of a dense order takes these
    codes even when only equalities read it, since the order has no
    element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
-   values and the game runs before (4) and (5); otherwise, or when the BDD grows
-   past its node limit, a region is a formula whose
+   values and the game runs before (4) and (5); otherwise, or when the nodes
+   the regions still need outgrow its node limit (nodes no region needs any
+   more are freed as the table fills), a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
    UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
    are played like any other step, their inputs by the environment and
@@ -858,8 +859,13 @@ the Mealy introspection (the cached solution, its current state) shows, and
 a step reads only the inputs its move depends on. A revision of the
 specification is made as in any run: the running specification is revised
 pointwise by the update, and the data game is solved again for the revised
-specification, starting from the values already played; the revision is
-refused when that game does not decide it or is not won from those values.
+specification. The game starts from the values already played when it is
+won from them; otherwise, and when the revision reads a stream the run has
+no values of, it starts from values of its own, as the revised
+specification of any run does (see [Pointwise revision](#pointwise-revision)).
+When the game shows that the running `sometimes` goals cannot be met along
+the update, they give way to it. The revision is refused only when the game
+does not decide the revised specification or shows that no strategy keeps it.
 Otherwise `run` executes the strategy of (4) and (5), as a safety formula
 (below). A specification whose `always` part reads a fixed step, such as
 `o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
@@ -2254,10 +2260,12 @@ intervals `[a, b)` over the rationals on the extended real line.  Elements
 are finite unions of such intervals.  The sentinels `-inf` and `+inf` are
 supported as endpoints.
 
-Internally an element is a sorted map from left to right endpoint stored as
-IEEE doubles, so endpoints are exact for dyadic rationals and rounded otherwise.
-Rational (`1/4`), decimal (`0.25`) and integer endpoint syntaxes are accepted,
-plus `-inf`/`+inf`.  Bare integers inside `{...}:qint` have a special meaning:
+Every endpoint is an exact rational with a 64-bit numerator and denominator,
+so `1/3` and `0.3333333333333333` are different endpoints.  Rational (`1/4`),
+decimal (`0.25`, `2e-3`) and integer endpoint syntaxes are accepted, plus
+`-inf`/`+inf`; a literal whose exact value does not fit is rejected rather
+than rounded.  An endpoint prints as an integer, a terminating decimal or
+`p/q`.  Bare integers inside `{...}:qint` have a special meaning:
 `{0}` and `{1}` are the algebraic bottom and top, and any other integer `n`
 denotes the interval `[n, n+1)`; write `[0,1)` and `[1,2)` explicitly.
 
@@ -2916,8 +2924,8 @@ rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
 the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
 closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
-bitvectors of at most 16 bits may take when Tau decides it on the bits of
-its values, before the solver takes it instead; 1048576 by default, `0`
+bitvectors of at most 16 bits may keep in use at once when Tau decides it on
+the bits of its values, before the solver takes it instead; 1048576 by default, `0`
 leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
@@ -2961,6 +2969,23 @@ it goes: each step through the safety pipeline, and, for a strategy of the
 abstraction or of a data game with no such machine, that game or synthesis
 when it starts.  The program then executes the embedded spec the same way,
 with the same solver, so it needs `ltlsynt` where `run` does.
+
+A table (`build_program_desc`, and `make_table_provider` in
+`src/table_step_provider.h`, which plays one in the interpreter) picks each
+step's outputs from the edge that step takes. It plays the strategy of the
+abstraction only when every claim an edge makes about the outputs can be met
+at that step whatever the inputs and the earlier values are, and the parts of
+the spec all start at the same step; otherwise a value chosen now could break
+the spec later, as `o1[0] = 1` does for
+`always o2[t] = o1[t-1] && o3[t] = o2[t-1] && o3[t-1] = 0`. Such a strategy
+is refined the way `run` refines it: the data game is solved on the same
+abstraction, and the table plays the Mealy machine of its strategy.
+`playable_table_solution` returns the strategy a table plays. When the data
+game has no such machine, these functions return an error saying why, and
+the spec is executed by `run` (or `tau compile`). `emit_program` also refuses
+a Mealy machine of the data game that reads values before step 0, which its
+standalone class cannot carry; drive such a strategy through the table step
+provider.
 
 ## When to use which
 
@@ -3240,7 +3265,8 @@ it is read, and drop its binder, before the case split; mirroring
 names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose
 binders are all of one kind quantifier-free, mirroring
 `--bv-quantifier-free-decision`; off by default), `bv-bitblast-max-nodes`
-(the BDD budget of the decision on the bits of values of at most 16 bits,
+(the BDD budget, in nodes in use at once, of the decision on the bits of
+values of at most 16 bits,
 mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
 question to the solver), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
