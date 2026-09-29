@@ -133,6 +133,31 @@ TEST_SUITE("cvc5_bitblast_sat") {
 			== std::optional<bool>(false) );
 	}
 
+	TEST_CASE("a table too small for every node built decides the same") {
+		// the nodes of the terms already read are freed as the table
+		// fills; 512 nodes decide what 2^20 do for most formulas
+		formula_gen gen(20260928);
+		size_t decided = 0;
+		for (size_t i = 0; i < 400; ++i) {
+			const cvc5::Term f = gen.formula(4);
+			const auto small = cvc5_bitblast_sat(f, 16, 512);
+			if (!small) continue;
+			++decided;
+			CAPTURE(f.toString());
+			CHECK( small == cvc5_bitblast_sat(f, 16, size_t{1} << 20) );
+		}
+		CHECK( decided > 300 );
+	}
+
+	TEST_CASE("a falling chain fits in a table smaller than all it builds") {
+		// the chain builds some 2^16 nodes, of which a few hundred are
+		// read at any time
+		CHECK( cvc5_bitblast_sat(falling_chain(8, 255), 16, size_t{1} << 13)
+			== std::optional<bool>(true) );
+		CHECK( cvc5_bitblast_sat(falling_chain(8, 256), 16, size_t{1} << 13)
+			== std::optional<bool>(false) );
+	}
+
 	TEST_CASE("declines what it has no circuit or room for") {
 		cvc5::Term x = cvc5_term_manager.mkConst(bv_sort(8), "dx");
 		cvc5::Term y = cvc5_term_manager.mkConst(bv_sort(8), "dy");
