@@ -2315,20 +2315,31 @@ result<tref> pin_written_warm_ups(tref fm) {
 // The stream is renamed as well as re-tagged: resolve_io_vars stamps every
 // io_var from the io context and then the name prefix, so a stream still
 // called i1 would be read as an input again on any path that parses or
-// normalizes the formula. The new name is an output by prefix and is
-// registered nowhere.
+// normalizes the formula. The new name is an output by prefix, is
+// registered nowhere, and is not the name of any other stream of fm, so an
+// input is never merged with an output the user named after it.
 template <NodeType node>
 tref inputs_as_outputs(tref fm) {
 	using tau = tree<node>;
+	const trefs io_vars = tau::get(fm).select_all([](tref n) {
+		return tau::get(n).is(tau::io_var); });
+	std::set<std::string> used;
+	for (tref v : io_vars) used.insert(get_var_name<node>(v));
+	std::map<std::string, std::string> renamed;
+	auto fresh = [&](const std::string& in) {
+		if (auto it = renamed.find(in); it != renamed.end())
+			return it->second;
+		std::string out = "o_in_" + in;
+		while (used.count(out)) out += "_";
+		used.insert(out);
+		return renamed[in] = out;
+	};
 	subtree_map<node, tref> flip;
-	for (tref v : tau::get(fm).select_all([](tref n) {
-		const auto& t = tau::get(n);
-		return t.is(tau::io_var) && t.is_input_variable(); }))
-	{
+	for (tref v : io_vars) {
 		const auto& t = tau::get(v);
+		if (!t.is_input_variable()) continue;
 		trefs ch;
-		ch.push_back(build_var_name<node>(
-			"o_in_" + get_var_name<node>(v)));
+		ch.push_back(build_var_name<node>(fresh(get_var_name<node>(v))));
 		for (size_t i = 1; i < t.children_size(); ++i)
 			ch.push_back(t.child(i));
 		flip.emplace(v, tau::get(node::output_variable(), ch));

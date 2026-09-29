@@ -873,8 +873,12 @@ post_normalization:
 		// `realizable` tells which
 		if (!safety_spec && counter_route) {
 			fold_rejected(safety_failures, false);
-			return r.with_assert_check_error(code::unsat,
-				"Tau specification is unsat");
+			if (unrealizable) return r.with_assert_check_error(
+				code::unsat, "Tau specification is unsat");
+			return r.with_assert_check_error(code::solver_error,
+				"UNKNOWN: whether the Tau specification is "
+				"realizable could not be decided, so it cannot "
+				"be executed");
 		}
 		if (!safety_spec && unrealizable) {
 			fold_rejected(safety_failures, false);

@@ -170,6 +170,13 @@ std::set<std::string> ins_of(const std::string& call) {
 // ltlsynt that never gives a verdict.
 const char* mute_ltlsynt = "#!/bin/sh\nexit 2\n";
 
+// ltlsynt that answers UNREALIZABLE and prints no game, so no data game
+// can decide the abstraction's verdict.
+const char* refuting_ltlsynt =
+	"#!/bin/sh\n"
+	"for a in \"$@\"; do [ \"$a\" = \"--print-game-hoa\" ] && exit 2; done\n"
+	"echo UNREALIZABLE\nexit 1\n";
+
 struct ltl_alg_scope {
 	explicit ltl_alg_scope(const std::string& alg) {
 		api<node_t>::set_ltl_algorithm(alg);
@@ -490,11 +497,8 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 TEST_SUITE("LTL(ABA) open points: validity") {
 
-	// Defect: inputs_as_outputs renames i29 to o_in_i29, joining it with
-	// the user's stream.
-	TEST_CASE("valid keeps an input apart from an output named after it"
-		* doctest::should_fail())
-	{
+	// valid reads i29 as an output; its new name must not be o_in_i29
+	TEST_CASE("valid keeps an input apart from an output named after it") {
 		auto safety = api<node_t>::valid("always (o_in_i29[t] = i29[t])");
 		REQUIRE(safety.has_value());
 		CHECK_FALSE(safety.value());
@@ -519,6 +523,24 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		const std::string text = report_text(i.report());
 		INFO(text);
 		CHECK(text.find("Tau specification is unsat") == std::string::npos);
+	}
+
+	// Only the data game refutes on the default path: an abstraction that
+	// is unrealizable while no data game decides is undecided.
+	TEST_CASE("the counter route reports an undecided refutation as unknown") {
+		path_stubs stubs({{"ltlsynt", refuting_ltlsynt}});
+		io_context<node_t> ctx;
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("always o32[1] = 1 && "
+			"o32[0] = 0 && o32[t] = o31[t-1] && o31[t-1] = 1.")
+			.value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto i = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE_FALSE(i.has_value());
+		const std::string text = report_text(i.report());
+		INFO(text);
+		CHECK(text.find("Tau specification is unsat") == std::string::npos);
+		CHECK(text.find("UNKNOWN") != std::string::npos);
 	}
 
 	TEST_CASE("execution stops once the data game refutes the spec"
@@ -776,10 +798,9 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 		return calls.size();
 	}
 
-	// Defect: refine_or_observe re-solves the sound abstraction without its
-	// input twins.
+	// Every ltlsynt call after the sound one keeps its input twins.
 	TEST_CASE("the sound abstraction keeps its input twins when it observes"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = op_spec(past_input_until);
@@ -798,10 +819,10 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 		if (r.has_value()) CHECK(r.value());
 	}
 
-	// Defect: the sound abstraction's solution keeps observed == false, so
-	// its refinement adds no observations.
+	// The sound abstraction's solution is an observed one, so its first
+	// refinement adds observations.
 	TEST_CASE("the sound abstraction's first refinement adds observations"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = op_spec(past_input_until);

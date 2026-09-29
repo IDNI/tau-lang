@@ -627,17 +627,21 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 				"environment choose what the data has fixed; "
 				"realizability could not be decided"));
 		}
-		std::optional<std::optional<ltl_aba_solution<node>>> sound;
-		{
-			const bool outer = ltl_observed_abstraction;
-			const bool outer_twins = ltl_input_twins;
-			ltl_observed_abstraction = ltl_input_twins = true;
-			sound = r.merge_take(solve_ltl_aba<node>(fm));
-			ltl_observed_abstraction = outer;
-			ltl_input_twins = outer_twins;
-		}
+		// the refinement solves again, and its UNREALIZABLE is a proof
+		// only on the same abstraction: both flags hold throughout
+		struct sound_flags {
+			bool observed = ltl_observed_abstraction;
+			bool twins = ltl_input_twins;
+			sound_flags() { ltl_observed_abstraction = ltl_input_twins = true; }
+			~sound_flags() {
+				ltl_observed_abstraction = observed;
+				ltl_input_twins = twins;
+			}
+		} flags;
+		auto sound = r.merge_take(solve_ltl_aba<node>(fm));
 		if (!sound) return backend_failed();
 		if (!*sound) return unrealizable(how);
+		(*sound)->observed = true;
 		auto refined = r.merge_take(
 			refine_or_observe<node>(fm, **sound, output));
 		if (!refined) return std::move(r);
