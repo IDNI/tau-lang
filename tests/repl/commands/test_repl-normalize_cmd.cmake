@@ -212,3 +212,12 @@ add_repl_test(normalize_cmd-qlt_pinned_neq_closed
 add_repl_test(normalize_cmd-qlt_pinned_neq_residual
 	"normalize ex x:qlt (a:qlt <= x && x <= a && x != b:qlt)" ": a != b")
 
+# GitHub #149: fex / fall are evaluated before any substitution can cross their
+# binder, on every command, so a binder never captures a variable of the same
+# name outside it.
+add_repl_test(normalize_cmd-fall_binder_not_captured
+	"normalize ((fall y (x | y)) & y) = 0" ": (xy|yx) = 0")
+add_repl_test(normalize_cmd-fex_binder_solve
+	"solve b = 0 && (fex b (a & b)) != 0" "a := \\{ T \\}")
+add_repl_test(normalize_cmd-fex_equals_body
+	"normalize (fex y (x & y)) = x" ": T")
