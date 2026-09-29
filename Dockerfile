@@ -59,10 +59,6 @@ ARG BUILD_JOBS=5
 # this layer and every one after it, wiping the cvc5/boost deps cache
 FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS base
 
-# TARGETARCH picks the spot source: the OBS repo has no arm64 packages, so a
-# cross build uses Spot's own LRDE Debian repo instead.
-ARG TARGETARCH
-
 # Install dependencies
 # python3-dev and python3-venv stay for the tau-testnet stage, whose venv is
 # made from the system interpreter. nanobind never reaches the system Python:
@@ -76,23 +72,6 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	mingw-w64=11.0.1-3build1 \
 	libboost-all-dev=1.83.0.1ubuntu2 \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2
-
-# spot gives ltlsynt and ltl2tgba to the LTL suites. The OBS home:adl repo is
-# amd64 only; arm64 falls back to the LRDE repo, the same fallback
-# scripts/setup-ubuntu-ci-deps.sh uses.
-RUN echo "(BUILD) -- Installing spot" && \
-	if [ "$TARGETARCH" = "amd64" ]; then \
-		wget -q -O - 'https://build.opensuse.org/projects/home:adl/signing_keys/download?kind=gpg' \
-			| gpg --dearmor -o /usr/share/keyrings/home-adl-obs.gpg && \
-		echo 'deb [signed-by=/usr/share/keyrings/home-adl-obs.gpg] https://download.opensuse.org/repositories/home:/adl/xUbuntu_24.04/ ./' \
-			> /etc/apt/sources.list.d/home-adl-obs.list && \
-		apt-get update && apt-get install -y --no-install-recommends spot; \
-	else \
-		wget -q -O /usr/share/keyrings/spot-archive-keyring.gpg https://www.lrde.epita.fr/repo/debian.gpg && \
-		echo 'deb [signed-by=/usr/share/keyrings/spot-archive-keyring.gpg] http://www.lrde.epita.fr/repo/debian stable/' \
-			> /etc/apt/sources.list.d/spot.list && \
-		apt-get update && apt-get install -y --no-install-recommends spot; \
-	fi
 
 # create tau-lang directory and set it as the working directory
 RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \

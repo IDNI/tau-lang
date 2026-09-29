@@ -253,6 +253,12 @@ endfunction()
 # spot is an optional test-time tool. Do not fall back to a host ltlsynt: an ELF under an .exe name
 # would make the suites run and fail instead of skip.
 function(tau_deps_resolve_spot)
+	# A wasm module cannot exec a host process, so no spot package serves it.
+	# The LTL suites skip there through ltlsynt_available().
+	if(TAU_DEPS_TARGET STREQUAL "wasm32-emscripten")
+		message(STATUS "Spot not used on ${TAU_DEPS_TARGET}")
+		return()
+	endif()
 	set(_windows_targets "windows-x86_64-msvc" "windows-x86_64-mingw")
 	find_program(TAU_HOST_LTLSYNT ltlsynt NO_CACHE)
 	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets)
