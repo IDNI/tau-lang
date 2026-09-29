@@ -93,8 +93,8 @@ inline bool bv_quantifier_free_decision_enabled() {
 }
 
 /// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
-/// the nodes it may build before it leaves the formula to cvc5; 0 leaves
-/// every formula to cvc5. The option `bv-bitblast-max-nodes`.
+/// the nodes it may keep in use at once before it leaves the formula to
+/// cvc5; 0 leaves every formula to cvc5. The option `bv-bitblast-max-nodes`.
 inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
 
 /// Widest bit-vector the BDD decision takes. A product of two wider values
