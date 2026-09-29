@@ -25,10 +25,10 @@
 #     compiled suite in headless Chrome, the REPL suite inside the page, and
 #     the REPL page start check
 # - build, w64-build and wasm-node each split in three:
-#   - <stage>-resolve: configures and builds, which resolves the store packages
+#   - <stage>-resolve: configures only, which resolves the store packages
 #   - <stage>-publish: publishes those packages when TAU_STORE_PUBLISH=ON, and
 #     runs no test
-#   - <stage>: runs the tests on top of <stage>-resolve
+#   - <stage>: compiles and runs the tests on top of <stage>-resolve
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
@@ -183,6 +183,55 @@ ARG TAU_BAS=
 # the objects. A ccache mount survives it, and it outlives the build.
 ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 
+# Set TEST_GCC_BUILD=no to skip the gcc compilation check
+ARG TEST_GCC_BUILD=yes
+
+# Resolve every store package this build reads, and nothing else: the compile
+# lives in the build stage, which inherits this layer, so a compile failure
+# never rebuilds a dependency. The gcc check compiles a second, gcc-built set
+# of packages, so its configure belongs here for the publish to see them. The
+# *-all preset enables the executable and the tests in one configure.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Resolving ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
+	echo " (BUILD) -- Tests: $TESTS" && \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	else \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tau --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi && \
+	if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset devel-make-gcc --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi
+
+# The trusted workflow turns this on: the same image that resolves the store
+# packages publishes the ones the remote lacks, so the Linux ids match what
+# every Docker consumer requests. Off for every other build. A side stage, so a
+# failing test cannot hold a package back.
+FROM build-resolve AS build-publish
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+# Compile the tree configured above, then run the tests (if TESTS = "yes").
+FROM build-resolve AS build
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+ARG TESTS=yes
+ARG TAU_BAS=
+
 # *-all enables the executable and the tests in one configure
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
@@ -212,24 +261,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	rm -rf build/devel; \
 fi
-
-# The trusted workflow turns this on: the same image that resolves the store
-# packages publishes the ones the remote lacks, so the Linux ids match what
-# every Docker consumer requests. Off for every other build. A side stage, so a
-# failing test cannot hold a package back.
-FROM build-resolve AS build-publish
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev store-publish; \
-	fi
-
-# Run the tests (if TESTS = "yes") on the build above.
-FROM build-resolve AS build
-
-ARG BUILD_JOBS=5
-ARG BUILD_PRESET=release
-ARG TESTS=yes
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running tests: ${BUILD_PRESET}-all" && \
@@ -262,8 +293,8 @@ RUN echo "(BUILD) -- Building packages" && \
 # Run the tau-testnet suite against the release build
 
 # tau-testnet consumes the built tree and the binding, not the tau suite, so it
-# inherits the resolve stage and does not re-run ctest on the way in.
-FROM build-resolve AS testnet
+# inherits the build stage and does not re-run ctest on the way in.
+FROM build AS testnet
 
 ARG BUILD_JOBS=5
 
@@ -398,6 +429,44 @@ ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 # cache mount the CI carries across runs, as on the native build.
 ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 
+# Resolve the w64 store packages, and nothing else: the compile lives in the
+# w64-build stage, which inherits this layer, so a compile failure never
+# rebuilds a dependency.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Resolving w64 ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
+	echo " (BUILD) -- Tests: $TESTS" && \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_BUILD_EXECUTABLE=ON -DTAU_BUILD_TESTS=ON \
+			-DCMAKE_CROSSCOMPILING_EMULATOR=wine \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	else \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_BUILD_EXECUTABLE=ON \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi
+
+# The trusted workflow turns this on to publish the w64 packages the resolve
+# stage just resolved.
+FROM w64-build-resolve AS w64-build-publish
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+# Compile the tree configured above, then run the w64 suite under wine
+# (if TESTS = "yes").
+FROM w64-build-resolve AS w64-build
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+ARG TESTS=yes
+
 # Build tau executable, and its suite for wine if TESTS = "yes"
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
@@ -414,21 +483,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	fi && \
 	ccache --show-stats
-
-# The trusted workflow turns this on to publish the w64 packages it just built.
-FROM w64-build-resolve AS w64-build-publish
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev store-publish; \
-	fi
-
-# Run the w64 suite under wine (if TESTS = "yes").
-FROM w64-build-resolve AS w64-build
-
-ARG BUILD_JOBS=5
-ARG BUILD_PRESET=release
-ARG TESTS=yes
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running w64 tests under wine" && \
@@ -522,17 +576,57 @@ ARG TESTS=yes
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
-# Native tau for the parity check, built before the wasm configure: js_parity
-# is registered only when TAU_PARITY_NATIVE_BIN exists (tests/CMakeLists.txt).
+# Native tau is the js_parity reference: tests/CMakeLists.txt registers that
+# test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
+# wasm configure below. Its own store packages resolve in this layer.
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building native tau (sbf,tau pack) for parity" && \
 	scripts/with-gh-token ./dev preset release-tau -DTAU_BAS=sbf,tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
+# Resolve the wasm store packages, and nothing else: the wasm compile lives in
+# the wasm-node stage, which inherits this layer, so a compile failure never
+# rebuilds an emscripten dependency. The -all-tests preset builds the library,
+# the suite and the CLI from one configure.
+#
+# Tau's no-thread coverage is a droppable, no-SharedArrayBuffer configuration
+# kept measured so it does not rot, because -pthread is the default for every
+# other wasm target; its packages differ from the pthread ones.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Resolving the wasm dependencies" && \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARITY_REQUIRE_NATIVE=ON; \
+	else \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi && \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+# The trusted workflow turns this on to publish the wasm packages the resolve
+# stage just resolved.
+FROM wasm-node-resolve AS wasm-node-publish
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+# Build the tree configured above, then run the node suites and the parity
+# check (if TESTS = "yes"). The native tau the parity check compares against
+# was built in the resolve stage and is inherited here.
+FROM wasm-node-resolve AS wasm-node
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release-wasm
+ARG TESTS=yes
+
 # The -all-tests preset builds the library, the suite and the CLI from one
-# configure, so the fetched dependencies compile once. This stage builds the
-# native tau the prescribed js_parity gate compares against, so it requires it.
+# configure, so the fetched dependencies compile once.
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
 	echo " (BUILD) -- Running node tests: $TESTS" && \
@@ -543,29 +637,11 @@ RUN --mount=type=secret,id=gh_token \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
-# Tau's no-thread coverage: the droppable, no-SharedArrayBuffer configuration
-# is kept measured so it does not rot, because -pthread is the default for
-# every other wasm target. Its packages differ from the pthread ones.
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
 	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
-
-# The trusted workflow turns this on to publish the wasm packages it just built.
-FROM wasm-node-resolve AS wasm-node-publish
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev store-publish; \
-	fi
-
-# Run the node suites and the parity check (if TESTS = "yes").
-FROM wasm-node-resolve AS wasm-node
-
-ARG BUILD_JOBS=5
-ARG BUILD_PRESET=release-wasm
-ARG TESTS=yes
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Smoke-testing tau.node.js" && \
