@@ -198,3 +198,17 @@ add_repl_test(normalize_cmd-qlt_nested_xor_unsat
 # `x < {1}` and contradicting `x > {5}`; the binder stays.
 add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
 	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")
+
+# GitHub #148: a disequality next to a qlt variable pinned to one value is kept,
+# not dropped as harmless over a dense order.
+add_repl_test(normalize_cmd-qlt_pinned_neq_sat
+	"sat a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_valid
+	"valid ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_solve
+	"solve a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" "no solution")
+add_repl_test(normalize_cmd-qlt_pinned_neq_closed
+	"normalize ex a:qlt ex b:qlt ex c:qlt ((((a <= c) && (c <= a) && (b <= c)) || ((a <= c) && (c <= a) && (b < c))) && (c != a))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_residual
+	"normalize ex x:qlt (a:qlt <= x && x <= a && x != b:qlt)" ": a != b")
+

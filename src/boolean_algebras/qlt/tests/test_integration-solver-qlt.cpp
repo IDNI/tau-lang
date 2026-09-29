@@ -480,10 +480,25 @@ TEST_SUITE("qlt residual elimination") {
 			"a : qlt < b : qlt.") );
 	}
 
-	TEST_CASE("bodies outside the fragment are left alone") {
-		// an equality needs no elimination, a disequality a case split
-		CHECK( residual("a : qlt < x : qlt && x : qlt = b : qlt.")
+	// GitHub #148: a variable pinned to one term is replaced by it, so a
+	// disequality next to the pin is kept instead of dropped.
+	TEST_CASE("a pinned variable is replaced by its pin") {
+		CHECK( eliminates_to("a : qlt < x : qlt && x : qlt = b : qlt.",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to(
+			"a : qlt <= x : qlt && x : qlt <= a : qlt && x : qlt != b : qlt.",
+			"a : qlt != b : qlt.") );
+		CHECK( eliminates_to(
+			"{1}:qlt <= x : qlt && x : qlt <= {1}:qlt && x : qlt != a : qlt.",
+			"{1}:qlt != a : qlt.") );
+		// two different bounds do not pin
+		CHECK( residual(
+			"a : qlt <= x : qlt && x : qlt <= b : qlt && x : qlt != c : qlt.")
 			== nullptr );
+	}
+
+	TEST_CASE("bodies outside the fragment are left alone") {
+		// a disequality without a pin needs a case split
 		CHECK( residual("a : qlt < x : qlt && x : qlt != b : qlt.")
 			== nullptr );
 		// a conjunct without the variable
