@@ -120,8 +120,8 @@ function(_tau_deps_run_producer dep producer_cmd out_var)
 			list(REMOVE_AT _args 0)
 		endif()
 	endif()
-	# Stream the producer's stderr while configure waits on it; the capture
-	# stays, so a failure still carries the whole report.
+	# Stream the producer stderr live; the capture holds the progress and error
+	# lines, and the build output stays in the entry log.
 	execute_process(
 		COMMAND ${producer_cmd} ${_args}
 		RESULT_VARIABLE _rc
