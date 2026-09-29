@@ -17,6 +17,7 @@ build() {
                         --build-arg "TAU_PARSER_GIT_DESCRIBED=$(git -C external/parser describe --tags --always)"
                         --build-arg "TAU_PARSER_GIT_BRANCH=$(git -C external/parser rev-parse --abbrev-ref HEAD)"
                         --build-arg "TAU_PARSER_GIT_COMMIT_HASH=$(git -C external/parser log -1 --format=%h)"
+                        --build-arg "TAU_PARSER_COMMIT=$(git -C external/parser rev-parse HEAD)"
                 )
         fi
         echo "Building: '${@}'"
