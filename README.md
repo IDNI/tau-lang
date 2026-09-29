@@ -763,10 +763,15 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    the regions still need outgrow its node limit (nodes no region needs any
    more are freed as the table fills), a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
-   UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
+   UNREALIZABLE or UNKNOWN answer of (4) and (5). When a quantifier stays
+   and every stream is of one bitvector type, the game is played once more
+   on formulas that keep their quantifiers, each region decided whole on
+   the bits of its values or by the solver, all of them within one
+   `--bv-solve-timeout`; such a game gives a verdict but no strategy to
+   `run`. The steps before step 0
    are played like any other step, their inputs by the environment and
    their outputs by the system. The game answers UNKNOWN only when a
-   quantifier cannot be eliminated or a fixpoint reaches the
+   quantifier cannot be eliminated or decided, or a fixpoint reaches the
    refinement-round cap; (4) and (5) then keep their answer.
 
 A formula is **realizable** iff its data game is won; where that game is
@@ -2858,15 +2863,22 @@ closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
 bitvectors of at most 16 bits may keep in use at once when Tau decides it on
 the bits of its values, before the solver takes it instead; 1048576 by default, `0`
-leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
+leaves every question to the solver), `--bv-solve-timeout` (the seconds a
+bitvector question with quantifiers may take on the bits of its values, and,
+when it multiplies or divides two values that are not constants, in the
+solver, which then runs it in a separate process stopped at the limit; a
+question stopped there has no answer, so the command asking it answers
+UNKNOWN, naming the limit; 60 by default, `0` runs the solver in the process
+with no limit), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
 1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
-`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`, `--bv-widening`
-and `--bv-max-width` are not recognized options at all.
+`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`,
+`--bv-solve-timeout`, `--bv-widening` and `--bv-max-width` are not
+recognized options at all.
 
 ## `tau compile` — synthesis-to-executable compiler
 
@@ -3195,7 +3207,11 @@ binders are all of one kind quantifier-free, mirroring
 (the BDD budget, in nodes in use at once, of the decision on the bits of
 values of at most 16 bits,
 mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
-question to the solver), `bv-widening` (the
+question to the solver), `bv-solve-timeout` (the seconds a bitvector question
+with quantifiers may take, on its bits and, when it multiplies or divides two
+values that are not constants, in the solver, before the command asking it
+answers UNKNOWN,
+mirroring `--bv-solve-timeout`; 60 by default, 0 = no limit), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
 mirroring `--bv-widening`; off by default) and `bv-max-width` (cap on the
 width widening may compute at, mirroring `--bv-max-width`; 1024 by default,
