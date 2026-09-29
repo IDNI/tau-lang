@@ -21,7 +21,7 @@ build() {
                 )
         fi
         echo "Building: '${@}'"
-        docker buildx build --progress=${PROGRESS} ${git_args[@]+"${git_args[@]}"} "$@" .
+        docker buildx build --progress="${PROGRESS}" ${git_args[@]+"${git_args[@]}"} "$@" .
 }
 
 run() {
