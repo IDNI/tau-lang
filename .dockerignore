@@ -1,3 +1,12 @@
 # Git metadata differs per checkout, so it must never enter the digest of a build layer.
 .git
 **/.git
+# Build trees and machine-local checkouts are large and differ per machine.
+build/
+build-*/
+**/build
+**/build-*
+external/parser/build
+.local
+**/.local
+**/node_modules
