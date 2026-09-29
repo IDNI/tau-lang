@@ -73,8 +73,8 @@ jobs:
             echo "matrix={\"include\":[$default]}" >> "$GITHUB_OUTPUT"
           fi
 
-  # One job builds the system packages, so the deps job and every later
-  # image import the layer. Change the scope to force a rebuild.
+  # One job builds the system packages and the wine layer, so the deps job
+  # and every later image import them. Change the scope to force a rebuild.
   base:
     name: Build base image (system packages)
     runs-on: ubuntu-24.04
@@ -90,12 +90,21 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build base stage
+      # w64-deps holds the wine layer. It sits on top of deps, so this job
+      # also builds deps, and the deps job reads that layer from tau-base.
+      - name: Build base and w64-deps stages
         run: |
           ./dev docker base \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=tau-base \
             --cache-to   type=gha,scope=tau-base,mode=max
+          ./dev docker w64-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-to   type=gha,scope=tau-base,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # One job installs oras and the binding venv on top of the base layer, so
   # the pack matrix imports the layer instead of each entry building it.
