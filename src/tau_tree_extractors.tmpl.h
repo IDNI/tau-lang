@@ -140,8 +140,8 @@ rewriter::rules get_rec_relations(tref rrs) {
 // type lives on its argument variable (ref_arg > bf > variable), not on
 // the ref_arg node itself -- see transform_ref_args_to_captures's
 // def_transformer, which reads the same t[0][0] for the same reason. A
-// non-variable argument (a nested ref, a constant) reads whatever
-// effective type its own subtree carries.
+// non-variable argument (a nested ref, a constant) reads the effective type
+// of its own expression node, never a nested call's arguments.
 template <NodeType node>
 std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	using tau = tree<node>;
@@ -149,11 +149,18 @@ std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	std::vector<size_t> types;
 	for (tref a : (tt(r) | tau::ref_args || tau::ref_arg).values()) {
 		const auto& at = tau::get(a);
-		tref var = (at.children_size() > 0
-				&& at[0].children_size() > 0
-				&& at[0][0].is(tau::variable))
-			? at[0][0].get() : a;
-		types.push_back(get_effective_ba_type<node>(var));
+		if (at.children_size() == 0) {
+			types.push_back(get_effective_ba_type<node>(a));
+			continue;
+		}
+		// A spec kept as written leaves the ref_arg untyped; its
+		// argument expression still carries the inferred type.
+		if (at[0].children_size() > 0 && at[0][0].is(tau::variable)) {
+			types.push_back(get_effective_ba_type<node>(at[0][0].get()));
+			continue;
+		}
+		size_t type = get_effective_ba_type<node>(at[0].get());
+		types.push_back(type ? type : get_effective_ba_type<node>(a));
 	}
 	return types;
 }

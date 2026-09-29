@@ -71,6 +71,18 @@ add_repl_test_fail(definitions-whole_tuple_call_arg_type_mismatch
 	"origin(u,v) := (u:sbf = 0 && v = 0). type Point = {a: sbf, b: sbf}. n (p:Point = p) && origin(p)"
 	"disagrees with")
 set_tests_properties("test_repl-definitions-whole_tuple_call_arg_type_mismatch" PROPERTIES TIMEOUT 60)
+# A typed constant passed as an argument carries its type on the argument
+# expression, not on the untyped ref_arg around it.
+add_repl_test(definitions-call_constant_arg_type_matches_sbf
+	"g(x:sbf) := x:sbf. sat g({a}:sbf) = {a}:sbf."
+	": T")
+add_repl_test(definitions-call_constant_arg_type_matches_bv
+	"g(x:bv[2]) := x:bv[2]. valid g({1}:bv[2]) = {1}:bv[2]."
+	": T")
+add_repl_test_fail(definitions-call_constant_arg_width_mismatch
+	"g(x:bv[2]) := x:bv[2]. sat g({1}:bv[4]) = {1}:bv[2]."
+	"Incompatible type information")
+
 # A reference with no definition at all reaching solve is not an internal
 # error: the solver names the unresolved reference instead.
 add_repl_test_fail(definitions-solve_unresolved_reference
