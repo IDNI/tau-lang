@@ -395,16 +395,26 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 # WINEDEBUG drops wine's own noise, and not the output of a test.
 ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 
+# A source change misses every object layer, so the compiled objects live in a
+# cache mount the CI carries across runs, as on the native build.
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # Build tau executable, and its suite for wine if TESTS = "yes"
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Building tests: $TESTS" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_BUILD_EXECUTABLE=ON && \
+		-DTAU_BUILD_EXECUTABLE=ON \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine; \
-	fi
+			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi && \
+	ccache --show-stats
 
 # The trusted workflow turns this on to publish the w64 packages it just built.
 FROM w64-build-resolve AS w64-build-publish
