@@ -118,7 +118,7 @@ jobs:
 
       # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
       # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: crazy-max/ghaction-github-runtime@v4
 
       # --load is needed: the container-driver builder does not populate the
       # local image store. Packages land in ~/.tau/packages. The nightly target
@@ -160,7 +160,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: crazy-max/ghaction-github-runtime@v4
 
       - name: Build image with nightly packages
         run: |
@@ -627,3 +627,75 @@ jobs:
           files: packages/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The coverage build is slow and changes little between commits, so it runs
+  # once a night and keeps the report as an artifact.
+  coverage:
+    needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    name: Coverage report
+    env:
+      # ubuntu-24.04 runners are 4-core
+      TAU_BUILD_JOBS: 4
+      TAU_STORE_KEEP: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-ubuntu-24.04-coverage-${{ github.sha }}
+          restore-keys: |
+            tau-store-ubuntu-24.04-coverage-
+
+      - name: Install the build dependencies and lcov
+        run: |
+          ./dev setup-ubuntu-ci-deps.sh
+          sudo apt-get install -y --no-install-recommends lcov
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # TAU_BUILD_TESTS is OFF by default, so the coverage build has to ask for
+      # the suites before ctest has anything to run.
+      - name: Build with coverage
+        run: ./dev preset coverage -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} -DTAU_BUILD_TESTS=ON
+
+      # A failing test must not sink the nightly, but a configure or ctest error
+      # must. ctest's exit status does not separate the two, so the run is
+      # tolerated and the next step requires that it actually ran.
+      - name: Run the tests
+        continue-on-error: true
+        run: ctest --preset coverage -j ${{ env.TAU_BUILD_JOBS }} --timeout 1200 --output-on-failure
+
+      - name: Require the tests to have run
+        run: |
+          log=build/coverage-gcc/Testing/Temporary/LastTest.log
+          test -s "$log" || { echo "ctest wrote no $log; the run never happened" >&2; exit 1; }
+          echo "ctest ran, $log is $(wc -l < "$log") lines"
+
+      - name: Generate the coverage report
+        run: ./dev preset coverage --keep-cache --target coverage -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Upload the coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            build/coverage-gcc/coverage
+            build/coverage-gcc/coverage.info
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}

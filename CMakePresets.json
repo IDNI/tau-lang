@@ -2061,6 +2061,10 @@
 		{
 			"name": "devel-msvc-all-clang-cl",
 			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
+			"name": "coverage",
+			"configurePreset": "coverage"
 		}
 	]
 }
