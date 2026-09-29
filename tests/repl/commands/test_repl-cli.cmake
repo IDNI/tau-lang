@@ -301,3 +301,12 @@ else()
 		PASS_REGULAR_EXPRESSION "o1\\[0\\] := 200"
 		TIMEOUT 120)
 endif()
+
+# --- --charvar=false printing ------------------------------------------------
+# With multi-character names `xy` is one variable, so a printed conjunction
+# must keep its `&` to read back as the same formula.
+add_test(NAME "test_repl-cli-no_charvar_prints_conjunction"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --charvar=false --color=false -S error -e 'normalize (ab:sbf & c_:sbf) = 0:sbf.'")
+set_tests_properties("test_repl-cli-no_charvar_prints_conjunction" PROPERTIES
+	PASS_REGULAR_EXPRESSION "(ab&c_|c_&ab) = 0"
+	FAIL_REGULAR_EXPRESSION "Error|abc_|c_ab")

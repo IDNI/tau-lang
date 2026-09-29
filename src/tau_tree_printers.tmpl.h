@@ -391,6 +391,8 @@ int_t get_max_var_name_b_id(tref fm) {
 inline bool pretty_printer_highlighting = false;
 inline bool pretty_printer_indenting    = false;
 inline bool print_json                  = false;
+// Without charvar `xy` is one variable, so a conjunction always prints `&`.
+inline bool pretty_printer_charvar      = true;
 
 template <NodeType node>
 std::ostream& tree<node>::print(std::ostream& os) const {
@@ -854,7 +856,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
+				if (!pretty_printer_charvar) out("&");
+				else if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
 					|| t.child_is(tau::ba_constant)
 					|| ((isalnum(static_cast<unsigned char>(last_written_char))
 						|| last_written_char == '_')

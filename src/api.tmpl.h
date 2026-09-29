@@ -112,6 +112,7 @@ void api<node>::set_charvar(bool charvar) {
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	pack_set_charvar<node>(charvar);
+	pretty_printer_charvar = charvar;
 }
 
 template <NodeType node>
