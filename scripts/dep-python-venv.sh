@@ -13,8 +13,8 @@
 #
 # Progress goes to stderr and the interpreter path is the last line on stdout.
 # A CI job does not capture it: the script appends TAU_PYTHON to GITHUB_ENV
-# (the way dep-oras.sh appends to GITHUB_PATH), so every later step builds
-# with the venv interpreter. The interpreter is named bin/python3 on Linux and
+# and the venv's bin directory to GITHUB_PATH (the way dep-oras.sh does), so
+# every later step builds with the venv interpreter and its repair tool. The interpreter is named bin/python3 on Linux and
 # macOS, Scripts/python.exe on Windows, and TAU_PYTHON carries the native form
 # so the native CMake on Windows can read it.
 #
@@ -150,5 +150,10 @@ fi
 interpreter="$(native_path "${venv}/${VENV_PYTHON}")"
 if [ -n "${GITHUB_ENV:-}" ] && [ -w "${GITHUB_ENV}" ]; then
 	printf 'TAU_PYTHON=%s\n' "${interpreter}" >> "${GITHUB_ENV}"
+fi
+# The wheel repair tools install beside the interpreter, and the binding
+# finds them with find_program, so later steps need that directory on PATH.
+if [ -n "${GITHUB_PATH:-}" ] && [ -w "${GITHUB_PATH}" ]; then
+	printf '%s\n' "$(dirname "${interpreter}")" >> "${GITHUB_PATH}"
 fi
 echo "${interpreter}"
