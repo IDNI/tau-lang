@@ -237,15 +237,23 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 	// (var = fv1 && var = fv2) with fv1 != fv2 syntactically → empty.
 	// (var = fv && var < fv) → empty.
 	// (var = fv && var > fv) → empty.
+	// (var = fv && var != fv), (fv <= var <= fv && var != fv) → empty.
 	auto has_same = [](const subtree_set<node>& a, const subtree_set<node>& b) {
 		for (tref t : a) if (b.contains(t)) return true;
+		return false;
+	};
+	auto pinned_and_excluded = [&] {
+		for (tref t : neq_free)
+			if (eq_free.contains(t) || (lower_nonstrict.contains(t)
+				&& upper_nonstrict.contains(t))) return true;
 		return false;
 	};
 	if (has_same(lower_strict, upper_strict)
 	 || has_same(lower_strict, upper_nonstrict)
 	 || has_same(lower_nonstrict, upper_strict)
 	 || has_same(lower_strict, eq_free)
-	 || has_same(upper_strict, eq_free))
+	 || has_same(upper_strict, eq_free)
+	 || pinned_and_excluded())
 		acc = qlt::bottom();
 	// Two distinct equalities to different free vars → contradictory iff
 	// we can't prove they're equal. Stay undetermined in this case.
@@ -341,8 +349,10 @@ static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 // where <_ij is strict iff either bound is strict. Density gives a point
 // strictly between L and U, and the absence of endpoints the one-sided case
 // (which qlt_dlo_qe_interval already decides, so only the two-sided case is
-// answered here). Anything else -- an equality, a disequality (it needs a
-// case split), a compound term, a typed 0/1 sentinel (an endpoint) --
+// answered here). A variable pinned to one term t -- by `var = t` or by
+// `t <= var && var <= t` -- is eliminated by substituting t, whatever the
+// other conjuncts are. Anything else -- a disequality without a pin (it needs
+// a case split), a compound term, a typed 0/1 sentinel (an endpoint) --
 // returns nullptr and leaves the binder in place.
 template<NodeType node>
 static tref qlt_dlo_fm_residual(tref var, tref body) {
@@ -360,18 +370,18 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		const auto& st = tau::get(side);
 		return st.has_child() && (st[0].is(tau::bf_f) || st[0].is(tau::bf_t));
 	};
-	std::function<bool(tref)> collect = [&](tref n) -> bool {
+	// A bound on var read off one atom, normalised to `var op other` with
+	// op among <, <=, >, >= and =; nullopt for any other atom.
+	struct bound { size_t op; tref other; };
+	auto read_bound = [&](tref n) -> std::optional<bound> {
 		const auto& t = tau::get(n);
-		if (t.equals_T()) return true;
-		if (!t.is(tau::wff) || !t.has_child()) return false;
+		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
 		auto op = t[0].value.nt;
-		if (op == tau::wff_and)
-			return collect(t[0].first()) && collect(t[0].second());
 		bool negate = false;
 		const tree<node>* at = &t[0];
 		if (op == tau::wff_neg) {
 			const auto& ti = tau::get(t[0].first());
-			if (!ti.is(tau::wff) || !ti.has_child()) return false;
+			if (!ti.is(tau::wff) || !ti.has_child()) return std::nullopt;
 			at = &ti[0];
 			op = ti[0].value.nt;
 			negate = true;
@@ -380,21 +390,22 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
 		else if (op == tau::bf_ngteq) op = tau::bf_lt;
 		else if (op == tau::bf_nlteq) op = tau::bf_gt;
-		if (op != tau::bf_lt && op != tau::bf_lteq
-			&& op != tau::bf_gt && op != tau::bf_gteq) return false;
+		if (op == tau::bf_eq && negate) return std::nullopt;
+		if (op != tau::bf_lt && op != tau::bf_lteq && op != tau::bf_eq
+			&& op != tau::bf_gt && op != tau::bf_gteq) return std::nullopt;
 		tref lhs = at->first(), rhs = at->second();
 		const bool in_l = contains<node>(lhs, var);
 		const bool in_r = contains<node>(rhs, var);
-		if (in_l == in_r) return false;
-		if (!is_bare_var(in_l ? lhs : rhs)) return false;
+		if (in_l == in_r) return std::nullopt;
+		if (!is_bare_var(in_l ? lhs : rhs)) return std::nullopt;
 		tref other = in_l ? rhs : lhs;
-		if (is_sentinel(other)) return false;
+		if (is_sentinel(other)) return std::nullopt;
 		// Normalise to `var op other`.
 		if (in_r) {
 			if      (op == tau::bf_lt)   op = tau::bf_gt;
 			else if (op == tau::bf_gt)   op = tau::bf_lt;
 			else if (op == tau::bf_lteq) op = tau::bf_gteq;
-			else                         op = tau::bf_lteq;
+			else if (op == tau::bf_gteq) op = tau::bf_lteq;
 		}
 		if (negate) {
 			if      (op == tau::bf_lt)   op = tau::bf_gteq;
@@ -402,12 +413,58 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 			else if (op == tau::bf_lteq) op = tau::bf_gt;
 			else                         op = tau::bf_lt;
 		}
-		if (op == tau::bf_lt || op == tau::bf_lteq)
-			upper.emplace_back(other, op == tau::bf_lt);
-		else lower.emplace_back(other, op == tau::bf_gt);
-		return true;
+		return bound{ op, other };
 	};
-	if (!collect(inner) || lower.empty() || upper.empty()) return nullptr;
+	trefs conjs;
+	std::function<void(tref)> flatten = [&](tref n) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::wff) && t.has_child()
+			&& t[0].value.nt == tau::wff_and)
+			flatten(t[0].first()), flatten(t[0].second());
+		else conjs.push_back(n);
+	};
+	flatten(inner);
+	// ex var (var = t && phi) == phi[var := t], and t <= var <= t is var = t.
+	// The pin must not be rebound inside the scope, or substituting it there
+	// would capture it.
+	auto rebinds = [&](tref term) {
+		for (tref v : get_free_vars<node>(term))
+			if (tau::get(inner).find_top([&](tref m) {
+				return is_quantifier<node>(m)
+					&& tau::get(tau::get(m)[0].first())
+						== tau::get(v); }))
+				return true;
+		return false;
+	};
+	trefs le, ge;
+	for (tref c : conjs) {
+		auto b = read_bound(c);
+		if (!b) continue;
+		tref pin = nullptr;
+		if (b->op == tau::bf_eq) pin = b->other;
+		else if (b->op == tau::bf_lteq) {
+			for (tref g : ge) if (tau::get(g) == tau::get(b->other)) pin = g;
+			le.push_back(b->other);
+		} else if (b->op == tau::bf_gteq) {
+			for (tref l : le) if (tau::get(l) == tau::get(b->other)) pin = l;
+			ge.push_back(b->other);
+		}
+		if (pin && !rebinds(pin)) {
+			subtree_map<node, tref> changes;
+			for (tref occ : tau::get(inner).select_all(is_bare_var))
+				changes.emplace(occ, pin);
+			return rewriter::replace<node>(inner, changes);
+		}
+	}
+	for (tref c : conjs) {
+		if (tau::get(c).equals_T()) continue;
+		auto b = read_bound(c);
+		if (!b || b->op == tau::bf_eq) return nullptr;
+		if (b->op == tau::bf_lt || b->op == tau::bf_lteq)
+			upper.emplace_back(b->other, b->op == tau::bf_lt);
+		else lower.emplace_back(b->other, b->op == tau::bf_gt);
+	}
+	if (lower.empty() || upper.empty()) return nullptr;
 	trefs out;
 	for (const auto& [l, ls] : lower)
 		for (const auto& [u, us] : upper)

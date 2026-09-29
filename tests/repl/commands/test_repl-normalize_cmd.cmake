@@ -236,3 +236,26 @@ add_repl_test(normalize_cmd-issue185_juxtaposed_min_printed
 	"normalize x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "x min\\(x")
 add_repl_test(normalize_cmd-issue185_juxtaposed_min_sat
 	"sat x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+
+# GitHub #148: a disequality next to a qlt variable pinned to one value is kept,
+# not dropped as harmless over a dense order.
+add_repl_test(normalize_cmd-qlt_pinned_neq_sat
+	"sat a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_valid
+	"valid ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_solve
+	"solve a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" "no solution")
+add_repl_test(normalize_cmd-qlt_pinned_neq_closed
+	"normalize ex a:qlt ex b:qlt ex c:qlt ((((a <= c) && (c <= a) && (b <= c)) || ((a <= c) && (c <= a) && (b < c))) && (c != a))" ": F")
+add_repl_test(normalize_cmd-qlt_pinned_neq_residual
+	"normalize ex x:qlt (a:qlt <= x && x <= a && x != b:qlt)" ": a != b")
+
+# GitHub #149: fex / fall are evaluated before any substitution can cross their
+# binder, on every command, so a binder never captures a variable of the same
+# name outside it.
+add_repl_test(normalize_cmd-fall_binder_not_captured
+	"normalize ((fall y (x | y)) & y) = 0" ": (xy|yx) = 0")
+add_repl_test(normalize_cmd-fex_binder_solve
+	"solve b = 0 && (fex b (a & b)) != 0" "a := \\{ T \\}")
+add_repl_test(normalize_cmd-fex_equals_body
+	"normalize (fex y (x & y)) = x" ": T")
