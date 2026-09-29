@@ -381,6 +381,15 @@ struct api {
 	 */
 	static void set_ltl_window_max_paths(size_t n);
 	/**
+	 * @brief Seconds the data game may spend on regions that keep their
+	 * quantifiers, all their questions together, each taking at most a
+	 * quarter of it (`ltl_closed_regions_timeout_param`); past either that
+	 * attempt is undecided. 0 skips the attempt. The parameter wins over
+	 * the `TAU_LTL_CLOSED_REGIONS_TIMEOUT` environment fallback (default
+	 * 20).
+	 */
+	static void set_ltl_closed_regions_timeout(size_t seconds);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */

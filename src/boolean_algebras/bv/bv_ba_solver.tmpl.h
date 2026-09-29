@@ -609,10 +609,13 @@ inline std::string bv_solve_timeout_message() {
 		+ " s; 0 = unbounded), so no answer is given";
 }
 
-/// When a question asked now runs out of `bv_solve_timeout`; never when
-/// the budget is 0 or no child process can bound it.
+/// When a question asked now runs out: at the deadline of a scope that
+/// shares one, else of `bv_solve_timeout`; never when that budget is 0 or no
+/// child process can bound it.
 inline std::chrono::steady_clock::time_point bv_question_deadline() {
-	if (!bv_solve_timeout || !bounded_calls_available())
+	if (!bounded_calls_available())
+		return std::chrono::steady_clock::time_point::max();
+	if (!shared_deadline() && !bv_solve_timeout)
 		return std::chrono::steady_clock::time_point::max();
 	return budget_deadline(std::chrono::seconds(bv_solve_timeout));
 }
@@ -835,7 +838,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	}
 	solver.assertFormula(expr.value());
 	// the questions of a scope sharing one budget all count against it
-	auto result = bv_check_sat(solver, shared_budget_start().has_value()
+	auto result = bv_check_sat(solver, shared_deadline().has_value()
 		|| bv_needs_bound(expr.value()), deadline, ran_out);
 	if (result == bv_sat_status::unknown)
 		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();

@@ -2988,14 +2988,20 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	// with quantifiers the normalizer leaves standing to a type whose owner
 	// decides them whole
 	std::vector<std::optional<size_t>> modes{ std::nullopt };
-	if (auto t = closed_decision_type<node>(atoms)) modes.push_back(t);
+	const size_t closed_seconds = ltl_closed_regions_timeout();
+	if (auto t = closed_decision_type<node>(atoms); t && closed_seconds)
+		modes.push_back(t);
 	for (auto mode : modes) {
 		if (wins || !formulas) break;
-		// The decisions of closed regions share one time budget, and one
-		// that passes it fails them, and only them: nothing else reads
-		// its missing answer.
+		// The decisions of closed regions share one time budget,
+		// ltl_closed_regions_timeout(), each taking at most a quarter of
+		// it, and one that passes either fails them, and only them:
+		// nothing else reads its missing answer. A question these regions
+		// can answer at all is answered in seconds, one they cannot keeps
+		// cvc5 busy past any budget, so the quarter ends the latter early.
 		std::optional<time_budget_handled> budget;
-		if (mode) budget.emplace(true);
+		if (mode) budget.emplace(std::chrono::seconds(closed_seconds),
+			std::chrono::milliseconds(closed_seconds * 250));
 		formula_regions<node> regions(arena, mode);
 		data_game_solver solver(regions, arena,
 			ltl_max_refinement_rounds(), keep);

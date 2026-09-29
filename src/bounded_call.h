@@ -26,6 +26,7 @@
 #ifndef __IDNI__TAU__BOUNDED_CALL_H__
 #define __IDNI__TAU__BOUNDED_CALL_H__
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -164,38 +165,53 @@ inline std::string take_time_budget_exhausted() {
 	return m;
 }
 
-/// While set, the bounded questions asked share one budget, counted from
-/// this time instead of from each question's start.
-inline std::optional<std::chrono::steady_clock::time_point>&
-	shared_budget_start()
-{
-	static std::optional<std::chrono::steady_clock::time_point> start;
-	return start;
+/// While set, the deadline every bounded question asked shares, in place
+/// of each question's own budget.
+inline std::optional<std::chrono::steady_clock::time_point>& shared_deadline() {
+	static std::optional<std::chrono::steady_clock::time_point> deadline;
+	return deadline;
 }
 
-/// When a question with a budget of @p budget, asked now, runs out.
+/// While a deadline is shared, the most any one question asked may take.
+inline std::chrono::steady_clock::duration& shared_question_budget() {
+	static std::chrono::steady_clock::duration budget{};
+	return budget;
+}
+
+/// When a question with a budget of @p budget, asked now, runs out; in a
+/// scope that shares a deadline, that deadline, or the scope's own budget
+/// of one question when that ends first.
 inline std::chrono::steady_clock::time_point budget_deadline(
 	std::chrono::steady_clock::duration budget)
 {
-	const auto& shared = shared_budget_start();
-	return (shared ? *shared : std::chrono::steady_clock::now()) + budget;
+	const auto now = std::chrono::steady_clock::now();
+	const auto& shared = shared_deadline();
+	if (!shared) return now + budget;
+	return std::min(*shared, now + shared_question_budget());
 }
 
 /**
  * @brief Keeps the budgets that run out in its scope from reaching the
- * boundary of the unit of work; with `share`, the questions asked in it
- * share one budget.
+ * boundary of the unit of work; with a `share`d budget, the questions asked
+ * in it all end by the time that budget, counted from the scope's opening,
+ * passes, and each takes at most `per_question`.
  *
  * Only for a caller that reads every missing answer in its scope as
  * "undecided" and derives no verdict from it; what ran out before the scope
  * opened still reaches the boundary.
  */
 struct time_budget_handled {
+	using duration = std::chrono::steady_clock::duration;
 	std::string outer = take_time_budget_exhausted();
-	std::optional<std::chrono::steady_clock::time_point> outer_start
-		= shared_budget_start();
-	explicit time_budget_handled(bool share = false) {
-		if (share) shared_budget_start() = std::chrono::steady_clock::now();
+	std::optional<std::chrono::steady_clock::time_point> outer_deadline
+		= shared_deadline();
+	duration outer_question = shared_question_budget();
+	explicit time_budget_handled(std::optional<duration> share = {},
+		std::optional<duration> per_question = {})
+	{
+		if (!share) return;
+		shared_deadline() = std::chrono::steady_clock::now() + *share;
+		shared_question_budget() = per_question.value_or(*share);
 	}
 	time_budget_handled(const time_budget_handled&) = delete;
 	time_budget_handled& operator=(const time_budget_handled&) = delete;
@@ -203,7 +219,8 @@ struct time_budget_handled {
 	bool ran_out() const { return !time_budget_exhausted().empty(); }
 	~time_budget_handled() {
 		time_budget_exhausted() = std::move(outer);
-		shared_budget_start() = outer_start;
+		shared_deadline() = outer_deadline;
+		shared_question_budget() = outer_question;
 	}
 };
 

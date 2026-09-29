@@ -766,9 +766,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    UNREALIZABLE or UNKNOWN answer of (4) and (5). When a quantifier stays
    and every stream is of one bitvector type, the game is played once more
    on formulas that keep their quantifiers, each region decided whole on
-   the bits of its values or by the solver, all of them within one
-   `--bv-solve-timeout`; such a game gives a verdict but no strategy to
-   `run`. The steps before step 0
+   the bits of its values or by the solver, all of them within
+   `--ltl-closed-regions-timeout` (20 seconds, each question at most a
+   quarter of it); such a game gives a verdict but no strategy to `run`. The steps before step 0
    are played like any other step, their inputs by the environment and
    their outputs by the system. The game answers UNKNOWN only when a
    quantifier cannot be eliminated or decided, or a fixpoint reaches the
@@ -850,6 +850,7 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
+| `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
 a CLI flag, a REPL option and an `api::set_*` setter (see the CLI and REPL
@@ -2842,6 +2843,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
+| -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -3173,6 +3175,12 @@ verdict is an error (UNKNOWN), never a false answer.
 examines per check (`--ltl-window-max-paths`). 4096 by default, or
 `TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
 likewise answers UNKNOWN.
+
+* `ltlclosedregionstimeout`: seconds the data game may spend on regions that
+keep their quantifiers, all their questions together, each question at most
+a quarter of it (`--ltl-closed-regions-timeout`). 20 by default, or
+`TAU_LTL_CLOSED_REGIONS_TIMEOUT` when that is set; 0 skips the attempt. Past
+either bound that attempt is undecided, and the other routes keep deciding.
 
 Changing any of these, the two temporal-normalization caps, `preprocessing`
 or an option an algebra declares (below) between two queries drops the
@@ -3728,7 +3736,8 @@ carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOptio
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
 (`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
-`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`) have no counterpart
+`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`,
+`set_ltl_closed_regions_timeout`) have no counterpart
 there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
 

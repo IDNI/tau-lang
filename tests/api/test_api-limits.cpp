@@ -135,6 +135,7 @@ TEST_SUITE("Tau API - runtime limits") {
 		const long s2 = ltl_guard_max_cubes_param;
 		const long s3 = ltl_max_refinement_rounds_param;
 		const long s4 = ltl_window_max_paths_param;
+		const long s5 = ltl_closed_regions_timeout_param;
 		tau_api::set_ltl_hoa_max_states(77);
 		CHECK( ltl_hoa_max_states() == 77 );
 		tau_api::set_ltl_hoa_max_states(0);
@@ -147,13 +148,18 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( ltl_max_refinement_rounds() == 0 );
 		tau_api::set_ltl_window_max_paths(11);
 		CHECK( ltl_window_max_paths() == 11 );
+		tau_api::set_ltl_closed_regions_timeout(3);
+		CHECK( ltl_closed_regions_timeout() == 3 );
+		tau_api::set_ltl_closed_regions_timeout(0);
+		CHECK( ltl_closed_regions_timeout() == 0 );
+		ltl_closed_regions_timeout_param = s5;
 		ltl_hoa_max_states_param = s1;
 		ltl_guard_max_cubes_param = s2;
 		ltl_max_refinement_rounds_param = s3;
 		ltl_window_max_paths_param = s4;
 	}
 
-	// Each of the four game caps resolves parameter > environment >
+	// Each of the game caps resolves parameter > environment >
 	// default, like the timeout and the QE cap before them, so a script
 	// can set one without a flag and a flag always wins over the script.
 	TEST_CASE("ltl game caps: parameter beats environment, garbage keeps "
@@ -174,7 +180,10 @@ TEST_SUITE("Tau API - runtime limits") {
 				&ltl_max_refinement_rounds, 64 },
 			{ "TAU_LTL_WINDOW_MAX_PATHS",
 				&ltl_window_max_paths_param,
-				&ltl_window_max_paths, 4096 }
+				&ltl_window_max_paths, 4096 },
+			{ "TAU_LTL_CLOSED_REGIONS_TIMEOUT",
+				&ltl_closed_regions_timeout_param,
+				&ltl_closed_regions_timeout, 20 }
 		};
 		for (const auto& c : caps) {
 			const long saved = *c.param;
@@ -183,7 +192,8 @@ TEST_SUITE("Tau API - runtime limits") {
 			CHECK( c.effective() == c.dflt );
 			setenv(c.var, "7", 1);
 			CHECK( c.effective() == 7 );
-			// 0 is a value, not an absence: it means unlimited.
+			// 0 is a value, not an absence: it means unlimited (no attempt
+			// for the closed regions).
 			setenv(c.var, "0", 1);
 			CHECK( c.effective() == 0 );
 			setenv(c.var, "-3", 1);

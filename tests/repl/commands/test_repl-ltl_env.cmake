@@ -114,6 +114,26 @@ add_test(NAME "test_repl-ltl_env-window_max_paths_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-window-max-paths 0 -e \"get ltlwindowmaxpaths\"")
 set_tests_properties("test_repl-ltl_env-window_max_paths_flag" PROPERTIES
 	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *unlimited")
+add_test(NAME "test_repl-ltl_env-closed_regions_timeout_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 7 -e \"get ltlclosedregionstimeout\"")
+set_tests_properties("test_repl-ltl_env-closed_regions_timeout_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlclosedregionstimeout: *7 s")
+add_test(NAME "test_repl-ltl_env-closed_regions_timeout_default"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlclosedregionstimeout\"")
+set_tests_properties("test_repl-ltl_env-closed_regions_timeout_default" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlclosedregionstimeout: *20 s")
+add_test(NAME "test_repl-ltl_env-closed_regions_timeout_set"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set ltlclosedregionstimeout 0. get ltlclosedregionstimeout\"")
+set_tests_properties("test_repl-ltl_env-closed_regions_timeout_set" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlclosedregionstimeout: *off")
+add_test(NAME "test_repl-ltl_env-closed_regions_timeout_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_CLOSED_REGIONS_TIMEOUT=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlclosedregionstimeout\"")
+set_tests_properties("test_repl-ltl_env-closed_regions_timeout_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlclosedregionstimeout: *5 s")
+add_test(NAME "test_repl-ltl_env-closed_regions_timeout_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_CLOSED_REGIONS_TIMEOUT=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 9 -e \"get ltlclosedregionstimeout\"")
+set_tests_properties("test_repl-ltl_env-closed_regions_timeout_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlclosedregionstimeout: *9 s")
 add_test(NAME "test_repl-ltl_env-pwr_semantic_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --pwr-semantic -e \"get pwrsemantic\"")
 set_tests_properties("test_repl-ltl_env-pwr_semantic_flag" PROPERTIES

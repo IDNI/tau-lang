@@ -254,6 +254,12 @@ NB_MODULE(tau, m) {
 			&tau_api::set_ltl_window_max_paths,
 			"Strategy paths the multi-step window oracle examines "
 			"per check (--ltl-window-max-paths); 0 = unlimited." },
+		{ "set_ltl_closed_regions_timeout",
+			&tau_api::set_ltl_closed_regions_timeout,
+			"Seconds the data game may spend on regions that keep "
+			"their quantifiers, each question at most a quarter of "
+			"it (--ltl-closed-regions-timeout); default 20, 0 = no "
+			"such attempt." },
 		{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
 			"Decided tau-algebra rows whose key tree is kept alive "
 			"across the step sweep (--ba-decision-pins); default "
