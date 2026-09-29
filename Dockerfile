@@ -72,6 +72,10 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	mingw-w64=11.0.1-3build1 \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2
 
+# The presets and the host tgf probe need the plain names, and every stage inherits them.
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
+	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+
 # create tau-lang directory and set it as the working directory
 RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
 	mkdir -p /tau-lang ~/.tau
@@ -146,11 +150,6 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
 	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH} \
 	TAU_PARSER_COMMIT=${TAU_PARSER_COMMIT}
-
-# The presets name clang and clang++. The versioned package provides
-# only clang-19 and clang++-19.
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
-	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
 # The HTTP oracle in nlang links libcurl.
 RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev
