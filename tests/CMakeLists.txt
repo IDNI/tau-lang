@@ -270,7 +270,13 @@ function(_tau_add_test_target N src work_dir)
 	# The Spot store package's bin dir, when configure had to build one; the
 	# suite helpers probe TAU_SPOT_BIN after PATH.
 	if(TAU_SPOT_BIN)
-		list(APPEND _tau_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+		set(_tau_spot_bin "${TAU_SPOT_BIN}")
+		# A PE under wine reads a Linux path through the Z: drive.
+		if(CMAKE_CROSSCOMPILING_EMULATOR AND TAU_DEPS_TARGET MATCHES "^windows-")
+			string(REPLACE "/" "\\" _tau_spot_bin "${_tau_spot_bin}")
+			set(_tau_spot_bin "Z:${_tau_spot_bin}")
+		endif()
+		list(APPEND _tau_test_env "TAU_SPOT_BIN=${_tau_spot_bin}")
 	endif()
 	set_tests_properties(${N}
 		PROPERTIES WORKING_DIRECTORY ${work_dir}

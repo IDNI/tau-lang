@@ -10,8 +10,13 @@ include("${CMAKE_CURRENT_LIST_DIR}/../external/parser/cmake/tau-store.cmake")
 
 # Compiler and flag arguments every producer receives, so no producer reads a
 # compiler from the environment. The values are the preset's build-type flags,
-# so switching the build type selects a different package.
+# so switching the build type selects a different package. An optional target
+# names the store target of the package, and defaults to TAU_DEPS_TARGET.
 function(_tau_deps_toolchain_args out)
+	set(_target "${TAU_DEPS_TARGET}")
+	if(ARGC GREATER 1)
+		set(_target "${ARGV1}")
+	endif()
 	string(TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
 	set(_cflags_var "CMAKE_C_FLAGS_${_build_type}")
 	set(_cxxflags_var "CMAKE_CXX_FLAGS_${_build_type}")
@@ -20,7 +25,7 @@ function(_tau_deps_toolchain_args out)
 		"-DTAU_DEP_CXX=${CMAKE_CXX_COMPILER}"
 		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS} ${${_cflags_var}}"
 		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS} ${${_cxxflags_var}}"
-		"-DTAU_DEP_TARGET=${TAU_DEPS_TARGET}")
+		"-DTAU_DEP_TARGET=${_target}")
 	# A cross toolchain travels as a file; macOS and MSVC build with the host
 	# compiler the preset picked and pass none.
 	if(CMAKE_TOOLCHAIN_FILE)
@@ -59,11 +64,12 @@ endfunction()
 
 # The command that runs a target producer with the flag environment cleared and
 # this configure's compiler and flags. Callers append package-specific options.
+# An optional target overrides the store target, as in _tau_deps_toolchain_args.
 function(tau_deps_producer_command out script)
 	if(NOT TAU_BASH)
 		message(FATAL_ERROR "running a dependency producer needs bash")
 	endif()
-	_tau_deps_toolchain_args(_toolchain)
+	_tau_deps_toolchain_args(_toolchain ${ARGN})
 	# Git Bash rewrites an argument that starts with / as a path, which mangles
 	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
 	# Exclude the flag arguments only: a real path, such as the toolchain file,
@@ -102,14 +108,29 @@ function(tau_deps_host_producer_command out script)
 endfunction()
 
 # Run one producer and set <out_var> to its printed prefix. Extra arguments are
-# appended to the producer command line.
+# appended to the producer command line. A leading OPTIONAL turns a producer
+# failure into a warning and an empty <out_var>.
 function(_tau_deps_run_producer dep producer_cmd out_var)
+	set(_args ${ARGN})
+	set(_optional FALSE)
+	if(_args)
+		list(GET _args 0 _first)
+		if(_first STREQUAL "OPTIONAL")
+			set(_optional TRUE)
+			list(REMOVE_AT _args 0)
+		endif()
+	endif()
 	execute_process(
-		COMMAND ${producer_cmd} ${ARGN}
+		COMMAND ${producer_cmd} ${_args}
 		RESULT_VARIABLE _rc
 		OUTPUT_VARIABLE _out
 		ERROR_VARIABLE _err)
 	if(NOT _rc EQUAL 0)
+		if(_optional)
+			message(WARNING "cannot resolve the optional ${dep} package.\n${_err}\n${_out}")
+			set(${out_var} "" PARENT_SCOPE)
+			return()
+		endif()
 		message(FATAL_ERROR "cannot resolve the ${dep} package.\n${_err}\n${_out}")
 	endif()
 	if(NOT _out MATCHES "package prefix: (.*)")
@@ -127,6 +148,13 @@ endfunction()
 
 function(tau_deps_ensure_prefix dep script out_prefix)
 	tau_deps_producer_command(_cmd "${script}")
+	_tau_deps_run_producer("${dep}" "${_cmd}" _prefix ${ARGN})
+	set(${out_prefix} "${_prefix}" PARENT_SCOPE)
+endfunction()
+
+# As tau_deps_ensure_prefix, but the package takes the store id of <target>.
+function(tau_deps_ensure_prefix_as dep script target out_prefix)
+	tau_deps_producer_command(_cmd "${script}" "${target}")
 	_tau_deps_run_producer("${dep}" "${_cmd}" _prefix ${ARGN})
 	set(${out_prefix} "${_prefix}" PARENT_SCOPE)
 endfunction()
@@ -214,17 +242,35 @@ endfunction()
 # Spot is a host tool Tau only execs (ltlsynt, autfilt, ltlfilt); nothing
 # links it. A host that already has ltlsynt on PATH -- apt, brew, conda --
 # uses that. Otherwise the store package supplies the tools, and configure
-# publishes its bin directory as TAU_SPOT_BIN. windows-x86_64-msvc always takes
-# the package: its MSYS2 build needs the runtime DLLs copied beside the exes, and
-# a Windows PATH ltlsynt would not carry them.
+# publishes its bin directory as TAU_SPOT_BIN. Both Windows targets always take
+# the package: a host PATH tool cannot carry the runtime DLLs of the PE, and wine
+# cannot load an ELF.
+#
+# windows-x86_64-mingw takes the windows-x86_64-msvc entry, the Windows PE a
+# MinGW tau execs. Under that id the producer applies the msvc host guard
+# before it reads any store, so a configure on a Linux host always misses. A
+# miss warns and leaves TAU_SPOT_BIN empty, and the LTL suites skip, because
+# spot is an optional test-time tool. Do not fall back to a host ltlsynt: an ELF under an .exe name
+# would make the suites run and fail instead of skip.
 function(tau_deps_resolve_spot)
+	set(_windows_targets "windows-x86_64-msvc" "windows-x86_64-mingw")
 	find_program(TAU_HOST_LTLSYNT ltlsynt NO_CACHE)
-	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets)
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()
-	tau_deps_ensure_prefix(spot
-		"${PROJECT_SOURCE_DIR}/scripts/dep-spot-package.sh" TAU_SPOT_PREFIX)
+	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
+		tau_deps_ensure_prefix_as(spot
+			"${PROJECT_SOURCE_DIR}/scripts/dep-spot-package.sh"
+			"windows-x86_64-msvc" TAU_SPOT_PREFIX OPTIONAL)
+		if(NOT TAU_SPOT_PREFIX)
+			message(STATUS "Spot not resolved: the LTL suites skip")
+			return()
+		endif()
+	else()
+		tau_deps_ensure_prefix(spot
+			"${PROJECT_SOURCE_DIR}/scripts/dep-spot-package.sh" TAU_SPOT_PREFIX)
+	endif()
 	set(TAU_SPOT_PREFIX "${TAU_SPOT_PREFIX}" PARENT_SCOPE)
 	set(TAU_SPOT_BIN "${TAU_SPOT_PREFIX}/bin" PARENT_SCOPE)
 	message(STATUS "Spot from store: TAU_SPOT_BIN=${TAU_SPOT_PREFIX}/bin")
