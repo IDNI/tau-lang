@@ -653,6 +653,11 @@ FROM wasm-browser-deps AS wasm-browser
 
 COPY --from=source /tau-lang /tau-lang
 
+# The wasm-node store entries, so the browser configure resolves nothing again.
+# This belongs to the browser stage and not to wasm-browser-deps: from there the
+# wasm-deps job would pull the whole wasm-node-resolve build in behind it.
+COPY --from=wasm-node-resolve /root/.tau/store /root/.tau/store
+
 WORKDIR /tau-lang
 
 # The build context carries no .git, so the stamp arrives as a build argument.
