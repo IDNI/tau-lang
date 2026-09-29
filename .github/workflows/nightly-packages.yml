@@ -664,10 +664,8 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # TAU_BUILD_TESTS is OFF by default, so the coverage build has to ask for
-      # the suites before ctest has anything to run.
       - name: Build with coverage
-        run: ./dev preset coverage -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} -DTAU_BUILD_TESTS=ON
+        run: ./dev preset coverage -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       # A failing test must not sink the nightly, but a configure or ctest error
       # must. ctest's exit status does not separate the two, so the run is
