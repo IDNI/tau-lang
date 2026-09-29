@@ -70,7 +70,6 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
-	libboost-all-dev=1.83.0.1ubuntu2 \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2
 
 # create tau-lang directory and set it as the working directory
@@ -269,7 +268,9 @@ RUN echo "(BUILD) -- Building packages" && \
 # ------------------------------------------------------------
 # Run the tau-testnet suite against the release build
 
-FROM build AS testnet
+# tau-testnet consumes the built tree and the binding, not the tau suite, so it
+# inherits the resolve stage and does not re-run ctest on the way in.
+FROM build-resolve AS testnet
 
 ARG BUILD_JOBS=5
 
