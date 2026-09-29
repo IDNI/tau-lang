@@ -1583,6 +1583,17 @@ struct data_game_step_provider : step_provider<node> {
 		const assignment<node>& memory, size_t time_point, size_t) override
 	{
 		result<std::optional<solution<node>>> r;
+		// the first step after a reset carries what solving again reported
+		r.append(std::move(reset_report));
+		reset_report = {};
+		if (unsolved_after_reset) {
+			return r.with_error(code::solver_error,
+				unrealizable_after_reset
+				? "after the reset, the revised specification is "
+					"unrealizable from step 0"
+				: "UNKNOWN: after the reset, the data game does not "
+					"decide the revised specification from step 0");
+		}
 		auto get = [&](const std::string& name, size_t tid, bool input,
 			int_t time) -> tref
 		{
@@ -1664,7 +1675,30 @@ struct data_game_step_provider : step_provider<node> {
 		return get_max_initial<node>(tree<node>::get(spec->get())
 			.select_top(is_child<node, tree<node>::io_var>));
 	}
+	// A reset restarts the revised spec at step 0, its fixed steps where
+	// it states them, so a strategy solved from a later step is solved
+	// again. Set when that gives no strategy, and whether the game
+	// refuted the spec rather than leaving it undecided.
+	bool unsolved_after_reset = false;
+	bool unrealizable_after_reset = false;
+	// what solving it again reported
+	report reset_report;
 	void reset() override {
+		unsolved_after_reset = unrealizable_after_reset = false;
+		reset_report = {};
+		if (offset && spec) {
+			std::shared_ptr<data_game_strategy<node>> next;
+			bool unrealizable = false;
+			auto full = ltl_to_safety_formula_full<node>(spec->get(),
+				&next, true, &unrealizable);
+			if (full.has_value() && next) strategy = std::move(next);
+			else {
+				unsolved_after_reset = true;
+				unrealizable_after_reset = full.has_value()
+					&& unrealizable;
+			}
+			reset_report = std::move(full).report();
+		}
 		offset = 0;
 		strategy->reset();
 	}

@@ -627,10 +627,9 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		}
 	}
 
-	// Defect: reset sets the offset of the revised strategy to 0, so its
-	// fixed step moves from 6 to 4.
+	// A reset restarts the revised spec, so its fixed step stays at 6.
 	TEST_CASE("a revised data-game run keeps its fixed steps after reset"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		io_context<node_t> ctx;
 		auto nso = get_nso_rr<node_t>(ctx,
