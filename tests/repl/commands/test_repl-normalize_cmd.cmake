@@ -277,3 +277,13 @@ add_repl_test(normalize_cmd-qlt_density_point_kept
 	"sat a:qlt = b:qlt && (ex x:qlt (a <= x && x <= b && x != c:qlt))" ": T")
 add_repl_test(normalize_cmd-qlt_density_equivalence
 	"valid all a:qlt all b:qlt all c:qlt ((ex x:qlt (a <= x && x <= b && x != c)) <-> (a < b || (a = b && a != c)))" ": T")
+# GitHub #185: a bare min/max is the built-in, not a function call, as the
+# whole right-hand side of a definition and as a fixed-point fallback
+add_repl_test(normalize_cmd-issue185_definition_max
+	"g(x:bv[2]) := max(x:bv[2], {2}:bv[2]). normalize g({0}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_definition_min
+	"g(x:bv[2]) := min(x:bv[2], {2}:bv[2]). normalize g({3}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
+add_repl_test(normalize_cmd-issue185_definition_ref_kept
+	"f(x, y) := x | y. g(x) := f(x, x). normalize g(a) = 0." "%1[^%]*: a = 0")
+add_repl_test(normalize_cmd-issue185_fallback_max
+	"g[0](x:bv[2]) := {0}:bv[2]. g[n](x:bv[2]) := g[n-1](x:bv[2])'. normalize (g({1}:bv[2]) fallback max({0}:bv[2], {2}:bv[2])) = {2}:bv[2]." "%1[^%]*: T")

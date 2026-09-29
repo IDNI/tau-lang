@@ -16,7 +16,7 @@ definitions            => (_ (rec_relation | input_def | output_def | type_def) 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
 spec_part              => rec_relation | input_def | output_def | type_def | main.
 
-rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
+rec_relation           => ref _ ":=" _ (capture | (ref & ~bf_min & ~bf_max) | wff | bf).
 input_def              => io_var_name [ member_path ] [ typed ] _ ":=" _ "in"    __ stream.
 output_def             => io_var_name [ member_path ] [ typed ] _ ":=" _ "out"   __ stream.
 stream                 => "file" _ '(' _ q_file_name  _ ')'
@@ -36,7 +36,7 @@ member_path            => '.' member_name ('.' member_name)*.
 
 ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
-                        | capture | ref | wff | bf.
+                        | capture | (ref & ~bf_min & ~bf_max) | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 # wff and bf expressions
