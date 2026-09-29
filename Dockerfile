@@ -263,7 +263,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	scripts/with-gh-token ./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-	rm -rf build/devel; \
+	rm -rf build/devel-gcc; \
 fi
 
 # Run the tests (if TESTS = "yes") on the compiled tree above.
