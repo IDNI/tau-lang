@@ -557,7 +557,10 @@ jobs:
 
   wasm-browser:
     name: WebAssembly (browser)
-    needs: wasm-deps
+    # The browser stage copies the store from wasm-node-resolve. That job's
+    # publish step writes those layers to tau-wasm-node, so waiting for it turns
+    # the copy into a cache hit instead of a full rebuild.
+    needs: [wasm-deps, wasm-node]
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -579,7 +582,8 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-wasm-node
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
