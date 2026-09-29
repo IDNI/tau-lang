@@ -4,10 +4,9 @@
 //
 // variant_ba.h lifts the BA operators (&, |, ^, +, ~, == bool) to
 // std::variant<BAs...> by dispatching to the currently-active alternative.
-// When the two operands hold different alternatives, a debug or devel
-// build asserts (BA-12), and a release build returns a default-constructed
-// variant -- this file exercises both the same-alternative success path
-// and the release fallback for mismatched alternatives.
+// When the two operands hold different alternatives, every build aborts
+// (BA-12) -- this file exercises the same-alternative success path and
+// the abort on mismatched alternatives.
 //
 // variant_ba's operators require BAsPack<BAs...>, which in turn requires
 // cvc5::Term (aliased as `bv`) to be literally one of the alternatives
@@ -103,38 +102,14 @@ TEST_SUITE("variant boolean algebra") {
 		CHECK( s0 == false );
 	}
 
-	// Compiled only outside a debug build, where the assert is compiled
-	// out and the fallback variant is the real, observable behavior.
-#ifndef DEBUG
-	TEST_CASE("mismatched alternatives fall back to a default variant (BA-12)") {
-		V a = make_bv(true);
-		V b = make_sbf("1");
-
-		auto check_fallback = [](const V& r) {
-			CHECK( r.index() == 0 );
-			CHECK( std::get<bv>(r).isNull() );
-		};
-
-		check_fallback( a & b );
-		check_fallback( a | b );
-		check_fallback( a ^ b );
-		check_fallback( a + b );
-
-		// order shouldn't matter
-		check_fallback( b & a );
-		check_fallback( b | a );
-	}
-#endif
-
-#ifdef DEBUG
 #if defined(_WIN32) || defined(__EMSCRIPTEN__)
 	constexpr bool has_fork_death_check = false;
 #else
 	constexpr bool has_fork_death_check = true;
 #endif
 
-	// A debug build's assert turns a mismatched call into a real abort;
-	// only a fork can observe that without killing the whole test process.
+	// Every build aborts on a mismatched call; only a fork can observe
+	// that without killing the whole test process.
 	TEST_CASE("mismatched alternatives abort (BA-12)"
 	          * doctest::skip(!has_fork_death_check)) {
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
@@ -151,5 +126,4 @@ TEST_SUITE("variant boolean algebra") {
 		CHECK( dies_by_sigabrt([&]{ b | a; }) );
 #endif
 	}
-#endif
 }
