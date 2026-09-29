@@ -73,8 +73,8 @@ jobs:
             echo "matrix={\"include\":[$default]}" >> "$GITHUB_OUTPUT"
           fi
 
-  # One job builds the system packages and the wine layer, so the deps job
-  # and every later image import them. Change the scope to force a rebuild.
+  # One job builds the system packages, so the deps job and every later image
+  # import them. Change the scope to force a rebuild.
   base:
     name: Build base image (system packages)
     runs-on: ubuntu-24.04
@@ -90,25 +90,17 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # w64-deps holds the wine layer. It sits on top of deps, so this job
-      # also builds deps, and the deps job reads that layer from tau-base.
-      - name: Build base and w64-deps stages
+      - name: Build base stage
         run: |
           ./dev docker base \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=tau-base \
             --cache-to   type=gha,scope=tau-base,mode=max
-          ./dev docker w64-deps \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-base,mode=max
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # One job installs oras and the binding venv on top of the base layer, so
-  # the pack matrix imports the layer instead of each entry building it.
-  # Change the scope to force a rebuild.
+  # One job installs oras and the binding venv on top of the base layer, and
+  # the wine layer on top of deps, so the pack matrix and the MinGW job import
+  # those layers instead of each entry building them. Change the scope to force
+  # a rebuild.
   deps:
     name: Build deps image (oras + venv)
     needs: base
@@ -137,6 +129,20 @@ jobs:
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
             --cache-to   type=gha,scope=tau-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # w64-deps adds the wine layer the MinGW job needs. It sits on top of
+      # deps, so this job has the layers the build stage needs to reuse.
+      - name: Build w64-deps stage
+        run: |
+          ./dev docker w64-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-w64-deps \
+            --cache-to   type=gha,scope=tau-w64-deps,mode=max
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -419,6 +425,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-w64-deps \
             --cache-to   type=gha,scope=tau-w64-build,mode=max
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -432,6 +439,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-w64-deps \
             --cache-from type=gha,scope=tau-w64-build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
