@@ -21,6 +21,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The pusher's permission gates every publish step. GitHub checks the
+  # pusher, not the commit author, so the guard reads the triggering actor.
+  # A pull request never publishes, even when its author has write access.
+  guard:
+    name: Check the pusher's repository permission
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      allowed: ${{ steps.permission.outputs.allowed }}
+    steps:
+      - name: Read the pusher's permission
+        id: permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pull request: publishing is off"
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          perm="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.triggering_actor }}/permission" --jq '.permission')" \
+            || echo "::warning::cannot read the permission of ${{ github.triggering_actor }}"
+          echo "pusher ${{ github.triggering_actor }}: permission '${perm}'"
+          case "$perm" in
+            write|maintain|admin) echo "allowed=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "allowed=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
   probe:
     name: Choose the pack matrix
     runs-on: ubuntu-24.04
@@ -74,14 +103,18 @@ jobs:
 
   linux:
     name: Linux release tests (${{ matrix.name }})
-    needs: [probe, deps]
+    needs: [guard, probe, deps]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -111,8 +144,23 @@ jobs:
         with:
           cache-map: '{"ccache": "/root/.ccache"}'
 
+      # The publish stage resolves the store and publishes what it built
+      # before any test runs, so a red test cannot strand a package.
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker build-release-publish \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-release-${{ matrix.name }},mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # Each pack writes its own tau_pack.h, so each entry is a full build
-      # on top of the deps layer the deps job cached.
+      # on top of the layers the publish step cached.
       - name: Build release tests and run them
         run: |
           ./dev docker build-release \
@@ -121,7 +169,7 @@ jobs:
             --build-arg TAU_BAS=${{ matrix.pack }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
-            --cache-to   type=gha,scope=tau-release-${{ matrix.name }},mode=max
+            --cache-from type=gha,scope=tau-release-${{ matrix.name }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -129,14 +177,18 @@ jobs:
   # so it does not depend on the x86 `deps` job or its cache scope.
   linux-arm64:
     name: Linux arm64 release tests (${{ matrix.name }})
-    needs: probe
+    needs: [guard, probe]
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
     env:
       # ubuntu-24.04-arm runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -159,6 +211,19 @@ jobs:
         with:
           cache-map: '{"ccache": "/root/.ccache"}'
 
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker build-release-publish \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-release-arm-${{ matrix.name }},mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build release tests and run them
         run: |
           ./dev docker build-release \
@@ -167,7 +232,7 @@ jobs:
             --build-arg TAU_BAS=${{ matrix.pack }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
-            --cache-to   type=gha,scope=tau-release-arm-${{ matrix.name }},mode=max
+            --cache-from type=gha,scope=tau-release-arm-${{ matrix.name }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -177,10 +242,14 @@ jobs:
   # for the arm64 binaries and makes an arm64 venv for the interpreter.
   linux-arm64-cross:
     name: Linux arm64 cross tests
-    needs: probe
+    needs: [guard, probe]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -238,6 +307,14 @@ jobs:
 
       - name: Build the arm64 tests and the binding, run them under qemu
         run: ./dev preset release-arm64-all run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+      # Configure resolved the store before any test ran, so a red test still
+      # publishes what this job built.
+      - name: Publish the store packages
+        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   testnet:
     name: tau-testnet suite
@@ -320,11 +397,15 @@ jobs:
 
   wasm-node:
     name: WebAssembly (Node.js)
-    needs: wasm-deps
+    needs: [guard, wasm-deps]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -334,6 +415,19 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker wasm-node-publish \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-to   type=gha,scope=tau-wasm-node,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and test
         run: |
           ./dev docker wasm-node \
@@ -341,7 +435,8 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-wasm-node
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -374,11 +469,16 @@ jobs:
 
   macos:
     name: macOS release tests
+    needs: guard
     runs-on: macos-15
+    permissions:
+      contents: read
+      packages: write
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
       TAU_STORE_KEEP: 3
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -419,6 +519,14 @@ jobs:
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
+      # Configure resolved the store before any test ran, so a red test still
+      # publishes what this job built.
+      - name: Publish the store packages
+        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # saved after the run, so a build failure still keeps the packages that
       # did resolve and the next run does not rebuild them
       - name: Save the dependency store (~/.tau/store)
@@ -457,12 +565,17 @@ jobs:
   # the producers' vcvars64.bat search is only a local fallback.
   windows:
     name: Windows release (MSVC)
+    needs: guard
     runs-on: windows-latest
+    permissions:
+      contents: read
+      packages: write
     defaults:
       run:
         shell: bash
     env:
       TAU_BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -504,6 +617,14 @@ jobs:
 
       - name: Build and test tau (Release, MSVC)
         run: ./dev preset release-msvc-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Configure resolved the store before any test ran, so a red test still
+      # publishes what this job built.
+      - name: Publish the store packages
+        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()

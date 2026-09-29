@@ -1,12 +1,10 @@
 name: Dependencies (store)
 
-# The only job allowed to write packages. It runs after a successful Test
-# Release, or by hand, and only on the protected branches. Recipes therefore
-# come from the protected branch, never from a pull request head.
+# Test Release publishes the store packages inline. This file is the manual
+# bootstrap, dispatched by hand. The sources come from the default branch
+# because the checkout names it; the dispatch itself is not filtered, so anyone
+# with write access can run it from any branch.
 on:
-  workflow_run:
-    workflows: [ "Test Release" ]
-    types: [ completed ]
   workflow_dispatch:
 
 permissions:
@@ -23,10 +21,6 @@ env:
 
 jobs:
   publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -89,10 +83,6 @@ jobs:
   # the machine arch, and the arm container is the compiler their consumers
   # use.
   publish-linux-arm64:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
     runs-on: ubuntu-24.04-arm
     env:
       TAU_BUILD_JOBS: 4
@@ -120,10 +110,6 @@ jobs:
 
   # The macOS packages are AppleClang-built and cannot come from the Linux job.
   publish-macos:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
     runs-on: macos-15
     env:
       TAU_BUILD_JOBS: 3
@@ -150,10 +136,6 @@ jobs:
 
   # The MSVC packages are cl.exe-built and cannot come from the Linux job.
   publish-windows:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       contains(fromJSON('["devel","main"]'), github.event.workflow_run.head_branch))
     runs-on: windows-latest
     defaults:
       run:
@@ -169,6 +151,12 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      # The windows-x86_64-msvc Spot package is a Windows host tool built by
+      # MSYS2 UCRT64 g++, so its producer needs that toolchain on a Windows host.
+      - name: Install the MSYS2 UCRT64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
