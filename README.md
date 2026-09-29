@@ -2854,8 +2854,8 @@ rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
 the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
 closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
-bitvectors of at most 16 bits may take when Tau decides it on the bits of
-its values, before the solver takes it instead; 1048576 by default, `0`
+bitvectors of at most 16 bits may keep in use at once when Tau decides it on
+the bits of its values, before the solver takes it instead; 1048576 by default, `0`
 leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
@@ -3190,7 +3190,8 @@ it is read, and drop its binder, before the case split; mirroring
 names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose
 binders are all of one kind quantifier-free, mirroring
 `--bv-quantifier-free-decision`; off by default), `bv-bitblast-max-nodes`
-(the BDD budget of the decision on the bits of values of at most 16 bits,
+(the BDD budget, in nodes in use at once, of the decision on the bits of
+values of at most 16 bits,
 mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
 question to the solver), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),

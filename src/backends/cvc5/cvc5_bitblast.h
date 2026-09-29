@@ -37,7 +37,10 @@ namespace idni::tau_lang {
  *
  * @param f A Boolean cvc5 term.
  * @param max_width Widest bit-vector sort accepted.
- * @param max_nodes Largest BDD built before giving up.
+ * @param max_nodes Most nodes live at once before giving up. Once the
+ * table fills, the nodes of the terms no longer read are freed, and the
+ * term that ran out of nodes is built again, within a few times the room
+ * it had, when that more than doubled its room.
  * @return The verdict, or nullopt when a sort is wider than @p max_width,
  * two values that are neither constant nor the same are multiplied at more
  * than 10 bits, an operator has no circuit here (division, remainder, and
@@ -53,6 +56,11 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 	using id = data_bdd::id;
 	constexpr size_t max_product_width = 10;
 
+	// A binder's variable list has no value of its own.
+	auto first_operand = [](const Term& t) -> size_t {
+		const Kind k = t.getKind();
+		return k == Kind::FORALL || k == Kind::EXISTS ? 1 : 0;
+	};
 	// Variables and free constants, outermost first, and their widths.
 	std::unordered_map<Term, size_t> index;
 	std::vector<size_t> widths;
@@ -108,6 +116,31 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 
 	// A Boolean term takes one entry, a bit-vector term one per bit.
 	std::unordered_map<Term, bits> val;
+	auto each_value = [&](auto&& mark) {
+		for (const auto& [_, x] : val)
+			for (id e : x) mark(e);
+	};
+	// Drops the values no unevaluated term reads, which no term asks for
+	// again. Every unevaluated term is reached from f through unevaluated
+	// terms, since a term is evaluated after its operands.
+	auto drop_values_read = [&] {
+		std::unordered_set<Term> seen, read;
+		std::vector<Term> todo{ f };
+		while (!todo.empty()) {
+			const Term t = todo.back();
+			todo.pop_back();
+			if (!seen.insert(t).second) continue;
+			if (val.contains(t)) {
+				read.insert(t);
+				continue;
+			}
+			for (size_t i = first_operand(t); i < t.getNumChildren(); ++i)
+				todo.push_back(t[i]);
+		}
+		std::erase_if(val, [&](const auto& e) {
+			return !read.contains(e.first);
+		});
+	};
 	std::vector<std::pair<Term, bool>> stack{ { f, false } };
 	while (!stack.empty()) {
 		auto [t, expanded] = stack.back();
@@ -139,12 +172,11 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 				continue;
 			}
 			stack.push_back({ t, true });
-			// a binder's variable list has no value of its own
-			const bool binder = k == Kind::FORALL || k == Kind::EXISTS;
-			for (size_t i = t.getNumChildren(); i-- > (binder ? 1 : 0); )
+			for (size_t i = t.getNumChildren(); i-- > first_operand(t); )
 				if (!val.contains(t[i])) stack.push_back({ t[i], false });
 			continue;
 		}
+		const size_t room = bdd.room();
 		const size_t n = t.getNumChildren();
 		auto arg = [&](size_t i) -> const bits& { return val.at(t[i]); };
 		auto one = [&](size_t i) { return arg(i)[0]; };
@@ -221,11 +253,11 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 			// a product gets a quarter of the table, so the attempt
 			// gives up early on one that explodes
 			out = arg(0);
-			for (size_t i = 1; i < n; ++i) {
+			for (size_t i = 1; i < n && !bdd.full; ++i) {
 				bits p;
 				if (!bit_circuits::mul(bdd, out, arg(i),
-					bdd.nodes.size() + max_nodes / 4, p))
-					return std::nullopt;
+					bdd.size() + max_nodes / 4, p) && !bdd.full)
+						return std::nullopt;
 				out = std::move(p);
 			}
 			break;
@@ -259,8 +291,23 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 		}
 		default: return std::nullopt;
 		}
-		if (bdd.full) return std::nullopt;
+		// A term built again may grow the table by four times the room it
+		// ran out of, and a little more: one that needs more is declined
+		// at the cost of a small part of the table instead of all of it.
+		if (bdd.full) {
+			drop_values_read();
+			bdd.collect(each_value);
+			if (!bdd.worth_redoing(room)) return std::nullopt;
+			bdd.grow_at_most(4 * room + max_nodes / 64);
+			stack.push_back({ t, true });
+			continue;
+		}
+		bdd.grow_freely();
 		val.emplace(t, std::move(out));
+		if (bdd.wants_collect()) {
+			drop_values_read();
+			bdd.collect(each_value);
+		}
 	}
 	const bits& r = val.at(f);
 	if (r.size() != 1 || bdd.full) return std::nullopt;
