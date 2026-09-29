@@ -946,6 +946,13 @@ if(TEST "test_repl-realizable_cmd-bv_falling_output")
 		PROPERTIES TIMEOUT 120)
 endif()
 
+# A consistency question with a product of two 12-bit values, and one with
+# products of 8-bit values of different steps, stop on their time budget
+add_repl_budget_test(realizable_cmd-bv_budget_wide_product
+	"realizable (((i1[t]:bv[12] = (o2[t-1]:bv[12] + o1[t]:bv[12])) && (o2[t]:bv[12] != i1[t]:bv[12])) U ((i1[t]:bv[12] = o2[t-1]:bv[12]) || ((o2[t]:bv[12] * o1[t]:bv[12]) < (o1[t]:bv[12] + o1[t]:bv[12]))))")
+add_repl_budget_test(realizable_cmd-bv_budget_products_of_steps
+	"realizable (always (((o2[t]:bv[8] * {1}:bv[8]) <= o1[t-1]:bv[8]) && (o1[t-2]:bv[8] = i1[t-1]:bv[8]))) && (sometimes (((o2[t]:bv[8] - o2[t-1]:bv[8]) != (o1[t]:bv[8] * o2[t-2]:bv[8])) || ((o1[t-1]:bv[8] * {3}:bv[8]) < (i1[t-2]:bv[8] * i1[t-1]:bv[8])))) && (sometimes ((o2[t]:bv[8] != (i1[t-2]:bv[8] + {2}:bv[8])) || ((o2[t]:bv[8] * o1[t-2]:bv[8]) != i1[t]:bv[8])))")
+
 # Streams of a dense order read through order comparisons are played on the
 # order type of the window: how its values and the constants compare.
 # The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.

@@ -194,3 +194,54 @@ TEST_SUITE("cvc5_bitblast_sat") {
 		CHECK( !late );
 	}
 }
+
+TEST_SUITE("bounded bitvector decision") {
+
+	using tau = tree<node_t>;
+	tau::get_options wff_opts{ .parse = { .start = tau::wff } };
+
+	TEST_CASE("a question past its budget is unknown and noted") {
+		if (!bounded_calls_available()) return;
+		const size_t timeout = bv_solve_timeout;
+		const size_t nodes = bv_bitblast_max_nodes;
+		bv_solve_timeout = 1;
+		bv_bitblast_max_nodes = 0;
+		take_time_budget_exhausted();
+		auto wff = [](const std::string& src) {
+			return tau::get(src, wff_opts).value_or(nullptr);
+		};
+		tref hard = wff("all x:bv[16] ex y:bv[16] "
+			"all z:bv[16] ex u:bv[16] (y * x != z * u && z - u < z + y "
+			"&& x * z != y * u + {3}:bv[16])");
+		REQUIRE( hard );
+		auto s = bv_formula_sat_status<node_t>(hard);
+		const std::string noted = take_time_budget_exhausted();
+		// cvc5 does not decide it in a second
+		CHECK( s == bv_sat_status::unknown );
+		CHECK( noted.find("bv-solve-timeout, 1 s") != std::string::npos );
+		// asked again, the budget is noted again
+		bv_formula_sat_status<node_t>(hard);
+		CHECK( !take_time_budget_exhausted().empty() );
+		// once a budget ran out, the unit of work asks nothing more
+		note_time_budget_exhausted("earlier");
+		tref easy = wff("ex x:bv[8] x = {3}:bv[8]");
+		REQUIRE( easy );
+		CHECK( bv_formula_sat_status<node_t>(easy) == bv_sat_status::unknown );
+		take_time_budget_exhausted();
+		tau::clear_caches();
+		bv_solve_timeout = timeout;
+		bv_bitblast_max_nodes = nodes;
+	}
+
+	TEST_CASE("a quantified question is answered in its child") {
+		const size_t nodes = bv_bitblast_max_nodes;
+		bv_bitblast_max_nodes = 0;
+		take_time_budget_exhausted();
+		tref f = tau::get("all x:bv[8] ex y:bv[8] x * y = x",
+			wff_opts).value_or(nullptr);
+		REQUIRE( f );
+		CHECK( bv_formula_sat_status<node_t>(f) == bv_sat_status::sat );
+		CHECK( take_time_budget_exhausted().empty() );
+		bv_bitblast_max_nodes = nodes;
+	}
+}

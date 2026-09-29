@@ -29,6 +29,24 @@ function(add_repl_test_fail test_name test_cmd test_regex)
 	)
 endfunction()
 
+# `test_cmd` asks a bitvector question that neither the bits nor cvc5 decide
+# within a budget of 3 seconds (--bv-solve-timeout): the answer is UNKNOWN,
+# naming the budget, and never a verdict.
+function(add_repl_budget_test test_name test_cmd)
+	tau_repl_unsupported(_tau_skip "${test_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-solve-timeout 3 -e \"${test_cmd}\" 2>&1")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "UNKNOWN: a bitvector question passed its time budget [(]bv-solve-timeout, 3 s"
+		FAIL_REGULAR_EXPRESSION "%[0-9]+: [TF]"
+		TIMEOUT 120
+	)
+endfunction()
+
 function(add_echo_repl_test test_name test_cmd test_regex)
 	tau_repl_unsupported(_tau_skip "${test_cmd}")
 	if(_tau_skip)

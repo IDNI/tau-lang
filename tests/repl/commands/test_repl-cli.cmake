@@ -221,6 +221,18 @@ else()
 		FAIL_REGULAR_EXPRESSION "Error")
 endif()
 
+# --- bv-solve-timeout CLI flag (BA-declared option) --------------------------
+tau_repl_unsupported(_tau_skip "get bv-solve-timeout")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-cli-bv_solve_timeout_flag")
+else()
+	add_test(NAME "test_repl-cli-bv_solve_timeout_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-solve-timeout 7 -e \"get bv-solve-timeout\"")
+	set_tests_properties("test_repl-cli-bv_solve_timeout_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-solve-timeout: *7"
+		FAIL_REGULAR_EXPRESSION "Error")
+endif()
+
 # --- preprocessing default (GitHub #74) --------------------------------------
 # The CLI's own option table used to hardcode its own default of `true`, so
 # every plain `tau` invocation silently overrode the library's
