@@ -221,3 +221,21 @@ add_repl_test(normalize_cmd-fex_binder_solve
 	"solve b = 0 && (fex b (a & b)) != 0" "a := \\{ T \\}")
 add_repl_test(normalize_cmd-fex_equals_body
 	"normalize (fex y (x & y)) = x" ": T")
+
+# GitHub #148 follow-up: disequalities beside one lower and one upper bound are
+# eliminated by density, ex x (L <= x <= U && x != c) being
+# L < U || (L = U && L != c), and L < U when a bound is strict.
+add_repl_test(normalize_cmd-qlt_density_residual
+	"normalize ex x:qlt (a:qlt <= x && x <= b:qlt && x != c:qlt)" ": a < b \\|\\| a = b && [ab] != c")
+add_repl_test(normalize_cmd-qlt_density_strict
+	"normalize ex x:qlt (a:qlt < x && x <= b:qlt && x != c:qlt && x != d:qlt)" ": a < b\n")
+add_repl_test(normalize_cmd-qlt_density_closed_some
+	"normalize ex a:qlt ex b:qlt ex x:qlt (a <= x && x <= b && x != a && x != b)" ": T")
+add_repl_test(normalize_cmd-qlt_density_closed_all
+	"normalize all a:qlt all b:qlt ex x:qlt (a <= x && x <= b && x != a && x != b)" ": F")
+add_repl_test(normalize_cmd-qlt_density_point_excluded
+	"sat a:qlt = b:qlt && c:qlt = a:qlt && (ex x:qlt (a <= x && x <= b && x != c))" ": F")
+add_repl_test(normalize_cmd-qlt_density_point_kept
+	"sat a:qlt = b:qlt && (ex x:qlt (a <= x && x <= b && x != c:qlt))" ": T")
+add_repl_test(normalize_cmd-qlt_density_equivalence
+	"valid all a:qlt all b:qlt all c:qlt ((ex x:qlt (a <= x && x <= b && x != c)) <-> (a < b || (a = b && a != c)))" ": T")

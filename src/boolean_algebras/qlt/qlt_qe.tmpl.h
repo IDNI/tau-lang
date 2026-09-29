@@ -351,9 +351,15 @@ static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 // (which qlt_dlo_qe_interval already decides, so only the two-sided case is
 // answered here). A variable pinned to one term t -- by `var = t` or by
 // `t <= var && var <= t` -- is eliminated by substituting t, whatever the
-// other conjuncts are. Anything else -- a disequality without a pin (it needs
-// a case split), a compound term, a typed 0/1 sentinel (an endpoint) --
-// returns nullptr and leaves the binder in place.
+// other conjuncts are. Disequalities `var != c_k` beside one lower bound L
+// and one upper bound U are eliminated by density: an interval with an
+// interior point is not exhausted by finitely many points, so
+//   ex var (L <  var ... var <  U && /\ var != c_k)  ==  L < U  (either strict)
+//   ex var (L <= var && var <= U && /\ var != c_k)
+//       ==  L < U || (L = U && /\ L != c_k)
+// (L a variable or a constant, so never a typed 0/1). Anything else -- a
+// disequality beside several bounds, a compound term, a typed 0/1 sentinel
+// (an endpoint) -- returns nullptr and leaves the binder in place.
 template<NodeType node>
 static tref qlt_dlo_fm_residual(tref var, tref body) {
 	using tau = tree<node>;
@@ -456,15 +462,54 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 			return rewriter::replace<node>(inner, changes);
 		}
 	}
+	// The c of a disequality `var != c`, spelled `var != c` or `!(var = c)`.
+	auto read_excluded = [&](tref n) -> tref {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) || !t.has_child()) return nullptr;
+		const tree<node>* at = &t[0];
+		if (t[0].is(tau::wff_neg)) {
+			const auto& ti = tau::get(t[0].first());
+			if (!ti.is(tau::wff) || !ti.has_child()
+				|| !ti[0].is(tau::bf_eq)) return nullptr;
+			at = &ti[0];
+		} else if (!t[0].is(tau::bf_neq)) return nullptr;
+		tref lhs = at->first(), rhs = at->second();
+		const bool in_l = contains<node>(lhs, var);
+		const bool in_r = contains<node>(rhs, var);
+		if (in_l == in_r || !is_bare_var(in_l ? lhs : rhs)) return nullptr;
+		return in_l ? rhs : lhs;
+	};
+	trefs excluded;
 	for (tref c : conjs) {
 		if (tau::get(c).equals_T()) continue;
-		auto b = read_bound(c);
-		if (!b || b->op == tau::bf_eq) return nullptr;
-		if (b->op == tau::bf_lt || b->op == tau::bf_lteq)
-			upper.emplace_back(b->other, b->op == tau::bf_lt);
-		else lower.emplace_back(b->other, b->op == tau::bf_gt);
+		if (auto b = read_bound(c); b && b->op != tau::bf_eq) {
+			if (b->op == tau::bf_lt || b->op == tau::bf_lteq)
+				upper.emplace_back(b->other, b->op == tau::bf_lt);
+			else lower.emplace_back(b->other, b->op == tau::bf_gt);
+			continue;
+		}
+		tref e = read_excluded(c);
+		if (!e) return nullptr;
+		// No point is an end of the order, so `var != 0/1` always holds.
+		if (!is_sentinel(e)) excluded.push_back(e);
 	}
 	if (lower.empty() || upper.empty()) return nullptr;
+	if (!excluded.empty()) {
+		if (lower.size() != 1 || upper.size() != 1) return nullptr;
+		const auto& [l, ls] = lower.front();
+		const auto& [u, us] = upper.front();
+		if (ls || us) return tau::build_bf_lt(l, u);
+		// L = U is the single-point case: L must be a point for `L != c`
+		// to be all it takes.
+		const auto& lt = tau::get(l);
+		if (!lt.is(tau::bf) || !lt.has_child()
+			|| !(lt[0].is(tau::variable) || lt[0].is_ba_constant()))
+			return nullptr;
+		trefs point{ tau::build_bf_eq(l, u) };
+		for (tref e : excluded) point.push_back(tau::build_bf_neq(l, e));
+		return tau::build_wff_or(tau::build_bf_lt(l, u),
+			tau::build_wff_and(point));
+	}
 	trefs out;
 	for (const auto& [l, ls] : lower)
 		for (const auto& [u, us] : upper)
