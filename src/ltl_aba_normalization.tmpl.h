@@ -2481,14 +2481,19 @@ struct data_quantifier {
 		return n.value();
 	}
 
-	// Whether some play of the steps before step 0 reaches `fm`, a formula
-	// over the history: each such step is played like any other, its
-	// inputs by the environment and then its outputs, the earliest step
-	// outermost. nullopt when a quantifier is left standing.
-	std::optional<bool> reached_before_start(tref fm) {
+	// The closed formula saying that some play of the steps before step 0
+	// reaches `fm` (see reached_before_start); nullptr when `fm` reads a
+	// stream at a fixed step. `plain` binds every variable with a
+	// quantifier, expanding none.
+	tref before_start(tref fm, bool plain = false) {
+		auto bind = [&](tref v, tref f, bool exists) {
+			if (!plain) return quantify(v, f, exists);
+			return exists ? tau::build_wff_ex(v, f, false)
+				: tau::build_wff_all(v, f, false);
+		};
 		std::map<int_t, std::pair<trefs, trefs>> steps;
 		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
-			if (is_io_initial<node>(v)) return std::nullopt;
+			if (is_io_initial<node>(v)) return nullptr;
 			auto& [ins, outs] = steps[get_io_var_shift<node>(v)];
 			auto& bucket = is_input_stream<node>(v) ? ins : outs;
 			if (std::none_of(bucket.begin(), bucket.end(),
@@ -2497,9 +2502,19 @@ struct data_quantifier {
 		}
 		tref q = fm;
 		for (auto& [_, step] : steps) {
-			for (tref v : step.second) q = quantify(v, q, true);
-			for (tref v : step.first) q = quantify(v, q, false);
+			for (tref v : step.second) q = bind(v, q, true);
+			for (tref v : step.first) q = bind(v, q, false);
 		}
+		return q;
+	}
+
+	// Whether some play of the steps before step 0 reaches `fm`, a formula
+	// over the history: each such step is played like any other, its
+	// inputs by the environment and then its outputs, the earliest step
+	// outermost. nullopt when a quantifier is left standing.
+	std::optional<bool> reached_before_start(tref fm) {
+		tref q = before_start(fm);
+		if (!q) return std::nullopt;
 		tref n = eliminate(q);
 		if (!n) return std::nullopt;
 		if (tau::get(n).equals_T()) return true;

@@ -71,6 +71,32 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK(pack_modular_width<node_t>(sbf_id) == 0);
 #endif
 	}
+	TEST_CASE("pack_type_decides_closed / pack_decide_closed") {
+		CHECK_FALSE(pack_type_decides_closed<node_t>(size_t{0}));
+		CHECK(pack_decide_closed<node_t>(size_t{0}, tree<node_t>::_T())
+			== std::nullopt);
+#ifdef TAU_PACK_HAS_BA_BV
+		using tau = tree<node_t>;
+		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
+		CHECK(pack_type_decides_closed<node_t>(bv8));
+		tau::get_options opts{ .parse = { .start = tau::wff } };
+		auto closed = [&](const char* src) {
+			tref f = tau::get(src, opts).value_or(nullptr);
+			REQUIRE(f != nullptr);
+			return pack_decide_closed<node_t>(bv8, f);
+		};
+		CHECK(closed("all x:bv[8] ex y:bv[8] x * y = x")
+			== std::optional<bool>{ true });
+		CHECK(closed("ex x:bv[8] all y:bv[8] x + y = y")
+			== std::optional<bool>{ true });
+		CHECK(closed("ex x:bv[8] all y:bv[8] x * y = {1}:bv[8]")
+			== std::optional<bool>{ false });
+#endif
+#ifdef TAU_PACK_HAS_BA_SBF
+		const size_t sbf_id = tid(ba_descriptor<sbf_ba, node_t>::type_tree());
+		CHECK_FALSE(pack_type_decides_closed<node_t>(sbf_id));
+#endif
+	}
 	TEST_CASE("pack_dense_order_compare / pack_dense_order_between") {
 		CHECK_FALSE(pack_type_is_dense_order<node_t>(size_t{0}));
 		CHECK(pack_dense_order_between<node_t>(size_t{0}, nullptr, nullptr)

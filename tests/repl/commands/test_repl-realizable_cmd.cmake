@@ -946,6 +946,21 @@ if(TEST "test_repl-realizable_cmd-bv_falling_output")
 		PROPERTIES TIMEOUT 120)
 endif()
 
+# Products of two 16-bit values: the regions keep the quantifiers the
+# normalizer leaves standing and are decided whole. The environment keeps i1
+# at 0, so o1 * o2 != 0 needs o1 != 0, and o1 <= 0 * o1 never holds.
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_wide_product
+	"realizable (G (i1[t]:bv[16] != (o1[t]:bv[16] * o2[t]:bv[16]))) && (G (F (o1[t]:bv[16] <= (i1[t]:bv[16] * o1[t]:bv[16]))))" ": F")
+# no inputs: the system picks every value, products of two 12-bit values of
+# different steps among them
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_product_of_steps
+	"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))" ": T")
+if(TEST "test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps")
+	set_tests_properties(
+		"test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps"
+		PROPERTIES TIMEOUT 150)
+endif()
+
 # A consistency question with a product of two 12-bit values, and one with
 # products of 8-bit values of different steps, stop on their time budget
 add_repl_budget_test(realizable_cmd-bv_budget_wide_product

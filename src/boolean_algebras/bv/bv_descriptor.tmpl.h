@@ -186,6 +186,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief The truth of the closed bitvector formula @p form, decided
+	 * whole by its bits or cvc5 whatever its quantifier prefix; nullopt
+	 * when the formula is not bv's or the decision is undecided.
+	 */
+	static std::optional<bool> decide_closed(tref form) {
+		if (!can_solve(form)) return std::nullopt;
+		return sat_status(form);
+	}
+
+	/**
 	 * @brief Predicate-blast @p n; returns it unchanged unless BOTH the
 	 * core master `preprocessing` switch and bv's own `bv_blasting` switch
 	 * are on. A blasting failure carries its own report rather than a
