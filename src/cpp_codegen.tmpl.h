@@ -1003,7 +1003,11 @@ result<program_desc> build_program_desc(
 			// A guard is a sum of products; each cube becomes its own
 			// edge_desc so a disjunct is never dropped or mis-read.
 			auto cubes = parse_guard_cubes(e.guard_label);
-			if (!cubes) continue; // unparseable guard -- edge omitted
+			// the program would lack a transition of the strategy
+			if (!cubes) return r.with_error(code::parse_error,
+				"a guard of the strategy does not parse; the program "
+				"cannot be generated",
+				{{label::value, e.guard_label}});
 			for (auto& cube : *cubes) {
 				edge_desc ed;
 				ed.dst = e.dst;

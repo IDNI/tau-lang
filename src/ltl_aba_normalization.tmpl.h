@@ -1352,38 +1352,33 @@ static void extend_consistency_positive_k_ary(
 	// skip subsumed k-subsets.
 	std::vector<std::vector<int>> existing_forbid_sets;
 	if (out_constraints) {
+		// Only a positive forbid "G(!(name1 && name2 && ...))" subsumes:
+		// an implication or a forbid with a negated atom rules out other
+		// combinations. Names are matched whole (LT-9: `p1` is not in
+		// `p10`).
+		std::map<std::string, int> index_of;
+		for (int i = 0; i < n; ++i) index_of.emplace(atoms[i].second, i);
+		const std::string open = "G(!(", close = "))", sep = " && ";
 		for (const auto& c : *out_constraints) {
-			// Parse "G(!(name1 && name2 && ...))" into a set of
-			// indices. LT-9: token-boundary matching -- a raw
-			// substring find read `p1` inside `p10`/`p11`, so with
-			// >= 11 atoms a forbid was mis-parsed and a needed
-			// constraint wrongly skipped as subsumed.
-			auto contains_name = [&](const std::string& hay,
-					const std::string& name) {
-				size_t pos = 0;
-				auto is_word = [](char ch) {
-					return std::isalnum(
-						(unsigned char) ch)
-						|| ch == '_';
-				};
-				while ((pos = hay.find(name, pos))
-					!= std::string::npos) {
-					bool l_ok = pos == 0
-						|| !is_word(hay[pos - 1]);
-					size_t end = pos + name.size();
-					bool r_ok = end >= hay.size()
-						|| !is_word(hay[end]);
-					if (l_ok && r_ok) return true;
-					pos = end;
-				}
-				return false;
-			};
+			if (c.size() <= open.size() + close.size()
+				|| c.compare(0, open.size(), open) != 0
+				|| c.compare(c.size() - close.size(), close.size(),
+					close) != 0) continue;
+			const std::string body = c.substr(open.size(),
+				c.size() - open.size() - close.size());
 			std::vector<int> idxs;
-			for (int i = 0; i < n; ++i) {
-				if (contains_name(c, atoms[i].second))
-					idxs.push_back(i);
+			bool positive = true;
+			for (size_t at = 0; positive; ) {
+				size_t next = body.find(sep, at);
+				auto it = index_of.find(body.substr(at,
+					next == std::string::npos ? next : next - at));
+				if (it == index_of.end()) positive = false;
+				else idxs.push_back(it->second);
+				if (next == std::string::npos) break;
+				at = next + sep.size();
 			}
-			if (idxs.size() >= 2) existing_forbid_sets.push_back(std::move(idxs));
+			if (positive && idxs.size() >= 2)
+				existing_forbid_sets.push_back(std::move(idxs));
 		}
 	}
 	std::function<bool(const std::vector<int>&)> is_subsumed =

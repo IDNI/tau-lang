@@ -291,6 +291,7 @@ void api<node>::set_max_cover_products(size_t n) {
 
 template <NodeType node>
 void api<node>::set_max_constant_size(size_t n) {
+	option_change_guard<node> guard;
 	max_constant_size = n;
 }
 

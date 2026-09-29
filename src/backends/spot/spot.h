@@ -52,7 +52,7 @@ result<std::string> synthesize_game(const std::string& formula,
 /// Run `autfilt --dot` on HOA text and return the rendered dot text.
 result<std::string> to_dot(const std::string& hoa_text, int timeout_sec);
 
-/// Run `ltlfilt -f` on a formula and report whether it printed "1" (the
+/// Run `ltlfilt -F` on a formula (written to a temporary file) and report whether it printed "1" (the
 /// formula is a propositional tautology). A caller using this as an
 /// optimization fast path treats any error the same as "not proven".
 result<bool> is_tautology(const std::string& formula, int timeout_sec);

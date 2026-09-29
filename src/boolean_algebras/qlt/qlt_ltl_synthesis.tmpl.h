@@ -519,7 +519,7 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 		// This fast path runs up to CAP times on the default
 		// Algorithm-B gate; any ltlfilt failure just means "not proven
 		// a tautology", not an error worth reporting up.
-		auto taut = is_tautology(phi, 0);
+		auto taut = is_tautology(phi, ltl_timeout_sec());
 		if (taut.has_value() && taut.value()) {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
 			          << "(combo=" << combo << ")";

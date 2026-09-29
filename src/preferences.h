@@ -85,12 +85,22 @@ tref apply_preferences(tref spec, const preference_order& po) {
 				<< pref_str;
 			continue;
 		}
-		tref candidate = tau::build_wff_and(result, pref_clause);
+		// Typed whole, as a parsed spec is: the clause's stream takes the
+		// type the spec gives it, or the default.
+		tref candidate = infer_ba_types<node>(
+			tau::build_wff_and(result, pref_clause)).first;
+		if (candidate == nullptr) {
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- its type conflicts with "
+				"the spec";
+			continue;
+		}
 		// IN-2 / IN-R4: the realizability check can be undecided (backend
-		// failure, or a CTL* / semantic-negation spec that has no sound
+		// failure, or a semantic-negation spec that has no sound
 		// encoding); a preference is optional, so drop it rather than
-		// treat an undecided verdict as a decided one.
-		auto r = is_ltl_aba_realizable<node>(candidate, 0, false);
+		// treat an undecided verdict as a decided one. A CTL* spec is
+		// reduced to LTL first, as api::realizable does.
+		auto r = is_ctl_star_realizable<node>(candidate, 0, false);
 		if (!r.has_value()) {
 			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 				<< entry.var_name << "' -- realizability could not "

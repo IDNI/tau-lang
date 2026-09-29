@@ -3,6 +3,7 @@
 #include "satisfiability.h"
 #include "normalizer.h"
 #include "ltl_aba.h"
+#include "solver_types.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "heuristics/preprocess_placement.h"
 
@@ -59,6 +60,7 @@ size_t verdict_budget_fingerprint() {
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
 	mix(preprocessing);
+	mix(max_constant_size);
 	return ltl_verdict_budget_fingerprint(
 		pack_ba_options_fingerprint<node>(seed));
 }
@@ -2547,6 +2549,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			"witnesses range over every input branch, which is "
 			"stricter than E; satisfiability could not be decided");
 	};
+	// the memos are keyed on the formula as given; fm is rewritten below
+	[[maybe_unused]] const tref key_fm = fm;
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, bool,
 				subtree_pair_less<node, int_t>>;
@@ -2582,7 +2586,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 #endif // TAU_CACHE
 	auto memoize = [&](bool value) {
 #ifdef TAU_CACHE
-		cache.emplace(std::make_pair(fm, start_time), value);
+		cache.emplace(std::make_pair(key_fm, start_time), value);
 #endif // TAU_CACHE
 		r = value;
 	};
@@ -2622,7 +2626,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			memoize(reduced.value());
 		else {
 #ifdef TAU_CACHE
-			undecided.emplace(std::make_pair(fm, start_time), true);
+			undecided.emplace(std::make_pair(key_fm, start_time), true);
 #endif // TAU_CACHE
 			mark_undecided();
 		}

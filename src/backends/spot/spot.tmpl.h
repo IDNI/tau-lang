@@ -108,8 +108,21 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	for (const auto& s : argv) cargv.push_back(const_cast<char*>(s.c_str()));
 	cargv.push_back(nullptr);
 
+	// The child leads its own process group, so the watchdog reaches the
+	// processes it starts too: one of them left alive would hold the pipe
+	// open and the read below would wait for it.
+	posix_spawnattr_t attr;
+	if (posix_spawnattr_init(&attr) != 0) {
+		posix_spawn_file_actions_destroy(&fa);
+		::close(pipefd[0]); ::close(pipefd[1]);
+		return r.with_error(code::io_error, "failed to prepare the "
+			"subprocess", {{label::name, "posix_spawnattr_init"}});
+	}
+	posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+	posix_spawnattr_setpgroup(&attr, 0);
 	pid_t pid;
-	int rc = posix_spawnp(&pid, cargv[0], &fa, nullptr, cargv.data(), environ);
+	int rc = posix_spawnp(&pid, cargv[0], &fa, &attr, cargv.data(), environ);
+	posix_spawnattr_destroy(&attr);
 	posix_spawn_file_actions_destroy(&fa);
 	::close(pipefd[1]);
 	if (rc != 0) {
@@ -122,15 +135,23 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			{{label::name, argv[0]}});
 	}
 
-	// Watchdog thread: SIGTERM the child after timeout_sec seconds.
-	std::atomic<bool> done{false};
+	// Watchdog thread: after timeout_sec seconds SIGTERM the child's
+	// process group, and SIGKILL it when it is still running 2 s later
+	// (a child may ignore SIGTERM). The group stays valid until the child
+	// is reaped, which happens only after the watchdog stops.
+	std::atomic<bool> done{false}, fired{false};
 	std::thread killer;
 	if (timeout_sec > 0) {
-		killer = std::thread([pid, timeout_sec, &done]() {
-			const long long polls = 10LL * timeout_sec;
-			for (long long i = 0; i < polls && !done.load(); ++i)
-				::usleep(100'000);
-			if (!done.load()) ::kill(pid, SIGTERM);
+		killer = std::thread([pid, timeout_sec, &done, &fired]() {
+			auto wait = [&done](long long polls) {
+				for (long long i = 0; i < polls && !done.load(); ++i)
+					::usleep(100'000);
+				return !done.load();
+			};
+			if (!wait(10LL * timeout_sec)) return;
+			fired.store(true);
+			::kill(-pid, SIGTERM);
+			if (wait(20)) ::kill(-pid, SIGKILL);
 		});
 	}
 
@@ -163,13 +184,14 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << status
 		<< ", stdout=" << out;
 
+	if (fired.load())
+		return r.with_error(code::runtime_error,
+			"the command was killed by the timeout watchdog",
+			{{label::exit_code, WIFSIGNALED(status)
+				? 128 + WTERMSIG(status) : WEXITSTATUS(status)},
+			 {label::timeout, timeout_sec}});
 	if (WIFSIGNALED(status)) {
 		int exit_code = 128 + WTERMSIG(status);
-		if (exit_code == 143)
-			return r.with_error(code::runtime_error,
-				"the command was killed by the timeout watchdog",
-				{{label::exit_code, exit_code},
-				 {label::timeout, timeout_sec}});
 		return r.with_error(code::runtime_error,
 			"the command was killed by a signal",
 			{{label::exit_code, exit_code}});
@@ -289,8 +311,11 @@ inline result<std::string> to_dot(const std::string& hoa_text, int timeout_sec) 
 
 inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
 	result<bool> r;
-	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-f", formula}, timeout_sec,
-		[](int c) { return c == 0; }));
+	// a file, as in synthesize: a long formula passed inline exceeds
+	// MAX_ARG_STRLEN
+	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
+	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-F", tmp.path()},
+		timeout_sec, [](int c) { return c == 0; }));
 	while (!out.empty() && std::isspace((unsigned char) out.back()))
 		out.pop_back();
 	return r.with_value(out == "1");

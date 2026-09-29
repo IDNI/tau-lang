@@ -151,8 +151,9 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	// parameter `ltl_hoa_max_states()` (0 = unlimited).
 	const size_t cap = ltl_hoa_max_states();
 	const long max_states = cap
-		? (long) std::min<size_t>(cap, (size_t) LONG_MAX)
-		: LONG_MAX;
+		? (long) std::min<size_t>(cap, (size_t) INT_MAX)
+		: INT_MAX;
+	long start = 0;
 	bool seen_states = false;
 
 	auto num_of = [](const tt& n) -> long {
@@ -181,8 +182,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			aut.edges.assign(aut.num_states, {});
 			aut.state_accepting.assign(aut.num_states, false);
 		} else if (auto sl = tt(h) | hoa::start_line; sl.has_value()) {
-			long n = num_of(sl);
-			aut.initial_state = n < 0 ? 0 : (int) n;
+			start = num_of(sl);
 		} else if (auto ap = tt(h) | hoa::ap_line; ap.has_value()) {
 			long n = num_of(ap);
 			long taken = 0;
@@ -195,8 +195,13 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 						| tt::terminals));
 				++taken;
 			}
-			// the count promised more names than the line holds
-			for (; taken < n; ++taken) aut.aps.push_back("");
+			if (n < 0 || taken < n) {
+				return r.with_error(code::parse_error,
+					"the HOA strategy's AP count does not match "
+					"the names it lists",
+					{{label::value, std::string(
+						ap | hoa::num | tt::terminals)}});
+			}
 		}
 	}
 
@@ -204,6 +209,12 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 		return r.with_error(code::parse_error,
 			"the HOA strategy has no `States:` header");
 	}
+	if (start < 0 || start >= (long) aut.num_states) {
+		return r.with_error(code::parse_error,
+			"the HOA strategy's `Start:` state is not one of its states",
+			{{label::value, std::to_string(start)}});
+	}
+	aut.initial_state = (int) start;
 
 	int cur_state = -1;
 	auto body = root | hoa::body;

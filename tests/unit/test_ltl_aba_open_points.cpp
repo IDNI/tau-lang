@@ -204,9 +204,7 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 		CHECK(neg.has_value());
 	}
 
-	// Defect: with no state cap, parse_hoa truncates the count to int.
-	TEST_CASE("HOA strategy with a state count beyond int is refused"
-		* doctest::should_fail())
+	TEST_CASE("HOA strategy with a state count beyond int is refused")
 	{
 		const long saved = ltl_hoa_max_states_param;
 		api<node_t>::set_ltl_hoa_max_states(0);
@@ -218,9 +216,7 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 		CHECK_FALSE(r.has_value());
 	}
 
-	// Defect: parse_hoa does not check Start against the state count.
-	TEST_CASE("HOA strategy with an out-of-range Start is refused"
-		* doctest::should_fail())
+	TEST_CASE("HOA strategy with an out-of-range Start is refused")
 	{
 		auto r = parse_hoa(
 			"HOA: v1\nStates: 1\nStart: 5\nAP: 0\n"
@@ -229,9 +225,7 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 		CHECK_FALSE(r.has_value());
 	}
 
-	// Defect: parse_hoa pads a huge AP count with empty names.
-	TEST_CASE("HOA strategy with an unbounded AP count is refused"
-		* doctest::should_fail())
+	TEST_CASE("HOA strategy with an unbounded AP count is refused")
 	{
 		auto r = parse_hoa(
 			"HOA: v1\nStates: 1\nStart: 0\nAP: 1000000 \"p0\"\n"
@@ -348,9 +342,8 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D gates") {
 
 TEST_SUITE("LTL(ABA) open points: Spot processes") {
 
-	// Defect: is_tautology runs ltlfilt with the watchdog disabled.
 	TEST_CASE("constant-output fast path honours the LTL timeout"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		tref fm = op_spec("F (o15[t]:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
@@ -367,10 +360,8 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 		CHECK(elapsed < 10.0);
 	}
 
-	// Defect: is_tautology passes the formula inline with -f and hits
-	// MAX_ARG_STRLEN.
 	TEST_CASE("tautology check takes a formula beyond the argument limit"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		std::string phi = "1";
 		while (phi.size() < 200000) phi += " & 1";
@@ -380,9 +371,7 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 		CHECK(r.value());
 	}
 
-	// Defect: the watchdog sends SIGTERM only and the pipe read blocks.
-	TEST_CASE("a child ignoring SIGTERM does not outlive the timeout"
-		* doctest::should_fail())
+	TEST_CASE("a child ignoring SIGTERM does not outlive the timeout")
 	{
 		auto t0 = std::chrono::steady_clock::now();
 		auto r = spawn_capture({"sh", "-c", "trap '' TERM; sleep 12"}, 1,
@@ -393,9 +382,7 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 		CHECK(elapsed < 8.0);
 	}
 
-	// Defect: every exit by SIGTERM is reported as a watchdog timeout.
-	TEST_CASE("a SIGTERM the watchdog did not send is not a timeout"
-		* doctest::should_fail())
+	TEST_CASE("a SIGTERM the watchdog did not send is not a timeout")
 	{
 		auto r = spawn_capture({"sh", "-c", "kill -TERM $$"}, 30,
 			[](int) { return true; });
@@ -407,9 +394,7 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 
 TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 
-	// Defect: max_constant_size is in neither fingerprint.
-	TEST_CASE("the constant size budget is part of the options fingerprint"
-		* doctest::should_fail())
+	TEST_CASE("the constant size budget is part of the options fingerprint")
 	{
 		const size_t saved = max_constant_size;
 		const size_t before = api_detail::semantic_options_fingerprint<node_t>();
@@ -419,10 +404,8 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 		CHECK(before != after);
 	}
 
-	// Defect: the verdict memo is looked up under the formula and stored
-	// under its flattening.
 	TEST_CASE("a repeated full-LTL satisfiability query runs no ltlsynt"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// flatten_always_conjuncts merges the two always parts, so the
 		// formula the memo stores differs from the one it is asked.
@@ -467,10 +450,7 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 
 TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
-	// Defect: recorded implications are read as forbids by the subsumption
-	// check.
-	TEST_CASE("a recorded implication does not subsume a k-ary forbid"
-		* doctest::should_fail())
+	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
 		tref fm = op_spec("G F (o21[t]:qlt > o22[t]:qlt && "
 			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
@@ -744,10 +724,8 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		CHECK(i.step().has_value());
 	}
 
-	// Defect: build_program_desc drops an unparseable guard's edge
-	// silently.
 	TEST_CASE("codegen refuses a strategy edge whose guard does not parse"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		auto fm = api<node_t>::get_formula("G(o81[t]:qlt > {1/2}:qlt)");
 		REQUIRE(fm.has_value());
@@ -762,10 +740,8 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		CHECK_FALSE(d.has_value());
 	}
 
-	// Defect: apply_preferences skips the CTL* reduction, so the backstop
-	// refuses every candidate.
 	TEST_CASE("preferences keep a realizable CTL* strengthening"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		auto both = api<node_t>::realizable(
 			std::string("A (G F (o91[t] = 1)) && G (o92[t] = 0)"));
