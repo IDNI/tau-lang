@@ -1,6 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+
+#include <chrono>
 #include "backends/bdds/data_bdd.h"
 
 #include <bit>
@@ -187,5 +189,31 @@ TEST_SUITE("data_bdd collection") {
 		for (uint32_t v = nv; v-- > 0; ) p = bdd.exor(bdd.var(v), p);
 		CHECK( !bdd.full );
 		CHECK( eval(bdd, p, 1) );
+	}
+
+	TEST_CASE("a passed deadline fills the table for good") {
+		data_bdd bdd(size_t{1} << 16);
+		bdd.stop_at(data_bdd::clock::now() - std::chrono::seconds(1));
+		// the clock is read once per 2^14 new nodes or memo entries, the
+		// first one included
+		id p = data_bdd::F;
+		for (uint32_t v = nv; v-- > 0 && !bdd.full; )
+			p = bdd.exor(bdd.var(v), p);
+		CHECK( bdd.full );
+		CHECK( bdd.late );
+		CHECK( !bdd.worth_redoing(0) );
+		bdd.collect([](auto&&) {});
+		CHECK( bdd.full );
+	}
+
+	TEST_CASE("a deadline not passed changes nothing") {
+		data_bdd bdd(size_t{1} << 16);
+		bdd.stop_at(data_bdd::clock::now() + std::chrono::hours(1));
+		id p = data_bdd::F;
+		for (uint32_t v = nv; v-- > 0; ) p = bdd.exor(bdd.var(v), p);
+		CHECK( !bdd.full );
+		CHECK( !bdd.late );
+		for (uint32_t a = 0; a < (1u << nv); ++a)
+			CHECK( eval(bdd, p, a) == (std::popcount(a) % 2 == 1) );
 	}
 }

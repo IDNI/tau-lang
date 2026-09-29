@@ -180,4 +180,17 @@ TEST_SUITE("cvc5_bitblast_sat") {
 			make_bitvector_mul(u, u), make_bitvector_value(16, 2)), 16,
 			size_t{1} << 20) == std::optional<bool>(false) );
 	}
+
+	TEST_CASE("a passed deadline declines, and says so") {
+		bool late = false;
+		const auto past = data_bdd::clock::now() - std::chrono::seconds(1);
+		CHECK( !cvc5_bitblast_sat(falling_chain(8, 255), 16, size_t{1} << 20,
+			past, &late) );
+		CHECK( late );
+		late = true;
+		CHECK( cvc5_bitblast_sat(falling_chain(8, 255), 16, size_t{1} << 20,
+			data_bdd::clock::now() + std::chrono::hours(1), &late)
+			== std::optional<bool>(true) );
+		CHECK( !late );
+	}
 }
