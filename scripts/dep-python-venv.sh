@@ -34,7 +34,7 @@ NANOBIND_VERSION="${NANOBIND_VERSION:-3.0.1}"
 AUDITWHEEL_VERSION="${AUDITWHEEL_VERSION:-6.8.2}"
 DELOCATE_VERSION="${DELOCATE_VERSION:-0.13.0}"
 DELVEWHEEL_VERSION="${DELVEWHEEL_VERSION:-1.13.1}"
-UV_VERSION="${UV_VERSION:-0.12.13}"
+UV_VERSION="0.12.13"
 TARGET_ARCH="$(dep_var TAU_PYTHON_ARCH)"
 
 case "$(uname -s)" in
@@ -47,6 +47,25 @@ case "$(uname -m)" in
 	x86_64|amd64) HOST_ARCH=x86_64 ;;
 	aarch64|arm64) HOST_ARCH=aarch64 ;;
 	*) HOST_ARCH="$(uname -m)" ;;
+esac
+
+case "${HOST_OS}-${HOST_ARCH}" in
+	linux-x86_64)    UV_ASSET="uv-x86_64-unknown-linux-gnu.tar.gz" ;;
+	linux-aarch64)   UV_ASSET="uv-aarch64-unknown-linux-gnu.tar.gz" ;;
+	macos-x86_64)    UV_ASSET="uv-x86_64-apple-darwin.tar.gz" ;;
+	macos-aarch64)   UV_ASSET="uv-aarch64-apple-darwin.tar.gz" ;;
+	windows-x86_64)  UV_ASSET="uv-x86_64-pc-windows-msvc.zip" ;;
+	*) UV_ASSET="" ;;
+esac
+# From the .sha256 files of the uv release. A version bump needs new digests,
+# so a changed or unknown asset fails the checksum instead of running.
+case "${UV_VERSION} ${UV_ASSET}" in
+	"0.12.13 uv-x86_64-unknown-linux-gnu.tar.gz")  UV_SHA="745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd" ;;
+	"0.12.13 uv-aarch64-unknown-linux-gnu.tar.gz") UV_SHA="2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9" ;;
+	"0.12.13 uv-x86_64-apple-darwin.tar.gz")       UV_SHA="5e287ef61cb6a9b61b3a83fef124fd143e400468a7dac794230147a810e17119" ;;
+	"0.12.13 uv-aarch64-apple-darwin.tar.gz")      UV_SHA="7e6ddb9316acc00f2296c82ff4d99977870ee34b2f0ddcae9444d714db9364ed" ;;
+	"0.12.13 uv-x86_64-pc-windows-msvc.zip")       UV_SHA="a86c9dc7bad9b03f388583b7187c05fe9951c2e0d392217e8fd43d97787f6ec2" ;;
+	*) UV_SHA="" ;;
 esac
 
 # A native path for the tools that are not MSYS: uv writes the interpreter
@@ -111,13 +130,44 @@ if [ -x "${venv}/${VENV_PYTHON}" ] && [ "$(cat "${stamp}" 2>/dev/null)" = "${pac
 	echo "dep-python-venv: ${venv} already has ${packages}" >&2
 else
 	if ! command -v uv > /dev/null 2>&1; then
-		if [ ! -x "${uv_bin_dir}/uv" ] && [ ! -x "${uv_bin_dir}/uv.exe" ]; then
-			echo "dep-python-venv: installing uv into ${uv_bin_dir}" >&2
+		uv_stamp="${prefix}/uv/.version"
+		uv_expected="${UV_VERSION} ${UV_ASSET} ${UV_SHA}"
+		if { [ ! -x "${uv_bin_dir}/uv" ] && [ ! -x "${uv_bin_dir}/uv.exe" ]; } \
+			|| [ "$(cat "${uv_stamp}" 2>/dev/null)" != "${uv_expected}" ]; then
+			if [ -z "${UV_SHA}" ]; then
+				echo "dep-python-venv: no pinned uv digest for ${HOST_OS}-${HOST_ARCH}" >&2
+				exit 2
+			fi
+			echo "dep-python-venv: installing uv ${UV_VERSION} into ${uv_bin_dir}" >&2
+			uv_work="$(mktemp -d "${TMPDIR:-/tmp}/tau-uv.XXXXXX")"
+			# shellcheck disable=SC2064
+			trap "rm -rf '${uv_work}'" EXIT
+			uv_archive="${uv_work}/${UV_ASSET}"
+			curl -fsSL --retry 3 -o "${uv_archive}" \
+				"https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${UV_ASSET}" \
+				|| { echo "dep-python-venv: cannot download ${UV_ASSET}" >&2; exit 1; }
+			uv_actual="$(dep_sha256 "${uv_archive}")"
+			if [ "${uv_actual}" != "${UV_SHA}" ]; then
+				echo "dep-python-venv: ${UV_ASSET} hashes ${uv_actual}, expected ${UV_SHA}" >&2
+				exit 1
+			fi
+			(cd "${uv_work}" && "${CMAKE:-cmake}" -E tar xf "${uv_archive}") \
+				|| { echo "dep-python-venv: cannot extract ${UV_ASSET}" >&2; exit 1; }
+			# The .tar.gz holds its binaries in a folder named after the
+			# asset, and the .zip holds them at its root.
 			mkdir -p "${uv_bin_dir}"
-			curl -LsSf https://astral.sh/uv/install.sh \
-				| env UV_INSTALL_DIR="${uv_bin_dir}" UV_NO_MODIFY_PATH=1 \
-					UV_VERSION="${UV_VERSION}" sh >&2 \
-				|| { echo "dep-python-venv: cannot install uv" >&2; exit 1; }
+			uv_found=0
+			for f in "${uv_work}"/uv "${uv_work}"/uv.exe "${uv_work}"/uv-*/uv; do
+				[ -f "$f" ] || continue
+				mv "$f" "${uv_bin_dir}/"
+				uv_found=1
+			done
+			if [ "${uv_found}" != 1 ]; then
+				echo "dep-python-venv: ${UV_ASSET} holds no uv binary" >&2
+				exit 1
+			fi
+			chmod +x "${uv_bin_dir}"/uv* 2>/dev/null || true
+			printf '%s' "${uv_expected}" > "${uv_stamp}"
 		fi
 		PATH="${uv_bin_dir}:${PATH}"
 		export PATH
