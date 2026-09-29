@@ -456,7 +456,11 @@ RUN echo "(BUILD) -- Building wasm dependencies: emsdk" && \
 
 # emsdk ships the only node in the image, under a version directory whose name
 # is not fixed. tests/CMakeLists.txt requires node on the path under Emscripten.
-RUN ln -s "$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)/node" /usr/local/bin/node
+# dep-chrome.sh calls npx and dep-js-test-deps.sh calls npm.
+RUN node_bin="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
+	for tool in node npm npx; do \
+		ln -s "${node_bin}/${tool}" "/usr/local/bin/${tool}"; \
+	done
 
 
 # ------------------------------------------------------------
