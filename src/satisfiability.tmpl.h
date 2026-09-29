@@ -2417,7 +2417,7 @@ bool for_each_static_path(tref fm, const auto& f) {
 		return eq_neq(x, y) || eq_neq(y, x);
 	};
 	// The and/or skeleton of fm, with its leaves numbered by literal
-	enum kind_t { AND, OR, LIT, TRUE, FALSE };
+	enum kind_t { K_AND, K_OR, K_LIT, K_TRUE, K_FALSE };
 	struct part { kind_t kind; std::vector<size_t> sub; size_t lit = 0; };
 	std::vector<part> parts;
 	trefs lits;
@@ -2426,15 +2426,15 @@ bool for_each_static_path(tref fm, const auto& f) {
 		const auto& t = tau::get(g);
 		part p;
 		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
-			p.kind = t.child_is(tau::wff_and) ? AND : OR;
+			p.kind = t.child_is(tau::wff_and) ? K_AND : K_OR;
 			for (tref c : t.child_is(tau::wff_and)
 					? get_cnf_wff_clauses<node>(g)
 					: get_dnf_wff_clauses<node>(g))
 				p.sub.push_back(build(c));
-		} else if (t.equals_T()) p.kind = TRUE;
-		else if (t.equals_F()) p.kind = FALSE;
+		} else if (t.equals_T()) p.kind = K_TRUE;
+		else if (t.equals_F()) p.kind = K_FALSE;
 		else {
-			p.kind = LIT;
+			p.kind = K_LIT;
 			auto [it, fresh] = lit_ids.emplace(g, lits.size());
 			if (fresh) lits.push_back(g);
 			p.lit = it->second;
@@ -2464,15 +2464,15 @@ bool for_each_static_path(tref fm, const auto& f) {
 		const part& p = parts[g];
 		bool cont = true;
 		switch (p.kind) {
-		case AND:
+		case K_AND:
 			todo.insert(todo.end(), p.sub.rbegin(), p.sub.rend());
 			cont = go();
 			todo.resize(todo.size() - p.sub.size());
 			break;
-		case OR:
+		case K_OR:
 			if (std::ranges::any_of(p.sub, [&](size_t c) {
-				return parts[c].kind == TRUE
-					|| (parts[c].kind == LIT
+				return parts[c].kind == K_TRUE
+					|| (parts[c].kind == K_LIT
 						&& held[parts[c].lit]);
 			})) cont = go();
 			else for (size_t c : p.sub) {
@@ -2482,7 +2482,7 @@ bool for_each_static_path(tref fm, const auto& f) {
 				if (!cont) break;
 			}
 			break;
-		case LIT:
+		case K_LIT:
 			if (held[p.lit]) cont = go();
 			else if (std::ranges::none_of(negations[p.lit],
 				[&](size_t n) { return held[n] > 0; }))
@@ -2492,8 +2492,8 @@ bool for_each_static_path(tref fm, const auto& f) {
 				--held[p.lit], path.pop_back();
 			}
 			break;
-		case TRUE: cont = go(); break;
-		case FALSE: break;
+		case K_TRUE: cont = go(); break;
+		case K_FALSE: break;
 		}
 		todo.push_back(g);
 		return cont;
