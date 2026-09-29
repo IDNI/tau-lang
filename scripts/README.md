@@ -227,6 +227,38 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 
 - `gdb-tau`, `gdb`, `debug-tau`
 
+## Dependency store
+
+Configure resolves each dependency by a content id. The id is the SHA-256 of
+the recipe fields, so a changed recipe gives a new id and never a stale hit.
+
+The local store keeps one folder for each entry:
+
+```text
+$TAU_SHARED_PREFIX/store/<dep>/<id>/manifest.json
+$TAU_SHARED_PREFIX/store/<dep>/<id>/prefix/
+$TAU_SHARED_PREFIX/store/<dep>/<id>.lock
+```
+
+The store has two tiers:
+
+- The local tier is the folder above. A hit is used as it is.
+- The remote tier is the OCI registry that `TAU_STORE_REMOTE` names. It holds
+  one private artifact for each entry, tagged `<dep>-<id>`. Configure reads a
+  local miss from the remote. When the remote also misses, or when
+  `TAU_STORE_REMOTE` is not set, configure builds the dependency.
+
+`store-publish` sends the local entries to the remote. `TAU_STORE_KEEP` sets
+how many entries of each dependency stay in the local tier.
+
+Two files are the single definitions. Do not copy their rules into another
+file:
+
+- [`tau-store.cmake`](../external/parser/cmake/tau-store.cmake) defines the
+  layout, the lookup and the publication of a local entry.
+- [`tau-manifest.cmake`](../external/parser/cmake/tau-manifest.cmake) defines
+  the input id, the manifest schema and the manifest check.
+
 ## Docker
 
 See [`docker.sh`](docker.sh) — `docker tau`, `docker packages`, `docker w64-*`, …
