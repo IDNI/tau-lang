@@ -82,17 +82,11 @@ RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
 
 FROM base AS source
 
-# Copy source files to tau-lang directory
-COPY ./bindings  /tau-lang/bindings
-COPY ./cmake     /tau-lang/cmake
-COPY ./external  /tau-lang/external
-COPY ./licenses  /tau-lang/licenses
-COPY ./scripts   /tau-lang/scripts
-COPY ./src       /tau-lang/src
-COPY ./tests     /tau-lang/tests
-COPY ./.gitignore ./.gitmodules ./CMakeLists.txt ./CMakePresets.json ./dev \
-	./README.md ./LICENSE.md ./VERSION      /tau-lang/
-COPY ./parser   /tau-lang/parser
+# Copy the whole tree, so a new top-level directory cannot be left out.
+# .dockerignore keeps .git, the build trees and .local out.
+COPY ./ /tau-lang
+
+RUN cd /tau-lang && ./dev clean all
 
 
 # ============================================================
