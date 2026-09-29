@@ -1597,6 +1597,8 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "ltlrefinementrounds")      return ltl_refinement_rounds_opt;
 	if (x == "ltlwindowmaxpaths")        return ltl_window_max_paths_opt;
 	if (x == "ltlclosedregionstimeout")  return ltl_closed_regions_timeout_opt;
+	if (x == "ltldatagamemaxnodes")      return ltl_data_game_max_nodes_opt;
+	if (x == "ltldatagamemaxmemo")       return ltl_data_game_max_memo_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1715,11 +1717,11 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ revision_alts_opt, [climit, this]() {
 		out << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
 	{ consistency_subsets_opt, [climit, this]() {
-		out << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
+		out << "maxsubsets:          " << climit(max_consistency_subsets()) << "\n"; } },
 	{ cache_bound_opt, [climit, this]() {
 		out << "cachebound:          " << climit(cache_bound) << "\n"; } },
 	{ cover_products_opt, [climit, this]() {
-		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } },
+		out << "maxcoverproducts:    " << climit(max_cover_products()) << "\n"; } },
 	{ constant_size_opt, [climit, this]() {
 		out << "maxconstantsize:     " << climit(max_constant_size) << "\n"; } },
 	// Effective values, so the environment fallbacks show through when the
@@ -1745,6 +1747,10 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		const size_t s = ltl_closed_regions_timeout();
 		out << "ltlclosedregionstimeout: ";
 		if (s) out << s << " s\n"; else out << "off\n"; } },
+	{ ltl_data_game_max_nodes_opt, [climit, this]() {
+		out << "ltldatagamemaxnodes: " << climit(ltl_data_game_max_nodes()) << "\n"; } },
+	{ ltl_data_game_max_memo_opt, [climit, this]() {
+		out << "ltldatagamemaxmemo:  " << climit(ltl_data_game_max_memo()) << "\n"; } },
 	{ tref_budget_opt, [climit, this]() {
 		out << "trefbudget:          " << climit(tref_budget())
 			<< " (live: " << api<node>::tref_count() << ")\n"; } },
@@ -1963,6 +1969,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_ltl_window_max_paths(*n); } },
 	{ ltl_closed_regions_timeout_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_closed_regions_timeout(*n); } },
+	{ ltl_data_game_max_nodes_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_data_game_max_nodes(*n); } },
+	{ ltl_data_game_max_memo_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_data_game_max_memo(*n); } },
 	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_tref_budget(*n); } },
 	{ tref_budget_soft_opt, [&]() { if (auto n = str2count(); n)
@@ -2491,7 +2501,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"
 		"  ltlrefinementrounds    ABA-oracle refinement rounds         64\n"
 		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n"
-		"  ltlclosedregionstimeout data game on closed regions (s)     20\n";
+		"  ltlclosedregionstimeout data game on closed regions (s)     20\n"
+		"  ltldatagamemaxnodes    data-game BDD live nodes             8388608\n"
+		"  ltldatagamemaxmemo     data-game BDD memo entries           33554432\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts

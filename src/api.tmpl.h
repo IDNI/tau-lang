@@ -275,7 +275,7 @@ void api<node>::set_max_revision_alts(size_t n) {
 template <NodeType node>
 void api<node>::set_max_consistency_subsets(size_t n) {
 	option_change_guard<node> guard;
-	max_consistency_subsets = n;
+	max_consistency_subsets_param = (long) n;
 }
 
 template <NodeType node>
@@ -286,7 +286,7 @@ void api<node>::set_cache_bound(size_t n) {
 template <NodeType node>
 void api<node>::set_max_cover_products(size_t n) {
 	option_change_guard<node> guard;
-	max_cover_products = n;
+	max_cover_products_param = (long) n;
 }
 
 template <NodeType node>
@@ -341,6 +341,18 @@ template <NodeType node>
 void api<node>::set_ltl_closed_regions_timeout(size_t seconds) {
 	option_change_guard<node> guard;
 	ltl_closed_regions_timeout_param = (long) seconds;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_data_game_max_nodes(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_game_max_nodes_param = (long) n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_data_game_max_memo(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_game_max_memo_param = (long) n;
 }
 
 template <NodeType node>

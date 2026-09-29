@@ -95,6 +95,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt,
 	ltl_refinement_rounds_opt, ltl_window_max_paths_opt,
 	ltl_closed_regions_timeout_opt,
+	ltl_data_game_max_nodes_opt, ltl_data_game_max_memo_opt,
 	// The solver's lgrs-route variable cap (`-g --lgrs-max-vars`).
 	lgrs_max_vars_opt,
 	// Boolean, like the first group: the semantic (winning-region) fallback

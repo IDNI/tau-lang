@@ -19,11 +19,12 @@
 namespace idni::tau_lang {
 
 // A reduced ordered BDD without complement edges; node 0 is false and node 1
-// true. A table grown past `max_nodes` live nodes, or a memo of the
-// operations grown past `max_memo` entries (0 for no bound), sets `full`, and
-// every result from then on is meaningless: the caller must check `full` and
-// give up, or collect() and redo the work. Once full, the operations return
-// at once, and remember nothing.
+// true. A table grown past `max_nodes` live nodes sets `full`, and every
+// result from then on is meaningless: the caller must check `full` and give
+// up, or collect() and redo the work. Once full, the operations return at
+// once, and remember nothing. A memo of the operations grown to `max_memo`
+// entries (0 for no bound) sets `full` too under memo_policy::give_up, and
+// is emptied under memo_policy::clear, which costs recomputation only.
 //
 // collect() frees the nodes no root reaches and reuses their ids, so an id a
 // root reaches never changes; any other id held across it is dangling.
@@ -39,6 +40,10 @@ struct data_bdd {
 	struct nd { uint32_t var; id lo, hi; };
 	// An operation's arguments and result; `op` is `leaf` in an empty slot.
 	struct memo_entry { uint32_t op; id a, b, r; };
+	// What a memo of `max_memo` entries does.
+	enum class memo_policy { give_up, clear };
+	// The most live nodes the ids can name.
+	static constexpr size_t max_ids = UINT32_MAX;
 
 	// Linear probing reads the low bits, so every input bit must reach
 	// them: the finalizer of MurmurHash3.
@@ -64,6 +69,7 @@ struct data_bdd {
 	std::vector<memo_entry> memo_slots;
 	size_t unique_count = 0, memo_count = 0;
 	size_t max_nodes, max_memo;
+	memo_policy on_max_memo;
 	// mk() makes no node past this many live ones: max_nodes, or less
 	// while grow_at_most() bounds the work under way
 	size_t limit;
@@ -77,10 +83,13 @@ struct data_bdd {
 	// table first fills, so that a table that never does costs nothing
 	size_t next_collect = SIZE_MAX;
 	size_t collections = 0;
+	size_t memo_clears = 0;
 
-	explicit data_bdd(size_t cap, size_t memo_cap = 0)
+	explicit data_bdd(size_t cap, size_t memo_cap = 0,
+		memo_policy on_memo_cap = memo_policy::give_up)
 		: unique_slots(1024, F), memo_slots(1024, { leaf, 0, 0, 0 }),
-		max_nodes(cap), max_memo(memo_cap), limit(cap) {}
+		max_nodes(cap), max_memo(memo_cap), on_max_memo(on_memo_cap),
+		limit(cap) {}
 
 	// The live nodes, the two leaves included.
 	size_t size() const { return nodes.size() - free_ids.size(); }
@@ -140,8 +149,17 @@ struct data_bdd {
 		e = { op, a, b, r };
 		if (memo_count * 3 > memo_slots.size() * 2)
 			rebuild_memo(memo_slots.size() * 2, [](id) { return true; });
-		if (max_memo && memo_count >= max_memo) full = true;
+		if (max_memo && memo_count >= max_memo) {
+			if (on_max_memo == memo_policy::give_up) full = true;
+			else clear_memo();
+		}
 		passed_deadline();
+	}
+	// Empties the memo and gives its slots back.
+	void clear_memo() {
+		std::vector<memo_entry>(1024, { leaf, 0, 0, 0 }).swap(memo_slots);
+		memo_count = 0;
+		++memo_clears;
 	}
 	// Keeps the entries whose arguments and result `keep`.
 	template <typename Keep>

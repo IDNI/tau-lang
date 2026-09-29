@@ -4992,9 +4992,11 @@ TEST_SUITE("Data game strategy") {
 TEST_SUITE("Data game node collection") {
 
 	struct node_table {
-		const size_t saved = data_game_max_nodes;
-		explicit node_table(size_t n) { data_game_max_nodes = n; }
-		~node_table() { data_game_max_nodes = saved; }
+		const long saved = ltl_data_game_max_nodes_param;
+		explicit node_table(size_t n) {
+			ltl_data_game_max_nodes_param = (long) n;
+		}
+		~node_table() { ltl_data_game_max_nodes_param = saved; }
 	};
 
 	static std::optional<bool> realizable_in(size_t nodes, const char* s) {
@@ -5611,7 +5613,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// test — a false UNREALIZABLE whenever the feasible input classes only
 	// JOINTLY cover an infeasible product's class.  The exact check
 	// expands I_k ∧ ⋀_j ¬I_j into literal products (capped by the runtime
-	// parameter max_cover_products) and calls I_k covered iff every
+	// parameter max_cover_products_param) and calls I_k covered iff every
 	// product has some BA type's sub-conjunction infeasible.
 	// Fixture: p0 = (i1:qlt = 1/4), p1 = (i2:sbf = X) — inputs of two
 	// different types — and the jointly-infeasible qlt output pair
@@ -5678,7 +5680,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	// The expansion cap: negating GF-33's two-literal class {p0, p1}
-	// doubles the product count, so max_cover_products = 1 blows the cap
+	// doubles the product count, so a cap of 1 is exceeded
 	// and the pre-O8 syntactic verdict stands (refused, logged) — sound,
 	// at worst incomplete.  Restoring the default restores the exact
 	// answer.  (GF-31's single-literal classes never grow the expansion
@@ -5687,11 +5689,11 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		const size_t saved = max_cover_products;
-		max_cover_products = 1;
+		const long saved = max_cover_products_param;
+		max_cover_products_param = 1;
 		CHECK_FALSE(guard_is_aba_feasible<node_t>(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
-		max_cover_products = saved;
+		max_cover_products_param = saved;
 		CHECK(guard_is_aba_feasible<node_t>(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
 	}

@@ -314,7 +314,9 @@ struct api {
 	 * @brief Cap the ∀∃-synthesis checks the k-ary consistency-subset
 	 * walk may spend per atom group (LT-17); on the cap the remaining
 	 * subsets are skipped with a warning (sound, at worst a false
-	 * UNREALIZABLE). Default 4096; 0 = unlimited.
+	 * UNREALIZABLE). 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_MAX_CONSISTENCY_SUBSETS` environment fallback (default
+	 * 4096).
 	 */
 	static void set_max_consistency_subsets(size_t n);
 	/**
@@ -324,8 +326,9 @@ struct api {
 	static void set_cache_bound(size_t n);
 	/**
 	 * @brief Cap the ABA oracle's mixed-type coverage expansion;
-	 * beyond it the weaker syntactic verdict stands, logged. Default
-	 * 256; 0 = unlimited.
+	 * beyond it the weaker syntactic verdict stands, logged.
+	 * 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_MAX_COVER_PRODUCTS` environment fallback (default 256).
 	 */
 	static void set_max_cover_products(size_t n);
 	/** @brief Set the largest region of fresh values, in tree nodes, the
@@ -389,6 +392,20 @@ struct api {
 	 * 20).
 	 */
 	static void set_ltl_closed_regions_timeout(size_t seconds);
+	/**
+	 * @brief Cap on the live nodes of the BDD a data game over codes
+	 * builds (`ltl_data_game_max_nodes_param`); a full table makes the
+	 * game undecided. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_DATA_GAME_MAX_NODES` environment fallback (default 2^23).
+	 */
+	static void set_ltl_data_game_max_nodes(size_t n);
+	/**
+	 * @brief Cap on the operation memo entries of the BDD a data game over
+	 * codes builds (`ltl_data_game_max_memo_param`); the memo is emptied
+	 * when it reaches the cap. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_DATA_GAME_MAX_MEMO` environment fallback (default 2^25).
+	 */
+	static void set_ltl_data_game_max_memo(size_t n);
 	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).

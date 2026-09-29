@@ -825,8 +825,12 @@ struct code_regions {
 	std::vector<size_t> edge_base;
 	std::map<std::vector<size_t>, region> consistent;
 
-	code_regions(const arena& ar, const code_window& win, size_t max_nodes)
-		: a(ar), w(win), bdd(max_nodes) {}
+	// 0 for either cap is no bound; for the nodes, as many as an id names
+	code_regions(const arena& ar, const code_window& win, size_t max_nodes,
+		size_t max_memo)
+		: a(ar), w(win), bdd(max_nodes && max_nodes < data_bdd::max_ids
+			? max_nodes : data_bdd::max_ids, max_memo,
+			data_bdd::memo_policy::clear) {}
 
 	region top() { return data_bdd::T; }
 	region bottom() { return data_bdd::F; }
@@ -1840,11 +1844,6 @@ protected:
 		return it != sol.end() ? it->second : build_bf_f_type<node>(tid);
 	}
 };
-
-// Most nodes live at once in the BDD of a game over codes. A product of two
-// bitvector streams wider than 4 bits needs millions of them; 2^23 nodes and
-// their tables take about 1 GB.
-inline size_t data_game_max_nodes = size_t{1} << 23;
 
 // The bounds of a Mealy view (code_strategy::build_mealy).
 inline size_t data_game_mealy_max_states = 4096;
@@ -3351,7 +3350,8 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
-		code_regions<node> codes(arena, *window, data_game_max_nodes);
+		code_regions<node> codes(arena, *window,
+			ltl_data_game_max_nodes(), ltl_data_game_max_memo());
 		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
 			data_game_solver solver(codes, arena, 0, keep);

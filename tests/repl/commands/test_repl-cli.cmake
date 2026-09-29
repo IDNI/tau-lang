@@ -164,6 +164,8 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_constant_size|max-constant-size|u|300|maxconstantsize|300"
 	"tref_budget|tref-budget|y|4096|trefbudget|4096"
 	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
+	"ltl_data_game_max_nodes|ltl-data-game-max-nodes||4096|ltldatagamemaxnodes|4096"
+	"ltl_data_game_max_memo|ltl-data-game-max-memo||4096|ltldatagamemaxmemo|4096"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

@@ -194,6 +194,59 @@ add_test(NAME "test_repl-ltl_env-window_max_paths_flag_beats_env"
 	COMMAND bash -c "TAU_LTL_WINDOW_MAX_PATHS=0 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-window-max-paths 12 -e \"get ltlwindowmaxpaths\"")
 set_tests_properties("test_repl-ltl_env-window_max_paths_flag_beats_env" PROPERTIES
 	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *12")
+add_test(NAME "test_repl-ltl_env-data_game_max_nodes_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-data-game-max-nodes 0 -e \"get ltldatagamemaxnodes\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_nodes_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxnodes: *unlimited")
+add_test(NAME "test_repl-ltl_env-data_game_max_nodes_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_DATA_GAME_MAX_NODES=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltldatagamemaxnodes\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_nodes_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxnodes: *4096")
+add_test(NAME "test_repl-ltl_env-data_game_max_nodes_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_DATA_GAME_MAX_NODES=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-data-game-max-nodes 12 -e \"get ltldatagamemaxnodes\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_nodes_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxnodes: *12")
+add_test(NAME "test_repl-ltl_env-data_game_max_nodes_flag_rejects_garbage"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-data-game-max-nodes abc -e \"get ltldatagamemaxnodes\" 2>&1")
+set_tests_properties("test_repl-ltl_env-data_game_max_nodes_flag_rejects_garbage" PROPERTIES
+	PASS_REGULAR_EXPRESSION "expects a non-negative number")
+add_test(NAME "test_repl-ltl_env-data_game_max_memo_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-data-game-max-memo 0 -e \"get ltldatagamemaxmemo\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_memo_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxmemo: *unlimited")
+add_test(NAME "test_repl-ltl_env-data_game_max_memo_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_DATA_GAME_MAX_MEMO=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltldatagamemaxmemo\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_memo_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxmemo: *4096")
+add_test(NAME "test_repl-ltl_env-data_game_max_memo_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_DATA_GAME_MAX_MEMO=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-data-game-max-memo 12 -e \"get ltldatagamemaxmemo\"")
+set_tests_properties("test_repl-ltl_env-data_game_max_memo_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltldatagamemaxmemo: *12")
+add_test(NAME "test_repl-ltl_env-data_game_max_memo_garbage_warns"
+	COMMAND bash -c "TAU_LTL_DATA_GAME_MAX_MEMO=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltldatagamemaxmemo\" 2>&1")
+set_tests_properties("test_repl-ltl_env-data_game_max_memo_garbage_warns" PROPERTIES
+	PASS_REGULAR_EXPRESSION "TAU_LTL_DATA_GAME_MAX_MEMO='abc' is not a non-negative number")
+# The consistency-subset and coverage-product caps read the environment too.
+add_test(NAME "test_repl-ltl_env-consistency_subsets_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_MAX_CONSISTENCY_SUBSETS=7 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get maxsubsets\"")
+set_tests_properties("test_repl-ltl_env-consistency_subsets_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "maxsubsets: *7")
+add_test(NAME "test_repl-ltl_env-consistency_subsets_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_MAX_CONSISTENCY_SUBSETS=7 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 9 -e \"get maxsubsets\"")
+set_tests_properties("test_repl-ltl_env-consistency_subsets_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "maxsubsets: *9")
+add_test(NAME "test_repl-ltl_env-consistency_subsets_flag_rejects_garbage"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets abc -e \"get maxsubsets\" 2>&1")
+set_tests_properties("test_repl-ltl_env-consistency_subsets_flag_rejects_garbage" PROPERTIES
+	PASS_REGULAR_EXPRESSION "expects a non-negative number")
+add_test(NAME "test_repl-ltl_env-cover_products_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_MAX_COVER_PRODUCTS=0 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get maxcoverproducts\"")
+set_tests_properties("test_repl-ltl_env-cover_products_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "maxcoverproducts: *unlimited")
+add_test(NAME "test_repl-ltl_env-cover_products_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_MAX_COVER_PRODUCTS=0 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-cover-products 9 -e \"get maxcoverproducts\"")
+set_tests_properties("test_repl-ltl_env-cover_products_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "maxcoverproducts: *9")
 # The same three surfaces for the caps an algebra declares about itself; each
 # exists only when its algebra is in the pack, so each is gated on its own BA.
 tau_repl_unsupported(_tau_skip "get qlt-t3-cap")

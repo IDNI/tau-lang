@@ -59,8 +59,11 @@ namespace idni::tau_lang {
  * ltlsynt happened to pick such an edge — D3 = skip + log), never a false
  * REALIZABLE. Runtime parameter by policy (`--max-consistency-subsets`,
  * REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
+ * The sentinel -1 means "not set", in which case
+ * `TAU_LTL_MAX_CONSISTENCY_SUBSETS` is consulted and 4096 applies when that
+ * is absent too. Read through @ref max_consistency_subsets.
  */
-inline size_t max_consistency_subsets = 4096;
+inline long max_consistency_subsets_param = -1;
 
 /**
  * @brief Cap on the literal products the ABA oracle's exact mixed-type
@@ -72,8 +75,37 @@ inline size_t max_consistency_subsets = 4096;
  * that product and logs — a possible false UNREALIZABLE, never a false
  * REALIZABLE. Runtime parameter by policy (`--max-cover-products`, REPL
  * `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
+ * The sentinel -1 means "not set", in which case
+ * `TAU_LTL_MAX_COVER_PRODUCTS` is consulted and 256 applies when that is
+ * absent too. Read through @ref max_cover_products.
  */
-inline size_t max_cover_products = 256;
+inline long max_cover_products_param = -1;
+
+/**
+ * @brief Effective cap on the k-ary consistency subset checks per atom
+ * group (0 = unlimited).
+ *
+ * Precedence: @ref max_consistency_subsets_param when set (>= 0), else
+ * `TAU_LTL_MAX_CONSISTENCY_SUBSETS`, else 4096.
+ */
+inline size_t max_consistency_subsets() {
+	if (max_consistency_subsets_param >= 0)
+		return (size_t) max_consistency_subsets_param;
+	return env_limit_count("TAU_LTL_MAX_CONSISTENCY_SUBSETS", 4096);
+}
+
+/**
+ * @brief Effective cap on the literal products of the oracle's mixed-type
+ * coverage check (0 = unlimited).
+ *
+ * Precedence: @ref max_cover_products_param when set (>= 0), else
+ * `TAU_LTL_MAX_COVER_PRODUCTS`, else 256.
+ */
+inline size_t max_cover_products() {
+	if (max_cover_products_param >= 0)
+		return (size_t) max_cover_products_param;
+	return env_limit_count("TAU_LTL_MAX_COVER_PRODUCTS", 256);
+}
 
 // The ltlsynt watchdog, the algorithm choice and the QE cap
 // (`ltl_timeout_sec_param`, `ltl_algorithm_param`, `ltl_qe_max_vars_param`
@@ -94,8 +126,8 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	auto mix = [&seed](size_t v) {
 		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 	};
-	mix(max_consistency_subsets);
-	mix(max_cover_products);
+	mix(max_consistency_subsets());
+	mix(max_cover_products());
 	mix((size_t) ltl_timeout_sec());
 	mix(std::hash<std::string>{}(ltl_algorithm_choice()));
 	mix(ltl_qe_max_vars());
@@ -104,6 +136,8 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	mix(ltl_max_refinement_rounds());
 	mix(ltl_window_max_paths());
 	mix(ltl_closed_regions_timeout());
+	mix(ltl_data_game_max_nodes());
+	mix(ltl_data_game_max_memo());
 	return seed;
 }
 

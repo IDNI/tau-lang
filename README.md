@@ -861,6 +861,10 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
 | `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
+| `TAU_LTL_DATA_GAME_MAX_NODES` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited); a full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. Environment fallback of `--ltl-data-game-max-nodes` / REPL `set ltldatagamemaxnodes`. |
+| `TAU_LTL_DATA_GAME_MAX_MEMO` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited); a memo that reaches the cap is emptied, which costs recomputation, never a verdict. Environment fallback of `--ltl-data-game-max-memo` / REPL `set ltldatagamemaxmemo`. |
+| `TAU_LTL_MAX_CONSISTENCY_SUBSETS` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited); a fired cap is sound but may answer unrealizable. Environment fallback of `--max-consistency-subsets` / REPL `set maxsubsets`. |
+| `TAU_LTL_MAX_COVER_PRODUCTS` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited); beyond it the syntactic verdict stands. Environment fallback of `--max-cover-products` / REPL `set maxcoverproducts`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
 a CLI flag, a REPL option and an `api::set_*` setter (see the CLI and REPL
@@ -2842,8 +2846,8 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
 | -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default `TAU_TREF_BUDGET` or 0; 0 = unlimited) |
 | -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
-| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
-| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
+| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default `TAU_LTL_MAX_CONSISTENCY_SUBSETS` or 4096; 0 = unlimited) |
+| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default `TAU_LTL_MAX_COVER_PRODUCTS` or 256; 0 = unlimited) |
 | -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
@@ -2854,6 +2858,8 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
 | -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
+|     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default `TAU_LTL_DATA_GAME_MAX_NODES` or 8388608; 0 = unlimited) |
+|     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default `TAU_LTL_DATA_GAME_MAX_MEMO` or 33554432; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -3142,11 +3148,13 @@ characters (`--spec-size-warn`). 0 (off) by default.
 specification part (`--max-revision-alts`). Unlimited by default.
 
 * `maxsubsets`: cap on the k-ary consistency subset checks per atom group in
-LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default; a fired cap
-is sound but may answer unrealizable.
+LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default, or
+`TAU_LTL_MAX_CONSISTENCY_SUBSETS` when that is set; a fired cap is sound but
+may answer unrealizable.
 
 * `maxcoverproducts`: cap on the ABA oracle's mixed-type coverage expansion
-(`--max-cover-products`). 256 by default.
+(`--max-cover-products`). 256 by default, or `TAU_LTL_MAX_COVER_PRODUCTS` when
+that is set.
 
 * `maxconstantsize`: largest region of fresh values, in tree nodes, that a run
 keeps across steps (`--max-constant-size`). Each value a run commits shrinks
@@ -3193,6 +3201,16 @@ keep their quantifiers, all their questions together, each question at most
 a quarter of it (`--ltl-closed-regions-timeout`). 20 by default, or
 `TAU_LTL_CLOSED_REGIONS_TIMEOUT` when that is set; 0 skips the attempt. Past
 either bound that attempt is undecided, and the other routes keep deciding.
+
+* `ltldatagamemaxnodes`: cap on the live nodes of the BDD a data game over
+codes builds (`--ltl-data-game-max-nodes`). 8388608 (2^23) by default, or
+`TAU_LTL_DATA_GAME_MAX_NODES` when that is set; 0 = unlimited. A full table
+leaves the game undecided.
+
+* `ltldatagamemaxmemo`: cap on the operation memo entries of that BDD
+(`--ltl-data-game-max-memo`). 33554432 (2^25) by default, or
+`TAU_LTL_DATA_GAME_MAX_MEMO` when that is set; 0 = unlimited. A memo that
+reaches the cap is emptied, which costs recomputation only.
 
 Changing any of these, the two temporal-normalization caps, `preprocessing`
 or an option an algebra declares (below) between two queries drops the
@@ -3749,7 +3767,8 @@ the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
 (`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`,
-`set_ltl_closed_regions_timeout`) have no counterpart
+`set_ltl_closed_regions_timeout`,
+`set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`) have no counterpart
 there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
 

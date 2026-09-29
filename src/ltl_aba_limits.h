@@ -92,6 +92,32 @@ inline long ltl_window_max_paths_param = -1;
 inline long ltl_closed_regions_timeout_param = -1;
 
 /**
+ * @brief Most nodes live at once in the BDD of a data game over codes
+ * (`code_regions`); a full table makes the game undecided, never a verdict.
+ * A product of two bitvector streams wider than 4 bits needs millions of
+ * nodes; 2^23 nodes and their tables take about 1 GB.
+ *
+ * Runtime parameter by policy (`--ltl-data-game-max-nodes`, REPL
+ * `set ltldatagamemaxnodes`, `api::set_ltl_data_game_max_nodes`);
+ * 0 = unlimited. The sentinel -1 means "not set", in which case
+ * `TAU_LTL_DATA_GAME_MAX_NODES` is consulted and 2^23 applies when that is
+ * absent too. Read through @ref ltl_data_game_max_nodes.
+ */
+inline long ltl_data_game_max_nodes_param = -1;
+
+/**
+ * @brief Most entries of the operation memo of a data game's BDD; the memo
+ * is emptied when it reaches the cap, which costs recomputation only.
+ *
+ * Runtime parameter by policy (`--ltl-data-game-max-memo`, REPL
+ * `set ltldatagamemaxmemo`, `api::set_ltl_data_game_max_memo`);
+ * 0 = unlimited. The sentinel -1 means "not set", in which case
+ * `TAU_LTL_DATA_GAME_MAX_MEMO` is consulted and 2^25 applies when that is
+ * absent too. Read through @ref ltl_data_game_max_memo.
+ */
+inline long ltl_data_game_max_memo_param = -1;
+
+/**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
  * assignments are enumerated as `1 << n`: a signed shift is undefined at
  * 31 and the enumeration is hopeless long before. Not tunable.
@@ -283,6 +309,32 @@ inline size_t ltl_closed_regions_timeout() {
 	if (ltl_closed_regions_timeout_param >= 0)
 		return (size_t) ltl_closed_regions_timeout_param;
 	return env_limit_count("TAU_LTL_CLOSED_REGIONS_TIMEOUT", 20);
+}
+
+/**
+ * @brief Effective cap on the live nodes of a data game's BDD
+ * (0 = unlimited).
+ *
+ * Precedence: @ref ltl_data_game_max_nodes_param when set (>= 0), else
+ * `TAU_LTL_DATA_GAME_MAX_NODES`, else 2^23.
+ */
+inline size_t ltl_data_game_max_nodes() {
+	if (ltl_data_game_max_nodes_param >= 0)
+		return (size_t) ltl_data_game_max_nodes_param;
+	return env_limit_count("TAU_LTL_DATA_GAME_MAX_NODES", size_t{1} << 23);
+}
+
+/**
+ * @brief Effective cap on the operation memo entries of a data game's BDD
+ * (0 = unlimited).
+ *
+ * Precedence: @ref ltl_data_game_max_memo_param when set (>= 0), else
+ * `TAU_LTL_DATA_GAME_MAX_MEMO`, else 2^25.
+ */
+inline size_t ltl_data_game_max_memo() {
+	if (ltl_data_game_max_memo_param >= 0)
+		return (size_t) ltl_data_game_max_memo_param;
+	return env_limit_count("TAU_LTL_DATA_GAME_MAX_MEMO", size_t{1} << 25);
 }
 
 /**

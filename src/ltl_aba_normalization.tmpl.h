@@ -886,7 +886,7 @@ static bool guard_is_aba_feasible(
 			// feasible iff each BA type's sub-conjunction is
 			// (independent variables), and I_k is COVERED iff no
 			// product is feasible.  The expansion is capped by the
-			// runtime parameter max_cover_products; beyond it the
+			// runtime parameter max_cover_products(); beyond it the
 			// pre-O8 syntactic verdict stands (logged) — sound, at
 			// worst incomplete.
 			auto negate_lit = [&](tref l) -> tref {
@@ -897,6 +897,7 @@ static bool guard_is_aba_feasible(
 				return tau::build_wff_neg(l);
 			};
 			std::vector<trefs> products{ pk.input_lits };
+			const size_t cover_cap = max_cover_products();
 			bool blown = false;
 			for (auto& pj : live) {
 				if (!pj.feasible) continue;
@@ -905,9 +906,9 @@ static bool guard_is_aba_feasible(
 				std::vector<trefs> next;
 				for (auto& prod : products) {
 					for (tref l : pj.input_lits) {
-						if (max_cover_products
+						if (cover_cap
 							&& next.size() >=
-							max_cover_products) {
+							cover_cap) {
 							blown = true;
 							break;
 						}
@@ -924,7 +925,7 @@ static bool guard_is_aba_feasible(
 				ltl_verdict_incomplete = true;
 				LOG_WARNING << "[ltl_aba] mixed-type coverage "
 					"expansion exceeded "
-					<< max_cover_products
+					<< cover_cap
 					<< " products (--max-cover-products / "
 					"`set maxcoverproducts`, 0 = "
 					"unlimited); keeping the syntactic "
@@ -1109,10 +1110,11 @@ static void extend_consistency_positive_k_ary_walk(
 	// LT-17: the walk performs Θ(2^n) synthesis checks when the atoms are
 	// mostly jointly feasible (supersets of an infeasible set are pruned,
 	// but feasible sets prune nothing). Cap the checks at the runtime
-	// parameter `max_consistency_subsets` (0 = unlimited) and skip the
+	// parameter `max_consistency_subsets()` (0 = unlimited) and skip the
 	// rest: sound (the per-edge oracle still catches any jointly
 	// infeasible guard), at worst incomplete (a false UNREALIZABLE if
 	// ltlsynt picks such an edge — D3 = skip + log, never throw).
+	const size_t subset_cap = max_consistency_subsets();
 	size_t checks_spent = 0;
 	bool cap_fired = false;
 
@@ -1134,8 +1136,7 @@ static void extend_consistency_positive_k_ary_walk(
 				if (pure_out_lb) { any_pure_out_lb = true; break; }
 			}
 			if (any_pure_out_lb) return;
-			if (max_consistency_subsets
-				&& checks_spent >= max_consistency_subsets) {
+			if (subset_cap && checks_spent >= subset_cap) {
 				cap_fired = true;
 				ltl_verdict_incomplete = true;
 				LOG_WARNING << "[ltl_aba] k-ary consistency "
@@ -1230,9 +1231,9 @@ static void extend_consistency_positive_k_ary_mus(
 			"checks every strategy edge) but may "
 			"be a false UNREALIZABLE\n";
 	};
+	const size_t subset_cap = max_consistency_subsets();
 	auto over_cap = [&]() {
-		return max_consistency_subsets
-			&& checks_spent >= max_consistency_subsets;
+		return subset_cap && checks_spent >= subset_cap;
 	};
 	auto feasible_checked = [&](tref t) {
 		++checks_spent;
@@ -1705,13 +1706,14 @@ static void add_consistency_constraints(
 		}
 		// 2^n valuations per group; beyond the subset cap the rest is
 		// left to the verdict-incomplete flag
+		const size_t subset_cap = max_consistency_subsets();
 		for (auto& [type, g] : groups) {
 			if (g.size() < 3) continue;
 			const size_t n = g.size();
 			// 2^n valuations: the cap bounds them, and the 20 keeps
 			// an unlimited cap (0) from enumerating a million
-			if (n >= 20 || (max_consistency_subsets
-				&& (size_t{1} << n) > max_consistency_subsets))
+			if (n >= 20 || (subset_cap
+				&& (size_t{1} << n) > subset_cap))
 			{
 				LOG_WARNING << "[ltl_aba] " << n << " input atoms of one "
 					"type exceed the consistency subset cap (--max-"

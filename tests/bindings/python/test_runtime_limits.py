@@ -20,6 +20,7 @@ COUNT_SETTERS = (
 	"set_ltl_hoa_max_states", "set_ltl_guard_max_cubes",
 	"set_ltl_max_refinement_rounds", "set_ltl_window_max_paths",
 	"set_ltl_closed_regions_timeout", "set_ba_decision_pins",
+	"set_ltl_data_game_max_nodes", "set_ltl_data_game_max_memo",
 )
 
 # The shipped default of each count setter, restored after the round trip.
@@ -33,6 +34,8 @@ COUNT_DEFAULTS = {
 	"set_ltl_guard_max_cubes": 512, "set_ltl_max_refinement_rounds": 64,
 	"set_ltl_window_max_paths": 4096, "set_ba_decision_pins": 4096,
 	"set_ltl_closed_regions_timeout": 20,
+	"set_ltl_data_game_max_nodes": 8388608,
+	"set_ltl_data_game_max_memo": 33554432,
 }
 
 FLAG_SETTERS = {
