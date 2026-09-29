@@ -830,6 +830,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				return is_to_wrap(get(tmp)[0][0][0].get_type(), bf_neg);
 			} else return false;
 		};
+		// `x min(y, z)` printed without a separator reads back as a call
+		// of a function named `xmin`
+		auto is_name_call_next = [&](const tau& n) {
+			tref tmp = n.get();
+			while (get(tmp).child_is(bf_and)) tmp = get(tmp)[0][0].get();
+			const auto& c = get(tmp);
+			return c.child_is(bf_min) || c.child_is(bf_max)
+				|| c.child_is(bf_ref);
+		};
 		if (parent == nullptr) return true;
 		const auto& t = get(left), p = get(parent);
 		size_t pnt = p.get_type();
@@ -846,7 +855,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
-					|| t.child_is(tau::ba_constant)) {
+					|| t.child_is(tau::ba_constant)
+					|| ((isalnum(static_cast<unsigned char>(last_written_char))
+						|| last_written_char == '_')
+						&& is_name_call_next(p[1]))) {
 					out(" ");
 				}
 				else if (is_conj_next_wrapped(p[1])) {

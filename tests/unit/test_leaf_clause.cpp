@@ -302,5 +302,30 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
+
+	// GitHub #183: `ex y (s = y - 2)` holds for every s, but Boole's law
+	// `f(0) f(1) = 0` answers F for s = 0. complete_quantifier_elimination
+	// hands the clause an empty eliminability, so the guard sits in the
+	// clause itself.
+	TEST_CASE("a live variable under arithmetic keeps its binder") {
+		auto [block, body] = strip_block(parse(
+			"ex y : bv[3] { 0 }:bv[3] = y:bv[3] - { 2 }:bv[3]."), 1);
+		term_handle<node_t>::order order;
+		tref res = eliminate_block_over_clause<node_t>(
+			body, block, block_eliminability<node_t>{}, order).value();
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
+	}
+
+	TEST_CASE("arithmetic free of the live variable keeps the squeeze") {
+		auto [block, body] = strip_block(parse(
+			"ex y : bv[3] y:bv[3] & (z:bv[3] - { 2 }:bv[3]) = { 1 }:bv[3]."), 1);
+		term_handle<node_t>::order order;
+		tref res = eliminate_block_over_clause<node_t>(
+			body, block, block_eliminability<node_t>{}, order).value();
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
+	}
 #endif // TAU_PACK_HAS_BA_BV
 }

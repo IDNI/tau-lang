@@ -1960,9 +1960,47 @@ bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
 	return vars.size() > lgrs_max_vars;
 }
 
+/**
+ * @brief `true` if @p a lies below @p b in the Boolean-algebra order,
+ * variable by variable: `a[v] & b[v]' = 0` for every `v` either assigns.
+ *
+ * A variable one of the two leaves unassigned is unconstrained there, so it
+ * takes the value the mode gives such a variable: 0 in minimum mode, 1 in
+ * maximum mode. A comparison the canonical reduction cannot settle counts as
+ * not below.
+ */
+template <NodeType node>
+bool solution_below(const solution<node>& a, const solution<node>& b,
+	solver_mode mode)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto value = [mode](const solution<node>& s, tref var) {
+		if (auto it = s.find(var); it != s.end()) return it->second;
+		const size_t type = find_ba_type<node>(var);
+		return mode == solver_mode::minimum ? tau::_0(type)
+			: tau::_1(type);
+	};
+	auto below = [&](tref var) {
+		tref eq = tau::build_bf_eq_0(tau::build_bf_and(value(a, var),
+			tau::build_bf_neg(value(b, var))));
+		return tau::get(tt(eq) | bf_reduce_canonical<node>()
+			| tt::ref).equals_T();
+	};
+	for (const auto& [var, _] : a) if (!below(var)) return false;
+	for (const auto& [var, _] : b)
+		if (!a.contains(var) && !below(var)) return false;
+	return true;
+}
+
 // entry point for the solver
 // Reports why solve failed: an unsupported clause is code::solver_error,
 // no solution is code::unsat.
+//
+// In general mode the first expression path with a solution answers. In
+// minimum and maximum mode each path only yields the extreme solution of
+// that path, so every path is solved and the answer is one no other path's
+// solution lies strictly below (minimum) or above (maximum).
 template <NodeType node>
 static result<solution<node>> solve_form(tref form, solver_options options) {
 	result<solution<node>> r;
@@ -2012,6 +2050,20 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 	}
 	TAU_TRY_OR(form, normalize_non_temp<node>(form),
 		code::internal_error, "Normalization failed");
+	std::optional<solution<node>> extreme;
+	// `cand` replaces `extreme` only when strictly better, so the kept
+	// solution has no strictly better one among those seen: any that was
+	// better than it would also have been better than every solution it
+	// replaced.
+	auto keep_extreme = [&](solution<node>&& cand) {
+		if (!extreme) { extreme = std::move(cand); return; }
+		const auto& [lo, hi] = options.mode == solver_mode::minimum
+			? std::pair{ &cand, &extreme.value() }
+			: std::pair{ &extreme.value(), &cand };
+		if (solution_below<node>(*lo, *hi, options.mode)
+			&& !solution_below<node>(*hi, *lo, options.mode))
+			extreme = std::move(cand);
+	};
 	auto _s = r.open("expression_paths");
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
@@ -2288,9 +2340,13 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				a = bf_reduced_dnf<node>(a);
 				clause_solution.emplace(v, a);
 			}
-			return r.with_assert_check_value(std::move(clause_solution));
+			if (options.mode == solver_mode::general)
+				return r.with_assert_check_value(
+					std::move(clause_solution));
+			keep_extreme(std::move(clause_solution));
 		}
 	}
+	if (extreme) return r.with_assert_check_value(std::move(extreme.value()));
 	return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 }
 
