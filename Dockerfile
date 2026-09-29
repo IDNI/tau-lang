@@ -24,6 +24,11 @@
 #   - wasm-browser: builds the browser REPL page and (TESTS=yes) runs the
 #     compiled suite in headless Chrome, the REPL suite inside the page, and
 #     the REPL page start check
+# - build, w64-build and wasm-node each split in three:
+#   - <stage>-resolve: configures and builds, which resolves the store packages
+#   - <stage>-publish: publishes those packages when TAU_STORE_PUBLISH=ON, and
+#     runs no test
+#   - <stage>: runs the tests on top of <stage>-resolve
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
@@ -145,9 +150,10 @@ ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 
 
 # ------------------------------------------------------------
-# Build tau executable and run tests (if TESTS = "yes")
+# Build tau executable and its tests (if TESTS = "yes"). The store packages
+# resolve here, so the publish stage needs no test run.
 
-FROM deps AS build
+FROM deps AS build-resolve
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -210,9 +216,9 @@ ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
-	echo " (BUILD) -- Running tests: $TESTS" && \
+	echo " (BUILD) -- Building tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
@@ -222,15 +228,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	fi && \
 	ccache --show-stats
-
-# The trusted workflow turns this on: the same image that resolves the store
-# packages publishes the ones the remote lacks, so the Linux ids match what
-# every Docker consumer requests. Off for every other build.
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev store-publish; \
-	fi
 
 # Set TEST_GCC_BUILD=no to skip the gcc compilation check
 ARG TEST_GCC_BUILD=yes
@@ -243,6 +240,29 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	rm -rf build/devel; \
+fi
+
+# The trusted workflow turns this on: the same image that resolves the store
+# packages publishes the ones the remote lacks, so the Linux ids match what
+# every Docker consumer requests. Off for every other build. A side stage, so a
+# failing test cannot hold a package back.
+FROM build-resolve AS build-publish
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+# Run the tests (if TESTS = "yes") on the build above.
+FROM build-resolve AS build
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+ARG TESTS=yes
+
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Running tests: ${BUILD_PRESET}-all" && \
+	ctest --preset ${BUILD_PRESET}-all -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 # Set the entrypoint to the tau executable
@@ -351,9 +371,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends wine
 
 
 # ------------------------------------------------------------
-# Windows build image
+# Windows build image: builds tau and its tests (if TESTS = "yes"), so the
+# store packages resolve before any test runs
 
-FROM w64-deps AS w64-build
+FROM w64-deps AS w64-build-resolve
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -400,25 +421,37 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 # WINEDEBUG drops wine's own noise, and not the output of a test.
 ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 
-# Build tau executable, and run its suite under wine if TESTS = "yes"
+# Build tau executable, and its suite for wine if TESTS = "yes"
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
-	echo " (BUILD) -- Running tests: $TESTS" && \
+	echo " (BUILD) -- Building tests: $TESTS" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_EXECUTABLE=ON && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine && \
-		ctest --test-dir build/${BUILD_PRESET}-w64 -j ${BUILD_JOBS} \
-			--output-on-failure; \
+			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine; \
 	fi
 
 # The trusted workflow turns this on to publish the w64 packages it just built.
+FROM w64-build-resolve AS w64-build-publish
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
+
+# Run the w64 suite under wine (if TESTS = "yes").
+FROM w64-build-resolve AS w64-build
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+ARG TESTS=yes
+
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Running w64 tests under wine" && \
+	ctest --test-dir build/${BUILD_PRESET}-w64 -j ${BUILD_JOBS} \
+		--output-on-failure; \
+fi
 
 
 # ------------------------------------------------------------
@@ -468,8 +501,10 @@ RUN node_bin="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 # WebAssembly Node.js gate: build tau.js/tau.wasm/tau.esm.mjs and (with
 # TESTS=yes) run the wasm suite under emsdk's node, the no-thread
 # configuration, and the wasm-vs-native parity check. No Chrome or puppeteer.
+# The -resolve stage builds everything, so the store packages resolve before
+# any test runs.
 
-FROM wasm-deps AS wasm-node
+FROM wasm-deps AS wasm-node-resolve
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -525,12 +560,29 @@ RUN --mount=type=secret,id=gh_token \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
+# Tau's no-thread coverage: the droppable, no-SharedArrayBuffer configuration
+# is kept measured so it does not rot, because -pthread is the default for
+# every other wasm target. Its packages differ from the pthread ones.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Building wasm no-thread tests" && \
+	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+fi
+
 # The trusted workflow turns this on to publish the wasm packages it just built.
+FROM wasm-node-resolve AS wasm-node-publish
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
+
+# Run the node suites and the parity check (if TESTS = "yes").
+FROM wasm-node-resolve AS wasm-node
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release-wasm
+ARG TESTS=yes
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Smoke-testing tau.node.js" && \
@@ -542,13 +594,9 @@ RUN if [ "$TESTS" = "yes" ]; then \
 	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
-# Tau's no-thread coverage: the droppable, no-SharedArrayBuffer configuration
-# is kept measured so it does not rot now that -pthread is the default for
-# every other wasm target.
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TESTS" = "yes" ]; then \
+RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running wasm no-thread tests" && \
-	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	ctest --preset "${BUILD_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 # parity.js compares the wasm module against the native tau built above; the
