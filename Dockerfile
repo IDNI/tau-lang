@@ -29,6 +29,9 @@
 #   - <stage>-publish: publishes those packages when TAU_STORE_PUBLISH=ON, and
 #     runs no test
 #   - <stage>: compiles and runs the tests on top of <stage>-resolve
+# - build is split once more: build-compile compiles on top of build-resolve and
+#   build runs the tests on top of build-compile, so the testnet stage can reuse
+#   the compiled tree without running the tau suite
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
@@ -224,8 +227,9 @@ RUN --mount=type=secret,id=gh_token \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
 
-# Compile the tree configured above, then run the tests (if TESTS = "yes").
-FROM build-resolve AS build
+# Compile the tree configured above. This is a stage of its own so testnet can
+# reuse the compiled tree without running the tau suite.
+FROM build-resolve AS build-compile
 
 ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release
@@ -262,6 +266,13 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	rm -rf build/devel; \
 fi
 
+# Run the tests (if TESTS = "yes") on the compiled tree above.
+FROM build-compile AS build
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+ARG TESTS=yes
+
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running tests: ${BUILD_PRESET}-all" && \
 	ctest --preset ${BUILD_PRESET}-all -j ${BUILD_JOBS} --output-on-failure; \
@@ -293,8 +304,8 @@ RUN echo "(BUILD) -- Building packages" && \
 # Run the tau-testnet suite against the release build
 
 # tau-testnet consumes the built tree and the binding, not the tau suite, so it
-# inherits the build stage and does not re-run ctest on the way in.
-FROM build AS testnet
+# inherits the compile stage and does not run ctest on the way in.
+FROM build-compile AS testnet
 
 ARG BUILD_JOBS=5
 
