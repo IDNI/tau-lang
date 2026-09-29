@@ -623,12 +623,18 @@ jobs:
   # built here and cached. The MSVC shell comes from ilammy/msvc-dev-cmd, so
   # the producers' vcvars64.bat search is only a local fallback.
   windows:
-    name: Windows release (MSVC)
+    name: Windows release (${{ matrix.preset }})
     needs: guard
     runs-on: windows-latest
     permissions:
       contents: read
       packages: write
+    # The two presets write different store ids, so each entry keeps its own
+    # store cache.
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [release-msvc-all, release-msvc-all-clang-cl]
     defaults:
       run:
         shell: bash
@@ -657,9 +663,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.tau/store
-          key: tau-store-windows-latest-${{ github.sha }}
+          key: tau-store-windows-latest-${{ matrix.preset }}-${{ github.sha }}
           restore-keys: |
-            tau-store-windows-latest-
+            tau-store-windows-latest-${{ matrix.preset }}-
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
@@ -674,8 +680,8 @@ jobs:
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
-      - name: Build and test tau (Release, MSVC)
-        run: ./dev preset release-msvc-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+      - name: Build and test tau (${{ matrix.preset }})
+        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       # Configure resolved the store before any test ran, so a red test still
       # publishes what this job built.
