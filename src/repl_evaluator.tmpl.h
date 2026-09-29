@@ -2278,6 +2278,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
 		if (command_type == tau::run_cmd) finish_running();
 	}
+	// likewise a solver query that passed its time budget
+	if (auto m = take_time_budget_exhausted(); !m.empty()) {
+		error = true, result = 0;
+		tau::clear_caches();
+		TAU_LOG_ERROR << m;
+		if (command_type == tau::run_cmd) finish_running();
+	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		out << "result tree: ") << "\n";

@@ -22,6 +22,7 @@
 #include "normalizer.h"
 #include "ltl_aba_result.h"
 #include "bounded_cache.h"
+#include "bounded_call.h"
 #include "ocltl_phi_delta.h"
 #include "boolean_algebras/nso_ba.h"
 #include "logging.h"
