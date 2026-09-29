@@ -294,7 +294,7 @@ jobs:
       # anything runs an arm64 binary. The action registers it with the
       # fix-binary flag, which does not need systemd-binfmt on the runner.
       - name: Register qemu for the arm64 binaries
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 

@@ -139,7 +139,7 @@ jobs:
         run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
 
       - name: Upload Linux packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-linux-x86_64
           path: ${{ env.PKG_DIR }}
@@ -176,7 +176,7 @@ jobs:
         run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
 
       - name: Upload Linux arm64 packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-linux-arm64
           path: ${{ env.PKG_DIR }}
@@ -247,7 +247,7 @@ jobs:
           "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the arm64 wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-linux-arm64-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
@@ -313,7 +313,7 @@ jobs:
           "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the x86_64 wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-linux-x86_64-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
@@ -373,7 +373,7 @@ jobs:
         run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
 
       - name: Upload the SDK package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-linux-sdk-${{ matrix.preset }}
           path: ${{ env.PKG_DIR }}
@@ -428,7 +428,7 @@ jobs:
         run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
 
       - name: Upload macOS packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-packages-macos
           path: ${{ env.PKG_DIR }}
@@ -495,7 +495,7 @@ jobs:
           "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the macOS wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-darwin-arm64-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
@@ -575,7 +575,7 @@ jobs:
           "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the MSVC wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-windows-x86_64-msvc-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
@@ -594,7 +594,7 @@ jobs:
 
       # merge-multiple flattens both artifacts into one directory
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: packages-*
           merge-multiple: true
@@ -603,7 +603,7 @@ jobs:
       # The macOS job uploads under its own name, so the packages-* pattern
       # does not reach it.
       - name: Download macOS packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-packages-macos
           path: packages
@@ -617,7 +617,7 @@ jobs:
         run: ls -la packages/
 
       - name: Create Nightly Build Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "nightly-${{ env.date_iso }}"
           name: "Tau Language Framework ${{ env.version }} Nightly Build ${{ env.date_iso }}"
