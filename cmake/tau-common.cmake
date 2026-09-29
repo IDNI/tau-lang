@@ -152,9 +152,13 @@ function(target_setup target)
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
+			# tau's own targets carry these: no dependency exports its build
+			# flags, so nothing else supplies them and a value-losing or sign
+			# conversion would go unnoticed.
+			-Wconversion -Wsign-conversion
 			# warnings as errors in dev configs only, so a newly
 			# introduced warning is caught there, not in Release
-			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
+			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Devel>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
 			# GCC 15 reports -Wstrict-overflow at -O0 with --coverage in
 			# code no other configuration flags; keep it visible, not fatal
 			$<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Coverage>>:-Wno-error=strict-overflow>
