@@ -759,8 +759,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    which there are finitely many; a stream of a dense order takes these
    codes even when only equalities read it, since the order has no
    element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
-   values and the game runs before (4) and (5); otherwise, or when the BDD grows
-   past its node limit, a region is a formula whose
+   values and the game runs before (4) and (5); otherwise, or when the nodes
+   the regions still need outgrow its node limit (nodes no region needs any
+   more are freed as the table fills), a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
    UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
    are played like any other step, their inputs by the environment and

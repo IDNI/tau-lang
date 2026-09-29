@@ -4941,6 +4941,57 @@ TEST_SUITE("Data game strategy") {
 	}
 }
 
+// The regions of these games pass through two to five times more nodes than
+// the table holds; freeing the nodes no region needs any more as it fills
+// decides each game as the default table does. The stream names are this
+// suite's own, since the library keeps the types of the streams it has seen.
+TEST_SUITE("Data game node collection") {
+
+	struct node_table {
+		const size_t saved = data_game_max_nodes;
+		explicit node_table(size_t n) { data_game_max_nodes = n; }
+		~node_table() { data_game_max_nodes = saved; }
+	};
+
+	static std::optional<bool> realizable_in(size_t nodes, const char* s) {
+		tref fm = spec(s);
+		REQUIRE(fm != nullptr);
+		node_table table(nodes);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		if (!r.has_value()) return std::nullopt;
+		return r.value();
+	}
+
+	TEST_CASE("an unrealizable game over 5-bit values in 2^14 nodes") {
+		CHECK(realizable_in(size_t{1} << 14,
+			"(always (((o82[t-1]:bv[5] - o81[t-1]:bv[5]) = o81[t-1]:bv[5]) "
+			"&& (o82[t]:bv[5] != i81[t-1]:bv[5]))) "
+			"&& (sometimes ((i81[t-1]:bv[5] * o82[t]:bv[5]) "
+			"!= (i81[t]:bv[5] + i81[t-1]:bv[5]))) "
+			"&& (sometimes (((o82[t-1]:bv[5] + {17}:bv[5]) "
+			"<= o82[t-1]:bv[5]) || (i81[t-1]:bv[5] <= {18}:bv[5]))).")
+			== std::optional<bool>(false));
+	}
+
+	TEST_CASE("an unrealizable game over 8-bit squares in 2^15 nodes") {
+		CHECK(realizable_in(size_t{1} << 15,
+			"(G (o83[t-2]:bv[8] < (o83[t-2]:bv[8] - o83[t]:bv[8]))) "
+			"&& (F ((o83[t]:bv[8] <= (o83[t-1]:bv[8] * o83[t-1]:bv[8])) "
+			"&& (({3}:bv[8] * o83[t-2]:bv[8]) != o83[t]:bv[8]))).")
+			== std::optional<bool>(false));
+	}
+
+	TEST_CASE("a realizable game over 8-bit products in 2^16 nodes") {
+		CHECK(realizable_in(size_t{1} << 16,
+			"(G (({1}:bv[8] <= (o84[t-2]:bv[8] * o84[t-1]:bv[8])) "
+			"&& (({3}:bv[8] + o85[t-1]:bv[8]) "
+			"!= ({0}:bv[8] * i84[t-2]:bv[8])))) "
+			"&& (F (((o84[t-2]:bv[8] - i84[t-2]:bv[8]) = i84[t]:bv[8]) "
+			"|| ((o85[t-1]:bv[8] - o85[t]:bv[8]) <= i84[t]:bv[8]))).")
+			== std::optional<bool>(true));
+	}
+}
+
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
 
 TEST_SUITE("ltl_explain diagnostics") {
