@@ -192,11 +192,7 @@ bool alg_d_product_wins(const alg_d::synth_game& g, int K,
 
 TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
-	// Defect: to_dnf reads cap 0 literally, so every compound guard fails
-	// to expand.
-	TEST_CASE("guard DNF with cap 0 is unlimited"
-		* doctest::should_fail())
-	{
+	TEST_CASE("guard DNF with cap 0 is unlimited") {
 		const long saved = ltl_guard_max_cubes_param;
 		api<node_t>::set_ltl_guard_max_cubes(0);
 		auto conj = alg_d::hoa_guard::to_dnf("0 & 1");
@@ -247,19 +243,20 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
 TEST_SUITE("LTL(ABA) open points: pairwise consistency") {
 
-	// Defect: any two structurally different equalities on one stream are
-	// declared infeasible.
-	TEST_CASE("equal-meaning ground equalities are not declared infeasible"
-		* doctest::should_fail())
-	{
+	TEST_CASE("equal-meaning ground equalities are not declared infeasible") {
 		tref a = op_wff("o1[t] = 0");
 		tref b = op_wff("o1[t]' = 1");
 		tref c = op_wff("0 = o1[t]");
+		tref d = op_wff("1 = o1[t]");
 		REQUIRE(a != nullptr);
 		REQUIRE(b != nullptr);
 		REQUIRE(c != nullptr);
+		REQUIRE(d != nullptr);
 		CHECK_FALSE(ground_eq_pair_syntactically_infeasible<node_t>(a, b));
 		CHECK_FALSE(ground_eq_pair_syntactically_infeasible<node_t>(a, c));
+		// two distinct constants are still caught, in either orientation
+		CHECK(ground_eq_pair_syntactically_infeasible<node_t>(a, d));
+		CHECK(ground_eq_pair_syntactically_infeasible<node_t>(d, c));
 	}
 }
 
@@ -452,10 +449,7 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 		CHECK(n2 == 0);
 	}
 
-	// Defect: an undecided solver result reads as infeasible.
-	TEST_CASE("an undecided atom is feasible, not infeasible"
-		* doctest::should_fail())
-	{
+	TEST_CASE("an undecided atom is feasible, not infeasible") {
 		tref fm = op_spec("F ((fex x (x * o19[t]:bv[4])) = 1).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -463,8 +457,17 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 		tref atom = atoms[0].first;
 		auto sat = is_non_temp_nso_satisfiable<node_t>(atom);
 		REQUIRE_FALSE(sat.has_value());
+		ltl_verdict_incomplete = false;
 		CHECK(aba_existential_feasible<node_t>(atom));
+		CHECK(ltl_verdict_incomplete);
+		ltl_verdict_incomplete = false;
 		CHECK(aba_synthesis_feasible<node_t>(atom));
+		CHECK(ltl_verdict_incomplete);
+		// an edge is accepted only on a proven answer
+		ltl_verdict_incomplete = false;
+		CHECK_FALSE(aba_existential_proven_feasible<node_t>(atom));
+		CHECK(ltl_verdict_incomplete);
+		ltl_verdict_incomplete = false;
 	}
 }
 
@@ -500,10 +503,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 		CHECK(forbids_all(skel));
 	}
 
-	// Defect: a residue that normalizes to neither T nor F becomes "1".
-	TEST_CASE("a stream-free residue in the skeleton is refused"
-		* doctest::should_fail())
-	{
+	TEST_CASE("a stream-free residue in the skeleton is refused") {
 		tref fm = op_spec("F (o24[t]:qlt = {0}:qlt) && "
 			"G (o24[t]:qlt = {0}:qlt || {c}:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);

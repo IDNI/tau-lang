@@ -713,7 +713,16 @@ static result<std::string> skeleton_wff_with_testers(
 			return r.with_error(code::solver_error,
 				"skeleton_wff_with_testers: normalization failed");
 		}
-		return r.with_value(tree<node>::get(normalized.value()).equals_F() ? "0" : "1");
+		const auto& nf = tree<node>::get(normalized.value());
+		if (nf.equals_T()) return r.with_value("1");
+		if (nf.equals_F()) return r.with_value("0");
+		// a residue whose value normalization cannot find: a constant
+		// would answer a different question
+		return r.with_error(code::unsupported_operation,
+			std::string("the LTL skeleton has no proposition for a ")
+			+ node::name(nt) + " without streams that normalizes to "
+			"neither T nor F (" + truncate_for_message(nf.to_str())
+			+ "); realizability could not be decided");
 	}
 	}
 }

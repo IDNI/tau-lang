@@ -285,9 +285,8 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	// arith_ops and solve -- every pack without bv -- still needs this
 	// second anti-prenex/resolve, because it is what closes a scope like
 	// `ex b (b != 1)`. A quantifier surviving there reaches check_decided
-	// as undecided, and aba_synthesis_feasible reads that conservative
-	// false as an infeasible oracle atom: UNREALIZABLE for a realizable
-	// spec. ctx2 needs no gate either -- with no arithmetic-owning BA
+	// as undecided, and the LTL(ABA) feasibility checks then leave a
+	// realizable spec undecided instead of deciding it. ctx2 needs no gate either -- with no arithmetic-owning BA
 	// has_foreign_arith_constant holds of every constant, which is the
 	// Boole-decomposition branch the paragraph above asks for.
 	analysis_context<node> ctx2;

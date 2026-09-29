@@ -22,6 +22,7 @@
 #include "ltl_aba_limits.h"
 #include <cerrno>
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 
 #include <algorithm>
@@ -242,14 +243,15 @@ inline bool normalise_cube(cube& c) {
 }
 
 /// @brief Recursive-descent parser turning a guard label into DNF cubes,
-/// failing when the expansion exceeds `max_cubes`.
+/// failing when the expansion exceeds `max_cubes` (0 = unlimited).
 struct parser {
 	const std::string& s;
 	size_t i = 0;
 	size_t max_cubes;
 	bool failed = false;
 
-	explicit parser(const std::string& str, size_t cap) : s(str), max_cubes(cap) {}
+	explicit parser(const std::string& str, size_t cap)
+		: s(str), max_cubes(cap ? cap : SIZE_MAX) {}
 
 	static std::vector<cube> dnf_true()  { return { cube{} }; }
 	static std::vector<cube> dnf_false() { return {}; }
@@ -347,7 +349,7 @@ struct parser {
  * `max_cubes` (see the section comment above: callers must REFUSE the edge
  * in that case).  An empty label is the unconditional guard.
  * @param label Guard label over AP indices.
- * @param max_cubes Cap on the number of cubes produced.
+ * @param max_cubes Cap on the number of cubes produced (0 = unlimited).
  * @return The cubes, or `std::nullopt`.
  */
 inline std::optional<std::vector<cube>> to_dnf(
