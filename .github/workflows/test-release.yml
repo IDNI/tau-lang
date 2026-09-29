@@ -212,7 +212,12 @@ jobs:
           EOF
           sudo apt-get update
 
+      # The venv step runs the arm64 interpreter outside ctest, so it needs
+      # the loader prefix that cmake/tau-cross-test-environment.cmake gives
+      # only to the tests.
       - name: Install the cross toolchain and the arm64 venv
+        env:
+          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
         run: |
           ./dev setup-ubuntu-ci-deps.sh
           # The arm64 toolchain seeds FindPython from the interpreter in
