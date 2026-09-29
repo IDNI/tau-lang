@@ -345,6 +345,10 @@ FROM deps AS w64-deps
 # from the Linux one; configure builds a w64 package the remote does not have.
 ARG BUILD_JOBS=5
 
+# wine runs the w64 suite. wine, not wine64: Ubuntu's wine package runs 64-bit
+# PE executables on its own, with no i386 multiarch for mingw-w64-x86_64 binaries.
+RUN apt-get update && apt-get install -y --no-install-recommends wine
+
 
 # ------------------------------------------------------------
 # Windows build image
@@ -397,15 +401,12 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 
 # Build tau executable, and run its suite under wine if TESTS = "yes"
-# wine, not wine64: Ubuntu's wine package runs 64-bit PE executables on its
-# own, with no i386 multiarch needed for these mingw-w64-x86_64 binaries
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Running tests: $TESTS" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_EXECUTABLE=ON && \
 	if [ "$TESTS" = "yes" ]; then \
-		apt-get update && apt-get install -y --no-install-recommends wine && \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine && \
 		ctest --test-dir build/${BUILD_PRESET}-w64 -j ${BUILD_JOBS} \
