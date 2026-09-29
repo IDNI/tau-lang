@@ -550,10 +550,8 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		CHECK(text.find("Tau specification is unsat") == std::string::npos);
 	}
 
-	// Defect: after the data game refutes the spec, refine_or_observe still
-	// runs ltlsynt.
 	TEST_CASE("execution stops once the data game refutes the spec"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// o43 is o41 two steps back, which the abstraction's windows miss
 		tref fm = op_spec("G (o42[t]:bv[1] = o41[t-1]:bv[1]) && "
@@ -835,6 +833,102 @@ TEST_SUITE("LTL(ABA) open points: initial memory") {
 			CAPTURE(prop);
 			CHECK(prop.rfind("d_", 0) != 0);
 		}
+	}
+}
+
+
+
+TEST_SUITE("LTL(ABA) open points: mixed algebras") {
+
+	TEST_CASE("a quantifier prefix over two algebras is decided") {
+		tref sat = op_spec("ex x:sbf ex y:tau "
+			"((x = 0 || y = 0) && (x != 0 || y != 0)).");
+		tref unsat = op_spec("ex x:sbf ex y:qlt (x != 0 && "
+			"y > {0}:qlt && (x = 0 || y < {0}:qlt)).");
+		REQUIRE(sat != nullptr);
+		REQUIRE(unsat != nullptr);
+		auto r1 = normalizer<node_t>(sat);
+		auto r2 = normalizer<node_t>(unsat);
+		REQUIRE(r1.has_value());
+		REQUIRE(r2.has_value());
+		CHECK(tau::get(r1.value()).equals_T());
+		CHECK(tau::get(r2.value()).equals_F());
+	}
+
+	// Defect: eliminate_block_over_clause sends the decline to LOG_ERROR
+	// and leaves its report empty.
+	TEST_CASE("a mixed-type block the leaf elimination keeps is reported"
+		* doctest::should_fail())
+	{
+		// The clause of the AN-7 guard test in test_antiprenexing.cpp:
+		// the tau operand comes first so the type scan sees it.
+		tref x_bf = build_bf_variable<node_t>("x", sbf_type_id<node_t>());
+		tref x = tau::trim(x_bf);
+		tref clause = tau::build_wff_and(
+			tau::build_bf_eq_0(x_bf),
+			tau::build_bf_eq_0(tau::build_bf_and(
+				build_bf_variable<node_t>("y",
+					tau_type_id<node_t>()),
+				x_bf)));
+		term_handle<node_t>::order order;
+		auto res = eliminate_block_over_clause<node_t>(clause,
+			trefs{ x }, block_eliminability<node_t>{}, order);
+		REQUIRE(res.has_value());
+		CHECK(tau::get(res.value()).find_top(is<node_t, tau::wff_ex>)
+			!= nullptr);
+		CHECK_FALSE(report_text(res.report()).empty());
+	}
+
+	// Defect: one stream make_code_window cannot code makes the whole
+	// window nullopt, so the game on codes declines the codable streams too.
+	TEST_CASE("an uncodable stream leaves the other streams their codes"
+		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+	{
+		// o2 is read against the sbf constant X, which no code stands for
+		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+			"G (F (o2[t]:sbf = {X}:sbf)).");
+		REQUIRE(fm != nullptr);
+		ltl_aba_solution<node_t> partial;
+		auto m = solve_ltl_aba<node_t>(fm, &partial);
+		REQUIRE(m.has_value());
+		const ltl_aba_solution<node_t> s = m.value() ? *m.value() : partial;
+		REQUIRE_FALSE(s.game_skeleton.empty());
+		auto on_formulas = solve_data_game<node_t>(s.game_skeleton, s.atoms,
+			s.input_props, s.output_props, true);
+		auto on_codes = solve_data_game<node_t>(s.game_skeleton, s.atoms,
+			s.input_props, s.output_props, false);
+		REQUIRE(on_formulas.has_value());
+		REQUIRE(on_codes.has_value());
+		CHECK(on_formulas.value() == data_game_verdict::realizable);
+		CHECK(on_codes.value() == data_game_verdict::realizable);
+	}
+
+#ifdef NDEBUG
+	constexpr bool variant_assert_live = false;
+#else
+	constexpr bool variant_assert_live = true;
+#endif
+
+	// Defect: variant_ba's operator& answers mismatched alternatives with a
+	// default-constructed variant, the first BA of the pack, in release.
+	// Typing gives both operands of a BA operation one type, so no
+	// user-level path is known to reach it; the case pins the mechanism.
+	TEST_CASE("mismatched constants do not combine into a third algebra"
+		* doctest::skip(variant_assert_live) * doctest::should_fail())
+	{
+		auto constant_of = [](const char* s) {
+			tref fm = op_spec(s);
+			REQUIRE(fm != nullptr);
+			auto cs = tau::get(fm).select_top([](tref n) {
+				return tau::get(n).is_ba_constant(); });
+			REQUIRE_FALSE(cs.empty());
+			return tau::get(cs[0]).get_ba_constant();
+		};
+		auto l = constant_of("o1[t]:sbf = {X}:sbf.");
+		auto r = constant_of("o2[t]:qlt = {1}:qlt.");
+		REQUIRE(l.index() != r.index());
+		auto both = l & r;
+		CHECK((both.index() == l.index() || both.index() == r.index()));
 	}
 }
 
