@@ -963,18 +963,19 @@ else()
 		PASS_REGULAR_EXPRESSION "the strategy|UNKNOWN")
 endif()
 # no inputs: the system picks every value, products of two 12-bit values of
-# different steps among them; the attempt needs about 11 s of its 20, so the
-# case gives it 60 to stay decided under a loaded test run
+# different steps among them; its slowest question needs 6 to 8 s alone and
+# over 10 s under a loaded test run, so the case gives the attempt 240 s, a
+# quarter of which (60 s) bounds each question
 tau_repl_unsupported(_tau_skip "realizable x:bv[12]")
 if(_tau_skip)
 	tau_repl_record_skip("test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps")
 else()
 	add_test(NAME "test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 60 -e \"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))\" -S trace")
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 240 -e \"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))\" -S trace")
 	set_tests_properties(
 		"test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps"
 		PROPERTIES PASS_REGULAR_EXPRESSION ": T" FAIL_REGULAR_EXPRESSION "Error"
-		TIMEOUT 150)
+		TIMEOUT 400)
 endif()
 
 # A consistency question with a product of two 12-bit values, and one with
