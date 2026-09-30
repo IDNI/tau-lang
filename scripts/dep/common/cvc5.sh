@@ -255,7 +255,7 @@ _dep_cvc5_producer() {
 		${_DEP_CVC5_COMPILER_ENV[@]+"${_DEP_CVC5_COMPILER_ENV[@]}"} \
 		CXXFLAGS="${DEP_CVC5_CXXFLAGS} ${prefix_map}" \
 		CFLAGS="${DEP_CVC5_CFLAGS} ${prefix_map}" \
-		./configure.sh --no-gpl --auto-download --no-poly \
+		./configure.sh --no-gpl --auto-download --no-poly -DUSE_DEFAULT_LINKER=ON \
 			${_DEP_CVC5_TARGET_ARGS[@]+"${_DEP_CVC5_TARGET_ARGS[@]}"} \
 			-DSKIP_SET_RPATH=ON \
 			-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH" \
@@ -383,10 +383,12 @@ _dep_cvc5_target_setup
 
 # tau asks cvc5 only for linear logics, and libpoly serves only nonlinear
 # arithmetic.
+# cvc5 otherwise links with mold or gold when the host has one.
 _DEP_CVC5_CONFIGURE_ARGS=(
 	--no-gpl
 	--auto-download
 	--no-poly
+	-DUSE_DEFAULT_LINKER=ON
 	-DSKIP_SET_RPATH=ON
 	-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH"
 	-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH"
