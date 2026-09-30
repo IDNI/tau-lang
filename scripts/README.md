@@ -248,6 +248,10 @@ The store has two tiers:
   local miss from the remote. When the remote also misses, or when
   `TAU_STORE_REMOTE` is not set, configure builds the dependency.
 
+With `TAU_STORE_PUBLISH=ON` and `TAU_STORE_REMOTE` set, configure pushes each
+entry it builds to the remote right after the build. A failed push stops the
+configure. An entry from a local hit or a remote pull is not pushed.
+
 `store-publish` sends the local entries to the remote. `TAU_STORE_KEEP` sets
 how many entries of each dependency stay in the local tier.
 
