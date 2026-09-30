@@ -869,7 +869,13 @@ the fast path in front of Algorithm B enumerates, default 100,
 **Other environment variables.** Three Boolean switches keep an environment
 fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
 value other than `0` enables, `0` disables; read once, then it overrides
-`--ba-component-factoring` / `set factoring`), `TAU_BV_CASE_SPLIT` (`0`
+`--ba-component-factoring` / `set factoring`; the decision by components
+is taken on a formula of `always` clauses that read their streams at the
+current step and at steps back, and declined where a unit refers to
+absolute time, through a `sometimes` clause, a stream read at a fixed time
+point or a constraint on the time point, and where an `always` clause holds
+a temporal operator of its own, so that the whole formula decides),
+`TAU_BV_CASE_SPLIT` (`0`
 disables, any other value enables; overrides `bv-case-split` in both
 directions) and `TAU_BV_QF_DECISION` (a value other than `0` enables the
 quantifier-free bitvector decision; `bv-quantifier-free-decision` enables it
@@ -3008,9 +3014,9 @@ preprocessing pass, e.g. bv's own predicate blasting (see below) — off
 disables all of them regardless of their own setting. It's on by default.
 
 * `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
-tau-algebra constant tests: a constant whose clauses share no variables is
-decided per component, each decision remembered across steps, instead of as a
-whole. It's on by default (the REPL starts with the value of the
+tau-algebra constant tests: a constant whose clauses share no variables and
+refer to no absolute time is decided per component, each decision remembered
+across steps, instead of as a whole. It's on by default (the REPL starts with the value of the
 `-K, --ba-component-factoring` command line option).
 
 * `Z|pwrsemantic`: Can be on/off. Enables the semantic (winning-region)
