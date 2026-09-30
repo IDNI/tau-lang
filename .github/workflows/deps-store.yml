@@ -18,6 +18,8 @@ concurrency:
 env:
   # One private OCI artifact per store entry, tagged <dep>-<id>.
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+  # Every job here publishes, so configure publishes each entry it builds.
+  TAU_STORE_PUBLISH: "ON"
 
 jobs:
   publish:
@@ -38,16 +40,16 @@ jobs:
 
       # The Linux packages must carry the compiler the Docker consumers use, so
       # they are built and published from the same image the tests build in.
-      # TESTS=no keeps it to a configure and a tau build. With
-      # TAU_STORE_PUBLISH=ON, configure publishes each entry it builds.
+      # TESTS=no keeps it to a configure and a tau build. The store_publish
+      # secret makes configure publish each entry it builds.
       - name: Resolve and publish the Linux store packages
         run: |
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             --build-arg TESTS=no \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=ON \
             --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,8 +62,8 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             --build-arg TESTS=no \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=ON \
             --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-wasm-deps
         env:
@@ -73,8 +75,8 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             --build-arg TESTS=no \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=ON \
             --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,8 +104,8 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             --build-arg TESTS=no \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=ON \
             --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

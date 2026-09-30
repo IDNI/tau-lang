@@ -7,7 +7,7 @@
 # - base: contains the base system with installed system dependencies
 # - Linux branch is:
 #   - deps: dependencies (cvc5)
-#   - linux-store: resolves every Linux store package once, for build and asan
+#   - linux-resolve: resolves every Linux store package once, for build and asan
 #   - build: builds tau executable and runs tests
 #   - packages: creates a release packages (deb and rpm)
 #   - testnet: runs the tau-testnet suite against the build
@@ -27,9 +27,9 @@
 #     compiled suite in headless Chrome, the REPL suite inside the page, and
 #     the REPL page start check
 # - build, w64-build and wasm-node each split in two (build-resolve starts
-#   from linux-store):
+#   from linux-resolve):
 #   - <stage>-resolve: configures only, which resolves the store packages. With
-#     TAU_STORE_PUBLISH=ON, configure publishes each entry right after it builds it
+#     the store_publish secret set to ON, configure publishes each entry it builds
 #   - <stage>: compiles and runs the tests on top of <stage>-resolve
 # - build is split once more: build-compile compiles on top of build-resolve and
 #   build runs the tests on top of build-compile, so the testnet stage can reuse
@@ -135,7 +135,7 @@ ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 # the others, and the gcc check needs its own gcc-built set. build-resolve and
 # asan start from here, so their configure finds only local hits.
 
-FROM deps AS linux-store
+FROM deps AS linux-resolve
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -179,10 +179,11 @@ ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 ARG TEST_GCC_BUILD=yes
 
 # The launchers match the later configure steps, so the store ids match.
-# ON makes configure publish each store entry right after it builds it, so a
-# later failure cannot lose it. The workflow turns it on when the guard allows.
-ARG TAU_STORE_PUBLISH=OFF
+# The store_publish secret makes configure publish each entry right after it
+# builds it. A secret, unlike a build argument, stays out of the layer cache
+# key, so a test job that does not publish still hits this layer.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving the Linux store: $(head -n 1 VERSION)" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --configure-only \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -200,7 +201,7 @@ RUN --mount=type=secret,id=gh_token \
 # Build tau executable and its tests (if TESTS = "yes"). The store packages
 # resolve here as local hits, before any test runs.
 
-FROM linux-store AS build-resolve
+FROM linux-resolve AS build-resolve
 
 # Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
@@ -224,8 +225,8 @@ ARG TAU_BAS=
 # Configure the pack this build compiles. The compile lives in the build stage,
 # which inherits this layer, so a compile failure never rebuilds a dependency.
 # The *-all preset enables the executable and the tests in one configure.
-ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -253,6 +254,7 @@ ARG TAU_BAS=
 # *-all enables the executable and the tests in one configure
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Building tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -273,6 +275,7 @@ ARG TEST_GCC_BUILD=yes
 # Check also make and gcc compilation since ninja and clang is used by default
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
 	scripts/with-gh-token ./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -337,6 +340,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	scripts/with-gh-token ./dev test-with-tau-testnet \
 		${BUILD_PRESET}-binding-python \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -347,15 +351,15 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 # Run the tests with the address sanitizer. The sanitizer flag is added after
 # configure resolves the store, so this stage reuses the Linux store packages.
 
-FROM linux-store AS asan
+FROM linux-resolve AS asan
 
 ARG BUILD_JOBS=5
 
-# The launchers match linux-store, so the store ids match. release-asan sets
+# The launchers match linux-resolve, so the store ids match. release-asan sets
 # TAU_LTO=OFF, which moves only the parser SDK id.
-ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building and running the address sanitizer tests" && \
 	scripts/with-gh-token ./dev preset release-asan-tests run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -509,10 +513,11 @@ ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 # Resolve the w64 store packages, and nothing else: the compile lives in the
 # w64-build stage, which inherits this layer, so a compile failure never
 # rebuilds a dependency.
-# ON makes configure publish each store entry right after it builds it, so a
-# later failure cannot lose it. The workflow turns it on when the guard allows.
-ARG TAU_STORE_PUBLISH=OFF
+# The store_publish secret makes configure publish each entry right after it
+# builds it. A secret, unlike a build argument, stays out of the layer cache
+# key, so a test job that does not publish still hits this layer.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving w64 ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -541,6 +546,7 @@ ARG TESTS=yes
 # Build tau executable, and its suite for wine if TESTS = "yes"
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Building tests: $TESTS" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -650,10 +656,11 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
 # wasm configure below. Its own store packages resolve in this layer.
-# ON makes configure publish each store entry right after it builds it, so a
-# later failure cannot lose it. The workflow turns it on when the guard allows.
-ARG TAU_STORE_PUBLISH=OFF
+# The store_publish secret makes configure publish each entry right after it
+# builds it. A secret, unlike a build argument, stays out of the layer cache
+# key, so a test job that does not publish still hits this layer.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building native tau (sbf,tau pack) for parity" && \
 	scripts/with-gh-token ./dev preset release-tau -DTAU_BAS=sbf,tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
@@ -668,6 +675,7 @@ RUN --mount=type=secret,id=gh_token \
 # kept measured so it does not rot, because -pthread is the default for every
 # other wasm target; its packages differ from the pthread ones.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving the wasm dependencies" && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests --configure-only \
@@ -693,6 +701,7 @@ ARG TESTS=yes
 # The -all-tests preset builds the library, the suite and the CLI from one
 # configure, so the fetched dependencies compile once.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
 	echo " (BUILD) -- Running node tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -703,6 +712,7 @@ RUN --mount=type=secret,id=gh_token \
 	fi
 
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
 	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
@@ -818,6 +828,7 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 # bindings/js/tests/run-suite-in-chrome.js. This stage does not build the native
 # tau the js_parity gate needs, so it turns that gate off.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_BROWSER_TESTS=ON -DTAU_PARITY_REQUIRE_NATIVE=OFF; \
@@ -832,6 +843,7 @@ fi
 # replayed inside it in headless Chrome. The suite reads its case list from
 # the node build configured above (build/release-wasm).
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running the REPL suite inside the browser REPL" && \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-repl-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
