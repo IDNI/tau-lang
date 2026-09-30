@@ -147,14 +147,34 @@ struct bdd_reference {
 	ref_type shift: SHIFT_WIDTH = 0;
 	ref_type id: ID_WIDTH = 0;
 
+	// The masks make each bitfield store visibly fit its width. in/out are
+	// 0/1 inverter flags, table_full() keeps an id below 2^ID_WIDTH, and the
+	// asserts catch a value that does not fit.
+	static constexpr ref_type flag_mask = 1;
+	static constexpr ref_type shift_mask = (ref_type{1} << SHIFT_WIDTH) - 1;
+	static constexpr ref_type id_mask = (ref_type{1} << ID_WIDTH) - 1;
+
 	bdd_reference() = default;
-	// in/out are 0/1 inverter flags; the bitfields hold ref_type.
 	bdd_reference(auto in, auto out, auto id)
-		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
-		  id(static_cast<ref_type>(id)) {}
+		: in(static_cast<ref_type>(in) & flag_mask),
+		  out(static_cast<ref_type>(out) & flag_mask),
+		  id(static_cast<ref_type>(id) & id_mask)
+	{
+		DBG(assert(static_cast<ref_type>(in) == this->in);)
+		DBG(assert(static_cast<ref_type>(out) == this->out);)
+		DBG(assert(static_cast<ref_type>(id) == this->id);)
+	}
 	bdd_reference(auto in, auto out, auto shift, auto id)
-		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
-		  shift(shift), id(static_cast<ref_type>(id)) {}
+		: in(static_cast<ref_type>(in) & flag_mask),
+		  out(static_cast<ref_type>(out) & flag_mask),
+		  shift(static_cast<ref_type>(shift) & shift_mask),
+		  id(static_cast<ref_type>(id) & id_mask)
+	{
+		DBG(assert(static_cast<ref_type>(in) == this->in);)
+		DBG(assert(static_cast<ref_type>(out) == this->out);)
+		DBG(assert(static_cast<ref_type>(shift) == this->shift);)
+		DBG(assert(static_cast<ref_type>(id) == this->id);)
+	}
 
 	// id indexes the universe vector V; ID_WIDTH never exceeds size_t's
 	// range, checked once here rather than at each V[n.id] use.
@@ -247,11 +267,22 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 	ref_type out: 1 = 0;
 	ref_type id: ID_WIDTH = 0;
 
+	// The masks make each bitfield store visibly fit its width. in/out are
+	// 0/1 inverter flags, table_full() keeps an id below 2^ID_WIDTH, and the
+	// asserts catch a value that does not fit.
+	static constexpr ref_type flag_mask = 1;
+	static constexpr ref_type id_mask = (ref_type{1} << ID_WIDTH) - 1;
+
 	bdd_reference() = default;
-	// in/out are 0/1 inverter flags; the bitfields hold ref_type.
 	bdd_reference(auto in, auto out, auto id)
-		: in(static_cast<ref_type>(in)), out(static_cast<ref_type>(out)),
-		  id(static_cast<ref_type>(id)) {}
+		: in(static_cast<ref_type>(in) & flag_mask),
+		  out(static_cast<ref_type>(out) & flag_mask),
+		  id(static_cast<ref_type>(id) & id_mask)
+	{
+		DBG(assert(static_cast<ref_type>(in) == this->in);)
+		DBG(assert(static_cast<ref_type>(out) == this->out);)
+		DBG(assert(static_cast<ref_type>(id) == this->id);)
+	}
 
 	bool operator==(const bdd_reference x) const {
 		return in == x.in && out == x.out && id == x.id;
