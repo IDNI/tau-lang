@@ -3144,6 +3144,22 @@ result<typename interpreter<node>::update_plan>
 			"specification; no update was performed");
 		return r;
 	}
+	// The game builds values of every stream's type, and the update may
+	// name a stream without one: it takes the type of the running
+	// stream of that name, or the default for a new one.
+	{
+		subtree_map<node, size_t> running_types;
+		for (tref v : tau::get(dg->spec->get()).select_top(
+			is_child<node, tau::io_var>))
+				running_types.emplace(v, tau::get(v).get_ba_type());
+		tref typed = infer_ba_types<node>(update, &running_types).first;
+		if (!typed) {
+			r.warning("the update gives a stream a type other than "
+				"the running one; no update was performed");
+			return r;
+		}
+		update = typed;
+	}
 	// As in plan_update: the fixed steps of the update count from
 	// time_point, and the values in memory replace the ones it reads.
 	trefs io_vars = tau::get(update).select_top(is_child<node, tau::io_var>);

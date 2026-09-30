@@ -668,6 +668,82 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		CHECK(values["o71[6]:bv[1]"] == "1");
 	}
 
+	// The update names a stream the running spec does not, with no type.
+	TEST_CASE("a data-game run accepts an update on a new untyped stream"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		io_context<node_t> ctx;
+		auto nso = get_nso_rr<node_t>(ctx,
+			tau::get("always F (o1[t] = 0).").value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto made = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE(made.has_value());
+		auto& i = made.value();
+		REQUIRE(i.plays_data_game());
+		REQUIRE(i.step().has_value());
+		auto psi = api<node_t>::get_formula("always F (o2[t] = 1)");
+		REQUIRE(psi.has_value());
+		auto accepted = i.update(psi.value());
+		REQUIRE(accepted.has_value());
+		CHECK(accepted.value());
+		CHECK(i.step().has_value());
+	}
+
+	// An untyped stream of the update named like a running one takes its
+	// type, so its values are the running stream's.
+	TEST_CASE("an untyped update of a running stream takes its type"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		io_context<node_t> ctx;
+		auto nso = get_nso_rr<node_t>(ctx,
+			tau::get("always F (o1[t]:bv[8] = 0).").value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto made = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE(made.has_value());
+		auto& i = made.value();
+		REQUIRE(i.plays_data_game());
+		REQUIRE(i.step().has_value());
+		auto psi = api<node_t>::get_formula("o1[3] = {7}");
+		REQUIRE(psi.has_value());
+		auto accepted = i.update(psi.value());
+		REQUIRE(accepted.has_value());
+		REQUIRE(accepted.value());
+		std::map<std::string, std::string> values;
+		for (int k = 0; k < 4; ++k) {
+			auto sr = i.step();
+			REQUIRE(sr.has_value());
+			if (const auto& out = sr.value().first)
+				for (const auto& [var, val] : *out)
+					values[tau::get(var).to_str()] =
+						tau::get(val).to_str();
+		}
+		// made at step 1, the update's fixed step 3 is step 4
+		CHECK(values["o1[4]:bv[8]"] == "{ 7 }:bv[8]");
+	}
+
+	TEST_CASE("an update giving a running stream another type is refused"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		io_context<node_t> ctx;
+		auto nso = get_nso_rr<node_t>(ctx,
+			tau::get("always F (o1[t]:bv[8] = 0).").value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto made = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE(made.has_value());
+		auto& i = made.value();
+		REQUIRE(i.plays_data_game());
+		REQUIRE(i.step().has_value());
+		auto psi = api<node_t>::get_formula("o1[3]:sbf = 1");
+		REQUIRE(psi.has_value());
+		auto accepted = i.update(psi.value());
+		REQUIRE(accepted.has_value());
+		CHECK_FALSE(accepted.value());
+		CHECK(i.step().has_value());
+	}
+
 	// Defect: build_program_desc drops an unparseable guard's edge
 	// silently.
 	TEST_CASE("codegen refuses a strategy edge whose guard does not parse"
