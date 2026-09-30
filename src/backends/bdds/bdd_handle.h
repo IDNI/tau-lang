@@ -357,7 +357,7 @@ struct bdd_handle {
 		return get(bdd<B,o>::split_clause(b));
 	}
 
-	size_t hash () {return std::hash<bdd_ref>{}(b);}
+	std::uint64_t hash () {return bdd_ref::hash(b);}
 #ifndef DEBUG
 private:
 #endif
@@ -552,7 +552,7 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool,o>::split_clause(b));
 	}
 
-	size_t hash () {return std::hash<bdd_ref>{}(b);}
+	std::uint64_t hash () {return bdd_ref::hash(b);}
 
 #ifndef DEBUG
 	private:

@@ -233,14 +233,14 @@ result<std::string> ba_types<node>::name(size_t ba_type_id) {
 }
 
 template <NodeType node>
-size_t ba_types<node>::name_hash(size_t ba_type_id) {
+std::uint64_t ba_types<node>::name_hash(size_t ba_type_id) {
 	// id 0 must short-circuit exactly like get_ba_type_name(0): name(0)
 	// touches type_trees(), whose static initializer is itself building
 	// the untyped type's nodes (and hashing them through here) the first
 	// time -- going through name() recurses into that initialization
 	// (__gnu_cxx::recursive_init_error).
 	if (ba_type_id == 0) {
-		static const size_t h0 = std::hash<std::string>{}(":untyped");
+		static const std::uint64_t h0 = portable_string_hash(":untyped");
 		return h0;
 	}
 	DBG(assert(ba_type_id < type_trees().size());)
@@ -248,17 +248,17 @@ size_t ba_types<node>::name_hash(size_t ba_type_id) {
 	// (see id()), so a computed hash never changes. 0 marks "not yet
 	// computed" -- no valid name hashes to 0 in practice, and a spurious
 	// recompute would be harmless (same value again).
-	static std::vector<size_t> cache;
+	static std::vector<std::uint64_t> cache;
 	if (ba_type_id < cache.size() && cache[ba_type_id])
 		return cache[ba_type_id];
 	if (ba_type_id >= cache.size()) cache.resize(ba_type_id + 1, 0);
 	auto nm = name(ba_type_id);
 	// TODO (HIGH) dropped error: name's report -- node::hashit's noexcept contract cannot carry it.
 	if (!nm.has_value()) {
-		static const size_t h_invalid = std::hash<std::string>{}(":invalid");
+		static const std::uint64_t h_invalid = portable_string_hash(":invalid");
 		return h_invalid;
 	}
-	return cache[ba_type_id] = std::hash<std::string>{}(nm.value());
+	return cache[ba_type_id] = portable_string_hash(nm.value());
 }
 
 template <NodeType node>

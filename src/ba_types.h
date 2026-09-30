@@ -181,7 +181,7 @@ struct ba_types {
 	 * cached integer instead. Derived from the name (not the
 	 * registration-order id), so it stays deterministic across runs.
 	 */
-	static size_t name_hash(size_t ba_type_id);
+	static std::uint64_t name_hash(size_t ba_type_id);
 
 	/** @brief Print the type name for @p ba_type to @p os. */
 	static std::ostream& print(std::ostream& os, size_t ba_type);

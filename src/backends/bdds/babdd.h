@@ -58,8 +58,8 @@ inline int_t signed_lit(uint_t v, bool neg) {
 
 // Cantor pairing function: maps a pair of naturals to a single
 // natural injectively; used as the hash combiner for node hashing.
-inline size_t fpairing(size_t x, size_t y) {
-	const size_t z = x + y;
+inline std::uint64_t fpairing(std::uint64_t x, std::uint64_t y) {
+	const std::uint64_t z = x + y;
 	return y+((z * (z + 1))>>1);
 }
 
@@ -246,11 +246,11 @@ struct bdd_reference {
 		return bdd_reference(x.in, x.out, s - x.shift + 1, x.id);
 	}
 
-	static size_t hash(const bdd_reference x) {
+	static std::uint64_t hash(const bdd_reference x) {
 		std::uint64_t seed = 0;
 		hash_combine(seed, x.id + x.in);
 		hash_combine(seed, x.shift + x.out);
-		return static_cast<size_t>(seed);
+		return seed;
 	}
 };
 
@@ -302,8 +302,8 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 		return bdd_reference(x.in, x.out == 1 ? 0 : 1, x.id);
 	}
 
-	static size_t hash(const bdd_reference x) {
-		return (x.id + x.in) ^ x.out;
+	static std::uint64_t hash(const bdd_reference x) {
+		return (std::uint64_t{x.id} + x.in) ^ x.out;
 	}
 };
 
@@ -320,7 +320,7 @@ struct bdd_node {
 		hash(hash_utri(v, R::hash(h), R::hash(l))) {}
 	uint_t v;
 	R h, l;
-	size_t hash;
+	std::uint64_t hash;
 	bool operator==(const auto& x) const {
 		return hash == x.hash && v == x.v && h == x.h && l == x.l;
 	}
@@ -334,7 +334,7 @@ struct node_skeleton {
 	node_skeleton(R h, R l) :
 		h(h), l(l), hash(hash_upair(R::hash(h), R::hash(l))) {}
 	R h, l;
-	size_t hash;
+	std::uint64_t hash;
 	bool operator==(const auto& x) const {
 		return hash == x.hash && h == x.h && l == x.l;
 	}
@@ -344,38 +344,41 @@ struct node_skeleton {
 
 namespace std {
 
+// The node hashes are 64 bits on every platform. Only std::hash narrows them
+// to size_t, which is 32 bits on wasm32.
 template<typename R>
 struct hash<idni::tau_lang::bdd_node<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
+	size_t operator()(auto& n) const { return static_cast<size_t>(n.hash); }
 };
 
 template<typename R>
 struct hash<idni::tau_lang::node_skeleton<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
+	size_t operator()(auto& n) const { return static_cast<size_t>(n.hash); }
 };
 
 template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
 struct hash<array<idni::tau_lang::bdd_reference<S, O, IW, SW>, 2>> {
 	size_t operator()(const auto& a) const {
-		return idni::tau_lang::hash_upair(
+		return static_cast<size_t>(idni::tau_lang::hash_upair(
 			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[0])),
-			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1])));
+			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1]))));
 	}
 };
 
 template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
 struct hash<idni::tau_lang::bdd_reference<S, O, IW, SW>> {
 	size_t operator()(const auto& a) const {
-		return idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a);
+		return static_cast<size_t>(
+			idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a));
 	}
 };
 
 template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
 struct hash<pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::tau_lang::uint_t>> {
 	size_t operator()(const auto& p) const {
-		return idni::tau_lang::hash_upair(
+		return static_cast<size_t>(idni::tau_lang::hash_upair(
 			(hash<idni::tau_lang::bdd_reference<S, O, IW, SW>>{}(p.first)),
-			p.second);
+			p.second));
 	}
 };
 

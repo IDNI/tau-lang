@@ -57,6 +57,10 @@ struct rr {
 	htref main;                    ///< Handle to the main formula.
 };
 
+/** @brief Content hash of @p r over the 64-bit tree hashes, the same on every platform. */
+template <NodeType node>
+std::uint64_t rr_hash(const rr<node>& r) noexcept;
+
 } // namespace idni::tau_lang
 
 /**

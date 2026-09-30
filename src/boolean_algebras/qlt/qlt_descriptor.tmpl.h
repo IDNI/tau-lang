@@ -57,6 +57,9 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static constexpr const char* type_name = "qlt";
 	static constexpr int default_type_priority = 50;
 
+	/** @brief The 64-bit content hash: std::hash<qlt> keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const qlt& x) { return qlt_hash(x); }
+
 	/** @brief qlt is ω-categorical but not a Boolean algebra. */
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = true;

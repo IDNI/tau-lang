@@ -287,6 +287,47 @@ inline bool hsb::operator!=(const hsb& o) const noexcept {
 	return !(*this == o);
 }
 
+namespace hsb_detail {
+// -0.0 equals 0.0 under feq, so both hash alike.
+inline std::uint64_t double_hash(double d) {
+	return std::bit_cast<std::uint64_t>(d == 0.0 ? 0.0 : d);
+}
+
+inline std::uint64_t halfspace_hash(const hsb_halfspace& h) {
+	std::uint64_t seed = h.w.size();
+	for (double x : h.w) idni::hash_combine(seed, double_hash(x));
+	idni::hash_combine(seed, double_hash(h.b));
+	return seed;
+}
+
+// The tree shares subtrees, so memo hashes each one once per call.
+inline std::uint64_t tree_content_hash(tref n,
+	std::unordered_map<tref, std::uint64_t>& memo)
+{
+	if (!n) return 0;
+	if (auto it = memo.find(n); it != memo.end()) return it->second;
+	const auto& t = hsb_tree::get(n);
+	std::uint64_t seed = 0;
+	idni::hash_combine(seed, static_cast<std::uint64_t>(t.value.nt));
+	if (static_cast<hsb::kind>(t.value.nt) == hsb::kind::halfspace)
+		idni::hash_combine(seed,
+			halfspace_hash(hsb_halfspace_pool::get(t.value.data)));
+	for (tref c : t.children())
+		idni::hash_combine(seed, tree_content_hash(c, memo));
+	return memo.emplace(n, seed).first->second;
+}
+} // namespace hsb_detail
+
+inline std::uint64_t hsb::content_hash() const {
+	if (content_hash_cache == 0) {
+		std::unordered_map<tref, std::uint64_t> memo;
+		content_hash_cache = hsb_detail::tree_content_hash(root_ref(), memo);
+		// 0 marks "not computed"
+		if (content_hash_cache == 0) content_hash_cache = 1;
+	}
+	return content_hash_cache;
+}
+
 inline bool hsb::operator==(bool b) const {
 	auto k = root_kind();
 	return b ? (k == kind::top) : (k == kind::bot);
@@ -352,12 +393,11 @@ inline std::ostream& operator<<(std::ostream& os, const hsb& h) {
 } // namespace idni::tau_lang
 
 /// @brief `std::hash` specialisation for `idni::tau_lang::hsb`.
-/// Hashes via the tref pointer, consistent with operator== (O(1)).
+/// Equal roots give equal content, so this agrees with operator==.
 template<>
 struct std::hash<idni::tau_lang::hsb> {
 	size_t operator()(const idni::tau_lang::hsb& h) const noexcept {
-		return std::hash<const void*>{}(
-			static_cast<const void*>(h.root_ref()));
+		return static_cast<size_t>(h.content_hash());
 	}
 };
 

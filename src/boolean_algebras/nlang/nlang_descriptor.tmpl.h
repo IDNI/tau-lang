@@ -22,6 +22,9 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	static constexpr const char* type_name = "nlang";
 	static constexpr int default_type_priority = 50;
+
+	/** @brief The 64-bit content hash: std::hash<nlang_ba> keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const nlang_ba& x) { return nlang_hash(x); }
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 	// answers come from an LLM oracle, so comparing two constants can leave

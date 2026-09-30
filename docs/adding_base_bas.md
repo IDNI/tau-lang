@@ -191,7 +191,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `codegen_witness(var, conj)`, `codegen_constant_expr(cst)` | C++ spellings of a witness / a constant for generated code | owner |
 | `output_always_satisfiable_by_system` | that a system can always meet an output constraint by choosing its output | owner |
 | `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading | owner, by type tree |
-| `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id) | the constant's own alternative, at the point of use |
+| `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id). `hash_constant` must return `std::uint64_t`, the same value on every platform, because `std::hash` returns `size_t`. Another return type fails `ba_descriptor_complete` and a `static_assert` in `node::hashit`. On x86_64 Linux `size_t` is `std::uint64_t`, so there a `size_t` result still passes | the constant's own alternative, at the point of use |
 | `constant_size(x)` | how many tree nodes a constant carries when operations on constants build ever larger ones (the wrapper embeds a whole spec); `max_constant_size` bounds the values the solver builds by it | the constant's own alternative, at the point of use |
 | `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
 | `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |

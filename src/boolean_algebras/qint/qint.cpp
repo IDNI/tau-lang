@@ -425,6 +425,13 @@ result<qint> qint_eval_parse_tree(
 	}
 }
 
+std::uint64_t qint_hash(const qint& d) noexcept {
+	std::uint64_t seed = d.intervals.size();
+	for (auto& [lo, hi] : d.intervals)
+		idni::hash_combine(seed, lo.p, lo.q, hi.p, hi.q);
+	return seed;
+}
+
 } // namespace idni::tau_lang
 
 // =============================================================================
@@ -434,8 +441,5 @@ result<qint> qint_eval_parse_tree(
 size_t std::hash<idni::tau_lang::qint>::operator()(
 	const idni::tau_lang::qint& d) const noexcept
 {
-	std::uint64_t seed = d.intervals.size();
-	for (auto& [lo, hi] : d.intervals)
-		idni::hash_combine(seed, lo.p, lo.q, hi.p, hi.q);
-	return static_cast<size_t>(seed);
+	return static_cast<size_t>(idni::tau_lang::qint_hash(d));
 }

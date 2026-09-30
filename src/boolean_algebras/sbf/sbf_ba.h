@@ -68,7 +68,7 @@ struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
 	size_t operator()(const idni::tau_lang::hbdd<idni::tau_lang::Bool>& h)
 		const noexcept
 	{
-		return h->hash();
+		return static_cast<size_t>(h->hash());
 	}
 };
 

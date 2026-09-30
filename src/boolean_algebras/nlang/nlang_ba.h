@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 
+#include "utility/hashing.h"
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
 #include "ba_constants.h"
@@ -486,13 +487,18 @@ result<typename node<BAs...>::constant_with_type> parse_nlang(
 		ba_descriptor<nlang_ba, node<BAs...>>::type_tree() });
 }
 
+/// Content hash in uint64_t, the same on every platform.
+inline std::uint64_t nlang_hash(const nlang_ba& n) {
+	return idni::portable_string_hash(n.to_string());
+}
+
 } // namespace idni::tau_lang
 
 // Hash specialization for nlang_ba
 template<>
 struct std::hash<idni::tau_lang::nlang_ba> {
 	size_t operator()(const idni::tau_lang::nlang_ba& n) const noexcept {
-		return std::hash<std::string>{}(n.to_string());
+		return static_cast<size_t>(idni::tau_lang::nlang_hash(n));
 	}
 };
 

@@ -223,8 +223,8 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 	return !(*this == that);
 }
 // Hash of a nonterminal's name.
-inline size_t nt_hash_of_name(const std::string& nm) {
-	size_t h = std::hash<std::string>{}(nm);
+inline std::uint64_t nt_hash_of_name(const std::string& nm) {
+	std::uint64_t h = portable_string_hash(nm);
 	if (!h) h = 1;  // reserve 0 as the "not computed" marker
 	return h;
 }
@@ -234,9 +234,9 @@ inline size_t nt_hash_of_name(const std::string& nm) {
 // (#414). Same reason ba_types::name_hash hashes the type name below.
 template <typename... BAs>
 requires BAsPack<BAs...>
-static size_t nt_name_hash(size_t nt) {
+static std::uint64_t nt_name_hash(size_t nt) {
 	// index = nt id; 0 marks "not yet computed"
-	static std::vector<size_t> cache;
+	static std::vector<std::uint64_t> cache;
 	if (nt < cache.size() && cache[nt]) return cache[nt];
 	if (nt >= cache.size()) cache.resize(nt + 1, 0);
 	return cache[nt] = nt_hash_of_name(node<BAs...>::name(nt));
@@ -246,17 +246,19 @@ static size_t nt_name_hash(size_t nt) {
 // declares one, else std::hash.
 template <typename Node, std::size_t I>
 struct ba_constant_hasher {
-	static size_t hash(const typename Node::constant& c) {
+	static std::uint64_t hash(const typename Node::constant& c) {
 		using BA = std::variant_alternative_t<I, typename Node::constant>;
+		static_assert(ba_hash_constant_well_typed_v<Node, BA>,
+			"ba_descriptor::hash_constant must return std::uint64_t");
 		if constexpr (ba_has_hash_constant_v<Node, BA>)
 			return ba_descriptor<BA, Node>::hash_constant(std::get<I>(c));
-		else return std::hash<BA>{}(std::get<I>(c));
+		else return portable_hash(std::get<I>(c));
 	}
 };
 
 template <typename Node, std::size_t... Is>
 constexpr auto ba_constant_hasher_table(std::index_sequence<Is...>) {
-	return std::array<size_t (*)(const typename Node::constant&),
+	return std::array<std::uint64_t (*)(const typename Node::constant&),
 		sizeof...(Is)>{ &ba_constant_hasher<Node, Is>::hash... };
 }
 
@@ -303,7 +305,7 @@ uint64_t node<BAs...>::hashit() const {
 	else if (tree<node>::is_string_nt(nt)) {
 		hash_combine(seed, dict(get_string_id()));
 	}
-	else hash_combine(seed, static_cast<size_t>(data));
+	else hash_combine(seed, static_cast<std::uint64_t>(data));
 	return seed;
 }
 

@@ -14,6 +14,8 @@
 #include <charconv>
 #include <cstdint>
 
+#include "utility/hashing.h"
+
 
 #include "tau_tree.h"
 #include "ba_constants.h"
@@ -292,18 +294,34 @@ tref simplify_qlt_term(tref t);
 qlt qlt_splitter(const qlt& x, splitter_type st);
 qlt qlt_splitter_one();
 
+/// Content hashes in uint64_t, the same on every platform.
+inline std::uint64_t qlt_rational_hash(const qlt_rational& r) {
+	if (!r.sym.empty()) return idni::portable_string_hash(r.sym) * 17239ULL;
+	if (r.pos_inf) return UINT64_MAX;
+	if (r.neg_inf) return UINT64_MAX - 1;
+	std::uint64_t h = idni::portable_hash(r.p);
+	h ^= idni::portable_hash(r.q) * 2654435761ULL;
+	return h;
+}
+
+inline std::uint64_t qlt_hash(const qlt& q) {
+	std::uint64_t h = 0;
+	for (auto& p : q.pieces) {
+		h ^= qlt_rational_hash(p.lo.val) * 2654435761ULL;
+		h ^= qlt_rational_hash(p.hi.val) * 2246822519ULL;
+		h ^= (idni::portable_hash(p.lo.bound) * 7)
+			^ (idni::portable_hash(p.hi.bound) * 13);
+	}
+	return h;
+}
+
 } // namespace idni::tau_lang
 
 // Hash specialization for qlt_rational
 template<>
 struct std::hash<idni::tau_lang::qlt_rational> {
 	size_t operator()(const idni::tau_lang::qlt_rational& r) const noexcept {
-		if (!r.sym.empty()) return std::hash<std::string>{}(r.sym) * 17239ULL;
-		if (r.pos_inf) return SIZE_MAX;
-		if (r.neg_inf) return SIZE_MAX - 1;
-		size_t h = std::hash<long long>{}(r.p);
-		h ^= std::hash<long long>{}(r.q) * 2654435761ULL;
-		return h;
+		return static_cast<size_t>(idni::tau_lang::qlt_rational_hash(r));
 	}
 };
 
@@ -311,14 +329,7 @@ struct std::hash<idni::tau_lang::qlt_rational> {
 template<>
 struct std::hash<idni::tau_lang::qlt> {
 	size_t operator()(const idni::tau_lang::qlt& q) const noexcept {
-		size_t h = 0;
-		auto hr = std::hash<idni::tau_lang::qlt_rational>{};
-		for (auto& p : q.pieces) {
-			h ^= hr(p.lo.val) * 2654435761ULL;
-			h ^= hr(p.hi.val) * 2246822519ULL;
-			h ^= ((size_t)p.lo.bound * 7) ^ ((size_t)p.hi.bound * 13);
-		}
-		return h;
+		return static_cast<size_t>(idni::tau_lang::qlt_hash(q));
 	}
 };
 

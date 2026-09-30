@@ -22,6 +22,8 @@ struct ba_descriptor<hsb, node<PackBAs...>> {
 	static constexpr const char* type_name = "hsb";
 	static constexpr int default_type_priority = 50;
 
+	static std::uint64_t hash_constant(const hsb& x) { return x.content_hash(); }
+
 	/** @brief hsb generalizes qint's intervals to polyhedra in R^d. */
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;

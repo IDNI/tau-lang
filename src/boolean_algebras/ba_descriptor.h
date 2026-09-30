@@ -72,9 +72,21 @@ constexpr bool ba_has_descriptor_v = requires {
  */
 template <typename Node, typename BA>
 constexpr bool ba_has_hash_constant_v = requires(const BA& x) {
-	{ ba_descriptor<BA, Node>::hash_constant(x) }
-		-> std::convertible_to<size_t>;
+	ba_descriptor<BA, Node>::hash_constant(x);
 };
+
+/**
+ * @brief `true` unless @p BA declares a `hash_constant` whose result is not
+ * `std::uint64_t`. A `size_t` hash keeps 32 bits on wasm32 and would give
+ * another constant order there.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_hash_constant_well_typed_v = [] {
+	if constexpr (ba_has_hash_constant_v<Node, BA>)
+		return std::is_same_v<decltype(ba_descriptor<BA, Node>::hash_constant(
+			std::declval<const BA&>())), std::uint64_t>;
+	else return true;
+}();
 
 /**
  * @brief Kind of a BA-declared CLI/REPL option.
@@ -383,6 +395,8 @@ concept ba_descriptor_complete =
 	// constants live in a hashed variant, so the value type must hash
  && requires(const BA& x) {
         { std::hash<BA>{}(x) } -> std::convertible_to<size_t>;       }
+	// an optional hash_constant is the 64-bit, platform-independent hash
+ && ba_hash_constant_well_typed_v<Node, BA>
 	// core compares constants against plain truth values
  && requires(const BA& x, bool b) {
         { x == b } -> std::convertible_to<bool>;                     }

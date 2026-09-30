@@ -20,6 +20,12 @@ if(NOT TARGET tauparser)
 	add_library(tauparser ALIAS idni::tauparser_static)
 endif()
 
+# The SDK targets carry TAU_USE_PORTABLE_HASH, so a value set here has no effect.
+if(DEFINED TAU_USE_PORTABLE_HASH AND NOT TAU_USE_PORTABLE_HASH)
+	message(FATAL_ERROR "TAU_USE_PORTABLE_HASH=OFF has no effect: tau follows "
+		"the parser SDK, which the store builds with TAU_USE_PORTABLE_HASH=ON")
+endif()
+
 message(STATUS "parser SDK at ${TAU_PARSER_SDK_PREFIX}")
 message(STATUS "host tgf at ${TAU_TGF_PACKAGE_PREFIX}")
 

@@ -20,6 +20,7 @@ set(TESTS
 	bounded_cache
 	data_bdd
 	canonicalize_tref
+	hash_order
 	temporal_connectives
 	eliminability
 	execution

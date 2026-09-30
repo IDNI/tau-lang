@@ -21,6 +21,9 @@ struct ba_descriptor<qint, node<PackBAs...>> {
 
 	static constexpr const char* type_name = "qint";
 	static constexpr int default_type_priority = 50;
+
+	/** @brief The 64-bit content hash: std::hash<qint> keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const qint& x) { return qint_hash(x); }
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 

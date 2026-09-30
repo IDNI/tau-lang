@@ -25,6 +25,9 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	static constexpr const char* type_name = "tau";
 	static constexpr int default_type_priority = 0;
+
+	/** @brief The 64-bit content hash: std::hash<tau_ba> keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const ba_t& x) { return rr_hash(x.nso_rr); }
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 

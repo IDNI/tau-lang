@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "defs.h"
+#include "utility/hashing.h"
 
 namespace idni::tau_lang {
 
@@ -38,13 +39,13 @@ inline size_t default_bv_size = 16;
  * declares nothing and falls back to `std::hash<BA>`, which is already
  * content-derived for them (`tau_ba` goes through `rr`'s tree hash).
  */
-inline size_t hash_bv_constant(const cvc5::Term& t) {
+inline std::uint64_t hash_bv_constant(const cvc5::Term& t) {
 	if (t.isNull()) return 0;
-	static std::unordered_map<uint64_t, size_t> memo;
+	static std::unordered_map<uint64_t, std::uint64_t> memo;
 	const uint64_t id = t.getId();
 	if (auto it = memo.find(id); it != memo.end()) return it->second;
 	return memo.emplace(id,
-		std::hash<std::string>{}(t.toString())).first->second;
+		idni::portable_string_hash(t.toString())).first->second;
 }
 
 // Bit width of the sort of bitvector value `b`. DBG-asserts

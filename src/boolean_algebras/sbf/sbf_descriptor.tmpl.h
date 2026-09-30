@@ -27,6 +27,9 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	static constexpr const char* type_name = "sbf";
 	static constexpr int default_type_priority = 1;
+
+	/** @brief The 64-bit BDD reference hash: std::hash keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const sbf_ba& x) { return x->hash(); }
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 

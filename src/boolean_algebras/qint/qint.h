@@ -143,6 +143,9 @@ std::optional<qint> qint_eval_interval(
 result<qint> qint_eval_parse_tree(
 	const qint_parser::tree::traverser& t);
 
+/// Content hash in uint64_t, the same on every platform.
+std::uint64_t qint_hash(const qint& d) noexcept;
+
 } // namespace idni::tau_lang
 
 // --- Hash specialization for qint ---

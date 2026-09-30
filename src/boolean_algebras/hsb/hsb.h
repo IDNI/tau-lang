@@ -4,6 +4,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_H__
 
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -13,6 +14,7 @@
 #include <numeric>
 #include <optional>
 #include <sstream>
+#include <unordered_map>
 #include <iomanip>
 #include <string>
 #include <vector>
@@ -179,6 +181,8 @@ struct hsb {
 	// ── Root ─────────────────────────────────────────────────────────────────
 
 	htref root;  ///< GC-safe handle into the lcrs_tree<hsb_node> store.
+	/// Cached content_hash(); 0 means not computed yet.
+	mutable std::uint64_t content_hash_cache = 0;
 
 	hsb();
 	explicit hsb(tref r);
@@ -265,6 +269,10 @@ struct hsb {
 
 	/// @brief Structural equality (O(1) tref pointer comparison after interning).
 	bool operator==(const hsb& o) const noexcept;
+
+	/// Hash of the formula and its halfspace values, not of a pool index or
+	/// a pointer, so the order is the same on every run and platform.
+	std::uint64_t content_hash() const;
 	bool operator!=(const hsb& o) const noexcept;
 
 	/// @brief Compares with a bool: `true` iff equal to top/bot respectively.
