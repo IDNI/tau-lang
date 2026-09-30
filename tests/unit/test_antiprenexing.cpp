@@ -1908,11 +1908,17 @@ TEST_SUITE("AN-7 heterogeneous block guard") {
 					tau_type_id<node_t>()),
 				x_bf)));
 		term_handle<node_t>::order order;
-		tref res = eliminate_block_over_clause<node_t>(clause,
-			trefs{ x }, block_eliminability<node_t>{}, order).value();
+		auto rr = eliminate_block_over_clause<node_t>(clause,
+			trefs{ x }, block_eliminability<node_t>{}, order);
+		REQUIRE( rr.has_value() );
+		tref res = rr.value();
 		REQUIRE( res != nullptr );
 		// The quantifier survives (elimination declined).
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
 			!= nullptr );
+		// and the report says why
+		std::ostringstream os;
+		rr.report().print(os);
+		CHECK( os.str().find("mix BA types") != std::string::npos );
 	}
 }

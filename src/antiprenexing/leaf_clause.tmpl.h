@@ -142,9 +142,9 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// per path on a blasted DAG.
 	for (tref c : conjs) pre_order<node>(c).visit_unique(type_scan);
 	if (!types_homogeneous) {
-		LOG_ERROR << "eliminate_block_over_clause: dependent conjuncts "
-			"mix BA types, keeping the quantifier block: "
-			<< LOG_FM(clause);
+		r.warning("dependent conjuncts mix BA types, keeping the "
+			"quantifier block",
+			{{label::value, truncate_for_message(TAU_TO_STR(clause))}});
 		tref kept = tau::build_wff_and(conjs);
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			kept = build_wff_ex<node>(*v, kept, false);
