@@ -641,11 +641,18 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
+    needs: guard
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       TAU_BUILD_JOBS: 4
       TAU_STORE_KEEP: 3
+      # No other job builds with the runner's clang and LTO off, so this job
+      # publishes its own packages for the next run to pull.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
