@@ -180,6 +180,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base \
             --cache-to   type=gha,scope=tau-linux-deps,mode=max
