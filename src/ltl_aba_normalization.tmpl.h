@@ -1866,8 +1866,10 @@ static result<std::string> apply_step_counter_encoding(
 	out_max_pos = max_pos;
 
 	const int_t clamp = max_pos + 1; // parked state, held forever past the trace
+	// w bits count 0..clamp. `<= clamp` states that bound directly: in the
+	// form `< clamp + 1` gcc must assume that the + 1 does not overflow.
 	size_t w = 1;
-	while ((int_t(1) << w) < clamp + 1) ++w;
+	while ((int_t(1) << w) <= clamp) ++w;
 
 	std::vector<std::string> bits(w);
 	for (size_t b = 0; b < w; ++b)
