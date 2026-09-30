@@ -9,7 +9,8 @@
 #
 # cvc5 downloads neither CaDiCaL nor GMP here. CaDiCaL builds from the pinned
 # closure archive with cmake/cvc5-msvc/cadical.cmake, and GMP comes from vcpkg
-# at a pinned commit, because gmpxx must have the MSVC ABI.
+# at a pinned commit, because gmpxx must have the MSVC ABI. GMP is a DLL, never
+# a static library in cvc5.dll, and it ships in bin beside cvc5.dll.
 
 set -u
 
@@ -19,7 +20,7 @@ DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOU
 CVC5_MSVC_VCPKG_REPO="https://github.com/microsoft/vcpkg.git"
 # The vcpkg commit whose gmp port is 6.3.0, port-version 5.
 CVC5_MSVC_VCPKG_COMMIT="e06564091c10e0b042900800c9fd48aad7f00643"
-CVC5_MSVC_GMP_PORT="gmp:x64-windows-static-md"
+CVC5_MSVC_GMP_PORT="gmp:x64-windows"
 CVC5_MSVC_GMP_VERSION="6.3.0#5"
 # cvc5 keys its Windows code on the MinGW macro __WIN32__. The flags hold no
 # path: the compat header and the unistd.h shim reach clang-cl through CL, and
@@ -169,11 +170,13 @@ _dep_cvc5_msvc_gmp() {
 		./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" ) \
 		|| { echo "dep-cvc5: vcpkg install ${CVC5_MSVC_GMP_PORT} failed" >&2; return 1; }
 	installed="${vcpkg}/installed/${CVC5_MSVC_GMP_PORT#*:}"
-	mkdir -p "${deps}/include" "${deps}/lib" || return 1
+	mkdir -p "${deps}/include" "${deps}/lib" "${deps}/bin" || return 1
 	cp "${installed}"/include/gmp*.h "${deps}/include/" \
 		|| { echo "dep-cvc5: no GMP headers under ${installed}/include" >&2; return 1; }
 	cp "${installed}"/lib/*.lib "${deps}/lib/" \
 		|| { echo "dep-cvc5: no GMP libraries under ${installed}/lib" >&2; return 1; }
+	cp "${installed}"/bin/*gmp*.dll "${deps}/bin/" \
+		|| { echo "dep-cvc5: no GMP DLL under ${installed}/bin" >&2; return 1; }
 	# cvc5's FindGMP asks for gmp and gmpxx, which MSVC finds as gmp.lib and
 	# gmpxx.lib only.
 	for lib in gmp gmpxx; do
@@ -255,6 +258,14 @@ _dep_cvc5_target_prebuild() {
 	export CL
 	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
+}
+
+# The GMP DLLs go beside cvc5.dll, where configure copies every DLL from.
+_dep_cvc5_target_postinstall() {
+	local prefix="$1" work="$2"
+	mkdir -p "${prefix}/bin" || return 1
+	cp "${work}/msvc-deps/bin/"*gmp*.dll "${prefix}/bin/" \
+		|| { echo "dep-cvc5: no GMP DLL under ${work}/msvc-deps/bin" >&2; return 1; }
 }
 
 source "$(dirname "${BASH_SOURCE[0]}")/../common/cvc5.sh"

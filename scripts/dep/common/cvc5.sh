@@ -12,8 +12,9 @@
 #
 # The target file defines _dep_cvc5_gmp_header, which prints the system gmp.h
 # or nothing, and _dep_cvc5_target_setup, which sets the target arguments. It
-# may define _dep_cvc5_target_fields, which prints extra id fields, and
-# _dep_cvc5_target_prebuild <work> <build>, which runs before the configure.
+# may define _dep_cvc5_target_fields, which prints extra id fields,
+# _dep_cvc5_target_prebuild <work> <build>, which runs before the configure, and
+# _dep_cvc5_target_postinstall <prefix> <work>, which runs after the install.
 
 set -u
 
@@ -39,6 +40,7 @@ CVC5_EXPECTED_CLOSURE=(
 
 declare -F _dep_cvc5_target_fields > /dev/null || _dep_cvc5_target_fields() { :; }
 declare -F _dep_cvc5_target_prebuild > /dev/null || _dep_cvc5_target_prebuild() { :; }
+declare -F _dep_cvc5_target_postinstall > /dev/null || _dep_cvc5_target_postinstall() { :; }
 
 _dep_cvc5_compiler_id() {
 	dep_compiler_id "$DEP_CVC5_CXX"
@@ -274,6 +276,8 @@ _dep_cvc5_producer() {
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_CVC5_CMAKE" --install "$build" \
 		|| { echo "dep-cvc5: install failed" >&2; rm -rf "$work"; return 1; }
+	_dep_cvc5_target_postinstall "$staging_prefix" "$work" \
+		|| { echo "dep-cvc5: post-install step failed" >&2; rm -rf "$work"; return 1; }
 	# The cross GMP is built under the staging tree and its library, import
 	# library, dll, .la and .pc files bake those paths in. Rewrite each to an
 	# equal-length placeholder so no build path enters the published package.
