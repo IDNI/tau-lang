@@ -51,18 +51,18 @@ case "${CMD}" in
                 echo "  deps          - build deps image"
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
-                echo "  build-release-publish - build build-publish image, release, no tests"
+                echo "  build-release-resolve - build build-resolve image, release, configure only"
                 echo "  test-with-testnet - run the tau-testnet suite against the build"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
                 echo "  w64-build     - build w64-build image"
-                echo "  w64-build-publish - build w64-build-publish image, no tests"
+                echo "  w64-build-resolve - build w64-build-resolve image, configure only"
                 echo "  w64-packages  - release packages (Windows)"
                 echo "  w64-nightly   - nightly release packages (Windows)"
                 echo "  wasm-deps         - build wasm-deps image"
                 echo "  wasm-node         - build wasm-node image, and (TESTS=yes) run the node suite"
-                echo "  wasm-node-publish - build wasm-node-publish image, no tests"
+                echo "  wasm-node-resolve - build wasm-node-resolve image, configure only"
                 echo "  wasm-browser-deps - build wasm-browser-deps image (Chrome, npm packages)"
                 echo "  wasm-browser      - build wasm-browser image, and (TESTS=yes) run the browser suite"
                 ;;
@@ -100,8 +100,8 @@ case "${CMD}" in
         "build-release")
                 build --target build --build-arg BUILD_PRESET="release" -t tau:build "${@:2}"
                 ;;
-        "build-release-publish")
-                build --target build-publish --build-arg BUILD_PRESET="release" -t tau:build-publish "${@:2}"
+        "build-release-resolve")
+                build --target build-resolve --build-arg BUILD_PRESET="release" -t tau:build-resolve "${@:2}"
                 ;;
         "test-with-testnet")
                 build --target testnet -t tau:testnet "${@:2}"
@@ -120,8 +120,8 @@ case "${CMD}" in
         "w64-build")
                 build --target w64-build -t tau:w64-build "${@:2}"
                 ;;
-        "w64-build-publish")
-                build --target w64-build-publish -t tau:w64-build-publish "${@:2}"
+        "w64-build-resolve")
+                build --target w64-build-resolve -t tau:w64-build-resolve "${@:2}"
                 ;;
         "w64-packages")
                 build --target w64-packages -t tau:w64-packages "${@:2}" && \
@@ -137,8 +137,8 @@ case "${CMD}" in
         "wasm-node")
                 build --target wasm-node -t tau:wasm-node "${@:2}"
                 ;;
-        "wasm-node-publish")
-                build --target wasm-node-publish -t tau:wasm-node-publish "${@:2}"
+        "wasm-node-resolve")
+                build --target wasm-node-resolve -t tau:wasm-node-resolve "${@:2}"
                 ;;
         "wasm-browser-deps")
                 build --target wasm-browser-deps -t tau:wasm-browser-deps "${@:2}"

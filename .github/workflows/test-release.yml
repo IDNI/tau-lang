@@ -197,24 +197,16 @@ jobs:
           restore-keys: |
             ccache-ubuntu-24.04-${{ matrix.name }}-
 
-      - name: Restore the store mount
-        uses: actions/cache@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-linux-${{ matrix.name }}-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-linux-${{ matrix.name }}-
-
-      - name: Load ccache and the store into the build mounts
+      - name: Load ccache into the build mount
         uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          cache-map: '{"ccache": "/root/.ccache", "tau-store": {"target": "/root/.tau/store", "id": "tau-store-linux"}}'
+          cache-map: '{"ccache": "/root/.ccache"}'
 
-      # The publish stage resolves the store and publishes what it built
-      # before any test runs, so a red test cannot strand a package.
-      - name: Resolve and publish the store packages
+      # Configure publishes each store entry as soon as it builds it, so a
+      # red test cannot strand a package.
+      - name: Resolve the store packages
         run: |
-          ./dev docker build-release-publish \
+          ./dev docker build-release-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
@@ -227,12 +219,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Each pack writes its own tau_pack.h, so each entry is a full build
-      # on top of the layers the publish step cached.
+      # on top of the layers the resolve step cached. The same
+      # TAU_STORE_PUBLISH keeps the resolve layer a cache hit.
       - name: Build release tests and run them
         run: |
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --build-arg TAU_BAS=${{ matrix.pack }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
@@ -274,22 +268,14 @@ jobs:
           restore-keys: |
             ccache-ubuntu-24.04-arm-${{ matrix.name }}-
 
-      - name: Restore the store mount
-        uses: actions/cache@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-linux-arm-${{ matrix.name }}-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-linux-arm-${{ matrix.name }}-
-
-      - name: Load ccache and the store into the build mounts
+      - name: Load ccache into the build mount
         uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          cache-map: '{"ccache": "/root/.ccache", "tau-store": {"target": "/root/.tau/store", "id": "tau-store-linux"}}'
+          cache-map: '{"ccache": "/root/.ccache"}'
 
-      - name: Resolve and publish the store packages
+      - name: Resolve the store packages
         run: |
-          ./dev docker build-release-publish \
+          ./dev docker build-release-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
@@ -306,6 +292,7 @@ jobs:
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --build-arg TAU_BAS=${{ matrix.pack }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
@@ -440,22 +427,14 @@ jobs:
           restore-keys: |
             ccache-ubuntu-24.04-mingw64-wine-
 
-      - name: Restore the store mount
-        uses: actions/cache@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-w64-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-w64-
-
-      - name: Load ccache and the store into the build mounts
+      - name: Load ccache into the build mount
         uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          cache-map: '{"ccache": "/root/.ccache", "tau-store": {"target": "/root/.tau/store", "id": "tau-store-w64"}}'
+          cache-map: '{"ccache": "/root/.ccache"}'
 
-      - name: Resolve and publish the store packages
+      - name: Resolve the store packages
         run: |
-          ./dev docker w64-build-publish \
+          ./dev docker w64-build-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
@@ -473,6 +452,7 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TESTS=yes \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
@@ -483,11 +463,15 @@ jobs:
 
   testnet:
     name: tau-testnet suite
-    needs: linux
+    needs: [guard, linux]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -511,18 +495,10 @@ jobs:
           restore-keys: |
             ccache-ubuntu-24.04-default-
 
-      - name: Restore the store mount
-        uses: actions/cache/restore@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-linux-default-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-linux-default-
-
-      - name: Load ccache and the store into the build mounts
+      - name: Load ccache into the build mount
         uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          cache-map: '{"ccache": "/root/.ccache", "tau-store": {"target": "/root/.tau/store", "id": "tau-store-linux"}}'
+          cache-map: '{"ccache": "/root/.ccache"}'
 
       # tau-testnet's specs use bv, so this suite only runs against the default pack
       - name: Run the tau-testnet suite
@@ -530,6 +506,7 @@ jobs:
           ./dev docker test-with-testnet \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
@@ -544,11 +521,15 @@ jobs:
   # (cmake/tau-deps.cmake), never the older ~/.tau dist path.
   wasm-deps:
     name: Build wasm deps images (emsdk, Chrome)
-    needs: deps
+    needs: [guard, deps]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -558,25 +539,12 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # A failed wasm resolve keeps its finished entries in the store mount,
-      # so the mount needs a round trip through the actions cache.
-      - name: Restore the store mount
-        uses: actions/cache@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-wasm-deps-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-wasm-
-
-      - name: Load the store into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"tau-store": {"target": "/root/.tau/store", "id": "tau-store-wasm"}}'
-
       - name: Build wasm-deps and wasm-browser-deps stages
         run: |
           ./dev docker wasm-browser-deps \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
@@ -605,24 +573,9 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # A failed wasm resolve keeps its finished entries in the store mount,
-      # so the mount needs a round trip through the actions cache.
-      - name: Restore the store mount
-        uses: actions/cache@v6
-        with:
-          path: tau-store
-          key: tau-store-docker-wasm-node-${{ github.sha }}
-          restore-keys: |
-            tau-store-docker-wasm-
-
-      - name: Load the store into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"tau-store": {"target": "/root/.tau/store", "id": "tau-store-wasm"}}'
-
-      - name: Resolve and publish the store packages
+      - name: Resolve the store packages
         run: |
-          ./dev docker wasm-node-publish \
+          ./dev docker wasm-node-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
@@ -639,6 +592,7 @@ jobs:
           ./dev docker wasm-node \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
@@ -650,13 +604,17 @@ jobs:
   wasm-browser:
     name: WebAssembly (browser)
     # The browser stage copies the store from wasm-node-resolve. That job's
-    # publish step writes those layers to tau-wasm-node, so waiting for it turns
+    # resolve step writes those layers to tau-wasm-node, so waiting for it turns
     # the copy into a cache hit instead of a full rebuild.
-    needs: [wasm-deps, wasm-node]
+    needs: [guard, wasm-deps, wasm-node]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -671,6 +629,7 @@ jobs:
           ./dev docker wasm-browser \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
