@@ -341,6 +341,56 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Every other Linux job builds with clang. This job builds the library with
+  # gcc, so a gcc error shows in a job of its own. It reads the packages of
+  # the resolver's layers, so it resolves nothing and publishes nothing.
+  linux-gcc:
+    name: Linux (gcc)
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-gcc-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-gcc-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the build layer changes with every commit.
+      - name: Build
+        run: |
+          ./dev docker linux-gcc \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-linux-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # tau-testnet's specs use bv, so this suite runs on the wheel of the default
   # pack. It takes the tau-wheel store package when the remote has it, else the
   # artifact of the same wheel, and compiles nothing.

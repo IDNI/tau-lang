@@ -57,6 +57,7 @@ case "${CMD}" in
                 echo "  test-with-testnet - run the tau-testnet suite on the wheel in TAU_WHEEL_DIR"
                 echo "  asan          - build and run the tests with the address sanitizer"
                 echo "  linux-devel   - build and run the devel suite, with asserts live"
+                echo "  linux-gcc     - build the library with gcc"
                 echo "  linux-arm64-cross - cross-build Linux arm64 and run its tests under qemu"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
@@ -125,6 +126,9 @@ case "${CMD}" in
                 ;;
         "linux-devel")
                 build --target linux-devel -t tau:linux-devel "${@:2}"
+                ;;
+        "linux-gcc")
+                build --target linux-gcc -t tau:linux-gcc "${@:2}"
                 ;;
         "linux-arm64-cross")
                 build --target linux-arm64-cross -t tau:linux-arm64-cross "${@:2}"

@@ -15,6 +15,7 @@
 #   - testnet: runs the tau-testnet suite on that wheel, compiling nothing
 #   - asan: builds and runs the tests with the address sanitizer
 #   - linux-devel: builds and runs the devel suite, with asserts live
+#   - linux-gcc: builds the library with gcc
 #   - linux-arm64-cross: cross-builds Linux arm64 and runs its tests under qemu
 #   - runner: provides a deb based image with installed tau package
 #   - rpm-runner: provides an rpm based image with installed tau package
@@ -42,7 +43,6 @@
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
 # use --build-arg TESTS="no" to skip running tests (build, w64-build, wasm-node, wasm-browser)
-# use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
 # Use BUILD_KIT=1 (install docker-buildx) to avoid rebuilds of unnecessary stages
@@ -152,8 +152,8 @@ ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 
 # ------------------------------------------------------------
 # Resolve every Linux store package once: the default pack is a superset of
-# the others, and the gcc check needs its own gcc-built set. build-resolve and
-# asan start from here, so their configure finds only local hits.
+# the others, and a gcc configure takes the same clang-built packages. The
+# later Linux stages start from here, so their configure finds only local hits.
 
 FROM deps AS linux-resolve
 
@@ -195,9 +195,6 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 # the objects. A ccache mount survives it, and it outlives the build.
 ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 
-# Set TEST_GCC_BUILD=no to skip the gcc compilation check
-ARG TEST_GCC_BUILD=yes
-
 # The launchers match the later configure steps, so the store ids match.
 # The store_publish secret makes configure publish each entry right after it
 # builds it. A secret, unlike a build argument, stays out of the layer cache
@@ -208,13 +205,7 @@ RUN --mount=type=secret,id=gh_token \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --configure-only \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-	if [ "$TEST_GCC_BUILD" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset devel-make-gcc --configure-only \
-			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
-	fi
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 
 # ------------------------------------------------------------
@@ -288,20 +279,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	fi && \
 	ccache --show-stats
-
-# Set TEST_GCC_BUILD=no to skip the gcc compilation check
-ARG TEST_GCC_BUILD=yes
-
-# Check also make and gcc compilation since ninja and clang is used by default
-RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
-	--mount=type=secret,id=gh_token \
-	--mount=type=secret,id=store_publish \
-	if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
-	scripts/with-gh-token ./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-	rm -rf build/devel-gcc; \
-fi
 
 # Run the tests (if TESTS = "yes") on the compiled tree above.
 FROM build-compile AS build
@@ -425,6 +402,24 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building and running the devel tests" && \
 	scripts/with-gh-token ./dev preset devel-all run \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+	ccache --show-stats
+
+# ------------------------------------------------------------
+# Build the library with gcc, which no other Linux stage uses. The gcc
+# configure takes the clang-built packages, so it finds only local hits.
+# devel-gcc has no build preset, so this uses its parent devel-ninja-gcc.
+
+FROM linux-resolve AS linux-gcc
+
+ARG BUILD_JOBS=5
+
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the library with gcc" && \
+	scripts/with-gh-token ./dev preset devel-ninja-gcc \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
