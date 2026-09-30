@@ -263,7 +263,8 @@ entry it builds to the remote right after the build. A failed push stops the
 configure. An entry from a local hit or a remote pull is not pushed.
 
 `store-publish` sends the local entries to the remote. `TAU_STORE_KEEP` sets
-how many entries of each dependency stay in the local tier.
+how many entries of each dependency and variant stay in the local tier. The
+variant is the manifest `target`, `compiler_id` and `cxxflags` (default 2).
 
 Two files are the single definitions. Do not copy their rules into another
 file:

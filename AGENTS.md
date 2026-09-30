@@ -41,8 +41,9 @@ only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published.
 build type builds a package with the release flags, so `devel`, `debug` and `release`
 share one package. An unset `TAU_STORE_REMOTE` and a failed remote read both fall
 through to a build.
-`TAU_STORE_KEEP` sets how many entries per dependency stay, by last use (default 3; 0
-disables eviction). Normal CI only reads the remote (`packages: read`); the trusted
+`TAU_STORE_KEEP` sets how many entries stay per dependency and variant, by last use
+(default 2; 0 disables eviction). The variant is the manifest `target`, `compiler_id`
+and `cxxflags`, so a configure for one target never evicts the package of another. Normal CI only reads the remote (`packages: read`); the trusted
 `deps-store.yml` on `devel` and `main` is the only publisher (`./dev store-publish`).
 The target in the id names the platform the package runs on: `linux-x86_64`
 (Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),

@@ -95,8 +95,8 @@ tau_shared_helpers_check_provenance()
 # How cvc5 and Boost are provided: a store package the platform builds with
 # this preset's compiler.
 option(TAU_LTO "Build the library and the executables with link time optimization" ON)
-set(TAU_STORE_KEEP "3" CACHE STRING
-	"Store entries to keep per dependency, by last use (0 disables eviction)")
+set(TAU_STORE_KEEP "2" CACHE STRING
+	"Store entries to keep per dependency and variant (target, compiler, flags), by last use (0 disables eviction)")
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
