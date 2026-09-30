@@ -277,10 +277,16 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Install ccache
+        run: |
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
       # The store is content-addressed; a miss is built with the preset's
       # AppleClang and reused by the next run.
@@ -299,8 +305,34 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-arm64-package-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-arm64-package-
+
       - name: Build macOS packages (.dmg + .zip)
-        run: ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: |
+          ccache --zero-stats
+          ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -330,10 +362,16 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Install ccache
+        run: |
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
       # The venv carries the interpreter, nanobind and delocate, and the
       # script appends TAU_PYTHON for the build and the wheel check.
@@ -359,8 +397,34 @@ jobs:
       - name: Set the wheel time
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-arm64-wheel-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-arm64-wheel-
+
       - name: Build the macOS wheel
-        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: |
+          ccache --zero-stats
+          ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -477,10 +541,16 @@ jobs:
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Install ccache
+        run: |
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -497,8 +567,34 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-intel-x86_64-package-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-intel-x86_64-package-
+
       - name: Build macOS packages (.dmg + .zip)
-        run: ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: |
+          ccache --zero-stats
+          ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -524,10 +620,16 @@ jobs:
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Install ccache
+        run: |
+          brew install ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
       - name: Create the wheel venv
         run: ./dev dep-python-venv
@@ -551,8 +653,34 @@ jobs:
       - name: Set the wheel time
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-intel-x86_64-wheel-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-intel-x86_64-wheel-
+
       - name: Build the macOS wheel
-        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: |
+          ccache --zero-stats
+          ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()

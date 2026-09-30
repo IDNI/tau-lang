@@ -910,6 +910,7 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
+      CCACHE_MAXSIZE: 2G
     steps:
       - uses: actions/checkout@v7
         with:
@@ -924,10 +925,22 @@ jobs:
           key: tau-store-macos-arm64-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Install the binding venv, spot, and coreutils
+      - name: Install the binding venv, spot, coreutils, and ccache
         run: |
-          brew install spot coreutils
+          brew install spot coreutils ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           ./dev dep-python-venv
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-arm64-tests-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-arm64-tests-
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -935,8 +948,22 @@ jobs:
           # reproducer here, and that is the only trace of it.
           CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
         run: |
+          ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -1025,6 +1052,7 @@ jobs:
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4
+      CCACHE_MAXSIZE: 2G
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1039,10 +1067,22 @@ jobs:
           key: tau-store-macos-x86_64-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Install the binding venv, spot, and coreutils
+      - name: Install the binding venv, spot, coreutils, and ccache
         run: |
-          brew install spot coreutils
+          brew install spot coreutils ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           ./dev dep-python-venv
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-intel-x86_64-tests-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-intel-x86_64-tests-
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -1050,8 +1090,22 @@ jobs:
           # reproducer here, and that is the only trace of it.
           CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
         run: |
+          ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -1078,11 +1132,13 @@ jobs:
 
   # A ccache or store key ends in the commit, so every run adds an entry. This
   # job keeps the newest entry of each key on this ref and deletes the rest. A
-  # failed job saves no ccache, so its newest entry is the last good one.
+  # failed Linux job saves no ccache. A macOS job saves it also after a failure,
+  # so a run that stops at its time limit keeps the objects it compiled.
   cache-cleanup:
     name: Cleanup · old cache entries
     needs: [linux, linux-devel, linux-gcc, linux-asan, linux-arm64,
-      windows-msvc-store, macos-arm64-store, macos-x86_64-store]
+      windows-msvc-store, macos-arm64-store, macos-x86_64-store,
+      macos-arm64, macos-x86_64]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
