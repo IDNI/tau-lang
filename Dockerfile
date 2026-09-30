@@ -10,7 +10,9 @@
 #   - linux-resolve: resolves every Linux store package once, for build and asan
 #   - build: builds tau executable and runs tests
 #   - packages: creates a release packages (deb and rpm)
-#   - testnet: runs the tau-testnet suite against the build
+#   - tau-wheel: packs the Python binding as the tau-wheel store package and
+#     exports it (--output type=local)
+#   - testnet: runs the tau-testnet suite on that wheel, compiling nothing
 #   - asan: builds and runs the tests with the address sanitizer
 #   - linux-devel: builds and runs the devel suite, with asserts live
 #   - linux-arm64-cross: cross-builds Linux arm64 and runs its tests under qemu
@@ -34,8 +36,8 @@
 #     the store_publish secret set to ON, configure publishes each entry it builds
 #   - <stage>: compiles and runs the tests on top of <stage>-resolve
 # - build is split once more: build-compile compiles on top of build-resolve and
-#   build runs the tests on top of build-compile, so the testnet stage can reuse
-#   the compiled tree without running the tau suite
+#   build runs the tests on top of build-compile, so the tau-wheel stage can
+#   reuse the compiled tree without running the tau suite
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
@@ -333,34 +335,59 @@ RUN echo "(BUILD) -- Building packages" && \
 
 
 # ------------------------------------------------------------
-# Run the tau-testnet suite against the release build
+# Pack the Python binding as the tau-wheel store package. The store_publish
+# secret makes the packing step publish it, and the tau-wheel stage exports the
+# wheel with its store id, so the testnet job compiles nothing.
 
-# tau-testnet consumes the built tree and the binding, not the tau suite, so it
-# inherits the compile stage and does not run ctest on the way in.
-FROM build-compile AS testnet
+FROM build-compile AS tau-wheel-build
 
 ARG BUILD_JOBS=5
-
-# Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
-
-WORKDIR /tau-lang
-
-# This stage builds the binding against its own tau-testnet venv, which holds
-# the interpreter and nanobind that suite runs; the image's venv is not it.
-ENV TAU_PYTHON=
-
-# The tau-testnet requirements build fastecdsa from source, which needs gmp
-RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
-	scripts/with-gh-token ./dev test-with-tau-testnet \
-		${BUILD_PRESET}-binding-python \
+	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --keep-cache --target tau_wheel \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+	mkdir -p /tau-wheel && \
+	whl="$(ls build/${BUILD_PRESET}/bindings/python/nanobind/wheel/tau_nanobind-*.whl)" && \
+	cp "$whl" /tau-wheel/ && \
+	for d in /root/.tau/store/tau-wheel/*/prefix; do \
+		if cmp -s "$d/$(basename "$whl")" "$whl"; then \
+			basename "$(dirname "$d")" > /tau-wheel/store-id; \
+		fi; \
+	done && \
+	test -s /tau-wheel/store-id
+
+# Only the wheel and its store id, for an --output type=local export.
+FROM scratch AS tau-wheel
+COPY --from=tau-wheel-build /tau-wheel/ /
+
+
+# ------------------------------------------------------------
+# Run the tau-testnet suite on a prebuilt wheel. The wheel arrives through the
+# tau-wheel-dir build context (--build-context tau-wheel-dir=<dir>), so this
+# stage compiles nothing of tau.
+
+FROM base AS testnet
+
+# fastecdsa builds from source where it publishes no wheel, and it needs gmp.
+RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
+
+COPY --from=source /tau-lang /tau-lang
+
+WORKDIR /tau-lang
+
+COPY --from=tau-wheel-dir / /tau-wheel/
+
+# The wheel binds one CPython version and ABI, so the venv takes that version.
+RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
+	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
+	test -n "$minor" && command -v "python3.${minor}" && \
+	TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
+		./dev test-with-tau-testnet
 
 # ------------------------------------------------------------
 # Run the tests with the address sanitizer. The sanitizer flag is added after

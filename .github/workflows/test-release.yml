@@ -191,14 +191,20 @@ jobs:
   # so each entry is a full build.
   linux:
     name: Linux (${{ matrix.name }})
-    needs: [probe, linux-resolve]
+    needs: [guard, probe, linux-resolve]
     runs-on: ubuntu-24.04
+    # The default entry publishes the tau-wheel package, which no other job
+    # builds.
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ matrix.name == 'default' && needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -236,6 +242,33 @@ jobs:
             --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The wheel reuses the compiled tree of the step above. It runs after a
+      # red test too, so the testnet job still gets a wheel.
+      - name: Pack and publish the tau wheel
+        if: ${{ !cancelled() && matrix.name == 'default' }}
+        run: |
+          ./dev docker tau-wheel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_WHEEL_DIR: tau-wheel
+
+      # A pull request cannot publish, so the artifact hands the wheel on.
+      - name: Upload the tau wheel
+        if: ${{ !cancelled() && matrix.name == 'default' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tau-wheel
+          path: tau-wheel/
+          if-no-files-found: error
 
   # The devel build keeps assert() and DBG(...) live, which the release build
   # removes. It reads the release packages from the resolver's layers, so it
@@ -282,14 +315,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # tau-testnet's specs use bv, so this suite runs against the default pack.
+  # tau-testnet's specs use bv, so this suite runs on the wheel of the default
+  # pack. It takes the tau-wheel store package when the remote has it, else the
+  # artifact of the same wheel, and compiles nothing.
   testnet:
     name: Linux (tau-testnet)
-    needs: linux-resolve
+    needs: linux
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
     steps:
       - uses: actions/checkout@v7
         with:
@@ -299,32 +332,37 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # The default pack entry of the linux job writes this cache, so the
-      # key names default. This job only reads, to avoid a duplicate save.
-      - name: Restore ccache
-        uses: actions/cache/restore@v6
+      - name: Download the tau wheel artifact
+        uses: actions/download-artifact@v8
         with:
-          path: ccache
-          key: ccache-linux-default-${{ github.sha }}
-          restore-keys: |
-            ccache-linux-default-
+          name: tau-wheel
+          path: tau-wheel-artifact
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
 
-      - name: Build and test
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # store-remote.sh verifies a pulled entry before it imports it.
+      - name: Take the wheel from the store, else from the artifact
+        run: |
+          id="$(cat tau-wheel-artifact/store-id)"
+          mkdir -p tau-wheel
+          if external/parser/scripts/store-remote.sh pull "$HOME/.tau" "tau-wheel/${id}"; then
+            echo "tau-wheel ${id}: from the store"
+            cp "$HOME/.tau/store/tau-wheel/${id}/prefix"/tau_nanobind-*.whl tau-wheel/
+          else
+            echo "tau-wheel ${id}: not on the remote, from the artifact"
+            cp tau-wheel-artifact/tau_nanobind-*.whl tau-wheel/
+          fi
+
+      - name: Run the tau-testnet suite
         run: |
           ./dev docker test-with-testnet \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-linux-deps \
-            --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_WHEEL_DIR: tau-wheel
 
   # The address sanitizer job builds on the resolver's layers. release-asan
   # sets TAU_LTO=OFF, which moves the parser SDK id, so this job publishes that

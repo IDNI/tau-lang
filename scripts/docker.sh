@@ -53,7 +53,8 @@ case "${CMD}" in
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
                 echo "  build-release-resolve - build build-resolve image, release, configure only"
-                echo "  test-with-testnet - run the tau-testnet suite against the build"
+                echo "  tau-wheel     - build the tau wheel into TAU_WHEEL_DIR (default build/tau-wheel)"
+                echo "  test-with-testnet - run the tau-testnet suite on the wheel in TAU_WHEEL_DIR"
                 echo "  asan          - build and run the tests with the address sanitizer"
                 echo "  linux-devel   - build and run the devel suite, with asserts live"
                 echo "  linux-arm64-cross - cross-build Linux arm64 and run its tests under qemu"
@@ -110,8 +111,14 @@ case "${CMD}" in
         "build-release-resolve")
                 build --target build-resolve --build-arg BUILD_PRESET="release" -t tau:build-resolve "${@:2}"
                 ;;
+        "tau-wheel")
+                build --target tau-wheel \
+                        --output "type=local,dest=${TAU_WHEEL_DIR:-build/tau-wheel}" "${@:2}"
+                ;;
         "test-with-testnet")
-                build --target testnet -t tau:testnet "${@:2}"
+                build --target testnet \
+                        --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
+                        -t tau:testnet "${@:2}"
                 ;;
         "asan")
                 build --target asan -t tau:asan "${@:2}"
