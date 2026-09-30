@@ -209,7 +209,7 @@ set(_issue183_cmd "normalize all x:bv[3] ((x:bv[3] != {6}:bv[3]) || (ex y:bv[3] 
 foreach(_s 0 2)
 	tau_repl_unsupported(_tau_skip "${_issue183_cmd}")
 	if(_tau_skip)
-		tau_repl_record_skip("normalize_cmd-issue183_sub_true_splits${_s}")
+		tau_repl_record_skip("normalize_cmd-issue183_sub_true_splits${_s}" PACK)
 		continue()
 	endif()
 	add_test(NAME "test_repl-normalize_cmd-issue183_sub_true_splits${_s}"

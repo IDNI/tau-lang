@@ -87,7 +87,7 @@ endfunction()
 function(add_compile_run_test test_name steps spec)
 	tau_repl_unsupported(_tau_skip "${spec}")
 	if(_tau_skip)
-		tau_repl_record_skip("${test_name}")
+		tau_repl_record_skip("${test_name}" PACK)
 		return()
 	endif()
 	add_test(NAME "test_repl-${test_name}"
