@@ -194,7 +194,10 @@ ARG TEST_GCC_BUILD=yes
 # never rebuilds a dependency. The gcc check compiles a second, gcc-built set
 # of packages, so its configure belongs here for the publish to see them. The
 # *-all preset enables the executable and the tests in one configure.
+# A cache mount holds the store, so a failed configure keeps the entries it
+# finished. The mount is not part of the layer, so the store is copied out.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=cache,id=tau-store-linux,target=/root/.tau/store,sharing=locked \
 	echo "(BUILD) -- Resolving ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -214,7 +217,11 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
-	fi
+	fi && \
+	mkdir -p /root/.tau/store-layer && cp -a /root/.tau/store/. /root/.tau/store-layer/
+
+# The store mount hides the layer's own store, so the copy moves into place here.
+RUN rm -rf /root/.tau/store && mv /root/.tau/store-layer /root/.tau/store
 
 # The trusted workflow turns this on: the same image that resolves the store
 # packages publishes the ones the remote lacks, so the Linux ids match what
@@ -471,7 +478,10 @@ ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
 # Resolve the w64 store packages, and nothing else: the compile lives in the
 # w64-build stage, which inherits this layer, so a compile failure never
 # rebuilds a dependency.
+# A cache mount holds the store, so a failed configure keeps the entries it
+# finished. The mount is not part of the layer, so the store is copied out.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=cache,id=tau-store-w64,target=/root/.tau/store,sharing=locked \
 	echo "(BUILD) -- Resolving w64 ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
@@ -487,7 +497,11 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_BUILD_EXECUTABLE=ON \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
-	fi
+	fi && \
+	mkdir -p /root/.tau/store-layer && cp -a /root/.tau/store/. /root/.tau/store-layer/
+
+# The store mount hides the layer's own store, so the copy moves into place here.
+RUN rm -rf /root/.tau/store && mv /root/.tau/store-layer /root/.tau/store
 
 # The trusted workflow turns this on to publish the w64 packages the resolve
 # stage just resolved.
@@ -617,8 +631,9 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
-# wasm configure below. Its own store packages resolve in this layer.
+# wasm configure below. Its own store packages resolve in the store mount.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=cache,id=tau-store-wasm,target=/root/.tau/store,sharing=locked \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building native tau (sbf,tau pack) for parity" && \
 	scripts/with-gh-token ./dev preset release-tau -DTAU_BAS=sbf,tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
@@ -632,7 +647,10 @@ RUN --mount=type=secret,id=gh_token \
 # Tau's no-thread coverage is a droppable, no-SharedArrayBuffer configuration
 # kept measured so it does not rot, because -pthread is the default for every
 # other wasm target; its packages differ from the pthread ones.
+# A cache mount holds the store, so a failed configure keeps the entries it
+# finished. The mount is not part of the layer, so the store is copied out.
 RUN --mount=type=secret,id=gh_token \
+	--mount=type=cache,id=tau-store-wasm,target=/root/.tau/store,sharing=locked \
 	echo "(BUILD) -- Resolving the wasm dependencies" && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests --configure-only \
@@ -644,7 +662,11 @@ RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
-	fi
+	fi && \
+	mkdir -p /root/.tau/store-layer && cp -a /root/.tau/store/. /root/.tau/store-layer/
+
+# The store mount hides the layer's own store, so the copy moves into place here.
+RUN rm -rf /root/.tau/store && mv /root/.tau/store-layer /root/.tau/store
 
 # The trusted workflow turns this on to publish the wasm packages the resolve
 # stage just resolved.
