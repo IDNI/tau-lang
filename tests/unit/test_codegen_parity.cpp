@@ -325,12 +325,12 @@ result<bool> trace_is_admissible(const std::string& spec_src,
 			}
 		if (!found) return r.with_error(code::invalid_argument,
 			"the trace names a stream the spec does not declare",
-			{{label::name, a.name}});
+			{{tau_lang::label::name, a.name}});
 		size_t type_id = tau::get(found).get_ba_type();
 		if (type_id == 0) return r.with_error(
 			code::missing_type_information,
 			"the stream has no resolved BA type",
-			{{label::name, a.name}});
+			{{tau_lang::label::name, a.name}});
 		TAU_TRY(auto type_tree, tau::get(found).get_ba_type_tree());
 		TAU_TRY(auto cnst, ba_constants<node_t>::get(a.value, type_tree));
 		tref const_bf = build_bf_ba_constant<node_t>(cnst.first, type_id);
