@@ -103,7 +103,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
       # does not expose to run: steps
@@ -135,7 +140,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -169,7 +179,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -211,7 +226,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -286,7 +306,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -329,7 +354,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -387,7 +417,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -433,7 +468,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -468,7 +508,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -511,7 +556,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -545,7 +595,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -577,7 +632,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -627,7 +687,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -658,7 +723,12 @@ jobs:
         with:
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -712,7 +782,12 @@ jobs:
         with:
           platforms: arm64
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 

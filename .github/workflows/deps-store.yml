@@ -34,7 +34,12 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
@@ -94,7 +99,12 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           submodules: recursive
 
+      # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
