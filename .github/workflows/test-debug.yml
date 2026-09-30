@@ -1,10 +1,8 @@
 name: Test Debug
 
+# Manual only: the release suites cover every push, and a debug run is for
+# a person who asks for one.
 on:
-  push:
-    branches: [ "devel", "devel-*" ]
-  pull_request:
-    branches: [ "devel", "devel-*" ]
   workflow_dispatch:
 
 permissions:
