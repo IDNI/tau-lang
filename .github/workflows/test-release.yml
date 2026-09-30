@@ -321,7 +321,7 @@ jobs:
   testnet:
     name: Linux (tau-testnet)
     needs: linux
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.linux.result != 'skipped' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
