@@ -58,7 +58,7 @@ add_repl_test(ctl_star-realizable_E_F_input
 # the witness state has read its input: no branch from it keeps i1 at both
 # 1 and 0; decided on codes within the round cap of a game over formulas
 add_repl_test(ctl_star-realizable_E_always_input_both_values
-	"fragment ctl_star. set ltlrefinementrounds 4. realizable (E (always i1[t] = 1)) && (E (always i1[t] = 0))" ": F")
+	"fragment ctl_star. set ltlrefinementrounds 4. realizable (E (always i1[t] = 1)) && (E (always i1[t] = 0))" ": F" REQUIRES ltlsynt)
 # a past operator under E keeps the all-paths encoding: undecided, not F
 add_repl_test(ctl_star-realizable_E_since_undecided
 	"fragment ctl_star. realizable E ((i1[t] = 1) since (i1[t] = 0))"
@@ -115,8 +115,19 @@ add_raw_repl_test(ltl_cmd-backend_failure_is_unknown
 # ── Batch 3: error ≠ verdict ───────────────────────────────────────────────
 
 # IN-N1: no Spot on PATH is UNKNOWN, not "UNREALIZABLE (propositional)"
+# tau-run starts wine from PATH. tau.exe under wine cannot start a host
+# ltlsynt, so the directory of wine hides no Spot from the case.
+set(_no_spot_path /nonexistent-dir-without-spot)
+if(CMAKE_CROSSCOMPILING_EMULATOR AND WIN32 AND NOT CMAKE_HOST_WIN32)
+	list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 _emulator)
+	find_program(_emulator_path "${_emulator}" NO_CACHE)
+	if(_emulator_path)
+		cmake_path(GET _emulator_path PARENT_PATH _emulator_dir)
+		string(APPEND _no_spot_path ":${_emulator_dir}")
+	endif()
+endif()
 add_raw_repl_test(ltl_cmd-no_spot_is_unknown
-	"TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=/nonexistent-dir-without-spot ${TAU_RUN} -e \"ltl F o1[t] = 1\""
+	"TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=${_no_spot_path} ${TAU_RUN} -e \"ltl F o1[t] = 1\""
 	"UNKNOWN" FAIL_REGEX "UNREALIZABLE|Aborted|core dumped")
 
 # LA-8: a REALIZABLE line followed by a garbled HOA must not become a

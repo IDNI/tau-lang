@@ -110,7 +110,7 @@ add_repl_test(ltl_decisions-normalize_until_false_target
 add_repl_test(ltl_decisions-per_literal_guard_sat
 	"sat (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T")
 add_repl_test(ltl_decisions-per_literal_guard_realizable
-	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T")
+	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T" REQUIRES ltlsynt)
 
 # a consistency cap that gives up leaves the abstraction open; the input
 # tautology is decided on the data

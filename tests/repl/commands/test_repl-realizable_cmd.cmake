@@ -56,7 +56,7 @@ add_repl_test(realizable_cmd-sbf-constant_zero_sometimes_sat "realizable (someti
 add_repl_test(realizable_cmd-sbf-constant_one_sometimes_sat "realizable (sometimes o1[t]:sbf = 1)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-sbf-always_zero_and_sometimes_zero_sat "realizable (always o1[t]:sbf = 0) && (sometimes o1[t]:sbf = 0)." ": T")
 add_repl_test(realizable_cmd-sbf-always_one_conflicts_with_sometimes_zero_unsat "realizable (always o1[t]:sbf = 1) && (sometimes o1[t]:sbf = 0)." ": F")
-add_repl_test(realizable_cmd-sbf-loopback_and_constant_always_unsat "realizable (always o1[t]:sbf = o1[t-1]:sbf) && (always o1[t-1]:sbf = 1) && (sometimes o1[t]:sbf = 0)." ": F")
+add_repl_test(realizable_cmd-sbf-loopback_and_constant_always_unsat "realizable (always o1[t]:sbf = o1[t-1]:sbf) && (always o1[t-1]:sbf = 1) && (sometimes o1[t]:sbf = 0)." ": F" REQUIRES ltlsynt)
 
 # satisfiability: hsb
 add_repl_test(realizable_cmd-hsb-top_always_sat "realizable (always o1[t]:hsb = {top}:hsb)." ": T")
@@ -109,7 +109,7 @@ add_repl_test(realizable_cmd-mixed-simple_always_constant_position "realizable (
 add_repl_test(realizable_cmd-mixed-simple_sometimes_no_loopback "realizable (sometimes o1[t]:bv[4] = { 0 } || o2[t] = 0)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_tau "realizable (sometimes o1[t]:bv[4] = { 0 } || o2[t-2] = o2[t])." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv "realizable (sometimes o1[t]:bv[4] = o1[t-2] || o2[t] = 0)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv_and_tau "realizable (sometimes o1[t]:bv[4] = o1[t-2] || o2[t] = o2[t])." ": T")
+add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv_and_tau "realizable (sometimes o1[t]:bv[4] = o1[t-2] || o2[t] = o2[t])." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_sat "realizable (always o1[t]:bv[4] = o1[t-1] && o2[t] = o2[t-1]) || (sometimes o1[t]:bv[4] = { 1 } && o2[t] = 1)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_unsat "realizable (always o1[t]:bv[4] = { 1 } && o2[t] = 1) && (sometimes o1[t-1]:bv[4] = { 0 } || o2[t-1] = 0)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-qlt_and_bool_always_sat "realizable (always o1[t]:qlt > {0}:qlt && o2[t] = 1)." ": T")
@@ -642,9 +642,9 @@ add_repl_test(realizable_cmd-by_grammar-shape_m_12_dyadic_o1_0_1_u_g_f_o2_1_4_3_
 add_repl_test(realizable_cmd-by_grammar-shape_m_13_qlt_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_14_qlt_g_f_o1_0_1_qlt "realizable G (F (o1[t]:qlt = {(0, 1)}:qlt))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_15_qlt_o1_1_2_u_g_f_o2_0 "realizable (o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_m_16_nlang_f_f_f_o1_it_is_raining_nlang "realizable F (F (F (o1[t]:nlang = {it is raining}:nlang)))." ": T")
-add_repl_test(realizable_cmd-by_grammar-shape_m_17_nlang_g_f_o1_the_sun_is_shining_nlang "realizable G (F (o1[t]:nlang = {the sun is shining}:nlang))." ": T")
-add_repl_test(realizable_cmd-by_grammar-shape_m_18_nlang_o1_it_is_raining_u_g_f_o2_the_sun_is_shining "realizable (o1[t]:nlang = {it is raining}:nlang) until (G (F (o2[t]:nlang = {the sun is shining}:nlang)))." ": T")
+add_repl_test(realizable_cmd-by_grammar-shape_m_16_nlang_f_f_f_o1_it_is_raining_nlang "realizable F (F (F (o1[t]:nlang = {it is raining}:nlang)))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-by_grammar-shape_m_17_nlang_g_f_o1_the_sun_is_shining_nlang "realizable G (F (o1[t]:nlang = {the sun is shining}:nlang))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-by_grammar-shape_m_18_nlang_o1_it_is_raining_u_g_f_o2_the_sun_is_shining "realizable (o1[t]:nlang = {it is raining}:nlang) until (G (F (o2[t]:nlang = {the sun is shining}:nlang)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_n_01_f_f_f_o1_t_1_0_qlt "realizable F (F (F (o1[t-1]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_n_02_f_f_f_o1_t_2_0_qlt "realizable F (F (F (o1[t-2]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_n_03_f_f_f_o1_t_3_0_qlt "realizable F (F (F (o1[t-3]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
@@ -809,88 +809,88 @@ add_repl_test(realizable_cmd-bv-bare_strict_increase_unrealizable "realizable o1
 # the stream they fix stays free at every later step. The system owns every
 # stream, so each of these is realizable exactly when it is satisfiable.
 add_repl_test(realizable_cmd-initial_value_constant_stream_with_sometimes
-	"realizable (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_neq
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] != 0)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] != 0)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_first_stage
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o1[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o1[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_at_step_1
-	"realizable (always o1[1] = 0 && o2[1] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+	"realizable (always o1[1] = 0 && o2[1] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_lookback_2
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-2]) && (sometimes o2[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-2]) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_3_stages_initial_conditions_sometimes
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1]) && (sometimes o3[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1]) && (sometimes o3[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_5_stages_initial_conditions_sometimes
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o4[0] = 0 && o5[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1] && o4[t] = o3[t-1] && o5[t] = o4[t-1]) && (sometimes o5[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o4[0] = 0 && o5[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1] && o4[t] = o3[t-1] && o5[t] = o4[t-1]) && (sometimes o5[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_tautology
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && (i1[t] = 0 || i1[t] != 0)) && (sometimes o2[t] = 1)" ": T")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && (i1[t] = 0 || i1[t] != 0)) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_bv
-	"realizable (always o1[0]:bv[8] = 0 && o2[0]:bv[8] = 0 && o2[t]:bv[8] = o1[t-1]:bv[8]) && (sometimes o2[t]:bv[8] = 1)" ": T")
+	"realizable (always o1[0]:bv[8] = 0 && o2[0]:bv[8] = 0 && o2[t]:bv[8] = o1[t-1]:bv[8]) && (sometimes o2[t]:bv[8] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_sbf
-	"realizable (always o1[0]:sbf = 0 && o2[0]:sbf = 0 && o2[t]:sbf = o1[t-1]:sbf) && (sometimes o2[t]:sbf = 1)" ": T")
+	"realizable (always o1[0]:sbf = 0 && o2[0]:sbf = 0 && o2[t]:sbf = o1[t-1]:sbf) && (sometimes o2[t]:sbf = 1)" ": T" REQUIRES ltlsynt)
 # the chain still carries the initial zero forward when o1 is pinned to it
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_pinned_source_unrealizable
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && o1[t] = 0) && (sometimes o2[t] = 1)" ": F")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && o1[t] = 0) && (sometimes o2[t] = 1)" ": F" REQUIRES ltlsynt)
 # the environment keeps i1 away from 0
 add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_unrealizable
-	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1 && i1[t] = 0)" ": F")
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1 && i1[t] = 0)" ": F" REQUIRES ltlsynt)
 
 # The environment picks each input after the history is fixed. o2[t] is
 # o1[t-1], fixed a step before i1[t], so o2 cannot be made to meet i1; the
 # synthesis game played on the data shows it.
 add_repl_test(realizable_cmd-data_check_history_fixed_before_input
-	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))" ": F")
+	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_check_past_atom_against_input
-	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))" ": F")
+	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))" ": F" REQUIRES ltlsynt)
 # o1 copies i1 one step later, so the same relation one step back is won.
 add_repl_test(realizable_cmd-data_check_copy_of_past_input
-	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t-1]:bv[1]))" ": T")
+	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t-1]:bv[1]))" ": T" REQUIRES ltlsynt)
 # The relations make o1 repeat every six steps and flip every two, which no
 # stream does; only a chain longer than the lookback window shows it, and
 # the chain is blocked once the strategy loses against the data.
 add_repl_test(realizable_cmd-data_check_chain_longer_than_window
-	"realizable (always o2[t]:bv[1] = o1[t-2]:bv[1] && o3[t]:bv[1] = o2[t-2]:bv[1] && !(o1[t]:bv[1] = o3[t]:bv[1]) && o3[t-2]:bv[1] = o1[t]:bv[1]) && (sometimes o1[t-1]:bv[1] = 1)" ": F")
+	"realizable (always o2[t]:bv[1] = o1[t-2]:bv[1] && o3[t]:bv[1] = o2[t-2]:bv[1] && !(o1[t]:bv[1] = o3[t]:bv[1]) && o3[t-2]:bv[1] = o1[t]:bv[1]) && (sometimes o1[t-1]:bv[1] = 1)" ": F" REQUIRES ltlsynt)
 # A claim over an input the strategy cannot see is observed: set o1 to the
 # input seen at the step before, or output the terminal constant at once.
 add_repl_test(realizable_cmd-data_check_observed_copy_then_check
-	"realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": T")
+	"realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_check_observed_until_past_input
-	"realizable (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X&Y}:sbf)" ": T")
+	"realizable (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X&Y}:sbf)" ": T" REQUIRES ltlsynt)
 
 # The synthesis game played on the data decides what the abstraction over
 # the atoms leaves open or rejects: inputs are picked by the environment at
 # each step, after the history, and outputs after them.
 add_repl_test(realizable_cmd-data_game_history_fixed_before_input_tau
-	"realizable G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t]))" ": F")
+	"realizable G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t]))" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_delayed_copy_of_past_input
-	"realizable (always o1[1]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o2[t]:bv[1])" ": T")
+	"realizable (always o1[1]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o2[t]:bv[1])" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_value_fixed_two_steps_before_input
-	"realizable (always o1[0]:bv[1] = 0 && o1[t]:bv[1] = o2[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": F")
+	"realizable (always o1[0]:bv[1] = 0 && o1[t]:bv[1] = o2[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": F" REQUIRES ltlsynt)
 # no input sequence avoids i1[t-1] = i1[t] || i1[t-1] = 1 for two steps
 add_repl_test(realizable_cmd-data_game_unavoidable_input_goal
-	"realizable (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) && (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T")
+	"realizable (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) && (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_unavoidable_input_goal_ltl
-	"realizable (T U (o2[t]:bv[1] = i2[t-1]:bv[1])) && (T U ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T")
+	"realizable (T U (o2[t]:bv[1] = i2[t-1]:bv[1])) && (T U ((i1[t-1]:bv[1] = i1[t]:bv[1] || i1[t-1]:bv[1] = 1)))" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_mirrored_input_goal
-	"realizable (always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 && o1[t]:bv[1] = i1[t]:bv[1]) && (sometimes (!(o1[t]:bv[1] = 1) || i1[t-1]:bv[1] = 1))" ": T")
+	"realizable (always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 && o1[t]:bv[1] = i1[t]:bv[1]) && (sometimes (!(o1[t]:bv[1] = 1) || i1[t-1]:bv[1] = 1))" ": T" REQUIRES ltlsynt)
 # the always part reads two steps back, so the goal holds during its warm-up
 add_repl_test(realizable_cmd-data_game_outputs_goal_in_warm_up
-	"realizable (always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] && (o2[t-1] = 1 && o2[t-1] = o1[t-1]) && !(o1[t-2] = 0)) && (sometimes o1[t] = o2[t-1])" ": T")
+	"realizable (always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] && (o2[t-1] = 1 && o2[t-1] = o1[t-1]) && !(o1[t-2] = 0)) && (sometimes o1[t] = o2[t-1])" ": T" REQUIRES ltlsynt)
 # o2 is always 1, so the environment keeps i2 at 0
 add_repl_test(realizable_cmd-data_game_constant_output_against_input
-	"realizable (always o2[t-1]:bv[1] = 1) && (sometimes i2[t]:bv[1] = o2[t]:bv[1])" ": F")
+	"realizable (always o2[t-1]:bv[1] = 1) && (sometimes i2[t]:bv[1] = o2[t]:bv[1])" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_constant_output_against_input_ltl
-	"realizable (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F")
+	"realizable (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_sat_ltl_spelling
-	"sat (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F")
+	"sat (G (o2[t-1]:bv[1] = 1)) && (T U (i2[t]:bv[1] = o2[t]:bv[1]))" ": F" REQUIRES ltlsynt)
 # Over the default type these streams are read only through equalities, so
 # the game is played on codes of the values, within the round cap that
 # stops a game over formulas: o2 and o3 repeat o1 two steps later, and o3
 # is o1 two steps back, so o3[t-1] = 1 && o2[t] = o3[t-1] never holds.
 add_repl_test(realizable_cmd-data_game_equalities_over_default_type
-	"set ltlrefinementrounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F")
+	"set ltlrefinementrounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F" REQUIRES ltlsynt)
 
 # An abstraction over the atoms without a winning strategy is no proof: its
 # consistency constraints quantify the inputs universally, so they forbid
@@ -898,45 +898,43 @@ add_repl_test(realizable_cmd-data_game_equalities_over_default_type
 # every i1 meets one of the four atoms a step later; the game on the values
 # of bv[2] decides it.
 add_repl_test(realizable_cmd-abstraction_without_strategy_input_after_output
-	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-abstraction_without_strategy_sat_ltl_spelling
-	"sat T U (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
+	"sat T U (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-abstraction_without_strategy_sat_sometimes_spelling
 	"sat sometimes (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
 # the same once the abstraction's strategy is blocked for edges no data
 # realizes and no strategy is left
 add_repl_test(realizable_cmd-abstraction_refined_without_strategy
-	"realizable (G (F (o1[t-2]:bv[2] = { 2 }:bv[2]))) && (G (F ((((o1[t-1]:bv[2] != i1[t-2]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]') && (o1[t-2]:bv[2] = i1[t-2]:bv[2] || o1[t]:bv[2] = 0))) W (o1[t-2]:bv[2] != i1[t]:bv[2]))))" ": T")
+	"realizable (G (F (o1[t-2]:bv[2] = { 2 }:bv[2]))) && (G (F ((((o1[t-1]:bv[2] != i1[t-2]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]') && (o1[t-2]:bv[2] = i1[t-2]:bv[2] || o1[t]:bv[2] = 0))) W (o1[t-2]:bv[2] != i1[t]:bv[2]))))" ": T" REQUIRES ltlsynt)
 # without the constants the environment picks an i1 outside both atoms
 add_repl_test(realizable_cmd-abstraction_without_strategy_unrealizable
-	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]')" ": F")
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]')" ": F" REQUIRES ltlsynt)
 # A value compared with the complement of another is read on codes of the
 # pairs {v, v'}, so the game is played on the codes instead of on formulas.
 add_repl_test(realizable_cmd-data_game_complement_codes
-	"realizable (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1]))" ": T")
-set_tests_properties("test_repl-realizable_cmd-data_game_complement_codes"
-	PROPERTIES TIMEOUT 60)
+	"realizable (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1]))" ": T" TIMEOUT 60 REQUIRES ltlsynt)
 
 # A type with few elements read by arithmetic or by constants other than 0
 # and 1 is played on its values: the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
 add_repl_test(realizable_cmd-data_game_bv_arithmetic_values
-	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T")
+	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T" REQUIRES ltlsynt)
 
 # A bitvector stream of more than 4 bits is played on its bits, each
 # comparison a circuit over them: i1[t] + i1[t-1] never exceeds 1 when the
 # environment keeps i1 at 0
 add_repl_test(realizable_cmd-data_game_bv_bits_sum_of_inputs
-	"realizable (G ({1}:bv[8] = o1[t]:bv[8])) && (F (o1[t]:bv[8] < (i1[t]:bv[8] + i1[t-1]:bv[8])))" ": F")
+	"realizable (G ({1}:bv[8] = o1[t]:bv[8])) && (F (o1[t]:bv[8] < (i1[t]:bv[8] + i1[t-1]:bv[8])))" ": F" REQUIRES ltlsynt)
 # o1 falls by at least 2 a step, wrapping around 0, and meets 3
 add_repl_test(realizable_cmd-data_game_bv_bits_falling_output
-	"realizable (always ((o1[t]:bv[8] + {1}:bv[8]) < o1[t-1]:bv[8])) && (sometimes ({3}:bv[8] = o1[t-1]:bv[8]))" ": T")
+	"realizable (always ((o1[t]:bv[8] + {1}:bv[8]) < o1[t-1]:bv[8])) && (sometimes ({3}:bv[8] = o1[t-1]:bv[8]))" ": T" REQUIRES ltlsynt)
 # 3 is invertible modulo 2^16, so o2 meets the goal at step 0, before the
 # always part starts
 add_repl_test(realizable_cmd-data_game_bv_bits_product_by_constant
-	"realizable (always o2[t]:bv[16] = o1[t-1]:bv[16] + i1[t]:bv[16]) && (sometimes o2[t]:bv[16] * {3}:bv[16] = {1000}:bv[16] + i1[t]:bv[16])" ": T")
+	"realizable (always o2[t]:bv[16] = o1[t-1]:bv[16] + i1[t]:bv[16]) && (sometimes o2[t]:bv[16] * {3}:bv[16] = {1000}:bv[16] + i1[t]:bv[16])" ": T" REQUIRES ltlsynt)
 # against i1 = 4094 only o1 = 4095 is above it, one more than i1
 add_repl_test(realizable_cmd-data_game_bv_bits_difference_with_past_input
-	"realizable (always o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12]) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F")
+	"realizable (always o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12]) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F" REQUIRES ltlsynt)
 # o1 cannot fall forever through 8-bit values; the unrolling that finds it
 # out is decided on the bits of the values
 add_repl_test(realizable_cmd-bv_falling_output
@@ -950,15 +948,15 @@ endif()
 # order type of the window: how its values and the constants compare.
 # The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.
 add_repl_test(realizable_cmd-data_game_order_types_input_below_output
-	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": F")
+	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": F" REQUIRES ltlsynt)
 # the environment keeps i1 constant
 add_repl_test(realizable_cmd-data_game_order_types_until_input_changes
-	"realizable (({1/2}:qlt > i1[t]:qlt) U (i1[t]:qlt != i1[t-1]:qlt))" ": F")
+	"realizable (({1/2}:qlt > i1[t]:qlt) U (i1[t]:qlt != i1[t-1]:qlt))" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_order_types_constant_input_below_one
-	"realizable (always {0}:qlt = o1[t-1]:qlt) && (sometimes (i1[t-1]:qlt = i1[t-1]:qlt || i1[t]:qlt < o1[t-1]:qlt)) && (sometimes (i1[t-1]:qlt != i1[t]:qlt || {1}:qlt <= i1[t]:qlt))" ": F")
+	"realizable (always {0}:qlt = o1[t-1]:qlt) && (sometimes (i1[t-1]:qlt = i1[t-1]:qlt || i1[t]:qlt < o1[t-1]:qlt)) && (sometimes (i1[t-1]:qlt != i1[t]:qlt || {1}:qlt <= i1[t]:qlt))" ": F" REQUIRES ltlsynt)
 # an i1 at most 1 is copied into o1, which must stay above 1
 add_repl_test(realizable_cmd-data_game_order_types_copied_input_above_one
-	"realizable (always (o1[t]:qlt = i1[t-1]:qlt && {1}:qlt < o1[t-1]:qlt)) && (sometimes o1[t]:qlt <= o1[t-2]:qlt)" ": F")
+	"realizable (always (o1[t]:qlt = i1[t-1]:qlt && {1}:qlt < o1[t-1]:qlt)) && (sometimes o1[t]:qlt <= o1[t-2]:qlt)" ": F" REQUIRES ltlsynt)
 # o2 stays below 1 and o1 climbs from 0 to 1/2 over two steps
 add_repl_test(realizable_cmd-data_game_order_types_outputs_climb
-	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" ": T")
+	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" ": T" REQUIRES ltlsynt)

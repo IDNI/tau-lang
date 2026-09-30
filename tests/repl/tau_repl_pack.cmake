@@ -19,9 +19,9 @@
 # resolved when no ltlsynt was on PATH.
 find_program(TAU_LTLSYNT_PROGRAM ltlsynt HINTS "${TAU_SPOT_BIN}")
 
-# A wasm module cannot spawn a host process, so a host ltlsynt found on
-# PATH does not count as usable under Emscripten.
-if(TAU_LTLSYNT_PROGRAM AND NOT EMSCRIPTEN)
+# A wasm module and tau.exe under wine cannot start the host ltlsynt, so a
+# host ltlsynt found on PATH does not count as usable there.
+if(TAU_LTLSYNT_PROGRAM AND NOT EMSCRIPTEN AND NOT (WIN32 AND NOT CMAKE_HOST_WIN32))
 	set(TAU_REPL_LTLSYNT_USABLE TRUE)
 else()
 	set(TAU_REPL_LTLSYNT_USABLE FALSE)
@@ -65,7 +65,7 @@ endif()
 set(TAU_REPL_SKIP_REASONS PACK LTLSYNT HOSTFS SUBPROCESS SDK)
 set(TAU_REPL_DISABLED_REASONS HOSTFS SUBPROCESS)
 set(TAU_REPL_SKIP_WHY_PACK "naming a BA outside TAU_BAS=${TAU_BAS}")
-set(TAU_REPL_SKIP_WHY_LTLSYNT "needing ltlsynt, which this build cannot run")
+set(TAU_REPL_SKIP_WHY_LTLSYNT "needing ltlsynt, which this build cannot find or a wasm module or tau.exe under wine cannot start")
 set(TAU_REPL_SKIP_WHY_HOSTFS "opening a host file this build's filesystem cannot reach")
 set(TAU_REPL_SKIP_WHY_SUBPROCESS "spawning a host compiler, which a wasm module or tau.exe under wine cannot run")
 set(TAU_REPL_SKIP_WHY_SDK "needing a platform SDK this build tree does not hold")

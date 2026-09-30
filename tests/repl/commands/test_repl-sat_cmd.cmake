@@ -154,8 +154,8 @@ add_repl_test(sat_cmd-sometimes_constant_output_vs_input "sat (always o1[t] = 0)
 add_repl_test(sat_cmd-sometimes_follower_output "sat (always o1[t] = i1[t]) && (sometimes o1[t] = 1)" ": F")
 add_repl_test(sat_cmd-sometimes_follower_stronger "sat (always o1[t] = i1[t]) && (sometimes (i1[t] = 1 && o1[t] = 1))" ": F")
 # sat agrees with realizable and with the full-LTL spelling
-add_repl_test(sat_cmd-sometimes_input_realizable "realizable sometimes i1[t] = 1" ": F")
-add_repl_test(sat_cmd-sometimes_input_until "sat T U (i1[t] = 1)" ": F")
+add_repl_test(sat_cmd-sometimes_input_realizable "realizable sometimes i1[t] = 1" ": F" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-sometimes_input_until "sat T U (i1[t] = 1)" ": F" REQUIRES ltlsynt)
 # the step at which the sometimes holds may depend on the inputs: no single
 # step forces it, but every input sequence reaches it
 add_repl_test(sat_cmd-sometimes_input_dependent_step "sat sometimes (i1[t]:bv[1] = 1 || i1[t-1]:bv[1] = 0)" ": T" TIMEOUT 60)
@@ -168,7 +168,7 @@ add_repl_test(sat_cmd-sometimes_inputs_two_goals "sat (always ((o2[t-1]:bv[1] = 
 # reads less far back may already hold
 add_repl_test(sat_cmd-warm_up_sometimes_first_step "sat (always o1[t-1] = 1 && !(o2[t] = o1[t-1])) && (sometimes o2[t] = 1)" ": T")
 add_repl_test(sat_cmd-warm_up_sometimes_output "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
-add_repl_test(sat_cmd-warm_up_realizable "realizable (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_realizable "realizable (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_continuation "sat (always (i2[t] = o1[t-2] || o1[t-1] = 0) && o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t])" ": T")
 add_repl_test(sat_cmd-warm_up_same_lookback "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes (o2[t] = 1 && o1[t-1] = 1))" ": F")
 add_repl_test(sat_cmd-warm_up_none "sat (always o2[t] = 0) && (sometimes o2[t] = 1)" ": F")
@@ -183,8 +183,8 @@ add_repl_test(sat_cmd-warm_up_tautology_own_always "sat (always o2[t] = 1) && (a
 add_repl_test(sat_cmd-warm_up_absorbed "sat (always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)" ": T")
 add_repl_test(sat_cmd-warm_up_tautology_input "sat (always o2[t] = 1 && i1[t-1] = i1[t-1]) && (sometimes o2[t] = 0)" ": T")
 add_repl_test(sat_cmd-warm_up_tautology_bv "sat (always o2[t]:bv[1] = 1 && o1[t-2]:bv[1] = o1[t-2]:bv[1]) && (sometimes o2[t-1]:bv[1] = 0)" ": T")
-add_repl_test(sat_cmd-warm_up_tautology_realizable "realizable (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": T")
-add_repl_test(sat_cmd-warm_up_tautology_until "sat (G (o2[t] = 1 && o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_realizable "realizable (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": T" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_tautology_until "sat (G (o2[t] = 1 && o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))" ": T" REQUIRES ltlsynt)
 # in a sometimes clause it delays the first step the clause may hold at
 add_repl_test(sat_cmd-warm_up_tautology_sometimes "sat (always o2[t] = 1 && o3[t-1] = 0) && (sometimes (o2[t] = 0 && o1[t-1] = o1[t-1]))" ": F")
 # a sometimes part implied by another one is still asked from its own warm-up
