@@ -419,7 +419,7 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 			else if (op == tau::bf_lteq) op = tau::bf_gt;
 			else                         op = tau::bf_lt;
 		}
-		return bound{ op, other };
+		return bound{ static_cast<size_t>(op), other };
 	};
 	trefs conjs;
 	std::function<void(tref)> flatten = [&](tref n) {
