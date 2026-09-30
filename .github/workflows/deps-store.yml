@@ -38,8 +38,8 @@ jobs:
 
       # The Linux packages must carry the compiler the Docker consumers use, so
       # they are built and published from the same image the tests build in.
-      # TESTS=no keeps it to a configure and a tau build; the store is what the
-      # run leaves behind and TAU_STORE_PUBLISH uploads.
+      # TESTS=no keeps it to a configure and a tau build. With
+      # TAU_STORE_PUBLISH=ON, configure publishes each entry it builds.
       - name: Resolve and publish the Linux store packages
         run: |
           ./dev docker build-release \

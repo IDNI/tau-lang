@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The branch and the pusher's permission gate every publish step. GitHub
+  # The branch and the pusher's permission gate every publish. GitHub
   # checks the pusher, not the commit author, so the guard reads the
   # triggering actor. A pull request never publishes.
   guard:

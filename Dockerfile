@@ -24,10 +24,9 @@
 #   - wasm-browser: builds the browser REPL page and (TESTS=yes) runs the
 #     compiled suite in headless Chrome, the REPL suite inside the page, and
 #     the REPL page start check
-# - build, w64-build and wasm-node each split in three:
-#   - <stage>-resolve: configures only, which resolves the store packages
-#   - <stage>-publish: publishes those packages when TAU_STORE_PUBLISH=ON, and
-#     runs no test
+# - build, w64-build and wasm-node each split in two:
+#   - <stage>-resolve: configures only, which resolves the store packages. With
+#     TAU_STORE_PUBLISH=ON, configure publishes each entry right after it builds it
 #   - <stage>: compiles and runs the tests on top of <stage>-resolve
 # - build is split once more: build-compile compiles on top of build-resolve and
 #   build runs the tests on top of build-compile, so the testnet stage can reuse
@@ -130,7 +129,7 @@ ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 
 # ------------------------------------------------------------
 # Build tau executable and its tests (if TESTS = "yes"). The store packages
-# resolve here, so the publish stage needs no test run.
+# resolve and publish here, before any test runs.
 
 FROM deps AS build-resolve
 
@@ -192,7 +191,7 @@ ARG TEST_GCC_BUILD=yes
 # Resolve every store package this build reads, and nothing else: the compile
 # lives in the build stage, which inherits this layer, so a compile failure
 # never rebuilds a dependency. The gcc check compiles a second, gcc-built set
-# of packages, so its configure belongs here for the publish to see them. The
+# of packages, so its configure belongs here to resolve and publish them. The
 # *-all preset enables the executable and the tests in one configure.
 # ON makes configure publish each store entry right after it builds it, so a
 # later failure cannot lose it. The workflow turns it on when the guard allows.
