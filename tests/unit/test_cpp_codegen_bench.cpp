@@ -25,6 +25,7 @@
 #include "ltl_aba.h"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -260,11 +261,11 @@ TEST_SUITE("cpp_codegen_bench") {
         // Require at least 8 GB free before running the atomless2 benchmark:
         // its synthesis does ~190 ABA feasibility checks that can accumulate
         // several GB of formula-cache entries.
-        constexpr long ATOMLESS_MIN_MEM = 8L * 1024 * 1024 * 1024;
+        constexpr std::uint64_t ATOMLESS_MIN_MEM = UINT64_C(8) * 1024 * 1024 * 1024;
 
         for (auto& s : specs) {
             if (std::string(s.name) == "atomless2"
-                    && tau_test_available_mem_bytes() < (uint64_t)ATOMLESS_MIN_MEM) {
+                    && tau_test_available_mem_bytes() < ATOMLESS_MIN_MEM) {
                 MESSAGE("Spec        : atomless2 — SKIPPED (< 8 GB free)");
                 continue;
             }
