@@ -17,11 +17,15 @@ function(_tau_deps_toolchain_args out)
 	if(ARGC GREATER 1)
 		set(_target "${ARGV1}")
 	endif()
+	# Stripped, so an empty CMAKE_<LANG>_FLAGS gives the same flag string, and the
+	# same store id, as the host producer command.
+	string(STRIP "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}" _cflags)
+	string(STRIP "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" _cxxflags)
 	set(_args
 		"-DTAU_DEP_CC=${CMAKE_C_COMPILER}"
 		"-DTAU_DEP_CXX=${CMAKE_CXX_COMPILER}"
-		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}"
-		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}"
+		"-DTAU_DEP_CFLAGS=${_cflags}"
+		"-DTAU_DEP_CXXFLAGS=${_cxxflags}"
 		"-DTAU_DEP_TARGET=${_target}")
 	# A cross toolchain travels as a file; macOS and MSVC build with the host
 	# compiler the preset picked and pass none.
@@ -48,11 +52,13 @@ endfunction()
 # clang and the release flags, as every package; the target's global flags may
 # carry wasm-only options native clang rejects.
 function(_tau_deps_host_toolchain_args out)
+	string(STRIP "${CMAKE_C_FLAGS_RELEASE}" _cflags)
+	string(STRIP "${CMAKE_CXX_FLAGS_RELEASE}" _cxxflags)
 	set(_args
 		"-DTAU_DEP_CC=${TAU_HOST_C_COMPILER}"
 		"-DTAU_DEP_CXX=${TAU_HOST_CXX_COMPILER}"
-		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS_RELEASE}"
-		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS_RELEASE}")
+		"-DTAU_DEP_CFLAGS=${_cflags}"
+		"-DTAU_DEP_CXXFLAGS=${_cxxflags}")
 	set(${out} "${_args}" PARENT_SCOPE)
 endfunction()
 
@@ -189,14 +195,16 @@ function(tau_deps_resolve_parser)
 	endif()
 	tau_deps_ensure_prefix(parser-sdk "${_parser}" TAU_PARSER_SDK_PREFIX
 		${_parser_args})
+	# tgf only runs on the build machine, so its LTO does not follow TAU_LTO: one
+	# id serves every target preset of a host.
 	if(_cross)
 		tau_deps_ensure_host_prefix(tgf "${_parser}" TAU_TGF_PACKAGE_PREFIX
 			"-DTAU_PARSER_PACKAGE=tgf"
-			"-DTAU_PARSER_LTO=${TAU_LTO}" "-DTAU_PARSER_LTO_FAT=ON")
+			"-DTAU_PARSER_LTO=ON" "-DTAU_PARSER_LTO_FAT=ON")
 	else()
 		tau_deps_ensure_prefix(tgf "${_parser}" TAU_TGF_PACKAGE_PREFIX
 			"-DTAU_PARSER_PACKAGE=tgf"
-			"-DTAU_PARSER_LTO=${TAU_LTO}" "-DTAU_PARSER_LTO_FAT=ON")
+			"-DTAU_PARSER_LTO=ON" "-DTAU_PARSER_LTO_FAT=ON")
 	endif()
 	set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
 	set(TAU_UNORDERED_DENSE_PREFIX "${TAU_UNORDERED_DENSE_PREFIX}" PARENT_SCOPE)
