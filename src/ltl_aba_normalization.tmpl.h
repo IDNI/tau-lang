@@ -122,6 +122,13 @@ tref guard_to_aba(
 // the rest existentially, since the env picks inputs adversarially.
 // aba_existential_feasible (the oracle) quantifies everything existentially,
 // since a guard's own inputs already hold when it fires.
+//
+// Both rest on a tri-state check, where nullopt means the solver could not
+// decide. A caller that adds a constraint or drops a product on
+// infeasibility reads undecided as feasible (the `_feasible` functions); a
+// caller that accepts an edge on feasibility reads it as infeasible
+// (`aba_existential_proven_feasible`). Either way an UNREALIZABLE verdict
+// may rest on it, so reading undecided sets ltl_verdict_incomplete.
 
 // ── Mechanism 1(a) shadow crosscheck (ocLTL runtime-alignment design) ───────
 //
@@ -320,7 +327,7 @@ static bool qlt_order_conj_unsat(tref fm) {
 }
 
 template <NodeType node>
-static bool aba_existential_feasible(tref fm) {
+static std::optional<bool> aba_existential_feasibility(tref fm) {
 	using tau = tree<node>;
 	if (tau::get(fm).equals_T()) return true;
 	if (tau::get(fm).equals_F()) return false;
@@ -337,7 +344,7 @@ static bool aba_existential_feasible(tref fm) {
 		fp != cache_budget) { cache.clear(); cache_budget = fp; }
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	auto compute = [&]() -> bool {
+	auto compute = [&]() -> std::optional<bool> {
 		// Over a non-aba omcat theory, ask that theory per free variable
 		// rather than the general satisfiability path below.
 		//
@@ -425,15 +432,34 @@ static bool aba_existential_feasible(tref fm) {
 				return true;
 			}
 		auto sat = is_non_temp_nso_satisfiable<node>(fm);
-		return sat.has_value() && sat.value();
+		if (!sat.has_value()) return std::nullopt;
+		return sat.value();
 	};
 	ocltl_swap_stats().total_calls.fetch_add(1, std::memory_order_relaxed);
-	bool result = compute();
-	ocltl_swap_crosscheck<node>(fm, result); // shadow-only, see the note above
+	std::optional<bool> result = compute();
+	// an undecided check may be decided by a later, larger budget
+	if (!result) return std::nullopt;
+	ocltl_swap_crosscheck<node>(fm, *result); // shadow-only, see the note above
 #ifdef TAU_CACHE
-	cache.emplace(fm, result);
+	cache.emplace(fm, *result);
 #endif // TAU_CACHE
 	return result;
+}
+
+template <NodeType node>
+static bool aba_existential_feasible(tref fm) {
+	auto r = aba_existential_feasibility<node>(fm);
+	if (r) return *r;
+	ltl_verdict_incomplete = true;
+	return true;
+}
+
+template <NodeType node>
+static bool aba_existential_proven_feasible(tref fm) {
+	auto r = aba_existential_feasibility<node>(fm);
+	if (r) return *r;
+	ltl_verdict_incomplete = true;
+	return false;
 }
 
 // Per-step feasibility under an adversarial input: each free stream/time
@@ -442,7 +468,7 @@ static bool aba_existential_feasible(tref fm) {
 // instance may depend on an earlier one, never the reverse. Under
 // ltl_observed_abstraction every instance is existential.
 template <NodeType node>
-static bool aba_synthesis_feasible(tref fm) {
+static std::optional<bool> aba_synthesis_feasibility(tref fm) {
 	using tau = tree<node>;
 	if (tau::get(fm).equals_T()) return true;
 	if (tau::get(fm).equals_F()) return false;
@@ -478,19 +504,25 @@ static bool aba_synthesis_feasible(tref fm) {
 	// through its own quantifier support instead of DNF/Shannon case-split.
 	// A nullopt (cvc5 unknown or translation failure) is not a "no": fall
 	// through to the general solver rather than reading it as infeasible.
-	auto sat_nt = [](tref f) {
-		auto sr = is_non_temp_nso_satisfiable<node>(f);
-		return sr.has_value() && sr.value();
-	};
-	bool result;
-	if (pack_can_solve<node>(q_fm)) {
-		if (auto sat = pack_sat_status<node>(q_fm)) result = *sat;
-		else result = sat_nt(q_fm);
-	} else result = sat_nt(q_fm);
+	std::optional<bool> result;
+	if (pack_can_solve<node>(q_fm)) result = pack_sat_status<node>(q_fm);
+	if (!result)
+		if (auto sr = is_non_temp_nso_satisfiable<node>(q_fm);
+			sr.has_value()) result = sr.value();
+	// an undecided check may be decided by a later, larger budget
+	if (!result) return std::nullopt;
 #ifdef TAU_CACHE
-	cache.emplace(fm, result);
+	cache.emplace(fm, *result);
 #endif // TAU_CACHE
 	return result;
+}
+
+template <NodeType node>
+static bool aba_synthesis_feasible(tref fm) {
+	auto r = aba_synthesis_feasibility<node>(fm);
+	if (r) return *r;
+	ltl_verdict_incomplete = true;
+	return true;
 }
 
 // Unified feasibility dispatch (code_restruct_suggestion #6).
@@ -577,15 +609,21 @@ struct guard_product {
 // independent, so each gets its own solver call. Used directly where the
 // caller already has bare position formulas (window_infeasible_paths); the
 // guard_lit overload below handles the pick-and-classify-by-atom shape most
-// other callers have.
+// other callers have. `proven` reads an undecided check as infeasible, for
+// a caller that accepts an edge on a feasible answer.
 template <NodeType node>
-static bool guard_conj_feasible(const trefs& fs, bool single_type)
+static bool guard_conj_feasible(const trefs& fs, bool single_type,
+	bool proven = false)
 {
 	using tau = tree<node>;
+	auto feasible = [proven](tref f) {
+		return proven ? aba_existential_proven_feasible<node>(f)
+			: aba_existential_feasible<node>(f);
+	};
 	if (single_type) {
 		tref conj = tau::_T();
 		for (tref f : fs) conj = tau::build_wff_and(conj, f);
-		return aba_existential_feasible<node>(conj);
+		return feasible(conj);
 	}
 	std::map<size_t, tref> per_type;
 	for (tref f : fs) {
@@ -594,7 +632,7 @@ static bool guard_conj_feasible(const trefs& fs, bool single_type)
 		it->second = tau::build_wff_and(it->second, f);
 	}
 	for (auto& [tid, conj] : per_type)
-		if (!aba_existential_feasible<node>(conj)) return false;
+		if (!feasible(conj)) return false;
 	return true;
 }
 
@@ -602,14 +640,18 @@ static bool guard_conj_feasible(const trefs& fs, bool single_type)
 // set is single-typed.  `pick` selects which literals participate.
 template <NodeType node, typename Pick>
 static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
-    Pick&& pick, bool single_type)
+    Pick&& pick, bool single_type, bool proven = false)
 {
 	using tau = tree<node>;
+	auto feasible = [proven](tref f) {
+		return proven ? aba_existential_proven_feasible<node>(f)
+			: aba_existential_feasible<node>(f);
+	};
 	if (single_type) {
 		tref conj = tau::_T();
 		for (auto& gl : lits)
 			if (pick(gl)) conj = tau::build_wff_and(conj, gl.lit);
-		return aba_existential_feasible<node>(conj);
+		return feasible(conj);
 	}
 	std::map<size_t, tref> per_type;
 	for (auto& gl : lits) {
@@ -619,7 +661,7 @@ static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
 		it->second = tau::build_wff_and(it->second, gl.lit);
 	}
 	for (auto& [tid, conj] : per_type)
-		if (!aba_existential_feasible<node>(conj)) return false;
+		if (!feasible(conj)) return false;
 	return true;
 }
 
@@ -689,8 +731,9 @@ static std::vector<guard_product<node>> build_guard_live_products(
 		           return gl.pure_input; }, single_type))
 			continue;
 
+		// a feasible product covers input classes, so it must be proven
 		p.feasible = guard_conj_feasible<node>(p.lits, [](const guard_lit<node>&) {
-			return true; }, single_type);
+			return true; }, single_type, /*proven=*/true);
 		std::sort(p.input_lits.begin(), p.input_lits.end());
 		live.push_back(std::move(p));
 	}
@@ -960,32 +1003,52 @@ static int_t max_atom_lookback(
 	return m;
 }
 
-// True if `atom` is a ground equality (bf_eq) over exactly one io_var: the
-// shape the pairwise consistency fast path can decide without a solver
-// call. Positional atoms (no uniform shift) are excluded.
+// The constant of a ground equality `v = c` or `c = v`, where v is a bare
+// io_var with a uniform shift and c is 0, 1 or a BA constant; nullptr for
+// any other shape (an operator on either side, a second variable, ...).
 template <NodeType node>
-static bool atom_is_ground_single_stream_eq(tref atom) {
+static tref ground_eq_constant(tref atom) {
 	using tau = tree<node>;
 	const auto& t = tau::get(atom);
-	if (!t.has_child() || t[0].value.nt != tau::bf_eq) return false;
-	if (tau::get(atom).select_top(is_child<node, tau::io_var>).size() != 1)
-		return false;
-	return atom_uniform_shift<node>(atom).has_value();
+	if (!t.has_child() || t[0].value.nt != tau::bf_eq
+		|| t[0].children_size() != 2) return nullptr;
+	auto is_var = [](tref side) {
+		const auto& sd = tau::get(side);
+		return sd.child_is(tau::variable) && sd[0].child_is(tau::io_var);
+	};
+	auto is_const = [](tref side) {
+		const auto& sd = tau::get(side);
+		return sd.child_is(tau::bf_t) || sd.child_is(tau::bf_f)
+			|| sd.child_is(tau::ba_constant);
+	};
+	tref l = t[0].child(0), r = t[0].child(1);
+	tref c = is_var(l) && is_const(r) ? r
+		: is_const(l) && is_var(r) ? l : nullptr;
+	if (!c || !atom_uniform_shift<node>(atom).has_value()) return nullptr;
+	return c;
 }
 
-// Two ground single-stream equalities over the same io_var/shift agree iff
-// they carry the same constant; distinct constants are infeasible (forbid),
-// the same constant is trivially co-satisfiable. Returns false (fall
-// through to the solver) whenever the shape doesn't provably match.
+// Two ground equalities over the same io_var and shift are infeasible
+// together iff their constants differ. Only two constants of one kind
+// (both 0/1, or both BA constants) are compared, since 1 and a BA constant
+// may denote the same element. Returns false (fall through to the solver)
+// whenever the shape doesn't provably match.
 template <NodeType node>
 static bool ground_eq_pair_syntactically_infeasible(tref a, tref b) {
 	using tau = tree<node>;
-	if (!atom_is_ground_single_stream_eq<node>(a)
-	    || !atom_is_ground_single_stream_eq<node>(b))
-		return false;
+	tref ca = ground_eq_constant<node>(a);
+	tref cb = ground_eq_constant<node>(b);
+	if (!ca || !cb) return false;
 	if (atom_io_var_names<node>(a) != atom_io_var_names<node>(b)) return false;
 	if (*atom_uniform_shift<node>(a) != *atom_uniform_shift<node>(b)) return false;
-	return !tau::subtree_equals(a, b);
+	const auto& x = tau::get(ca);
+	const auto& y = tau::get(cb);
+	if (x.child_is(tau::ba_constant) != y.child_is(tau::ba_constant))
+		return false;
+	// 0 and 1 by kind, since a type annotation is part of their tree
+	if (!x.child_is(tau::ba_constant))
+		return x.child_is(tau::bf_t) != y.child_is(tau::bf_t);
+	return !tau::subtree_equals(x.first(), y.first());
 }
 
 // ── ABA consistency constraints ──────────────────────────────────────────────
@@ -2310,8 +2373,8 @@ static window_oracle_result window_infeasible_paths(
 
 	// Conjoin a set of position formulas, partitioned per BA type unless
 	// every atom shares one type (see guard_conj_feasible's trefs overload).
-	auto conj_feasible = [&](const trefs& fs) -> bool {
-		return guard_conj_feasible<node>(fs, single_type);
+	auto conj_feasible = [&](const trefs& fs, bool proven = false) -> bool {
+		return guard_conj_feasible<node>(fs, single_type, proven);
 	};
 
 	// One product = a conjunction of kept literals; an empty product means
@@ -2384,7 +2447,8 @@ static window_oracle_result window_infeasible_paths(
 		}
 
 		if (!any_data) return; // no data constraint anywhere in this window
-		if (conj_feasible(feasibility_terms)) return; // window is fine
+		if (conj_feasible(feasibility_terms, /*proven=*/true))
+			return; // window is fine
 
 		// Jointly infeasible; but if the environment itself can never
 		// drive the path (its pure-input part is already infeasible),
