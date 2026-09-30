@@ -9,9 +9,9 @@ on:
 
 # This workflow resolves the store. A resolving job publishes what it built
 # when the guard job allows it, so those jobs ask for packages: write. The
-# publish runs inline, so a red test cannot strand a package and a branch run
-# can fill the store. A pull request never publishes. A maintainer who
-# updates a branch inside the repository does publish.
+# publish runs inline, so a red test cannot strand a package. Only a push to
+# devel, devel-* or main by a writer publishes. A pull request, a push to any
+# other branch and a manual run never publish.
 permissions:
   contents: read
   packages: read
@@ -24,9 +24,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The pusher's permission gates every publish step. GitHub checks the
-  # pusher, not the commit author, so the guard reads the triggering actor.
-  # A pull request never publishes, even when its author has write access.
+  # The branch and the pusher's permission gate every publish step. GitHub
+  # checks the pusher, not the commit author, so the guard reads the
+  # triggering actor. A pull request never publishes.
   guard:
     name: Check the pusher's repository permission
     runs-on: ubuntu-24.04
@@ -45,6 +45,19 @@ jobs:
             echo "allowed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "${{ github.event_name }} run: publishing is off, only a push publishes"
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "${{ github.ref }}" in
+            refs/heads/devel|refs/heads/devel-*|refs/heads/main) ;;
+            *)
+              echo "ref ${{ github.ref }}: publishing is off, only devel, devel-* and main publish"
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           perm="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.triggering_actor }}/permission" --jq '.permission')" \
             || echo "::warning::cannot read the permission of ${{ github.triggering_actor }}"
           echo "pusher ${{ github.triggering_actor }}: permission '${perm}'"
