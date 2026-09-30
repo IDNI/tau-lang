@@ -55,6 +55,7 @@ case "${CMD}" in
                 echo "  build-release-resolve - build build-resolve image, release, configure only"
                 echo "  test-with-testnet - run the tau-testnet suite against the build"
                 echo "  asan          - build and run the tests with the address sanitizer"
+                echo "  linux-arm64-cross - cross-build Linux arm64 and run its tests under qemu"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
@@ -113,6 +114,9 @@ case "${CMD}" in
                 ;;
         "asan")
                 build --target asan -t tau:asan "${@:2}"
+                ;;
+        "linux-arm64-cross")
+                build --target linux-arm64-cross -t tau:linux-arm64-cross "${@:2}"
                 ;;
         "packages")
                 build --target packages -t tau:packages "${@:2}" && \

@@ -365,9 +365,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The wasm32-emscripten resolver. Its resolve stage first builds a native tau
-  # as the parity reference, which reads the linux-x86_64 packages, so it waits
-  # for the linux resolver instead of building them a second time.
+  # The wasm32-emscripten resolver. Its resolve stage copies the store of
+  # linux-resolve for the native parity tau and the host tools, so it waits
+  # for that job and reads its layers.
   wasm-node:
     name: WebAssembly (Node.js)
     needs: [guard, wasm-deps, linux-resolve]
@@ -395,6 +395,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-wasm-deps \
             --cache-to   type=gha,scope=tau-wasm-build,mode=max
         env:
@@ -442,10 +443,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The windows-x86_64-mingw resolver. It publishes before the tests, so a
-  # failed wine test keeps the mingw packages.
+  # failed wine test keeps the mingw packages. Its stage copies the store of
+  # linux-resolve for the host tools, so it waits for that job.
   linux-mingw64-wine-resolve:
     name: Windows cross-build store (MinGW)
-    needs: [guard, deps]
+    needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -470,6 +472,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base \
             --cache-to   type=gha,scope=tau-mingw64-wine-deps,mode=max
@@ -515,6 +518,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-mingw64-wine-deps \
+            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -597,94 +601,63 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The cross gate builds the same preset on x86 and runs it under qemu. The
-  # host spot keeps ltlsynt off the arm64 store package, which this host cannot
-  # execute. It builds and runs the Python binding too, so it registers qemu
-  # for the arm64 binaries and makes an arm64 venv for the interpreter.
+  # The cross gate builds the arm64 suite on x86 in the Linux image and runs it
+  # under qemu. Its stage starts from linux-resolve, so the host packages are
+  # hits, and it resolves and publishes the cross arm64 packages.
   linux-arm64-cross:
     name: Linux arm64 cross (clang, qemu)
-    needs: guard
+    needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     env:
+      # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
-      # Configure publishes each store entry right after it builds it.
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      # A test that starts an arm64 child reaches binfmt, and QEMU_LD_PREFIX
-      # is set for those children, so the handler must be registered before
-      # anything runs an arm64 binary. The action registers it with the
-      # fix-binary flag, which does not need systemd-binfmt on the runner.
+      # The build container runs arm64 binaries through the host's binfmt
+      # handler. The action registers it with the fix-binary flag, so the
+      # handler works inside the container too.
       - name: Register qemu for the arm64 binaries
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
-      # The default archive serves amd64 only, so the arm64 packages come from
-      # the ports archive and the default sources are pinned to amd64.
-      - name: Enable the arm64 multiarch sources
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo sed -i -E 's/^Types: (deb|deb-src)$/&\nArchitectures: amd64/' \
-            /etc/apt/sources.list.d/ubuntu.sources
-          sudo tee /etc/apt/sources.list.d/ubuntu-ports.sources >/dev/null <<'EOF'
-          Types: deb
-          URIs: http://ports.ubuntu.com/ubuntu-ports/
-          Suites: noble noble-updates noble-backports noble-security
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          Architectures: arm64
-          EOF
-          sudo apt-get update
+      - uses: docker/setup-buildx-action@v4
 
-      # The venv step runs the arm64 interpreter outside ctest, so it needs
-      # the loader prefix that cmake/tau-cross-test-environment.cmake gives
-      # only to the tests.
-      - name: Install the cross toolchain and the arm64 venv
-        env:
-          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
-        run: |
-          ./dev setup-ubuntu-ci-deps.sh
-          # The arm64 toolchain seeds FindPython from the interpreter in
-          # TAU_PYTHON (cmake/toolchains/aarch64-linux-gnu.cmake), so no arm64
-          # Python headers are installed here.
-          sudo apt-get install -y --no-install-recommends \
-            clang g++-aarch64-linux-gnu qemu-user
-          # The interpreter and nanobind come from the arm64 venv, which the
-          # binfmt registration above makes runnable. TAU_PYTHON arrives in
-          # later steps through GITHUB_ENV.
-          ./dev dep-python-venv -DTAU_PYTHON_ARCH=aarch64
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
+      - name: Restore ccache
+        uses: actions/cache@v6
         with:
-          path: ~/.tau/store
-          key: tau-store-linux-arm64-cross-${{ github.sha }}
+          path: ccache
+          key: ccache-linux-arm64-cross-${{ github.sha }}
           restore-keys: |
-            tau-store-linux-arm64-cross-
+            ccache-linux-arm64-cross-
 
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
-
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Build the arm64 tests and the binding, run them under qemu
-        run: ./dev preset release-arm64-all run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
-
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the test layer changes with every commit.
+      - name: Resolve, build and test under qemu
+        run: |
+          ./dev docker linux-arm64-cross \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The windows-x86_64-msvc resolver. cl.exe and clang-cl record a different
   # compiler in the package id, so this job resolves both id sets once and
