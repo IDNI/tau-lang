@@ -87,10 +87,16 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
-	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data),
+	: nt(static_cast<T>(nt) & nt_mask), term(is_term || is_term_nt(nt)),
+		ext(static_cast<T>(ext) & T(1)), data(data & data_mask),
 		ba_type(static_cast<uint32_t>(ba_type)),
 		hash(hashit())
 {
+	// The masks make each bitfield store visibly fit its width; these catch
+	// a value that the width would cut.
+	DBG(assert(static_cast<T>(nt) == this->nt);)
+	DBG(assert(static_cast<T>(ext) == this->ext);)
+	DBG(assert(data == this->data);)
 	static_assert(sizeof...(BAs) > 0,
 	"Empty template parameter pack not allowed");
 	// DBG(LOG_TRACE << "ba: " << ba_type);

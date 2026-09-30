@@ -200,6 +200,13 @@ struct node {
 
 	/** @brief Reinterpret the inline `data` field as `int_t`. */
 	int_t as_int() const;
+	/**
+	 * @brief The inline `data` of an integer node: the 32-bit pattern of
+	 * @p i, which fits data_bits, so as_int() reads @p i back on every target.
+	 */
+	static constexpr T integer_data(int_t i) {
+		return static_cast<T>(static_cast<uint32_t>(i));
+	}
 
 	/** @brief Return the full 64-bit payload. */
 	uint64_t get_data() const;

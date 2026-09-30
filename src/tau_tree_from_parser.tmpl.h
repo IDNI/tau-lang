@@ -212,7 +212,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 			}
 
 			case integer: x = getx_data(
-				static_cast<size_t>(process_integer())); break;
+				node::integer_data(process_integer())); break;
 
 			// digital terminals (same as is_digital_nt())
 			case num:

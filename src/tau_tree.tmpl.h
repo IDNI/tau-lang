@@ -616,7 +616,7 @@ tref tree<node>::get_num(uint64_t n) {
 
 template <NodeType node>
 tref tree<node>::get_integer(int_t n) {
-	return get(node(integer, static_cast<typename node::T>(n)));
+	return get(node(integer, node::integer_data(n)));
 }
 
 // constants
