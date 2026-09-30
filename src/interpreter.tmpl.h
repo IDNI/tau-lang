@@ -3889,7 +3889,7 @@ result<htrefs> interpreter<node>::finalize_alternatives(const trefs& alts) {
 		r.warning("pointwise revision produced more alternatives than "
 			"the cap keeps; the middle preference tiers are dropped",
 			{{label::limit, max_revision_alts},
-			 {label::value, result.size()}});
+			 {label::actual, result.size()}});
 		tref last = result.back();
 		result.resize(max_revision_alts - 1);
 		result.push_back(last);
