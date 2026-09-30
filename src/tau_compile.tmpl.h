@@ -170,7 +170,8 @@ inline result<bool> write_artifact_presets(const std::string& out_dir,
 // Runs the SDK's build script through the portable process helper. The script
 // writes configure.log and build.log into the artifact directory and prints
 // the failing stage; its exit code is the verdict. The check that out_exe
-// exists only catches a script that reported success without copying.
+// exists only catches a script that reported success without copying. The
+// script output goes to compile.log there, and a failure reports its end.
 inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	const std::string& artifact_dir, const std::string& out_exe,
 	const std::string& cxx, const std::string& preset,
@@ -223,13 +224,29 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	// A stale temporary from an earlier run must not read as this run's
 	// success; the script copies only after a clean build.
 	for (const auto& t : temps) fs::remove(t, ec);
+	// cmake -P prints every message on stderr. A report keeps only the
+	// start of an output, and the cause of a failure is at its end.
+	const std::string script_log = (fs::path(artifact_dir) / "compile.log")
+		.string();
 	spawn_options opts;
-	opts.merge_stderr = true;
+	opts.stderr_path = script_log;
 	auto spawned = spawn_capture(argv, 0, [](int c) { return c == 0; }, opts);
 	if (!spawned.has_value()) {
 		r.merge(std::move(spawned));
+		std::ifstream log_in(script_log, std::ios::binary);
+		std::ostringstream log_text;
+		log_text << log_in.rdbuf();
+		std::string_view tail = log_text.view();
+		while (!tail.empty() && (tail.back() == '\n' || tail.back() == '\r'))
+			tail.remove_suffix(1);
+		// Long enough to hold the cmake error above the call stack of tau_exit.
+		const size_t tail_len = 400;
+		if (tail.size() > tail_len) tail.remove_prefix(tail.size() - tail_len);
 		return r.with_error(code::runtime_error,
-			"compile: the cmake build failed");
+			"compile: the cmake build failed",
+			{{label::path, script_log},
+			 {label::value, tail.empty() ? std::string("(no output)")
+				: truncate_for_message(tail, tail_len)}});
 	}
 	auto move_into_place = [&](const std::string& from, const std::string& to) {
 		if (!fs::exists(from, ec) || ec) return false;
