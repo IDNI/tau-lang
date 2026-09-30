@@ -314,6 +314,7 @@ _dep_cvc5_producer() {
 	echo "dep-cvc5: feature set (CMakeCache USE_/ENABLE_):"
 	_dep_cvc5_features "${build}/CMakeCache.txt" | sed 's/^/  /' >&2
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
+		${_DEP_CVC5_BUILD_ENV[@]+"${_DEP_CVC5_BUILD_ENV[@]}"} \
 		"$DEP_CVC5_CMAKE" --build "$build" -- -j "$CVC5_JOBS" \
 		|| { echo "dep-cvc5: build failed" >&2; rm -rf "$work"; return 1; }
 	echo "dep-cvc5: verified closure:"
@@ -423,6 +424,7 @@ DEP_CVC5_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
 DEP_CVC5_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_CVC5_TARGET_ARGS=()
 _DEP_CVC5_COMPILER_ENV=()
+_DEP_CVC5_BUILD_ENV=()
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
 DEP_CVC5_BUILD_RPATH='${ORIGIN}'
 case "$DEP_CVC5_TARGET" in
@@ -464,6 +466,14 @@ case "$DEP_CVC5_TARGET" in
 			fi
 			_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
 				"-DPython3_EXECUTABLE=$_py")
+			# cvc5's FindGMP takes the GMP --host from TOOLCHAIN_PREFIX, which
+			# only cvc5's own toolchain file sets. An empty --host builds a
+			# static x86 GMP, and the shared libpoly then misses libgmp.so.
+			_DEP_CVC5_TARGET_ARGS+=(-DTOOLCHAIN_PREFIX=aarch64-linux-gnu)
+			# GMP configures at build time and would pick the gcc cross compiler.
+			_DEP_CVC5_BUILD_ENV=(
+				CC="$DEP_CVC5_CC --target=aarch64-linux-gnu"
+				CXX="$DEP_CVC5_CXX --target=aarch64-linux-gnu")
 		fi
 		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
 		# The toolchain file sets Python_EXECUTABLE to TAU_PYTHON, the arm64
