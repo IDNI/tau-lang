@@ -24,6 +24,8 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    # A hung job fails at its timeout instead of at the six-hour limit.
+    timeout-minutes: 100
     env:
       # ubuntu-24.04 runners are 4-core
       TAU_BUILD_JOBS: 4
@@ -91,6 +93,7 @@ jobs:
   # use.
   publish-linux-arm64:
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
     env:
       TAU_BUILD_JOBS: 4
     steps:
@@ -123,6 +126,7 @@ jobs:
   # The macOS packages are AppleClang-built and cannot come from the Linux job.
   publish-macos:
     runs-on: macos-15
+    timeout-minutes: 240
     env:
       TAU_BUILD_JOBS: 3
     steps:
@@ -149,6 +153,7 @@ jobs:
   # The MSVC packages are cl.exe-built and cannot come from the Linux job.
   publish-windows:
     runs-on: windows-latest
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash

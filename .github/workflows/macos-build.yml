@@ -13,6 +13,8 @@ env:
 jobs:
   build_and_deploy:
     runs-on: macos-15
+    # A hung job fails at its timeout instead of at the six-hour limit.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
         with:

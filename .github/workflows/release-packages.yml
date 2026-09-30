@@ -14,6 +14,8 @@ jobs:
   linux:
     name: Linux packages
     runs-on: ubuntu-24.04
+    # A hung job fails at its timeout instead of at the six-hour limit.
+    timeout-minutes: 170
     env:
       BUILD_JOBS: 4
     steps:
@@ -60,6 +62,7 @@ jobs:
   linux-arm64:
     name: Linux arm64 packages
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
     env:
       BUILD_JOBS: 4
     steps:
@@ -102,6 +105,7 @@ jobs:
   linux-arm64-wheel:
     name: Linux arm64 wheel
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
     env:
       BUILD_JOBS: 4
     steps:
@@ -170,6 +174,7 @@ jobs:
   linux-x86_64-wheel:
     name: Linux x86_64 wheel
     runs-on: ubuntu-24.04
+    timeout-minutes: 170
     env:
       BUILD_JOBS: 4
     steps:
@@ -233,6 +238,7 @@ jobs:
   linux-sdk:
     name: Linux SDK packages (${{ matrix.preset }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 200
     strategy:
       fail-fast: false
       matrix:
@@ -285,6 +291,7 @@ jobs:
   macos:
     name: macOS packages
     runs-on: macos-15
+    timeout-minutes: 240
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -337,6 +344,7 @@ jobs:
   macos-wheel:
     name: macOS wheel
     runs-on: macos-15
+    timeout-minutes: 240
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -397,6 +405,7 @@ jobs:
   windows-msvc-wheel:
     name: Windows wheel (MSVC)
     runs-on: windows-latest
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash
@@ -475,6 +484,7 @@ jobs:
     needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
       macos, macos-wheel, windows-msvc-wheel ]
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     # Creating the release needs contents: write; the build jobs keep the
     # workflow-level read-only token.
     permissions:

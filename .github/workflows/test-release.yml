@@ -30,6 +30,8 @@ jobs:
   guard:
     name: Setup · pusher permission
     runs-on: ubuntu-24.04
+    # A hung job fails at its timeout instead of at the six-hour limit.
+    timeout-minutes: 20
     permissions:
       contents: read
     outputs:
@@ -72,6 +74,7 @@ jobs:
   probe:
     name: Setup · pack matrix
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
@@ -97,6 +100,7 @@ jobs:
     name: Linux x86_64 · environment
     needs: guard
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -163,6 +167,7 @@ jobs:
     name: Linux x86_64 · tests
     needs: [guard, probe, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 170
     # The default entry publishes the tau-wheel package, which no other job
     # builds.
     permissions:
@@ -252,6 +257,7 @@ jobs:
     name: Linux x86_64 · tests (devel)
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 110
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -301,6 +307,7 @@ jobs:
     name: Linux x86_64 · tests (gcc)
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -351,6 +358,7 @@ jobs:
     needs: linux
     if: ${{ !cancelled() && needs.linux.result != 'skipped' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 140
     steps:
       - uses: actions/checkout@v7
         with:
@@ -408,6 +416,7 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 170
     permissions:
       contents: read
       packages: write
@@ -463,6 +472,7 @@ jobs:
     name: WebAssembly · environment
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -512,6 +522,7 @@ jobs:
     name: WebAssembly · tests (node)
     needs: [guard, wasm-deps, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 140
     permissions:
       contents: read
       packages: write
@@ -565,6 +576,7 @@ jobs:
     name: WebAssembly · tests (browser)
     needs: [wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 140
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -603,6 +615,7 @@ jobs:
     name: Windows MinGW · environment
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     permissions:
       contents: read
       packages: write
@@ -658,6 +671,7 @@ jobs:
     name: Windows MinGW · tests (wine)
     needs: linux-mingw64-wine-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 200
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -708,6 +722,7 @@ jobs:
     name: Linux arm64 · environment
     needs: guard
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
     permissions:
       contents: read
       packages: write
@@ -759,6 +774,7 @@ jobs:
     name: Linux arm64 · tests
     needs: linux-arm64-resolve
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
     env:
       # ubuntu-24.04-arm runners are 4-core
       BUILD_JOBS: 4
@@ -807,6 +823,7 @@ jobs:
     name: Windows MSVC · environment
     needs: guard
     runs-on: windows-latest
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
@@ -879,6 +896,7 @@ jobs:
     name: Windows MSVC · tests
     needs: windows-msvc-store
     runs-on: windows-latest
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash
@@ -941,6 +959,7 @@ jobs:
     name: macOS arm64 · environment
     needs: guard
     runs-on: macos-15
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
@@ -994,6 +1013,7 @@ jobs:
     name: macOS arm64 · tests
     needs: macos-arm64-store
     runs-on: macos-15
+    timeout-minutes: 240
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -1054,6 +1074,7 @@ jobs:
     name: macOS x86_64 · environment
     needs: guard
     runs-on: macos-15-intel
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
@@ -1107,6 +1128,7 @@ jobs:
     name: macOS x86_64 · tests
     needs: macos-x86_64-store
     runs-on: macos-15-intel
+    timeout-minutes: 240
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4
@@ -1171,6 +1193,7 @@ jobs:
       macos-x86_64-store]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       actions: write
     steps:
