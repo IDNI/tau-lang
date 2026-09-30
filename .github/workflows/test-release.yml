@@ -799,68 +799,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The cross gate builds the arm64 suite on x86 in the Linux image and runs it
-  # under qemu. Its stage starts from linux-resolve, so the host packages are
-  # hits, and it resolves and publishes the cross arm64 packages.
-  linux-arm64-cross:
-    name: Linux arm64 · tests (cross, qemu)
-    needs: [guard, linux-resolve]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # The build container runs arm64 binaries through the host's binfmt
-      # handler. The action registers it with the fix-binary flag, so the
-      # handler works inside the container too.
-      - name: Register qemu for the arm64 binaries
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-arm64-cross-${{ github.sha }}
-          restore-keys: |
-            ccache-linux-arm64-cross-
-
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
-
-      # No --cache-to: the test layer changes with every commit.
-      - name: Resolve, build and test under qemu
-        run: |
-          ./dev docker linux-arm64-cross \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # The Windows MSVC environment: the windows-x86_64-msvc store. cl.exe and
   # clang-cl record a different compiler in the package id, so this job
   # resolves both id sets once and saves the store. The test matrix below
@@ -1229,7 +1167,7 @@ jobs:
   cache-cleanup:
     name: Cleanup · old cache entries
     needs: [linux, linux-devel, linux-gcc, linux-asan, linux-mingw64-wine,
-      linux-arm64, linux-arm64-cross, windows-msvc-store, macos-arm64-store,
+      linux-arm64, windows-msvc-store, macos-arm64-store,
       macos-x86_64-store]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04

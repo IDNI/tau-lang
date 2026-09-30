@@ -99,8 +99,10 @@ ARM64 architectures):
 - `tau-sdk-windows-x86_64-mingw` is the same box for the Windows (MinGW)
   target.
 - `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target.
-- `tau-sdk-linux-arm64` is the same box for the Linux arm64 target, built by
-  cross compilation from an x86 host.
+- `tau-sdk-linux-arm64` is the same box for the Linux arm64 target on an x86
+  host. It is not a release package. Build it with
+  `./dev preset release-arm64-sdk-packages-deb` (or `-rpm`). The ARM64 release
+  packages carry the native `tau-sdk`.
 
 Install the SDK for each platform you target: one box carries one platform's
 archive, headers, bundled dependencies, presets and toolchain, and nothing of

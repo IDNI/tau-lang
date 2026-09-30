@@ -343,8 +343,6 @@ jobs:
           - preset: release-w64-sdk-packages-rpm
           - preset: release-wasm-sdk-packages-deb
           - preset: release-wasm-sdk-packages-rpm
-          - preset: release-arm64-sdk-packages-deb
-          - preset: release-arm64-sdk-packages-rpm
     env:
       BUILD_JOBS: 4
     steps:
@@ -362,8 +360,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends rpm unzip xz-utils
           case "${{ matrix.preset }}" in
             *-w64-*) sudo apt-get install -y --no-install-recommends mingw-w64 ;;
-            *-arm64-*) sudo apt-get install -y --no-install-recommends \
-              clang g++-aarch64-linux-gnu ;;
             *) ./dev dep-emsdk ;;
           esac
 

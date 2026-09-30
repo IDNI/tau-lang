@@ -478,7 +478,7 @@ Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas a
 - `cpp_codegen.h` / `cpp_codegen.tmpl.h`, `codegen_strategy.h` and the per-BA `<id>_codegen.tmpl.h` files — emit a synthesized strategy as a standalone C++17 program.
 - `pointwise_revision.h`, `preferences.h` — pointwise revision of a running specification and its preference order.
 - `parse_error_hint.h` — actionable hints for parse errors.
-- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`); the `-arm64-all` presets build and test it too, taking the aarch64 Python from the multiarch layout (`cmake/toolchains/aarch64-linux-gnu.cmake`) and running its tests under qemu.
+- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`); the local `-arm64-all` presets cross build it too, taking the aarch64 Python from the multiarch layout (`cmake/toolchains/aarch64-linux-gnu.cmake`) and running its tests under qemu. CI builds and tests arm64 natively on an arm64 runner and uses no qemu.
 
 ### Heuristics (`src/heuristics/`)
 

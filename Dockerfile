@@ -16,7 +16,6 @@
 #   - asan: builds and runs the tests with the address sanitizer
 #   - linux-devel: builds and runs the devel suite, with asserts live
 #   - linux-gcc: builds the library with gcc
-#   - linux-arm64-cross: cross-builds Linux arm64 and runs its tests under qemu
 #   - runner: provides a deb based image with installed tau package
 #   - rpm-runner: provides an rpm based image with installed tau package
 # - Windows branch is:
@@ -424,49 +423,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	ccache --show-stats
-
-# ------------------------------------------------------------
-# Cross build of Linux arm64 on x86, run under qemu. It starts from
-# linux-resolve, so the host packages are local hits and only the cross arm64
-# packages build here. The host needs a registered qemu binfmt handler.
-
-FROM linux-resolve AS linux-arm64-cross
-
-# The default archive serves amd64 only, so the arm64 packages come from the
-# ports archive and the default sources are pinned to amd64.
-RUN dpkg --add-architecture arm64 && \
-	sed -i -E 's/^Types: (deb|deb-src)$/&\nArchitectures: amd64/' \
-		/etc/apt/sources.list.d/ubuntu.sources && \
-	printf '%s\n' \
-		'Types: deb' \
-		'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
-		'Suites: noble noble-updates noble-backports noble-security' \
-		'Components: main restricted universe multiverse' \
-		'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
-		'Architectures: arm64' \
-		> /etc/apt/sources.list.d/ubuntu-ports.sources && \
-	apt-get update && \
-	apt-get install -y --no-install-recommends g++-aarch64-linux-gnu qemu-user
-
-# The arm64 interpreter and nanobind for the binding. The venv step runs that
-# interpreter outside ctest, so it needs the loader prefix the tests get from
-# cmake/tau-cross-test-environment.cmake.
-RUN QEMU_LD_PREFIX=/usr/aarch64-linux-gnu ./dev dep-python-venv -DTAU_PYTHON_ARCH=aarch64
-ENV TAU_PYTHON=/root/.tau/py312-aarch64/bin/python3
-
-ARG BUILD_JOBS=5
-
-# The launchers match linux-resolve, so the host package ids match.
-RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
-	--mount=type=secret,id=gh_token \
-	--mount=type=secret,id=store_publish \
-	echo "(BUILD) -- Building the arm64 tests and the binding, running them under qemu" && \
-	scripts/with-gh-token ./dev preset release-arm64-all run \
-		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-	ccache --show-stats
-
 
 # ============================================================
 

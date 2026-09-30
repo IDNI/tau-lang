@@ -96,8 +96,8 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   `$TAU_SHARED_PREFIX/py312`, and nanobind plus the platform's wheel repair
   tool (auditwheel, delocate or delvewheel) install into it with the venv's
   own pip. The script exports the interpreter as `TAU_PYTHON` to a CI job
-  through `$GITHUB_ENV`. A target arch needs binfmt for that arch, which the
-  arm64 cross job registers first.
+  through `$GITHUB_ENV`. A target arch needs a binfmt handler for that arch
+  on the local host.
 - `dep-cvc5`, `dep-boost`, `dep-curl`, `dep-spot`, `dep-tau-wheel`, `dep-tau-js`
   — the store producers configure runs itself; called by hand only to prefetch.
   Each has one script per target, `scripts/dep/<target>/<dep>.sh`, and one
