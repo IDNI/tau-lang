@@ -8,6 +8,7 @@ include_guard(GLOBAL)
 # The SDK is prebuilt, so its recorded lto and compiler id must match this
 # configure. A mismatch is a hard error: the SDK is built from this same preset,
 # so a difference means the store entry came from another toolchain.
+# One exception: tau_deps_gcc_takes_clang_packages gives a gcc configure on Linux the clang SDK.
 
 list(PREPEND CMAKE_PREFIX_PATH "${TAU_PARSER_SDK_PREFIX}")
 find_package(tauparser CONFIG REQUIRED NO_CMAKE_FIND_ROOT_PATH)
@@ -66,6 +67,11 @@ function(tau_parser_packages_check_lto tau_lto)
 			"the SDK is built from this preset's TAU_LTO, so they must match")
 	endif()
 	_tau_configure_compiler_id(_tau_compiler)
+	# A gcc configure on Linux links the clang SDK that tau-deps resolved for it.
+	tau_deps_gcc_takes_clang_packages(_clang_packages)
+	if(_clang_packages AND _sdk_compiler STREQUAL "Clang")
+		return()
+	endif()
 	if(NOT _sdk_compiler STREQUAL "${_tau_compiler}")
 		message(FATAL_ERROR
 			"the parser SDK was built with compiler_id=${_sdk_compiler}, but this "

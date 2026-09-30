@@ -8,6 +8,16 @@ include_guard(GLOBAL)
 # decides when a producer runs.
 include("${CMAKE_CURRENT_LIST_DIR}/../external/parser/cmake/tau-store.cmake")
 
+# A gcc configure on Linux takes the packages of the clang one: both share
+# libstdc++, and the parser SDK carries fat LTO objects gcc can link.
+function(tau_deps_gcc_takes_clang_packages out)
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TAU_DEPS_TARGET MATCHES "^linux-")
+		set(${out} TRUE PARENT_SCOPE)
+	else()
+		set(${out} FALSE PARENT_SCOPE)
+	endif()
+endfunction()
+
 # Compiler and flag arguments every producer receives, so no producer reads a
 # compiler from the environment. Every build type passes the release flags, so
 # a devel or debug configure uses the packages of the release one. An optional
@@ -23,9 +33,8 @@ function(_tau_deps_toolchain_args out)
 	string(STRIP "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" _cxxflags)
 	set(_cc "${CMAKE_C_COMPILER}")
 	set(_cxx "${CMAKE_CXX_COMPILER}")
-	# A gcc configure on Linux takes the packages of the clang one: both share
-	# libstdc++, and the parser SDK carries fat LTO objects gcc can link.
-	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TAU_DEPS_TARGET MATCHES "^linux-")
+	tau_deps_gcc_takes_clang_packages(_clang_packages)
+	if(_clang_packages)
 		find_program(_clang clang NO_CACHE)
 		find_program(_clangxx clang++ NO_CACHE)
 		if(NOT _clang OR NOT _clangxx)
