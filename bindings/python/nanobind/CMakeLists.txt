@@ -200,6 +200,12 @@ set_source_files_properties(tau_nanobind.cpp PROPERTIES
 if(BUILD_TESTING)
 	file(GLOB TAU_PYTHON_BINDING_TEST_SCRIPTS
 		"${CMAKE_SOURCE_DIR}/tests/bindings/python/test_*.py")
+	set(_tau_python_test_env
+		"TAU_PYTHON_MODULE_DIR=$<TARGET_FILE_DIR:${TAU_PYTHON_BINDING_MODULE}>")
+	# The library probes TAU_SPOT_BIN after PATH, and a store Spot is only there.
+	if(TAU_SPOT_BIN)
+		list(APPEND _tau_python_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+	endif()
 	foreach(test_script ${TAU_PYTHON_BINDING_TEST_SCRIPTS})
 		get_filename_component(test_stem "${test_script}" NAME_WE)
 		# the wheel check takes a wheel path, so it registers separately below
@@ -209,7 +215,7 @@ if(BUILD_TESTING)
 		add_test(NAME "binding-python-${test_stem}"
 			COMMAND ${TAU_PYTHON_EMULATOR} ${Python_EXECUTABLE} "${test_script}")
 		set_tests_properties("binding-python-${test_stem}" PROPERTIES
-			ENVIRONMENT "TAU_PYTHON_MODULE_DIR=$<TARGET_FILE_DIR:${TAU_PYTHON_BINDING_MODULE}>")
+			ENVIRONMENT "${_tau_python_test_env}")
 	endforeach()
 
 	# Repeatable wheel check: verifies a built wheel's tag, module, bundled cvc5
