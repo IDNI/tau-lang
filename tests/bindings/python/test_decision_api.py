@@ -14,6 +14,9 @@ import tau_loader as tau
 INPUT_DEPENDENT = "always o1[t]:bv[8] = i1[t]:bv[8] && o1[t] != {0}:bv[8]."
 CONTRADICTION = "always o2[t] = 1 && o2[t] = 0."
 
+# The binding has no type query, and each option name starts with its family.
+HAS_BV = any(n.startswith("bv-") for n in tau.ba_option_names())
+
 def untyped(core):
 	return [re.sub(r":[a-z]+(\[[0-9]+\])?", "", c) for c in core]
 
@@ -32,6 +35,7 @@ def test_sat_valid_realizable():
 	assert verdict(tau.unsat(CONTRADICTION)) is True
 	assert verdict(tau.unrealizable(CONTRADICTION)) is True
 
+def test_input_dependent():
 	# Tau satisfiability quantifies the inputs universally: some input
 	# (i1 = 0) makes the spec contradictory, so it is unsat.
 	assert verdict(tau.sat(INPUT_DEPENDENT)) is False
@@ -103,10 +107,15 @@ def test_warm_ups_as_written():
 def main():
 	test_warm_ups_as_written()
 	test_sat_valid_realizable()
+	if HAS_BV:
+		test_input_dependent()
 	test_definitions_are_applied()
 	test_errors_carry_no_verdict()
 	test_unsat_core()
-	test_reset_between_typings()
+	if HAS_BV:
+		test_reset_between_typings()
+	else:
+		print("skipped the bv cases: the pack has no bv")
 	print("Test passed!")
 
 if __name__ == "__main__":
