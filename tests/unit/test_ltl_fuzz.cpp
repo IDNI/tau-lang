@@ -32,6 +32,7 @@
 #include <string>
 #include <cstdlib>
 #include <cstdio>
+#include <limits>
 #include <unordered_set>
 
 using namespace idni::tau_lang;
@@ -42,7 +43,7 @@ static void do_gc() {
 }
 using std::string;
 using std::mt19937;
-using std::uint64_t;
+using std::uint32_t;
 
 // ── formula pair (tau syntax + Spot syntax) ────────────────────────────────────
 
@@ -182,9 +183,15 @@ static int spot_decide(const string& ltl_formula) {
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-static uint64_t get_env_uint(const char* name, uint64_t def) {
+// mt19937 seeds from 32 bits only, so a seed that does not fit fails the test
+// instead of losing its high bits.
+static uint32_t get_env_seed(const char* name, uint32_t def) {
 	const char* v = std::getenv(name);
-	return v ? (uint64_t)std::stoull(v) : def;
+	if (!v) return def;
+	const unsigned long long seed = std::stoull(v);
+	if (seed > std::numeric_limits<uint32_t>::max())
+		FAIL(name << "=" << seed << " does not fit the 32-bit mt19937 seed");
+	return static_cast<uint32_t>(seed);
 }
 
 static int get_env_int(const char* name, int def) {
@@ -200,7 +207,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 		* doctest::skip(!ltlsynt_available())) {
 		// Any formula tau can parse must not throw an exception.
 		// Parse failures (nullptr) are acceptable — crashes are not.
-		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  42);
+		uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  42);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300);
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
 		if (depth < 1) depth = 1;
@@ -220,7 +227,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 	}
 
 	TEST_CASE("DETERM: same formula gives the same verdict 3 times") {
-		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  43);
+		uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  43);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 5;
 		if (count < 1) count = 1;
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
@@ -253,7 +260,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 	// of Emscripten -- using it here would skip the case under Node as well.
 	TEST_CASE("CROSS: tau verdict matches Spot (ltlsynt) verdict"
 		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0)) {
-		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  44);
+		uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  44);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300);
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
 		if (depth < 1) depth = 1;
@@ -319,7 +326,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 	TEST_CASE("CROSS-bv1: tau verdict matches Spot over two-element atoms"
 		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
 			|| !pack_owns_ba_type_name<node_t>("bv"))) {
-		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  45);
+		uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  45);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 3;
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
 		if (count < 1) count = 1;
