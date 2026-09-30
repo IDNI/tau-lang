@@ -32,7 +32,6 @@ CVC5_DEFAULT_COMMIT="ea1b484fa54bfe56c0f8b3ac90a6e3e2f46441e7"
 CVC5_EXPECTED_CLOSURE=(
 	"CaDiCaL|rel-2.1.3-elevate|https://github.com/arminbiere/cadical/archive/rel-2.1.3-elevate.tar.gz|15e1e82f7f9a9da0e97070cb8ac41d5b32139f65d54f72d2ff84849b0466ef92"
 	"SymFPU|e6ac3af9c2c574498ea171c957425b407625448b|https://github.com/cvc5/symfpu/archive/e6ac3af9c2c574498ea171c957425b407625448b.tar.gz|823aa663fcc2f6844ae5e9ea83ceda4ed393cdb3dadefce9b3c7c41cd0f4f702"
-	"libpoly|0.2.0|https://github.com/SRI-CSL/libpoly/archive/refs/tags/v0.2.0.tar.gz|146adc0d3f6fe8038adb6b8b69dd16114a4be12f520d5c1fb333f3746d233abe"
 	"GMP|6.3.0|https://github.com/cvc5/cvc5-deps/blob/main/gmp-6.3.0.tar.bz2?raw=true|ac28211a7cfb609bae2e2c8d6058d66c8fe96434f740cf6fe2e47b000d1c20cb"
 )
 
@@ -303,7 +302,7 @@ _dep_cvc5_producer() {
 		${_DEP_CVC5_COMPILER_ENV[@]+"${_DEP_CVC5_COMPILER_ENV[@]}"} \
 		CXXFLAGS="${DEP_CVC5_CXXFLAGS} ${prefix_map}" \
 		CFLAGS="${DEP_CVC5_CFLAGS} ${prefix_map}" \
-		./configure.sh --no-gpl --auto-download \
+		./configure.sh --no-gpl --auto-download --no-poly \
 			${_DEP_CVC5_TARGET_ARGS[@]+"${_DEP_CVC5_TARGET_ARGS[@]}"} \
 			-DSKIP_SET_RPATH=ON \
 			-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH" \
@@ -468,7 +467,7 @@ case "$DEP_CVC5_TARGET" in
 				"-DPython3_EXECUTABLE=$_py")
 			# cvc5's FindGMP takes the GMP --host from TOOLCHAIN_PREFIX, which
 			# only cvc5's own toolchain file sets. An empty --host builds a
-			# static x86 GMP, and the shared libpoly then misses libgmp.so.
+			# static x86 GMP that cvc5 cannot link.
 			_DEP_CVC5_TARGET_ARGS+=(-DTOOLCHAIN_PREFIX=aarch64-linux-gnu)
 			# GMP configures at build time and would pick the gcc cross compiler.
 			_DEP_CVC5_BUILD_ENV=(
@@ -495,9 +494,12 @@ case "$DEP_CVC5_TARGET" in
 		;;
 esac
 
+# tau asks cvc5 only for linear logics, and libpoly serves only nonlinear
+# arithmetic.
 _DEP_CVC5_CONFIGURE_ARGS=(
 	--no-gpl
 	--auto-download
+	--no-poly
 	-DSKIP_SET_RPATH=ON
 	-DCMAKE_INSTALL_RPATH="$DEP_CVC5_INSTALL_RPATH"
 	-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH"
