@@ -110,22 +110,21 @@ endif()
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
 message(STATUS "TAU_LINK_OPTIONS ${TAU_LINK_OPTIONS}")
 
-# gold links noticeably faster than bfd; use it everywhere when available.
-# em++ always links (it ignores -fuse-ld=gold rather than rejecting it), so
-# the check below passes there too, but wasm-ld is em++'s only real linker.
-# MSVC has no gold; skip the probe entirely.
-if(EMSCRIPTEN OR NOT TAU_IS_GNU_OR_CLANG)
-	set(TAU_LINKER "")
-else()
+# clang links with lld, because asan supports lld. Every other toolchain keeps
+# its default linker. em++ reports the Clang id, but wasm-ld is its only linker.
+set(TAU_LINKER "")
+if(NOT EMSCRIPTEN AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+		AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
 	include(CheckLinkerFlag)
-	check_linker_flag(CXX "-fuse-ld=gold" TAU_HAVE_GOLD)
-	if(TAU_HAVE_GOLD)
-		set(TAU_LINKER "-fuse-ld=gold")
-		set(CMAKE_LINK_DEPENDS_USE_LINKER FALSE)
-	else()
-		set(TAU_LINKER "")
-		message(STATUS "gold not available, linking with the default linker")
+	check_linker_flag(CXX "-fuse-ld=lld" TAU_HAVE_LLD)
+	if(TAU_HAVE_LLD)
+		set(TAU_LINKER "-fuse-ld=lld")
 	endif()
+endif()
+if(TAU_LINKER)
+	message(STATUS "linker: lld")
+else()
+	message(STATUS "linker: the default linker of the compiler")
 endif()
 
 include(git-defs) # for ${TAU_GIT_DEFINITIONS}

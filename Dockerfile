@@ -79,11 +79,14 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
-	clang-19=1:19.1.1-1ubuntu1~24.04.2
+	clang-19=1:19.1.1-1ubuntu1~24.04.2 \
+	lld-19=1:19.1.1-1ubuntu1~24.04.2
 
 # The presets and the host tgf probe need the plain names, and every stage inherits them.
+# -fuse-ld=lld looks for ld.lld.
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
-	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100 && \
+	update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-19 100
 
 # Spot's own Debian repository is the only official Spot package source, and it
 # serves amd64 only. An arm64 image has no ltlsynt on PATH, so its configure
