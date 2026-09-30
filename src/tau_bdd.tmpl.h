@@ -821,7 +821,11 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 	for (i = 0; i != v.size(); ++i)
 		// m holds the smallest variable, so unequal variables are bigger or leaves
 		if (!tau::subtree_equals(get_var(v[i]), m)) l.push_back(v[i]);
-		else if (get_low(v[i]) == F) return flag ? res = F, 1 : 2;
+		else if (get_low(v[i]) == F) {
+			if (!flag) return 2;
+			res = F;
+			return 1;
+		}
 		else if (get_low(v[i]) != T) l.push_back(get_low(v[i]));
 
 	am_sort(l);
