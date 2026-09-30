@@ -314,6 +314,7 @@ jobs:
       packages: write
     env:
       BUILD_JOBS: 4
+      # Configure publishes each store entry right after it builds it.
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
@@ -388,14 +389,6 @@ jobs:
         with:
           path: ~/.tau/store
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
-
-      # Configure resolved the store before any test ran, so a red test still
-      # publishes what this job built.
-      - name: Publish the store packages
-        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
-        run: ./dev store-publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The MinGW gate builds the Windows pack in the w64 image and runs its
   # suite under wine. It runs the default pack only.
@@ -696,6 +689,7 @@ jobs:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
       TAU_STORE_KEEP: 3
+      # Configure publishes each store entry right after it builds it.
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
@@ -736,14 +730,6 @@ jobs:
         run: |
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      # Configure resolved the store before any test ran, so a red test still
-      # publishes what this job built.
-      - name: Publish the store packages
-        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
-        run: ./dev store-publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # saved after the run, so a build failure still keeps the packages that
       # did resolve and the next run does not rebuild them
@@ -799,6 +785,7 @@ jobs:
         shell: bash
     env:
       TAU_BUILD_JOBS: 4
+      # Configure publishes each store entry right after it builds it.
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
@@ -841,14 +828,6 @@ jobs:
 
       - name: Build and test tau (${{ matrix.preset }})
         run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      # Configure resolved the store before any test ran, so a red test still
-      # publishes what this job built.
-      - name: Publish the store packages
-        if: ${{ !cancelled() && needs.guard.outputs.allowed == 'true' }}
-        run: ./dev store-publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
