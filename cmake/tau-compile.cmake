@@ -27,6 +27,9 @@
 # The platform list and the preset-to-platform map come from the SDK the script
 # lives in; no list is repeated here.
 
+# A -P script sets no policy by itself: cmake 3.x then rejects IN_LIST.
+cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
+
 # cmake_language(EXIT) is the only way a -P script chooses its own exit code.
 # Older cmake collapses every failure to 1, so a success must return instead
 # of falling into the FATAL_ERROR branch.
