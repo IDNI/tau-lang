@@ -25,6 +25,12 @@
 
 #include <fstream>
 #include <sys/stat.h>
+// getpid is POSIX; Windows declares it in process.h instead.
+#ifdef _WIN32
+#  include <process.h>
+#else
+#  include <unistd.h>
+#endif
 
 using namespace idni::tau_lang;
 
