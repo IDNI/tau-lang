@@ -146,8 +146,7 @@ function(_tau_deps_run_producer dep producer_cmd out_var)
 			list(REMOVE_AT _args 0)
 		endif()
 	endif()
-	# Stream the producer stderr live; the capture holds the progress and error
-	# lines, and the build output stays in the entry log.
+	# The producer output streams live on stderr, and the entry log keeps a copy.
 	execute_process(
 		COMMAND ${producer_cmd} ${_args}
 		RESULT_VARIABLE _rc
@@ -156,11 +155,11 @@ function(_tau_deps_run_producer dep producer_cmd out_var)
 		ECHO_ERROR_VARIABLE)
 	if(NOT _rc EQUAL 0)
 		if(_optional)
-			message(WARNING "cannot resolve the optional ${dep} package.\n${_err}\n${_out}")
+			message(WARNING "cannot resolve the optional ${dep} package; see the output and the entry log above.\n${_out}")
 			set(${out_var} "" PARENT_SCOPE)
 			return()
 		endif()
-		message(FATAL_ERROR "cannot resolve the ${dep} package.\n${_err}\n${_out}")
+		message(FATAL_ERROR "cannot resolve the ${dep} package; see the output and the entry log above.\n${_out}")
 	endif()
 	if(NOT _out MATCHES "package prefix: (.*)")
 		message(FATAL_ERROR "no prefix in the ${dep} producer output:\n${_out}")
