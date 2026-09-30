@@ -380,6 +380,28 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
 	}
 
+	// The view of a strategy on the bits of a bitvector wider than 4 bits
+	// reads i1 bit by bit, and o1 is a value of its type.
+	TEST_CASE("compile_spec: the data game's Mealy view on bits is carried as a table") {
+		const std::string m = emitted_main(
+			"(always (i1[t]:bv[8] > {100}:bv[8] -> o1[t]:bv[8] = {7}:bv[8])) "
+			"&& (sometimes (i1[t]:bv[8] > {100}:bv[8] "
+			"|| o1[t]:bv[8] = {200}:bv[8]))", "dg_view_bits");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
+	}
+
+	// The view of a strategy on the order types of qlt values places each
+	// value among the last ones and the constants.
+	TEST_CASE("compile_spec: the data game's Mealy view on order types is carried as a table") {
+		const std::string m = emitted_main(
+			"((i1[t-1]:qlt <= i1[t]:qlt && i1[t-1]:qlt > o1[t-1]:qlt)) "
+			"U ((o1[t]:qlt != i1[t]:qlt && o1[t-1]:qlt != i1[t-1]:qlt))",
+			"dg_view_order");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
+	}
+
 	// An output atom that also reads its own last value has no constant
 	// witness: o2[t] > o2[t-1] is solved each step for the value o2[t-1]
 	// holds.
