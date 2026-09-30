@@ -87,12 +87,14 @@ function(tau_deps_producer_command out script)
 	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
 	# Exclude the flag arguments only: a real path, such as the toolchain file,
 	# must still convert.
+	# Git Bash also rewrites the CFLAGS and CXXFLAGS that a producer exports.
 	# A producer resolves its own job count as -D > env > auto, so hand it this
 	# configure's resolved value as the -D the environment cannot shadow.
 	set(${out}
 		"${CMAKE_COMMAND}" -E env
 			--unset=CPPFLAGS --unset=CFLAGS --unset=CXXFLAGS --unset=LDFLAGS
 			"MSYS2_ARG_CONV_EXCL=-DTAU_DEP_CFLAGS=\;-DTAU_DEP_CXXFLAGS=\;-DCMAKE_C_FLAGS=\;-DCMAKE_CXX_FLAGS="
+			"MSYS2_ENV_CONV_EXCL=CXXFLAGS\;CFLAGS"
 			"TAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}"
 			"TAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}"
 			"${TAU_BASH}" "${script}" ${_toolchain}
@@ -109,10 +111,12 @@ function(tau_deps_host_producer_command out script)
 	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
 	# Exclude the flag arguments only: a real path, such as the toolchain file,
 	# must still convert.
+	# Git Bash also rewrites the CFLAGS and CXXFLAGS that a producer exports.
 	set(${out}
 		"${CMAKE_COMMAND}" -E env
 			--unset=CPPFLAGS --unset=CFLAGS --unset=CXXFLAGS --unset=LDFLAGS
 			"MSYS2_ARG_CONV_EXCL=-DTAU_DEP_CFLAGS=\;-DTAU_DEP_CXXFLAGS=\;-DCMAKE_C_FLAGS=\;-DCMAKE_CXX_FLAGS="
+			"MSYS2_ENV_CONV_EXCL=CXXFLAGS\;CFLAGS"
 			"TAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}"
 			"TAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}"
 			"${TAU_BASH}" "${script}" ${_toolchain}
