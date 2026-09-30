@@ -1,0 +1,4 @@
+# Repository text is LF on every platform. The provenance guard pins sha256
+# digests of working-tree files, and the store ids hash them, so a CRLF
+# checkout would fail configure on Windows.
+* -text
