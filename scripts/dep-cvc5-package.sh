@@ -253,6 +253,19 @@ _dep_cvc5_producer() {
 		rm -rf "$work"
 		return 1
 	fi
+	# configure.sh joins its options into one string and splits it again, so a
+	# value with a space would reach CMake in pieces.
+	local _a
+	for _a in ${_DEP_CVC5_TARGET_ARGS[@]+"${_DEP_CVC5_TARGET_ARGS[@]}"} \
+			"--prefix=${staging_prefix}"; do
+		case "$_a" in
+			*" "*)
+				echo "dep-cvc5: cvc5's configure.sh cannot pass an option with a space: '${_a}'" >&2
+				rm -rf "$work"
+				return 1
+				;;
+		esac
+	done
 	# configure.sh must run from the cvc5 base directory. The prefix is added
 	# here, not part of the recorded args.
 	( cd "$work" && env -u CPPFLAGS -u LDFLAGS \
@@ -388,13 +401,12 @@ case "$DEP_CVC5_TARGET" in
 		_DEP_CVC5_TARGET_ARGS=(--win64)
 		;;
 	windows-x86_64-msvc)
-		# Native MSVC: Ninja + the production build type. cl comes from the
-		# preset through -DTAU_DEP_C*; CMake must not fall back to another
-		# compiler. GMP is the known risk -- point CVC5_CMAKE_PREFIX at an
-		# MSVC-compatible GMP when --auto-download cannot supply one.
-		_DEP_CVC5_TARGET_ARGS=(--ninja production
-			-DCMAKE_C_COMPILER="$DEP_CVC5_CC"
-			-DCMAKE_CXX_COMPILER="$DEP_CVC5_CXX")
+		# Native MSVC: Ninja + the production build type. GMP is the known risk --
+		# point CVC5_CMAKE_PREFIX at an MSVC-compatible GMP when --auto-download
+		# cannot supply one.
+		# cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
+		# spaces, and cl sits under "Program Files".
+		_DEP_CVC5_TARGET_ARGS=(--ninja production)
 		_py="$(_dep_cvc5_python || true)"
 		if [ -n "$_py" ]; then
 			_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
