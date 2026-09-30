@@ -49,6 +49,7 @@ case "${CMD}" in
                 echo "  build         - default build"
                 echo "  base          - build base image"
                 echo "  deps          - build deps image"
+                echo "  linux-store   - resolve every Linux store package once"
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
                 echo "  build-release-resolve - build build-resolve image, release, configure only"
@@ -94,6 +95,9 @@ case "${CMD}" in
                 ;;
         "deps")
                 build --target deps -t tau:deps "${@:2}"
+                ;;
+        "linux-store")
+                build --target linux-store -t tau:linux-store "${@:2}"
                 ;;
         "build-debug")
                 build --target build --build-arg BUILD_PRESET="debug" -t tau:debug "${@:2}"

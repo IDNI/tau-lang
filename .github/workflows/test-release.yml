@@ -162,9 +162,46 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # One job resolves every Linux store package, so the pack jobs, asan and
+  # testnet read the layer instead of each building a missing package. A pull
+  # request, which cannot publish, still gets the store through this layer.
+  linux-store:
+    name: Resolve the Linux store
+    needs: [guard, deps]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Resolve the Linux store packages
+        run: |
+          ./dev docker linux-store \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-linux-store \
+            --cache-to   type=gha,scope=tau-linux-store,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   linux:
     name: Linux release tests (${{ matrix.name }})
-    needs: [guard, probe, deps]
+    needs: [guard, probe, deps, linux-store]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -217,6 +254,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-linux-store \
             --cache-to   type=gha,scope=tau-release-${{ matrix.name }},mode=max
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -234,6 +272,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-linux-store \
             --cache-from type=gha,scope=tau-release-${{ matrix.name }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -464,7 +503,7 @@ jobs:
 
   testnet:
     name: tau-testnet suite
-    needs: [guard, linux]
+    needs: [guard, linux, linux-store]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -511,6 +550,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-linux-store \
             --cache-from type=gha,scope=tau-release-default
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -647,7 +687,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
-    needs: [guard, deps]
+    needs: [guard, deps, linux-store]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -687,7 +727,8 @@ jobs:
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
-            --cache-from type=gha,scope=tau-deps
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-linux-store
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -7,6 +7,7 @@
 # - base: contains the base system with installed system dependencies
 # - Linux branch is:
 #   - deps: dependencies (cvc5)
+#   - linux-store: resolves every Linux store package once, for build and asan
 #   - build: builds tau executable and runs tests
 #   - packages: creates a release packages (deb and rpm)
 #   - testnet: runs the tau-testnet suite against the build
@@ -25,7 +26,8 @@
 #   - wasm-browser: builds the browser REPL page and (TESTS=yes) runs the
 #     compiled suite in headless Chrome, the REPL suite inside the page, and
 #     the REPL page start check
-# - build, w64-build and wasm-node each split in two:
+# - build, w64-build and wasm-node each split in two (build-resolve starts
+#   from linux-store):
 #   - <stage>-resolve: configures only, which resolves the store packages. With
 #     TAU_STORE_PUBLISH=ON, configure publishes each entry right after it builds it
 #   - <stage>: compiles and runs the tests on top of <stage>-resolve
@@ -129,10 +131,11 @@ ENV TAU_PYTHON=/root/.tau/py312/bin/python3
 
 
 # ------------------------------------------------------------
-# Build tau executable and its tests (if TESTS = "yes"). The store packages
-# resolve and publish here, before any test runs.
+# Resolve every Linux store package once: the default pack is a superset of
+# the others, and the gcc check needs its own gcc-built set. build-resolve and
+# asan start from here, so their configure finds only local hits.
 
-FROM deps AS build-resolve
+FROM deps AS linux-store
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -157,6 +160,48 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 # The HTTP oracle in nlang links libcurl.
 RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev
 
+ARG BUILD_JOBS=5
+
+# Argument BUILD_PRESET=release/debug picks the CMake preset family
+ARG BUILD_PRESET=release
+
+# The remote store: configure reads a missing package from it before it builds
+# one (cmake/tau-deps.cmake). The token is mounted only for the configure
+# step; an empty value keeps the remote out of a local build.
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
+# The source COPY above changes on every commit, so no layer cache can hold
+# the objects. A ccache mount survives it, and it outlives the build.
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
+# Set TEST_GCC_BUILD=no to skip the gcc compilation check
+ARG TEST_GCC_BUILD=yes
+
+# The launchers match the later configure steps, so the store ids match.
+# ON makes configure publish each store entry right after it builds it, so a
+# later failure cannot lose it. The workflow turns it on when the guard allows.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Resolving the Linux store: $(head -n 1 VERSION)" && \
+	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --configure-only \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+	if [ "$TEST_GCC_BUILD" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset devel-make-gcc --configure-only \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi
+
+
+# ------------------------------------------------------------
+# Build tau executable and its tests (if TESTS = "yes"). The store packages
+# resolve here as local hits, before any test runs.
+
+FROM linux-store AS build-resolve
+
 # Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
 
@@ -173,29 +218,12 @@ ARG BUILD_PRESET=release
 # Argument TESTS=no is used to skip building and running tests
 ARG TESTS=yes
 
-# The remote store: configure reads a missing package from it before it builds
-# one (cmake/tau-deps.cmake). The token is mounted only for the configure
-# step; an empty value keeps the remote out of a local build.
-ARG TAU_STORE_REMOTE=
-ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
-
 # Argument TAU_BAS=<ids> picks the pack; empty keeps the default pack
 ARG TAU_BAS=
 
-# The source COPY above changes on every commit, so no layer cache can hold
-# the objects. A ccache mount survives it, and it outlives the build.
-ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
-
-# Set TEST_GCC_BUILD=no to skip the gcc compilation check
-ARG TEST_GCC_BUILD=yes
-
-# Resolve every store package this build reads, and nothing else: the compile
-# lives in the build stage, which inherits this layer, so a compile failure
-# never rebuilds a dependency. The gcc check compiles a second, gcc-built set
-# of packages, so its configure belongs here to resolve and publish them. The
-# *-all preset enables the executable and the tests in one configure.
-# ON makes configure publish each store entry right after it builds it, so a
-# later failure cannot lose it. The workflow turns it on when the guard allows.
+# Configure the pack this build compiles. The compile lives in the build stage,
+# which inherits this layer, so a compile failure never rebuilds a dependency.
+# The *-all preset enables the executable and the tests in one configure.
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Resolving ${BUILD_PRESET} dependencies: $(head -n 1 VERSION)" && \
@@ -208,12 +236,6 @@ RUN --mount=type=secret,id=gh_token \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tau --configure-only \
-			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
-			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
-	fi && \
-	if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset devel-make-gcc --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
@@ -325,40 +347,12 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 # Run the tests with the address sanitizer. The sanitizer flag is added after
 # configure resolves the store, so this stage reuses the Linux store packages.
 
-FROM deps AS asan
-
-COPY --from=source /tau-lang /tau-lang
-
-WORKDIR /tau-lang
-
-# The build context carries no .git, so the stamp arrives as a build argument.
-ARG TAU_GIT_DESCRIBED=
-ARG TAU_GIT_BRANCH=
-ARG TAU_GIT_COMMIT_HASH=
-ARG TAU_PARSER_GIT_DESCRIBED=
-ARG TAU_PARSER_GIT_BRANCH=
-ARG TAU_PARSER_GIT_COMMIT_HASH=
-ARG TAU_PARSER_COMMIT=
-ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
-	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
-	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH} \
-	TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
-	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
-	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH} \
-	TAU_PARSER_COMMIT=${TAU_PARSER_COMMIT}
-
-# The HTTP oracle in nlang links libcurl.
-RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev
+FROM linux-store AS asan
 
 ARG BUILD_JOBS=5
 
-ARG TAU_STORE_REMOTE=
-ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
-
-ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
-
-# The launchers match build-resolve, so the store ids match the Linux job's.
-# release-asan sets TAU_LTO=OFF, which moves only the parser SDK id.
+# The launchers match linux-store, so the store ids match. release-asan sets
+# TAU_LTO=OFF, which moves only the parser SDK id.
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
