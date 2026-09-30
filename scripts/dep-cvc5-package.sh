@@ -119,6 +119,22 @@ _dep_cvc5_python() {
 	return 1
 }
 
+# The build host's own interpreter, for cvc5's build scripts. A cross job can
+# put the target venv first on PATH, and that interpreter runs only under qemu.
+_dep_cvc5_host_python() {
+	local c m
+	m="$(uname -m)"
+	for c in "$(command -v python3 2>/dev/null || true)" /usr/bin/python3; do
+		[ -n "$c" ] && [ -x "$c" ] || continue
+		if "$c" -c 'import platform, sys; sys.exit(platform.machine() != sys.argv[1])' \
+				"$m" > /dev/null 2>&1; then
+			printf '%s' "$c"
+			return 0
+		fi
+	done
+	return 1
+}
+
 _dep_cvc5_field_block() {
 	local build_helper publish_helper manifest store
 	local recipe_hash build_hash publish_hash manifest_hash store_hash
@@ -427,8 +443,20 @@ case "$DEP_CVC5_TARGET" in
 			fi
 			_DEP_CVC5_TARGET_ARGS+=(
 				-DCMAKE_TOOLCHAIN_FILE="$DEP_CVC5_TOOLCHAIN")
+			_py="$(_dep_cvc5_host_python || true)"
+			if [ -z "$_py" ]; then
+				echo "dep-cvc5: linux-arm64 needs a build-host python3" >&2
+				exit 2
+			fi
+			_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
+				"-DPython3_EXECUTABLE=$_py")
 		fi
 		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
+		# The toolchain file sets Python_EXECUTABLE to TAU_PYTHON, the arm64
+		# interpreter for the binding, and that shadows the -D above.
+		if dep_target_is_cross linux-arm64; then
+			_DEP_CVC5_COMPILER_ENV+=(TAU_PYTHON=)
+		fi
 		;;
 	darwin-*)
 		# macOS has no $ORIGIN and no absolute install_name: a relocatable
