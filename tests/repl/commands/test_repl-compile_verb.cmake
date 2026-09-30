@@ -58,3 +58,11 @@ add_compile_run_test(compile_verb-solves_as_run_from_start 6
 # or was refused, its bitvector output given no witness.
 add_compile_run_test(compile_verb-solves_as_run_witness 6
 	"always o1[t-1]:bv[1] = 1")
+# The data game decides each of these on codes a table carries since the
+# Mealy view covers them: the bits of an 8-bit output,
+add_compile_run_test(compile_verb-plays_view_on_bits 6
+	"(always ((o1[t]:bv[8] < (o1[t]:bv[8] - {3}:bv[8])) || ({0}:bv[8] = o1[t-1]:bv[8]))) && (sometimes ((({3}:bv[8] + o1[t]:bv[8]) <= o1[t-1]:bv[8]) || (o1[t]:bv[8] < {2}:bv[8])))")
+# and the order of qlt values, whose output the program solves each step
+# for the point run takes.
+add_compile_run_test(compile_verb-plays_view_on_order_types 6
+	"(always {0}:qlt <= o1[t]:qlt) && (sometimes ({1/2}:qlt > o1[t]:qlt || o1[t-1]:qlt != o1[t-1]:qlt))")
