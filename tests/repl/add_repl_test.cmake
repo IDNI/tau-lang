@@ -49,6 +49,9 @@ function(tau_repl_unescape_quotes out cmd)
 	set(${out} "${_cmd}" PARENT_SCOPE)
 endfunction()
 
+# The host picks the shell of a case: a Windows target built on Linux runs its
+# cases through bash and TAU_RUN, so the emulator starts tau.exe.
+
 # add_repl_test(<name> <cmd> <regex> [FLAGS <arg>...] [NO_TRACE]
 #     [ENV <VAR=value>...] [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
 #     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
@@ -62,7 +65,7 @@ function(add_repl_test test_name test_cmd test_regex)
 	if(_tau_NO_TRACE)
 		set(_trace "")
 	endif()
-	if(WIN32)
+	if(CMAKE_HOST_WIN32)
 		tau_repl_unescape_quotes(_cmd "${test_cmd}")
 		add_test(NAME "test_repl-${test_name}"
 			COMMAND ${TAU_LAUNCHER} ${_tau_FLAGS} -e "${_cmd}" ${_trace})
@@ -82,7 +85,7 @@ function(add_echo_repl_test test_name test_cmd test_regex)
 	cmake_parse_arguments(PARSE_ARGV 3 _tau "${TAU_REPL_CHECK_OPTIONS}"
 		"${TAU_REPL_CHECK_ONE_VALUE}" "${TAU_REPL_CHECK_MULTI_VALUE}")
 	tau_repl_gate_case("test_repl-${test_name}" test_cmd)
-	if(WIN32)
+	if(CMAKE_HOST_WIN32)
 		tau_repl_unescape_quotes(_cmd "${test_cmd}")
 		add_test(NAME "test_repl-${test_name}"
 			COMMAND powershell -NoProfile -Command
@@ -122,7 +125,7 @@ function(add_multiline_repl_test test_name test_regex)
 			list(APPEND _args -X)
 		endif()
 	endif()
-	if(WIN32)
+	if(CMAKE_HOST_WIN32)
 		# PowerShell needs real newlines. It doubles a single quote inside a
 		# single-quoted string.
 		string(REPLACE "\\n" "\n" _ps_stdin "${_payload}")

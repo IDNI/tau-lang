@@ -166,8 +166,9 @@ if(NOT DEFINED TAU_RUN)
 endif()
 
 # The launcher of a case that runs tau without a shell. TAU_RUN is a sh
-# script, so Windows takes the binary itself.
-if(WIN32)
+# script, so a Windows host takes the binary itself. A cross host keeps
+# TAU_RUN, which puts the emulator in front of tau.exe.
+if(CMAKE_HOST_WIN32)
 	set(TAU_LAUNCHER "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 else()
 	set(TAU_LAUNCHER "${TAU_RUN}")
