@@ -789,10 +789,20 @@ the edge the inputs take, asks the solver for outputs within the move of
 the vertex reached (a value no stream holds when its code says so), and
 follows the edge those outputs take. The values before step 0 are its own:
 every input 0 and outputs for which the start is won. A strategy of the game
-on codes of values and equalities (not on bits or order types) is also a finite Mealy machine over atoms that compare the current
+on codes is also a finite Mealy machine over atoms that compare the current
 values with 0, 1, the elements of their type and the last values of the
-streams: a state is a game vertex with the pattern of equalities among the
-last values, and the machine is minimized. The run plays that machine, which
+streams: a state is a game vertex with what the last values hold for the
+steps to come, and the machine is minimized. On codes of values and
+equalities, a state holds the pattern of equalities among the last values.
+On the bits of a bitvector wider than 4 bits, it holds the bits a later step
+reads, a step reads an input bit by bit (`(i1[t] & 4) != 0`), only as far as
+its move depends on the bits, and an output is a value of its type. On the
+order types of `qlt` values, it holds how the last values and the constants
+compare, a step places an input among them (`i1[t] < o1[t-1]`,
+`{1}:qlt < i1[t]`, `i1[t] = {0}:qlt`), and an output is the point it equals
+or lies strictly between its neighbours below and above. A machine is built
+only within 4096 states and 65536 edges; past them, or for a strategy of the
+game over formulas, the run plays the game's moves directly. The run plays that machine, which
 the Mealy introspection (the cached solution, its current state) shows, and
 a step reads only the inputs its move depends on. A revision of the
 specification is made as in any run: the running specification is revised
@@ -2899,11 +2909,13 @@ prints outputs, and exits when its input closes.  Exit code `0` on success,
 [Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
 The program makes the moves `run` makes, because `tau compile` asks the
 interpreter what it executes. When `run` plays the Mealy machine of the data
-game's strategy, the program carries that machine. Otherwise `run` solves as
-it goes: each step through the safety pipeline, and, for a strategy of the
+game's strategy, the program carries that machine as a table of up to 400
+edges; a larger table would take the C++ compiler longer than the program
+below, which builds the machine when it starts, as `run` does. Otherwise
+`run` solves as it goes: each step through the safety pipeline, and, for a strategy of the
 abstraction (steps 4 and 5 of the realizability algorithm) or of a data game
-with no such machine (decided over formulas, over the bits of a bitvector
-wider than 4 bits, or over the order types of `qlt` values), that game or
+with no such machine (decided over formulas, or a machine past its bounds,
+such as an output that copies every value of a 16-bit input), that game or
 synthesis when it starts. The program then executes the embedded spec the
 same way, with the same solver, so it needs `ltlsynt` where `run` does.
 
