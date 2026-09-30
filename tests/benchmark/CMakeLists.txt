@@ -32,7 +32,7 @@ foreach(X IN LISTS BENCHMARK_TESTS)
 	target_setup(${N})
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME})
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
-	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	set_tests_properties(${N} PROPERTIES
 	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}"
 	)

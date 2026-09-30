@@ -7,6 +7,11 @@ if(EMSCRIPTEN)
 	find_program(NODE_EXECUTABLE node REQUIRED)
 	set(TEST_RUNNER "${NODE_EXECUTABLE}")
 	set(TEST_SUFFIX ".js")
+elseif(WIN32 AND CMAKE_CROSSCOMPILING)
+	# add_test() adds the emulator only ahead of a target name, and ctest on
+	# the build host adds no .exe to a path.
+	set(TEST_RUNNER ${CMAKE_CROSSCOMPILING_EMULATOR})
+	set(TEST_SUFFIX "${CMAKE_EXECUTABLE_SUFFIX}")
 else()
 	set(TEST_RUNNER "")
 	set(TEST_SUFFIX "")
