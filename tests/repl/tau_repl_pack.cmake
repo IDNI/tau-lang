@@ -67,7 +67,7 @@ set(TAU_REPL_DISABLED_REASONS HOSTFS SUBPROCESS)
 set(TAU_REPL_SKIP_WHY_PACK "naming a BA outside TAU_BAS=${TAU_BAS}")
 set(TAU_REPL_SKIP_WHY_LTLSYNT "needing ltlsynt, which this build cannot run")
 set(TAU_REPL_SKIP_WHY_HOSTFS "opening a host file this build's filesystem cannot reach")
-set(TAU_REPL_SKIP_WHY_SUBPROCESS "spawning a host compiler, which a wasm module cannot run")
+set(TAU_REPL_SKIP_WHY_SUBPROCESS "spawning a host compiler, which a wasm module or tau.exe under wine cannot run")
 set(TAU_REPL_SKIP_WHY_SDK "needing a platform SDK this build tree does not hold")
 
 # Sets <out> to the reason a case cannot run, or to an empty string. hostfs
@@ -80,7 +80,10 @@ function(tau_repl_skip_reason out cmd requires)
 			set(_pack TRUE)
 		endif()
 	endforeach()
-	if("subprocess" IN_LIST requires AND EMSCRIPTEN)
+	# A Windows target on another host runs tau.exe under wine, which cannot
+	# start the host cmake and compiler.
+	if("subprocess" IN_LIST requires
+			AND (EMSCRIPTEN OR (WIN32 AND NOT CMAKE_HOST_WIN32)))
 		set(${out} SUBPROCESS PARENT_SCOPE)
 	elseif(_pack)
 		set(${out} PACK PARENT_SCOPE)

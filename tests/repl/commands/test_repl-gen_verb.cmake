@@ -13,8 +13,10 @@ function(add_gen_test test_name)
 	cmake_parse_arguments(PARSE_ARGV 1 _tau "" "CASE;SPEC;SPEC2" REQUIRES)
 	set(_test "test_repl-gen_verb-${test_name}")
 	# `tau gen` reads a host spec file and writes beside it, which a wasm
-	# node host cannot do.
-	list(APPEND _tau_REQUIRES subprocess)
+	# node host cannot do. It starts no compiler, so wine runs it.
+	if(EMSCRIPTEN)
+		list(APPEND _tau_REQUIRES subprocess)
+	endif()
 	file(READ "${_tau_SPEC}" _spec_src)
 	if(_tau_SPEC2)
 		file(READ "${_tau_SPEC2}" _spec2_src)

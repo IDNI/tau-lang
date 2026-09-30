@@ -85,11 +85,9 @@ endfunction()
 # `tau compile` against `run`: the program of a spec with no inputs prints
 # what `run <steps> steps` prints (check_compile_matches_run.cmake).
 function(add_compile_run_test test_name steps spec)
-	tau_repl_unsupported(_tau_skip "${spec}")
-	if(_tau_skip)
-		tau_repl_record_skip("${test_name}" PACK)
-		return()
-	endif()
+	cmake_parse_arguments(PARSE_ARGV 3 _tau "" "" "")
+	set(_tau_REQUIRES subprocess)
+	tau_repl_gate_case("test_repl-${test_name}" spec)
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND ${CMAKE_COMMAND}
 			"-DTAU=${TAU_LAUNCHER}" "-DSTEPS=${steps}" "-DSPEC=${spec}"
@@ -99,4 +97,5 @@ function(add_compile_run_test test_name steps spec)
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "SAME: "
 		TIMEOUT 900 RUN_SERIAL TRUE)
+	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()
