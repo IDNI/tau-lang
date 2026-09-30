@@ -90,9 +90,9 @@ jobs:
 
   # The Linux x86_64 environment: the system base, the deps image and the
   # store packages, one build each, so each cache scope keeps one writer.
-  # It publishes the packages it builds, so the test jobs resolve nothing and a
-  # failed test keeps the publish. A pull request, which cannot publish, gets
-  # the store through the layer cache.
+  # It publishes the packages it builds before any test job runs, so a failed
+  # test keeps the publish. The resolve layer is not cached: the test jobs
+  # pull the store from the remote.
   linux-resolve:
     name: Linux x86_64 · environment
     needs: guard
@@ -126,7 +126,7 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-base,mode=max
+            --cache-to   type=gha,scope=tau-base,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -139,7 +139,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
-            --cache-to   type=gha,scope=tau-deps,mode=max
+            --cache-to   type=gha,scope=tau-deps,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -150,15 +150,13 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-linux-deps,mode=max
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The Linux x86_64 test jobs read the environment's layers, so the store is a
-  # cache hit and nothing resolves here. Each pack writes its own tau_pack.h,
+  # The Linux x86_64 test jobs read the tool layers of the environment and pull
+  # the store the environment published. Each pack writes its own tau_pack.h,
   # so each entry is a full build. GitHub appends the pack name to the job
   # name.
   linux:
@@ -216,7 +214,6 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BAS=${{ env.PACK }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -233,7 +230,6 @@ jobs:
             --build-arg TAU_BAS=${{ env.PACK }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -250,8 +246,8 @@ jobs:
           if-no-files-found: error
 
   # The devel build keeps assert() and DBG(...) live, which the release build
-  # removes. It reads the release packages from the environment's layers, so it
-  # resolves nothing, needs no guard and publishes nothing.
+  # removes. It pulls the release packages the environment published, so it
+  # builds none, needs no guard and publishes nothing.
   linux-devel:
     name: Linux x86_64 · tests (devel)
     needs: linux-resolve
@@ -293,15 +289,14 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Every other Linux job builds with clang. This job builds the library with
-  # gcc, so a gcc error shows in a job of its own. It reads the packages of
-  # the environment's layers, so it resolves nothing and publishes nothing.
+  # gcc, so a gcc error shows in a job of its own. It pulls the packages the
+  # environment published, so it builds none and publishes nothing.
   linux-gcc:
     name: Linux x86_64 · tests (gcc)
     needs: linux-resolve
@@ -343,7 +338,6 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -403,9 +397,10 @@ jobs:
         env:
           TAU_WHEEL_DIR: tau-wheel
 
-  # The address sanitizer job builds on the environment's layers. release-asan
-  # sets TAU_LTO=OFF, which moves the parser SDK id, so this job publishes that
-  # one package. It runs on the devel branches and by hand only: it is slow.
+  # The address sanitizer job builds on the environment's tool layers.
+  # release-asan sets TAU_LTO=OFF, which moves the parser SDK id, so this job
+  # publishes that one package. It runs on the devel branches and by hand
+  # only: it is slow.
   linux-asan:
     name: Linux x86_64 · tests (asan)
     if: >-
@@ -455,7 +450,6 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -486,21 +480,34 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build wasm-deps and wasm-browser-deps stages
+      # mode=min keeps the layers of the final target only, so each slow stage
+      # is the target of its own build and has its own scope.
+      - name: Build the wasm-deps stage
         run: |
-          ./dev docker wasm-browser-deps \
+          ./dev docker wasm-deps \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-wasm-deps \
-            --cache-to   type=gha,scope=tau-wasm-deps,mode=max
+            --cache-to   type=gha,scope=tau-wasm-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the wasm-browser-deps stage
+        run: |
+          ./dev docker wasm-browser-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-wasm-browser-deps \
+            --cache-to   type=gha,scope=tau-wasm-browser-deps,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The wasm32-emscripten resolver and the node tests. Its resolve stage copies
   # the store of the Linux x86_64 environment for the native parity tau and
-  # the host tools, so it waits for that job and reads its layers.
+  # the host tools, so it waits for that job and pulls its packages.
   wasm-node:
     name: WebAssembly · tests (node)
     needs: [guard, wasm-deps, linux-resolve]
@@ -533,9 +540,9 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-wasm-deps \
-            --cache-to   type=gha,scope=tau-wasm-build,mode=max
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -546,13 +553,14 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-wasm-deps \
-            --cache-from type=gha,scope=tau-wasm-build
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The browser stage copies the store from wasm-node-resolve, so it waits for
-  # the node test job and reads its layers. It does not wait for the Linux
-  # x86_64 test jobs.
+  # the node test job, which publishes the wasm packages. It does not wait for
+  # the Linux x86_64 test jobs.
   wasm-browser:
     name: WebAssembly · tests (browser)
     needs: [wasm-deps, wasm-node, linux-resolve]
@@ -580,8 +588,10 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-wasm-browser-deps \
             --cache-from type=gha,scope=tau-wasm-deps \
-            --cache-from type=gha,scope=tau-wasm-build
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -614,7 +624,21 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build the MinGW stages, resolve and publish the store packages
+      # mode=min keeps the layers of the final target only, so the wine and
+      # MinGW stage is the target of its own build.
+      - name: Build the w64-deps stage
+        run: |
+          ./dev docker w64-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-mingw64-wine-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base \
+            --cache-to   type=gha,scope=tau-mingw64-wine-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve and publish the store packages
         run: |
           ./dev docker w64-build-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -622,15 +646,13 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-mingw64-wine-deps \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-mingw64-wine-deps,mode=max
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The mingw test job reads the layers of its environment, so the store is a
-  # cache hit and nothing resolves here. It runs the default pack only, and
+  # The mingw test job reads the tool layers of its environment and pulls the
+  # store the environment published. It runs the default pack only, and
   # only the REPL suite under wine: the native jobs run the C++ suite.
   linux-mingw64-wine:
     name: Windows MinGW · tests (wine)
@@ -674,7 +696,6 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-mingw64-wine-deps \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -708,6 +729,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      # The deps stage holds the base layers too, so one arm64 scope covers
+      # both.
+      - name: Build the deps stage
+        run: |
+          ./dev docker deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-linux-arm64-deps \
+            --cache-to   type=gha,scope=tau-linux-arm64-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Resolve and publish the store packages
         run: |
           ./dev docker linux-resolve \
@@ -715,13 +748,12 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-arm64-deps \
-            --cache-to   type=gha,scope=tau-linux-arm64-deps,mode=max
+            --cache-from type=gha,scope=tau-linux-arm64-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The native arm64 test job reads the layers of its environment, so the
-  # store is a cache hit and nothing resolves here. The pack matrix runs on
+  # The native arm64 test job reads the tool layers of its environment and
+  # pulls the store the environment published. The pack matrix runs on
   # x86_64 only, so arm64 checks the platform with the default pack.
   linux-arm64:
     name: Linux arm64 · tests
@@ -824,7 +856,6 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
         env:
@@ -1051,3 +1082,34 @@ jobs:
 
       - name: Run tau
         run: ./build/release/tau -v
+
+  # A ccache or store key ends in the commit, so every run adds an entry. This
+  # job keeps the newest entry of each key on this ref and deletes the rest. A
+  # failed job saves no ccache, so its newest entry is the last good one.
+  cache-cleanup:
+    name: Cleanup · old cache entries
+    needs: [linux, linux-devel, linux-gcc, linux-asan, linux-mingw64-wine,
+      linux-arm64, linux-arm64-cross, windows-msvc-store, macos]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Keep the newest entry of each ccache and store key
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # Newest first. The key without its commit is the job's prefix.
+          gh api --paginate "repos/${REPO}/actions/caches?ref=${REF}&per_page=100" \
+            --jq '.actions_caches[]
+              | select(.key | test("^(ccache-|tau-store-).*-[0-9a-f]{40}$"))
+              | [.created_at, .id, .key] | @tsv' \
+            | sort -r \
+            | awk -F '\t' '{ p = $3; sub(/-[0-9a-f]+$/, "", p) } seen[p]++ { print $2 "\t" $3 }' \
+            | while IFS=$'\t' read -r id key; do
+                echo "delete ${key}"
+                gh api -X DELETE "repos/${REPO}/actions/caches/${id}"
+              done
