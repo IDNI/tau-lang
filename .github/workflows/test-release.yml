@@ -997,9 +997,10 @@ jobs:
       - name: Build and test
         run: ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
-  # The darwin-arm64 resolver: one job resolves, publishes and tests.
-  macos:
-    name: macOS arm64 · tests
+  # The darwin-arm64 environment: resolves and publishes the store and saves it
+  # for the tests job below. A miss builds with the preset's own AppleClang.
+  macos-arm64-store:
+    name: macOS arm64 · environment
     needs: guard
     runs-on: macos-15
     permissions:
@@ -1016,24 +1017,22 @@ jobs:
         with:
           submodules: recursive
 
-      # The store is content-addressed, so a restored entry is reused and a
-      # miss is built here with the preset's own AppleClang. The key does not
-      # need to describe the recipes: a stale key costs a rebuild, never a
-      # wrong package.
+      # The store is content-addressed, so a stale key costs a rebuild, never
+      # a wrong package.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
           path: ~/.tau/store
-          key: tau-store-macos-15-${{ github.sha }}
+          key: tau-store-macos-arm64-${{ github.sha }}
           restore-keys: |
-            tau-store-macos-15-
+            tau-store-macos-arm64-
 
       - name: Install the binding venv, spot, and coreutils
         run: |
           brew install spot coreutils
-          # The venv carries the interpreter and nanobind, and the script
-          # appends TAU_PYTHON to the env for the build.
+          # The -all preset configures the binding, so configure needs the
+          # venv interpreter.
           ./dev dep-python-venv
 
       - name: Install oras for the dependency store
@@ -1041,6 +1040,43 @@ jobs:
 
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: ./dev preset release-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  macos-arm64:
+    name: macOS arm64 · tests
+    needs: macos-arm64-store
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The environment job saved this key for the same commit. An exact hit
+      # holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-arm64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          ./dev dep-python-venv
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -1050,15 +1086,6 @@ jobs:
         run: |
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      # saved after the run, so a build failure still keeps the packages that
-      # did resolve and the next run does not rebuild them
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -1076,7 +1103,120 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: macos-clang-crash
+          name: macos-arm64-clang-crash
+          path: ${{ runner.temp }}/clang-crash
+          if-no-files-found: ignore
+
+      - name: Run tau
+        run: ./build/release/tau -v
+
+  # The darwin-x86_64 environment: resolves and publishes the store and saves it
+  # for the tests job below. A miss builds with the preset's own AppleClang.
+  macos-x86_64-store:
+    name: macOS x86_64 · environment
+    needs: guard
+    runs-on: macos-15-intel
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+      TAU_STORE_KEEP: 3
+      # Configure publishes each store entry right after it builds it.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The store is content-addressed, so a stale key costs a rebuild, never
+      # a wrong package.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-x86_64-
+
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          # The -all preset configures the binding, so configure needs the
+          # venv interpreter.
+          ./dev dep-python-venv
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: ./dev preset release-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  macos-x86_64:
+    name: macOS x86_64 · tests
+    needs: macos-x86_64-store
+    runs-on: macos-15-intel
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The environment job saved this key for the same commit. An exact hit
+      # holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          ./dev dep-python-venv
+
+      - name: Build tau and tests, run tests (Release)
+        env:
+          # Apple clang prints no stack dump. A crash leaves a preprocessed
+          # reproducer here, and that is the only trace of it.
+          CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
+        run: |
+          mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Collect the compiler crash reports
+        if: failure()
+        run: |
+          d="${{ runner.temp }}/clang-crash"
+          cp ~/Library/Logs/DiagnosticReports/clang* "$d"/ 2>/dev/null || true
+          ls -la "$d"
+          for f in "$d"/*.ips "$d"/*.crash; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            cat "$f"
+          done
+
+      - name: Upload the compiler crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-x86_64-clang-crash
           path: ${{ runner.temp }}/clang-crash
           if-no-files-found: ignore
 
@@ -1089,7 +1229,8 @@ jobs:
   cache-cleanup:
     name: Cleanup · old cache entries
     needs: [linux, linux-devel, linux-gcc, linux-asan, linux-mingw64-wine,
-      linux-arm64, linux-arm64-cross, windows-msvc-store, macos]
+      linux-arm64, linux-arm64-cross, windows-msvc-store, macos-arm64-store,
+      macos-x86_64-store]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     permissions:
