@@ -315,9 +315,9 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 		// desugaring failure, is "can't decide" (std::nullopt), never
 		// a verdict.
 		if (realizability_has_game_operators<node_t>(spec_fm)) {
-			auto [safety_spec, ltl_sol, _aux] =
-				ltl_to_safety_formula_full<node_t>(spec_fm);
-			(void)ltl_sol;
+			auto full = ltl_to_safety_formula_full<node_t>(spec_fm);
+			if (!full.has_value()) return std::nullopt;
+			tref safety_spec = std::get<0>(full.value());
 			if (!safety_spec) return std::nullopt;
 			auto normalized = normalizer<node_t>(safety_spec);
 			if (!normalized.has_value()) return std::nullopt;

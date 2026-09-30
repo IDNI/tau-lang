@@ -258,7 +258,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
 		std::shared_ptr<data_game_strategy<node_t>> data;
-		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(ltl_to_safety_formula_full<node_t>(fm, &data).has_value());
 		REQUIRE(data != nullptr);
 		REQUIRE(data->view != nullptr);
 		auto d = build_program_desc<node_t>(*data->view, "data_game");

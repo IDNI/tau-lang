@@ -823,9 +823,18 @@ post_normalization:
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		bool unrealizable = false;
+		auto full = ltl_to_safety_formula_full<node>(spec, &data_strategy,
+			counter_route, &unrealizable);
+		if (!full.has_value()) {
+			fold_rejected(safety_failures, false);
+			r.merge(std::move(full));
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is not executable: no strategy "
+				"was synthesised (see `realizable`)");
+		}
 		std::tie(safety_spec, sol_opt, unanchored_aux) =
-			ltl_to_safety_formula_full<node>(spec, &data_strategy,
-				counter_route, &unrealizable);
+			std::move(full.value());
+		r.merge(std::move(full));
 		// The data game decided the spec: its strategy chooses every
 		// step's outputs, so no spec part is solved.
 		if (data_strategy) {
@@ -875,8 +884,6 @@ post_normalization:
 				"it for all inputs");
 		}
 		if (!safety_spec) {
-			LOG_ERROR << "Tau specification is not executable: no "
-				"strategy was synthesised (see `realizable`)\n";
 			return r.with_assert_check_error(code::unsat,
 				"Tau specification is not executable: no strategy "
 				"was synthesised (see `realizable`)");
@@ -3228,8 +3235,19 @@ result<typename interpreter<node>::update_plan>
 		}
 		std::shared_ptr<data_game_strategy<node>> next;
 		bool unrealizable = false;
-		ltl_to_safety_formula_full<node>(rebased, &next, true,
+		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true,
 			&unrealizable);
+		if (!full.has_value()) {
+			auto sc = r.open("rejected candidate");
+			r.info("the revised specification has no executable "
+				"strategy; the alternative is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			report rep = std::move(full).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+			continue;
+		}
+		r.merge(std::move(full));
 		if (!next) {
 			if (unrealizable) refuted.insert(alt);
 			r.info(unrealizable

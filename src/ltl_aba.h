@@ -571,10 +571,11 @@ static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
  * state bits `o__ltl_ms<i>__` (see the block comment at the definition).
  * @tparam node Tree node type.
  * @param sol Strategy solution to encode.
- * @return The safety formula `always(phi)`.
+ * @return The safety formula `always(phi)`; an error for an edge to a state
+ * the automaton does not have, or a body that does not normalize.
  */
 template <NodeType node>
-static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
+static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
 
 /**
  * @brief Fixed-time constraints for the warm-up steps of a multi-state Mealy
@@ -607,13 +608,13 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
  *   - Multi-state Mealy strategies: encoded as a safety formula with auxiliary
  *     one-hot state bits `o__ltl_ms<i>__` per `encode_mealy_as_safety`.
  *
- * Returns nullptr if not realizable.
  * @tparam node Tree node type.
  * @param fm Normalised LTL formula.
- * @return The safety formula, or nullptr if not realizable.
+ * @return The safety formula, or nullptr if not realizable; an error when
+ * the strategy cannot be synthesised or encoded.
  */
 template <NodeType node>
-tref ltl_to_safety_formula(tref fm);
+result<tref> ltl_to_safety_formula(tref fm);
 
 /**
  * @brief Variant of `ltl_to_safety_formula` that ALSO returns the
@@ -648,10 +649,12 @@ tref ltl_to_safety_formula(tref fm);
  * formula exactly (the data game, or an algebra's own synthesis) proves
  * that no strategy exists.
  * @return {safety formula or nullptr, optional solution, unanchored
- * auxiliary output names}.
+ * auxiliary output names}; an error when the strategy cannot be
+ * synthesised or encoded as a safety formula and the data game gives none.
  */
 template <NodeType node>
-std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
+result<std::tuple<tref, std::optional<ltl_aba_solution<node>>,
+	std::vector<std::string>>>
 ltl_to_safety_formula_full(tref fm,
 	std::shared_ptr<data_game_strategy<node>>* data_strategy = nullptr,
 	bool synthesize = false, bool* unrealizable = nullptr);

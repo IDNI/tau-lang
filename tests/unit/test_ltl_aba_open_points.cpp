@@ -526,10 +526,7 @@ TEST_SUITE("LTL(ABA) open points: validity") {
 
 TEST_SUITE("LTL(ABA) open points: execution") {
 
-	// Defect: the counter route reports an undecided spec as unsat.
-	TEST_CASE("the counter route reports an undecided spec as unknown"
-		* doctest::should_fail())
-	{
+	TEST_CASE("the counter route reports an undecided spec as unknown") {
 		path_stubs stubs({{"ltlsynt", mute_ltlsynt}});
 		io_context<node_t> ctx;
 		auto nso = get_nso_rr<node_t>(ctx, tau::get("always o32[1] = 1 && "
