@@ -669,7 +669,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The mingw test job reads the resolver's layers, so the store is a cache hit
-  # and nothing resolves here. It runs the default pack only.
+  # and nothing resolves here. It runs the default pack only, and only the REPL
+  # suite under wine: the native jobs run the C++ suite.
   linux-mingw64-wine:
     name: Windows cross-build (MinGW, wine)
     needs: linux-mingw64-wine-resolve

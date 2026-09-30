@@ -627,7 +627,7 @@ RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_BUILD_EXECUTABLE=ON -DTAU_BUILD_TESTS=ON \
+			-DTAU_BUILD_EXECUTABLE=ON -DTAU_BUILD_REPL_TESTS=ON \
 			-DCMAKE_CROSSCOMPILING_EMULATOR=wine \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
@@ -639,15 +639,15 @@ RUN --mount=type=secret,id=gh_token \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	fi
 
-# Compile the tree configured above, then run the w64 suite under wine
-# (if TESTS = "yes").
+# Compile the tree configured above, then run the w64 REPL suite under wine
+# (if TESTS = "yes"). The native builds run the C++ suite.
 FROM w64-build-resolve AS w64-build
 
 ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release
 ARG TESTS=yes
 
-# Build tau executable, and its suite for wine if TESTS = "yes"
+# Build tau executable, and its REPL suite for wine if TESTS = "yes"
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
@@ -659,14 +659,14 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-w64 -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine \
+			-DTAU_BUILD_REPL_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	fi && \
 	ccache --show-stats
 
 RUN if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Running w64 tests under wine" && \
+	echo "(BUILD) -- Running w64 REPL tests under wine" && \
 	ctest --test-dir build/${BUILD_PRESET}-w64 -j ${BUILD_JOBS} \
 		--output-on-failure; \
 fi

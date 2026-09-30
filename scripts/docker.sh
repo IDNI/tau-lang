@@ -62,7 +62,7 @@ case "${CMD}" in
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
-                echo "  w64-build     - build w64-build image"
+                echo "  w64-build     - build w64-build image, and (TESTS=yes) run the REPL suite under wine"
                 echo "  w64-build-resolve - build w64-build-resolve image, configure only"
                 echo "  w64-packages  - release packages (Windows)"
                 echo "  w64-nightly   - nightly release packages (Windows)"
