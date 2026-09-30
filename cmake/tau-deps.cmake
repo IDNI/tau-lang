@@ -21,9 +21,22 @@ function(_tau_deps_toolchain_args out)
 	# same store id, as the host producer command.
 	string(STRIP "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}" _cflags)
 	string(STRIP "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" _cxxflags)
+	set(_cc "${CMAKE_C_COMPILER}")
+	set(_cxx "${CMAKE_CXX_COMPILER}")
+	# A gcc configure on Linux takes the packages of the clang one: both share
+	# libstdc++, and the parser SDK carries fat LTO objects gcc can link.
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TAU_DEPS_TARGET MATCHES "^linux-")
+		find_program(_clang clang NO_CACHE)
+		find_program(_clangxx clang++ NO_CACHE)
+		if(NOT _clang OR NOT _clangxx)
+			message(FATAL_ERROR "a gcc configure on Linux builds its packages with clang and clang++")
+		endif()
+		set(_cc "${_clang}")
+		set(_cxx "${_clangxx}")
+	endif()
 	set(_args
-		"-DTAU_DEP_CC=${CMAKE_C_COMPILER}"
-		"-DTAU_DEP_CXX=${CMAKE_CXX_COMPILER}"
+		"-DTAU_DEP_CC=${_cc}"
+		"-DTAU_DEP_CXX=${_cxx}"
 		"-DTAU_DEP_CFLAGS=${_cflags}"
 		"-DTAU_DEP_CXXFLAGS=${_cxxflags}"
 		"-DTAU_DEP_TARGET=${_target}")
