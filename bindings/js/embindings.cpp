@@ -163,7 +163,7 @@ val js_interpreter_step(int handle, val inputs) {
 		unsigned n = keys["length"].as<unsigned>();
 		for (unsigned k = 0; k < n; ++k) {
 			std::string name = keys[k].as<std::string>();
-			step_inputs[{name, interp.time_point}] =
+			step_inputs[{name, stream_pos(interp.time_point)}] =
 				inputs[name].as<std::string>();
 		}
 		auto r = tau_api::step(interp, std::move(step_inputs),
