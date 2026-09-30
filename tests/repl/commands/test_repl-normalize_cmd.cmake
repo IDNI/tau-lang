@@ -292,3 +292,10 @@ add_repl_test(normalize_cmd-issue185_definition_ref_kept
 	"f(x, y) := x | y. g(x) := f(x, x). normalize g(a) = 0." "%1[^%]*: a = 0")
 add_repl_test(normalize_cmd-issue185_fallback_max
 	"g[0](x:bv[2]) := {0}:bv[2]. g[n](x:bv[2]) := g[n-1](x:bv[2])'. normalize (g({1}:bv[2]) fallback max({0}:bv[2], {2}:bv[2])) = {2}:bv[2]." "%1[^%]*: T")
+
+# The zero test and the test for one of a constant whose formula refers to
+# absolute time are decided on the formula as a whole.
+add_repl_test(normalize_cmd-tau_absolute_time_zero "set charvar off. normalize { (always o2[t] = 1) && (always o1[t-2] = 0) && (sometimes o2[t-1] = 0) }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_one "set charvar off. normalize { sometimes ((o1[t-2] != 0 && [t < 2]) || (o3[t] = o3[1] && i1[t] = o3[t-1]) || (o4[1] = 0 && [t >= 3])) }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_fixed_point_zero "set charvar off. normalize { (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0) }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_constraint_zero "set charvar off. normalize { (always ([t < 2] -> i1[t] = 0)) && (always ((o4[t-2] = 1 && o1[t] = o4[t-2]) -> o1[t] = 1)) }:tau = 0" ": F")
