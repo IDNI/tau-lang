@@ -210,6 +210,11 @@ if(EMSCRIPTEN)
 		target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE -pthread)
 	endif()
 endif()
+if(TAU_ADDRESS_SANITIZER AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	# The archive references the asan runtime, so an artifact must link it too.
+	target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE -fsanitize=address)
+	target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE -fsanitize=address)
+endif()
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES EXPORT_NAME TAU)
 
 # cvc5 and curl are dependencies only when the pack this library was built for
