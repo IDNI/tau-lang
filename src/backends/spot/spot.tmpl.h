@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <optional>
 #include <thread>
 
@@ -35,8 +36,20 @@ extern char** environ;
 #endif
 
 #include "utility/temp_file.h"
+#include "self_exe_path.h"
 
 namespace idni::tau_lang {
+
+// A package installs the Spot tools in <prefix>/libexec/tau/spot. tau is in
+// <prefix>/bin, or at the root of a macOS package.
+inline std::vector<std::string> spot_package_dirs() {
+	std::string self = self_exe_path();
+	if (self.empty()) return {};
+	namespace fs = std::filesystem;
+	fs::path exe_dir = fs::path(self).parent_path();
+	return { (exe_dir / ".." / "libexec" / "tau" / "spot").lexically_normal().string(),
+		(exe_dir / "libexec" / "tau" / "spot").string() };
+}
 
 // A report text label needs text: the parser's report cannot hold an empty
 // string under one, so a silent child says so instead.
@@ -112,9 +125,10 @@ inline std::string win_quote_arg(const std::string& arg) {
 }
 
 // PATH first, then TAU_SPOT_BIN (the store package's bin dir, set by
-// configure). Never link Spot; only exec ltlsynt/autfilt/ltlfilt. SearchPathA
-// with a null base searches the current directory before PATH, so the walk is
-// explicit: an ltlsynt.exe dropped beside tau must not be picked up.
+// configure), then the Spot folder of a package. Never link Spot; only exec
+// ltlsynt/autfilt/ltlfilt. SearchPathA with a null base searches the current
+// directory before PATH, so the walk is explicit: an ltlsynt.exe dropped
+// beside tau must not be picked up.
 inline bool win_find_exe(const std::string& name, char* exe, DWORD exe_sz) {
 	if (name.find_first_of("\\/") != std::string::npos) {
 		if (GetFileAttributesA(name.c_str()) == INVALID_FILE_ATTRIBUTES)
@@ -160,7 +174,10 @@ inline bool win_find_exe(const std::string& name, char* exe, DWORD exe_sz) {
 		}
 	}
 	std::string spot_bin;
-	return env_var("TAU_SPOT_BIN", spot_bin) && search_in(spot_bin);
+	if (env_var("TAU_SPOT_BIN", spot_bin) && search_in(spot_bin)) return true;
+	for (const auto& dir : spot_package_dirs())
+		if (search_in(dir)) return true;
+	return false;
 }
 
 inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
@@ -352,12 +369,20 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	int rc = posix_spawnp(&pid, cargv[0], &fa, nullptr, cargv.data(), environ);
 	if (rc == ENOENT && argv[0].find('/') == std::string::npos) {
 		// posix_spawnp reads PATH only; the store package's bin dir is
-		// named by TAU_SPOT_BIN, which configure exports.
-		if (const char* bin = ::getenv("TAU_SPOT_BIN"); bin && *bin) {
-			std::string full = std::string(bin) + "/" + argv[0];
+		// named by TAU_SPOT_BIN, which configure exports, and a package
+		// holds the tools in its own Spot folder.
+		std::vector<std::string> dirs;
+		if (const char* bin = ::getenv("TAU_SPOT_BIN"); bin && *bin)
+			dirs.emplace_back(bin);
+		for (auto& dir : spot_package_dirs()) dirs.push_back(std::move(dir));
+		std::string full;
+		for (const auto& dir : dirs) {
+			full = dir + "/" + argv[0];
+			if (::access(full.c_str(), X_OK) != 0) continue;
 			cargv[0] = const_cast<char*>(full.c_str());
 			rc = posix_spawnp(&pid, cargv[0], &fa, nullptr,
 				cargv.data(), environ);
+			break;
 		}
 	}
 	posix_spawn_file_actions_destroy(&fa);

@@ -959,6 +959,27 @@ else()
 		"cvc5 not required by TAU_BAS=${TAU_BAS}; no cvc5 runtime installed")
 endif()
 
+# The Spot tools of the store package, where tau finds them after PATH and
+# TAU_SPOT_BIN (src/backends/spot/spot.tmpl.h). They link Spot statically. The
+# Windows tools also need the MinGW runtime DLLs that the package puts beside them.
+if(TAU_BUILD_EXECUTABLE AND TAU_SPOT_PREFIX)
+	set(_tau_spot_exe "")
+	if(TAU_DEPS_TARGET MATCHES "^windows-")
+		set(_tau_spot_exe ".exe")
+		file(GLOB _tau_spot_dlls "${TAU_SPOT_PREFIX}/bin/*.dll")
+		install(FILES ${_tau_spot_dlls}
+			DESTINATION "libexec/tau/spot" COMPONENT ${TAU_PKG_COMPONENT})
+	endif()
+	install(PROGRAMS
+			"${TAU_SPOT_PREFIX}/bin/ltlsynt${_tau_spot_exe}"
+			"${TAU_SPOT_PREFIX}/bin/autfilt${_tau_spot_exe}"
+			"${TAU_SPOT_PREFIX}/bin/ltlfilt${_tau_spot_exe}"
+		DESTINATION "libexec/tau/spot" COMPONENT ${TAU_PKG_COMPONENT})
+	install(DIRECTORY "${TAU_SPOT_PREFIX}/share/licenses/"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT ${TAU_PKG_COMPONENT})
+endif()
+
 # Set CPack generators
 set(CPACK_COMPONENTS_ALL "")
 if(TAU_BUILD_EXECUTABLE)

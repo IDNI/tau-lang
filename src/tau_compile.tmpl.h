@@ -14,16 +14,9 @@
 #include <utility>
 #include <vector>
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
-#include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#elif !defined(__EMSCRIPTEN__)
-#include <unistd.h>
-#endif
-
 #include "cpp_codegen.h"
 #include "definitions.h"
+#include "self_exe_path.h"
 #include "tau_artifact_template.h"
 #include "tau_pack.h"
 #include "utility/escapes.h"
@@ -52,34 +45,6 @@ private:
 	definitions<Node>& defs;
 	typename definitions<Node>::snapshot saved;
 };
-
-// The directory of the running executable. The platform self-path call, not
-// argv[0], so a PATH lookup or a symlink still names the real binary.
-inline std::string self_exe_path() {
-#if defined(__EMSCRIPTEN__)
-	return {};
-#elif defined(_WIN32) && !defined(__CYGWIN__)
-	char buf[MAX_PATH];
-	DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
-	if (n == 0 || n == MAX_PATH) return {};
-	return std::string(buf, n);
-#elif defined(__APPLE__)
-	uint32_t size = 0;
-	_NSGetExecutablePath(nullptr, &size);
-	std::string buf(size, '\0');
-	if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
-	return std::string(buf.c_str());
-#else
-	std::vector<char> buf(4096);
-	for (;;) {
-		ssize_t n = readlink("/proc/self/exe", buf.data(), buf.size());
-		if (n < 0) return {};
-		if (static_cast<size_t>(n) < buf.size())
-			return std::string(buf.data(), static_cast<size_t>(n));
-		buf.resize(buf.size() * 2);
-	}
-#endif
-}
 
 // An SDK directory always holds TauConfig.cmake; probing only that file keeps
 // a directory that merely exists from reading as an SDK.
@@ -621,7 +586,7 @@ inline result<std::string> resolve_sdk_dir(const std::string& platform) {
 		std::string built = compile_detail::platform_sdk_dir(platform);
 		if (!built.empty()) return r.with_value(built);
 	}
-	std::string self = compile_detail::self_exe_path();
+	std::string self = self_exe_path();
 	if (self.empty())
 		return r.with_error(code::not_found,
 			"tau SDK not found and the executable path is unknown; "

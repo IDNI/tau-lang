@@ -53,7 +53,10 @@ the Visual Studio clang-cl for cvc5). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
-configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too).
+configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too). A package
+build always takes the store package and installs the three tools and their
+licenses. The tools go to `libexec/tau/spot`, where tau looks after `PATH` and
+`TAU_SPOT_BIN`.
 Each store producer has one script per target, `scripts/dep/<target>/<dep>.sh`, and
 one shared recipe, `scripts/dep/common/<dep>.sh` (the parser has the same layout).
 The id records the hash of both files, so a change to a target script moves the id of

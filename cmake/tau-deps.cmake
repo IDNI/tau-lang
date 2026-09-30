@@ -323,8 +323,8 @@ endfunction()
 
 # Spot is a host tool Tau only execs (ltlsynt, autfilt, ltlfilt); nothing
 # links it. A host that already has ltlsynt on PATH -- apt, brew, conda --
-# uses that. Otherwise the store package supplies the tools, and configure
-# publishes its bin directory as TAU_SPOT_BIN. Both Windows targets always take
+# uses that, except in a package build. Otherwise the store package supplies
+# the tools, and configure publishes its bin directory as TAU_SPOT_BIN. Both Windows targets always take
 # the package: a host PATH tool cannot carry the runtime DLLs of the PE, and wine
 # cannot load an ELF.
 #
@@ -342,8 +342,16 @@ function(tau_deps_resolve_spot)
 		return()
 	endif()
 	set(_windows_targets "windows-x86_64-msvc" "windows-x86_64-mingw")
+	# A package ships the store tools: a host ltlsynt loads the host's Spot
+	# libraries, which a package cannot carry.
+	set(_package_ships_spot OFF)
+	if(TAU_BUILD_EXECUTABLE AND (TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE
+			OR TAU_MACOS_PACKAGE OR TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE))
+		set(_package_ships_spot ON)
+	endif()
 	find_program(TAU_HOST_LTLSYNT ltlsynt NO_CACHE)
-	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets)
+	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets
+			AND NOT _package_ships_spot)
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()
