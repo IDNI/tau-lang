@@ -39,13 +39,14 @@ if(DEFINED ENV{TAU_PYTHON} AND NOT "$ENV{TAU_PYTHON}" STREQUAL "")
 endif()
 
 if(TAU_AARCH64_QEMU AND _tau_py_from_env)
-	set(_tau_py_probe_code
-		"import sysconfig;"
-		"print(sysconfig.get_paths()['include']);"
-		"soabi = sysconfig.get_config_var('SOABI');"
-		"ext = sysconfig.get_config_var('EXT_SUFFIX') or '';"
-		"print(soabi or (ext[1:-3] if ext.startswith('.') and ext.endswith('.so') else ''))")
-	string(REPLACE ";" " " _tau_py_probe_code "${_tau_py_probe_code}")
+	# One statement per line: a ';' inside a CMake string is a list separator.
+	set(_tau_py_probe_code [=[
+import sysconfig
+print(sysconfig.get_paths()['include'])
+soabi = sysconfig.get_config_var('SOABI')
+ext = sysconfig.get_config_var('EXT_SUFFIX') or ''
+print(soabi or (ext[1:-3] if ext.startswith('.') and ext.endswith('.so') else ''))
+]=])
 	execute_process(
 		COMMAND "${TAU_AARCH64_QEMU}" -L "${TAU_AARCH64_SYSROOT}"
 			"$ENV{TAU_PYTHON}" -c "${_tau_py_probe_code}"
