@@ -84,6 +84,55 @@ function(_tau_deps_host_toolchain_args out)
 	set(${out} "${_args}" PARENT_SCOPE)
 endfunction()
 
+# The store target of the build machine, by the same rule as devrc's
+# dep_host_target. A host producer builds for it.
+function(_tau_deps_host_target out)
+	set(_t "")
+	if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+		set(_arch "arm64")
+	elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+		set(_arch "x86_64")
+	else()
+		set(_arch "")
+	endif()
+	if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND _arch)
+		set(_t "linux-${_arch}")
+	elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND _arch)
+		set(_t "darwin-${_arch}")
+	elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND _arch STREQUAL "x86_64")
+		set(_t "windows-x86_64-mingw")
+	endif()
+	set(${out} "${_t}" PARENT_SCOPE)
+endfunction()
+
+# The producer of <dep> under <root>, scripts/dep/<target>/<dep>.sh, by the same
+# rule as devrc's dep_producer_script. The target defaults to TAU_DEPS_TARGET.
+function(tau_deps_producer_script out root dep)
+	set(_target "${TAU_DEPS_TARGET}")
+	if(ARGC GREATER 3)
+		set(_target "${ARGV3}")
+	endif()
+	set(_script "${root}/scripts/dep/${_target}/${dep}.sh")
+	if(_target STREQUAL "" OR NOT EXISTS "${_script}")
+		file(GLOB _scripts "${root}/scripts/dep/*/${dep}.sh")
+		set(_targets "")
+		foreach(_s IN LISTS _scripts)
+			get_filename_component(_d "${_s}" DIRECTORY)
+			get_filename_component(_d "${_d}" NAME)
+			if(NOT _d STREQUAL "common")
+				list(APPEND _targets "${_d}")
+			endif()
+		endforeach()
+		list(SORT _targets)
+		string(REPLACE ";" " " _targets "${_targets}")
+		if(_targets STREQUAL "")
+			set(_targets "none")
+		endif()
+		message(FATAL_ERROR "dep-${dep}: no producer for target '${_target}'. Targets with a producer: ${_targets}.")
+	endif()
+	set(${out} "${_script}" PARENT_SCOPE)
+endfunction()
+
 # The command that runs a target producer with the flag environment cleared and
 # this configure's compiler and flags. Callers append package-specific options.
 # An optional target overrides the store target, as in _tau_deps_toolchain_args.
@@ -196,12 +245,13 @@ endfunction()
 # Resolve the parser-side dependencies in order and publish the prefixes Tau
 # needs. unordered_dense and ftxui first: the parser SDK id embeds their ids.
 function(tau_deps_resolve_parser)
-	set(_scripts "${PROJECT_SOURCE_DIR}/external/parser/scripts")
-	set(_parser "${_scripts}/dep-parser-sdk.sh")
+	set(_root "${PROJECT_SOURCE_DIR}/external/parser")
+	tau_deps_producer_script(_parser "${_root}" parser-sdk)
+	tau_deps_producer_script(_unordered_dense "${_root}" unordered-dense)
+	tau_deps_producer_script(_ftxui "${_root}" ftxui)
 	tau_deps_ensure_prefix(unordered_dense
-		"${_scripts}/dep-unordered-dense.sh" TAU_UNORDERED_DENSE_PREFIX)
-	tau_deps_ensure_prefix(ftxui
-		"${_scripts}/dep-ftxui.sh" TAU_FTXUI_PREFIX)
+		"${_unordered_dense}" TAU_UNORDERED_DENSE_PREFIX)
+	tau_deps_ensure_prefix(ftxui "${_ftxui}" TAU_FTXUI_PREFIX)
 	list(APPEND CMAKE_PREFIX_PATH "${TAU_FTXUI_PREFIX}")
 	_tau_deps_target_is_cross_toolchain(_cross)
 	if(_cross)
@@ -223,7 +273,9 @@ function(tau_deps_resolve_parser)
 	# tgf only runs on the build machine, so its LTO does not follow TAU_LTO: one
 	# id serves every target preset of a host.
 	if(_cross)
-		tau_deps_ensure_host_prefix(tgf "${_parser}" TAU_TGF_PACKAGE_PREFIX
+		_tau_deps_host_target(_host_target)
+		tau_deps_producer_script(_host_parser "${_root}" parser-sdk "${_host_target}")
+		tau_deps_ensure_host_prefix(tgf "${_host_parser}" TAU_TGF_PACKAGE_PREFIX
 			"-DTAU_PARSER_PACKAGE=tgf"
 			"-DTAU_PARSER_LTO=ON" "-DTAU_PARSER_LTO_FAT=ON")
 	else()
