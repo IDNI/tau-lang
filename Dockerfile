@@ -12,6 +12,7 @@
 #   - packages: creates a release packages (deb and rpm)
 #   - testnet: runs the tau-testnet suite against the build
 #   - asan: builds and runs the tests with the address sanitizer
+#   - linux-devel: builds and runs the devel suite, with asserts live
 #   - linux-arm64-cross: cross-builds Linux arm64 and runs its tests under qemu
 #   - runner: provides a deb based image with installed tau package
 #   - rpm-runner: provides an rpm based image with installed tau package
@@ -363,6 +364,24 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building and running the address sanitizer tests" && \
 	scripts/with-gh-token ./dev preset release-asan-tests run \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+	ccache --show-stats
+
+# ------------------------------------------------------------
+# Build and run the devel suite, which keeps assert() and DBG(...) live. Every
+# build type reads the release packages, so this configure finds only local
+# hits, and the stage mounts no publish secret.
+
+FROM linux-resolve AS linux-devel
+
+ARG BUILD_JOBS=5
+
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building and running the devel tests" && \
+	scripts/with-gh-token ./dev preset devel-all run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \

@@ -237,6 +237,51 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The devel build keeps assert() and DBG(...) live, which the release build
+  # removes. It reads the release packages from the resolver's layers, so it
+  # resolves nothing, needs no guard and publishes nothing.
+  linux-devel:
+    name: Linux (devel)
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-devel-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-devel-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the test layer changes with every commit.
+      - name: Build and test
+        run: |
+          ./dev docker linux-devel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-linux-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # tau-testnet's specs use bv, so this suite runs against the default pack.
   testnet:
     name: Linux (tau-testnet)
