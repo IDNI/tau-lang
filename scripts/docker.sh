@@ -53,6 +53,7 @@ case "${CMD}" in
                 echo "  build-release - build build image with release tests"
                 echo "  build-release-resolve - build build-resolve image, release, configure only"
                 echo "  test-with-testnet - run the tau-testnet suite against the build"
+                echo "  asan          - build and run the tests with the address sanitizer"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
@@ -105,6 +106,9 @@ case "${CMD}" in
                 ;;
         "test-with-testnet")
                 build --target testnet -t tau:testnet "${@:2}"
+                ;;
+        "asan")
+                build --target asan -t tau:asan "${@:2}"
                 ;;
         "packages")
                 build --target packages -t tau:packages "${@:2}" && \

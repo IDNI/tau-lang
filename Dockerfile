@@ -10,6 +10,7 @@
 #   - build: builds tau executable and runs tests
 #   - packages: creates a release packages (deb and rpm)
 #   - testnet: runs the tau-testnet suite against the build
+#   - asan: builds and runs the tests with the address sanitizer
 #   - runner: provides a deb based image with installed tau package
 #   - rpm-runner: provides an rpm based image with installed tau package
 # - Windows branch is:
@@ -319,6 +320,54 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+# ------------------------------------------------------------
+# Run the tests with the address sanitizer. The sanitizer flag is added after
+# configure resolves the store, so this stage reuses the Linux store packages.
+
+FROM deps AS asan
+
+COPY --from=source /tau-lang /tau-lang
+
+WORKDIR /tau-lang
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_GIT_DESCRIBED=
+ARG TAU_GIT_BRANCH=
+ARG TAU_GIT_COMMIT_HASH=
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ARG TAU_PARSER_COMMIT=
+ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
+	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
+	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH} \
+	TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH} \
+	TAU_PARSER_COMMIT=${TAU_PARSER_COMMIT}
+
+# The HTTP oracle in nlang links libcurl.
+RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev
+
+ARG BUILD_JOBS=5
+
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
+# The launchers match build-resolve, so the store ids match the Linux job's.
+# release-asan sets TAU_LTO=OFF, which moves only the parser SDK id.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building and running the address sanitizer tests" && \
+	scripts/with-gh-token ./dev preset release-asan-tests run \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+	ccache --show-stats
 
 
 # ============================================================

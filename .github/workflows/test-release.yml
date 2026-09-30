@@ -634,59 +634,57 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The address sanitizer gate runs natively, so it needs no image. It runs
-  # on the devel branches and by hand only, because it is slow.
+  # The address sanitizer gate builds in the Linux image, so every store
+  # package except the LTO-off parser SDK is a hit. It runs on the devel
+  # branches and by hand only, because it is slow.
   linux-asan:
     name: Linux release tests (address sanitizer)
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
-    needs: guard
+    needs: [guard, deps]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     env:
       # ubuntu-24.04 runners are 4-core
-      TAU_BUILD_JOBS: 4
-      TAU_STORE_KEEP: 3
-      # No other job builds with the runner's clang and LTO off, so this job
-      # publishes its own packages for the next run to pull.
+      BUILD_JOBS: 4
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
         with:
-          path: ~/.tau/store
-          key: tau-store-ubuntu-24.04-asan-${{ github.sha }}
+          path: ccache
+          key: ccache-ubuntu-24.04-asan-${{ github.sha }}
           restore-keys: |
-            tau-store-ubuntu-24.04-asan-
+            ccache-ubuntu-24.04-asan-
 
-      - name: Install the build dependencies
-        run: |
-          ./dev setup-ubuntu-ci-deps.sh
-          sudo apt-get install -y --no-install-recommends clang
-
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
-
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Build the tests with the address sanitizer and run them
-        run: ./dev preset release-asan-tests run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the test layer changes with every commit.
+      - name: Build the tests with the address sanitizer and run them
+        run: |
+          ./dev docker asan \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   macos:
     name: macOS release tests
