@@ -83,6 +83,19 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
+# Spot's own Debian repository is the only official Spot package source, and it
+# serves amd64 only. An arm64 image has no ltlsynt on PATH, so its configure
+# builds Spot from the store.
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+	echo "(BUILD) -- Installing spot" && \
+	wget -q -O /usr/share/keyrings/spot-archive-keyring.gpg \
+		https://www.lrde.epita.fr/repo/debian.gpg && \
+	echo 'deb [signed-by=/usr/share/keyrings/spot-archive-keyring.gpg] https://www.lrde.epita.fr/repo/debian stable/' \
+		> /etc/apt/sources.list.d/spot.list && \
+	apt-get update && apt-get install -y --no-install-recommends spot; \
+fi
+
 # create tau-lang directory and set it as the working directory
 RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
 	mkdir -p /tau-lang ~/.tau

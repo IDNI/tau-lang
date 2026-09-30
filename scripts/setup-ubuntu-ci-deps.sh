@@ -37,29 +37,18 @@ if ! command -v gcc-13 &>/dev/null; then
 fi
 
 # ── Spot (ltlsynt / ltl2tgba) ──────────────────────────────────────────────
-# Try OBS home:adl repo first.  Detect Ubuntu version for correct URL.
-UBUNTU_VERSION=$(lsb_release -rs 2>/dev/null || echo "22.04")
-OBS_URL="https://download.opensuse.org/repositories/home:/adl/xUbuntu_${UBUNTU_VERSION}/"
-
-if [ ! -f /usr/share/keyrings/home-adl-obs.gpg ]; then
-	retry bash -c "set -o pipefail; wget -q -O - 'https://build.opensuse.org/projects/home:adl/signing_keys/download?kind=gpg' \
-		| sudo gpg --dearmor -o /usr/share/keyrings/home-adl-obs.gpg"
-fi
-
-echo "deb [signed-by=/usr/share/keyrings/home-adl-obs.gpg] ${OBS_URL} ./" \
-	| sudo tee /etc/apt/sources.list.d/home-adl-obs.list >/dev/null
-
-retry sudo apt-get update -qq
-
-# Install spot; if it fails from OBS (missing for this Ubuntu version),
-# fall back to Spot's official LRDE Debian repository.
-if ! retry sudo apt-get install -y --no-install-recommends spot 2>/dev/null; then
-	echo "Spot not available from OBS for Ubuntu ${UBUNTU_VERSION}, trying LRDE repo..."
-	sudo wget -q -O /usr/share/keyrings/spot-archive-keyring.gpg https://www.lrde.epita.fr/repo/debian.gpg
-	echo 'deb [signed-by=/usr/share/keyrings/spot-archive-keyring.gpg] http://www.lrde.epita.fr/repo/debian stable/' \
+# Spot's own Debian repository is the only official Spot package source, and it
+# serves amd64 only. On another arch, configure builds Spot from the store.
+if [ "$(dpkg --print-architecture)" = "amd64" ]; then
+	retry sudo wget -q -O /usr/share/keyrings/spot-archive-keyring.gpg \
+		https://www.lrde.epita.fr/repo/debian.gpg
+	echo 'deb [signed-by=/usr/share/keyrings/spot-archive-keyring.gpg] https://www.lrde.epita.fr/repo/debian stable/' \
 		| sudo tee /etc/apt/sources.list.d/spot.list >/dev/null
 	retry sudo apt-get update -qq
 	retry sudo apt-get install -y --no-install-recommends spot
+else
+	echo "Spot has no $(dpkg --print-architecture) package; configure builds it from the store"
+	retry sudo apt-get update -qq
 fi
 
 retry sudo apt-get install -y --no-install-recommends \
