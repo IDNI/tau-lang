@@ -1,9 +1,10 @@
 #!/bin/bash
-# Build and cache the Spot CLI package in the LOCAL store.
+# Build and cache the Spot CLI package in the LOCAL store. Each
+# scripts/dep/<target>/spot.sh sources this file for its own target.
 #
-#   ./dev dep-spot-package -DTAU_DEP_TARGET=linux-x86_64 -DTAU_DEP_CC=clang \
+#   ./dev dep-spot -DTAU_DEP_TARGET=linux-x86_64 -DTAU_DEP_CC=clang \
 #       -DTAU_DEP_CXX=clang++ -DTAU_BUILD_JOBS=8
-#   ./dev dep-spot-package -DTAU_DEP_TARGET=windows-x86_64-msvc -DTAU_BUILD_JOBS=8
+#   ./dev dep-spot -DTAU_DEP_TARGET=windows-x86_64-msvc -DTAU_BUILD_JOBS=8
 #
 # Tau never links Spot: it only execs ltlsynt, autfilt and ltlfilt, the way a
 # Linux install gets them from the distro `spot` package. This producer builds
@@ -18,38 +19,47 @@
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_SPOT_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 # Spot 2.16 release tarball digest, fetched from the URL below.
 SPOT_SHA256="688463cb2fa393c51d9cf938fb01a716b91e4c8122aeb52fd116a3bbfddab869"
 
-# The MSYS2 UCRT64 toolchain that builds the Windows host tool.
-_dep_spot_msys_root() {
-	local d
-	for d in \
-		"/c/msys64" \
-		"/c/tools/msys64" \
-		"${HOME:-}/msys64" \
-		"/c/Program Files/msys64"
-	do
-		if [ -x "${d}/ucrt64/bin/g++.exe" ]; then
-			printf '%s' "$d"
-			return 0
-		fi
-	done
-	return 1
-}
+# A target file overrides the ones it needs before it sources this file.
+# _dep_spot_target_setup sets the builder and its flags.
+declare -F _dep_spot_target_setup > /dev/null || _dep_spot_target_setup() { :; }
+
+# _dep_spot_target_build <src> <staging prefix> configures, builds and
+# installs the tools with the preset's compiler.
+if ! declare -F _dep_spot_target_build > /dev/null; then
+	_dep_spot_target_build() {
+		local src="$1" staging_prefix="$2"
+		( cd "$src" && env -u CPPFLAGS -u LDFLAGS \
+			CC="$DEP_SPOT_CC" CXX="$DEP_SPOT_CXX" \
+			${_DEP_SPOT_CROSS_ENV[@]+"${_DEP_SPOT_CROSS_ENV[@]}"} \
+			./configure --prefix="$staging_prefix" --disable-python \
+				--disable-shared --disable-devel ) \
+			|| { echo "dep-spot: configure failed" >&2; return 1; }
+		( cd "$src" && make -j "$DEP_SPOT_JOBS" ) \
+			|| { echo "dep-spot: build failed" >&2; return 1; }
+		( cd "$src" && make install-exec ) \
+			|| { echo "dep-spot: install failed" >&2; return 1; }
+	}
+fi
+
+# _dep_spot_target_finish <staging prefix> completes the installed tools.
+declare -F _dep_spot_target_finish > /dev/null || _dep_spot_target_finish() { :; }
 
 _dep_spot_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_SPOT_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -61,6 +71,7 @@ _dep_spot_field_block() {
 		"url=${SPOT_URL}" \
 		"sha256=${DEP_SPOT_SHA256}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -109,60 +120,15 @@ _dep_spot_producer() {
 		return 1
 	fi
 
-	local build_script="${work}/build.sh"
-	if [ "$DEP_SPOT_BUILDER" = msys2 ]; then
-		# Git Bash rewrites `/c` and `/d` on cmd/bash command lines as
-		# filesystem paths; keep the MSYS2 invocation in one login shell and
-		# let it set UCRT64 up itself.
-		cat > "$build_script" <<EOF
-#!/bin/bash
-set -euo pipefail
-export PATH=/ucrt64/bin:/usr/bin:\$PATH
-cd "${src}"
-./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel
-make -j${DEP_SPOT_JOBS}
-make install-exec
-EOF
-		export MSYSTEM=UCRT64
-		export CHERE_INVOKING=1
-		"${DEP_SPOT_MSYS_ROOT}/usr/bin/bash.exe" --login "$build_script" \
-			|| { echo "dep-spot: MSYS2 build failed" >&2; rm -rf "$work"; return 1; }
-	else
-		( cd "$src" && env -u CPPFLAGS -u LDFLAGS \
-			CC="$DEP_SPOT_CC" CXX="$DEP_SPOT_CXX" \
-			${_DEP_SPOT_CROSS_ENV[@]+"${_DEP_SPOT_CROSS_ENV[@]}"} \
-			./configure --prefix="$staging_prefix" --disable-python \
-				--disable-shared --disable-devel ) \
-			|| { echo "dep-spot: configure failed" >&2; rm -rf "$work"; return 1; }
-		( cd "$src" && make -j "$DEP_SPOT_JOBS" ) \
-			|| { echo "dep-spot: build failed" >&2; rm -rf "$work"; return 1; }
-		( cd "$src" && make install-exec ) \
-			|| { echo "dep-spot: install failed" >&2; rm -rf "$work"; return 1; }
-	fi
+	_dep_spot_target_build "$src" "$staging_prefix" || { rm -rf "$work"; return 1; }
 
-	local exe="ltlsynt"
-	[ "$DEP_SPOT_TARGET" = "windows-x86_64-msvc" ] && exe="ltlsynt.exe"
-	if [ ! -f "${staging_prefix}/bin/${exe}" ]; then
-		echo "dep-spot: ${staging_prefix}/bin/${exe} missing" >&2
+	if [ ! -f "${staging_prefix}/bin/${DEP_SPOT_EXE}" ]; then
+		echo "dep-spot: ${staging_prefix}/bin/${DEP_SPOT_EXE} missing" >&2
 		rm -rf "$work"
 		return 1
 	fi
 
-	if [ "$DEP_SPOT_BUILDER" = msys2 ]; then
-		# CreateProcess loads DLLs from the executable's directory; the MSVC
-		# test process has no UCRT64 on PATH the way an MSYS shell does.
-		local dll
-		for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
-			if [ -f "${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/${dll}" ]; then
-				cp -f "${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/${dll}" \
-					"${staging_prefix}/bin/"
-			fi
-		done
-		if [ -x "${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/strip.exe" ]; then
-			"${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/strip.exe" \
-				"${staging_prefix}/bin/"*.exe
-		fi
-	fi
+	_dep_spot_target_finish "$staging_prefix" || { rm -rf "$work"; return 1; }
 
 	# The configure prefix is baked into the tools; rewrite every baked build
 	# path to an equal-length placeholder so none is published.
@@ -212,13 +178,7 @@ SPOT_VERSION="$(dep_var SPOT_VERSION 2.16)"
 SPOT_URL="$(dep_var SPOT_URL \
 	"https://www.lre.epita.fr/dload/spot/spot-${SPOT_VERSION}.tar.gz")"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-spot: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target spot
 dep_require_target_host dep-spot "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
@@ -239,26 +199,11 @@ if [ -z "$DEP_SPOT_CC" ] || [ -z "$DEP_SPOT_CXX" ]; then
 	echo "dep-spot: no compiler; pass -DTAU_DEP_CC and -DTAU_DEP_CXX" >&2
 	exit 2
 fi
-# Spot has no CMake configure to take the toolchain's target flag, so a cross
-# build reaches it through the flags instead.
 _DEP_SPOT_CROSS_ENV=()
-if [ "$DEP_SPOT_TARGET" = "linux-arm64" ] \
-		&& dep_target_is_cross "$DEP_SPOT_TARGET"; then
-	_DEP_SPOT_CROSS_ENV=(CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
-		CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")")
-fi
-
 DEP_SPOT_BUILDER="preset"
 DEP_SPOT_BUILDER_CXX="$DEP_SPOT_CXX"
-if [ "$DEP_SPOT_TARGET" = "windows-x86_64-msvc" ]; then
-	DEP_SPOT_BUILDER="msys2"
-	if ! DEP_SPOT_MSYS_ROOT="$(_dep_spot_msys_root)"; then
-		echo "dep-spot: MSYS2 UCRT64 g++ not found; install MSYS2 and" >&2
-		echo "  pacman -S mingw-w64-ucrt-x86_64-gcc make" >&2
-		exit 2
-	fi
-	DEP_SPOT_BUILDER_CXX="${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/g++.exe"
-fi
+DEP_SPOT_EXE="ltlsynt"
+_dep_spot_target_setup
 
 _DEP_SPOT_CONFIGURE_ARGS=(
 	--disable-python

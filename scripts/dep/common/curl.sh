@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build and cache the static curl package for the Windows targets in the LOCAL
-# store.
+# store. Each scripts/dep/<target>/curl.sh sources this file for its own target.
 #
 #   ./dev dep-curl -DTAU_DEP_TARGET=windows-x86_64-mingw -DTAU_BUILD_JOBS=8
 #   ./dev dep-curl -DTAU_DEP_TARGET=windows-x86_64-msvc -DTAU_BUILD_JOBS=8
@@ -15,10 +15,10 @@
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_CURL_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 CURL_VERSION="8.11.1"
 CURL_URL="https://curl.se/download/curl-8.11.1.tar.gz"
 CURL_SHA256="a889ac9dbba3644271bd9d1302b5c22a088893719b72be3487bc3d401e5c4e80"
@@ -29,12 +29,13 @@ _dep_curl_compiler_id() {
 
 _dep_curl_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_CURL_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -46,6 +47,7 @@ _dep_curl_field_block() {
 		"url=${CURL_URL}" \
 		"sha256=${CURL_SHA256}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -168,13 +170,7 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-curl: only the Windows targets are supported, got '${DEP_TARGET:-$(dep_host_target)}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target curl
 dep_require_target_host dep-curl "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"

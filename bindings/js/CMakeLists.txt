@@ -87,8 +87,8 @@ add_custom_target(tau_js_package_assets ALL
 # content-addressed store every other package uses. The producer cmd comes
 # from tau-deps, so the identity records this configure's compiler and flags.
 if(TAU_DEPS_FROM_STORE)
-	tau_deps_producer_command(_tau_js_producer_cmd
-		"${CMAKE_SOURCE_DIR}/scripts/dep-tau-js-package.sh")
+	tau_deps_producer_script(_tau_js_script "${CMAKE_SOURCE_DIR}" tau-js)
+	tau_deps_producer_command(_tau_js_producer_cmd "${_tau_js_script}")
 	get_filename_component(_tau_js_parser_entry "${TAU_PARSER_SDK_PREFIX}" DIRECTORY)
 	get_filename_component(_tau_js_parser_id "${_tau_js_parser_entry}" NAME)
 	get_filename_component(_tau_js_ftxui_entry "${TAU_FTXUI_PREFIX}" DIRECTORY)

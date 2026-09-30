@@ -16,6 +16,11 @@ help() {
 			echo -e "\t$(basename "$script" .sh)"
 		fi
 	done
+	for script in scripts/dep/common/*.sh; do
+		if [ -f "$script" ]; then
+			echo -e "\tdep-$(basename "$script" .sh)"
+		fi
+	done
 	echo "For more information, see scripts/README.md"
 }
 

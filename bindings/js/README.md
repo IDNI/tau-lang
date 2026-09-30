@@ -7,7 +7,7 @@ the preset: pthreads by default, or the `release-wasm-nothreads` library.
 
 It is assembled by the Emscripten preset (configure writes `package.json` into
 the build directory and `tau_js_package_assets` copies the `files` it lists) and
-published to the local dependency store by `scripts/dep-tau-js-package.sh`. It
+published to the local dependency store by `scripts/dep/wasm32-emscripten/tau-js.sh`. It
 is not published to a public npm registry.
 
 ## Usage

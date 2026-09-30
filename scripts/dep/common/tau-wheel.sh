@@ -1,5 +1,6 @@
 #!/bin/bash
-# Publish the tau nanobind wheel as a LOCAL store package.
+# Publish the tau nanobind wheel as a LOCAL store package. Each
+# scripts/dep/<target>/tau-wheel.sh sources this file for its own target.
 #
 #   ./dev dep-tau-wheel \
 #     -DTAU_WHEEL_FILE=<built wheel> -DTAU_WHEEL_SHA256=<digest> \
@@ -18,17 +19,17 @@
 # not inputs and are not recorded.
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-TAU_WHEEL_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# Content hash of the Tau working tree. The provenance helpers and this recipe
-# are excluded: each is hashed on its own or cannot change the wheel bytes.
+# Content hash of the Tau working tree. The provenance helpers and the wheel
+# recipe files are excluded: each is hashed on its own or cannot change the wheel bytes.
 # Tracked files only, so an untracked build artifact cannot move the id.
 _dep_tau_wheel_tree_hash() {
 	local src="$1" value digest
-	local exclude='^(external/parser|scripts/dep-tau-wheel-package\.sh)$'
+	local exclude='^(external/parser|scripts/dep/[^/]+/tau-wheel\.sh)$'
 	if command -v sha256sum > /dev/null 2>&1; then
 		digest="sha256sum"
 	elif command -v shasum > /dev/null 2>&1; then
@@ -47,14 +48,15 @@ _dep_tau_wheel_tree_hash() {
 }
 
 _dep_tau_wheel_field_block() {
-	local recipe_hash tree_hash compiler_id
+	local recipe_hash recipe_common_hash tree_hash compiler_id
 	local build_helper publish_helper manifest store
 	local build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$TAU_WHEEL_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	tree_hash="$(_dep_tau_wheel_tree_hash "$TAU_WHEEL_TREE")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
@@ -79,6 +81,7 @@ _dep_tau_wheel_field_block() {
 		"python_abi=${TAU_WHEEL_PY_ABI}" \
 		"nanobind_version=${TAU_WHEEL_NANOBIND_VERSION}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -114,6 +117,8 @@ _dep_tau_wheel_producer() {
 }
 
 dep_entry "$@"
+
+dep_require_file_target tau-wheel
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in

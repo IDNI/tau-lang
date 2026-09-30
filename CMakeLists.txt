@@ -494,8 +494,8 @@ endif()
 # for cvc5 it does not link.
 #
 if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-	tau_deps_ensure_prefix(cvc5
-		"${PROJECT_SOURCE_DIR}/scripts/dep-cvc5-package.sh" CVC5_STORE_PREFIX)
+	tau_deps_producer_script(_cvc5_producer "${PROJECT_SOURCE_DIR}" cvc5)
+	tau_deps_ensure_prefix(cvc5 "${_cvc5_producer}" CVC5_STORE_PREFIX)
 	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
 	message(STATUS "cvc5 from store: CVC5_DIR=${CVC5_DIR}")
 
@@ -532,8 +532,8 @@ endif()
 # Add Boost log library
 #
 if(TAU_DEPS_FROM_STORE)
-	tau_deps_ensure_prefix(boost
-		"${PROJECT_SOURCE_DIR}/scripts/dep-boost-package.sh" BOOST_STORE_PREFIX)
+	tau_deps_producer_script(_boost_producer "${PROJECT_SOURCE_DIR}" boost)
+	tau_deps_ensure_prefix(boost "${_boost_producer}" BOOST_STORE_PREFIX)
 	# The installed Boost config lives under lib/cmake and the libraries under
 	# lib, both inside the package prefix.
 	set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")

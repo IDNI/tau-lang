@@ -301,8 +301,8 @@ function(tau_deps_resolve_curl)
 			AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
 		return()
 	endif()
-	tau_deps_ensure_prefix(curl
-		"${PROJECT_SOURCE_DIR}/scripts/dep-curl-package.sh" TAU_CURL_PREFIX)
+	tau_deps_producer_script(_curl_producer "${PROJECT_SOURCE_DIR}" curl)
+	tau_deps_ensure_prefix(curl "${_curl_producer}" TAU_CURL_PREFIX)
 	if(NOT TARGET CURL::libcurl)
 		add_library(CURL::libcurl STATIC IMPORTED)
 		# MSVC names its import/static library .lib; MinGW names it .a.
@@ -348,16 +348,17 @@ function(tau_deps_resolve_spot)
 		return()
 	endif()
 	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
-		tau_deps_ensure_prefix_as(spot
-			"${PROJECT_SOURCE_DIR}/scripts/dep-spot-package.sh"
+		tau_deps_producer_script(_spot_producer "${PROJECT_SOURCE_DIR}" spot
+			"windows-x86_64-msvc")
+		tau_deps_ensure_prefix_as(spot "${_spot_producer}"
 			"windows-x86_64-msvc" TAU_SPOT_PREFIX OPTIONAL)
 		if(NOT TAU_SPOT_PREFIX)
 			message(STATUS "Spot not resolved: the LTL suites skip")
 			return()
 		endif()
 	else()
-		tau_deps_ensure_prefix(spot
-			"${PROJECT_SOURCE_DIR}/scripts/dep-spot-package.sh" TAU_SPOT_PREFIX)
+		tau_deps_producer_script(_spot_producer "${PROJECT_SOURCE_DIR}" spot)
+		tau_deps_ensure_prefix(spot "${_spot_producer}" TAU_SPOT_PREFIX)
 	endif()
 	set(TAU_SPOT_PREFIX "${TAU_SPOT_PREFIX}" PARENT_SCOPE)
 	set(TAU_SPOT_BIN "${TAU_SPOT_PREFIX}/bin" PARENT_SCOPE)

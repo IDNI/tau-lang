@@ -1,23 +1,22 @@
 #!/bin/bash
-# Build and cache the native Linux Boost package in the LOCAL store.
+# Build and cache the Boost package in the LOCAL store. Each
+# scripts/dep/<target>/boost.sh sources this file for its own target.
 #
-#   ./dev dep-boost-package -DTAU_DEP_CC=clang -DTAU_DEP_CXX=clang++ \
+#   ./dev dep-boost -DTAU_DEP_CC=clang -DTAU_DEP_CXX=clang++ \
 #       -DTAU_BUILD_JOBS=5
-#   ./dev dep-boost-package -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
+#   ./dev dep-boost -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
 #
 # The source is pinned to one immutable commit (Boost 1.86.0).
 #
-# Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected. The wasm32-emscripten variants have their
-# own threading and exception-encoding inputs, which this identity records
-# explicitly.
+# The wasm32-emscripten variants have their own threading and
+# exception-encoding inputs, which this identity records explicitly.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_BOOST_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 BOOST_DEFAULT_REPO="https://github.com/boostorg/boost.git"
 BOOST_DEFAULT_COMMIT="65c1319bb92fe7a9a4abd588eff5818d9c2bccf9"
 BOOST_TOOLSET="gcc"
@@ -114,6 +113,34 @@ BOOST_EXPECTED_CLOSURE=(
 	"tools/cmake@ae2e6a647187246d6009f80b56ba4c2c8f3a008c"
 )
 
+# A target file overrides the ones it needs before it sources this file.
+# _dep_boost_target_setup sets the b2 settings of the target.
+declare -F _dep_boost_target_setup > /dev/null || _dep_boost_target_setup() { :; }
+
+# _dep_boost_user_config <work> <cxx> writes <work>/user-config.jam.
+if ! declare -F _dep_boost_user_config > /dev/null; then
+	_dep_boost_user_config() {
+		cat > "${1}/user-config.jam" <<EOF
+using ${BOOST_TOOLSET} : : ${2} ;
+EOF
+	}
+fi
+
+# _dep_boost_target_build <work> <staging prefix> bootstraps b2 and installs.
+if ! declare -F _dep_boost_target_build > /dev/null; then
+	_dep_boost_target_build() {
+		local work="$1" staging_prefix="$2" b2_bin="${1}/b2" b2_version
+		( cd "$work" && ./bootstrap.sh --with-toolset=${BOOST_TOOLSET} --with-libraries=log ) \
+			|| { echo "dep-boost: bootstrap failed" >&2; return 1; }
+		b2_version="$("$b2_bin" --version 2>&1 | head -n 1)"
+		echo "dep-boost: ${b2_version} (bootstrapped with toolset ${BOOST_TOOLSET})" >&2
+		( cd "$work" && "$b2_bin" --user-config=./user-config.jam \
+			--prefix="$staging_prefix" --build-dir="${work}/bin.v2" \
+			"${_DEP_BOOST_B2_ARGS[@]}" -j "$DEP_BOOST_JOBS" install ) \
+			|| { echo "dep-boost: b2 build failed" >&2; return 1; }
+	}
+fi
+
 _dep_boost_compiler_id() {
 	dep_compiler_id "$DEP_BOOST_CXX"
 }
@@ -127,14 +154,15 @@ _dep_boost_closure_actual() {
 
 _dep_boost_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	local closure=""
 	local entry
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_BOOST_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -148,6 +176,7 @@ _dep_boost_field_block() {
 		"repo=${BOOST_REPO}" \
 		"commit=${BOOST_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -230,96 +259,8 @@ _dep_boost_producer() {
 	echo "dep-boost: resolved closure has $(printf '%s\n' "${BOOST_EXPECTED_CLOSURE[@]}" | wc -l) submodules" >&2
 	# Bootstrap with an explicit toolset. The compiler is pinned through a
 	# user-config so the recorded toolset is not the host default.
-	local b2_bin="${work}/b2"
-	if [ "$DEP_BOOST_TARGET" = "windows-x86_64-mingw" ]; then
-		cat > "${work}/user-config.jam" <<EOF
-using gcc : mingw64 : ${cxx}
-        :
-        <rc>x86_64-w64-mingw32-windres
-        <archiver>x86_64-w64-mingw32-ar
-;
-EOF
-	elif [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
-		# b2's msvc toolset finds cl through the developer environment the
-		# runner set up; naming the compiler path here would freeze a version.
-		cat > "${work}/user-config.jam" <<EOF
-using msvc ;
-EOF
-	elif [ "$DEP_BOOST_TARGET" = "wasm32-emscripten" ]; then
-		EMSCRIPTEN_DIR="${TAU_SHARED_PREFIX}/emsdk/upstream/emscripten"
-		cat > "${work}/user-config.jam" <<EOF
-using emscripten : : ${EMSCRIPTEN_DIR}/em++ ;
-EOF
-	else
-		cat > "${work}/user-config.jam" <<EOF
-using ${BOOST_TOOLSET} : : ${cxx} ;
-EOF
-	fi
-	if [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
-		# bootstrap.bat + b2 in one cmd session, so both inherit the vcvars
-		# environment. Git Bash rewrites `/c`, `/d` and `--`-switches on a
-		# cmd.exe command line as filesystem paths; keeping them in a .bat
-		# lets cmd parse them itself. vcvars64.bat is a local fallback only:
-		# CI gets the MSVC shell from an action, so cl is already on PATH and
-		# a missing vcvars is not fatal.
-		local _boost_win _prefix_win _build_win _vcvars _v
-		_boost_win="$(cygpath -w "$work")"
-		_prefix_win="$(cygpath -w "$staging_prefix")"
-		_build_win="$(cygpath -w "${work}/bin.v2")"
-		_vcvars=""
-		for _v in \
-			"${VSINSTALLDIR:-}/VC/Auxiliary/Build/vcvars64.bat" \
-			"/c/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/vcvars64.bat" \
-			"/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat" \
-			"/c/Program Files/Microsoft Visual Studio/2022/Professional/VC/Auxiliary/Build/vcvars64.bat"
-		do
-			[ -f "$_v" ] || continue
-			_vcvars="$(cygpath -w "$_v" 2>/dev/null || echo "$_v")"
-			break
-		done
-		local _bat="${work}/_tau_msvc_build.bat"
-		{
-			printf '@echo off\r\n'
-			if [ -n "$_vcvars" ]; then
-				echo "dep-boost: using vcvars $_vcvars" >&2
-				printf 'call "%s"\r\n' "$_vcvars"
-				printf 'if errorlevel 1 exit /b 1\r\n'
-			fi
-			printf 'cd /d "%s"\r\n' "$_boost_win"
-			printf 'if errorlevel 1 exit /b 1\r\n'
-			printf 'call bootstrap.bat --with-libraries=log\r\n'
-			printf 'if errorlevel 1 exit /b 1\r\n'
-			printf 'b2.exe --user-config=./user-config.jam'
-			printf ' --prefix="%s" --build-dir="%s"' \
-				"$_prefix_win" "$_build_win"
-			printf ' --with-log --layout=system -j%s' "$DEP_BOOST_JOBS"
-			for _a in "${_DEP_BOOST_B2_ARGS[@]}"; do
-				printf ' %s' "$_a"
-				done
-			printf ' install\r\n'
-		} > "$_bat"
-		b2_bin="${work}/b2.exe"
-		cmd.exe //c "$(cygpath -w "$_bat")" \
-			|| { echo "dep-boost: MSVC bootstrap+b2 failed" >&2; rm -rf "$work"; return 1; }
-	else
-		if [ "$(dep_host_os)" = windows ]; then
-			# bootstrap.bat has no --with-toolset; the toolset arrives
-			# through the user-config passed to b2 below.
-			b2_bin="${work}/b2.exe"
-			( cd "$work" && cmd //c bootstrap.bat --with-libraries=log ) \
-				|| { echo "dep-boost: bootstrap failed" >&2; rm -rf "$work"; return 1; }
-		else
-			( cd "$work" && ./bootstrap.sh --with-toolset=${BOOST_TOOLSET} --with-libraries=log ) \
-				|| { echo "dep-boost: bootstrap failed" >&2; rm -rf "$work"; return 1; }
-		fi
-		local b2_version
-		b2_version="$("$b2_bin" --version 2>&1 | head -n 1)"
-		echo "dep-boost: ${b2_version} (bootstrapped with toolset ${BOOST_TOOLSET})" >&2
-		( cd "$work" && "$b2_bin" --user-config=./user-config.jam \
-			--prefix="$staging_prefix" --build-dir="${work}/bin.v2" \
-			"${_DEP_BOOST_B2_ARGS[@]}" -j "$DEP_BOOST_JOBS" install ) \
-			|| { echo "dep-boost: b2 build failed" >&2; rm -rf "$work"; return 1; }
-	fi
+	_dep_boost_user_config "$work" "$cxx" || { rm -rf "$work"; return 1; }
+	_dep_boost_target_build "$work" "$staging_prefix" || { rm -rf "$work"; return 1; }
 	# Boost's generated CMake configs bake the staging prefix into an
 	# if(EXISTS ...) block. Derive the prefix from the config file's own location
 	# instead, so a relocated package resolves itself. Every config sits at
@@ -342,13 +283,7 @@ EOF
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-boost: unknown target '${DEP_TARGET:-$(dep_host_target)}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target boost
 dep_require_target_host dep-boost "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
@@ -396,46 +331,8 @@ DEP_BOOST_B2_THREADING="${BOOST_THREADING}"
 DEP_BOOST_B2_ADDRESS_MODEL="64"
 DEP_BOOST_B2_PIC=" -fPIC"
 DEP_BOOST_B2_ARCH=""
-case "$DEP_BOOST_TARGET" in
-	windows-x86_64-mingw)
-		DEP_BOOST_TARGET_OS="windows"
-		;;
-	linux-arm64)
-		# A native arm64 host lets b2 read the arch itself; a cross build from
-		# x86 must name it or b2 adds the host's x86 flags.
-		if dep_target_is_cross linux-arm64; then
-			DEP_BOOST_B2_ARCH="arm"
-		fi
-		;;
-	darwin-arm64|darwin-x86_64)
-		# b2 names the macOS variant clang-darwin from the toolset plus this.
-		DEP_BOOST_TARGET_OS="darwin"
-		# A dylib's install_name would bake the staging prefix and fail the
-		# path audit; Tau links Boost statically anyway.
-		BOOST_LINK_MODE="static"
-		DEP_BOOST_B2_LINK="static"
-		;;
-	windows-x86_64-msvc)
-		DEP_BOOST_TARGET_OS="windows"
-		DEP_BOOST_B2_PIC=""
-		# --layout=system names the static and the shared library identically,
-		# so install static only (Tau links Boost statically).
-		BOOST_LINK_MODE="static"
-		DEP_BOOST_B2_LINK="static"
-		;;
-	wasm32-emscripten)
-		# em++ rejects the -m64 that address-model=64 becomes, and needs no PIC.
-		DEP_BOOST_TARGET_OS=""
-		DEP_BOOST_B2_TOOLSET="emscripten"
-		DEP_BOOST_B2_LINK="static"
-		DEP_BOOST_B2_ADDRESS_MODEL="32"
-		DEP_BOOST_B2_PIC=""
-		case " $DEP_BOOST_CXXFLAGS " in
-			*" -pthread "*) DEP_BOOST_B2_THREADING="multi" ;;
-			*) DEP_BOOST_B2_THREADING="single" ;;
-		esac
-		;;
-esac
+DEP_BOOST_B2_DEFINE=""
+_dep_boost_target_setup
 
 _DEP_BOOST_B2_ARGS=(
 	"toolset=${DEP_BOOST_B2_TOOLSET}"
@@ -452,8 +349,8 @@ fi
 if [ -n "$DEP_BOOST_TARGET_OS" ]; then
 	_DEP_BOOST_B2_ARGS+=("target-os=${DEP_BOOST_TARGET_OS}")
 fi
-if [ "$DEP_BOOST_TARGET" = "wasm32-emscripten" ] || [ "$DEP_BOOST_TARGET" = "windows-x86_64-msvc" ]; then
-	_DEP_BOOST_B2_ARGS+=("define=BOOST_LOG_WITHOUT_SYSLOG")
+if [ -n "$DEP_BOOST_B2_DEFINE" ]; then
+	_DEP_BOOST_B2_ARGS+=("define=${DEP_BOOST_B2_DEFINE}")
 fi
 
 block="$(_dep_boost_field_block)" || {

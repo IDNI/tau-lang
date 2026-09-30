@@ -1,24 +1,24 @@
 #!/bin/bash
-# Build and cache the native Linux cvc5 package in the LOCAL store.
+# Build and cache the cvc5 package in the LOCAL store. Each
+# scripts/dep/<target>/cvc5.sh sources this file for its own target.
 #
-#   ./dev dep-cvc5-package -DTAU_DEP_CC=clang -DTAU_DEP_CXX=clang++ \
+#   ./dev dep-cvc5 -DTAU_DEP_CC=clang -DTAU_DEP_CXX=clang++ \
 #       -DTAU_BUILD_JOBS=5
-#   ./dev dep-cvc5-package -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
+#   ./dev dep-cvc5 -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
 #
 # The source is pinned to one immutable commit; the recipe tag is resolved to it
 # and never checked out as a tag. Producer mode builds into a staging entry and
 # publishes it. Consumer mode only looks up an existing entry.
 #
-# The native, windows-x86_64-mingw, macOS and MSVC tuples are produced. MSVC
-# builds with Ninja, the production build type and the preset's cl; GMP is the
-# known risk and CVC5_CMAKE_PREFIX can point at an MSVC-compatible one.
+# The target file defines _dep_cvc5_gmp_header, which prints the system gmp.h
+# or nothing, and _dep_cvc5_target_setup, which sets the target arguments.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_CVC5_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 CVC5_DEFAULT_REPO="https://github.com/cvc5/cvc5.git"
 # cvc5-1.3.1, resolved to its commit. Never build the moving tag.
 CVC5_DEFAULT_COMMIT="ea1b484fa54bfe56c0f8b3ac90a6e3e2f46441e7"
@@ -56,31 +56,11 @@ _dep_cvc5_gmp_version() {
 	printf '%s.%s.%s' "$major" "$minor" "${patch:-0}"
 }
 
-# The gmp.h cvc5's FindGMP resolves to, or nothing when it falls back to the
-# download. Linux carries GMP in /usr/include. macOS has no system GMP, so
-# FindGMP picks the Homebrew copy when its prefix search reaches it.
-_dep_cvc5_gmp_header() {
-	if [ "$(dep_host_os)" = linux ] \
-			&& [ "${DEP_CVC5_TARGET:-$(dep_host_target)}" != "windows-x86_64-mingw" ] \
-			&& ! dep_target_is_cross "${DEP_CVC5_TARGET:-$(dep_host_target)}"; then
-		[ -f /usr/include/gmp.h ] && printf '%s' /usr/include/gmp.h
-		return 0
-	fi
-	if [ "$(dep_host_os)" = darwin ] && command -v brew > /dev/null 2>&1; then
-		local prefix
-		prefix="$(brew --prefix gmp 2>/dev/null || true)"
-		if [ -n "$prefix" ] && [ -f "${prefix}/include/gmp.h" ]; then
-			printf '%s' "${prefix}/include/gmp.h"
-		fi
-	fi
-	return 0
-}
-
 # Resolve the system GMP, if the host provides it, before the build. cvc5's
 # FindGMP uses the system GMP when gmp.h is on the include path and only then
 # falls back to the download, so this is the same choice the configure makes.
-# windows-x86_64-mingw cross-builds and MSVC reach the download unless
-# -DCVC5_CMAKE_PREFIX points at an MSVC-compatible GMP.
+# A target whose _dep_cvc5_gmp_header finds no gmp.h reaches the download,
+# unless -DCVC5_CMAKE_PREFIX points at a GMP.
 _dep_cvc5_gmp() {
 	if [ -n "${CVC5_CMAKE_PREFIX:-}" ]; then
 		printf 'external|%s' "$CVC5_CMAKE_PREFIX"
@@ -98,51 +78,16 @@ _dep_cvc5_gmp() {
 	printf 'download|6.3.0'
 }
 
-# A real python for cvc5's FindPython: Git Bash PATH can carry the
-# WindowsApps store stub, which imports nothing useful.
-_dep_cvc5_python() {
-	local c d
-	for d in python3 python; do
-		c="$(command -v "$d" 2>/dev/null || true)"
-		[ -n "$c" ] || continue
-		case "$c" in *WindowsApps*) continue ;; esac
-		if "$c" -c "import sys" > /dev/null 2>&1; then
-			if command -v cygpath > /dev/null 2>&1; then
-				cygpath -m "$c"
-			else
-				printf '%s' "$c"
-			fi
-			return 0
-		fi
-	done
-	return 1
-}
-
-# The build host's own interpreter, for cvc5's build scripts. A cross job can
-# put the target venv first on PATH, and that interpreter runs only under qemu.
-_dep_cvc5_host_python() {
-	local c m
-	m="$(uname -m)"
-	for c in "$(command -v python3 2>/dev/null || true)" /usr/bin/python3; do
-		[ -n "$c" ] && [ -x "$c" ] || continue
-		if "$c" -c 'import platform, sys; sys.exit(platform.machine() != sys.argv[1])' \
-				"$m" > /dev/null 2>&1; then
-			printf '%s' "$c"
-			return 0
-		fi
-	done
-	return 1
-}
-
 _dep_cvc5_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	local gmp closure=""
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_CVC5_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -162,6 +107,7 @@ _dep_cvc5_field_block() {
 		"repo=${CVC5_REPO}" \
 		"commit=${CVC5_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -248,10 +194,10 @@ _dep_cvc5_producer() {
 	# identity. The real paths go into the compiler flags; the identity records
 	# the fixed placeholder each role maps to. GCC takes the last matching map,
 	# so the least specific root comes first and the staging token is always
-	# consumed. cl.exe has no flag-encoded path map; its install-time rewrite
-	# below covers it.
+	# consumed. A compiler with no flag-encoded path map (cl.exe) runs with
+	# DEP_CVC5_PREFIX_MAP=OFF; the install-time rewrite below covers it.
 	prefix_map=""
-	if [ "$DEP_CVC5_TARGET" != "windows-x86_64-msvc" ]; then
+	if [ "$DEP_CVC5_PREFIX_MAP" = ON ]; then
 		prefix_map="-ffile-prefix-map=${staging}=staging -ffile-prefix-map=${staging_prefix}=staging -ffile-prefix-map=${work}=cvc5-src -ffile-prefix-map=${build}=cvc5-build"
 	fi
 	rm -rf "$work"
@@ -368,13 +314,13 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-cvc5: unsupported target '${DEP_TARGET:-$(dep_host_target)}'" >&2
+dep_require_file_target cvc5
+for _hook in _dep_cvc5_gmp_header _dep_cvc5_target_setup; do
+	if ! declare -F "$_hook" > /dev/null; then
+		echo "dep-cvc5: ${DEP_RECIPE} defines no ${_hook}" >&2
 		exit 2
-		;;
-esac
+	fi
+done
 dep_require_target_host dep-cvc5 "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
@@ -402,7 +348,7 @@ CVC5_JOBS="$(dep_jobs)"
 DEP_CVC5_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 CVC5_CMAKE_PREFIX="$(dep_var CVC5_CMAKE_PREFIX "")"
 DEP_CVC5_GENERATOR="Unix Makefiles"
-[ "$DEP_CVC5_TARGET" = "windows-x86_64-msvc" ] && DEP_CVC5_GENERATOR="Ninja"
+DEP_CVC5_PREFIX_MAP=ON
 
 # The system GMP, detected once, is both an identity input and the closure
 # choice the configure will make.
@@ -426,73 +372,7 @@ _DEP_CVC5_COMPILER_ENV=()
 _DEP_CVC5_BUILD_ENV=()
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
 DEP_CVC5_BUILD_RPATH='${ORIGIN}'
-case "$DEP_CVC5_TARGET" in
-	windows-x86_64-mingw)
-		# cvc5's own mingw64 toolchain picks the cross compilers; --win64 enables it.
-		_DEP_CVC5_TARGET_ARGS=(--win64)
-		;;
-	windows-x86_64-msvc)
-		# Native MSVC: Ninja + the production build type. GMP is the known risk --
-		# point CVC5_CMAKE_PREFIX at an MSVC-compatible GMP when --auto-download
-		# cannot supply one.
-		# cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
-		# spaces, and cl sits under "Program Files".
-		_DEP_CVC5_TARGET_ARGS=(--ninja production)
-		_py="$(_dep_cvc5_python || true)"
-		if [ -n "$_py" ]; then
-			_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
-				"-DPython3_EXECUTABLE=$_py")
-		fi
-		if [ -n "$CVC5_CMAKE_PREFIX" ]; then
-			_DEP_CVC5_TARGET_ARGS+=("-DCMAKE_PREFIX_PATH=$CVC5_CMAKE_PREFIX")
-		fi
-		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
-		;;
-	linux-arm64)
-		# A cross build from x86 configures with the aarch64 toolchain file,
-		# whose find-root-path modes keep cvc5 off the host's x86 GMP.
-		if dep_target_is_cross linux-arm64; then
-			if [ -z "$DEP_CVC5_TOOLCHAIN" ]; then
-				echo "dep-cvc5: linux-arm64 needs -DTAU_DEP_TOOLCHAIN" >&2
-				exit 2
-			fi
-			_DEP_CVC5_TARGET_ARGS+=(
-				-DCMAKE_TOOLCHAIN_FILE="$DEP_CVC5_TOOLCHAIN")
-			_py="$(_dep_cvc5_host_python || true)"
-			if [ -z "$_py" ]; then
-				echo "dep-cvc5: linux-arm64 needs a build-host python3" >&2
-				exit 2
-			fi
-			_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
-				"-DPython3_EXECUTABLE=$_py")
-			# cvc5's FindGMP takes the GMP --host from TOOLCHAIN_PREFIX, which
-			# only cvc5's own toolchain file sets. An empty --host builds a
-			# static x86 GMP that cvc5 cannot link.
-			_DEP_CVC5_TARGET_ARGS+=(-DTOOLCHAIN_PREFIX=aarch64-linux-gnu)
-			# GMP configures at build time and would pick the gcc cross compiler.
-			_DEP_CVC5_BUILD_ENV=(
-				CC="$DEP_CVC5_CC --target=aarch64-linux-gnu"
-				CXX="$DEP_CVC5_CXX --target=aarch64-linux-gnu")
-		fi
-		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
-		# The toolchain file sets Python_EXECUTABLE to TAU_PYTHON, the arm64
-		# interpreter for the binding, and that shadows the -D above.
-		if dep_target_is_cross linux-arm64; then
-			_DEP_CVC5_COMPILER_ENV+=(TAU_PYTHON=)
-		fi
-		;;
-	darwin-*)
-		# macOS has no $ORIGIN and no absolute install_name: a relocatable
-		# package resolves through @rpath, matching Tau's own install rpath.
-		DEP_CVC5_INSTALL_RPATH='@loader_path:@loader_path/../lib'
-		DEP_CVC5_BUILD_RPATH='@loader_path'
-		_DEP_CVC5_TARGET_ARGS=(-DCMAKE_INSTALL_NAME_DIR=@rpath)
-		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
-		;;
-	*)
-		_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
-		;;
-esac
+_dep_cvc5_target_setup
 
 # tau asks cvc5 only for linear logics, and libpoly serves only nonlinear
 # arithmetic.

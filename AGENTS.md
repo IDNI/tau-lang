@@ -52,6 +52,11 @@ Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
 configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too).
+Each store producer has one script per target, `scripts/dep/<target>/<dep>.sh`, and
+one shared recipe, `scripts/dep/common/<dep>.sh` (the parser has the same layout).
+The id records the hash of both files, so a change to a target script moves the id of
+that target only. `./dev dep-<dep>` (for example `./dev dep-cvc5`) runs the script of
+the `-DTAU_DEP_TARGET` target, else of the host.
 
 `windows-x86_64-msvc` builds the full pack from the store, cvc5 included, and runs the
 C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
@@ -310,7 +315,7 @@ cases in the browser REPL page.
 The wasm library is also the npm package: configure writes `package.json` into the
 build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies the
 `LICENSE.md` and the test scripts its `files` list names, so the build directory is
-the installable package. `tau_js_publish` runs the `dep-tau-js-package.sh` producer,
+the installable package. `tau_js_publish` runs the `dep-tau-js` producer,
 which puts exactly those listed files into the local store like every other package.
 There is no npm registry and no npm token anywhere in the build or CI. The package
 is the library only, never the REPL; its threading follows the preset, so

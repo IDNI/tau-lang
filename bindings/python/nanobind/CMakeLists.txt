@@ -161,8 +161,8 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 		endif()
 	endif()
 
-	tau_deps_producer_command(_tau_wheel_producer
-		"${CMAKE_SOURCE_DIR}/scripts/dep-tau-wheel-package.sh")
+	tau_deps_producer_script(_tau_wheel_script "${CMAKE_SOURCE_DIR}" tau-wheel)
+	tau_deps_producer_command(_tau_wheel_producer "${_tau_wheel_script}")
 	get_filename_component(_tau_parser_entry "${TAU_PARSER_SDK_PREFIX}" DIRECTORY)
 	get_filename_component(_tau_parser_id "${_tau_parser_entry}" NAME)
 	get_filename_component(_tau_cvc5_entry "${CVC5_STORE_PREFIX}" DIRECTORY)

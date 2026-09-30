@@ -98,9 +98,14 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   own pip. The script exports the interpreter as `TAU_PYTHON` to a CI job
   through `$GITHUB_ENV`. A target arch needs binfmt for that arch, which the
   arm64 cross job registers first.
-- `dep-*-package` — the store producers configure runs itself (`dep-cvc5-package`,
-  `dep-boost-package`, `dep-curl-package`, `dep-spot-package`); called by hand
-  only to prefetch. `dep-spot-package` builds the Spot CLI Tau execs, never
+- `dep-cvc5`, `dep-boost`, `dep-curl`, `dep-spot`, `dep-tau-wheel`, `dep-tau-js`
+  — the store producers configure runs itself; called by hand only to prefetch.
+  Each has one script per target, `scripts/dep/<target>/<dep>.sh`, and one
+  shared recipe, `scripts/dep/common/<dep>.sh`. `./dev dep-<dep>` runs the
+  script of the `-DTAU_DEP_TARGET` target, else of the host, and a target
+  without a script fails with the list of targets that have one. The id records
+  `recipe_hash` of the target script and `recipe_common_hash` of the shared
+  recipe. `dep-spot` builds the Spot CLI Tau execs, never
   links: MSYS2 UCRT64 g++ on `windows-x86_64-msvc`, the preset's compiler elsewhere, and
   a host with `ltlsynt` on `PATH` skips it entirely.
 - `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
