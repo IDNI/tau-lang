@@ -242,14 +242,19 @@ jobs:
   # so it does not depend on the x86 `deps` job or its cache scope.
   linux-arm64:
     name: Linux arm64 release tests (${{ matrix.name }})
-    needs: [guard, probe]
+    needs: guard
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
+    # The pack matrix runs on x86_64 only. arm64 checks the platform, so the
+    # default pack is enough here.
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
+      matrix:
+        include:
+          - name: default
+            pack: ""
     env:
       # ubuntu-24.04-arm runners are 4-core
       BUILD_JOBS: 4
