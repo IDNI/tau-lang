@@ -384,6 +384,34 @@ ARG BUILD_JOBS=5
 # PE executables on its own, with no i386 multiarch for mingw-w64-x86_64 binaries.
 RUN apt-get update && apt-get install -y --no-install-recommends wine
 
+# Ubuntu 24.04's mingw-w64 GCC 13 defines std::type_info::operator== twice in a
+# C++23 static link (GCC PR 110572). Take GCC 16 from Debian forky by sha256, from
+# snapshot.debian.org, which keeps every version. Drop Ubuntu's trees first.
+RUN set -eux; \
+	test "$(dpkg --print-architecture)" = amd64; \
+	rm -rf /usr/x86_64-w64-mingw32 /usr/lib/gcc/x86_64-w64-mingw32; \
+	rm -rf /usr/share/doc/*mingw-w64*; \
+	mkdir -p /tmp/mingw-debs; cd /tmp/mingw-debs; \
+	printf '%s\n' \
+		'46d240cdc2d3ce92503e0ff647ac7f7edc385d8affb833903ade15c882a6b6b8  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/b/binutils-mingw-w64/binutils-mingw-w64-base_2.47-6+13.3+b1_amd64.deb' \
+		'7ee8b4c8cce93221606d6eb1ceed01c821eef4f178cceb6f7bccde5757fd6399  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/b/binutils-mingw-w64/binutils-mingw-w64-x86-64_2.47-6+13.3+b1_amd64.deb' \
+		'6ef2784e073e7de3a4946918b51d4e66a49c5e964e6e7e231aad4fc662059a01  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/g/gcc-mingw-w64/g++-mingw-w64-x86-64-win32_16.2.0-1+29_amd64.deb' \
+		'f09078ea8108135c0b2d501b735d8c1f15f752f1f414dd51a7ebfffb303fca51  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/g/gcc-mingw-w64/gcc-mingw-w64-base_16.2.0-1+29_amd64.deb' \
+		'14f6601dad10b5b73b1a7db5aaee18a1ef56f5cf9010b312ff30633322c4890c  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/g/gcc-mingw-w64/gcc-mingw-w64-x86-64-win32-runtime_16.2.0-1+29_amd64.deb' \
+		'99ae948f575b53d6eca7728988605372d536284dbe8d6ed14bfe98074afeda1a  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/g/gcc-mingw-w64/gcc-mingw-w64-x86-64-win32_16.2.0-1+29_amd64.deb' \
+		'65a8c1261144617234f9b490d354e0a04f21649fe10c451a02fb0dc4d5db7b4d  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/m/mingw-w64/mingw-w64-common_14.0.0-1_all.deb' \
+		'2802e3b2cc08c4732c1aae490457df5e8f2468ccb66d7974c8b4a76ea59ae449  https://snapshot.debian.org/archive/debian/20260920T143653Z/pool/main/m/mingw-w64/mingw-w64-x86-64-dev_14.0.0-1_all.deb' \
+		> packages; \
+	while read -r sha url; do \
+		file="$(basename "$url")"; \
+		curl -fsSL -o "$file" "$url"; \
+		echo "$sha  $file" | sha256sum -c --quiet -; \
+	done < packages; \
+	for deb in *.deb; do dpkg -x "$deb" /; done; \
+	cd /; rm -rf /tmp/mingw-debs; \
+	x86_64-w64-mingw32-g++ --version; \
+	x86_64-w64-mingw32-ld --version
+
 
 # ------------------------------------------------------------
 # Windows build image: builds tau and its tests (if TESTS = "yes"), so the
