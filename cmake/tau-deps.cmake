@@ -9,22 +9,19 @@ include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/../external/parser/cmake/tau-store.cmake")
 
 # Compiler and flag arguments every producer receives, so no producer reads a
-# compiler from the environment. The values are the preset's build-type flags,
-# so switching the build type selects a different package. An optional target
-# names the store target of the package, and defaults to TAU_DEPS_TARGET.
+# compiler from the environment. Every build type passes the release flags, so
+# a devel or debug configure uses the packages of the release one. An optional
+# target names the store target of the package, and defaults to TAU_DEPS_TARGET.
 function(_tau_deps_toolchain_args out)
 	set(_target "${TAU_DEPS_TARGET}")
 	if(ARGC GREATER 1)
 		set(_target "${ARGV1}")
 	endif()
-	string(TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
-	set(_cflags_var "CMAKE_C_FLAGS_${_build_type}")
-	set(_cxxflags_var "CMAKE_CXX_FLAGS_${_build_type}")
 	set(_args
 		"-DTAU_DEP_CC=${CMAKE_C_COMPILER}"
 		"-DTAU_DEP_CXX=${CMAKE_CXX_COMPILER}"
-		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS} ${${_cflags_var}}"
-		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS} ${${_cxxflags_var}}"
+		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}"
+		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}"
 		"-DTAU_DEP_TARGET=${_target}")
 	# A cross toolchain travels as a file; macOS and MSVC build with the host
 	# compiler the preset picked and pass none.
@@ -48,17 +45,14 @@ function(_tau_deps_target_is_cross_toolchain out)
 endfunction()
 
 # The host tool tgf must run on the build machine, so it is built with native
-# clang and the build type's own flags; the target's global flags may carry
-# wasm-only options native clang rejects.
+# clang and the release flags, as every package; the target's global flags may
+# carry wasm-only options native clang rejects.
 function(_tau_deps_host_toolchain_args out)
-	string(TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
-	set(_cflags_var "CMAKE_C_FLAGS_${_build_type}")
-	set(_cxxflags_var "CMAKE_CXX_FLAGS_${_build_type}")
 	set(_args
 		"-DTAU_DEP_CC=${TAU_HOST_C_COMPILER}"
 		"-DTAU_DEP_CXX=${TAU_HOST_CXX_COMPILER}"
-		"-DTAU_DEP_CFLAGS=${${_cflags_var}}"
-		"-DTAU_DEP_CXXFLAGS=${${_cxxflags_var}}")
+		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS_RELEASE}"
+		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS_RELEASE}")
 	set(${out} "${_args}" PARENT_SCOPE)
 endfunction()
 

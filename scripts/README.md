@@ -231,6 +231,8 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 
 Configure resolves each dependency by a content id. The id is the SHA-256 of
 the recipe fields, so a changed recipe gives a new id and never a stale hit.
+Every build type gives a producer the release flags, so the `devel`, `debug`
+and `release` presets use the same packages.
 
 The local store keeps one folder for each entry:
 

@@ -37,8 +37,10 @@ builds in `build/<type>-bvonly` and `{release,devel,debug}-tests-nobv` in
 Dependencies come from the local store at `~/.tau/store`. Configure resolves each one
 by content id: a store hit is reused, a miss is read from the remote store named by
 `TAU_STORE_REMOTE` (one private GHCR OCI artifact per entry, tagged `<dep>-<id>`), and
-only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published. An
-unset `TAU_STORE_REMOTE` and a failed remote read both fall through to a build.
+only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published. Every
+build type builds a package with the release flags, so `devel`, `debug` and `release`
+share one package. An unset `TAU_STORE_REMOTE` and a failed remote read both fall
+through to a build.
 `TAU_STORE_KEEP` sets how many entries per dependency stay, by last use (default 3; 0
 disables eviction). Normal CI only reads the remote (`packages: read`); the trusted
 `deps-store.yml` on `devel` and `main` is the only publisher (`./dev store-publish`).
