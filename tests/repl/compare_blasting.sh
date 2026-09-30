@@ -11,8 +11,11 @@ FORMULA="${2:?usage: compare_blasting.sh <tau-binary> <formula>}"
 MEMORY_LIMIT_KB=$((16384 * 1024))
 TIME_LIMIT_S=1200
 
-ulimit -v "${MEMORY_LIMIT_KB}" 2>/dev/null || \
-	echo "warning: could not apply ${MEMORY_LIMIT_KB}KB address-space limit" >&2
+# An asan build reserves terabytes of address space at start.
+if [ -z "${TAU_BLASTING_NO_MEMORY_LIMIT:-}" ]; then
+	ulimit -v "${MEMORY_LIMIT_KB}" 2>/dev/null || \
+		echo "warning: could not apply ${MEMORY_LIMIT_KB}KB address-space limit" >&2
+fi
 
 source "${BASH_SOURCE[0]%/*}/../../scripts/resolve_timeout"
 
@@ -32,10 +35,18 @@ run_normalize() {
 		printf '%s\n' "${out}" >&2
 		return 1
 	fi
-	printf '%s' "${out}" \
+	local line
+	line="$(printf '%s' "${out}" \
 		| sed 's/\x1b\[[0-9;]*m//g' \
 		| grep -E '^%[0-9]+:' \
-		| tail -1
+		| tail -1)"
+	# A crash, or a sanitizer report, prints no result line and no "Error".
+	if [ -z "${line}" ] && [ "${rc}" -ne 0 ]; then
+		echo "__ERROR__ tau exited with status ${rc} [blasting ${mode}]" >&2
+		printf '%s\n' "${out}" >&2
+		return 1
+	fi
+	printf '%s' "${line}"
 }
 
 ON="$(run_normalize on)"   || exit 1
