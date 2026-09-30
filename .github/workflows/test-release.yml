@@ -7,11 +7,11 @@ on:
     branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
 
-# This workflow resolves the store. A resolving job publishes what it built
-# when the guard job allows it, so those jobs ask for packages: write. The
-# publish runs inline, so a red test cannot strand a package. Only a push to
-# devel, devel-* or main by a writer publishes. A pull request, a push to any
-# other branch and a manual run never publish.
+# This workflow resolves the store. When the guard job allows it, configure
+# publishes each entry right after it builds it, so a later failure cannot
+# lose it, and the jobs that resolve ask for packages: write. Only a push or a
+# manual run on devel, devel-* or main by a writer publishes. A pull request
+# and a run on any other branch never publish.
 permissions:
   contents: read
   packages: read
@@ -45,11 +45,14 @@ jobs:
             echo "allowed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "${{ github.event_name }}" != "push" ]; then
-            echo "${{ github.event_name }} run: publishing is off, only a push publishes"
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          case "${{ github.event_name }}" in
+            push|workflow_dispatch) ;;
+            *)
+              echo "${{ github.event_name }} run: publishing is off, only a push or a manual run publishes"
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           case "${{ github.ref }}" in
             refs/heads/devel|refs/heads/devel-*|refs/heads/main) ;;
             *)
