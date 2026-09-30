@@ -551,6 +551,35 @@ size_t pack_modular_width(size_t ba_type) {
 }
 
 /**
+ * @brief Whether the BA owning @p ba_type decides closed formulas over it
+ * whatever their quantifier prefix (see ba_has_closed_decision).
+ */
+template <typename Node>
+bool pack_type_decides_closed(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_closed_decision<Node, BA>)
+				return true;
+			return std::nullopt;
+		}).value_or(false);
+}
+
+/**
+ * @brief The truth of the closed formula @p form over @p ba_type, decided by
+ * the BA owning the type with no quantifier eliminated first; nullopt when
+ * undecided or when the owner does not decide closed formulas.
+ */
+template <typename Node>
+std::optional<bool> pack_decide_closed(size_t ba_type, tref form) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_closed_decision<Node, BA>)
+				return ba_descriptor<BA, Node>::decide_closed(form);
+			return std::nullopt;
+		});
+}
+
+/**
  * @brief The integer the constant @p c of @p ba_type holds, when the type is
  * read with modular semantics (see pack_modular_width); nullopt otherwise.
  */

@@ -195,6 +195,13 @@ cli::options tau_options() {
 		.set_description("cap the strategy paths the multi-step window "
 			"oracle examines per check (default: "
 			"TAU_LTL_WINDOW_MAX_PATHS or 4096; 0 = unlimited)");
+	opts["ltl-closed-regions-timeout"] =
+		cli::option("ltl-closed-regions-timeout", 'K', "")
+		.set_description("cap in seconds the data game's attempt on regions "
+			"that keep their quantifiers, all its questions together, "
+			"each at most a quarter of it (default: "
+			"TAU_LTL_CLOSED_REGIONS_TIMEOUT or 20; 0 = no such "
+			"attempt)");
 	opts["tref-budget"] = cli::option("tref-budget", 'y', "")
 		.set_description("cap the live interned tree nodes; an api call "
 			"that starts with the store at or above the cap fails "
@@ -412,6 +419,8 @@ int main(int argc, char** argv) {
 		tau_api::set_ltl_max_refinement_rounds(*n);
 	if (auto n = given_count("ltl-window-max-paths"); n)
 		tau_api::set_ltl_window_max_paths(*n);
+	if (auto n = given_count("ltl-closed-regions-timeout"); n)
+		tau_api::set_ltl_closed_regions_timeout(*n);
 	if (auto n = given_count("tref-budget"); n)
 		tau_api::set_tref_budget(*n);
 	if (auto n = given_count("tref-budget-soft"); n)

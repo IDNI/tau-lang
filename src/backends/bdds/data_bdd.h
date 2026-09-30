@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -26,6 +27,9 @@ namespace idni::tau_lang {
 //
 // collect() frees the nodes no root reaches and reuses their ids, so an id a
 // root reaches never changes; any other id held across it is dangling.
+//
+// With a deadline (stop_at), the table counts as full from the moment it
+// passes, `late` says so, and no collection clears it.
 struct data_bdd {
 	using id = uint32_t;
 	static constexpr id F = 0, T = 1;
@@ -64,6 +68,11 @@ struct data_bdd {
 	// while grow_at_most() bounds the work under way
 	size_t limit;
 	bool full = false;
+	using clock = std::chrono::steady_clock;
+	clock::time_point deadline = clock::time_point::max();
+	bool late = false;
+	// the clock is read once per this many new nodes or memo entries
+	uint32_t until_clock = 0;
 	// wants_collect() once this many nodes are live; never before the
 	// table first fills, so that a table that never does costs nothing
 	size_t next_collect = SIZE_MAX;
@@ -79,6 +88,16 @@ struct data_bdd {
 	size_t room() const { return max_nodes - std::min(size(), max_nodes); }
 	size_t memo_size() const { return memo_count; }
 	size_t unique_size() const { return unique_count; }
+
+	// Fills the table once the time `t` passes.
+	void stop_at(clock::time_point t) { deadline = t; }
+	// Whether the deadline passed; it then fills the table.
+	bool passed_deadline() {
+		if (deadline == clock::time_point::max() || until_clock--) return late;
+		until_clock = 1u << 14;
+		if (clock::now() >= deadline) late = full = true;
+		return late;
+	}
 
 	// Lets at most `n` more nodes be live until grow_freely().
 	void grow_at_most(size_t n) { limit = std::min(max_nodes, size() + n); }
@@ -122,6 +141,7 @@ struct data_bdd {
 		if (memo_count * 3 > memo_slots.size() * 2)
 			rebuild_memo(memo_slots.size() * 2, [](id) { return true; });
 		if (max_memo && memo_count >= max_memo) full = true;
+		passed_deadline();
 	}
 	// Keeps the entries whose arguments and result `keep`.
 	template <typename Keep>
@@ -140,7 +160,7 @@ struct data_bdd {
 		if (lo == hi) return lo;
 		const size_t i = unique_slot(v, lo, hi);
 		if (unique_slots[i] != F) return unique_slots[i];
-		if (size() >= limit) { full = true; return F; }
+		if (size() >= limit || passed_deadline()) { full = true; return F; }
 		id n;
 		if (free_ids.empty()) {
 			n = (id)nodes.size();
@@ -259,7 +279,8 @@ struct data_bdd {
 	// three quarters of the table stay live. Past that, the work that
 	// follows runs out again after a few steps, each paying a collection.
 	bool worth_redoing(size_t before) const {
-		return room() > 2 * before && size() <= max_nodes / 4 * 3;
+		return !late && room() > 2 * before
+			&& size() <= max_nodes / 4 * 3;
 	}
 
 	// Frees every node that no root reaches: `each_root(mark)` calls
@@ -300,7 +321,7 @@ struct data_bdd {
 		unique_count = size() - 2;
 		rebuild_unique(slots(unique_count));
 		rebuild_memo(slots(memo_count), [&](id n) { return live[n]; });
-		full = false;
+		full = late;
 		++collections;
 		// the next collection once half the room left is used, and not
 		// before an eighth of the table is: past seven eighths live, only

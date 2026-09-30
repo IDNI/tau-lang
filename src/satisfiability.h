@@ -16,6 +16,7 @@
 
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
+#include "bounded_call.h"
 
 namespace idni::tau_lang {
 

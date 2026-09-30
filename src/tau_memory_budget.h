@@ -36,6 +36,7 @@
 #define __IDNI__TAU__TAU_MEMORY_BUDGET_H__
 
 #include "backends/bdds/babdd.h"
+#include "bounded_call.h"
 #include "env_limits.h"
 #include "tau_diagnostics.h"
 #include "tau_tree.h"
@@ -225,6 +226,10 @@ std::invoke_result_t<F> with_budget(F&& f) {
 	};
 	if (depth == 0 && take_bdd_node_table_exhausted<node>())
 		return exhausted();
+	// what work outside any unit left behind, after a budget ran out, may
+	// sit in the caches
+	if (depth == 0 && !take_time_budget_exhausted().empty())
+		tree<node>::clear_caches();
 	if (over_tref_budget<node>()) {
 		std::invoke_result_t<F> refused;
 		refused.error(code::runtime_error, tref_budget_message<node>());
@@ -234,6 +239,15 @@ std::invoke_result_t<F> with_budget(F&& f) {
 	++depth;
 	auto r = f();
 	--depth;
+	// A query that passed its time budget left an answer missing, and what
+	// read it computed nothing to trust.
+	if (depth == 0 && !time_budget_exhausted().empty()) {
+		r.error(code::solver_error, take_time_budget_exhausted());
+		// the caches may hold what was computed from the missing answer
+		tree<node>::clear_caches();
+		bdd_node_table_exhausted = false;
+		return r;
+	}
 	if (!bdd_node_table_exhausted) return r;
 	if (depth == 0) take_bdd_node_table_exhausted<node>();
 	r.error(code::runtime_error, messages::bdd_node_table_exhausted);

@@ -36,12 +36,15 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
 
+#include <chrono>
 #include <cstdlib>
+#include <unordered_set>
 #include <cvc5/cvc5.h>
 
 #include "backends/cvc5/cvc5.h"
 #include "backends/cvc5/cvc5_options.h"
 #include "backends/cvc5/cvc5_bitblast.h"
+#include "bounded_call.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
@@ -100,6 +103,13 @@ inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
 /// Widest bit-vector the BDD decision takes. A product of two wider values
 /// outgrows any useful budget.
 inline constexpr size_t bv_bitblast_max_width = 16;
+
+/// Wall-clock budget, in seconds, of one quantified cvc5 decision of
+/// `bv_formula_sat_status`: the query runs in a child process killed at the
+/// bound (bounded_call.h), and a query killed there has no answer, which
+/// makes the command asking it UNKNOWN. 0 runs every query in the process,
+/// unbounded. The option `bv-solve-timeout`.
+inline size_t bv_solve_timeout = 60;
 
 /**
  * @brief Configure a solver for a quantifier-free decision-only query.

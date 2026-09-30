@@ -946,6 +946,44 @@ if(TEST "test_repl-realizable_cmd-bv_falling_output")
 		PROPERTIES TIMEOUT 120)
 endif()
 
+# Products of two 16-bit values: the regions keep the quantifiers the
+# normalizer leaves standing and are decided whole. The environment keeps i1
+# at 0, so o1 * o2 != 0 needs o1 != 0, and o1 <= 0 * o1 never holds.
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_wide_product
+	"realizable (G (i1[t]:bv[16] != (o1[t]:bv[16] * o2[t]:bv[16]))) && (G (F (o1[t]:bv[16] <= (i1[t]:bv[16] * o1[t]:bv[16]))))" ": F")
+# with the attempt on closed regions switched off, the same game is undecided
+tau_repl_unsupported(_tau_skip "realizable x:bv[16]")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-realizable_cmd-data_game_bv_closed_regions_off")
+else()
+	add_test(NAME "test_repl-realizable_cmd-data_game_bv_closed_regions_off"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 0 -e \"realizable (G (i1[t]:bv[16] != (o1[t]:bv[16] * o2[t]:bv[16]))) && (G (F (o1[t]:bv[16] <= (i1[t]:bv[16] * o1[t]:bv[16]))))\" 2>&1")
+	set_tests_properties("test_repl-realizable_cmd-data_game_bv_closed_regions_off" PROPERTIES
+		FAIL_REGULAR_EXPRESSION "%[0-9]+: [TF]"
+		PASS_REGULAR_EXPRESSION "the strategy|UNKNOWN")
+endif()
+# no inputs: the system picks every value, products of two 12-bit values of
+# different steps among them; the attempt needs about 11 s of its 20, so the
+# case gives it 60 to stay decided under a loaded test run
+tau_repl_unsupported(_tau_skip "realizable x:bv[12]")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps")
+else()
+	add_test(NAME "test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-closed-regions-timeout 60 -e \"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))\" -S trace")
+	set_tests_properties(
+		"test_repl-realizable_cmd-data_game_bv_closed_regions_product_of_steps"
+		PROPERTIES PASS_REGULAR_EXPRESSION ": T" FAIL_REGULAR_EXPRESSION "Error"
+		TIMEOUT 150)
+endif()
+
+# A consistency question with a product of two 12-bit values, and one with
+# products of 8-bit values of different steps, stop on their time budget
+add_repl_budget_test(realizable_cmd-bv_budget_wide_product
+	"realizable (((i1[t]:bv[12] = (o2[t-1]:bv[12] + o1[t]:bv[12])) && (o2[t]:bv[12] != i1[t]:bv[12])) U ((i1[t]:bv[12] = o2[t-1]:bv[12]) || ((o2[t]:bv[12] * o1[t]:bv[12]) < (o1[t]:bv[12] + o1[t]:bv[12]))))")
+add_repl_budget_test(realizable_cmd-bv_budget_products_of_steps
+	"realizable (always (((o2[t]:bv[8] * {1}:bv[8]) <= o1[t-1]:bv[8]) && (o1[t-2]:bv[8] = i1[t-1]:bv[8]))) && (sometimes (((o2[t]:bv[8] - o2[t-1]:bv[8]) != (o1[t]:bv[8] * o2[t-2]:bv[8])) || ((o1[t-1]:bv[8] * {3}:bv[8]) < (i1[t-2]:bv[8] * i1[t-1]:bv[8])))) && (sometimes ((o2[t]:bv[8] != (i1[t-2]:bv[8] + {2}:bv[8])) || ((o2[t]:bv[8] * o1[t-2]:bv[8]) != i1[t]:bv[8])))")
+
 # Streams of a dense order read through order comparisons are played on the
 # order type of the window: how its values and the constants compare.
 # The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.

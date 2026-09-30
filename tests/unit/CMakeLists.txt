@@ -18,6 +18,7 @@ set(TESTS
 	ba_types
 	ba_types_inference
 	bounded_cache
+	bounded_call
 	data_bdd
 	canonicalize_tref
 	temporal_connectives

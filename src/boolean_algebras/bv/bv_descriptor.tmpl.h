@@ -186,6 +186,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief The truth of the closed bitvector formula @p form, decided
+	 * whole by its bits or cvc5 whatever its quantifier prefix; nullopt
+	 * when the formula is not bv's or the decision is undecided.
+	 */
+	static std::optional<bool> decide_closed(tref form) {
+		if (!can_solve(form)) return std::nullopt;
+		return sat_status(form);
+	}
+
+	/**
 	 * @brief Predicate-blast @p n; returns it unchanged unless BOTH the
 	 * core master `preprocessing` switch and bv's own `bv_blasting` switch
 	 * are on. A blasting failure carries its own report rather than a
@@ -300,6 +310,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_bitblast_max_nodes_option(size_t n) {
 		bv_bitblast_max_nodes = n;
 	}
+	static size_t get_solve_timeout_option() { return bv_solve_timeout; }
+	// the verdicts remembered under the old budget are dropped with it
+	static void set_solve_timeout_option(size_t n) {
+		if (n != bv_solve_timeout) tau::clear_caches();
+		bv_solve_timeout = n;
+	}
 	static bool get_widening_option() { return bv_widening; }
 	static void set_widening_option(bool enabled) { bv_widening = enabled; }
 	static size_t get_max_width_option() { return bv_max_width; }
@@ -314,7 +330,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `bv-definitional-elimination`, `bv-defelim-max-clauses`,
 	 * `bv-defelim-max-atoms`, `bv-defelim-max-subset`,
 	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
-	 * `bv-bitblast-max-nodes`, `bv-widening` and `bv-max-width`.
+	 * `bv-bitblast-max-nodes`, `bv-solve-timeout`, `bv-widening` and
+	 * `bv-max-width`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -330,11 +347,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * and its caps (heuristics/bv_definitional_elimination.h), read by
 	 * @ref eliminate_definitional_existentials. `quantifier-free-decision`
 	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h), and
-	 * `bitblast-max-nodes` its `bv_bitblast_max_nodes` budget.
+	 * `bitblast-max-nodes` its `bv_bitblast_max_nodes` budget and
+	 * `solve-timeout` its `bv_solve_timeout`.
 	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
 	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 13> options() {
+	static std::array<ba_option, 14> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -400,6 +418,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				"formula of at most 16 bits is decided on its bits, "
 				"before cvc5 takes it (default 1048576, 0 = always "
 				"cvc5)" },
+			{ "solve-timeout", ba_option_kind::count,
+				nullptr, nullptr,
+				get_solve_timeout_option, set_solve_timeout_option,
+				"cap in seconds each quantified bitvector question "
+				"cvc5 decides, run in a separate process; past it the "
+				"answer is unknown (default 60, 0 = unbounded, in the "
+				"process)" },
 			{ "widening", ba_option_kind::flag,
 				get_widening_option, set_widening_option,
 				nullptr, nullptr,

@@ -231,6 +231,16 @@ concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::modular_value(t, c) }
 			-> std::convertible_to<std::optional<uint64_t>>; };
 
+// decide_closed decides a closed formula over the type whatever its
+// quantifier prefix, with no quantifier eliminated first: true when it
+// holds, false when not, nullopt when undecided (the formula untranslatable,
+// the decision out of budget).
+template <typename Node, typename BA>
+concept ba_has_closed_decision = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::decide_closed(f) }
+			-> std::convertible_to<std::optional<bool>>; };
+
 // The type's values, read by = and the order comparisons, form a dense
 // linear order without endpoints; dense_order_compare orders two constants
 // (-1, 0, 1), nullopt when either is not a point of the order, and

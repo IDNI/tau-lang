@@ -338,6 +338,12 @@ void api<node>::set_ltl_window_max_paths(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_closed_regions_timeout(size_t seconds) {
+	option_change_guard<node> guard;
+	ltl_closed_regions_timeout_param = (long) seconds;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	option_change_guard<node> guard;
 	pwr_semantic_fallback = on;

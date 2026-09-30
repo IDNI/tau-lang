@@ -78,6 +78,20 @@ inline long ltl_max_refinement_rounds_param = -1;
 inline long ltl_window_max_paths_param = -1;
 
 /**
+ * @brief Seconds the data game may spend on regions that keep their
+ * quantifiers (formula_regions::closed_type), all their questions together,
+ * each taking at most a quarter of it; past either that attempt is
+ * undecided, and the game with it.
+ *
+ * Runtime parameter by policy (`--ltl-closed-regions-timeout`, REPL
+ * `set ltlclosedregionstimeout`, `api::set_ltl_closed_regions_timeout`);
+ * 0 skips the attempt. The sentinel -1 means "not set", in which case
+ * `TAU_LTL_CLOSED_REGIONS_TIMEOUT` is consulted and 20 applies when that is
+ * absent too. Read through @ref ltl_closed_regions_timeout.
+ */
+inline long ltl_closed_regions_timeout_param = -1;
+
+/**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
  * assignments are enumerated as `1 << n`: a signed shift is undefined at
  * 31 and the enumeration is hopeless long before. Not tunable.
@@ -256,6 +270,19 @@ inline size_t ltl_window_max_paths() {
 	if (ltl_window_max_paths_param >= 0)
 		return (size_t) ltl_window_max_paths_param;
 	return env_limit_count("TAU_LTL_WINDOW_MAX_PATHS", 4096);
+}
+
+/**
+ * @brief Effective budget, in seconds, of the data game's regions that keep
+ * their quantifiers (0 = no such attempt).
+ *
+ * Precedence: @ref ltl_closed_regions_timeout_param when set (>= 0), else
+ * `TAU_LTL_CLOSED_REGIONS_TIMEOUT`, else 20.
+ */
+inline size_t ltl_closed_regions_timeout() {
+	if (ltl_closed_regions_timeout_param >= 0)
+		return (size_t) ltl_closed_regions_timeout_param;
+	return env_limit_count("TAU_LTL_CLOSED_REGIONS_TIMEOUT", 20);
 }
 
 /**

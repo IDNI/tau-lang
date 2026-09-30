@@ -763,10 +763,15 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    the regions still need outgrow its node limit (nodes no region needs any
    more are freed as the table fills), a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
-   UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
+   UNREALIZABLE or UNKNOWN answer of (4) and (5). When a quantifier stays
+   and every stream is of one bitvector type, the game is played once more
+   on formulas that keep their quantifiers, each region decided whole on
+   the bits of its values or by the solver, all of them within
+   `--ltl-closed-regions-timeout` (20 seconds, each question at most a
+   quarter of it); such a game gives a verdict but no strategy to `run`. The steps before step 0
    are played like any other step, their inputs by the environment and
    their outputs by the system. The game answers UNKNOWN only when a
-   quantifier cannot be eliminated or a fixpoint reaches the
+   quantifier cannot be eliminated or decided, or a fixpoint reaches the
    refinement-round cap; (4) and (5) then keep their answer.
 
 A formula is **realizable** iff its data game is won; where that game is
@@ -845,6 +850,7 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
+| `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
 a CLI flag, a REPL option and an `api::set_*` setter (see the CLI and REPL
@@ -2837,6 +2843,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
+| -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -2858,15 +2865,22 @@ closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
 bitvectors of at most 16 bits may keep in use at once when Tau decides it on
 the bits of its values, before the solver takes it instead; 1048576 by default, `0`
-leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
+leaves every question to the solver), `--bv-solve-timeout` (the seconds a
+bitvector question with quantifiers may take on the bits of its values, and,
+when it multiplies or divides two values that are not constants, in the
+solver, which then runs it in a separate process stopped at the limit; a
+question stopped there has no answer, so the command asking it answers
+UNKNOWN, naming the limit; 60 by default, `0` runs the solver in the process
+with no limit), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
 1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
-`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`, `--bv-widening`
-and `--bv-max-width` are not recognized options at all.
+`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`,
+`--bv-solve-timeout`, `--bv-widening` and `--bv-max-width` are not
+recognized options at all.
 
 ## `tau compile` — synthesis-to-executable compiler
 
@@ -3162,6 +3176,12 @@ examines per check (`--ltl-window-max-paths`). 4096 by default, or
 `TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
 likewise answers UNKNOWN.
 
+* `ltlclosedregionstimeout`: seconds the data game may spend on regions that
+keep their quantifiers, all their questions together, each question at most
+a quarter of it (`--ltl-closed-regions-timeout`). 20 by default, or
+`TAU_LTL_CLOSED_REGIONS_TIMEOUT` when that is set; 0 skips the attempt. Past
+either bound that attempt is undecided, and the other routes keep deciding.
+
 Changing any of these, the two temporal-normalization caps, `preprocessing`
 or an option an algebra declares (below) between two queries drops the
 verdict memos, so the next `sat`/`realizable` is decided
@@ -3195,7 +3215,11 @@ binders are all of one kind quantifier-free, mirroring
 (the BDD budget, in nodes in use at once, of the decision on the bits of
 values of at most 16 bits,
 mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
-question to the solver), `bv-widening` (the
+question to the solver), `bv-solve-timeout` (the seconds a bitvector question
+with quantifiers may take, on its bits and, when it multiplies or divides two
+values that are not constants, in the solver, before the command asking it
+answers UNKNOWN,
+mirroring `--bv-solve-timeout`; 60 by default, 0 = no limit), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
 mirroring `--bv-widening`; off by default) and `bv-max-width` (cap on the
 width widening may compute at, mirroring `--bv-max-width`; 1024 by default,
@@ -3712,7 +3736,8 @@ carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOptio
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
 (`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
-`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`) have no counterpart
+`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`,
+`set_ltl_closed_regions_timeout`) have no counterpart
 there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
 

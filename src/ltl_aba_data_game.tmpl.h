@@ -132,6 +132,13 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 }
 
 // Regions as formulas over the io_vars of the window.
+//
+// With `closed_type`, a type whose owner decides closed formulas over it
+// whatever their quantifier prefix (pack_decide_closed), and every stream of
+// that type, a region keeps its quantifiers and is never normalized: its
+// emptiness is the truth of its existential closure, and the steps before
+// step 0 are decided the same way. Every question such regions ask is one
+// such decision, whose missing answer fails the regions.
 template <NodeType node>
 struct formula_regions {
 	using tau = tree<node>;
@@ -141,18 +148,42 @@ struct formula_regions {
 	bool failed = false;
 	data_quantifier<node> dq;
 	std::map<tref, tref> normal;
+	std::optional<size_t> closed_type;
 
-	explicit formula_regions(const arena& ar) : a(ar) {}
+	explicit formula_regions(const arena& ar,
+		std::optional<size_t> closed = std::nullopt)
+		: a(ar), closed_type(closed) {}
 
 	tref norm(tref f) {
 		if (failed) return tau::_F();
 		const auto& t = tau::get(f);
 		if (t.equals_T() || t.equals_F()) return f;
 		if (auto it = normal.find(f); it != normal.end()) return it->second;
+		if (closed_type) return f;
 		tref n = data_quantifier<node>::eliminate(f);
 		if (!n) { failed = true; return tau::_F(); }
 		normal.emplace(f, n);
 		return n;
+	}
+
+	// `var`, a stream read at the current step, bound in `body` under a
+	// fresh name: a region that keeps its quantifiers is read one step
+	// later by the predecessor, which moves every stream it names, and a
+	// bound one must stay where it is.
+	tref bind(tref var, tref body, bool exists) {
+		tref fresh = tau::build_variable(find_ba_type<node>(var));
+		body = rewriter::replace<node>(body,
+			subtree_map<node, tref>{ { var, fresh } });
+		return exists ? tau::build_wff_ex(fresh, body, false)
+			: tau::build_wff_all(fresh, body, false);
+	}
+
+	// The truth of the closed formula `q`, when decided.
+	std::optional<bool> decide(tref q) {
+		const auto& t = tau::get(q);
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		return pack_decide_closed<node>(*closed_type, q);
 	}
 	tref top() { return tau::_T(); }
 	tref bottom() { return tau::_F(); }
@@ -174,6 +205,14 @@ struct formula_regions {
 		const auto& t = tau::get(f);
 		if (t.equals_F()) return true;
 		if (t.equals_T()) return false;
+		if (closed_type) {
+			tref q = f;
+			for (tref v : tau::get(f).get_free_vars())
+				q = tau::build_wff_ex(v, q, false);
+			auto sat = decide(q);
+			if (!sat) { failed = true; return true; }
+			return !*sat;
+		}
 		if (qlt_order_conj_unsat<node>(f)) return true;
 		// an undecided check is no emptiness: the game fails instead
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
@@ -181,7 +220,9 @@ struct formula_regions {
 		return !sat.value();
 	}
 	std::optional<bool> reached(tref f) {
-		return dq.reached_before_start(f);
+		if (!closed_type) return dq.reached_before_start(f);
+		tref q = dq.before_start(f, true);
+		return q ? decide(q) : std::nullopt;
 	}
 	// The positions from which the chooser of vertex `i` takes edge `j`
 	// into `Y`.
@@ -209,7 +250,8 @@ struct formula_regions {
 		if (x.picks != arena::chooser::none) {
 			auto [ins, outs] = data_quantifier<node>::current_vars(body);
 			for (tref var : x.picks == arena::chooser::inputs ? ins : outs)
-				body = dq.quantify(var, body, mine);
+				body = closed_type ? bind(var, body, mine)
+					: dq.quantify(var, body, mine);
 		}
 		return norm(body);
 	}
@@ -2861,6 +2903,26 @@ static void describe_strategy(data_game_strategy<node>& st,
 	st.reset();
 }
 
+// The type of every stream the atoms read, when they all have one and its
+// owner decides closed formulas over it (formula_regions::closed_type).
+template <NodeType node>
+static std::optional<size_t> closed_decision_type(
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using tau = tree<node>;
+	std::optional<size_t> tid;
+	for (auto& [atom, _] : atoms)
+		for (tref v : tau::get(atom).select_top(
+			is_child<node, tau::io_var>))
+		{
+			const size_t t = find_ba_type<node>(v);
+			if (tid && *tid != t) return std::nullopt;
+			tid = t;
+		}
+	if (!tid || !pack_type_decides_closed<node>(*tid)) return std::nullopt;
+	return tid;
+}
+
 // Decides the realizability of `skeleton` over `atoms` on the data; over
 // formula regions only when `formulas` is set. With `strategy`, a won game
 // also gives the system's strategy there.
@@ -2922,14 +2984,32 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			}
 		}
 	}
-	// codes the BDD cannot hold leave the game to the formulas
-	if (!wins && formulas) {
-		formula_regions<node> regions(arena);
+	// codes the BDD cannot hold leave the game to the formulas, and those
+	// with quantifiers the normalizer leaves standing to a type whose owner
+	// decides them whole
+	std::vector<std::optional<size_t>> modes{ std::nullopt };
+	const size_t closed_seconds = ltl_closed_regions_timeout();
+	if (auto t = closed_decision_type<node>(atoms); t && closed_seconds)
+		modes.push_back(t);
+	for (auto mode : modes) {
+		if (wins || !formulas) break;
+		// The decisions of closed regions share one time budget,
+		// ltl_closed_regions_timeout(), each taking at most a quarter of
+		// it, and one that passes either fails them, and only them:
+		// nothing else reads its missing answer. A question these regions
+		// can answer at all is answered in seconds, one they cannot keeps
+		// cvc5 busy past any budget, so the quarter ends the latter early.
+		std::optional<time_budget_handled> budget;
+		if (mode) budget.emplace(std::chrono::seconds(closed_seconds),
+			std::chrono::milliseconds(closed_seconds * 250));
+		formula_regions<node> regions(arena, mode);
 		data_game_solver solver(regions, arena,
 			ltl_max_refinement_rounds(), keep);
 		auto w = solver.solve_all();
 		if (w) wins = regions.reached(w->sys[arena.init]);
-		if (keep && wins && *wins) {
+		if (budget && budget->ran_out()) wins.reset();
+		// a region that keeps quantifiers gives no moves to play
+		if (keep && wins && *wins && !mode) {
 			auto st = std::make_shared<formula_strategy<node>>();
 			describe_strategy<node>(*st, arena, atoms);
 			for (size_t i = 0; i < arena.v.size(); ++i) {

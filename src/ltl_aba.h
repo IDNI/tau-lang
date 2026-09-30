@@ -22,6 +22,7 @@
 #include "normalizer.h"
 #include "ltl_aba_result.h"
 #include "bounded_cache.h"
+#include "bounded_call.h"
 #include "ocltl_phi_delta.h"
 #include "boolean_algebras/nso_ba.h"
 #include "logging.h"
@@ -102,6 +103,7 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	mix(ltl_guard_max_cubes());
 	mix(ltl_max_refinement_rounds());
 	mix(ltl_window_max_paths());
+	mix(ltl_closed_regions_timeout());
 	return seed;
 }
 

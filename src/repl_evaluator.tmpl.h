@@ -1596,6 +1596,7 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "ltlguardmaxcubes")         return ltl_guard_max_cubes_opt;
 	if (x == "ltlrefinementrounds")      return ltl_refinement_rounds_opt;
 	if (x == "ltlwindowmaxpaths")        return ltl_window_max_paths_opt;
+	if (x == "ltlclosedregionstimeout")  return ltl_closed_regions_timeout_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1740,6 +1741,10 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds()) << "\n"; } },
 	{ ltl_window_max_paths_opt, [climit, this]() {
 		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths()) << "\n"; } },
+	{ ltl_closed_regions_timeout_opt, [this]() {
+		const size_t s = ltl_closed_regions_timeout();
+		out << "ltlclosedregionstimeout: ";
+		if (s) out << s << " s\n"; else out << "off\n"; } },
 	{ tref_budget_opt, [climit, this]() {
 		out << "trefbudget:          " << climit(tref_budget())
 			<< " (live: " << api<node>::tref_count() << ")\n"; } },
@@ -1956,6 +1961,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_ltl_max_refinement_rounds(*n); } },
 	{ ltl_window_max_paths_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_window_max_paths(*n); } },
+	{ ltl_closed_regions_timeout_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_closed_regions_timeout(*n); } },
 	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_tref_budget(*n); } },
 	{ tref_budget_soft_opt, [&]() { if (auto n = str2count(); n)
@@ -2278,6 +2285,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
 		if (command_type == tau::run_cmd) finish_running();
 	}
+	// likewise a solver query that passed its time budget
+	if (auto m = take_time_budget_exhausted(); !m.empty()) {
+		error = true, result = 0;
+		tau::clear_caches();
+		TAU_LOG_ERROR << m;
+		if (command_type == tau::run_cmd) finish_running();
+	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		out << "result tree: ") << "\n";
@@ -2476,7 +2490,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
 		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"
 		"  ltlrefinementrounds    ABA-oracle refinement rounds         64\n"
-		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n";
+		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n"
+		"  ltlclosedregionstimeout data game on closed regions (s)     20\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts

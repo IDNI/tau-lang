@@ -831,6 +831,9 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 		return ir.has_value() && ir.value();
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
+		// a solver question left without an answer ends the search: no
+		// step after it gives a result to trust
+		if (!time_budget_exhausted().empty()) return { nullptr, step_num };
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi
@@ -943,6 +946,10 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	while (step_num < lookback || !(weakening ? impl(chi, chi_prev)
 						: impl(chi_prev, chi)))
 	{
+		if (!time_budget_exhausted().empty())
+			return r.with_error(code::solver_error,
+				"the search stopped once a solver question went "
+				"unanswered");
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// Same contract as find_fixpoint_phi: a give-up yields no
@@ -1843,6 +1850,10 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	const int_t flag_search_limit = flag_boundary + 1
 					+ (int_t)max_flag_search_steps;
 	for (int_t i = s + 1; true; ++i) {
+		if (!time_budget_exhausted().empty())
+			return r.with_error(code::solver_error,
+				"the search stopped once a solver question went "
+				"unanswered");
 		if (flag_search_bounded && i > flag_search_limit) {
 			// A bounded give-up is no verdict: it used to report F,
 			// which callers read as a proof of unsatisfiability. Surface
