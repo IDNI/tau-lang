@@ -2,8 +2,9 @@
 
 /* The POSIX names that cvc5 and CaDiCaL use and the MSVC CRT does not give.
  * The windows-x86_64-msvc producer forces this header into every clang-cl
- * compile with /FI. The CRT keeps access, close, write, isatty, fileno,
- * getpid, popen and pclose under their POSIX names, so no macro renames them.
+ * compile with /FI. The CRT keeps access, close, write, isatty, fileno and
+ * getpid under their POSIX names. It declares popen and pclose only as _popen
+ * and _pclose, so the functions below give the POSIX names without a macro.
  */
 #ifndef TAU_CVC5_MSVC_COMPAT_H
 #define TAU_CVC5_MSVC_COMPAT_H
@@ -45,6 +46,14 @@ static __inline int mkstemp(char* name) {
 	if (_mktemp_s(name, strlen(name) + 1) != 0) return -1;
 	return _open(name, _O_CREAT | _O_EXCL | _O_RDWR | _O_BINARY,
 		_S_IREAD | _S_IWRITE);
+}
+
+static __inline FILE* popen(const char* command, const char* mode) {
+	return _popen(command, mode);
+}
+
+static __inline int pclose(FILE* stream) {
+	return _pclose(stream);
 }
 
 #endif
