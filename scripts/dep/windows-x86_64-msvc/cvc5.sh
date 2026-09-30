@@ -1,14 +1,32 @@
 #!/bin/bash
 # The cvc5 package for windows-x86_64-msvc.
 # scripts/dep/common/cvc5.sh holds the shared recipe.
+#
+# cvc5 does not build with cl.exe, so the clang-cl of the Visual Studio install
+# builds it for both MSVC presets. The id records that builder and its own
+# flags, not the preset compiler, so the cl and clang-cl presets share one
+# package. Both sides use the MSVC ABI, the VS STL and the /MD runtime.
+#
+# cvc5 downloads neither CaDiCaL nor GMP here. CaDiCaL builds from the pinned
+# closure archive with cmake/cvc5-msvc/cadical.cmake, and GMP comes from vcpkg
+# at a pinned commit, because gmpxx must have the MSVC ABI.
 
 set -u
 
 DEP_FILE_TARGET=windows-x86_64-msvc
 DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# No system GMP serves this target. -DCVC5_CMAKE_PREFIX can point at an
-# MSVC-compatible GMP when --auto-download cannot supply one.
+CVC5_MSVC_VCPKG_REPO="https://github.com/microsoft/vcpkg.git"
+# The vcpkg commit whose gmp port is 6.3.0, port-version 5.
+CVC5_MSVC_VCPKG_COMMIT="e06564091c10e0b042900800c9fd48aad7f00643"
+CVC5_MSVC_GMP_PORT="gmp:x64-windows-static-md"
+CVC5_MSVC_GMP_VERSION="6.3.0#5"
+# cvc5 keys its Windows code on the MinGW macro __WIN32__. The flags hold no
+# path: the compat header and the unistd.h shim reach clang-cl through CL, and
+# their hashes are id fields.
+CVC5_MSVC_FLAGS="-D__WIN32__"
+
+# No system GMP serves this target: the prebuild step installs the vcpkg one.
 _dep_cvc5_gmp_header() {
 	return 0
 }
@@ -33,24 +51,161 @@ _dep_cvc5_python() {
 	return 1
 }
 
-# Native MSVC: Ninja + the production build type. cl.exe has no flag-encoded
-# path map.
+# The clang-cl of the Visual Studio install, not the first one on PATH: a
+# standalone LLVM changes with the runner image, and the VS copy matches the
+# STL headers that cl.exe uses.
+_dep_cvc5_vs_clang_cl() {
+	local vswhere vs
+	vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+	[ -x "$vswhere" ] || vswhere="$(command -v vswhere.exe 2>/dev/null || true)"
+	[ -n "$vswhere" ] || return 1
+	vs="$("$vswhere" -latest -products '*' \
+		-requires Microsoft.VisualStudio.Component.VC.Llvm.Clang \
+		-property installationPath 2>/dev/null | tr -d '\r' | head -n 1)"
+	[ -n "$vs" ] || return 1
+	vs="$(cygpath -m "$vs")"
+	[ -f "${vs}/VC/Tools/Llvm/x64/bin/clang-cl.exe" ] || return 1
+	printf '%s' "${vs}/VC/Tools/Llvm/x64/bin/clang-cl.exe"
+}
+
 _dep_cvc5_target_setup() {
-	local _py
+	local _py _clang_cl
+	if [ -n "$CVC5_CMAKE_PREFIX" ]; then
+		echo "dep-cvc5: windows-x86_64-msvc builds its own CaDiCaL and GMP; remove -DCVC5_CMAKE_PREFIX" >&2
+		exit 2
+	fi
+	if ! _clang_cl="$(_dep_cvc5_vs_clang_cl)"; then
+		echo "dep-cvc5: no Visual Studio clang-cl found; install the VS component Microsoft.VisualStudio.Component.VC.Llvm.Clang" >&2
+		exit 2
+	fi
+	CVC5_MSVC_DIR="${DEV_ROOT}/cmake/cvc5-msvc"
+	DEP_CVC5_CC="$_clang_cl"
+	DEP_CVC5_CXX="$_clang_cl"
+	DEP_CVC5_CFLAGS="$CVC5_MSVC_FLAGS"
+	DEP_CVC5_CXXFLAGS="$CVC5_MSVC_FLAGS"
+	DEP_CVC5_GMP_SOURCE="vcpkg"
+	DEP_CVC5_GMP_VERSION="$CVC5_MSVC_GMP_VERSION"
 	DEP_CVC5_GENERATOR="Ninja"
+	# clang-cl takes no flag-encoded path map; the install-time rewrite covers it.
 	DEP_CVC5_PREFIX_MAP=OFF
-	# cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
-	# spaces, and cl sits under "Program Files".
+	# clang-cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
+	# spaces, and clang-cl sits under "Program Files".
 	_DEP_CVC5_TARGET_ARGS=(--ninja production)
 	_py="$(_dep_cvc5_python || true)"
 	if [ -n "$_py" ]; then
 		_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
 			"-DPython3_EXECUTABLE=$_py")
 	fi
-	if [ -n "$CVC5_CMAKE_PREFIX" ]; then
-		_DEP_CVC5_TARGET_ARGS+=("-DCMAKE_PREFIX_PATH=$CVC5_CMAKE_PREFIX")
-	fi
 	_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
+}
+
+# The builder, the vcpkg pin and the files of cmake/cvc5-msvc/ change the
+# package, so each is an id field.
+_dep_cvc5_target_fields() {
+	local compat unistd cadical
+	compat="$(dep_sha256 "${CVC5_MSVC_DIR}/compat.h")" || return 1
+	unistd="$(dep_sha256 "${CVC5_MSVC_DIR}/include/unistd.h")" || return 1
+	cadical="$(dep_sha256 "${CVC5_MSVC_DIR}/cadical.cmake")" || return 1
+	printf '%s\n' \
+		"builder=clang-cl" \
+		"vcpkg_repo=${CVC5_MSVC_VCPKG_REPO}" \
+		"vcpkg_commit=${CVC5_MSVC_VCPKG_COMMIT}" \
+		"gmp_port=${CVC5_MSVC_GMP_PORT}" \
+		"msvc_compat_h_hash=${compat}" \
+		"msvc_unistd_h_hash=${unistd}" \
+		"msvc_cadical_cmake_hash=${cadical}"
+}
+
+# GMP from vcpkg into <deps>. The vcpkg build uses cl.exe of the MSVC shell,
+# so it runs before CL is set for clang-cl.
+_dep_cvc5_msvc_gmp() {
+	local work="$1" deps="$2" vcpkg="${1}/msvc-vcpkg" installed lib
+	git init -q "$vcpkg" \
+		&& git -C "$vcpkg" remote add origin "$CVC5_MSVC_VCPKG_REPO" \
+		&& git -C "$vcpkg" fetch -q --depth 1 origin "$CVC5_MSVC_VCPKG_COMMIT" \
+		&& git -C "$vcpkg" checkout -q FETCH_HEAD \
+		|| { echo "dep-cvc5: cannot fetch vcpkg ${CVC5_MSVC_VCPKG_COMMIT}" >&2; return 1; }
+	( cd "$vcpkg" && cmd.exe //c "$(cygpath -w "${vcpkg}/bootstrap-vcpkg.bat")" -disableMetrics ) \
+		|| { echo "dep-cvc5: vcpkg bootstrap failed" >&2; return 1; }
+	# The runner's own VCPKG_ROOT must not redirect this pinned checkout, and
+	# Git Bash must not rewrite the port:triplet argument as a path list.
+	( cd "$vcpkg" && env -u VCPKG_ROOT VCPKG_DISABLE_METRICS=1 MSYS2_ARG_CONV_EXCL='*' \
+		./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" ) \
+		|| { echo "dep-cvc5: vcpkg install ${CVC5_MSVC_GMP_PORT} failed" >&2; return 1; }
+	installed="${vcpkg}/installed/${CVC5_MSVC_GMP_PORT#*:}"
+	mkdir -p "${deps}/include" "${deps}/lib" || return 1
+	cp "${installed}"/include/gmp*.h "${deps}/include/" \
+		|| { echo "dep-cvc5: no GMP headers under ${installed}/include" >&2; return 1; }
+	cp "${installed}"/lib/*.lib "${deps}/lib/" \
+		|| { echo "dep-cvc5: no GMP libraries under ${installed}/lib" >&2; return 1; }
+	# cvc5's FindGMP asks for gmp and gmpxx, which MSVC finds as gmp.lib and
+	# gmpxx.lib only.
+	for lib in gmp gmpxx; do
+		if [ ! -f "${deps}/lib/${lib}.lib" ] && [ -f "${deps}/lib/lib${lib}.lib" ]; then
+			cp "${deps}/lib/lib${lib}.lib" "${deps}/lib/${lib}.lib" || return 1
+		fi
+		if [ ! -f "${deps}/lib/${lib}.lib" ]; then
+			echo "dep-cvc5: vcpkg gave no ${lib}.lib" >&2
+			return 1
+		fi
+	done
+}
+
+# CaDiCaL from the pinned closure archive into <deps>. The archive stays under
+# the cvc5 build tree, where the closure check reads it.
+_dep_cvc5_msvc_cadical() {
+	local work="$1" build="$2" deps="$3"
+	local entry name version url sha archive got src
+	for entry in "${CVC5_EXPECTED_CLOSURE[@]}"; do
+		IFS='|' read -r name version url sha <<< "$entry"
+		[ "$name" = CaDiCaL ] && break
+	done
+	if [ "$name" != CaDiCaL ]; then
+		echo "dep-cvc5: no CaDiCaL entry in the expected closure" >&2
+		return 1
+	fi
+	mkdir -p "${build}/msvc-archives" "${work}/msvc-src" || return 1
+	archive="${build}/msvc-archives/$(_dep_cvc5_url_archive "$url")"
+	curl -fsSL "$url" -o "$archive" \
+		|| { echo "dep-cvc5: CaDiCaL download failed" >&2; return 1; }
+	got="$(dep_sha256 "$archive")" || return 1
+	if [ "$got" != "$sha" ]; then
+		echo "dep-cvc5: CaDiCaL archive hashes ${got}, expected ${sha}" >&2
+		return 1
+	fi
+	tar -xzf - -C "${work}/msvc-src" < "$archive" \
+		|| { echo "dep-cvc5: CaDiCaL extract failed" >&2; return 1; }
+	src="${work}/msvc-src/cadical-${version}"
+	[ -d "$src" ] || { echo "dep-cvc5: extracted tree not found: '${src}'" >&2; return 1; }
+	cp "${CVC5_MSVC_DIR}/cadical.cmake" "${src}/CMakeLists.txt" || return 1
+	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
+		"$DEP_CVC5_CMAKE" -S "$src" -B "${src}/build" -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_COMPILER="$DEP_CVC5_CXX" \
+		-DCVC5_MSVC_DIR="$(cygpath -m "$CVC5_MSVC_DIR")" \
+		-DCMAKE_INSTALL_PREFIX="$(cygpath -m "$deps")" \
+		|| { echo "dep-cvc5: CaDiCaL configure failed" >&2; return 1; }
+	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
+		"$DEP_CVC5_CMAKE" --build "${src}/build" -- -j "$CVC5_JOBS" \
+		|| { echo "dep-cvc5: CaDiCaL build failed" >&2; return 1; }
+	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
+		"$DEP_CVC5_CMAKE" --install "${src}/build" \
+		|| { echo "dep-cvc5: CaDiCaL install failed" >&2; return 1; }
+}
+
+# CMAKE_PREFIX_PATH and CL carry the checkout and staging paths, so they travel
+# in the environment of the configure and the build, not in the id.
+_dep_cvc5_target_prebuild() {
+	local work="$1" build="$2" deps="${1}/msvc-deps"
+	_dep_cvc5_msvc_gmp "$work" "$deps" || return 1
+	_dep_cvc5_msvc_cadical "$work" "$build" "$deps" || return 1
+	export CMAKE_PREFIX_PATH
+	CMAKE_PREFIX_PATH="$(cygpath -m "$deps")"
+	# clang-cl reads extra options from CL. The compat header goes into every
+	# file, because ssize_t reaches files that do not include unistd.h.
+	export CL
+	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
+	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
 }
 
 source "$(dirname "${BASH_SOURCE[0]}")/../common/cvc5.sh"

@@ -47,7 +47,8 @@ disables eviction). Normal CI only reads the remote (`packages: read`); the trus
 The target in the id names the platform the package runs on: `linux-x86_64`
 (Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),
 `windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
-`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (cl.exe). The
+`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (cl.exe, and
+the Visual Studio clang-cl for cvc5). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
@@ -60,7 +61,11 @@ the `-DTAU_DEP_TARGET` target, else of the host.
 
 `windows-x86_64-msvc` builds the full pack from the store, cvc5 included, and runs the
 C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
-CI; a producer's `vcvars64.bat` search is only a local fallback. The suites
+CI; a producer's `vcvars64.bat` search is only a local fallback. cvc5 does not build
+with cl.exe, so its producer builds it with the Visual Studio clang-cl for both MSVC
+presets, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
+The id records that builder, so the cl and clang-cl presets share one cvc5 package.
+Configure copies `cvc5.dll` into the build root, where the executables are. The suites
 carry no platform skip of their own: `tests/test_helpers.h` gives every
 platform a scratch directory, a host-compiler probe and `tau_test_run` over
 `spawn_capture`, and `tests/test_memory_query.h` reports available and current

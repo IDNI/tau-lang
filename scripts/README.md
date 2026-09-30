@@ -107,7 +107,10 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   `recipe_hash` of the target script and `recipe_common_hash` of the shared
   recipe. `dep-spot` builds the Spot CLI Tau execs, never
   links: MSYS2 UCRT64 g++ on `windows-x86_64-msvc`, the preset's compiler elsewhere, and
-  a host with `ltlsynt` on `PATH` skips it entirely.
+  a host with `ltlsynt` on `PATH` skips it entirely. `dep-cvc5` on
+  `windows-x86_64-msvc` builds with the Visual Studio clang-cl, not the preset's
+  compiler, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a
+  pinned vcpkg.
 - `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
   the parser's own script, so one install serves both repos
 - `dep-chrome`, `dep-js-test-deps` — pinned Chrome for Testing and

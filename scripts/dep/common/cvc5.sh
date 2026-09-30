@@ -11,7 +11,9 @@
 # publishes it. Consumer mode only looks up an existing entry.
 #
 # The target file defines _dep_cvc5_gmp_header, which prints the system gmp.h
-# or nothing, and _dep_cvc5_target_setup, which sets the target arguments.
+# or nothing, and _dep_cvc5_target_setup, which sets the target arguments. It
+# may define _dep_cvc5_target_fields, which prints extra id fields, and
+# _dep_cvc5_target_prebuild <work> <build>, which runs before the configure.
 
 set -u
 
@@ -34,6 +36,9 @@ CVC5_EXPECTED_CLOSURE=(
 	"SymFPU|e6ac3af9c2c574498ea171c957425b407625448b|https://github.com/cvc5/symfpu/archive/e6ac3af9c2c574498ea171c957425b407625448b.tar.gz|823aa663fcc2f6844ae5e9ea83ceda4ed393cdb3dadefce9b3c7c41cd0f4f702"
 	"GMP|6.3.0|https://github.com/cvc5/cvc5-deps/blob/main/gmp-6.3.0.tar.bz2?raw=true|ac28211a7cfb609bae2e2c8d6058d66c8fe96434f740cf6fe2e47b000d1c20cb"
 )
+
+declare -F _dep_cvc5_target_fields > /dev/null || _dep_cvc5_target_fields() { :; }
+declare -F _dep_cvc5_target_prebuild > /dev/null || _dep_cvc5_target_prebuild() { :; }
 
 _dep_cvc5_compiler_id() {
 	dep_compiler_id "$DEP_CVC5_CXX"
@@ -133,6 +138,7 @@ _dep_cvc5_field_block() {
 		"lto=OFF" \
 		"sanitizer=OFF" \
 		"file_prefix_map=cvc5-src;cvc5-build;staging;store"
+	_dep_cvc5_target_fields
 }
 
 # Verify the fetched auto-download archives against the expected closure, and
@@ -242,6 +248,7 @@ _dep_cvc5_producer() {
 				;;
 		esac
 	done
+	_dep_cvc5_target_prebuild "$work" "$build" || { rm -rf "$work"; return 1; }
 	# configure.sh must run from the cvc5 base directory. The prefix is added
 	# here, not part of the recorded args.
 	( cd "$work" && env -u CPPFLAGS -u LDFLAGS \
