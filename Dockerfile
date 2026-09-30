@@ -391,6 +391,14 @@ ARG BUILD_JOBS=5
 # PE executables on its own, with no i386 multiarch for mingw-w64-x86_64 binaries.
 RUN apt-get update && apt-get install -y --no-install-recommends wine
 
+# WINEPREFIX keeps the wine configuration out of the home directory.
+# WINEDEBUG drops wine's own noise, and not the output of a test.
+ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
+
+# Parallel tests that each find no prefix all create it at once, and their
+# wine servers fail to start. Create the prefix once, here.
+RUN wineboot -i && wineserver -w
+
 # Ubuntu 24.04's mingw-w64 GCC 13 defines std::type_info::operator== twice in a
 # C++23 static link (GCC PR 110572). Take GCC 16 from Debian forky by sha256, from
 # snapshot.debian.org, which keeps every version. Drop Ubuntu's trees first.
@@ -466,10 +474,6 @@ ARG TESTS=yes
 # builds one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
-
-# WINEPREFIX keeps the wine configuration out of the home directory.
-# WINEDEBUG drops wine's own noise, and not the output of a test.
-ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
 
 # A source change misses every object layer, so the compiled objects live in a
 # cache mount the CI carries across runs, as on the native build.
