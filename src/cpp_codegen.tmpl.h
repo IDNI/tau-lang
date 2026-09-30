@@ -314,7 +314,14 @@ atom_field_info classify_atom_field(
 		return m;
 	if (classify_output_field<node>(atom_ref, io_ref) != field_kind::witness)
 		return m;
-	if (pack_type_has_codegen_witness<node>(
+	// An atom that also reads the variable at another step (o[t] < o[t-1])
+	// has no constant witness: it is solved at runtime, once that step's
+	// value is known, for the variable at the current step.
+	const bool lookback = fvars.size() > 1;
+	if (lookback)
+		for (tref v : fvars)
+			if (get_io_var_shift<node>(v) == 0) io_ref = v;
+	if (!lookback && pack_type_has_codegen_witness<node>(
 		tree<node>::get(io_ref).get_ba_type()))
 	{
 		m.var_name = var_name;
@@ -779,6 +786,16 @@ result<program_desc> build_program_desc(
 	for (auto& [atom_ref, prop] : sol.atoms) {
 		bool is_out = !input_set.count(prop);
 		ameta[prop] = classify_atom_field<node>(atom_ref, is_out, revisable);
+		// The data game's Mealy view solves its outputs each step, as the
+		// run does: for an order comparison a constant baked now may be
+		// another point than the one the run takes.
+		if (auto& m = ameta[prop]; sol.data_game
+			&& m.kind == field_kind::witness
+			&& tau::get(atom_ref)[0].value.nt != tau::bf_eq)
+		{
+			m.template_vars.emplace_back(m.var_name, m.io_var_ref);
+			m.kind = field_kind::witness_template;
+		}
 		if (atom_is_data_typed<node>(atom_ref, revisable)) {
 			TAU_TRY(auto ge, build_atom_ground_expr<node>(atom_ref));
 			atoms.push_back({prop, std::move(ge)});
