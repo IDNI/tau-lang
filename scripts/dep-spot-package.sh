@@ -133,14 +133,11 @@ EOF
 			${_DEP_SPOT_CROSS_ENV[@]+"${_DEP_SPOT_CROSS_ENV[@]}"} \
 			./configure --prefix="$staging_prefix" --disable-python \
 				--disable-shared --disable-devel ) \
-			> "${work}/configure.log" 2>&1 \
-			|| { echo "dep-spot: configure failed" >&2; tail -20 "${work}/configure.log" >&2; rm -rf "$work"; return 1; }
+			|| { echo "dep-spot: configure failed" >&2; rm -rf "$work"; return 1; }
 		( cd "$src" && make -j "$DEP_SPOT_JOBS" ) \
-			> "${work}/build.log" 2>&1 \
-			|| { echo "dep-spot: build failed" >&2; tail -20 "${work}/build.log" >&2; rm -rf "$work"; return 1; }
+			|| { echo "dep-spot: build failed" >&2; rm -rf "$work"; return 1; }
 		( cd "$src" && make install-exec ) \
-			> "${work}/install.log" 2>&1 \
-			|| { echo "dep-spot: install failed" >&2; tail -20 "${work}/install.log" >&2; rm -rf "$work"; return 1; }
+			|| { echo "dep-spot: install failed" >&2; rm -rf "$work"; return 1; }
 	fi
 
 	local exe="ltlsynt"

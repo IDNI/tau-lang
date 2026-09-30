@@ -306,13 +306,11 @@ EOF
 			# bootstrap.bat has no --with-toolset; the toolset arrives
 			# through the user-config passed to b2 below.
 			b2_bin="${work}/b2.exe"
-			( cd "$work" && cmd //c bootstrap.bat --with-libraries=log \
-				> "${work}/bootstrap.log" 2>&1 ) \
-				|| { echo "dep-boost: bootstrap failed" >&2; tail -20 "${work}/bootstrap.log" >&2; rm -rf "$work"; return 1; }
+			( cd "$work" && cmd //c bootstrap.bat --with-libraries=log ) \
+				|| { echo "dep-boost: bootstrap failed" >&2; rm -rf "$work"; return 1; }
 		else
-			( cd "$work" && ./bootstrap.sh --with-toolset=${BOOST_TOOLSET} --with-libraries=log \
-				> "${work}/bootstrap.log" 2>&1 ) \
-				|| { echo "dep-boost: bootstrap failed" >&2; tail -20 "${work}/bootstrap.log" >&2; rm -rf "$work"; return 1; }
+			( cd "$work" && ./bootstrap.sh --with-toolset=${BOOST_TOOLSET} --with-libraries=log ) \
+				|| { echo "dep-boost: bootstrap failed" >&2; rm -rf "$work"; return 1; }
 		fi
 		local b2_version
 		b2_version="$("$b2_bin" --version 2>&1 | head -n 1)"

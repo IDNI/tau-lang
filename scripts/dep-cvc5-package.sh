@@ -269,6 +269,21 @@ _dep_cvc5_producer() {
 		rm -rf "$work"
 		return 1
 	fi
+	# The LOG_* options hide each dependency build in a stamp log. Without them
+	# the build streams. Another count means a changed file, so stop.
+	local _log_opts="${work}/cmake/deps-helper.cmake" _log_count
+	_log_count="$(grep -cE '^[[:space:]]*LOG_[A-Z_]+[[:space:]]+ON[[:space:]]*$' "$_log_opts")"
+	if [ "$_log_count" != 8 ]; then
+		echo "dep-cvc5: expected 8 LOG_* ON lines in ${_log_opts}, found ${_log_count}" >&2
+		rm -rf "$work"
+		return 1
+	fi
+	# cvc5 adds "-modified" to its version when the checkout is dirty.
+	sed -E '/^[[:space:]]*LOG_[A-Z_]+[[:space:]]+ON[[:space:]]*$/d' "$_log_opts" \
+		> "${_log_opts}.tmp" && mv "${_log_opts}.tmp" "$_log_opts" \
+		&& git -C "$work" update-index --assume-unchanged cmake/deps-helper.cmake \
+		&& git -C "$work" diff-index --quiet HEAD \
+		|| { echo "dep-cvc5: cannot remove the LOG_* options cleanly" >&2; rm -rf "$work"; return 1; }
 	# configure.sh joins its options into one string and splits it again, so a
 	# value with a space would reach CMake in pieces.
 	local _a
@@ -295,8 +310,7 @@ _dep_cvc5_producer() {
 			-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH" \
 			-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
 			--name=build --prefix="$staging_prefix" ) \
-		> "${work}/configure.log" 2>&1 \
-		|| { echo "dep-cvc5: configure failed" >&2; tail -20 "${work}/configure.log" >&2; rm -rf "$work"; return 1; }
+		|| { echo "dep-cvc5: configure failed" >&2; rm -rf "$work"; return 1; }
 	echo "dep-cvc5: feature set (CMakeCache USE_/ENABLE_):"
 	_dep_cvc5_features "${build}/CMakeCache.txt" | sed 's/^/  /' >&2
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
