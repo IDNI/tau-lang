@@ -116,11 +116,47 @@ _dep_cvc5_target_fields() {
 		"msvc_cadical_cmake_hash=${cadical}"
 }
 
-# GMP from vcpkg into <deps>. The vcpkg build uses cl.exe of the MSVC shell,
-# so it runs before CL is set for clang-cl.
+# A unique folder with a short path for the vcpkg tree and the CaDiCaL build.
+# Under the staging folder, their build paths pass the 260 characters cl.exe
+# accepts.
+_dep_cvc5_msvc_short_dir() {
+	local base="${TMPDIR:-/tmp}"
+	if [ -n "${RUNNER_TEMP:-}" ]; then
+		base="$(cygpath -u "$RUNNER_TEMP")" || return 1
+	fi
+	mktemp -d "${base}/cvc5.XXXXXX"
+}
+
+# Overwrite <root> in every file under <dir> with '@' of the same length. The
+# install step masks the staging paths the same way, but <root> is outside them.
+_dep_cvc5_msvc_mask_path() {
+	local root="$1" dir="$2"
+	python3 - "$dir" "$root" "$(cygpath -w "$root")" "$(cygpath -m "$root")" <<'PY'
+import os
+import sys
+top, *roots = sys.argv[1:]
+olds = sorted({r.encode() for r in roots if r}, key=len, reverse=True)
+for dirpath, _dirs, files in os.walk(top):
+	for name in files:
+		path = os.path.join(dirpath, name)
+		with open(path, 'rb') as fh:
+			data = fh.read()
+		new = data
+		for old in olds:
+			new = new.replace(old, b'@' * len(old))
+		if new != data:
+			with open(path, 'wb') as fh:
+				fh.write(new)
+PY
+}
+
+# GMP from vcpkg into <deps>, with the vcpkg checkout in <vcpkg>. The vcpkg
+# build uses cl.exe of the MSVC shell, so it runs before CL is set for clang-cl.
 _dep_cvc5_msvc_gmp() {
-	local work="$1" deps="$2" vcpkg="${1}/msvc-vcpkg" installed lib
+	local vcpkg="$1" deps="$2" installed lib
+	# Git for Windows refuses a path over 260 characters without core.longpaths.
 	git init -q "$vcpkg" \
+		&& git -C "$vcpkg" config core.longpaths true \
 		&& git -C "$vcpkg" remote add origin "$CVC5_MSVC_VCPKG_REPO" \
 		&& git -C "$vcpkg" fetch -q --depth 1 origin "$CVC5_MSVC_VCPKG_COMMIT" \
 		&& git -C "$vcpkg" checkout -q FETCH_HEAD \
@@ -151,10 +187,10 @@ _dep_cvc5_msvc_gmp() {
 	done
 }
 
-# CaDiCaL from the pinned closure archive into <deps>. The archive stays under
-# the cvc5 build tree, where the closure check reads it.
+# CaDiCaL from the pinned closure archive into <deps>, built in <cadical_build>.
+# The archive stays under the cvc5 build tree, where the closure check reads it.
 _dep_cvc5_msvc_cadical() {
-	local work="$1" build="$2" deps="$3"
+	local work="$1" build="$2" deps="$3" cadical_build="$4"
 	local entry name version url sha archive got src
 	for entry in "${CVC5_EXPECTED_CLOSURE[@]}"; do
 		IFS='|' read -r name version url sha <<< "$entry"
@@ -179,26 +215,39 @@ _dep_cvc5_msvc_cadical() {
 	[ -d "$src" ] || { echo "dep-cvc5: extracted tree not found: '${src}'" >&2; return 1; }
 	cp "${CVC5_MSVC_DIR}/cadical.cmake" "${src}/CMakeLists.txt" || return 1
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
-		"$DEP_CVC5_CMAKE" -S "$src" -B "${src}/build" -G Ninja \
+		"$DEP_CVC5_CMAKE" -S "$src" -B "$cadical_build" -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_CXX_COMPILER="$DEP_CVC5_CXX" \
 		-DCVC5_MSVC_DIR="$(cygpath -m "$CVC5_MSVC_DIR")" \
 		-DCMAKE_INSTALL_PREFIX="$(cygpath -m "$deps")" \
 		|| { echo "dep-cvc5: CaDiCaL configure failed" >&2; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
-		"$DEP_CVC5_CMAKE" --build "${src}/build" -- -j "$CVC5_JOBS" \
+		"$DEP_CVC5_CMAKE" --build "$cadical_build" -- -j "$CVC5_JOBS" \
 		|| { echo "dep-cvc5: CaDiCaL build failed" >&2; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
-		"$DEP_CVC5_CMAKE" --install "${src}/build" \
+		"$DEP_CVC5_CMAKE" --install "$cadical_build" \
 		|| { echo "dep-cvc5: CaDiCaL install failed" >&2; return 1; }
 }
 
 # CMAKE_PREFIX_PATH and CL carry the checkout and staging paths, so they travel
 # in the environment of the configure and the build, not in the id.
 _dep_cvc5_target_prebuild() {
-	local work="$1" build="$2" deps="${1}/msvc-deps"
-	_dep_cvc5_msvc_gmp "$work" "$deps" || return 1
-	_dep_cvc5_msvc_cadical "$work" "$build" "$deps" || return 1
+	local work="$1" build="$2" deps="${1}/msvc-deps" short rc exit_trap outer=""
+	short="$(_dep_cvc5_msvc_short_dir)" \
+		|| { echo "dep-cvc5: cannot create a short build folder" >&2; return 1; }
+	# The trap holds the path itself, as the local is gone when the trap runs,
+	# and it keeps the command of an outer EXIT trap.
+	exit_trap="$(trap -p EXIT)"
+	[ -n "$exit_trap" ] && outer="$(eval "set -- $exit_trap"; printf '%s' "$3")"
+	trap "rm -rf $(printf '%q' "$short")${outer:+; $outer}" EXIT
+	_dep_cvc5_msvc_gmp "${short}/vcpkg" "$deps" \
+		&& _dep_cvc5_msvc_cadical "$work" "$build" "$deps" "${short}/cadical" \
+		&& { _dep_cvc5_msvc_mask_path "$short" "$deps" \
+			|| { echo "dep-cvc5: cannot mask ${short} in ${deps}" >&2; false; }; }
+	rc=$?
+	rm -rf "$short"
+	eval "${exit_trap:-trap - EXIT}"
+	[ "$rc" -eq 0 ] || return 1
 	export CMAKE_PREFIX_PATH
 	CMAKE_PREFIX_PATH="$(cygpath -m "$deps")"
 	# clang-cl reads extra options from CL. The compat header goes into every
