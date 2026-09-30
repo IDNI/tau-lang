@@ -165,13 +165,13 @@ static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 	for (tref n : sys) {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::wff) || !t.has_child()) return {};
-		size_t op = t[0].value.nt;
+		size_t op = t[0].value.get_nt();
 		tref lhs, rhs;
 		bool neg = false;
 		if (op == tau::wff_neg) {
 			const auto& ti = tau::get(t[0].first());
 			if (!ti.is(tau::wff) || !ti.has_child()) return {};
-			op = ti[0].value.nt, lhs = ti[0].first(), rhs = ti[0].second();
+			op = ti[0].value.get_nt(), lhs = ti[0].first(), rhs = ti[0].second();
 			neg = true;
 		} else lhs = t[0].first(), rhs = t[0].second();
 		if      (op == tau::bf_nlt)   op = tau::bf_lt,   neg = !neg;

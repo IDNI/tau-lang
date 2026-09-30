@@ -378,7 +378,7 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 	};
 	// A bound on var read off one atom, normalised to `var op other` with
 	// op among <, <=, >, >= and =; nullopt for any other atom.
-	struct bound { size_t op; tref other; };
+	struct bound { typename node::T op; tref other; };
 	auto read_bound = [&](tref n) -> std::optional<bound> {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
