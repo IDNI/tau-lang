@@ -28,7 +28,7 @@ jobs:
   # checks the pusher, not the commit author, so the guard reads the
   # triggering actor. A pull request never publishes.
   guard:
-    name: Check the pusher's repository permission
+    name: Setup · pusher permission
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -70,102 +70,32 @@ jobs:
           esac
 
   probe:
-    name: Choose the pack matrix
+    name: Setup · pack matrix
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
 
+      # The matrix holds the pack name only, because GitHub appends every
+      # matrix value to the job name. The test job maps the name to TAU_BAS.
       - name: Choose the packs
         id: matrix
         run: |
-          default='{"name":"default","pack":""}'
-          nobv='{"name":"nobv","pack":"sbf,tau,qint"}'
-          bvonly='{"name":"bvonly","pack":"sbf,tau,bv"}'
           if [ -f cmake/tau_bas.cmake ]; then
-            echo "matrix={\"include\":[$default,$nobv,$bvonly]}" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"name":["default","nobv","bvonly"]}' >> "$GITHUB_OUTPUT"
           else
-            echo "matrix={\"include\":[$default]}" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"name":["default"]}' >> "$GITHUB_OUTPUT"
           fi
 
-  # One job builds the system base and the wine layers, so the image builds
-  # import them instead of each one building them. w64-deps sits on top of
-  # deps, so this job builds deps too. Change the scope to force a rebuild.
-  base:
-    name: Build base images (system, wine)
-    runs-on: ubuntu-24.04
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Build base and w64-deps stages
-        run: |
-          ./dev docker w64-deps \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-base,mode=max
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # One job builds the oras and binding venv layer, so the store-reading builds
-  # import it instead of each one installing it.
-  deps:
-    name: Build deps image (oras, venv)
-    # Reads the tau-base cache, so it waits for base instead of building the
-    # same layers beside it.
-    needs: base
-    runs-on: ubuntu-24.04
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Build deps stage
-        run: |
-          ./dev docker deps \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-deps,mode=max
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # The linux-x86_64 resolver: it reads the store, builds what is missing and
-  # publishes it, so the test jobs resolve nothing and a failed test keeps the
-  # publish. A pull request, which cannot publish, gets the store through the
-  # layer cache.
+  # The Linux x86_64 environment: the system base, the deps image and the
+  # store packages, one build each, so each cache scope keeps one writer.
+  # It publishes the packages it builds, so the test jobs resolve nothing and a
+  # failed test keeps the publish. A pull request, which cannot publish, gets
+  # the store through the layer cache.
   linux-resolve:
-    name: Linux store (x86_64)
-    needs: [guard, deps]
+    name: Linux x86_64 · environment
+    needs: guard
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -186,7 +116,32 @@ jobs:
             env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
             env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build the base stage
+        run: |
+          ./dev docker base \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-to   type=gha,scope=tau-base,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # tau-base holds the base layers only, so the deps layers come from their
+      # own scope.
+      - name: Build the deps stage
+        run: |
+          ./dev docker deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve and publish the store packages
         run: |
@@ -202,11 +157,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The linux-x86_64 test jobs read the resolver's layers, so the store is a
+  # The Linux x86_64 test jobs read the environment's layers, so the store is a
   # cache hit and nothing resolves here. Each pack writes its own tau_pack.h,
-  # so each entry is a full build.
+  # so each entry is a full build. GitHub appends the pack name to the job
+  # name.
   linux:
-    name: Linux (${{ matrix.name }})
+    name: Linux x86_64 · tests
     needs: [guard, probe, linux-resolve]
     runs-on: ubuntu-24.04
     # The default entry publishes the tau-wheel package, which no other job
@@ -221,6 +177,8 @@ jobs:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
       TAU_STORE_PUBLISH: ${{ matrix.name == 'default' && needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+      # An empty value keeps the default pack.
+      PACK: ${{ matrix.name == 'nobv' && 'sbf,tau,qint' || matrix.name == 'bvonly' && 'sbf,tau,bv' || '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -256,7 +214,7 @@ jobs:
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --build-arg TAU_BAS=${{ env.PACK }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
@@ -272,7 +230,7 @@ jobs:
           ./dev docker tau-wheel \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_BAS=${{ matrix.pack }} \
+            --build-arg TAU_BAS=${{ env.PACK }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-linux-deps \
@@ -292,10 +250,10 @@ jobs:
           if-no-files-found: error
 
   # The devel build keeps assert() and DBG(...) live, which the release build
-  # removes. It reads the release packages from the resolver's layers, so it
+  # removes. It reads the release packages from the environment's layers, so it
   # resolves nothing, needs no guard and publishes nothing.
   linux-devel:
-    name: Linux (devel)
+    name: Linux x86_64 · tests (devel)
     needs: linux-resolve
     runs-on: ubuntu-24.04
     env:
@@ -343,9 +301,9 @@ jobs:
 
   # Every other Linux job builds with clang. This job builds the library with
   # gcc, so a gcc error shows in a job of its own. It reads the packages of
-  # the resolver's layers, so it resolves nothing and publishes nothing.
+  # the environment's layers, so it resolves nothing and publishes nothing.
   linux-gcc:
-    name: Linux (gcc)
+    name: Linux x86_64 · tests (gcc)
     needs: linux-resolve
     runs-on: ubuntu-24.04
     env:
@@ -395,7 +353,7 @@ jobs:
   # pack. It takes the tau-wheel store package when the remote has it, else the
   # artifact of the same wheel, and compiles nothing.
   testnet:
-    name: Linux (tau-testnet)
+    name: Linux x86_64 · tests (tau-testnet)
     needs: linux
     if: ${{ !cancelled() && needs.linux.result != 'skipped' }}
     runs-on: ubuntu-24.04
@@ -445,11 +403,11 @@ jobs:
         env:
           TAU_WHEEL_DIR: tau-wheel
 
-  # The address sanitizer job builds on the resolver's layers. release-asan
+  # The address sanitizer job builds on the environment's layers. release-asan
   # sets TAU_LTO=OFF, which moves the parser SDK id, so this job publishes that
   # one package. It runs on the devel branches and by hand only: it is slow.
   linux-asan:
-    name: Linux (address sanitizer)
+    name: Linux x86_64 · tests (asan)
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
@@ -503,12 +461,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # One job builds emsdk and the browser test dependencies, so the wasm gates
-  # import them instead of each gate building them. Change the scope to force
-  # a rebuild.
+  # The WebAssembly environment: emsdk and the browser test dependencies, so
+  # the wasm test jobs import them instead of each one building them. It sits
+  # on the deps stage of the Linux x86_64 environment. Change the scope to
+  # force a rebuild.
   wasm-deps:
-    name: Build wasm deps images (emsdk, Chrome)
-    needs: deps
+    name: WebAssembly · environment
+    needs: linux-resolve
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -539,11 +498,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The wasm32-emscripten resolver. Its resolve stage copies the store of
-  # linux-resolve for the native parity tau and the host tools, so it waits
-  # for that job and reads its layers.
+  # The wasm32-emscripten resolver and the node tests. Its resolve stage copies
+  # the store of the Linux x86_64 environment for the native parity tau and
+  # the host tools, so it waits for that job and reads its layers.
   wasm-node:
-    name: WebAssembly (Node.js)
+    name: WebAssembly · tests (node)
     needs: [guard, wasm-deps, linux-resolve]
     runs-on: ubuntu-24.04
     permissions:
@@ -592,10 +551,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The browser stage copies the store from wasm-node-resolve, so it waits for
-  # the wasm-node job and reads its layers. It does not wait for the linux
-  # test job.
+  # the node test job and reads its layers. It does not wait for the Linux
+  # x86_64 test jobs.
   wasm-browser:
-    name: WebAssembly (browser)
+    name: WebAssembly · tests (browser)
     needs: [wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
     env:
@@ -626,11 +585,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The windows-x86_64-mingw resolver. It publishes before the tests, so a
+  # The Windows MinGW environment: the wine and MinGW layers (w64-deps) and the
+  # windows-x86_64-mingw store packages. It publishes before the tests, so a
   # failed wine test keeps the mingw packages. Its stage copies the store of
-  # linux-resolve for the host tools, so it waits for that job.
+  # the Linux x86_64 environment for the host tools, so it waits for that job.
   linux-mingw64-wine-resolve:
-    name: Windows cross-build store (MinGW)
+    name: Windows MinGW · environment
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     permissions:
@@ -654,13 +614,14 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Resolve and publish the store packages
+      - name: Build the MinGW stages, resolve and publish the store packages
         run: |
           ./dev docker w64-build-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-mingw64-wine-deps \
             --cache-from type=gha,scope=tau-linux-deps \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base \
@@ -668,11 +629,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The mingw test job reads the resolver's layers, so the store is a cache hit
-  # and nothing resolves here. It runs the default pack only, and only the REPL
-  # suite under wine: the native jobs run the C++ suite.
+  # The mingw test job reads the layers of its environment, so the store is a
+  # cache hit and nothing resolves here. It runs the default pack only, and
+  # only the REPL suite under wine: the native jobs run the C++ suite.
   linux-mingw64-wine:
-    name: Windows cross-build (MinGW, wine)
+    name: Windows MinGW · tests (wine)
     needs: linux-mingw64-wine-resolve
     runs-on: ubuntu-24.04
     env:
@@ -719,11 +680,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The native arm64 resolver. The same image as the x86_64 resolver on an
-  # arm runner, so the arm64 store packages are built natively. It reads and
-  # writes the arm64 scope only: the x86 layers never match an arm runner.
+  # The Linux arm64 environment. The same image as the x86_64 environment on
+  # an arm runner, so the arm64 store packages are built natively. It reads
+  # and writes the arm64 scope only: the x86 layers never match an arm runner.
   linux-arm64-resolve:
-    name: Linux arm64 store
+    name: Linux arm64 · environment
     needs: guard
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -759,11 +720,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The native arm64 test job reads the resolver's layers, so the store is a
-  # cache hit and nothing resolves here. The pack matrix runs on x86_64 only,
-  # so arm64 checks the platform with the default pack.
+  # The native arm64 test job reads the layers of its environment, so the
+  # store is a cache hit and nothing resolves here. The pack matrix runs on
+  # x86_64 only, so arm64 checks the platform with the default pack.
   linux-arm64:
-    name: Linux arm64
+    name: Linux arm64 · tests
     needs: linux-arm64-resolve
     runs-on: ubuntu-24.04-arm
     env:
@@ -810,7 +771,7 @@ jobs:
   # under qemu. Its stage starts from linux-resolve, so the host packages are
   # hits, and it resolves and publishes the cross arm64 packages.
   linux-arm64-cross:
-    name: Linux arm64 cross (clang, qemu)
+    name: Linux arm64 · tests (cross, qemu)
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     permissions:
@@ -869,11 +830,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The windows-x86_64-msvc resolver. cl.exe and clang-cl record a different
-  # compiler in the package id, so this job resolves both id sets once and
-  # saves the store. The test matrix below needs it and restores that store.
+  # The Windows MSVC environment: the windows-x86_64-msvc store. cl.exe and
+  # clang-cl record a different compiler in the package id, so this job
+  # resolves both id sets once and saves the store. The test matrix below
+  # needs it and restores that store.
   windows-msvc-store:
-    name: Windows (MSVC) store
+    name: Windows MSVC · environment
     needs: guard
     runs-on: windows-latest
     permissions:
@@ -942,8 +904,10 @@ jobs:
           path: ~/.tau/store
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
+  # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
+  # and a skipped job shows no unexpanded template.
   windows-msvc:
-    name: Native Windows (${{ matrix.preset }})
+    name: Windows MSVC · tests
     needs: windows-msvc-store
     runs-on: windows-latest
     defaults:
@@ -952,10 +916,11 @@ jobs:
     env:
       # windows-latest runners are 4-core
       TAU_BUILD_JOBS: 4
+      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-all' }}
     strategy:
       fail-fast: false
       matrix:
-        preset: [release-msvc-all, release-msvc-all-clang-cl]
+        compiler: [cl, clang-cl]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -974,7 +939,7 @@ jobs:
         with:
           arch: x64
 
-      # The store job saved this key for the same commit. Only the store job
+      # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -999,11 +964,11 @@ jobs:
 
       # Git Bash runs ./dev, and the preset carries the compiler choice.
       - name: Build and test
-        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
   # The darwin-arm64 resolver: one job resolves, publishes and tests.
   macos:
-    name: macOS
+    name: macOS arm64 · tests
     needs: guard
     runs-on: macos-15
     permissions:
