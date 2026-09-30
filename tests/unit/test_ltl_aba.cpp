@@ -4852,6 +4852,50 @@ TEST_SUITE("Data game strategy") {
 		CHECK(without_i1);
 	}
 
+	// A strategy on the bits of a bitvector wider than 4 bits is a Mealy
+	// machine too: its guards read the bits of i1 its moves depend on, and
+	// its outputs are values of the type.
+	TEST_CASE("a strategy on bits has a Mealy view over the bits it reads") {
+		tref fm = spec("(always (i1[t]:bv[8] > {100}:bv[8] "
+			"-> o1[t]:bv[8] = {7}:bv[8])) && (sometimes (i1[t]:bv[8] "
+			"> {100}:bv[8] || o1[t]:bv[8] = {200}:bv[8])).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		bool bit = false, value = false;
+		for (const auto& [a, _] : data->view->atoms) {
+			const std::string x = tau::get(a).to_str();
+			// (i1[t] & {b}) != 0, the conjunction printed as juxtaposition
+			bit = bit || (x.find("i1[t]") != std::string::npos
+				&& x.find("!= 0") != std::string::npos);
+			value = value || x.find("o1[t]") != std::string::npos;
+		}
+		CHECK(bit);
+		CHECK(value);
+		// fewer edges than values of i1: the guards split only the bits
+		// that decide i1 > 100
+		size_t edges = 0;
+		for (const auto& es : data->machine) edges += es.size();
+		CHECK(edges < 256);
+	}
+
+	// A strategy on the order types of qlt values is a Mealy machine whose
+	// atoms place each value among the last ones and the constants.
+	TEST_CASE("a strategy on order types has a Mealy view") {
+		tref fm = spec("((i1[t-1]:qlt <= i1[t]:qlt "
+			"&& i1[t-1]:qlt > o1[t-1]:qlt)) U ((o1[t]:qlt != i1[t]:qlt "
+			"&& o1[t-1]:qlt != i1[t-1]:qlt)).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		CHECK(data->view->aut.num_states >= 1);
+		CHECK_FALSE(data->view->history.empty());
+	}
+
 	// The running goal o1[t-2] = 1 cannot be met once o1 stays 0; the
 	// revision keeps the update and lets the goal go, as pointwise
 	// revision does when the running goals are not executable along it.
