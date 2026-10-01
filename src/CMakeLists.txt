@@ -15,6 +15,7 @@ set(TAU_CORE_HEADERS
 	heuristics/preprocess_placement.h       # runtime placement parameters for preprocessing and the solver
 	heuristics/simplify_options.h           # runtime option-set for bv simplification heuristics
 	defs.h             # common macro and types definitions
+	tau_string_hash.h  # string hash of names and constants
 	logging.h          # logging and its macros
 	env_limits.h       # environment fallback of a numeric runtime limit
 	reset_hooks.h      # caches api::reset empties

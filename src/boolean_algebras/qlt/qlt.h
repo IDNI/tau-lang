@@ -15,6 +15,7 @@
 #include <cstdint>
 
 #include "utility/hashing.h"
+#include "tau_string_hash.h"
 
 
 #include "tau_tree.h"
@@ -296,7 +297,7 @@ qlt qlt_splitter_one();
 
 /// Content hashes in uint64_t, the same on every platform.
 inline std::uint64_t qlt_rational_hash(const qlt_rational& r) {
-	if (!r.sym.empty()) return idni::portable_string_hash(r.sym) * 17239ULL;
+	if (!r.sym.empty()) return tau_string_hash(r.sym) * 17239ULL;
 	if (r.pos_inf) return UINT64_MAX;
 	if (r.neg_inf) return UINT64_MAX - 1;
 	std::uint64_t h = idni::portable_hash(r.p);

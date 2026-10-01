@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BA_TYPES_H__
 
 #include "tau_diagnostics.h"
+#include "tau_string_hash.h"
 
 namespace idni::tau_lang {
 

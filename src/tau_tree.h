@@ -27,6 +27,7 @@
 
 
 #include "defs.h"
+#include "tau_string_hash.h"
 #include "tau_diagnostics.h"
 #include "tau_parser.generated.h"
 

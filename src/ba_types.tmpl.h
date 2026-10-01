@@ -240,7 +240,7 @@ std::uint64_t ba_types<node>::name_hash(size_t ba_type_id) {
 	// time -- going through name() recurses into that initialization
 	// (__gnu_cxx::recursive_init_error).
 	if (ba_type_id == 0) {
-		static const std::uint64_t h0 = portable_string_hash(":untyped");
+		static const std::uint64_t h0 = tau_string_hash(":untyped");
 		return h0;
 	}
 	DBG(assert(ba_type_id < type_trees().size());)
@@ -255,10 +255,10 @@ std::uint64_t ba_types<node>::name_hash(size_t ba_type_id) {
 	auto nm = name(ba_type_id);
 	// TODO (HIGH) dropped error: name's report -- node::hashit's noexcept contract cannot carry it.
 	if (!nm.has_value()) {
-		static const std::uint64_t h_invalid = portable_string_hash(":invalid");
+		static const std::uint64_t h_invalid = tau_string_hash(":invalid");
 		return h_invalid;
 	}
-	return cache[ba_type_id] = portable_string_hash(nm.value());
+	return cache[ba_type_id] = tau_string_hash(nm.value());
 }
 
 template <NodeType node>

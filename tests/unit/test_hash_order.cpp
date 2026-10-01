@@ -6,6 +6,7 @@
 
 // The tree order compares node hashes first, so the printed order of a
 // normalized formula follows them. The pins hold on every platform.
+#if TAU_USE_PORTABLE_HASH
 
 namespace {
 
@@ -107,3 +108,5 @@ TEST_SUITE("hash order") {
 #endif
 
 }
+
+#endif // TAU_USE_PORTABLE_HASH

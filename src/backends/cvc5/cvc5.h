@@ -14,6 +14,7 @@
 
 #include "defs.h"
 #include "utility/hashing.h"
+#include "tau_string_hash.h"
 
 namespace idni::tau_lang {
 
@@ -45,7 +46,7 @@ inline std::uint64_t hash_bv_constant(const cvc5::Term& t) {
 	const uint64_t id = t.getId();
 	if (auto it = memo.find(id); it != memo.end()) return it->second;
 	return memo.emplace(id,
-		idni::portable_string_hash(t.toString())).first->second;
+		tau_string_hash(t.toString())).first->second;
 }
 
 // Bit width of the sort of bitvector value `b`. DBG-asserts

@@ -197,6 +197,8 @@ function(target_setup target)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
+	target_compile_definitions(${target} PRIVATE
+		TAU_USE_PORTABLE_HASH=$<BOOL:${TAU_USE_PORTABLE_HASH}>)
 	target_compile_features(${target} PRIVATE cxx_std_23)
 	# grammars are compiled ahead of time, so tau never parses .tgf at runtime
 	target_compile_definitions(${target} PRIVATE TAU_PARSER_NO_TGF)

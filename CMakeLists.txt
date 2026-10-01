@@ -100,6 +100,7 @@ set(TAU_STORE_KEEP "2" CACHE STRING
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
+option(TAU_USE_PORTABLE_HASH       "Hash strings with MurmurHash64A, the same on every platform" ON)
 option(TAU_LOG_LINES               "Log file and line numbers"             OFF)
 option(TAU_LOG_LINE_PATHS          "Log file with a path and line numbers" OFF)
 option(TAU_LOG_CHANNELS            "Enable Debug and Trace logging channels" OFF)
@@ -419,6 +420,7 @@ set(TAU_DEFINITIONS
 )
 
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
+message(STATUS "TAU_USE_PORTABLE_HASH: ${TAU_USE_PORTABLE_HASH}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
 message(STATUS "TAU_LOG_LINE_PATHS: ${TAU_LOG_LINE_PATHS}")
 message(STATUS "TAU_LOG_CHANNELS: ${TAU_LOG_CHANNELS}")

@@ -146,10 +146,10 @@ Key CMake options (forwarded from anywhere on the command line):
 Hashing is done in `uint64_t` regardless of the platform's `size_t` width
 (`external/parser/src/utility/hashing.h`), so the mixing is identical on
 32-bit targets (wasm32) and 64-bit ones. A string (a name, a type, the text
-of a constant) goes through `idni::portable_string_hash`, the public-domain
-MurmurHash64A, which gives the 64-bit libstdc++ `std::hash` values.
-Tau takes `TAU_USE_PORTABLE_HASH` from the parser SDK, and the store builds
-the SDK with it ON. Do not use `std::hash<std::string>` for a hash that can
+of a constant) goes through `tau_string_hash` (`src/tau_string_hash.h`). It uses
+the public-domain MurmurHash64A of the parser, which gives the 64-bit libstdc++
+`std::hash` values. `-DTAU_USE_PORTABLE_HASH=OFF` uses `std::hash` instead, for
+benchmarks. Do not use `std::hash<std::string>` for a hash that can
 give an order: libstdc++, libc++ and MSVC give different values. Hash order is observable in printed
 output — compare with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
 (`tests/test_helpers.h`) rather than pinning a spelling.

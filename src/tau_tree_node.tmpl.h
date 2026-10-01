@@ -224,7 +224,7 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 }
 // Hash of a nonterminal's name.
 inline std::uint64_t nt_hash_of_name(const std::string& nm) {
-	std::uint64_t h = portable_string_hash(nm);
+	std::uint64_t h = tau_string_hash(nm);
 	if (!h) h = 1;  // reserve 0 as the "not computed" marker
 	return h;
 }
