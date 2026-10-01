@@ -13,8 +13,10 @@
 # The target file defines _dep_cvc5_gmp_header, which prints the system gmp.h
 # or nothing, and _dep_cvc5_target_setup, which sets the target arguments. It
 # may define _dep_cvc5_target_fields, which prints extra id fields,
-# _dep_cvc5_target_prebuild <work> <build>, which runs before the configure, and
-# _dep_cvc5_target_postinstall <prefix> <work>, which runs after the install.
+# _dep_cvc5_target_prebuild <work> <build>, which runs before the configure,
+# _dep_cvc5_target_postinstall <prefix> <work>, which runs after the install, and
+# _dep_cvc5_target_gmp_licenses <dir> <work>, which copies the license of a GMP
+# that cvc5 did not download.
 
 set -u
 
@@ -41,6 +43,48 @@ CVC5_EXPECTED_CLOSURE=(
 declare -F _dep_cvc5_target_fields > /dev/null || _dep_cvc5_target_fields() { :; }
 declare -F _dep_cvc5_target_prebuild > /dev/null || _dep_cvc5_target_prebuild() { :; }
 declare -F _dep_cvc5_target_postinstall > /dev/null || _dep_cvc5_target_postinstall() { :; }
+
+# A system GMP is not in the package. Its license comes from the distro package
+# when the distro keeps one, else from the copy of the GMP 6.3.0 source in tau.
+declare -F _dep_cvc5_target_gmp_licenses > /dev/null || _dep_cvc5_target_gmp_licenses() {
+	local dir="$1" f found=0
+	for f in /usr/share/doc/libgmp10/copyright /usr/share/licenses/gmp/*; do
+		[ -f "$f" ] || continue
+		mkdir -p "$dir" && cp "$f" "$dir/" || return 1
+		found=1
+	done
+	[ "$found" = 1 ] || _dep_cvc5_license_copy "$dir" "${DEV_ROOT}"/licenses/gmp/*
+}
+
+# Copy each existing <file> into <dir>. No existing file is an error.
+_dep_cvc5_license_copy() {
+	local dir="$1" f found=0
+	shift
+	for f in "$@"; do
+		[ -f "$f" ] || continue
+		mkdir -p "$dir" && cp "$f" "$dir/" || return 1
+		found=1
+	done
+	[ "$found" = 1 ] || { echo "dep-cvc5: no license file for ${dir##*/}: $*" >&2; return 1; }
+}
+
+# The licenses of cvc5 and of each library in its package, from the sources of
+# this build.
+_dep_cvc5_licenses() {
+	local prefix="$1" work="$2" build="$3" lic="${1}/share/licenses"
+	if [ ! -f "${lic}/cvc5/COPYING" ]; then
+		_dep_cvc5_license_copy "${lic}/cvc5" "${work}/COPYING" || return 1
+	fi
+	_dep_cvc5_license_copy "${lic}/cadical" \
+		"${build}/deps/src/CaDiCaL-EP/LICENSE" "${work}"/msvc-src/cadical-*/LICENSE \
+		&& _dep_cvc5_license_copy "${lic}/symfpu" "${build}/deps/src/SymFPU-EP/LICENSE" \
+		|| return 1
+	if [ "$DEP_CVC5_GMP_SOURCE" = download ]; then
+		_dep_cvc5_license_copy "${lic}/gmp" "${build}"/deps/src/GMP-EP/COPYING*
+	else
+		_dep_cvc5_target_gmp_licenses "${lic}/gmp" "$work"
+	fi
+}
 
 _dep_cvc5_compiler_id() {
 	dep_compiler_id "$DEP_CVC5_CXX"
@@ -85,10 +129,21 @@ _dep_cvc5_gmp() {
 	printf 'download|6.3.0'
 }
 
+# One hash over the name and the content of each file in licenses/gmp.
+_dep_cvc5_gmp_licenses_hash() {
+	local f sum list=""
+	for f in "${DEV_ROOT}"/licenses/gmp/*; do
+		[ -f "$f" ] || { echo "dep-cvc5: no GMP license file in ${DEV_ROOT}/licenses/gmp" >&2; return 1; }
+		sum="$(dep_sha256 "$f")" || return 1
+		list="${list}${f##*/} ${sum}"$'\n'
+	done
+	printf '%s' "$list" | dep_sha256_stdin
+}
+
 _dep_cvc5_field_block() {
 	local build_helper publish_helper manifest store
 	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
-	local gmp closure=""
+	local gmp closure="" gmp_licenses_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
@@ -99,6 +154,8 @@ _dep_cvc5_field_block() {
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
 	store_hash="$(dep_sha256 "$store")" || return 1
+	# The repo GMP licenses enter a package whose system GMP has none.
+	gmp_licenses_hash="$(_dep_cvc5_gmp_licenses_hash)" || return 1
 	gmp="${DEP_CVC5_GMP_SOURCE}|${DEP_CVC5_GMP_VERSION}"
 	local entry name version url sha
 	for entry in "${CVC5_EXPECTED_CLOSURE[@]}"; do
@@ -123,6 +180,7 @@ _dep_cvc5_field_block() {
 		"closure=${closure}" \
 		"gmp_source=${gmp%%|*}" \
 		"gmp_version=${gmp##*|}" \
+		"gmp_licenses_hash=${gmp_licenses_hash}" \
 		"cflags=${DEP_CVC5_CFLAGS}" \
 		"cxxflags=${DEP_CVC5_CXXFLAGS}" \
 		"cmake_path=${DEP_CVC5_CMAKE}" \
@@ -309,16 +367,8 @@ PY
 		rm -rf "$work"
 		return 1
 	fi
-	if [ ! -f "$staging_prefix/share/licenses/cvc5/COPYING" ]; then
-		if [ -f "${work}/COPYING" ]; then
-			mkdir -p "$staging_prefix/share/licenses/cvc5"
-			cp "${work}/COPYING" "$staging_prefix/share/licenses/cvc5/COPYING"
-		else
-			echo "dep-cvc5: no COPYING in the cvc5 source" >&2
-			rm -rf "$work"
-			return 1
-		fi
-	fi
+	_dep_cvc5_licenses "$staging_prefix" "$work" "$build" \
+		|| { echo "dep-cvc5: cannot copy the license files" >&2; rm -rf "$work"; return 1; }
 	rm -rf "$work"
 	return 0
 }

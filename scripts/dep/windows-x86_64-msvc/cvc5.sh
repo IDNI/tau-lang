@@ -177,6 +177,12 @@ _dep_cvc5_msvc_gmp() {
 		|| { echo "dep-cvc5: no GMP libraries under ${installed}/lib" >&2; return 1; }
 	cp "${installed}"/bin/*gmp*.dll "${deps}/bin/" \
 		|| { echo "dep-cvc5: no GMP DLL under ${installed}/bin" >&2; return 1; }
+	# The GMP source license files, else the vcpkg copyright file that joins them.
+	local licenses=("${vcpkg}"/buildtrees/gmp/src/*/COPYING*)
+	[ -f "${licenses[0]}" ] || licenses=("${installed}/share/gmp/copyright")
+	mkdir -p "${deps}/share/licenses/gmp" \
+		&& cp "${licenses[@]}" "${deps}/share/licenses/gmp/" \
+		|| { echo "dep-cvc5: no GMP license file under ${vcpkg}" >&2; return 1; }
 	# cvc5's FindGMP asks for gmp and gmpxx, which MSVC finds as gmp.lib and
 	# gmpxx.lib only.
 	for lib in gmp gmpxx; do
@@ -258,6 +264,11 @@ _dep_cvc5_target_prebuild() {
 	export CL
 	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
+}
+
+_dep_cvc5_target_gmp_licenses() {
+	local dir="$1" work="$2"
+	mkdir -p "$dir" && cp "${work}/msvc-deps/share/licenses/gmp/"* "$dir/"
 }
 
 # The GMP DLLs go beside cvc5.dll, where configure copies every DLL from.

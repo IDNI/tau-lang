@@ -149,4 +149,8 @@ message("=== Finished installing cvc5 runtime dependencies ===")
 	# as a Release one, or the installed binary cannot start.
 	install(CODE "${_cvc5_install_code}"
 		COMPONENT "${COMPONENT}")
+	# The store package holds the license of cvc5 and of each library it bundles.
+	install(DIRECTORY "${CVC5_STORE_PREFIX}/share/licenses/"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT "${COMPONENT}")
 endfunction()
