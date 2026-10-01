@@ -56,6 +56,16 @@ static __inline int pclose(FILE* stream) {
 	return _pclose(stream);
 }
 
+/* cvc5 puts CVC5_EXPORT after a declarator. clang-cl rejects __declspec there
+ * and accepts the GNU spelling. cvc5_export.h keeps a macro that is set. */
+#ifndef CVC5_EXPORT
+#ifdef cvc5_obj_EXPORTS
+#define CVC5_EXPORT __attribute__((dllexport))
+#else
+#define CVC5_EXPORT __attribute__((dllimport))
+#endif
+#endif
+
 #endif
 
 #endif
