@@ -229,10 +229,12 @@ _dep_cvc5_msvc_cadical() {
 		-DCMAKE_CXX_COMPILER="$DEP_CVC5_CXX" \
 		-DCVC5_MSVC_DIR="$(cygpath -m "$CVC5_MSVC_DIR")" \
 		-DCMAKE_INSTALL_PREFIX="$(cygpath -m "$deps")" \
-		|| { echo "dep-cvc5: CaDiCaL configure failed" >&2; return 1; }
+		|| { echo "dep-cvc5: CaDiCaL configure failed" >&2
+			_dep_cvc5_print_logs "$cadical_build" >&2; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
 		"$DEP_CVC5_CMAKE" --build "$cadical_build" -- -j "$CVC5_JOBS" \
-		|| { echo "dep-cvc5: CaDiCaL build failed" >&2; return 1; }
+		|| { echo "dep-cvc5: CaDiCaL build failed" >&2
+			_dep_cvc5_print_logs "$cadical_build" >&2; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS -u CL \
 		"$DEP_CVC5_CMAKE" --install "$cadical_build" \
 		|| { echo "dep-cvc5: CaDiCaL install failed" >&2; return 1; }

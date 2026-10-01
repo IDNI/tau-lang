@@ -243,6 +243,19 @@ _dep_cvc5_verify_closure() {
 }
 
 # Print the enabled/disabled feature set from the build's own CMake cache.
+# Print the CMake logs of <build> that no command writes to the output: the
+# configure checks and every ExternalProject step.
+_dep_cvc5_print_logs() {
+	local build="$1" f
+	for f in "${build}/CMakeFiles/CMakeConfigureLog.yaml" \
+			"${build}"/deps/src/*-stamp/*.log; do
+		[ -f "$f" ] || continue
+		echo "dep-cvc5: ---- begin ${f} ----"
+		cat "$f"
+		echo "dep-cvc5: ---- end ${f} ----"
+	done
+}
+
 _dep_cvc5_features() {
 	local cache="$1"
 	grep -E '^(USE_|ENABLE_)[A-Z0-9_]+:BOOL=' "$cache" 2>/dev/null | LC_ALL=C sort
@@ -322,13 +335,17 @@ _dep_cvc5_producer() {
 			-DCMAKE_BUILD_RPATH="$DEP_CVC5_BUILD_RPATH" \
 			-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
 			--name=build --prefix="$staging_prefix" ) \
-		|| { echo "dep-cvc5: configure failed" >&2; rm -rf "$work"; return 1; }
+		|| { echo "dep-cvc5: configure failed" >&2; _dep_cvc5_print_logs "$build" >&2
+			rm -rf "$work"; return 1; }
+	_dep_cvc5_print_logs "$build" >&2
 	echo "dep-cvc5: feature set (CMakeCache USE_/ENABLE_):"
 	_dep_cvc5_features "${build}/CMakeCache.txt" | sed 's/^/  /' >&2
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		${_DEP_CVC5_BUILD_ENV[@]+"${_DEP_CVC5_BUILD_ENV[@]}"} \
 		"$DEP_CVC5_CMAKE" --build "$build" -- -j "$CVC5_JOBS" \
-		|| { echo "dep-cvc5: build failed" >&2; rm -rf "$work"; return 1; }
+		|| { echo "dep-cvc5: build failed" >&2; _dep_cvc5_print_logs "$build" >&2
+			rm -rf "$work"; return 1; }
+	_dep_cvc5_print_logs "$build" >&2
 	echo "dep-cvc5: verified closure:"
 	_dep_cvc5_verify_closure "$build" || { rm -rf "$work"; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
