@@ -354,6 +354,7 @@ result<tref> boole_normal_form(tref formula) {
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	bnf = syntactic_formula_simplification<node>(bnf);
+	bnf = fold_modular_value_cover<node>(bnf);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
@@ -432,6 +433,7 @@ result<tref> term_boole_normal_form(tref formula) {
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	tbnf = syntactic_formula_simplification<node>(tbnf);
+	tbnf = fold_modular_value_cover<node>(tbnf);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(tbnf, tbnf);

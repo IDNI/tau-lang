@@ -112,6 +112,115 @@ tref normalize_atomic_formula_operators(tref fm) {
 #endif // TAU_CACHE
 }
 
+// The value an equation `v = c` or `v' = c` (either side) pins the variable v
+// to, when v's type has modular semantics (pack_modular_width) and c is a
+// constant of that type; nullopt for any other equation.
+template <NodeType node>
+std::optional<std::pair<tref, uint64_t>> modular_variable_pin(
+	tref l, tref r)
+{
+	using tau = tree<node>;
+	auto pin = [](tref s, tref k)
+		-> std::optional<std::pair<tref, uint64_t>>
+	{
+		const auto& ks = tau::get(k);
+		if (!ks.is(tau::bf) || !ks.has_child()) return std::nullopt;
+		const auto& kc = ks[0];
+		if (!kc.is_ba_constant() && !kc.is(tau::bf_t)
+			&& !kc.is(tau::bf_f)) return std::nullopt;
+		bool negated = false;
+		if (tau::get(s).child_is(tau::bf_neg)) {
+			s = tau::get(s)[0].first();
+			negated = true;
+		}
+		if (!is_child<node, tau::variable>(s)) return std::nullopt;
+		const size_t tid = tau::get(s).get_ba_type();
+		const size_t n = pack_modular_width<node>(tid);
+		if (n == 0 || n >= 64) return std::nullopt;
+		if (kc.is_ba_constant() && kc.get_ba_type() != tid)
+			return std::nullopt;
+		auto v = pack_modular_value<node>(tid, k);
+		if (!v) return std::nullopt;
+		const uint64_t mask = (uint64_t{1} << n) - 1;
+		return std::make_pair(s, (negated ? ~*v : *v) & mask);
+	};
+	if (auto p = pin(l, r)) return p;
+	return pin(r, l);
+}
+
+/**
+ * @brief Folds a disjunction that pins a variable of a modular type to every
+ * value of the type to T, and dually a conjunction excluding every value to F.
+ * A disjunction of `v != c1` and `v != c2` with distinct values folds to T, and
+ * a conjunction of `v = c1` and `v = c2` to F.
+ *
+ * The values are read through the modular-bits capability, so a type whose
+ * owner does not declare it is left untouched.
+ */
+template <NodeType node>
+tref fold_modular_value_cover(tref fm) {
+	using tau = tree<node>;
+	struct group { tref var; size_t width; std::set<uint64_t> values; };
+	bool changed = false;
+	auto f = [&changed](tref n, tref parent) -> tref {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) || !t.has_child()) return n;
+		const size_t op = t[0].value.nt;
+		if (op != tau::wff_or && op != tau::wff_and) return n;
+		// only the root of a chain of the same connective is examined
+		if (parent && is<node>(parent, op)) return n;
+		trefs operands, stack{ n };
+		while (!stack.empty()) {
+			tref x = stack.back();
+			stack.pop_back();
+			if (tau::get(x).child_is(op)) {
+				stack.push_back(tau::get(x)[0].second());
+				stack.push_back(tau::get(x)[0].first());
+			} else operands.push_back(x);
+		}
+		std::vector<group> eqs, neqs;
+		auto add = [](std::vector<group>& gs, tref v, uint64_t c) {
+			for (auto& g : gs)
+				if (tau::get(g.var) == tau::get(v)) {
+					g.values.insert(c);
+					return;
+				}
+			gs.push_back({ v, pack_modular_width<node>(
+				tau::get(v).get_ba_type()), { c } });
+		};
+		for (tref x : operands) {
+			const auto& xt = tau::get(x);
+			bool neq = false;
+			const tau* eq = nullptr;
+			if (xt.child_is(tau::bf_eq)) eq = &xt[0];
+			else if (xt.child_is(tau::bf_neq)) eq = &xt[0], neq = true;
+			else if (xt.child_is(tau::wff_neg)
+				&& xt[0][0].child_is(tau::bf_eq))
+				eq = &xt[0][0][0], neq = true;
+			if (!eq) continue;
+			auto p = modular_variable_pin<node>(eq->first(),
+				eq->second());
+			if (p) add(neq ? neqs : eqs, p->first, p->second);
+		}
+		// A disjunction folds when its equations cover the type or two of
+		// its exclusions differ; a conjunction, dually.
+		const auto& covering = op == tau::wff_or ? eqs : neqs;
+		const auto& clashing = op == tau::wff_or ? neqs : eqs;
+		bool folds = false;
+		for (const auto& g : covering)
+			if (g.values.size() == (uint64_t{1} << g.width))
+				folds = true;
+		for (const auto& g : clashing)
+			if (g.values.size() > 1) folds = true;
+		if (!folds) return n;
+		changed = true;
+		return op == tau::wff_or ? tau::_T() : tau::_F();
+	};
+	auto up = [](tref n, tref) { return n; };
+	tref result = pre_order<node>(fm).apply(f, visit_wff<node>, up);
+	return changed ? syntactic_formula_simplification<node>(result) : fm;
+}
+
 template<NodeType node>
 tref gt_gteq_to_lt_lteq(tref fm) {
 	using tau = tree<node>;

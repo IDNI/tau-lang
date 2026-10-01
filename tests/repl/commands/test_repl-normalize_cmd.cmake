@@ -28,6 +28,11 @@ add_repl_test(normalize_cmd_wff_nonmem "normalize T" ": T")
 add_repl_test(normalize_cmd_wff_mem_rel "T. normalize %-0" "T")
 add_repl_test(normalize_cmd_wff_mem_abs "T. normalize %1" "T")
 
+# bv[1] has two values, so pinning a variable to both is a tautology
+add_repl_test(normalize_cmd-bv1_excluded_middle "normalize x:bv[1] = 1 || x:bv[1] = 0" ": T")
+add_repl_test(normalize_cmd-bv1_excluded_middle_stream "normalize o1[t]:bv[1] = 0 || o1[t]:bv[1] = 1" ": T")
+add_repl_test(normalize_cmd-bv1_excluded_middle_dual "normalize x:bv[1] != 1 && x:bv[1] != 0" ": F")
+
 # AP-N3 regression: get_type_and_arg() used to deref a null child.
 add_repl_test_fail(normalize_cmd-multiindex_fixed_point_call
 	"g[0, 0](Y) := Y = 0. g[n, 0](Y) := g[n - 1, 0](Y). normalize g(Y)"

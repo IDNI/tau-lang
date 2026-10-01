@@ -893,6 +893,73 @@ TEST_SUITE("Normalizer bv arithmetic associativity") {
 	}
 }
 
+// Equations pinning one variable of a modular type to every value of the type
+// are a tautology, exclusions of every value a contradiction.
+TEST_SUITE("Normalizer modular value cover") {
+	static tref normalized(const char* sample) {
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE( nso_rr.has_value() );
+		auto res = normalizer<node_t>(nso_rr.value());
+		REQUIRE( res.has_value() );
+		return res.value();
+	}
+	static bool is_T(const char* sample) {
+		return tau::get(normalized(sample)).equals_T();
+	}
+	static bool is_F(const char* sample) {
+		return tau::get(normalized(sample)).equals_F();
+	}
+	// Neither folded nor otherwise decided: both comparisons survive.
+	static bool kept(const char* sample) {
+		tref r = normalized(sample);
+		return !tau::get(r).equals_T() && !tau::get(r).equals_F()
+			&& tau::get(r).select_all(is<node_t, tau::bf_eq>).size()
+				+ tau::get(r).select_all(is<node_t, tau::bf_neq>)
+					.size() == 2;
+	}
+
+	TEST_CASE("bv[1]: both values of a free variable") {
+		CHECK( is_T("x:bv[1] = 1 || x:bv[1] = 0.") );
+		CHECK( is_T("x:bv[1] = 0 || x:bv[1] = 1.") );
+		CHECK( is_T("x:bv[1] = { 1 }:bv[1] || x:bv[1] = { 0 }:bv[1].") );
+	}
+	TEST_CASE("bv[1]: both values of a stream") {
+		CHECK( is_T("o1[t]:bv[1] = 1 || o1[t]:bv[1] = 0.") );
+	}
+	TEST_CASE("bv[1]: inside a larger disjunction and conjunction") {
+		CHECK( is_T("x:bv[1] = 1 || y:bv[1] = 0 || x:bv[1] = 0.") );
+		tref r = normalized("(x:bv[1] = 1 || x:bv[1] = 0) && y:bv[1] = 0.");
+		CHECK( tau::get(r).select_all(is<node_t, tau::bf_eq>).size() == 1 );
+	}
+	TEST_CASE("bv[1]: the duals") {
+		CHECK( is_F("x:bv[1] = 1 && x:bv[1] = 0.") );
+		CHECK( is_F("x:bv[1] != 1 && x:bv[1] != 0.") );
+		CHECK( is_T("x:bv[1] != 1 || x:bv[1] != 0.") );
+	}
+	TEST_CASE("bv[2]: all four values") {
+		CHECK( is_T("x:bv[2] = { 0 }:bv[2] || x:bv[2] = { 1 }:bv[2]"
+			" || x:bv[2] = { 2 }:bv[2] || x:bv[2] = { 3 }:bv[2].") );
+		CHECK( is_F("x:bv[2] != { 0 }:bv[2] && x:bv[2] != { 1 }:bv[2]"
+			" && x:bv[2] != { 2 }:bv[2] && x:bv[2] != { 3 }:bv[2].") );
+	}
+	TEST_CASE("two distinct exclusions") {
+		CHECK( is_T("x:bv[8] != { 1 }:bv[8] || x:bv[8] != { 2 }:bv[8].") );
+	}
+	TEST_CASE("not every value is covered") {
+		CHECK( kept("x:bv[8] = 1 || x:bv[8] = 0.") );
+		CHECK( kept("x:bv[2] = { 1 }:bv[2] || x:bv[2] = { 2 }:bv[2].") );
+	}
+	TEST_CASE("two variables") {
+		CHECK( kept("x:bv[1] = 1 || y:bv[1] = 0.") );
+	}
+	TEST_CASE("mixed types") {
+		CHECK( kept("x:bv[1] = 1 || y:bv[8] = 0.") );
+	}
+	TEST_CASE("a type without modular semantics") {
+		CHECK( kept("x:sbf = 1 || x:sbf = 0.") );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
