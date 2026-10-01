@@ -97,7 +97,8 @@ ARM64 architectures):
 - `tau` runs and interprets specs.
 - `tau-sdk` compiles native specs into programs and links against Tau.
 - `tau-sdk-windows-x86_64-mingw` is the same box for the Windows (MinGW)
-  target.
+  target. It is not a release package. Build it with
+  `./dev preset release-w64-sdk-packages-deb` (or `-rpm`).
 - `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target.
 - `tau-sdk-linux-arm64` is the same box for the Linux arm64 target on an x86
   host. It is not a release package. Build it with

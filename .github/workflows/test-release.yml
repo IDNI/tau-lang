@@ -607,114 +607,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The Windows MinGW environment: the wine and MinGW layers (w64-deps) and the
-  # windows-x86_64-mingw store packages. It publishes before the tests, so a
-  # failed wine test keeps the mingw packages. Its stage copies the store of
-  # the Linux x86_64 environment for the host tools, so it waits for that job.
-  linux-mingw64-wine-resolve:
-    name: Windows MinGW · environment
-    needs: [guard, linux-resolve]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    permissions:
-      contents: read
-      packages: write
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      # mode=min keeps the layers of the final target only, so the wine and
-      # MinGW stage is the target of its own build.
-      - name: Build the w64-deps stage
-        run: |
-          ./dev docker w64-deps \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-mingw64-wine-deps \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base \
-            --cache-to   type=gha,scope=tau-mingw64-wine-deps,mode=min
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Resolve and publish the store packages
-        run: |
-          ./dev docker w64-build-resolve \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-mingw64-wine-deps \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # The mingw test job reads the tool layers of its environment and pulls the
-  # store the environment published. It runs the default pack only, and
-  # only the REPL suite under wine: the native jobs run the C++ suite.
-  linux-mingw64-wine:
-    name: Windows MinGW · tests (wine)
-    needs: linux-mingw64-wine-resolve
-    runs-on: ubuntu-24.04
-    timeout-minutes: 200
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-mingw64-wine-${{ github.sha }}
-          restore-keys: |
-            ccache-linux-mingw64-wine-
-
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
-
-      - name: Build and test
-        run: |
-          ./dev docker w64-build \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TESTS=yes \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-mingw64-wine-deps \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-base
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # The Linux arm64 environment. The same image as the x86_64 environment on
   # an arm runner, so the arm64 store packages are built natively. It reads
   # and writes the arm64 scope only: the x86 layers never match an arm runner.
@@ -1188,9 +1080,8 @@ jobs:
   # failed job saves no ccache, so its newest entry is the last good one.
   cache-cleanup:
     name: Cleanup · old cache entries
-    needs: [linux, linux-devel, linux-gcc, linux-asan, linux-mingw64-wine,
-      linux-arm64, windows-msvc-store, macos-arm64-store,
-      macos-x86_64-store]
+    needs: [linux, linux-devel, linux-gcc, linux-asan, linux-arm64,
+      windows-msvc-store, macos-arm64-store, macos-x86_64-store]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20

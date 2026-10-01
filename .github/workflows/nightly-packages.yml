@@ -346,8 +346,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - preset: release-w64-sdk-packages-deb
-          - preset: release-w64-sdk-packages-rpm
           - preset: release-wasm-sdk-packages-deb
           - preset: release-wasm-sdk-packages-rpm
     env:
@@ -357,18 +355,15 @@ jobs:
         with:
           submodules: recursive
 
-      # The toolchain the platform preset cross-compiles with: MinGW from the
-      # distro, emsdk from the same script the wasm gates use. rpm and the
-      # archivers are the ones the Docker package image installs.
+      # The toolchain the platform preset cross-compiles with: emsdk from the
+      # same script the wasm gates use. rpm and the archivers are the ones the
+      # Docker package image installs.
       - name: Install the cross toolchain
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rpm unzip xz-utils
-          case "${{ matrix.preset }}" in
-            *-w64-*) sudo apt-get install -y --no-install-recommends mingw-w64 ;;
-            *) ./dev dep-emsdk ;;
-          esac
+          ./dev dep-emsdk
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras

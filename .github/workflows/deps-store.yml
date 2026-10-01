@@ -61,8 +61,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # The wasm and MinGW packages are built on this host too, in the same
-      # images their consumers use, so their ids match as well.
+      # The wasm packages are built on this host too, in the same image their
+      # consumers use, so their ids match as well.
       - name: Resolve and publish the wasm store packages
         run: |
           ./dev docker wasm-node \
@@ -73,18 +73,6 @@ jobs:
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Resolve and publish the MinGW store packages
-        run: |
-          ./dev docker w64-build \
-            --build-arg BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            --build-arg TESTS=no \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --secret id=store_publish,env=TAU_STORE_PUBLISH \
-            --cache-from type=gha,scope=tau-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
