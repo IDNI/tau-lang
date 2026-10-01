@@ -4881,6 +4881,30 @@ TEST_SUITE("Data game strategy") {
 		CHECK(without_i1);
 	}
 
+	// With a node table of one node the codes do not fit and the game is
+	// decided on formulas: the strategy has no Mealy view, and the inputs
+	// its step reads are the free variables of its labels and moves.
+	TEST_CASE("a strategy over formulas reads the inputs of its formulas") {
+		tref fm = spec("(sometimes o1[t]:bv[1] = i3[t]:bv[1]) "
+			"&& (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		const long saved = ltl_data_game_max_nodes_param;
+		ltl_data_game_max_nodes_param = 1;
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		auto r = ltl_to_safety_formula_full<node_t>(fm, &data);
+		ltl_data_game_max_nodes_param = saved;
+		REQUIRE(r.has_value());
+		REQUIRE(data != nullptr);
+		CHECK(std::dynamic_pointer_cast<formula_strategy<node_t>>(data)
+			!= nullptr);
+		CHECK(data->view == nullptr);
+		auto first = data->reads();
+		REQUIRE(first.has_value());
+		CHECK(*first == std::set<std::string>{ "i1", "i2", "i3" });
+	}
+
 	// A strategy on the bits of a bitvector wider than 4 bits is a Mealy
 	// machine too: its guards read the bits of i1 its moves depend on, and
 	// its outputs are values of the type.

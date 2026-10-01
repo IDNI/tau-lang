@@ -1636,8 +1636,17 @@ struct data_game_strategy {
 	// it reads all of them.
 	std::optional<std::set<std::string>> reads() const {
 		using tau = tree<node>;
-		if (!view) return std::nullopt;
 		std::set<std::string> names;
+		if (!view) {
+			auto d = direct_reads();
+			if (!d) return std::nullopt;
+			// a slot read later is read from memory, so its stream is
+			// read at every step
+			for (size_t s = 0; s < streams.size(); ++s)
+				if (streams[s].input && (d->now[s] || d->back[s]))
+					names.insert(streams[s].name);
+			return names;
+		}
 		auto add = [&](size_t a) {
 			for (tref x : tau::get(view->atoms[a].first).select_top(
 				is_child<node, tau::io_var>))
@@ -1665,10 +1674,12 @@ struct data_game_strategy {
 			ready = true;
 		}
 		window w(streams.size(), std::vector<tref>(depth + 1, nullptr));
+		const auto d = direct_reads();
 		for (size_t s = 0; s < streams.size(); ++s)
 			for (size_t k = 0; k <= depth; ++k) {
 				const int_t time = t - (int_t)k;
 				if (k == 0 && !streams[s].input) continue;
+				if (d && (k ? k > d->back[s] : !d->now[s])) continue;
 				tref x = time < 0 ? before[s][(size_t)(-time - 1)]->get()
 					: get(streams[s].name, streams[s].tid,
 						streams[s].input, time);
@@ -1852,6 +1863,15 @@ protected:
 	virtual result<tref> constraint(int i, const window& w, int_t t) = 0;
 	// fills `before`
 	virtual result<bool> choose_before(const solver_fn& solve) = 0;
+
+	// The slots of the window `step` reads without a view: now[s], whether
+	// it reads stream s at the step played, back[s], the deepest step back
+	// it ever reads s at.
+	struct slot_reads { std::vector<bool> now; std::vector<size_t> back; };
+	// the slots the next step reads; nullopt when it reads all of them
+	virtual std::optional<slot_reads> direct_reads() const {
+		return std::nullopt;
+	}
 
 	int follow(int x) const {
 		while (v[x].picks < 0 && v[x].dst.size() == 1 && v[x].dst[0] != x)
@@ -3238,6 +3258,38 @@ protected:
 
 	std::optional<bool> won_from(const window& win) override {
 		return truth(won_init->get(), win);
+	}
+
+	// The free variables of the labels and moves: those of the vertex the
+	// next step starts at, and of the system vertices its edges lead to,
+	// at the step played; those of every vertex at the steps before.
+	std::optional<typename base::slot_reads> direct_reads() const override
+	{
+		typename base::slot_reads d{ std::vector<bool>(streams.size()),
+			std::vector<size_t>(streams.size(), 0) };
+		auto scan = [&](const htref& f, bool played) {
+			for (tref x : tau::get(f->get()).select_top(
+				is_child<node, tau::io_var>))
+			{
+				auto it = index.find(get_var_name<node>(x));
+				if (it == index.end()) continue;
+				const size_t s = it->second;
+				const size_t k = (size_t)get_io_var_shift<node>(x);
+				if (k) d.back[s] = std::max(d.back[s], k);
+				else if (played) d.now[s] = true;
+			}
+		};
+		for (const auto& fs : labels) for (const auto& f : fs) scan(f, false);
+		for (const auto& fs : moves) for (const auto& f : fs) scan(f, false);
+		const int at = this->at;
+		if (this->v[at].picks == 0) {
+			for (const auto& f : labels[at]) scan(f, true);
+			for (int x : this->v[at].dst)
+				if (const int n = this->follow(x); this->v[n].picks == 1)
+					for (const auto& f : moves[n]) scan(f, true);
+		} else if (this->v[at].picks == 1)
+			for (const auto& f : moves[at]) scan(f, true);
+		return d;
 	}
 
 	std::optional<bool> holds_label(int i, size_t j, const window& win)

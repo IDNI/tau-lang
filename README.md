@@ -804,7 +804,10 @@ or lies strictly between its neighbours below and above. A machine is built
 only within 4096 states and 65536 edges; past them, or for a strategy of the
 game over formulas, the run plays the game's moves directly. The run plays that machine, which
 the Mealy introspection (the cached solution, its current state) shows, and
-a step reads only the inputs its move depends on. A revision of the
+a step reads only the inputs its move depends on. A strategy over formulas
+reads an input at a step only when the edge labels of its vertex or the
+moves it can take there name it, and at every step one that any of them
+names at an earlier step. A revision of the
 specification is made as in any run: the running specification is revised
 pointwise by the update, and the data game is solved again for the revised
 specification. The game starts from the values already played when it is

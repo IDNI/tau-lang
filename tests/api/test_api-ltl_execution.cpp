@@ -12,6 +12,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#include <algorithm>
 #include <functional>
 #include <map>
 #include <string>
@@ -138,4 +139,49 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		}
 		CHECK(saw_o1);
 	}
+
+	// With a node table of one node the data game cannot hold its codes
+	// and decides this spec on formulas: once o7 has met i9, no move reads
+	// i9, and the run stops asking for it.
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("a strategy over formulas asks only for the inputs its move reads"
+		* doctest::skip(!ltlsynt_available())) {
+		struct one_node {
+			const long saved = ltl_data_game_max_nodes_param;
+			one_node() { tau_api::set_ltl_data_game_max_nodes(1); }
+			~one_node() {
+				option_change_guard<node_t> guard;
+				ltl_data_game_max_nodes_param = saved;
+			}
+		} table;
+		auto maybe_i = tau_api::get_interpreter(
+			"(sometimes o7[t]:bv[1] = i9[t]:bv[1]) "
+			"&& (sometimes (o8[t]:bv[1] = i8[t-1]:bv[1])) "
+			"&& (sometimes ((i7[t-1]:bv[1] = i7[t]:bv[1] "
+			"|| i7[t-1]:bv[1] = 1))).");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		bool asked_i9 = false, dropped_i9 = false;
+		for (size_t step = 0; step < 6; ++step) {
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			std::map<stream_at, std::string> assigned;
+			bool i9 = false;
+			for (auto& in : inputs.value()) {
+				i9 = i9 || in.name == "i9";
+				assigned[in] = step % 2 ? "0" : "1";
+			}
+			CHECK(std::ranges::any_of(inputs.value(),
+				[](const auto& in) { return in.name == "i7"; }));
+			CHECK(std::ranges::any_of(inputs.value(),
+				[](const auto& in) { return in.name == "i8"; }));
+			asked_i9 = asked_i9 || i9;
+			dropped_i9 = dropped_i9 || (asked_i9 && !i9);
+			auto outputs = tau_api::step(i, assigned, /*interactive=*/false);
+			REQUIRE_MESSAGE(outputs.has_value(), "step " << step);
+		}
+		CHECK(asked_i9);
+		CHECK(dropped_i9);
+	}
+#endif // TAU_PACK_HAS_BA_BV
 }
