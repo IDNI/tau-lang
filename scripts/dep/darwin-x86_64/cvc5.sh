@@ -16,6 +16,9 @@ _dep_cvc5_gmp_header() {
 # macOS has no $ORIGIN and no absolute install_name: a relocatable
 # package resolves through @rpath, matching Tau's own install rpath.
 _dep_cvc5_target_setup() {
+	# GMP's libtool 2.4.6 reads an unset target as macOS 10.0 and links GMP
+	# with -flat_namespace -undefined suppress. An 11.0 target links it normally.
+	export MACOSX_DEPLOYMENT_TARGET=11.0
 	DEP_CVC5_INSTALL_RPATH='@loader_path:@loader_path/../lib'
 	DEP_CVC5_BUILD_RPATH='@loader_path'
 	# BUILD_GMP keeps FindGMP from the Homebrew GMP on the default search path.
