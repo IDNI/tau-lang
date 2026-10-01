@@ -1945,7 +1945,7 @@ that reason:
 2. the Boolean algebra of simple Boolean functions (`sbf`)
 3. the Boolean algebra of bitvectors of fixed bit width (`bv`)
 4. the ω-categorical theory of dense linear order without endpoints (`qlt`) — rationals under `<`; ω-categorical and decidable, hence supported
-5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — right-closed, left-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
+5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — left-closed, right-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
 6. the Natural Language Boolean Algebra (`nlang`)
 7. the Boolean algebra of lex-half-open polyhedra in ℝ^d (`hsb`) — generalizes `qint` from 1D to d dimensions using canonical halfspaces
 
@@ -2148,7 +2148,7 @@ The Tau Language currently supports the following base types:
 2. `sbf`: the type of simple Boolean functions,
 3. `bv[n]`: the type of bitvectors of bit width `n`,
 4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
-5. `qint`: the Boolean algebra of right-closed, left-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
+5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
 6. `nlang`: the Natural Language Boolean Algebra (its oracle needs `TAU_LLM_API_KEY` or `OPENAI_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
@@ -2232,8 +2232,9 @@ Elements are written as interval expressions inside `{...}:qint`:
 { [0,1/2) | [1,2) }:qint -- union of two intervals
 ```
 
-Only right-closed, left-open intervals are representable as single atoms;
-arbitrary Boolean combinations produce finite unions of such intervals.
+Each piece is a left-closed, right-open interval, and every Boolean
+combination is again a finite union of such intervals. `qint` is atomless:
+it has no atoms and no points, so a single point cannot be written.
 
 #### `hsb` — lex-half-open polyhedra
 
