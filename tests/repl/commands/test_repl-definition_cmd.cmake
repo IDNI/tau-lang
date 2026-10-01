@@ -147,3 +147,25 @@ add_repl_test(definitions-rec_quant_body_no_capture
 	"${_rec_g}. normalize all z (g[2](z))" ": T")
 add_repl_test(definitions-rec_quant_body_fixed_point
 	"${_rec_g}. normalize g(0)" ": T")
+
+# A definition without arguments (issue #196): k() takes its type from its
+# atom or its definition, as a call with arguments takes it from them. Left
+# untyped, it never matched the typed head of k and was answered F.
+set(_k0 "k() := {7}:bv[8]")
+add_repl_test(definitions-zero_args_sat
+	"${_k0}. sat k() = {7}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_valid
+	"${_k0}. valid k() != {7}:bv[8]" ": F")
+add_repl_test(definitions-zero_args_right_side
+	"${_k0}. sat {7}:bv[8] = k()" ": T")
+add_repl_test(definitions-zero_args_in_term
+	"${_k0}. valid k() + {1}:bv[8] = {8}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_untyped_body
+	"k() := 1. sat k() = 1" ": T")
+add_repl_test(definitions-zero_args_qint
+	"q() := {[0, 1/2)}:qint. valid q() != {[0, 1/2)}:qint" ": F")
+# a call without arguments in the body of another definition
+add_repl_test(definitions-zero_args_nested
+	"${_k0}. j() := k(). valid j() = {7}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_nested_term
+	"${_k0}. j() := k() + {1}:bv[8]. valid j() != {8}:bv[8]" ": F")
