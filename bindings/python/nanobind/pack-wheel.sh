@@ -23,6 +23,10 @@ cvc5_prefix="$2"
 out_dir="$3"
 version="${4:-0.1.0}"
 python="${TAU_WHEEL_PYTHON:-$(command -v python3)}"
+
+# The wheel writer and auditwheel stamp each zip entry with this time, so a
+# fixed value gives byte-identical wheels. CI passes the commit time.
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-315532800}"
 platform="${TAU_WHEEL_PLATFORM:?TAU_WHEEL_PLATFORM must name the target platform}"
 
 # The extension suffix differs per platform. The repair tool below is chosen
@@ -49,6 +53,8 @@ stage="${out_dir}/stage"
 pkgdir="${stage}/tau"
 rm -rf "${stage}"
 mkdir -p "${pkgdir}/tau_libs" "${out_dir}/wheel"
+# The count checks below need the wheel of this run alone.
+rm -f "${out_dir}/wheel"/tau_nanobind-*.whl
 cp "${module}" "${pkgdir}/"
 
 # Copy the cvc5 runtime closure the module needs. Walk the dynamic

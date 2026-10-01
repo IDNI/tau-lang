@@ -14,6 +14,10 @@ nanobind_version="$5"; parser_sdk_id="$6"; cvc5_id="$7"; boost_id="$8"
 shift 8
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The store id of the published wheel, for a caller that exports it. An old id
+# must never survive a failed publish.
+id_file="${out_dir}/tau-wheel-store-id"
+rm -f "$id_file"
 bash "${here}/pack-wheel.sh" "$module_dir" "$cvc5_prefix" "$out_dir" "$version"
 
 shopt -s nullglob
@@ -42,4 +46,5 @@ printf '%s\n' "$exec_out"
 prefix="$(printf '%s\n' "$exec_out" | sed -n 's/.*package prefix: //p' | tail -n 1)"
 if [ -n "$prefix" ] && [ -d "$prefix" ]; then
 	date +%s > "$(dirname "$prefix")/.last-used"
+	basename "$(dirname "$prefix")" > "$id_file"
 fi

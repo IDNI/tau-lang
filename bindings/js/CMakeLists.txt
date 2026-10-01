@@ -101,5 +101,7 @@ if(TAU_DEPS_FROM_STORE)
 			"-DTAU_JS_FTXUI_ID=${_tau_js_ftxui_id}"
 		DEPENDS tau_js tau_js_esm tau_js_package_assets
 		USES_TERMINAL
+		# The producer command holds ;-separated values that the shell must not split.
+		VERBATIM
 		COMMENT "Publishing the @idni/tau-lang package to the store")
 endif()

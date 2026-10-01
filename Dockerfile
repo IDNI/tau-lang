@@ -322,10 +322,14 @@ FROM build-compile AS tau-wheel-build
 
 ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release
+# The zip time of the wheel. An empty value takes the zip epoch. The name is
+# not SOURCE_DATE_EPOCH, which BuildKit also applies to the image.
+ARG TAU_WHEEL_EPOCH=
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
+	SOURCE_DATE_EPOCH="${TAU_WHEEL_EPOCH}" \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --keep-cache --target tau_wheel \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -333,11 +337,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	mkdir -p /tau-wheel && \
 	whl="$(ls build/${BUILD_PRESET}/bindings/python/nanobind/wheel/tau_nanobind-*.whl)" && \
 	cp "$whl" /tau-wheel/ && \
-	for d in /root/.tau/store/tau-wheel/*/prefix; do \
-		if cmp -s "$d/$(basename "$whl")" "$whl"; then \
-			basename "$(dirname "$d")" > /tau-wheel/store-id; \
-		fi; \
-	done && \
+	cp build/${BUILD_PRESET}/bindings/python/nanobind/tau-wheel-store-id /tau-wheel/store-id && \
 	test -s /tau-wheel/store-id
 
 # Only the wheel and its store id, for an --output type=local export.

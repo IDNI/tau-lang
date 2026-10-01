@@ -102,11 +102,11 @@ endif()
 
 # The wheel script reads the installed module from here. The relative search
 # path above is applied by this install, so the copy carries it. A Windows
-# extension is a DLL, which install(TARGETS) classifies as RUNTIME.
+# extension is a DLL, which install(TARGETS) classifies as RUNTIME. A COMPONENT
+# applies only to the artifact kind before it, so each kind names its own.
 install(TARGETS ${TAU_PYTHON_BINDING_MODULE}
-	LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/tau_wheel"
-	RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}/tau_wheel"
-	COMPONENT "Python")
+	LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/tau_wheel" COMPONENT "Python"
+	RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}/tau_wheel" COMPONENT "Python")
 
 # The wheel producer needs the built module, so it runs at build time. The
 # command comes from tau-deps, so the compiler and flags are this configure's.
@@ -187,6 +187,8 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 				${_tau_wheel_producer}
 		DEPENDS ${TAU_PYTHON_BINDING_MODULE}
 		USES_TERMINAL
+		# The producer command holds ;-separated values that the shell must not split.
+		VERBATIM
 		COMMENT "Packing and publishing the tau wheel")
 endif()
 
