@@ -639,7 +639,7 @@ std::optional<qlt> qlt_eval_parse_tree(
 		}}};
 	}
 
-	case type::qlt_single: {
+	case type::qlt_interval: {
 		auto children = (n | tt::children)();
 		if (children.empty()) return std::nullopt;
 		return qlt_eval_interval(children[0]);
