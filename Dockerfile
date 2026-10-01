@@ -189,6 +189,8 @@ ARG BUILD_PRESET=release
 # step; an empty value keeps the remote out of a local build.
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+ARG TAU_BUILD_CODEGEN_TESTS=
+ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # The source COPY above changes on every commit, so no layer cache can hold
 # the objects. A ccache mount survives it, and it outlives the build.
@@ -565,6 +567,8 @@ ARG TESTS=yes
 # builds one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+ARG TAU_BUILD_CODEGEN_TESTS=
+ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # A source change misses every object layer, so the compiled objects live in a
 # cache mount the CI carries across runs, as on the native build.
@@ -716,6 +720,8 @@ ARG TESTS=yes
 # builds one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+ARG TAU_BUILD_CODEGEN_TESTS=
+ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
@@ -886,6 +892,8 @@ ARG TESTS=yes
 # builds one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+ARG TAU_BUILD_CODEGEN_TESTS=
+ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # TAU_BUILD_BROWSER_TESTS adds the browser_suite ctest entry, which runs the
 # compiled suite in headless Chrome through
@@ -959,6 +967,8 @@ fi
 # one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+ARG TAU_BUILD_CODEGEN_TESTS=
+ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # Argument SDK_FORMAT=deb/rpm picks the package format of the SDK box.
 FROM wasm-packages-source AS wasm-sdk-packages-build

@@ -27,6 +27,13 @@ set(TAU_TESTS_REQUIRE_CODEGEN
 	test_cpp_codegen_program_desc
 	test_codegen_parity)
 
+set(TAU_CODEGEN_TESTS
+	${TAU_TESTS_REQUIRE_CODEGEN}
+	test_cpp_codegen
+	test_sbf_codegen
+	test_bv_codegen
+	test_qlt_codegen)
+
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	set(DOCTEST_VERSION "v2.4.11")
@@ -193,6 +200,10 @@ function(add test_name)
 		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
 		return()
 	endif()
+	if(NOT TAU_BUILD_CODEGEN_TESTS AND test_name IN_LIST TAU_CODEGEN_TESTS)
+		message(STATUS "Skipping ${test_name}: TAU_BUILD_CODEGEN_TESTS is OFF")
+		return()
+	endif()
 	if(EMSCRIPTEN AND test_name IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
 		message(STATUS "Skipping ${test_name}: codegen not supported under Emscripten yet")
 		return()
@@ -306,6 +317,10 @@ function(_tau_add_owned_test src)
 	get_filename_component(_n "${src}" NAME_WE)
 	if(_n IN_LIST TAU_SKIP_TESTS)
 		message(STATUS "Skipping C++ test ${_n} (covered by REPL test)")
+		return()
+	endif()
+	if(NOT TAU_BUILD_CODEGEN_TESTS AND _n IN_LIST TAU_CODEGEN_TESTS)
+		message(STATUS "Skipping ${_n}: TAU_BUILD_CODEGEN_TESTS is OFF")
 		return()
 	endif()
 	if(EMSCRIPTEN AND _n IN_LIST TAU_TESTS_REQUIRE_CODEGEN)

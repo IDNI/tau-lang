@@ -13,6 +13,7 @@ permissions:
 
 env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+  TAU_BUILD_CODEGEN_TESTS: "OFF"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -78,6 +79,7 @@ jobs:
           ./dev docker build-debug \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps
         env:

@@ -22,7 +22,9 @@ include(test_repl-ltl_env.cmake)
 include(test_repl-realizable_bv1.cmake)
 include(test_repl-misc_cmd.cmake)
 include(test_repl-hsb_literals.cmake)
-include(test_repl-codegen_cli.cmake)
+if(TAU_BUILD_CODEGEN_TESTS)
+	include(test_repl-codegen_cli.cmake)
+endif()
 include(test_repl-ba_constants_cmd.cmake)
 # enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
 # files: it covers every option they did (and more) under the same test names,
@@ -102,11 +104,13 @@ include(test_repl-cli.cmake)
 include(test_repl-limit_effects.cmake)
 include(test_repl-bdd_capacity.cmake)
 
-# `tau compile` verb
-include(test_repl-compile_verb.cmake)
+if(TAU_BUILD_CODEGEN_TESTS)
+	# `tau compile` verb
+	include(test_repl-compile_verb.cmake)
 
-# `tau gen` verb
-include(test_repl-gen_verb.cmake)
+	# `tau gen` verb
+	include(test_repl-gen_verb.cmake)
+endif()
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
