@@ -57,46 +57,6 @@ enumerate_phi_delta(const ocltl_phi_delta_dims& dims,
 	return reachable;
 }
 
-// Builds phi_delta for (dims, atoms), then checks the projected BDD against
-// a direct enumeration at every (sigma, rho, D) point.
-void check_pointwise(const ocltl_phi_delta_dims& dims,
-	const std::vector<ocltl_delta_atom>& atoms)
-{
-	auto reachable = enumerate_phi_delta(dims, atoms);
-	auto build = ocltl_build_phi_delta(dims, atoms);
-	REQUIRE(build.has_value());
-	const auto& result = build.value();
-
-	const size_t sigma_n = size_t{1} << result.sigma_vars.size();
-	const size_t rho_n = size_t{1} << result.rho_vars.size();
-	const size_t delta_n = size_t{1} << result.delta_vars.size();
-
-	size_t checked = 0, mismatches = 0;
-	for (ocltl_type_mask sigma = 0; sigma < sigma_n; ++sigma)
-	for (ocltl_type_mask rho = 0; rho < rho_n; ++rho)
-	for (size_t d = 0; d < delta_n; ++d) {
-		bool expected = reachable.count({ sigma, rho, d }) > 0;
-
-		ocltl_phi_delta_bdd point =
-			bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
-		for (size_t b = 0; b < result.sigma_vars.size(); ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((sigma >> b) & 1) != 0, result.sigma_vars[b]);
-		for (size_t b = 0; b < result.rho_vars.size(); ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((rho >> b) & 1) != 0, result.rho_vars[b]);
-		for (size_t b = 0; b < result.delta_vars.size(); ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((d >> b) & 1) != 0, result.delta_vars[b]);
-
-		bool actual = (result.relation & point) != false;
-		++checked;
-		if (actual != expected) ++mismatches;
-	}
-	CHECK(checked == sigma_n * rho_n * delta_n);
-	CHECK(mismatches == 0);
-}
-
 // ── ocltl_phi_delta_direct cross-checks ─────────────────────────────────────
 
 std::vector<bool> to_bits(size_t mask, size_t n) {
@@ -129,51 +89,6 @@ void check_direct_against_brute(const ocltl_phi_delta_dims& dims,
 			++mismatches;
 			if (mismatches <= 5)
 				std::cout << "MISMATCH vs brute sigma=" << sigma << " rho=" << rho
-					<< " d=" << d << " expected=" << expected
-					<< " actual=" << actual << std::endl;
-		}
-	}
-	CHECK(checked == sigma_n * rho_n * delta_n);
-	CHECK(mismatches == 0);
-}
-
-// Cross-checks ocltl_phi_delta_direct against phi_delta's own BDD output at every (sigma, rho, D) point.
-void check_direct_against_bdd(const ocltl_phi_delta_dims& dims,
-	const std::vector<ocltl_delta_atom>& atoms)
-{
-	auto build = ocltl_build_phi_delta(dims, atoms);
-	REQUIRE(build.has_value());
-	const auto& result = build.value();
-	const size_t b_count = result.sigma_vars.size();
-	const size_t c_count = result.rho_vars.size();
-	const size_t sigma_n = size_t{1} << b_count;
-	const size_t rho_n = size_t{1} << c_count;
-	const size_t delta_n = size_t{1} << result.delta_vars.size();
-
-	size_t checked = 0, mismatches = 0;
-	for (size_t sigma = 0; sigma < sigma_n; ++sigma)
-	for (size_t rho = 0; rho < rho_n; ++rho)
-	for (size_t d = 0; d < delta_n; ++d) {
-		ocltl_phi_delta_bdd point =
-			bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
-		for (size_t b = 0; b < b_count; ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((sigma >> b) & 1) != 0, result.sigma_vars[b]);
-		for (size_t b = 0; b < c_count; ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((rho >> b) & 1) != 0, result.rho_vars[b]);
-		for (size_t b = 0; b < result.delta_vars.size(); ++b)
-			point = point & bdd_handle<Bool, ocltl_phi_delta_bdd_options>::bit(
-				((d >> b) & 1) != 0, result.delta_vars[b]);
-		bool expected = (result.relation & point) != false;
-
-		bool actual = ocltl_phi_delta_direct(dims, atoms,
-			to_bits(sigma, b_count), to_bits(rho, c_count), d);
-		++checked;
-		if (actual != expected) {
-			++mismatches;
-			if (mismatches <= 5)
-				std::cout << "MISMATCH vs bdd sigma=" << sigma << " rho=" << rho
 					<< " d=" << d << " expected=" << expected
 					<< " actual=" << actual << std::endl;
 		}
@@ -251,50 +166,6 @@ void time_direct_samples(const ocltl_phi_delta_dims& dims, size_t delta_count,
 		<< " k_rho=" << k_rho << " |D|=" << delta_count
 		<< " samples=" << n_samples << " avg=" << avg_us << "us total="
 		<< fmt_dur(total) << std::endl;
-}
-
-// Builds and projects phi_delta for one (s, l, |atoms|) point, printing its
-// stats. A timeout or ceiling hit is reported, not treated as a test
-// failure; returns false when the point did not complete.
-bool report_point(size_t s, size_t l, size_t delta_count,
-	std::optional<bool> force_sigma_major = std::nullopt)
-{
-	ocltl_phi_delta_dims dims = packed_dims(s, l);
-	auto atoms = synthetic_atoms(dims.k(), delta_count);
-	std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
-		<< " K=" << dims.k() << " starting..." << std::endl;
-	auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
-	auto t0 = std::chrono::steady_clock::now();
-	auto result = ocltl_build_phi_delta(dims, atoms, deadline, {}, force_sigma_major);
-	if (!result.has_value()) {
-		std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
-			<< " K=" << dims.k() << " tau_bits=" << (size_t{1} << dims.k())
-			<< " SKIPPED (timeout or ceiling)" << std::endl;
-		return false;
-	}
-	const auto& rr = result.value();
-	auto t1 = std::chrono::steady_clock::now();
-	std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
-		<< " K=" << dims.k() << " tau_bits=" << rr.stats.tau_bits
-		<< " sigma_bits=" << rr.stats.sigma_bits
-		<< " rho_bits=" << rr.stats.rho_bits
-		<< " nodes_pre=" << rr.stats.nodes_before_projection
-		<< " nodes_post=" << rr.stats.nodes_after_projection
-		<< " time=" << fmt_dur(t1 - t0) << std::endl;
-	CHECK(rr.stats.tau_bits == (size_t{1} << dims.k()));
-	return true;
-}
-
-// Sweeps |Delta| upward for one (s, l), stopping the group once a point
-// times out or hits a ceiling (larger |Delta| only adds more work, never
-// less).
-void sweep_group(size_t s, size_t l, const std::vector<size_t>& delta_counts) {
-	for (size_t dc : delta_counts) {
-		auto t0 = std::chrono::steady_clock::now();
-		bool completed = report_point(s, l, dc);
-		auto elapsed = std::chrono::steady_clock::now() - t0;
-		if (!completed || elapsed >= std::chrono::seconds(120)) break;
-	}
 }
 
 // Reads a tests/codegen_specs/<name> fixture, trying both the ctest working
@@ -547,46 +418,6 @@ TEST_SUITE("ocltl_phi_delta: correctness") {
 		ocltl_phi_delta_bdd_init();
 	}
 
-	TEST_CASE("projected BDD agrees pointwise with brute-force T_3 enumeration (s=1, l=0)") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 1 }; // m, x, y each a single coordinate
-		std::vector<ocltl_delta_atom> atoms{
-			ocltl_atom_coordinate_eq(0, 1),   // coordinate 0 (m) == coordinate 1 (x)
-			ocltl_atom_coordinate_eq(1, 2),   // coordinate 1 (x) == coordinate 2 (y)
-			ocltl_atom_coordinate_const(0, true), // coordinate 0 (m) == the unit
-		};
-
-		auto build = ocltl_build_phi_delta(dims, atoms);
-		REQUIRE(build.has_value());
-		const auto& result = build.value();
-		REQUIRE(result.sigma_vars.size() == 4);
-		REQUIRE(result.rho_vars.size() == 2);
-		REQUIRE(result.delta_vars.size() == 3);
-		CHECK(result.stats.tau_bits == 8);
-
-		check_pointwise(dims, atoms);
-	}
-
-	TEST_CASE("projected BDD agrees pointwise with brute-force T_3 enumeration, general terms (s=1, l=0)") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 1 }; // coordinate 0 = m, 1 = x, 2 = y
-		ocltl_delta_term_ptr m = ocltl_term_coordinate(0);
-		ocltl_delta_term_ptr x = ocltl_term_coordinate(1);
-		ocltl_delta_term_ptr y = ocltl_term_coordinate(2);
-
-		std::vector<ocltl_delta_atom> atoms{
-			{ ocltl_term_meet(x, y), false },                    // x & y = 0
-			{ ocltl_term_complement(ocltl_term_join(x, y)), false }, // x | y = 1
-			{ ocltl_term_meet(ocltl_term_complement(x), y), false },  // ~x & y = 0
-			{ ocltl_term_join(                                    // (m & ~x) | (x & ~y) = 0
-				ocltl_term_meet(m, ocltl_term_complement(x)),
-				ocltl_term_meet(x, ocltl_term_complement(y))), false },
-			{ ocltl_term_meet(m, x), true },                      // m & x != 0
-		};
-
-		check_pointwise(dims, atoms);
-	}
-
 	TEST_CASE("atom-free reachable (sigma, rho) pairs are exactly valid-sigma x valid-rho (k=3)") {
 		ocltl_phi_delta_dims dims{ 1, 1, 1 };
 		size_t k_sigma = dims.d_m + dims.d_x, k_rho = dims.d_y;
@@ -682,60 +513,6 @@ TEST_SUITE("ocltl_phi_delta: direct predicate vs brute force") {
 	}
 }
 
-TEST_SUITE("ocltl_phi_delta: direct predicate vs BDD") {
-
-	TEST_CASE("bdd_init") {
-		ocltl_phi_delta_bdd_init();
-	}
-
-	TEST_CASE("k_sigma=3, k_rho=2 (K=5), atom-free") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 2, 1, 2 }; // k_sigma=3, k_rho=2
-		std::vector<ocltl_delta_atom> no_atoms;
-		check_direct_against_bdd(dims, no_atoms);
-	}
-
-	TEST_CASE("k_sigma=3, k_rho=2 (K=5), multiple atoms mixed D") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 2, 1, 2 };
-		std::vector<ocltl_delta_atom> atoms{
-			ocltl_atom_coordinate_eq(0, 3),
-			ocltl_atom_coordinate_eq(1, 4),
-			ocltl_atom_coordinate_const(2, true),
-			ocltl_atom_coordinate_const(4, false),
-		};
-		check_direct_against_bdd(dims, atoms);
-	}
-
-	TEST_CASE("k_sigma=2, k_rho=3 (K=5), atom-free") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 3 }; // k_sigma=2, k_rho=3
-		std::vector<ocltl_delta_atom> no_atoms;
-		check_direct_against_bdd(dims, no_atoms);
-	}
-
-	TEST_CASE("k_sigma=2, k_rho=3 (K=5), multiple atoms mixed D") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 3 };
-		std::vector<ocltl_delta_atom> atoms{
-			ocltl_atom_coordinate_eq(0, 2),
-			ocltl_atom_coordinate_eq(1, 3),
-			ocltl_atom_coordinate_const(4, true),
-			ocltl_atom_coordinate_const(3, false),
-		};
-		check_direct_against_bdd(dims, atoms);
-	}
-
-	// K=8 already exceeds the BDD build's default node ceiling, even atom-free.
-	TEST_CASE("k_sigma=5, k_rho=3 (K=8), atom-free, does not build under default limits") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 4, 1, 3 }; // k_sigma=5, k_rho=3
-		std::vector<ocltl_delta_atom> no_atoms;
-		auto build = ocltl_build_phi_delta(dims, no_atoms);
-		CHECK(build.has_error());
-	}
-}
-
 TEST_SUITE("ocltl_phi_delta: direct predicate scaling") {
 
 	TEST_CASE("bdd_init") {
@@ -809,159 +586,6 @@ TEST_SUITE("ocltl_phi_delta: assumption checks against a real spec") {
 	}
 }
 
-TEST_SUITE("ocltl_phi_delta: id ordering comparison") {
-
-	TEST_CASE("bdd_init") {
-		ocltl_phi_delta_bdd_init();
-	}
-
-	// k_sigma=3 > k_rho=2: rho-major (the smaller dimension) is compared against sigma-major.
-	TEST_CASE("sigma-major tau-bit ids (s=1, l=1, k_sigma=3, k_rho=2)") {
-		ocltl_phi_delta_bdd_init();
-		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8, 16, 20, 24 })
-			if (!report_point(1, 1, dc, true)) break;
-	}
-
-	TEST_CASE("rho-major tau-bit ids (s=1, l=1, k_sigma=3, k_rho=2)") {
-		ocltl_phi_delta_bdd_init();
-		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8, 16, 20, 24 })
-			if (!report_point(1, 1, dc, false)) break;
-	}
-
-	// k_sigma=2 < k_rho=5: the winning axis should flip to sigma.
-	TEST_CASE("sigma-major tau-bit ids on swapped dims (k_sigma=2, k_rho=5)") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 5 };
-		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8 }) {
-			auto atoms = synthetic_atoms(dims.k(), dc);
-			auto build = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, true);
-			if (!build.has_value()) {
-				std::cout << "sigma-major |D|=" << dc << " CEILING exceeded" << std::endl;
-				break;
-			}
-			std::cout << "sigma-major |D|=" << dc
-				<< " nodes_pre=" << build.value().stats.nodes_before_projection
-				<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
-		}
-	}
-
-	TEST_CASE("rho-major tau-bit ids on swapped dims (k_sigma=2, k_rho=5)") {
-		ocltl_phi_delta_bdd_init();
-		ocltl_phi_delta_dims dims{ 1, 1, 5 };
-		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8 }) {
-			auto atoms = synthetic_atoms(dims.k(), dc);
-			auto build = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, false);
-			if (!build.has_value()) {
-				std::cout << "rho-major |D|=" << dc << " CEILING exceeded" << std::endl;
-				break;
-			}
-			std::cout << "rho-major |D|=" << dc
-				<< " nodes_pre=" << build.value().stats.nodes_before_projection
-				<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
-		}
-	}
-}
-
-// One dims/atom-count shape per process: the shared BDD namespace remembers ids across shapes built in the same run.
-void probe_point(const ocltl_phi_delta_dims& dims, size_t delta_count) {
-	auto atoms = synthetic_atoms(dims.k(), delta_count);
-	std::cout << "probe K=" << dims.k() << " k_sigma=" << (dims.d_m + dims.d_x)
-		<< " k_rho=" << dims.d_y << " |D|=" << delta_count << " starting..." << std::endl;
-	auto build = ocltl_build_phi_delta(dims, atoms);
-	if (!build.has_value()) {
-		std::cout << "probe K=" << dims.k() << " |D|=" << delta_count
-			<< " CEILING exceeded" << std::endl;
-		return;
-	}
-	std::cout << "probe K=" << dims.k() << " |D|=" << delta_count
-		<< " nodes_pre=" << build.value().stats.nodes_before_projection
-		<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
-}
-
-TEST_SUITE("ocltl_phi_delta: boundary probe") {
-
-	TEST_CASE("bdd_init") {
-		ocltl_phi_delta_bdd_init();
-	}
-
-	TEST_CASE("atom-free K=6 (k_sigma=4, k_rho=2)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 3, 1, 2 }, 0);
-	}
-	TEST_CASE("atom-free K=7 (k_sigma=4, k_rho=3)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 3, 1, 3 }, 0);
-	}
-	TEST_CASE("atom-free K=8 (k_sigma=5, k_rho=3)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 4, 1, 3 }, 0);
-	}
-	TEST_CASE("atom-free K=9 (k_sigma=5, k_rho=4)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 4, 1, 4 }, 0);
-	}
-	TEST_CASE("atom-free K=10 (k_sigma=6, k_rho=4)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 5, 1, 4 }, 0);
-	}
-	TEST_CASE("k_rho fixed at 3, k_sigma=6 (K=9)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 5, 1, 3 }, 0);
-	}
-	TEST_CASE("k_rho fixed at 3, k_sigma=9 (K=12)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 8, 1, 3 }, 0);
-	}
-	TEST_CASE("one-atom K=6 (k_sigma=4, k_rho=2)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 3, 1, 2 }, 1);
-	}
-	TEST_CASE("one-atom K=7 (k_sigma=4, k_rho=3)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 3, 1, 3 }, 1);
-	}
-	TEST_CASE("one-atom K=8 (k_sigma=5, k_rho=3)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 4, 1, 3 }, 1);
-	}
-	TEST_CASE("one-atom K=9 (k_sigma=5, k_rho=4)") {
-		ocltl_phi_delta_bdd_init();
-		probe_point({ 4, 1, 4 }, 1);
-	}
-}
-
-TEST_SUITE("ocltl_phi_delta: scaling measurement") {
-
-	TEST_CASE("bdd_init") {
-		ocltl_phi_delta_bdd_init();
-	}
-
-	TEST_CASE("s=1, l=0 (tau_bits=8)") {
-		ocltl_phi_delta_bdd_init();
-		sweep_group(1, 0, { 1, 2, 4, 8 });
-	}
-
-	TEST_CASE("s=1, l=1 (tau_bits=32)") {
-		ocltl_phi_delta_bdd_init();
-		sweep_group(1, 1, { 1, 2, 4, 8, 16 });
-	}
-
-	TEST_CASE("s=1, l=2 (tau_bits=512)") {
-		ocltl_phi_delta_bdd_init();
-		sweep_group(1, 2, { 1, 2, 4, 8, 16 });
-	}
-
-	TEST_CASE("s=2, l=1 (tau_bits=1024)") {
-		ocltl_phi_delta_bdd_init();
-		sweep_group(2, 1, { 1, 2, 4, 8, 16, 20 });
-	}
-
-	TEST_CASE("s=2, l=2 (tau_bits=262144)") {
-		ocltl_phi_delta_bdd_init();
-		sweep_group(2, 2, { 1, 2, 4, 8, 16, 20 });
-	}
-}
-
 // Spot-checks stage1's relation against ocltl_phi_delta_direct at n_samples
 // pseudo-random (sigma, rho, D) points. ocltl_phi_delta_direct's sigma/rho
 // parameters are full type masks, one bit per minterm of the sigma/rho
@@ -1008,7 +632,8 @@ TEST_SUITE("ocltl_phi_delta: stage1 symbolic (sigma/rho/D only) correctness") {
 		ocltl_phi_delta_bdd_init();
 	}
 
-	// pointwise cross-check helper, mirroring check_pointwise / check_direct_against_bdd above.
+	// Checks stage1's relation against brute-force enumeration at every
+	// (sigma, rho, D) point.
 	void check_stage1_pointwise(const ocltl_phi_delta_dims& dims,
 		const std::vector<ocltl_delta_atom>& atoms)
 	{

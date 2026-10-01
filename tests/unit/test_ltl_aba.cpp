@@ -11,7 +11,7 @@
 //   6.  Safety fragment regression.
 //   7.  Printer: F/U/R/W/G round-trip through to_str().
 //   8.  NNF: push_negation_in produces correct LTL NNF duals.
-//   9.  ltl_to_safety_formula: single-state strategy extraction for execution.
+//   9.  ltl_to_safety_formula_full: single-state strategy extraction for execution.
 //   10. Normalization correctness.
 //   11. LTL equivalences.
 //   12. Multi-atom and multi-variable formulas.
@@ -101,6 +101,12 @@ static std::optional<ltl_aba_solution<node_t>> solve_ltl(tref fm) {
 	auto r = solve_ltl_aba<node_t>(fm);
 	REQUIRE(r.has_value());
 	return r.value();
+}
+
+// The safety formula ltl_to_safety_formula_full builds for `fm`.
+static result<tref> safety_formula(tref fm) {
+	return ltl_to_safety_formula_full<node_t>(fm).transform(
+		[](auto&& full) { return std::get<0>(full); });
 }
 
 // ── 1. Parser tests ───────────────────────────────────────────────────────────
@@ -588,14 +594,14 @@ TEST_SUITE("LTL NNF rules") {
 	}
 }
 
-// ── 9. ltl_to_safety_formula ─────────────────────────────────────────────────
+// ── 9. ltl_to_safety_formula_full ────────────────────────────────────────────
 
 TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("F(output = 0) converts to always(output = 0)") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -606,7 +612,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("F(output = 0) safety formula is realizable") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -617,7 +623,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("G(F(output = 0)) converts to always formula") {
 		tref fm = spec("G (F (o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -627,7 +633,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("(o=1) R (o=0) converts to always formula") {
 		tref fm = spec("(o1[t] = 1) release (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -638,7 +644,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// The system cannot force inputs; the formula is unrealizable.
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		CHECK(safety == nullptr);
@@ -648,7 +654,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// always(o=0) |= F(o=0), so the derived safety formula is consistent.
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -659,7 +665,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("W operator safety formula is realizable") {
 		tref fm = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -990,14 +996,14 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	// ltlsynt produces a 2-state automaton: state 0 → output p0=true → state 1,
 	//                                        state 1 → output p0=false → state 0.
 	// encode_mealy_as_safety should produce an always(phi) formula with lookback.
-	TEST_CASE("G(F(o=0)) && G(F(o!=0)) multi-state: ltl_to_safety_formula non-null") {
+	TEST_CASE("G(F(o=0)) && G(F(o!=0)) multi-state: ltl_to_safety_formula_full non-null") {
 		// This formula requires alternation — a 2-state Mealy machine.
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		// Must be realizable
 		CHECK(sat(fm));
-		// ltl_to_safety_formula must succeed (multi-state encoding)
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		// ltl_to_safety_formula_full must succeed (multi-state encoding)
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1007,7 +1013,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("G(F(o=0)) && G(F(o!=0)) safety formula is realizable") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1018,7 +1024,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("multi-state safety formula has auxiliary state vars") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1035,7 +1041,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 		// Regression: verify single-state path unchanged after multi-state addition
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1049,7 +1055,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 // ── 16. Interpreter (run) dispatch ───────────────────────────────────────────
 //
 // Verifies that the full CLI `run` path — normalizer →
-// realizability_has_game_operators → ltl_to_safety_formula →
+// realizability_has_game_operators → ltl_to_safety_formula_full →
 // make_interpreter — succeeds for LTL formulas.
 // Prior to the normalize_with_temp_simp guard, anti_prenex inside normalize()
 // would silently convert wff_sometimes → wff_sometimes, causing the LTL guard in

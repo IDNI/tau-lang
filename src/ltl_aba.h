@@ -598,33 +598,20 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 
 /**
  * @brief Convert a realizable LTL formula to a tau-lang safety formula
- * (always(phi)) that the existing interpreter pipeline can execute.
+ * (always(phi)) that the interpreter pipeline can execute, together with
+ * the ltl_aba_solution<node> (the strategy automaton + atoms map) when one
+ * was synthesised.
  *
  * Strategy:
  *   - Pure past-LTL formulas: compiled away to safety + init invariants
- *     (no Mealy synthesis needed; `_full` returns nullopt for the solution).
+ *     (no Mealy synthesis needed; the solution is nullopt).
  *   - Single-state Mealy strategies: extract the self-loop output constraint,
  *     wrap in always().
  *   - Multi-state Mealy strategies: encoded as a safety formula with auxiliary
  *     one-hot state bits `o__ltl_ms<i>__` per `encode_mealy_as_safety`.
  *
- * @tparam node Tree node type.
- * @param fm Normalised LTL formula.
- * @return The safety formula, or nullptr if not realizable; an error when
- * the strategy cannot be synthesised or encoded.
- */
-template <NodeType node>
-result<tref> ltl_to_safety_formula(tref fm);
-
-/**
- * @brief Variant of `ltl_to_safety_formula` that ALSO returns the
- * ltl_aba_solution<node> (the strategy automaton + atoms map) when one was
- * synthesised.
- *
- * The interpreter caches it so that downstream code can introspect the
- * Mealy state at runtime, visualise the strategy, extract boundary traces,
- * etc. — the strategy's information is otherwise discarded after the safety
- * encoding.
+ * The interpreter caches the solution to introspect the Mealy state at
+ * runtime.
  *
  * The optional is empty when:
  *   - the formula was unrealizable (returned nullptr),

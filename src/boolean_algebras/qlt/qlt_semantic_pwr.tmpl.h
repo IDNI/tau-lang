@@ -93,58 +93,6 @@ tref build_win_formula(
 }
 
 // ---------------------------------------------------------------------------
-// Build the Win_0 formula (initial state entry condition).
-//
-// Win_0 = the data-atom condition of the patterns reachable from THE fixed
-// initial memory ρ₀ = result.init_rho, provided (q_init, ρ₀) ∈ W.
-//
-// LG-12: this used to take the union over ALL winning ρ₀ — the ∃ρ₀ reading
-// whose phantom initial memories the fixed convention (F) retired (see
-// alg_d::initial_memory).  result.init_rho is -1 when unrealizable (or on a
-// hand-built result that never ran the solver), which yields nullptr here.
-// ---------------------------------------------------------------------------
-
-template <NodeType node>
-tref build_win0_formula(
-	const alg_d::alg_d_result& result,
-	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::qlt_type3>& T3,
-	const std::vector<int>& type_A)
-{
-	const int K = result.K;
-	const int T1_size = result.T1_size;
-	const int q_init = result.synth_game.init;
-	const int rho0 = result.init_rho;
-	if (rho0 < 0 || rho0 >= T1_size) return nullptr;
-	if (!result.winning_region.count(q_init * T1_size + rho0))
-		return nullptr;
-
-	// Collect D-patterns reachable from the fixed initial ρ₀.
-	std::set<int> init_patterns;
-	for (int t = 0; t < (int)T3.size(); ++t) {
-		if (T3[t].pos_m == rho0)
-			init_patterns.insert(type_A[t]);
-	}
-
-	if (init_patterns.empty()) return nullptr;
-
-	// Build formula (same logic as build_win_formula but restricted to init).
-	tref win0 = nullptr;
-	for (int pat : init_patterns) {
-		tref conj = nullptr;
-		for (int i = 0; i < K; ++i) {
-			tref literal = (pat & (1 << i))
-				? atoms[i].first
-				: build_wff_neg<node>(atoms[i].first);
-			conj = conj ? build_wff_and<node>(conj, literal) : literal;
-		}
-		if (!conj) continue;
-		win0 = win0 ? build_wff_or<node>(win0, conj) : conj;
-	}
-	return win0;
-}
-
-// ---------------------------------------------------------------------------
 // Semantic PWR optimal mode: try Algorithm D on clause ∧ update.
 //
 // Given a spec clause C and full update ψ:

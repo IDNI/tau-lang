@@ -826,15 +826,7 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 	return all;
 }
 
-// ── ltl_to_safety_formula ─────────────────────────────────────────────────────
-//
-// `_full` does the work and returns BOTH the safety formula AND the
-// ltl_aba_solution (when one was synthesised). The interpreter caches the
-// solution so it can introspect the Mealy state at runtime, visualise the
-// strategy, etc. — info that would otherwise be discarded after encoding.
-//
-// The thin wrapper `ltl_to_safety_formula(fm)` discards the solution to
-// preserve the existing single-return API for callers that don't need it.
+// ── ltl_to_safety_formula_full ────────────────────────────────────────────────
 
 template <NodeType node>
 result<std::tuple<tref, std::optional<ltl_aba_solution<node>>,
@@ -857,7 +849,7 @@ ltl_to_safety_formula_full(tref fm,
 		rep.demote_errors_to_warnings();
 		r.append(std::move(rep));
 	};
-	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
+	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: " << LOG_FM(fm);
 
 	// Fast path: if all LTL operators are past (S/T), compile them away and
 	// return G(curr && rhs) safety invariants for each S operator.
@@ -892,7 +884,7 @@ ltl_to_safety_formula_full(tref fm,
 	};
 
 	{
-		auto [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
+		auto [compiled_fast, safety_fm, init_fm, unanchored_aux] =
 			compile_since_trigger<node>(fm);
 		// The compiled invariants read their auxiliaries at t-1, which
 		// makes step 0 a warm-up step the interpreter does not enforce.
@@ -903,7 +895,7 @@ ltl_to_safety_formula_full(tref fm,
 			&& !realizability_has_game_operators<node>(compiled_fast)
 			&& body_max_lookback<node>(fm) > 0)
 		{
-			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
+			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: "
 			          << "pure past-LTL, returning safety formula";
 			// LT-2: the compiled formula used to be DISCARDED here, so the
 			// Boolean structure around each S never reached the interpreter
@@ -985,7 +977,7 @@ ltl_to_safety_formula_full(tref fm,
 	// take minutes.
 	if (data_unrealizable) return nothing();
 	if (!maybe) {
-		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
+		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: not realizable";
 		// only the default path has a game skeleton; the others decide
 		// their own abstraction exactly, as the realizability check
 		// takes them
@@ -1013,7 +1005,7 @@ ltl_to_safety_formula_full(tref fm,
 		const bool survives = refined.value();
 		r.merge(std::move(refined));
 		if (!survives) {
-			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "
+			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: no strategy "
 				"survives the ABA refinement";
 			return none();
 		}
@@ -1083,16 +1075,10 @@ ltl_to_safety_formula_full(tref fm,
 		combined = tau::build_wff_or(combined, norm_guard);
 	}
 	TAU_TRY(tref simplified, normalize_non_temp<node>(combined));
-	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
+	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full result: always("
 	          << LOG_FM(simplified) << ")";
 	return r.with_value(full_t{ tau::build_wff_always(simplified),
 		std::move(sol), {} });
-}
-
-template <NodeType node>
-result<tref> ltl_to_safety_formula(tref fm) {
-	return ltl_to_safety_formula_full<node>(fm).transform(
-		[](auto&& full) { return std::get<0>(full); });
 }
 
 // ── ltl_explain ───────────────────────────────────────────────────────────────

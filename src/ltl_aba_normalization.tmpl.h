@@ -2144,7 +2144,7 @@ static void add_input_twins(
 // ── Internal: solve LTL(ABA) problem ─────────────────────────────────────────
 //
 // Bundles the common steps shared by is_ltl_aba_realizable and
-// ltl_to_safety_formula: atom extraction, classification, skeleton + ABA
+// ltl_to_safety_formula_full: atom extraction, classification, skeleton + ABA
 // consistency constraints, ltlsynt call, HOA parse.
 //
 // Returns {atoms, input_props, output_props, automaton} on success,
@@ -2895,18 +2895,6 @@ static std::optional<tref> first_unforced_claim(
 // After the pass the formula no longer contains wff_since or wff_trigger, so it can
 // be sent to ltlsynt.
 
-// Return true if the tree rooted at fm contains any wff_since or wff_trigger node.
-template <NodeType node>
-static bool has_since_trigger(tref fm) {
-	using tau = tree<node>;
-	return tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_since || nt == tree<node>::wff_trigger;
-	}) != nullptr;
-}
-
 // Build   name[t+shift]:<carrier> = {value}   (shift ≤ 0: -1 → t-1, 0 → t).
 template <NodeType node>
 static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int value) {
@@ -2936,12 +2924,6 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 
 // Recursively rewrite all wff_since / wff_trigger nodes.
 // Uses `counter` for fresh auxiliary names.
-// `aux_pairs` collects (curr, prev) atom refs for each S operator.
-// LT-14 STATUS: no caller consumes `aux_pairs` today -- the described
-// G(X(p_prev) <-> p_curr) ltlsynt-skeleton integration does not exist
-// (solve_ltl_aba never calls compile_since_trigger; the sole caller,
-// ltl_to_safety_formula_full, binds it unused). The output is kept for
-// that documented-but-unbuilt integration; treat it as inert until then.
 // `safety_invs` collects G(curr && rhs) for the outermost S, and
 // G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form
 // for inner S lets the auxiliary variable be false at t=0 without forcing
@@ -2971,7 +2953,6 @@ template <NodeType node>
 static tref compile_since_trigger_rec(
     tref fm,
     int& counter,
-    std::vector<std::pair<tref,tref>>& aux_pairs,
     std::vector<tref>& safety_invs,
     std::vector<tref>& init_conds,
     std::vector<std::string>& unanchored_aux,
@@ -2997,8 +2978,8 @@ static tref compile_since_trigger_rec(
 		// Compile nested S/T inside the operands first (always inner), so
 		// that the ψ used for the t=0 initial condition below is the
 		// compiled one, matching what goes into the rewritten S.
-		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		phi = compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
@@ -3011,7 +2992,7 @@ static tref compile_since_trigger_rec(
 		// With is_outer=false the S contributes only its tracking
 		// invariant G(curr ↔ rhs), and the obligation is encoded below
 		// from the negated compiled formula.
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		tref s_rewr  = compile_since_trigger_rec<node>(s_node, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
 		tref compiled = tau::build_wff_neg(s_rewr);
 
 		if (is_outer) {
@@ -3042,8 +3023,8 @@ static tref compile_since_trigger_rec(
 		// Any S inside phi or psi is by definition inner (nested), so
 		// pass is_outer=false to suppress the always-true requirement
 		// and the psi-at-0 initial condition for those sub-operators.
-		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		phi = compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
@@ -3117,13 +3098,6 @@ static tref compile_since_trigger_rec(
 			unanchored_aux.push_back(aux_name);
 		}
 
-		// Record the (curr, prev) pair so the caller can add the temporal
-		// connection G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.  Without
-		// this, ltlsynt treats p_prev as an independent output proposition and
-		// the system can freely set it to 1 at any step t>0, breaking the
-		// recurrence semantics of S.
-		aux_pairs.emplace_back(curr, prev);
-
 		// Replace φ S ψ with curr ("since holds now").
 		return curr;
 	}
@@ -3150,20 +3124,20 @@ static tref compile_since_trigger_rec(
 	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
 
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_c = compile_since_trigger_rec<node>(op.first(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
 		if (new_c == op.first()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_c));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_l = compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_r = compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
 		if (new_l == op.first() && new_r == op.second()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_a = compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_b = compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref new_c = compile_since_trigger_rec<node>(op.third(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
 			return fm;
 		// 3-child case: use build_wff_conditional for wff_conditional,
@@ -3186,7 +3160,7 @@ static tref compile_since_trigger_rec(
 	new_kids.reserve(nc);
 	bool changed = false;
 	for (tref c : kids) {
-		tref nc_ = compile_since_trigger_rec<node>(c, counter, aux_pairs, safety_invs, init_conds, unanchored_aux, child_pol);
+		tref nc_ = compile_since_trigger_rec<node>(c, counter, safety_invs, init_conds, unanchored_aux, child_pol);
 		if (nc_ != c) changed = true;
 		new_kids.push_back(nc_);
 	}
@@ -3195,8 +3169,7 @@ static tref compile_since_trigger_rec(
 }
 
 // Top-level S/T compilation pass.
-// Returns {compiled_formula, safety_formula, init_formula, aux_pairs,
-// unanchored_aux}.
+// Returns {compiled_formula, safety_formula, init_formula, unanchored_aux}.
 //
 // compiled_formula is fm with every S/T node replaced by its auxiliary atom,
 // and fm unchanged when there are no S/T nodes.  It carries the spec's Boolean
@@ -3212,28 +3185,22 @@ static tref compile_since_trigger_rec(
 //   the un-negated psi, since φ T ψ requires ψ at position 0).  An off-spine S
 //   contributes nothing here — its t=0 anchor is the interpreter-side seeding
 //   of `unanchored_aux` (LA-N3; see the anchor note in the S branch).
-// aux_pairs: one entry per S operator: (curr_atom, prev_atom).
-// Callers use aux_pairs to add G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.
 // unanchored_aux: the auxiliary names of every INNER (off-spine) S — the ones
 //   whose tracking invariant leaves aux[t-1] free at the first enforced step.
 //   The interpreter seeds each to bv-0 at t = formula_time_point - 1
 //   (seed_since_aux_bits), encoding S(-1) = false / T(-1) = true.
 template <NodeType node>
-static std::tuple<tref, tref, tref, std::vector<std::pair<tref,tref>>,
-                  std::vector<std::string>>
+static std::tuple<tref, tref, tref, std::vector<std::string>>
 compile_since_trigger(tref fm) {
 	using tau = tree<node>;
-	// LT-16(b): has_since_trigger was a verbatim duplicate of
-	// has_past_operators (ltl_aba_helpers.tmpl.h); one predicate now.
 	if (!has_past_operators<node>(fm))
-		return {fm, tau::_T(), tau::_T(), {}, {}};
+		return {fm, tau::_T(), tau::_T(), {}};
 
-	std::vector<std::pair<tref,tref>> aux_pairs;
 	std::vector<tref> safety_invs;
 	std::vector<tref> init_conds;
 	std::vector<std::string> unanchored_aux;
 	int counter = 0;
-	tref compiled = compile_since_trigger_rec<node>(fm, counter, aux_pairs, safety_invs, init_conds, unanchored_aux);
+	tref compiled = compile_since_trigger_rec<node>(fm, counter, safety_invs, init_conds, unanchored_aux);
 
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
@@ -3245,8 +3212,7 @@ compile_since_trigger(tref fm) {
 
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
 	          << counter << " auxiliary variable(s) introduced";
-	return {compiled, safety_fm, init_fm, std::move(aux_pairs),
-	        std::move(unanchored_aux)};
+	return {compiled, safety_fm, init_fm, std::move(unanchored_aux)};
 }
 
 } // namespace idni::tau_lang

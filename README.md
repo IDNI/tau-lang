@@ -903,7 +903,7 @@ opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula
 that the data game does not decide,
-`ltl_to_safety_formula` converts the winning Mealy strategy to an executable
+`ltl_to_safety_formula_full` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
 self-loop guard directly.  Multi-state strategies are encoded using one-hot
 auxiliary output bitvector variables (`o__ltl_ms0__`, `o__ltl_ms1__`, …) and
@@ -3663,18 +3663,13 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 
 | Header | Purpose |
 |--------|---------|
-| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. `Pre_over_T1`, `nu_fixpoint`/`mu_fixpoint` over 2^{T_1} and `reachable_from` are staged helpers that Algorithm D does not use yet. |
+| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. |
 | `src/boolean_algebras/qlt/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings (at most 18 fractional digits); `collect_qlt_constants(fm)` harvesting named constants from a formula. |
-| `src/omcat_oracle_cache.h` | Thread-safe runtime cache for atomic oracle answers (tp(m,x) and achievability-set A_{ρ,J}). |
 
 ## Supporting infrastructure
 
 | Header | Purpose |
 |--------|---------|
-| `src/gr1_detect.h` | `is_gr1_fragment(fm, &n_safety, &n_liveness)` classifier for `⋀ G(ψ_safe) ∧ ⋀ GF(ψ_live)`. Staged: not wired into the synthesis dispatch, exercised by unit tests only. |
-| `src/liveness_decomp.h` | `decompose_liveness(fm)` splits GR(1)-shaped formulas into safety part + GF bodies. Staged, unit tests only. |
-| `src/mealy_extract.h` | Mealy-machine extraction helpers. Staged, unit tests only. |
-| `src/decomposed_spec.h` | `decomposed_spec { transient; invariant; reactive }` with `decompose_spec(fm)` classifier. |
 | `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
 | `src/tau_lang_api.h` | Documentation header for the library entry points (`is_tau_formula_sat`, `get_nso_rr`, `run`); there is no `tau_lang_is_realizable` symbol. |
 
@@ -3807,9 +3802,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * Mealy strategies with any number of states are executable.
   * `S` (since) and `T` (trigger) past LTL operators are decided through the
     ppLTLTT temporal-tester encoding on the synthesis path and compiled away
-    to auxiliary output variables for pure-past execution; the tester
-    integration is complete, the compile-away pass's `aux_pairs` output is
-    unused.
+    to auxiliary output variables for pure-past execution.
   * `nlang` type requires `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) to be set;
     without it every oracle question is answered `false` (not cached), so
     verdicts are not reliable.
@@ -3835,10 +3828,8 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
   game (Zielonka's recursive algorithm over priorities derived from the Büchi,
   co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
-  formulas.  The separate μ/ν fixpoint formulation over 2^{T₁} in
-  `src/omcat_types.h` (`Pre_over_T1`, `nu_fixpoint`, `mu_fixpoint`) is staged
-  and not used by the solver; extending D to input-bearing formulas (the T₂
-  dimension in the environment states) is the open design item.
+  formulas; extending D to input-bearing formulas (the T₂ dimension in the
+  environment states) is the open design item.
 * **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
   T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
   BDD-based type encoding: the type of a BA element relative to the formula's

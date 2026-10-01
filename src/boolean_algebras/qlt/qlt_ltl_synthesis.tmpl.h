@@ -621,7 +621,7 @@ solve_ltl_aba_algorithm_a(
 	// Populate sol.atoms with the d_i propositions phi_star uses, so
 	// downstream consumers (the codegen witness emitter in
 	// cpp_codegen.tmpl.h, the safety-formula extractor in
-	// ltl_to_safety_formula) can map AP names back to the original data
+	// ltl_to_safety_formula_full) can map AP names back to the original data
 	// atoms and emit qlt witnesses, executable safety formulas, etc.
 	// Previously sol.atoms was left empty, which forced the codegen down
 	// the propositional fallback that emits `bool o_d_0` instead of

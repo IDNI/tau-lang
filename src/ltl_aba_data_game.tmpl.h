@@ -346,7 +346,6 @@ struct code_window {
 	uint32_t block() const {
 		return (uint32_t)((depth + 1) * streams.size());
 	}
-	uint32_t step() const { return (uint32_t)streams.size(); }
 	uint32_t var(size_t s, size_t k, size_t b) const {
 		return (uint32_t)(b * block() + k * streams.size() + s);
 	}
