@@ -141,7 +141,7 @@ need solver or LTL types, which sit beside their single consumer:
 
 | member | what core asks it for | resolution |
 |---|---|---|
-| `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
+| `solve(fm)` | your own decision procedure for a whole formula of your types; its answer must convert to the caller's `optional<solution>` | owner of the formula's type |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch. A failure reports the reason (see [Preprocessing](#preprocessing)) | every declarer, chained in pack order, stopping at the first failure |
 | `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |
@@ -175,18 +175,22 @@ need solver or LTL types, which sit beside their single consumer:
 
 **Pack order is semantic** wherever the rule above says *first*, *any* or
 *chained*: `-DTAU_BAS=a,b` and `-DTAU_BAS=b,a` can differ there. Owner-gated
-members never depend on it, and the two single-declarer members refuse a second
-claimant at compile time so no build resolves them by order.
+members never depend on it, and the single-declarer member refuses a second
+claimant at compile time so no build resolves it by order.
 
 Declaring both `arith_ops` and `solve` is what makes core instantiate the
 arithmetic pipeline (predicate blasting, the arithmetic skip, the theory
-solver) for packs containing you; there is nothing else to switch on.
+solver) for packs containing you; there is nothing else to switch on. The
+theory solver hands your `solve` the atoms of a clause whose types you own, all
+of them in one formula (a cast lets one variable span two of your types), so
+several solving algebras can share a pack.
 
 Every fold's empty case is deliberate. `pack_zero_constant` and
-`pack_value_constant` return `nullptr`, and `pack_type_has_arith_ops` returns
-`false`, because "no BA owns this type" is an ordinary runtime outcome;
-`pack_solve` `static_assert`s, because its call sites are gated and reaching it
-means a gate drifted. When writing one, test the capability's concept with
+`pack_value_constant` return `nullptr`, `pack_type_has_arith_ops` returns
+`false`, and `pack_solve` returns `nullopt` (no owner, or an owner without
+`solve`), because "no BA owns this type" is an ordinary runtime outcome;
+`pack_bool_carrier_type` `static_assert`s, because a pack with nothing to carry
+a bit cannot build core at all. When writing one, test the capability's concept with
 `if constexpr` inside `pack_visit_all` or `pack_owner_apply`: a `?:` in a fold
 expression instantiates both arms for every BA, and a `requires`-expression
 nested in the fold's lambda crashes gcc 13.

@@ -269,10 +269,10 @@ a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
 type no BA owns, asked about its own type — do not add a second capability for
 that, `bv[1]`'s literals already are `1`/`0`. `print_constant` is how a BA whose
 own `operator<<` formats a constant unhelpfully (bv prints SMT-LIB) says how Tau
-should render it. Each fold's empty case is chosen deliberately — `pack_solve`
-static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
-and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
-type" is ordinary. When writing a fold, name the capability as a concept in
+should render it. Each fold's empty case is chosen deliberately —
+`pack_bool_carrier_type` static_asserts (reaching it means a gate drifted),
+while `pack_solve`, `pack_zero_constant` and `pack_type_has_arith_ops` return
+nullopt/nullptr/false because "no BA owns this type" is ordinary. When writing a fold, name the capability as a concept in
 `ba_descriptor.h` and test the name with `if constexpr` inside
 `pack_visit_all` or `pack_owner_apply`; never nest a `requires`-expression
 inside the fold's lambda (gcc 13 crashes on it), never use `?:` in a fold

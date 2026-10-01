@@ -17,6 +17,78 @@ TEST_SUITE("configuration") {
 	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
 }
 
+// A pack of two solving algebras and one without a solver, built only to
+// route through: the folds read nothing of a pack but its bas_tuple and the
+// descriptors' owns_type / solve. Each solver answers its own name, so a
+// test sees which one the fold reached.
+namespace two_solvers {
+struct solver_a {};
+struct solver_b {};
+struct no_solver {};
+struct fake_node {
+	using bas_tuple = std::tuple<solver_a, solver_b, no_solver>;
+};
+// solver_a owns two ids, as a parameterised family owns its widths
+constexpr size_t a_8 = 101, a_16 = 102, b_id = 201, none_id = 301,
+	nobody = 999;
+}
+
+namespace idni::tau_lang {
+template <>
+struct ba_descriptor<two_solvers::solver_a, two_solvers::fake_node> {
+	static constexpr const char* type_name = "solver_a";
+	static bool owns_type(size_t t) {
+		return t == two_solvers::a_8 || t == two_solvers::a_16;
+	}
+	static std::optional<std::string> solve(tref) { return "solver_a"; }
+};
+template <>
+struct ba_descriptor<two_solvers::solver_b, two_solvers::fake_node> {
+	static constexpr const char* type_name = "solver_b";
+	static bool owns_type(size_t t) { return t == two_solvers::b_id; }
+	static std::optional<std::string> solve(tref) { return "solver_b"; }
+};
+template <>
+struct ba_descriptor<two_solvers::no_solver, two_solvers::fake_node> {
+	static constexpr const char* type_name = "no_solver";
+	static bool owns_type(size_t t) { return t == two_solvers::none_id; }
+};
+}
+
+TEST_SUITE("pack_solve routes by the owner of the type") {
+	using namespace two_solvers;
+
+	TEST_CASE("each solver answers for its own types only") {
+		static_assert(ba_has_solve<fake_node, solver_a>);
+		static_assert(ba_has_solve<fake_node, solver_b>);
+		static_assert(!ba_has_solve<fake_node, no_solver>);
+		CHECK(pack_solve<fake_node, std::string>(a_8, nullptr)
+			== std::optional<std::string>("solver_a"));
+		CHECK(pack_solve<fake_node, std::string>(a_16, nullptr)
+			== std::optional<std::string>("solver_a"));
+		CHECK(pack_solve<fake_node, std::string>(b_id, nullptr)
+			== std::optional<std::string>("solver_b"));
+	}
+
+	TEST_CASE("an owner without solve and an unowned type answer nullopt") {
+		CHECK_FALSE(pack_solve<fake_node, std::string>(none_id, nullptr)
+			.has_value());
+		CHECK_FALSE(pack_solve<fake_node, std::string>(nobody, nullptr)
+			.has_value());
+		CHECK_FALSE(pack_solve<fake_node, std::string>(size_t{0}, nullptr)
+			.has_value());
+	}
+
+	TEST_CASE("pack_owner_index groups a BA's types and separates the BAs") {
+		CHECK(pack_owner_index<fake_node>(a_8) == std::optional<size_t>(0));
+		CHECK(pack_owner_index<fake_node>(a_16) == std::optional<size_t>(0));
+		CHECK(pack_owner_index<fake_node>(b_id) == std::optional<size_t>(1));
+		CHECK(pack_owner_index<fake_node>(none_id) == std::optional<size_t>(2));
+		CHECK_FALSE(pack_owner_index<fake_node>(nobody).has_value());
+		CHECK_FALSE(pack_owner_index<fake_node>(size_t{0}).has_value());
+	}
+}
+
 TEST_SUITE("pack_owner_apply") {
 	TEST_CASE("stops at the owner and answers nullopt for a type nobody owns") {
 		std::vector<std::string> visited;
@@ -280,6 +352,20 @@ TEST_SUITE("accumulating folds") {
 		REQUIRE(pack_can_solve<node_t>(unsat));
 		CHECK(pack_sat_status<node_t>(sat) == std::optional<bool>(true));
 		CHECK(pack_sat_status<node_t>(unsat) == std::optional<bool>(false));
+	}
+
+	TEST_CASE("pack_solve hands a bv formula to bv by its type") {
+		tref fm = wff("x = { 1 }:bv[8]");
+		REQUIRE(fm != nullptr);
+		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
+		auto sol = pack_solve<node_t, solution<node_t>>(bv8, fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->size() == 1);
+#ifdef TAU_PACK_HAS_BA_SBF
+		const size_t sbf_id = tid(ba_descriptor<sbf_ba, node_t>::type_tree());
+		CHECK_FALSE(pack_solve<node_t, solution<node_t>>(sbf_id, fm)
+			.has_value());
+#endif
 	}
 #endif
 	TEST_CASE("component-factoring switch round-trips through the pack") {
