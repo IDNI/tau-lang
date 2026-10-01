@@ -290,7 +290,7 @@ inline bool hsb::operator!=(const hsb& o) const noexcept {
 namespace hsb_detail {
 // -0.0 equals 0.0 under feq, so both hash alike.
 inline std::uint64_t double_hash(double d) {
-	return std::bit_cast<std::uint64_t>(d == 0.0 ? 0.0 : d);
+	return std::bit_cast<std::uint64_t>(std::fpclassify(d) == FP_ZERO ? 0.0 : d);
 }
 
 inline std::uint64_t halfspace_hash(const hsb_halfspace& h) {
