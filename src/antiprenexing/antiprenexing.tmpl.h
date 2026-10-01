@@ -2035,9 +2035,9 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			// Boolean algebra. What does need atomlessness is the
 			// distribution of a block over SEVERAL atoms, and both places
 			// that do it now carry their own guard: step 2a via
-			// `block_atom_profile::all_negated`'s `finite_ba_content`, and
+			// `block_atom_profile::all_negated`'s `atomic_ba_content`, and
 			// `eliminate_block_over_clause`'s two negative-atom
-			// constructions via `pack_type_has_arith_ops` on the clause type.
+			// constructions via `pack_type_is_atomic` on the clause type.
 			// (The former TODO (HIGH) here named exactly those two.)
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;

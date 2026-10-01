@@ -89,6 +89,13 @@ against the line naming it:
   a `result<tref>`, described below)
 - **parsing** — `parse`
 
+Declare `atomless = false` whenever your algebra has an atom, even if it is
+infinite. Core then never distributes a quantifier over several disequations
+(`ex x (A && B) == ex x A && ex x B` for negated atoms), a law that holds only
+without atoms (`pack_type_is_atomic`). It keeps that law's `F`, which holds in
+any Boolean algebra, asks your `omcat_qe` otherwise, and keeps the binder
+when neither decides.
+
 `is_one`, `is_zero`, `is_closed`, and `simplify_term` can each run a full
 decision or rewrite procedure. Each one can fail. Give each the same
 result-carrying shape that `preprocess` uses (see

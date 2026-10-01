@@ -242,11 +242,13 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief Decide a quantifier over a qlt variable by DLO elimination.
+	 * @brief Decide a quantifier over a qlt variable by DLO elimination,
+	 * or, without ordering atoms, by excluded values and point instances
+	 * (see qlt_omcat_qe).
 	 *
 	 * Answers satisfiability rather than the satisfying interval, which stays
-	 * qlt's own: nullopt says the body is not a DLO conjunction this can
-	 * resolve, and core falls through to the atomless-BA path.
+	 * qlt's own: nullopt says neither decides the body, and core falls
+	 * through to its generic path.
 	 */
 	static std::optional<bool> omcat_qe(tref var, tref body) {
 		return qlt_omcat_qe<node_t>(var, body);

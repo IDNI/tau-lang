@@ -59,10 +59,10 @@ block_atom_profile<node> profile_block_atoms(tref formula,
 	// (squeezing `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over
 	// a disjunction are valid in any Boolean algebra).
 	if (!p.skip_content && p.others == 0 && p.positives == 0 && p.negatives > 0)
-		p.finite_ba_content = tau::get(formula).find_top(
+		p.atomic_ba_content = tau::get(formula).find_top(
 			[](tref n) {
 				const size_t t = tau::get(n).get_ba_type();
-				return t > 0 && (pack_type_has_arith_ops<node>(t)
+				return t > 0 && (pack_type_is_atomic<node>(t)
 					|| is_bool_type<node>(t));
 			}) != nullptr;
 	return p;

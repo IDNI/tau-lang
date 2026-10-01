@@ -34,10 +34,11 @@ struct block_atom_profile {
 	size_t others = 0;
 	/// Any node the eliminability analysis skips, anywhere in the formula.
 	bool skip_content = false;
-	/// Any node carrying a BA type from a *finite* (hence atomic) family --
-	/// `bv[n]` or `bool`. Only computed when the sign census would otherwise
-	/// let `all_negated()` fire, since that is the only guard that needs it.
-	bool finite_ba_content = false;
+	/// Any node carrying a BA type that has atoms -- `bool`, or one whose
+	/// owner does not declare it atomless. Only computed when the sign census
+	/// would otherwise let `all_negated()` fire, since that is the only guard
+	/// that needs it.
+	bool atomic_ba_content = false;
 
 	/// Paper step 2a's guard.
 	///
@@ -48,10 +49,10 @@ struct block_atom_profile {
 	/// precondition and delegates it to the caller, but the caller only ever
 	/// established `!skip_content` -- i.e. atomlessness rode entirely on the
 	/// caller's choice of analysis, which is exactly what went wrong when
-	/// `blast_block` re-entered with a skip-nothing one. `finite_ba_content`
+	/// `blast_block` re-entered with a skip-nothing one. `atomic_ba_content`
 	/// checks it directly instead.
 	bool all_negated() const {
-		return !skip_content && !finite_ba_content && others == 0
+		return !skip_content && !atomic_ba_content && others == 0
 			&& positives == 0 && negatives > 0;
 	}
 	/// Paper step 2b's guard.

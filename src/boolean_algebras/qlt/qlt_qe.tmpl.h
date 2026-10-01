@@ -320,6 +320,244 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 	return acc;
 }
 
+// The finite rational p of a qlt constant that is exactly the point [p,p].
+template<NodeType node>
+static std::optional<qlt_rational> qlt_point_constant(const tree<node>& c) {
+	if (!c.is_ba_constant()) return std::nullopt;
+	auto v = c.get_ba_constant();
+	if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+	const qlt& q = std::get<qlt>(v);
+	if (q.inexact || q.pieces.size() != 1) return std::nullopt;
+	const auto& p = q.pieces[0];
+	if (!p.lo.val.is_finite() || p.lo.val != p.hi.val
+		|| p.lo.bound != qlt_bound::CLOSED
+		|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
+	return p.lo.val;
+}
+
+// The bf constant of one point p when every occurrence of var in body is an
+// operand of `p & var` or `p & var'`, nullptr otherwise.
+template<NodeType node>
+static tref qlt_point_meet_of(tref var, tref body) {
+	using tau = tree<node>;
+	tref point = nullptr;
+	bool ok = true;
+	auto is_bare_var = [&](tref n) {
+		const auto& t = tau::get(n);
+		return t.child_is(tau::variable)
+			&& tau::get(t.first()) == tau::get(var);
+	};
+	auto is_var_or_neg = [&](tref n) {
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::bf_neg)) return is_bare_var(t[0].first());
+		return is_bare_var(n);
+	};
+	auto meets_point = [&](tref cst, tref other) {
+		const auto& c = tau::get(cst);
+		if (!c.is(tau::bf) || !c.has_child() || !is_var_or_neg(other))
+			return false;
+		auto p = qlt_point_constant<node>(c[0]);
+		if (!p) return false;
+		if (!point) { point = cst; return true; }
+		return *p == *qlt_point_constant<node>(tau::get(point)[0]);
+	};
+	std::function<void(tref)> walk = [&](tref n) {
+		if (!ok) return;
+		const auto& t = tau::get(n);
+		if (t.is(tau::variable)) {
+			if (t == tau::get(var)) ok = false;
+			return;
+		}
+		if (t.is(tau::bf) && t.child_is(tau::bf_and)) {
+			tref a = t[0].first(), b = t[0].second();
+			if (meets_point(a, b) || meets_point(b, a)) return;
+		}
+		for (tref c : t.children()) walk(c);
+	};
+	walk(body);
+	return ok ? point : nullptr;
+}
+
+// The truth of a closed formula whose terms are qlt constants combined by the
+// Boolean operations, or nullopt when it holds anything else.
+template<NodeType node>
+static std::optional<bool> qlt_ground_truth(tref fm) {
+	using tau = tree<node>;
+	std::function<std::optional<qlt>(tref)> term
+		= [&](tref n) -> std::optional<qlt> {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
+		if (t.child_is(tau::bf_t)) return qlt::top();
+		if (t.child_is(tau::bf_f)) return qlt::bottom();
+		if (t[0].is_ba_constant()) {
+			auto v = t[0].get_ba_constant();
+			if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+			const qlt& q = std::get<qlt>(v);
+			if (q.inexact) return std::nullopt;
+			return q;
+		}
+		std::optional<qlt> r;
+		if (t.child_is(tau::bf_neg)) {
+			auto a = term(t[0].first());
+			if (a) r = ~*a;
+		} else if (t.child_is(tau::bf_and) || t.child_is(tau::bf_or)
+			|| t.child_is(tau::bf_xor))
+		{
+			auto a = term(t[0].first()), b = term(t[0].second());
+			if (a && b) r = t.child_is(tau::bf_and) ? *a & *b
+				: t.child_is(tau::bf_or) ? *a | *b : *a ^ *b;
+		}
+		if (!r || r->inexact) return std::nullopt;
+		return r;
+	};
+	std::function<std::optional<bool>(tref)> truth
+		= [&](tref n) -> std::optional<bool> {
+		const auto& t = tau::get(n);
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
+		const auto op = t[0].value.nt;
+		if (op == tau::wff_neg) {
+			auto a = truth(t[0].first());
+			if (!a) return std::nullopt;
+			return !*a;
+		}
+		if (op == tau::wff_and || op == tau::wff_or) {
+			auto a = truth(t[0].first());
+			if (!a || *a == (op == tau::wff_or)) return a;
+			return truth(t[0].second());
+		}
+		if (op == tau::bf_eq || op == tau::bf_neq) {
+			auto a = term(t[0].first()), b = term(t[0].second());
+			if (!a || !b) return std::nullopt;
+			const qlt d = *a ^ *b;
+			if (d.inexact) return std::nullopt;
+			return d.is_empty() == (op == tau::bf_eq);
+		}
+		return std::nullopt;
+	};
+	return truth(fm);
+}
+
+// The truth of closed body with var := the point v of type ba_type, or
+// nullopt when qlt_ground_truth cannot decide it.
+template<NodeType node>
+static std::optional<bool> qlt_point_instance(tref var, tref body,
+	const qlt_rational& v, size_t ba_type)
+{
+	using tau = tree<node>;
+	qlt point;
+	point.pieces.push_back({ qlt_endpoint{ v, qlt_bound::CLOSED },
+		qlt_endpoint{ v, qlt_bound::CLOSED } });
+	tref value = tau::get(tau::bf, { tau::get_ba_constant(
+		typename tau::constant(point), ba_type) });
+	subtree_map<node, tref> changes;
+	for (tref occ : tau::get(body).select_all([&](tref n) {
+		const auto& t = tau::get(n);
+		return t.child_is(tau::variable)
+			&& tau::get(t.first()) == tau::get(var); }))
+		changes.emplace(occ, value);
+	return qlt_ground_truth<node>(rewriter::replace<node>(body, changes));
+}
+
+// `ex var phi` (or `all var phi` when universal) for a closed phi in which var
+// meets one point p only as `p & var` and `p & var'`. p is an atom whether var
+// denotes a point or a set, so each such term is 0 or p by whether var
+// contains p; var := p and var := p + 1 are the two cases.
+template<NodeType node>
+static std::optional<bool> qlt_point_meet_qe(tref var, tref body,
+	bool universal)
+{
+	using tau = tree<node>;
+	tref point = qlt_point_meet_of<node>(var, body);
+	if (!point) return std::nullopt;
+	const auto& pc = tau::get(point)[0];
+	const qlt_rational p = *qlt_point_constant<node>(pc);
+	const size_t type = pc.get_ba_type();
+	auto in = qlt_point_instance<node>(var, body, p, type);
+	if (!in || *in != universal) return in;
+	return qlt_point_instance<node>(var, body, p + qlt_rational(1, 1), type);
+}
+
+// A point witness of `ex var phi` (T), or a point counterexample of
+// `all var phi` (F), for a closed phi; nullopt when no candidate is one. A
+// point is a value of var whether var denotes a point or a set, so only that
+// direction is answered. The candidates are the finite endpoints of the qlt
+// constants, the midpoints between consecutive ones and a point beyond each
+// end.
+template<NodeType node>
+static std::optional<bool> qlt_point_witness_qe(tref var, tref body,
+	bool universal)
+{
+	using tau = tree<node>;
+	std::vector<qlt_rational> ends;
+	size_t type = 0;
+	for (tref c : tau::get(body).select_all([](tref n) {
+		return tau::get(n).is_ba_constant(); }))
+	{
+		const auto& t = tau::get(c);
+		auto v = t.get_ba_constant();
+		if (!std::holds_alternative<qlt>(v)) continue;
+		type = t.get_ba_type();
+		for (const auto& piece : std::get<qlt>(v).pieces)
+			for (const auto& e : { piece.lo.val, piece.hi.val })
+				if (e.is_finite()) ends.push_back(e);
+	}
+	if (!type) return std::nullopt;
+	std::sort(ends.begin(), ends.end());
+	ends.erase(std::unique(ends.begin(), ends.end()), ends.end());
+	// Each candidate re-evaluates the whole body.
+	if (ends.size() > 32) return std::nullopt;
+	std::vector<qlt_rational> candidates;
+	if (ends.empty()) candidates.emplace_back(0, 1);
+	else {
+		candidates.push_back(ends.front() + qlt_rational(-1, 1));
+		for (size_t i = 0; i < ends.size(); ++i) {
+			if (i) candidates.push_back(ends[i - 1].midpoint(ends[i]));
+			candidates.push_back(ends[i]);
+		}
+		candidates.push_back(ends.back() + qlt_rational(1, 1));
+	}
+	for (const auto& v : candidates)
+		if (auto in = qlt_point_instance<node>(var, body, v, type);
+			in && *in != universal) return in;
+	return std::nullopt;
+}
+
+// True when body is a conjunction of disequations `var != t` with t free of
+// var. Such a body excludes finitely many values from infinitely many, points
+// or sets alike, so `ex var body` holds.
+template<NodeType node>
+static bool qlt_only_excludes(tref var, tref body) {
+	using tau = tree<node>;
+	auto is_bare_var = [&](tref side) {
+		const auto& t = tau::get(side);
+		return t.child_is(tau::variable)
+			&& tau::get(t.first()) == tau::get(var);
+	};
+	bool any = false;
+	std::function<bool(tref)> check = [&](tref n) {
+		const auto& t = tau::get(n);
+		if (t.equals_T()) return true;
+		if (!t.is(tau::wff) || !t.has_child()) return false;
+		if (t[0].is(tau::wff_and))
+			return check(t[0].first()) && check(t[0].second());
+		const tree<node>* at = &t[0];
+		if (t[0].is(tau::wff_neg)) {
+			const auto& ti = tau::get(t[0].first());
+			if (!ti.is(tau::wff) || !ti.has_child()
+				|| !ti[0].is(tau::bf_eq)) return false;
+			at = &ti[0];
+		} else if (!t[0].is(tau::bf_neq)) return false;
+		tref lhs = at->first(), rhs = at->second();
+		const bool in_l = contains<node>(lhs, var);
+		const bool in_r = contains<node>(rhs, var);
+		if (in_l == in_r || !is_bare_var(in_l ? lhs : rhs)) return false;
+		return any = true;
+	};
+	return check(body) && any;
+}
+
 // The omcat_qe capability: answers satisfiability rather than handing core the
 // interval, which stays qlt's own. body is either a bare existential scoped
 // conjunction or a wff_ex/wff_all node, whose quantifier decides which end of
@@ -337,7 +575,23 @@ static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 		}
 	}
 	auto interval = qlt_dlo_qe_interval<node>(var, inner);
-	if (!interval) return std::nullopt;
+	if (!interval) {
+		if (!universal && qlt_only_excludes<node>(var, inner))
+			return true;
+		// An ordering atom is the interval computation's alone: a
+		// substituted point would make a compound side such as
+		// `x & {3}` comparable through the order's 0/1 ends.
+		if (tau::get(inner).find_top([](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::bf_lt) || t.is(tau::bf_lteq)
+				|| t.is(tau::bf_gt) || t.is(tau::bf_gteq)
+				|| t.is(tau::bf_nlt) || t.is(tau::bf_nlteq)
+				|| t.is(tau::bf_ngt) || t.is(tau::bf_ngteq); }))
+			return std::nullopt;
+		if (auto r = qlt_point_meet_qe<node>(var, inner, universal))
+			return r;
+		return qlt_point_witness_qe<node>(var, inner, universal);
+	}
 	return universal ? interval->is_full() : !interval->is_empty();
 }
 

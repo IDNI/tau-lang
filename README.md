@@ -2215,6 +2215,16 @@ solver for the values (`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`,
 `o2 := 0`).  When no strategy exists, `run` says the specification is
 unrealizable.
 
+A point is an atom of the `qlt` constants: `{3}:qlt & x` is either `0` or
+`{3}:qlt`.  So a quantified `qlt` variable that meets one point `p` only as
+`p & x` and `p & x'` is decided by its two cases, `x := p` and another point
+(`ex x ((({3}:qlt & x) != 0) && (({3}:qlt & x') != 0))` is `F`).  Otherwise a
+closed quantifier whose `qlt` terms are Boolean combinations of constants is
+`T` (for `ex`) or `F` (for `all`) when a point at, between or beyond the
+constants' endpoints is a witness or a counterexample, and an existential
+whose body only excludes values (`x != t`, each `t` free of `x`) is `T`; when
+none of these applies, the binder stays.
+
 #### `qint` — atomless Boolean algebra of rational intervals
 
 `qint` represents the atomless Boolean algebra of left-closed, right-open

@@ -505,6 +505,20 @@ bool pack_type_is_atomless(size_t ba_type) {
 		}).value_or(false);
 }
 
+/**
+ * @brief `true` when a BA of the pack owns type id @p ba_type and does not
+ * declare it atomless.
+ *
+ * Not the negation of @ref pack_type_is_atomless: a type no BA owns is
+ * neither. Guards the laws that hold only in an atomless Boolean algebra.
+ */
+template <typename Node>
+bool pack_type_is_atomic(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return !ba_descriptor<BA, Node>::atomless;
+		}).value_or(false);
+}
 
 /**
  * @brief Canonical zero constant for @p ba_type, from the BA that owns it.
