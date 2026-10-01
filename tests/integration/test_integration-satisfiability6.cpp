@@ -866,18 +866,20 @@ TEST_SUITE("satisfiability helpers") {
 // -----------------------------------------------------------------------------
 TEST_SUITE("satisfiability regression") {
 
-	// Closes: the unresolved-`ref` guard at
-	// src/satisfiability.tmpl.h:1411-1416 was unpinned. An unresolved
-	// function/predicate symbol must make transform_to_execution report unsat
-	// rather than proceed with a formula it cannot decide.
-	TEST_CASE("transform_to_execution: unresolved ref returns F") {
+	// An unresolved function/predicate symbol has no definition to decide
+	// it: transform_to_execution reports an error and gives no verdict
+	// (issue #196: answering F turned `sat k() = 7` into F and
+	// `valid k() != 7` into T).
+	TEST_CASE("transform_to_execution: unresolved ref is an error, not a verdict") {
 		// `f` has no recurrence relation defining it, so it survives as a
 		// `ref` node under `wff_ref` (the bare `f(x).` spec shape is the one
 		// used in test_integration-nso_rr_fixed_point.cpp:84).
 		tref fm = create_spec("f(x).");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::ref>) != nullptr );
-		CHECK( transform_to_execution<node_t>(fm).value() == tau::_F() );
+		auto res = transform_to_execution<node_t>(fm);
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
 	// Closes: the purely non-temporal branch at

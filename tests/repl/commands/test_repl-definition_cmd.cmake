@@ -169,3 +169,6 @@ add_repl_test(definitions-zero_args_nested
 	"${_k0}. j() := k(). valid j() = {7}:bv[8]" ": T")
 add_repl_test(definitions-zero_args_nested_term
 	"${_k0}. j() := k() + {1}:bv[8]. valid j() != {8}:bv[8]" ": F")
+# A symbol no definition applies to gives no verdict: it is an error.
+add_repl_test_fail(definitions-undefined_symbol_is_error
+	"sat u() = {7}:bv[8]" "unresolved function or predicate symbol: no definition applies")

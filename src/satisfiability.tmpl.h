@@ -1896,12 +1896,12 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
-	// Make sure that no function/predicate symbol is still present
+	// A function/predicate symbol still present has no definition that
+	// applies to it: no verdict can be given about it
 	if (auto ref = tau::get(fm).find_top(is<node, tau::ref>); ref) {
-		LOG_ERROR << "transform_to_execution: unresolved function or "
-			"predicate symbol " << LOG_FM(ref) << " found; "
-			"treating the formula as unsatisfiable";
-		return r.with_assert_check_value(_F<node>());
+		return r.with_error(code::not_found, "unresolved function or "
+			"predicate symbol: no definition applies to it",
+			{{ label::value, truncate_for_message(TAU_TO_STR(ref)) }});
 	}
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
