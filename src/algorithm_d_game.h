@@ -203,7 +203,7 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 // ── HOA guard → DNF (sum of products) ────────────────────────────────────
 //
 // The evaluator above answers "does this label hold under this assignment".
-// Consumers that must EMIT code for a label (tau_codegen) or reason about it
+// Consumers that must EMIT code for a label (cpp_codegen.tmpl.h) or reason about it
 // symbolically (the ABA oracle) need its cubes instead, and both must call
 // `to_dnf` rather than hand-lex the label.  The digit loop
 // `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')` SKIPS '|', '('
@@ -887,7 +887,7 @@ inline product_game build_product_game(
 			feasible[pm][py][type_A[t]] = true;
 	}
 
-	// Batch O7: precise environment edges.  An env edge exists only when its
+	// Precise environment edges.  An env edge exists only when its
 	// guard's D-pattern is feasible from ρ, not merely when the guard is
 	// satisfiable by any propositional assignment (the guard's D-content is
 	// data, and data feasibility from ρ is the same fact regardless of which
@@ -984,7 +984,7 @@ inline product_game build_product_game(
 	// (see initial_memory above) — not position 0, not a solver choice.
 	// Out of range is a caller bug (assert); in Release the bad index is
 	// left as-is, which downstream membership tests read as UNREALIZABLE —
-	// fail-safe, unlike a silent clamp back to the old position-0 phantom.
+	// fail-safe, unlike a silent clamp to position 0.
 	assert(0 <= init_rho && init_rho < T1_size);
 	pg.init = G.init * T1_size + init_rho;
 	pg.player.assign(pg.n_states, 0);
@@ -1153,7 +1153,7 @@ static std::pair<StateSet,StateSet> solve(
 		for (int v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
-	// NOTE on dead ends (LG-32 / Batch O7): they are decided ONCE, BEFORE
+	// NOTE on dead ends: they are decided ONCE, BEFORE
 	// this recursion, in `zielonka_win_player1`'s textbook preprocessing —
 	// deliberately NOT here.  Inside the recursion "no successor in V" is
 	// not the same statement as "cannot move": the sub-games Zielonka
@@ -1210,7 +1210,7 @@ static std::pair<StateSet,StateSet> solve(
 /**
  * @brief Returns the set of states where player 1 (sys) wins.
  *
- * LG-32 / AL-R1 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
+ * TEXTBOOK dead-end semantics.  Parity-game
  * semantics say the player who cannot move LOSES the finite play, while
  * `solve` scores every state by its priority's parity — so dead ends are
  * decided here, BEFORE the parity recursion, the standard way:

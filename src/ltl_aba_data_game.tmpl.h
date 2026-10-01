@@ -27,9 +27,11 @@ namespace idni::tau_lang {
 // before step 0, each played like any other step, can reach the initial
 // vertex's region (data_quantifier::reached_before_start).
 //
-// When every stream has a two-element type or is read only through
-// equalities, a region is a BDD over codes of the window's values
-// (code_window, code_regions); otherwise it is a formula whose quantifiers
+// When every stream takes a code (a two-element type, a type read only
+// through equalities or complements, one with few elements, a modular
+// type or a dense order, see code_window), a region is a BDD over the codes
+// of the window's values (code_regions); otherwise it is a formula whose
+// quantifiers
 // the normalizer eliminates (formula_regions), and one it leaves standing
 // makes the game undecided. The formulas over a fixed set of variables and
 // constants are finitely many up to equivalence, so each fixpoint ends; the

@@ -2,7 +2,7 @@
 
 // Algorithm A (D_i + R_ρ encoding) skeleton builder — paper's main optimization.
 //
-// Replaces the old binary T_3 Q-type encoding with:
+// The encoding:
 //   R_ρ  — ⌈log₂|T₁|⌉ output bits binary-encoding the T₁ type of the current output y
 //   D_i  — K output bits, one per data subformula (passed verbatim to φ*)
 //

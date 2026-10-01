@@ -155,12 +155,9 @@ bool realizability_has_game_operators(tref fm) {
 // ── extract_data_atoms ────────────────────────────────────────────────────────
 
 // Recursive helper: walk the AST.  Any ABA comparison that contains an io_var
-// is recorded as a data atom, whether or not it is inside a temporal operator.
-// The `inside_temporal` flag is kept for future extensibility but is no longer
-// used to gate atom extraction — every io_var-containing comparison is a data
-// atom regardless of depth.  This is required so that atoms introduced by the
-// S/T compile-away pass (which appear at the top level of the conjunction) are
-// correctly represented in the propositional LTL skeleton.
+// is recorded as a data atom, whether or not it is inside a temporal operator
+// (`inside_temporal` does not gate it), so the atoms the S/T compile-away
+// pass puts at the top level of the conjunction reach the skeleton too.
 template <NodeType node>
 static void collect_atoms(
     tref n,
@@ -182,8 +179,6 @@ static void collect_atoms(
 	}
 
 	// If this is an ABA comparison with io_vars, record it as a data atom.
-	// (Previously gated on inside_temporal, but that excluded top-level atoms
-	// produced by S/T compile-away.)
 	if (is_aba_comparison<node>(n) && has_io_var<node>(n)) {
 		for (auto& [existing, _] : atoms)
 			if (tau::subtree_equals(existing, n)) return; // deduplicate
@@ -402,15 +397,13 @@ static result<std::vector<tref>> collect_hoist_conjuncts(
 	return r.with_assert_check_value(std::move(hoist));
 }
 
-// ── Propositional LTL skeleton (LT-16(c): ONE walker) ───────────────────────
+// ── Propositional LTL skeleton (one walker) ─────────────────────────────────
 //
-// skeleton_str used to be a verbatim copy of skeleton_str_with_testers
-// minus the ppLTLTT tester emission, so a guard added to one walker could
-// silently miss the other (that is how IN-R3 happened).  It is now a thin
-// wrapper delegating to the tester-emitting walker with a scratch vector.
-// Every ltl_skeleton call site is gated on !has_past, so past content
-// reaching this entry is refused (LT-12) rather than emitted as a partial
-// formula ltlsynt would misread.
+// skeleton_str is a thin wrapper delegating to the tester-emitting walker
+// (skeleton_str_with_testers) with a scratch vector, so a guard added to
+// the walker reaches both. Every ltl_skeleton call site is gated on
+// !has_past, so past content reaching this entry is refused rather than
+// emitted as a partial formula ltlsynt would misread.
 
 // Where a subformula sits: `pos` its polarity, `univ` whether it must hold
 // at every position of its scope (an obligation, as in a G body) or at some

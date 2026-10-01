@@ -1136,7 +1136,7 @@ result<tref> api<node>::eliminate_quantifiers(tref fm) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
 		// Quantifier elimination works on a formula; a term given here
-		// used to come back unchanged as if it had been eliminated.
+		// would come back unchanged as if it had been eliminated.
 		if (!tau::get(fm).is(tau::wff)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
@@ -1294,8 +1294,6 @@ result<bool> api<node>::realizable(tref fm) {
 			r = is_ltl_aba_realizable<node>(target, 0, true);
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
-			// (a spec root is not a formula: sat() used to reject it with
-			// an error here, which fell through the same way)
 			// unsat(fm) => unrealizable(fm): reject without running
 			// synthesis. An undecided sat (error) is not a decided
 			// false, so it falls through to the real check below.
@@ -1338,8 +1336,8 @@ result<bool> api<node>::sat(tref fm) {
 		// downstream safety pipeline sees one wff_always.  Non-mergeable
 		// Boolean combinations (disjunction, negation, F-on-non-singletons,
 		// etc.) survive flatten unchanged and are routed to the full-LTL
-		// pipeline by is_tau_formula_sat itself — there's no longer a
-		// pre-check that rejects them at this layer.
+		// pipeline by is_tau_formula_sat itself; this layer does not
+		// reject them.
 		fm = flatten_always_conjuncts<node>(simplified);
 		if (!fm || !is_formula(fm)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");

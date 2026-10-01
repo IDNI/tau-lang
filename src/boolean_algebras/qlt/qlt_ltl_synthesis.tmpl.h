@@ -529,8 +529,8 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 	return std::nullopt;
 }
 
-// LS-12: shared between solve_ltl_aba_algorithm_a and semantic_pwr_optimal
-// (qlt_semantic_pwr.tmpl.h), which used to carry verbatim copies of both loops.
+// Shared between solve_ltl_aba_algorithm_a and qlt_semantic_pwr_optimal
+// (qlt_semantic_pwr.tmpl.h).
 //
 // Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
 // undetermined) in T3 type t.
@@ -622,15 +622,12 @@ solve_ltl_aba_algorithm_a(
 	// downstream consumers (the codegen witness emitter in
 	// cpp_codegen.tmpl.h, the safety-formula extractor in
 	// ltl_to_safety_formula_full) can map AP names back to the original data
-	// atoms and emit qlt witnesses, executable safety formulas, etc.
-	// Previously sol.atoms was left empty, which forced the codegen down
-	// the propositional fallback that emits `bool o_d_0` instead of
-	// `double o1` — failing test_cpp_codegen_data_atoms's structural
-	// checks.
+	// atoms and emit qlt witnesses, executable safety formulas, etc.;
+	// without them the codegen emits `bool o_d_0` instead of `double o1`.
 	//
 	// Also populate sol.output_props with the d_i names so
-	// emit_cpp_program_data's Outputs-struct emission iterates over the
-	// data-atom propositions and fills in `double <var>` fields.
+	// build_program_desc's Outputs struct iterates over the data-atom
+	// propositions and fills in `double <var>` fields.
 	sol.atoms.reserve(atoms.size());
 	sol.output_props.reserve(atoms.size());
 	for (size_t i = 0; i < atoms.size(); ++i) {
@@ -765,20 +762,14 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 
 		// Realizable: call ltlsynt for the strategy automaton.
 		//
-		// LT-8 / LA-N1: the automaton carries the d_i names, so
-		// sol.atoms is renamed to d_i (as Algorithm A does) — without
-		// this the ABA oracle matched nothing by name and passed
-		// vacuously, and the safety encoding mapped every guard to
-		// TRUE.  The earlier straight rename was reverted because the
-		// propositional call below received φ* WITHOUT the ABA
-		// consistency constraints, so ltlsynt was free to choose an
-		// output-contradictory edge (`d_0 & d_1` for (o1>0) U (o1<0),
-		// ALG-D-28) that the un-vacuated oracle then rejected.  The
-		// strategy call therefore now carries the same
+		// The automaton carries the d_i names, so sol.atoms is renamed
+		// to d_i (as Algorithm A does): the ABA oracle and the safety
+		// encoding match atoms by name. The strategy call carries the
 		// add_consistency_constraints suffix the default path uses,
-		// over the renamed atoms: the data-infeasible combinations are
-		// excluded from the strategy instead of being scored by the
-		// oracle afterwards.  (Batch 5 of the 2026-08-18 review.)
+		// over the renamed atoms, so ltlsynt cannot pick an
+		// output-contradictory edge (`d_0 & d_1` for (o1>0) U (o1<0),
+		// ALG-D-28): the data-infeasible combinations are excluded from
+		// the strategy instead of being scored by the oracle afterwards.
 		for (int i = 0; i < K; ++i)
 			sol.atoms[i].second = "d_" + std::to_string(i);
 		std::string strategy_skeleton = phi_star;
@@ -790,7 +781,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		TAU_TRY(auto ltlsynt_out, call_ltlsynt(strategy_skeleton, {}, D_outs));
 		auto& [real2, hoa_text] = ltlsynt_out;
 		if (!real2) {
-			// Propositional call disagrees — fall through to default path
+			// Propositional call disagrees: restore the p_i names and fall
+			// through to the selection below, which reaches Algorithm A
+			// (D's applicability implies A's)
 			LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
 			for (int i = 0; i < K; ++i)
 				sol.atoms[i].second = "p" + std::to_string(i);
@@ -807,7 +800,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	}
 
 	// The choice comes from `--ltl-alg` / `set ltlalg` / TAU_LTL_ALG;
-	// ltl_algorithm_choice() (ltl_aba.h) validates it and reports an
+	// ltl_algorithm_choice() (ltl_aba_limits.h) validates it and reports an
 	// unrecognised value once (LS-8), returning "" for the default routing.
 	const bool alg_b_mode = alg_choice.empty() || alg_choice == "B";
 	const bool alg_a_mode = alg_choice == "A";
@@ -887,11 +880,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			// ltlsynt time out on.
 			if (auto win = constant_output_realizable<node>(
 				fm, sol.atoms); win) {
-				// LA-10: materialise the winning constant
+				// Materialise the winning constant
 				// combination as `always(⋀ o_k = c_k)` so the
-				// strategy survives into execution and codegen
-				// (it used to be discarded: executable=false,
-				// exit 5 / interpreter refusal).  Any
+				// strategy survives into execution and codegen.  Any
 				// representative of the winning 1-type works —
 				// atom truth only depends on the type — and
 				// qlt_type1::realize() picks one (the constant
@@ -951,8 +942,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 						tree<node>::build_wff_always(conj);
 					trivial.executable = true;
 				} else {
-					// Fail-safe: keep the sound verdict but
-					// fall back to the pre-LA-10 refusal.
+					// Fail-safe: keep the sound verdict, but
+					// the strategy is not executable.
 					LOG_WARNING << "[ltl_aba] constant-output "
 						"witness could not be built; the "
 						"strategy stays non-executable\n";

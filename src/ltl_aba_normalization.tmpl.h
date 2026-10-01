@@ -67,10 +67,8 @@ static tref parse_guard_expr(
 		}
 		bool neg = false;
 		if (s[pos] == '!') { neg = true; ++pos; skip_ws(); }
-		// LA-13: `!` used to be accepted only in front of digits, so
-		// `!(...)` returned F without consuming the group and `!f` read
-		// as F.  Negate a group or a constant structurally; the
-		// bookkeeping-AP drop-out below stays polarity-insensitive.
+		// Negate a group or a constant structurally; the bookkeeping-AP
+		// drop-out below stays polarity-insensitive.
 		if (neg && pos < s.size()
 		    && (s[pos] == '(' || s[pos] == 't' || s[pos] == 'f')) {
 			tref inner = parse_atom();
@@ -398,9 +396,7 @@ static std::optional<bool> aba_existential_feasibility(tref fm) {
 		// `--ltl-qe-max-vars` / `set ltlqemaxvars` /
 		// `api::set_ltl_qe_max_vars`, with TAU_LTL_OMCAT_QE_MAX_VARS as
 		// the environment fallback (default 2; see ltl_qe_max_vars() in
-		// ltl_aba.h). Setting it higher restores the old — unsound —
-		// behaviour and is only useful for measuring what the fast path
-		// was buying.
+		// ltl_aba_limits.h).
 
 		// Joint check first: it is the only thing that catches a
 		// transitivity chain, and it is exact when it fires.
@@ -555,11 +551,10 @@ static bool aba_synthesis_feasible(tref fm) {
 	return true;
 }
 
-// Unified feasibility dispatch (code_restruct_suggestion #6).
+// Unified feasibility dispatch.
 //
 // Picks between existential (∃(i,o). fm) and adversarial-input (∀i.∃o. fm)
-// feasibility. The pattern previously duplicated at call sites is now
-// centralized here:
+// feasibility:
 //
 //   - Pure-input formulas → EXISTENTIAL: pure-input constraints are env
 //     assumptions, not system obligations; ∃i captures env freedom.
@@ -570,7 +565,7 @@ static bool aba_synthesis_feasible(tref fm) {
 //
 // Callers still compute `pure_input` and `has_input` themselves (each has a
 // different fast path: single-atom uses is_pure_input_atom; pair uses both),
-// so this helper takes them as parameters.  Keeps the core policy in one place.
+// so this helper takes them as parameters.
 template <NodeType node>
 static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input) {
 	if (pure_input) return aba_existential_feasible<node>(fm);
@@ -695,20 +690,11 @@ static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
 	return true;
 }
 
-// LT-3: this used to hand-lex the label, accepting only '!', digits and
-// '&' and `break`ing on '|' or '('.  Spot prints strategy edge labels as
-// sums of products (e.g. `[0&1 | !0&!1]`), so that lexer
-//   (a) truncated a disjunctive label to its FIRST product — if that
-//       product was infeasible the oracle returned a spurious
-//       UNREALIZABLE for the whole specification; and
-//   (b) produced an EMPTY literal list for a label starting with '(' —
-//       which the per-type check then read as the empty conjunction ⊤,
-//       declaring the edge feasible without checking anything.
-//
-// The production parser (`parse_guard_expr` / `guard_to_aba`) already
-// implements the full grammar, including '|' and parentheses, precisely
-// because ltlsynt emits them.  Reuse it and split the result into its
-// top-level disjuncts (products); callers decide how the products combine.
+// Spot prints strategy edge labels as sums of products (e.g.
+// `[0&1 | !0&!1]`), so the label is read with the full guard grammar
+// (`parse_guard_expr` / `guard_to_aba`, '|' and parentheses included), and
+// the result is split into its top-level disjuncts (products); callers
+// decide how the products combine.
 //
 // Parses `guard_label` into its live products and marks each one's
 // full-literal feasibility. `dead_guard`, when given, reports a guard that
@@ -848,7 +834,7 @@ static bool guard_is_aba_feasible(
 	// the environment can choose the class whose only product has an
 	// infeasible output part (LA-R2).  And a product whose input part is
 	// infeasible is a DEAD product, not a licence to accept the whole edge
-	// (LA-R1: the old code `return true`d on the first dead product).
+	// (a dead product proves nothing about the other products).
 	//
 	// Rule: split each product P_k into its pure-input part I_k and the
 	// rest; drop input-dead products; P_k is feasible iff its full literal
@@ -905,20 +891,19 @@ static bool guard_is_aba_feasible(
 			covered = !aba_existential_feasible<node>(uncovered);
 		}
 		if (!covered && !single_type) {
-			// Batch O8: exact coverage for MIXED-type guards.
+			// Exact coverage for MIXED-type guards.
 			// The single-type semantic check above cannot run (one
 			// existential query cannot span independent BA types),
-			// so the syntactic subset test used to be the last
-			// word — a false UNREALIZABLE whenever the feasible
-			// input classes only jointly cover I_k.  Expand
+			// and the syntactic subset test misses input classes
+			// that only jointly cover I_k.  Expand
 			// I_k ∧ ⋀_{j feasible} ¬I_j into products of literals
 			// (¬I_j = ∨_{l ∈ I_j} ¬l distributed); a product is
 			// feasible iff each BA type's sub-conjunction is
 			// (independent variables), and I_k is COVERED iff no
 			// product is feasible.  The expansion is capped by the
 			// runtime parameter max_cover_products(); beyond it the
-			// pre-O8 syntactic verdict stands (logged) — sound, at
-			// worst incomplete.
+			// syntactic verdict stands (logged) and an UNREALIZABLE
+			// verdict is reported as UNKNOWN.
 			auto negate_lit = [&](tref l) -> tref {
 				const auto& lt = tau::get(l);
 				if (lt.has_child()
@@ -961,8 +946,8 @@ static bool guard_is_aba_feasible(
 					"unlimited); keeping the syntactic "
 					"verdict for this input class -- the "
 					"edge may be refused although it is "
-					"coverable (false UNREALIZABLE at "
-					"worst)\n";
+					"coverable, so an UNREALIZABLE verdict "
+					"is reported as undecided\n";
 			} else {
 				bool some_feasible = false;
 				for (auto& prod : products) {
@@ -1137,13 +1122,13 @@ static void extend_consistency_positive_k_ary_walk(
 	using tau = tree<node>;
 	const int n = static_cast<int>(atoms.size());
 
-	// LT-17: the walk performs Θ(2^n) synthesis checks when the atoms are
+	// The walk performs Θ(2^n) synthesis checks when the atoms are
 	// mostly jointly feasible (supersets of an infeasible set are pruned,
 	// but feasible sets prune nothing). Cap the checks at the runtime
 	// parameter `max_consistency_subsets()` (0 = unlimited) and skip the
-	// rest: sound (the per-edge oracle still catches any jointly
-	// infeasible guard), at worst incomplete (a false UNREALIZABLE if
-	// ltlsynt picks such an edge — D3 = skip + log, never throw).
+	// rest: a REALIZABLE verdict stays sound (the per-edge oracle still
+	// catches any jointly infeasible guard), and an UNREALIZABLE one is
+	// reported as UNKNOWN (ltl_verdict_incomplete).
 	const size_t subset_cap = max_consistency_subsets();
 	size_t checks_spent = 0;
 	bool cap_fired = false;
@@ -1174,10 +1159,10 @@ static void extend_consistency_positive_k_ary_walk(
 					<< checks_spent << " subset checks "
 					"(--max-consistency-subsets / `set "
 					"maxsubsets`, 0 = unlimited); "
-					"remaining subsets skipped -- the "
-					"verdict stays sound (the oracle "
-					"checks every strategy edge) but may "
-					"be a false UNREALIZABLE\n";
+					"remaining subsets skipped -- a "
+					"REALIZABLE verdict stays sound (the "
+					"oracle checks every strategy edge), "
+					"an UNREALIZABLE one is undecided\n";
 				return;
 			}
 			++checks_spent;
@@ -1243,8 +1228,9 @@ static void extend_consistency_positive_k_ary_mus(
 	std::vector<uint32_t> mus_masks;
 
 	// Same cap as extend_consistency_positive_k_ary_walk: one synthesis
-	// check per seed. Capping stays sound (the per-edge oracle still
-	// catches an infeasible guard) but can yield a false UNREALIZABLE.
+	// check per seed. Capping keeps a REALIZABLE verdict sound (the
+	// per-edge oracle still catches an infeasible guard); an UNREALIZABLE
+	// one is reported as UNKNOWN.
 	size_t checks_spent = 0;
 	bool cap_fired = false;
 	auto warn_capped = [&]() {
@@ -1256,10 +1242,10 @@ static void extend_consistency_positive_k_ary_mus(
 			<< checks_spent << " subset checks "
 			"(--max-consistency-subsets / `set "
 			"maxsubsets`, 0 = unlimited); "
-			"remaining subsets skipped -- the "
-			"verdict stays sound (the oracle "
-			"checks every strategy edge) but may "
-			"be a false UNREALIZABLE\n";
+			"remaining subsets skipped -- a "
+			"REALIZABLE verdict stays sound (the "
+			"oracle checks every strategy edge), "
+			"an UNREALIZABLE one is undecided\n";
 	};
 	const size_t subset_cap = max_consistency_subsets();
 	auto over_cap = [&]() {
@@ -2222,17 +2208,14 @@ struct ltl_aba_solution {
 	//   - Algorithm B: the strategy lives over the P_σ / R bits and the
 	//     returned solution carries no `atoms` at all.
 	//
-	// The verdict is still sound — `is_ltl_aba_realizable` uses it as before
-	// — but `ltl_to_safety_formula_full` must refuse to execute such a
-	// solution instead of encoding it as `always T`, which silently drops
-	// every obligation the strategy was carrying (LT-6).
+	// The verdict is sound — `is_ltl_aba_realizable` uses it — but
+	// `ltl_to_safety_formula_full` must not execute such a solution as
+	// `always T`, which would drop every obligation the strategy carries.
 	//
-	// LA-10: the constant-output fast path used to be a second
-	// non-executable route (`num_states == 0` recorded "some fixed output
-	// combination works" without saying which).  It now materialises its
-	// witness: `const_outputs` names each output stream with its constant
-	// rational value (as the literal text "p/q"), and `const_formula` is
-	// the executable `always(⋀_k o_k = c_k)` over the user's streams.
+	// The constant-output fast path materialises its witness:
+	// `const_outputs` names each output stream with its constant rational
+	// value (as the literal text "p/q"), and `const_formula` is the
+	// executable `always(⋀_k o_k = c_k)` over the user's streams.
 	// Convention: `num_states == 0` with `executable == true` and a
 	// non-empty `const_outputs` means "constant strategy const_formula".
 	bool executable = true;
@@ -2961,15 +2944,11 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 //        temporal operator, or inside another S/T's operands)
 //
 // An S is "outer" — i.e. gets the always-true treatment G(curr && rhs) —
-// only at `spine_pol == +1`.  This is the LT-2 fix: the old boolean
-// `is_outer` was propagated unchanged through wff_neg and wff_or, so EVERY
-// S not nested inside another S was forced to hold at every step.  Both
-// `!(φ S ψ)` and `(φ S ψ) || χ` therefore compiled to a safety formula
-// demanding `φ S ψ` always — the exact opposite of the first, and an
-// over-constraint of the second.  Off the spine the S keeps only its
-// biconditional tracking invariant plus a t=0 anchor, and its Boolean
-// context is carried by the compiled formula that
-// `ltl_to_safety_formula_full` now conjoins (it used to discard it).
+// only at `spine_pol == +1`: an S under a negation or a disjunction is not
+// asserted, so `!(φ S ψ)` and `(φ S ψ) || χ` must not demand `φ S ψ` at
+// every step.  Off the spine the S keeps only its biconditional tracking
+// invariant plus a t=0 anchor, and its Boolean context is carried by the
+// compiled formula that `ltl_to_safety_formula_full` conjoins.
 template <NodeType node>
 static result<tref> compile_since_trigger_rec(
     tref fm,
@@ -3071,7 +3050,7 @@ static result<tref> compile_since_trigger_rec(
 		// memory pre-population the Mealy state bits use: single-BA-type,
 		// no negative time index.
 		//
-		// Two shapes remain do-not-retry traps (both tried and reverted):
+		// Two other anchors do not work:
 		//  - `curr@0 ↔ ψ@0` in `init_conds` is a CROSS-BA-TYPE
 		//    biconditional outside any `always` at absolute time 0 (`curr`
 		//    is bv, ψ is in the user's BA); it made the interpreter reject
@@ -3124,7 +3103,7 @@ static result<tref> compile_since_trigger_rec(
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
 	// wff_sometimes, wff_until, wff_release, wff_weak_until, wff_always, etc.)
 	//
-	// The spine polarity is propagated, NOT the old boolean is_outer:
+	// The spine polarity is propagated, not a plain "outer" flag:
 	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);
 	//            under a negative spine it drops off — ¬(A ∧ B) asserts
 	//            neither operand.
@@ -3166,12 +3145,8 @@ static result<tref> compile_since_trigger_rec(
 		tref ch3[3] = { new_a, new_b, new_c };
 		return r.with_value(tau::get(tau::wff, tau::get(nt, ch3, 3)));
 	}
-	// Arity > 3.  This used to `return fm` unchanged, silently leaving any
-	// S/T below a wider node uncompiled — the pure-past fast path then just
-	// declines itself (the S survives, so realizability_has_game_operators
-	// stays true and solve_ltl_aba's ppLTLTT encoding takes over), but a
-	// silent arity limit in a rewriting pass is a trap.  Handle it
-	// generically.
+	// Arity > 3: every child, so no S/T below a wider node stays
+	// uncompiled.
 	trefs kids;
 	kids.reserve(nc);
 	for (size_t i = 0; i < nc; ++i) kids.push_back(op.child(i));

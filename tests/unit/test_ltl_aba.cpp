@@ -987,8 +987,8 @@ TEST_SUITE("LTL skeleton builder") {
 // ── 15. Multi-state Mealy strategy encoding ───────────────────────────────────
 //
 // Formulas that require multi-state strategies from ltlsynt are encoded using
-// one-hot auxiliary state bitvector variables (o__ltl_s0__, ...) so the
-// interpreter pipeline can execute them.
+// one-hot auxiliary state outputs of the Boolean carrier type (o__ltl_ms0__,
+// ...) so the interpreter pipeline can execute them.
 
 TEST_SUITE("Multi-state Mealy strategy") {
 
@@ -5150,9 +5150,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 		}
 	}
 
-	// issue #131: a term is not a formula. It used to reach the backends
-	// as one (a bv term aborted on a cvc5 exception; an sbf term answered
-	// UNREALIZABLE).
+	// A term is not a formula, so it never reaches the backends as one.
 	TEST_CASE("a term is an invalid argument, not a verdict") {
 		tref eq = wff("x = 0");
 		REQUIRE(eq != nullptr);
@@ -5266,7 +5264,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 
 
 // build_carrier_eq_aux's bare-reparsed S-operator auxiliary atom
-// (o__ltl_s0__) now registers as a real output stream too, so a stepped run
+// (o__ltl_s0__) registers as a real output stream too, so a stepped run
 // with real vector I/O succeeds and the S semantics hold at step 0.
 TEST_SUITE("Since (S) operator: executed safety path") {
 
@@ -5507,9 +5505,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1 | 1&0", aps, atoms));
 	}
 
-	// A leading '(' made the old lexer emit an EMPTY literal list, which the
-	// per-type check then read as the empty conjunction `T` — every
-	// parenthesised guard was declared feasible unchecked.
+	// A guard with a leading '(' is parsed in full: an empty literal list
+	// would read as the empty conjunction `T` and declare the edge feasible
+	// unchecked.
 	TEST_CASE("[GF-03] parenthesised guard is not vacuously accepted") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
@@ -5639,12 +5637,11 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
-	// ── Batch O8: exact mixed-type coverage ───────────────────────────────
+	// ── Exact mixed-type coverage ─────────────────────────────────────────
 	//
 	// The single-type semantic COVER check cannot span independent BA
-	// types, so mixed-type guards used to stop at the syntactic subset
-	// test — a false UNREALIZABLE whenever the feasible input classes only
-	// JOINTLY cover an infeasible product's class.  The exact check
+	// types, and the syntactic subset test misses feasible input classes
+	// that only JOINTLY cover an infeasible product's class.  The exact check
 	// expands I_k ∧ ⋀_j ¬I_j into literal products (capped by the runtime
 	// parameter max_cover_products_param) and calls I_k covered iff every
 	// product has some BA type's sub-conjunction infeasible.
@@ -5676,11 +5673,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
 	}
 
-	// The plan's flip fixture: the input-unconstrained product 2&3 is
+	// The input-unconstrained product 2&3 is
 	// infeasible, and the two feasible products' input classes p1 / ¬p1
 	// JOINTLY cover every input valuation.  The syntactic subset test
-	// cannot see that ({p1} ⊄ ∅), so this edge was refused pre-O8; the
-	// exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
+	// cannot see that ({p1} ⊄ ∅); the exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
 	TEST_CASE("[GF-31] jointly-covering mixed-type classes accept the edge") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
@@ -5714,9 +5710,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 
 	// The expansion cap: negating GF-33's two-literal class {p0, p1}
 	// doubles the product count, so a cap of 1 is exceeded
-	// and the pre-O8 syntactic verdict stands (refused, logged) — sound,
-	// at worst incomplete.  Restoring the default restores the exact
-	// answer.  (GF-31's single-literal classes never grow the expansion
+	// and the syntactic verdict stands (refused, logged; an UNREALIZABLE
+	// verdict is then undecided).  Restoring the default restores the
+	// exact answer.  (GF-31's single-literal classes never grow the expansion
 	// past one product, so that guard stays exact under any cap ≥ 1.)
 	TEST_CASE("[GF-34] the max_cover_products cap degrades to the syntactic verdict") {
 		bdd_init<Bool>();
@@ -5938,14 +5934,11 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
-	// `call_ltlsynt` used to special-case only exit 127 (binary not on
-	// PATH). Every other failure -- in particular exit 143, which is
-	// 128 + SIGTERM, exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends --
-	// fell through to a definitive UNREALIZABLE. A slow-but-realizable
-	// specification thus got a WRONG ANSWER with only a LOG_DEBUG trace
-	// behind it.
+	// A failed ltlsynt -- in particular exit 143, which is 128 + SIGTERM,
+	// exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends -- is no
+	// UNREALIZABLE verdict.
 	//
-	// The exit-code convention now lives entirely inside spawn_capture
+	// The exit-code convention lives entirely inside spawn_capture
 	// (backends/spot/spot.h), which decides it once from a real spawn and
 	// never returns the raw code; these cases drive that decision with
 	// small `sh` stubs instead of a synthetic (exit_code, stdout) pair.

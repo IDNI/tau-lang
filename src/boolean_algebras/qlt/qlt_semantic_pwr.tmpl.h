@@ -125,9 +125,9 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	if (has_input) return nullptr;
 	if (!is_algorithm_a_applicable<node>(atoms)) return nullptr;
 
-	// LS-2: the encoding below is Algorithm A's T_3 encoding, but it used to
-	// run WITHOUT either of the two soundness guards `solve_ltl_aba` applies
-	// to that same encoding.  Both matter here for the same reasons:
+	// The encoding below is Algorithm A's T_3 encoding, so it needs the two
+	// soundness guards qlt_try_propositional_synthesis applies to that same
+	// encoding, for the same reasons:
 	//
 	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
 	//     constant) gives `qlt_atom_holds_in_type3 == nullopt` for every

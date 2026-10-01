@@ -88,8 +88,9 @@ set_tests_properties("test_repl-limit_effect-specsizewarn_off_by_default" PROPER
 # a pairwise-feasible but jointly-infeasible triple {o1|o2=1, o1&o2=0, o1=o2}
 # put ">= 2" subset checks on the walk's plate; a cap of 1 must give up
 # loudly and still return the correct verdict (T -- the common commitment
-# o3=1 is dischargeable at t=0, and D3 = skip+log means a fired cap is at
-# worst a false UNREALIZABLE, never an error). Needs a live ltlsynt on PATH
+# o3=1 is dischargeable at t=0, and a fired cap skips and logs: at worst it
+# leaves an UNREALIZABLE verdict undecided, never an error). Needs a live
+# ltlsynt on PATH
 # (same as the other `sat`-on-full-LTL tests).
 add_test(NAME "test_repl-limit_effect-maxsubsets_giveup"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")

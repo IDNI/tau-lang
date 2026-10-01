@@ -1094,8 +1094,8 @@ tref build_prev_flag_on_lookback(tref io_var_node,
  * Held in one place, per node type, instead of as a function-local `static`
  * inside `transform_ctn_to_streams`: callers reset it explicitly via that
  * function's `reset_ctn_id` argument, and tests can inspect or reset it
- * directly. Still process-global (and therefore still single-thread only, like
- * the rest of this subsystem), but no longer hidden.
+ * directly. Process-global, and therefore single-thread only, like the rest
+ * of this subsystem.
  * @tparam node Tree node type.
  * @return Reference to the counter for @p node.
  * @endinternal
@@ -1311,8 +1311,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		auto normed = normalize_non_temp<node>(ubd_ctn);
 		if (!normed.has_value()) {
 			// A normalization failure (a cap violation) is not a
-			// refutation either; it used to return F, which every
-			// caller read as unsatisfiable.
+			// refutation either: F would read as unsatisfiable.
 			LOG_ERROR << "always_to_unbounded_continuation: "
 				"normalization of the unbound continuation failed";
 			return nullptr;
@@ -1857,9 +1856,8 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				"the search stopped once a solver question went "
 				"unanswered");
 		if (flag_search_bounded && i > flag_search_limit) {
-			// A bounded give-up is no verdict: it used to report F,
-			// which callers read as a proof of unsatisfiability. Surface
-			// it as an error instead.
+			// A bounded give-up is no verdict: F would read as a proof
+			// of unsatisfiability. Surface it as an error instead.
 			print_fixpoint_info("Temporal normalization of Tau "
 				"specification gave up after " +
 				std::to_string(steps) + " fixpoint steps and " +

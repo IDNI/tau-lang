@@ -1,20 +1,23 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// LTL(ABA) Realizability — extends tau-lang's safety fragment to full LTL.
+// LTL(ABA) realizability — extends tau-lang's safety fragment to full LTL
+// and CTL*.
 //
-// Operators: F (finally/eventually), U (until), R (release), W (weak until).
-//   G (globally) reuses wff_always — the existing safety pipeline handles it.
-//   X (neXt) and Y (Yesterday) are subsumed by io_var time indices and are
-//   therefore not needed as explicit grammar operators.
+// Operators: F (finally/eventually), U (until), R (release), W (weak until),
+//   the past S (since) and T (trigger), and the CTL* path quantifiers A and
+//   E. G (globally) reuses wff_always. X (neXt) and Y (Yesterday) are
+//   subsumed by io_var time indices.
 //
-// Algorithm (oracle-assisted synthesis):
-//   1. Extract data atoms (maximal temporal-operator-free subformulas).
-//   2. Build the propositional LTL skeleton over abstract propositions p0,p1,...
-//   3. Classify each proposition as input (only i* io_vars) or output (has o* io_var).
-//   4. Call Spot's ltlsynt for propositional realizability + strategy extraction.
-//   5. For each strategy automaton transition, verify ABA feasibility via tau-lang's
-//      existing ABA engine (the oracle).
-//   6. Return REALIZABLE iff there is an ABA-feasible accepting strategy.
+// Pipeline (is_ltl_aba_realizable, solve_ltl_aba):
+//   - A CTL* formula is reduced to LTL first (reduce_ctl_star_to_ltl).
+//   - A BA of the pack that synthesises its own formulas propositionally
+//     (pack_try_propositional_synthesis) may claim the formula.
+//   - Otherwise the data atoms become the propositions of an LTL skeleton,
+//     each classified as input or output, with the ABA consistency
+//     constraints conjoined; ltlsynt decides the skeleton and gives a
+//     strategy automaton, whose edges the ABA oracle checks.
+//   - The data game (ltl_aba_data_game.tmpl.h) plays the skeleton's game on
+//     the data and decides what the abstraction leaves open.
 
 #ifndef __IDNI__TAU__LTL_ABA_H__
 #define __IDNI__TAU__LTL_ABA_H__
@@ -49,15 +52,13 @@ namespace idni::tau_lang {
  * @brief Cap on the number of feasibility checks the k-ary positive-subset
  * walk may spend per atom group (0 = unlimited).
  *
- * LT-17: cap on the number of ∀∃-synthesis feasibility checks the k-ary
- * positive-subset walk (`extend_consistency_positive_k_ary`) may spend per
- * atom group. The walk is Θ(2^n) when the atoms are mostly jointly feasible
- * (nothing to prune), and each check is a full safety-synthesis fixpoint.
- * Skipping the remaining subsets is sound: a strategy edge whose guard uses
- * a jointly-infeasible combination is still caught by the per-edge oracle,
- * so a fired cap can only cost completeness (a false UNREALIZABLE when
- * ltlsynt happened to pick such an edge — D3 = skip + log), never a false
- * REALIZABLE. Runtime parameter by policy (`--max-consistency-subsets`,
+ * The walk (`extend_consistency_positive_k_ary_walk`) is Θ(2^n) when the
+ * atoms are mostly jointly feasible (nothing to prune), and each check is a
+ * full safety-synthesis fixpoint. Skipping the remaining subsets keeps a
+ * REALIZABLE verdict sound: a strategy edge whose guard uses a
+ * jointly-infeasible combination is still caught by the per-edge oracle.
+ * Once the cap fires, an UNREALIZABLE verdict is reported as UNKNOWN
+ * (ltl_verdict_incomplete). Runtime parameter by policy (`--max-consistency-subsets`,
  * REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
  * The sentinel -1 means "not set", in which case
  * `TAU_LTL_MAX_CONSISTENCY_SUBSETS` is consulted and 4096 applies when that
@@ -69,11 +70,10 @@ inline long max_consistency_subsets_param = -1;
  * @brief Cap on the literal products the ABA oracle's exact mixed-type
  * coverage check may expand (0 = unlimited).
  *
- * Batch O8: cap on the literal products the ABA oracle's exact
- * mixed-type coverage check may expand `I_k ∧ ⋀_j ¬I_j` into. Beyond the
- * cap the check keeps the (weaker, syntactic-subset) pre-O8 verdict for
- * that product and logs — a possible false UNREALIZABLE, never a false
- * REALIZABLE. Runtime parameter by policy (`--max-cover-products`, REPL
+ * The check expands `I_k ∧ ⋀_j ¬I_j` into literal products. Beyond the cap
+ * it keeps the weaker syntactic-subset verdict for that product and logs;
+ * an UNREALIZABLE verdict is then reported as UNKNOWN
+ * (ltl_verdict_incomplete). Runtime parameter by policy (`--max-cover-products`, REPL
  * `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
  * The sentinel -1 means "not set", in which case
  * `TAU_LTL_MAX_COVER_PRODUCTS` is consulted and 256 applies when that is
@@ -347,8 +347,9 @@ tref guard_to_aba(const std::string& guard_label,
 
 // ── CTL* → LTL reduction (Bloem/Schewe/Khalimov, arXiv:1711.10636) ──────────
 //
-// A restricted form of the reduction, without the paper's direction outputs:
-//   - positive E χ becomes a fresh witness output w with G(w → χ');
+// A restricted form of the reduction:
+//   - positive E χ becomes a fresh witness output w with G(w → χ'); with
+//     input streams, one direction output per input pins w's branch;
 //   - positive A χ reachable only through ∧ / G / A becomes χ';
 //   - A/E in negative polarity are rewritten through their NNF duals first;
 //   - every other placement is refused.
@@ -359,23 +360,22 @@ tref guard_to_aba(const std::string& guard_label,
  * @brief Result of reducing a CTL* formula to an LTL synthesis problem.
  *
  * Reduce a CTL* formula containing A/E quantifiers to an equivalent LTL
- * synthesis problem. Returns the reduced formula (pure LTL) and the set of
- * LT-23: the witness variables are SELF-CLASSIFYING -- they are built with
- * node::output_variable() (direction bit = output), so extract_data_atoms /
- * is_pure_input_atom already treat them as outputs and the only caller
- * (is_tau_formula_sat) rightly uses ltl_formula alone. Do NOT additionally
- * add `witnesses` to an output set; the vector is informational. Note the
- * names (`w_<n>`) have no `o` prefix, so classification rests entirely on
- * the direction bit.
+ * synthesis problem: the reduced formula (pure LTL) and its witness
+ * outputs. The witness variables classify themselves -- they are built as
+ * output variables (direction bit = output), so extract_data_atoms /
+ * is_pure_input_atom treat them as outputs. Do NOT additionally add
+ * `witnesses` to an output set. The names (`w_<n>`) have no `o` prefix, so
+ * the classification rests on the direction bit.
  * @tparam node Tree node type.
  */
 template <NodeType node>
 struct ctl_star_reduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
-    // IN-R6: BA type id per witness (index-aligned with `witnesses`): the
-    // pack's Boolean carrier (pack_bool_carrier_type). The interpreter uses
-    // these to register each witness as an internal output stream.
+    // BA type id per witness (index-aligned with `witnesses`): the pack's
+    // Boolean carrier (pack_bool_carrier_type), or the input's type for a
+    // direction output. The interpreter registers each witness as an
+    // internal output stream.
     std::vector<size_t> witness_types;
     // false when an E witness was encoded without direction outputs while
     // the formula has inputs (a past operator inside χ): the encoding is
@@ -438,12 +438,11 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output);
 
 // ── Semantic negation ─────────────────────────────────────────────────────────
 //
-// Semantic negation -φ means "φ is unrealizable by the system". A `-φ`
-// reached from the root through Boolean connectives only is a closed
+// Semantic negation -φ means "φ is unrealizable by the system": a closed
 // statement about φ's own game, decided by φ's realizability verdict
-// (determinacy) before the CTL* translation runs. A `-φ` under a temporal
-// operator or a path quantifier would need the input/output role swap from
-// that history on, which is not implemented: it is refused.
+// (determinacy) before the CTL* translation runs. Under a temporal operator
+// or a path quantifier it reads as "φ, started fresh here, is unrealizable".
+// A `-φ` under a data quantifier is not folded and is refused.
 
 /**
  * @brief True iff the formula contains a `wff_semantic_neg` node.
@@ -499,17 +498,16 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // introspection of the Mealy strategy.
 //
 // Forward-declared here; the full struct definition lives in
-// `ltl_aba_normalization.tmpl.h` (per upstream PR #90 god-file split).
-// Forward-decl is enough for `std::optional<ltl_aba_solution<node>>` in the
-// signature below — the type only needs to be complete at instantiation
-// sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
-// chain that defines it.
+// `ltl_aba_normalization.tmpl.h`. Forward-decl is enough for
+// `std::optional<ltl_aba_solution<node>>` in the signatures below — the type
+// only needs to be complete at instantiation sites (interpreter.tmpl.h,
+// cpp_codegen.tmpl.h), which include the tmpl chain that defines it.
 
 // A strategy of the data game (ltl_aba_data_game.tmpl.h).
 template <NodeType node>
 struct data_game_strategy;
 
-// ── Interpreter-facing helpers (LT-29) ───────────────────────────────────────
+// ── Interpreter-facing helpers ───────────────────────────────────────────────
 //
 // Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared
 // here so the contracts are visible without reading the template bodies.
@@ -518,16 +516,17 @@ struct data_game_strategy;
 //   - `aut.num_states == 0` means "realizable with no strategy automaton";
 //     is_ltl_aba_realizable reports such a solution REALIZABLE without
 //     running the ABA oracle; parse_hoa never produces it (a strategy text
-//     with fewer than one state is refused).  LA-10: `num_states == 0`
+//     with fewer than one state is refused).  `num_states == 0`
 //     with `executable == true` and non-empty `const_outputs` means
 //     "constant strategy": `const_formula` is the executable
 //     `always(⋀ o_k = c_k)` and `const_outputs` lists (stream, "p/q").
 //   - `executable == false` marks a solution that cannot be compiled into a
 //     program over the user's streams (Algorithm B bookkeeping bits);
-//     ltl_to_safety_formula_full and tau_codegen refuse it.
+//     ltl_to_safety_formula_full solves the formula again without
+//     propositional synthesis to get a strategy over the data.
 //   - `atoms` carry the AP names the automaton uses (p_i on the default
 //     path, d_i on Algorithms A/D); the oracle and the safety encoding match
-//     by NAME, so a mismatch makes both vacuous (LT-8).
+//     by NAME, so a mismatch makes both vacuous.
 
 /**
  * @brief Run the whole LTL(ABA) pipeline on a (normalised) formula and
