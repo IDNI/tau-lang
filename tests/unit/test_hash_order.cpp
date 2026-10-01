@@ -60,7 +60,7 @@ TEST_SUITE("hash order") {
 #ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("sbf") {
 		check_hashes({
-			{ "x:sbf = {a | b}:sbf && y:sbf = {c & d}:sbf", 16423924170973471836ull },
+			{ "x:sbf = {a | b}:sbf && y:sbf = {c & d}:sbf", 1749031699279516309ull },
 		});
 		check_prints({
 			{ "x:sbf = 0 || y:sbf = 0 || z:sbf = 0 || w:sbf = 0",
@@ -72,12 +72,12 @@ TEST_SUITE("hash order") {
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("bv") {
 		check_hashes({
-			{ "x:bv[8] = { #x07 }:bv[8] && y:bv[16] = { #x002a }:bv[16]", 8803381224999938168ull },
+			{ "x:bv[8] = { #x07 }:bv[8] && y:bv[16] = { #x002a }:bv[16]", 1706221739210031787ull },
 		});
 		check_prints({
 			{ "x:bv[8] = { #x07 }:bv[8] || y:bv[8] = { #x2a }:bv[8]"
 				" || z:bv[8] = { #xff }:bv[8]",
-				"x = { 7 }:bv[8] || y = { 42 }:bv[8] || z' = 0" },
+				"y = { 42 }:bv[8] || x = { 7 }:bv[8] || z' = 0" },
 		});
 	}
 #endif
@@ -85,11 +85,11 @@ TEST_SUITE("hash order") {
 #ifdef TAU_PACK_HAS_BA_QLT
 	TEST_CASE("qlt") {
 		check_hashes({
-			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt", 7864724426035127496ull },
+			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt", 12917797719874598464ull },
 		});
 		check_prints({
 			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt && z:qlt > {2}:qlt",
-				"{ 0 }:qlt < x && y < { 1 }:qlt && { 2 }:qlt < z" },
+				"y < { 1 }:qlt && { 2 }:qlt < z && { 0 }:qlt < x" },
 		});
 	}
 #endif
@@ -97,12 +97,12 @@ TEST_SUITE("hash order") {
 #ifdef TAU_PACK_HAS_BA_QINT
 	TEST_CASE("qint") {
 		check_hashes({
-			{ "x:qint = {[0, 1)}:qint && y:qint = {[2, 3)}:qint", 17347325469264162327ull },
+			{ "x:qint = {[0, 1)}:qint && y:qint = {[2, 3)}:qint", 18416050101415192169ull },
 		});
 		check_prints({
 			{ "x:qint = {[0, 1)}:qint || y:qint = {[2, 3)}:qint"
 				" || z:qint = {[4, 5)}:qint",
-				"y = { [2, 3) }:qint || x = { [0, 1) }:qint || z = { [4, 5) }:qint" },
+				"x = { [0, 1) }:qint || z = { [4, 5) }:qint || y = { [2, 3) }:qint" },
 		});
 	}
 #endif
