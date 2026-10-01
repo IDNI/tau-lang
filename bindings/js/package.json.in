@@ -1,5 +1,6 @@
 {
 	"name": "@idni/tau-lang",
+	"private": true,
 	"version": "@TAU_VERSION@",
 	"description": "Node.js and WebAssembly bindings for IDNI's Tau Language Framework.",
 	"license": "SEE LICENSE IN LICENSE.md",
