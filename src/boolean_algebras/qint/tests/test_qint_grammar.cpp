@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <sstream>
+
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
@@ -68,16 +70,16 @@ TEST_CASE("qint: parse integer literal '1'") {
 	CHECK(result.found);
 }
 
-TEST_CASE("qint: parse integer literal '5'") {
+TEST_CASE("qint: reject bare integer literal '5'") {
 	auto result = qint_parser_instance::instance()
 		.parse("5", 1);
-	CHECK(result.found);
+	CHECK_FALSE(result.found);
 }
 
-TEST_CASE("qint: parse negative integer literal '-3'") {
+TEST_CASE("qint: reject bare negative integer literal '-3'") {
 	auto result = qint_parser_instance::instance()
 		.parse("-3", 2);
-	CHECK(result.found);
+	CHECK_FALSE(result.found);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -225,6 +227,26 @@ TEST_CASE("qint: accept non-dyadic fraction 1/3") {
 TEST_CASE("qint: accept non-dyadic decimal 0.1") {
 	auto result = parse_qint<TAU_PACK_BASE_BAS>("{[0.1, 0.2)}");
 	CHECK(result.has_value());
+}
+
+TEST_CASE("qint: a bare number other than 0 and 1 is refused as a point") {
+	for (const char* src : { "{5}", "{-3}", "{0.5}", "{2/3}" }) {
+		INFO(src);
+		auto result = parse_qint<TAU_PACK_BASE_BAS>(src);
+		CHECK_FALSE(result.has_value());
+		std::ostringstream msg;
+		result.report().print(msg);
+		CHECK(msg.str().find("qint has no points") != std::string::npos);
+	}
+}
+
+TEST_CASE("qint: {0} and {1} are bottom and top") {
+	auto bot = parse_qint<TAU_PACK_BASE_BAS>("{0}");
+	auto top = parse_qint<TAU_PACK_BASE_BAS>("{1}");
+	REQUIRE(bot.has_value());
+	REQUIRE(top.has_value());
+	CHECK(std::get<qint>(bot.value().first).is_empty());
+	CHECK(std::get<qint>(top.value().first).is_full());
 }
 
 TEST_CASE("qint: reject malformed interval (missing bracket)") {

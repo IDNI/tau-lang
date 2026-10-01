@@ -2208,7 +2208,7 @@ unrealizable.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 
-`qint` represents the atomless Boolean algebra of right-closed, left-open
+`qint` represents the atomless Boolean algebra of left-closed, right-open
 intervals `[a, b)` over the rationals on the extended real line.  Elements
 are finite unions of such intervals.  The sentinels `-inf` and `+inf` are
 supported as endpoints.
@@ -2218,9 +2218,9 @@ so `1/3` and `0.3333333333333333` are different endpoints.  Rational (`1/4`),
 decimal (`0.25`, `2e-3`) and integer endpoint syntaxes are accepted, plus
 `-inf`/`+inf`; a literal whose exact value does not fit is rejected rather
 than rounded.  An endpoint prints as an integer, a terminating decimal or
-`p/q`.  Bare integers inside `{...}:qint` have a special meaning:
-`{0}` and `{1}` are the algebraic bottom and top, and any other integer `n`
-denotes the interval `[n, n+1)`; write `[0,1)` and `[1,2)` explicitly.
+`p/q`.  Inside `{...}:qint`, a bare `0` and `1` are the algebraic bottom
+and top; any other bare number is rejected, because `qint` has no points --
+write an interval such as `[n, n+1)` instead.
 
 Elements are written as interval expressions inside `{...}:qint`:
 

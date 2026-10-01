@@ -1,6 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include <charconv>
 #include <limits>
 #include <ostream>
 #include <vector>
@@ -380,21 +379,6 @@ std::optional<qint> qint_eval_parse_tree(
 
 	case type::qint_bot:
 		return qint::bottom();
-
-	case type::qint_integer: {
-		auto int_str = n | tt::terminals;
-		long long val = 0;
-		auto [ptr, ec] = std::from_chars(int_str.data(),
-			int_str.data() + int_str.size(), val);
-		if (ec != std::errc{}) return std::nullopt;
-
-		if (val == 0) return qint::bottom();
-		if (val == 1) return qint::top();
-
-		auto hi = add_int(qint_rational(val), 1);
-		if (!hi) return std::nullopt;
-		return qint{{ {qint_rational(val), *hi} }};
-	}
 
 	case type::qint_single: {
 		auto children = (n | tt::children)();

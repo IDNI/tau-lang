@@ -836,33 +836,14 @@ TEST_CASE("bare integer 1 parses to top") {
 	CHECK(q->is_full());
 }
 
-TEST_CASE("bare integer 5 parses to unit interval [5, 6)") {
-	auto q = parse_q("5");
-	REQUIRE(q.has_value());
-	REQUIRE(q->intervals.size() == 1);
-	auto [lo, hi] = piece(*q, 0);
-	CHECK(deq(lo, 5.0));
-	CHECK(deq(hi, 6.0));
-}
-
-TEST_CASE("double-exact bare integer 2^52-1 parses to non-empty unit "
-	"interval")
-{
-	auto q = parse_q("4503599627370495");
-	REQUIRE(q.has_value());
-	REQUIRE(q->intervals.size() == 1);
-	auto [lo, hi] = piece(*q, 0);
-	CHECK(deq(lo, 4503599627370495.0));
-	CHECK(deq(hi, 4503599627370496.0));
-	CHECK(lo < hi);
-}
-
-TEST_CASE("bare integer at long long max is rejected, not overflowed") {
-	// LLONG_MAX: the old code computed val + 1 in the integer type
-	// (signed overflow, UB); beyond double's integer resolution
-	// lo + 1.0 == lo, so no non-empty unit interval exists.
-	auto q = parse_q("9223372036854775807");
-	CHECK_FALSE(q.has_value());
+TEST_CASE("bare numbers other than 0 and 1 are rejected") {
+	// qint has no points: `5` must not read as an element
+	for (const char* src : { "5", "-3", "10", "01", "2", "-1", "0.5",
+		"1/2", "4503599627370495", "9223372036854775807" })
+	{
+		INFO(src);
+		CHECK_FALSE(parse_q(src).has_value());
+	}
 }
 
 } // TEST_SUITE qint — parse tree evaluation
