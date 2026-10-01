@@ -70,6 +70,8 @@ case "${CMD}" in
                 echo "  wasm-node-resolve - build wasm-node-resolve image, configure only"
                 echo "  wasm-browser-deps - build wasm-browser-deps image (Chrome, npm packages)"
                 echo "  wasm-browser      - build wasm-browser image, and (TESTS=yes) run the browser suite"
+                echo "  wasm-sdk-packages - build the wasm SDK package (--build-arg SDK_FORMAT=deb|rpm) into TAU_PACKAGES_DIR (default build/wasm-sdk-packages)"
+                echo "  wasm-npm          - build the wasm npm package into TAU_NPM_DIR (default build/wasm-npm)"
                 ;;
         "build")
                 build "${@:2}"
@@ -168,6 +170,14 @@ case "${CMD}" in
                 ;;
         "wasm-browser")
                 build --target wasm-browser -t tau:wasm-browser "${@:2}"
+                ;;
+        "wasm-sdk-packages")
+                build --target wasm-sdk-packages \
+                        --output "type=local,dest=${TAU_PACKAGES_DIR:-build/wasm-sdk-packages}" "${@:2}"
+                ;;
+        "wasm-npm")
+                build --target wasm-npm \
+                        --output "type=local,dest=${TAU_NPM_DIR:-build/wasm-npm}" "${@:2}"
                 ;;
         *)
                 echo "Unknown docker action: ${CMD}"

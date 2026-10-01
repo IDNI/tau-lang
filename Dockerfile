@@ -917,3 +917,81 @@ RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Checking the browser REPL page in Chrome" && \
 	node bindings/js/tests/repl-browser-check.js build/${BUILD_PRESET}-repl-browser; \
 fi
+
+
+# ------------------------------------------------------------
+# WebAssembly packages: the SDK box as deb or rpm, and the npm package of the
+# library. Each ends in a stage that holds only its files, for an
+# --output type=local export. Use --build-arg NIGHTLY=yes for a nightly.
+
+FROM wasm-deps AS wasm-packages-source
+
+# The package presets use rpm, unzip and xz-utils. The base stage has the first two.
+RUN apt-get update && apt-get install -y --no-install-recommends xz-utils
+
+COPY --from=source /tau-lang /tau-lang
+
+WORKDIR /tau-lang
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_GIT_DESCRIBED=
+ARG TAU_GIT_BRANCH=
+ARG TAU_GIT_COMMIT_HASH=
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ARG TAU_PARSER_COMMIT=
+ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
+	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
+	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH} \
+	TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH} \
+	TAU_PARSER_COMMIT=${TAU_PARSER_COMMIT}
+
+# if NIGHTLY is set to yes, then add .YYYY-MM-DD to the first line of the VERSION file
+ARG NIGHTLY=no
+RUN if [ "$NIGHTLY" = "yes" ]; then \
+	echo -n "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
+fi
+
+# The remote store: configure reads a missing package from it before it builds
+# one (cmake/tau-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
+# Argument SDK_FORMAT=deb/rpm picks the package format of the SDK box.
+FROM wasm-packages-source AS wasm-sdk-packages-build
+
+ARG BUILD_JOBS=5
+ARG SDK_FORMAT=deb
+
+# The preset name contains `package`, so ./dev preset builds and packs into
+# /root/.tau/packages.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the wasm SDK ${SDK_FORMAT} package: $(head -n 1 VERSION)" && \
+	scripts/with-gh-token ./dev preset release-wasm-sdk-packages-${SDK_FORMAT} \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	mkdir -p /tau-packages && \
+	cp -r /root/.tau/packages/. /tau-packages/ && \
+	test -n "$(ls /tau-packages)"
+
+# Only the SDK package, for an --output type=local export.
+FROM scratch AS wasm-sdk-packages
+COPY --from=wasm-sdk-packages-build /tau-packages/ /
+
+FROM wasm-packages-source AS wasm-npm-build
+
+ARG BUILD_JOBS=5
+
+# The build folder is the package: configure writes its package.json.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the wasm npm package: $(head -n 1 VERSION)" && \
+	scripts/with-gh-token ./dev preset release-wasm -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	mkdir -p /tau-npm && \
+	npm pack ./build/release-wasm --pack-destination /tau-npm && \
+	ls /tau-npm/*.tgz
+
+# Only the npm package, for an --output type=local export.
+FROM scratch AS wasm-npm
+COPY --from=wasm-npm-build /tau-npm/ /
