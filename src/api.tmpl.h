@@ -1784,7 +1784,11 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		// A spec root is always unwrapped, whether or not it holds a ref: a
 		// spec handed whole to the normalizer as its main formula is negated
-		// as if it were a wff by the syntactic simplifier.
+		// as if it were a wff by the syntactic simplifier. A parsed spec
+		// comes as `start`, which holds the spec.
+		if (tau::get(expr).is(tau::start)
+			&& tau::get(expr).child_is(tau::spec))
+				expr = tau::get(expr).first();
 		if (tau::get(expr).is(tau::spec)) {
 			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
 				ctx, expr); mayb_nso_rr)
