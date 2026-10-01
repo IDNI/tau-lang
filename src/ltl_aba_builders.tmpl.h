@@ -495,8 +495,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// leaving it to whichever caller happens to print the report.
 	auto backend_failed = [&]() -> result<bool> {
 		return r.with_error(code::solver_error,
-			"UNKNOWN: the synthesis backend failed or produced no "
-			"verdict; realizability could not be decided");
+			messages::unknown_realizability_no_verdict);
 	};
 
 	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
@@ -883,9 +882,10 @@ ltl_to_safety_formula_full(tref fm,
 		return acc;
 	};
 
+	TAU_TRY(auto since_trigger, compile_since_trigger<node>(fm));
 	{
-		auto [compiled_fast, safety_fm, init_fm, unanchored_aux] =
-			compile_since_trigger<node>(fm);
+		auto& [compiled_fast, safety_fm, init_fm, unanchored_aux] =
+			since_trigger;
 		// The compiled invariants read their auxiliaries at t-1, which
 		// makes step 0 a warm-up step the interpreter does not enforce.
 		// That matches the spec only when it has a lookback of its own;
@@ -923,8 +923,7 @@ ltl_to_safety_formula_full(tref fm,
 
 	// A pure-past spec rerouted here (no lookback of its own) is an
 	// invariant, as on the fast path: every step, not only step 0.
-	if (!realizability_has_game_operators<node>(
-		std::get<0>(compile_since_trigger<node>(fm))))
+	if (!realizability_has_game_operators<node>(std::get<0>(since_trigger)))
 		fm = wrap_always(fm);
 	ltl_aba_solution<node> partial;
 	auto maybe_r = solve_ltl_aba<node>(fm, &partial);
@@ -934,10 +933,17 @@ ltl_to_safety_formula_full(tref fm,
 	if (maybe_r.has_value() && maybe_r.value()
 		&& !maybe_r.value()->executable)
 	{
-		ltl_propositional_synthesis = false;
 		partial = {};
-		auto again = solve_ltl_aba<node>(fm, &partial);
-		ltl_propositional_synthesis = true;
+		auto again = [&] {
+			struct restore_synthesis {
+				bool outer;
+				~restore_synthesis() {
+					ltl_propositional_synthesis = outer;
+				}
+			} restore{ ltl_propositional_synthesis };
+			ltl_propositional_synthesis = false;
+			return solve_ltl_aba<node>(fm, &partial);
+		}();
 		if (again.has_value()) {
 			r.merge(std::move(maybe_r));
 			maybe_r = std::move(again);
@@ -1164,15 +1170,11 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		if (!real.has_value()) {
 			r.merge(std::move(real));
 			return r.with_error(code::solver_error,
-				"UNKNOWN: the synthesis backend failed or produced no "
-				"verdict; realizability could not be decided");
+				messages::unknown_realizability_no_verdict);
 		}
 		if (!decide && !real.value() && !exact_reduction) {
 			return r.with_error(code::solver_error,
-				"UNKNOWN: the CTL* reduction is unrealizable, but an E "
-				"witness over a past operator ranges over every input "
-				"branch, which is stricter than E; realizability could "
-				"not be decided");
+				messages::unknown_ctl_star_e_witness);
 		}
 		// what `run` executes
 		if (real.value()) {
@@ -1411,13 +1413,21 @@ static result<tref> shift_one_step(tref fm) {
 		TAU_TRY(tref a, N(op.child(0)));
 		return r.with_value(tau::build_wff_neg(a));
 	}
-	case tau::wff_and: case tau::wff_or: case tau::wff_imply:
+	case tau::wff_and: case tau::wff_or: {
+		// N-ary: every child, not only the first two
+		TAU_TRY(tref acc, N(op.child(0)));
+		for (size_t i = 1; i < op.children_size(); ++i) {
+			TAU_TRY(tref b, N(op.child(i)));
+			acc = nt == tau::wff_and ? tau::build_wff_and(acc, b)
+				: tau::build_wff_or(acc, b);
+		}
+		return r.with_value(acc);
+	}
+	case tau::wff_imply:
 	case tau::wff_rimply: case tau::wff_equiv: case tau::wff_xor: {
 		TAU_TRY(tref a, N(op.child(0)));
 		TAU_TRY(tref b, N(op.child(1)));
 		switch (nt) {
-		case tau::wff_and:    return r.with_value(tau::build_wff_and(a, b));
-		case tau::wff_or:     return r.with_value(tau::build_wff_or(a, b));
 		case tau::wff_imply:  return r.with_value(tau::build_wff_imply(a, b));
 		case tau::wff_rimply: return r.with_value(tau::build_wff_rimply(a, b));
 		case tau::wff_equiv:  return r.with_value(tau::build_wff_equiv(a, b));
@@ -1760,10 +1770,7 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	// says nothing about fm.
 	if (!real && !reduction.exact) {
 		return r.with_error(code::solver_error,
-			"UNKNOWN: the CTL* reduction is unrealizable, but an E "
-			"witness over a past operator ranges over every input "
-			"branch, which is stricter than E; realizability could "
-			"not be decided");
+			messages::unknown_ctl_star_e_witness);
 	}
 	return r.with_value(real);
 }

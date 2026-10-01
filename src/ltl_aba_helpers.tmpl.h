@@ -569,15 +569,16 @@ static result<std::string> skeleton_wff_with_testers(
 		TAU_TRY(auto phi, sk(inner.first(), c.neg()));
 		return r.with_value("!" + phi);
 	}
-	case tau::wff_and: {
-		TAU_TRY(auto phi, sk(inner.first(), c));
-		TAU_TRY(auto psi, sk(inner.second(), c));
-		return r.with_value("(" + phi + " & " + psi + ")");
-	}
+	case tau::wff_and:
 	case tau::wff_or: {
-		TAU_TRY(auto phi, sk(inner.first(), c));
-		TAU_TRY(auto psi, sk(inner.second(), c));
-		return r.with_value("(" + phi + " | " + psi + ")");
+		// N-ary: every child, not only the first two
+		const std::string op = nt == tau::wff_and ? " & " : " | ";
+		std::string out;
+		for (size_t i = 0; i < inner.children_size(); ++i) {
+			TAU_TRY(auto x, sk(inner.child(i), c));
+			out += (i ? op : "") + x;
+		}
+		return r.with_value("(" + out + ")");
 	}
 	case tau::wff_imply: {
 		TAU_TRY(auto phi, sk(inner.first(), c.neg()));

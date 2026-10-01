@@ -522,24 +522,49 @@ template <NodeType node>
 static std::optional<trefs> finite_elements(size_t tid, size_t max) {
 	using tau = tree<node>;
 	// the number of elements per type and bound, 0 for too many; the
-	// checks call the solver
+	// checks call the solver, whose answers the LTL(ABA) budgets and the
+	// algebras' options steer, so a change of either drops the entries
+	static std::mutex known_mutex;
 	static std::map<std::pair<std::string, size_t>, size_t> known;
+	static size_t known_budget = ltl_verdict_budget_fingerprint(
+		pack_ba_options_fingerprint<node>());
+	static const bool reset_registered = (on_reset([] {
+		std::lock_guard lock(known_mutex);
+		known.clear();
+	}), true);
+	(void)reset_registered;
 	auto type_name = get_ba_type_name<node>(tid);
 	if (!type_name.has_value()) return std::nullopt;
 	const std::string name = type_name.value();
-	if (auto it = known.find({ name, max }); it != known.end()) {
-		if (!it->second) return std::nullopt;
+	auto elements = [&](size_t n) {
 		trefs els;
-		for (size_t v = 0; v < it->second; ++v)
+		for (size_t v = 0; v < n; ++v)
 			els.push_back(pack_value_constant<node>(tid, v));
 		return els;
+	};
+	{
+		std::lock_guard lock(known_mutex);
+		if (const size_t fp = ltl_verdict_budget_fingerprint(
+				pack_ba_options_fingerprint<node>());
+			fp != known_budget) { known.clear(); known_budget = fp; }
+		if (auto it = known.find({ name, max }); it != known.end()) {
+			if (!it->second) return std::nullopt;
+			return elements(it->second);
+		}
 	}
+	// a check the solver leaves open decides nothing, so its answer is
+	// not remembered
+	bool undecided = false;
 	auto remember = [&](std::optional<trefs> els) {
-		known.emplace(std::pair{ name, max }, els ? els->size() : 0);
+		if (!undecided) {
+			std::lock_guard lock(known_mutex);
+			known.emplace(std::pair{ name, max }, els ? els->size() : 0);
+		}
 		return els;
 	};
-	auto decided_false = [](tref f) {
+	auto decided_false = [&](tref f) {
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
+		if (!sat.has_value()) undecided = true;
 		return sat.has_value() && !sat.value();
 	};
 	trefs els;

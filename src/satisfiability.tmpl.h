@@ -2656,8 +2656,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			// no verdict at all
 			r.merge(std::move(realizable));
 			return r.with_assert_check_error(code::solver_error,
-				"UNKNOWN: the synthesis backend failed or produced no "
-				"verdict; satisfiability could not be decided");
+				messages::unknown_satisfiability_no_verdict);
 		}
 		memoize(realizable.value());
 		DBG(assert(r.is_well_formed());)

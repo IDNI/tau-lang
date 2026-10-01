@@ -5,6 +5,29 @@
 
 namespace idni::tau_lang {
 
+// The value of a run of decimal digits; nullopt when `s` is not one or the
+// value does not fit.
+inline std::optional<size_t> parse_decimal_index(std::string_view s) {
+	size_t v = 0;
+	if (s.empty()) return std::nullopt;
+	auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+	if (ec != std::errc{} || end != s.data() + s.size()) return std::nullopt;
+	return v;
+}
+
+// One past the largest k of the `p<k>` proposition names in `atoms`.
+inline size_t next_prop_index(
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	size_t next = 0;
+	for (auto& [_, name] : atoms)
+		if (name.size() > 1 && name[0] == 'p')
+			if (auto k = parse_decimal_index(
+				std::string_view(name).substr(1)); k && *k < SIZE_MAX)
+					next = std::max(next, *k + 1);
+	return next;
+}
+
 
 // ── guard → ABA formula ───────────────────────────────────────────────────────
 
@@ -462,6 +485,13 @@ static bool aba_existential_proven_feasible(tref fm) {
 	return false;
 }
 
+// An io_var of an input stream: marked as one, or, where no direction was
+// set (a bare formula), named like one, as is_pure_input_atom reads it.
+template <NodeType node>
+static bool is_input_stream(tref v) {
+	return io_var_direction<node>(tree<node>::trim(v)) == 1;
+}
+
 // Per-step feasibility under an adversarial input: each free stream/time
 // instance is quantified in chronological order (earliest shift outermost),
 // input instances universally, everything else existentially -- a later
@@ -481,7 +511,7 @@ static std::optional<bool> aba_synthesis_feasibility(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	auto is_input = [](tref v) {
-		return tau::get(v).child_is(tau::io_var) && tau::get(v)[0].is_input_variable();
+		return tau::get(v).child_is(tau::io_var) && is_input_stream<node>(v);
 	};
 	// get_io_var_shift returns the lookback magnitude (t-k -> k, t -> 0),
 	// so a larger shift means an earlier point in time.
@@ -1872,9 +1902,14 @@ static result<std::string> apply_step_counter_encoding(
 
 	// Rewrites name[j] to name[t] (j==km) or name[t-(km-j)] textually, over
 	// every positional io_var found directly on `n` (not via `atoms`, which
-	// may already have dropped it for an earlier conjunct).
-	auto relativize_text = [&](tref n, int_t km) {
+	// may already have dropped it for an earlier conjunct). A match must
+	// start a name: `o1[2]` inside `xo1[2]` is another stream.
+	auto relativize_text = [&](tref n, int_t km) -> result<tref> {
+		result<tref> rr;
 		std::string txt = tau::get(n).to_str();
+		auto name_char = [](char c) {
+			return std::isalnum((unsigned char)c) || c == '_';
+		};
 		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>)) {
 			if (!is_io_initial<node>(v)) continue;
 			const std::string& vname = get_var_name<node>(v);
@@ -1884,22 +1919,26 @@ static result<std::string> apply_step_counter_encoding(
 			    : (vname + "[t-" + std::to_string(km - j) + "]");
 			size_t at = 0;
 			while ((at = txt.find(from, at)) != std::string::npos) {
+				if (at > 0 && name_char(txt[at - 1])) {
+					at += from.size();
+					continue;
+				}
 				txt.replace(at, from.size(), to);
 				at += to.size();
 			}
 		}
 		typename tau::get_options opts;
 		opts.parse.start = tau::wff;
-		// Feeds a tref back to its caller's own assert, so its signature
-		// stays fixed; it merges the parse call's report into the
-		// enclosing r instead.
-		tref rel = r.merge_take(tau::get(txt, std::move(opts))).value_or(nullptr);
-		if (!rel) return rel;
+		auto rel = rr.merge_take(tau::get(txt, std::move(opts)));
+		if (!rel) return rr;
+		if (!*rel) return rr.with_error(code::internal_error,
+			"step-counter encoding: the relativized atom does not parse",
+			{{label::value, truncate_for_message(txt)}});
 		// A bare wff parse leaves io_vars unclassified (transform_io_var
 		// later rejects that); resolve them here by name-prefix
 		// direction, the way build_carrier_eq_aux does.
-		return resolve_io_vars<node>(
-			*definitions<node>::instance().get_io_context(), rel);
+		return rr.with_value(resolve_io_vars<node>(
+			*definitions<node>::instance().get_io_context(), *rel));
 	};
 
 	auto drop_prop = [](std::vector<std::string>& props, const std::string& name) {
@@ -1922,11 +1961,14 @@ static result<std::string> apply_step_counter_encoding(
 		case tau::wff_neg:
 			return "!" + build_guard_skel(inner.first());
 		case tau::wff_and:
-			return "(" + build_guard_skel(inner.first())
-			     + " & " + build_guard_skel(inner.second()) + ")";
-		case tau::wff_or:
-			return "(" + build_guard_skel(inner.first())
-			     + " | " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_or: {
+			// N-ary: every child, not only the first two
+			const std::string op = nt == tau::wff_and ? " & " : " | ";
+			std::string out;
+			for (size_t i = 0; i < inner.children_size(); ++i)
+				out += (i ? op : "") + build_guard_skel(inner.child(i));
+			return "(" + out + ")";
+		}
 		case tau::wff_xor:
 			return "(" + build_guard_skel(inner.first())
 			     + " ^ " + build_guard_skel(inner.second()) + ")";
@@ -1968,9 +2010,7 @@ static result<std::string> apply_step_counter_encoding(
 				continue;
 			}
 
-			tref rel = relativize_text(a_orig, km);
-			assert(rel != nullptr
-				&& "apply_step_counter_encoding: atom relativization failed");
+			TAU_TRY(tref rel, relativize_text(a_orig, km));
 
 			// Compare against a resolved COPY, not the stored tref:
 			// mutating atoms[k].first would break its match against this
@@ -2026,13 +2066,6 @@ static result<std::string> apply_step_counter_encoding(
 	return r.with_value(std::move(extra));
 }
 
-// An io_var of an input stream: marked as one, or, where no direction was
-// set (a bare formula), named like one, as is_pure_input_atom reads it.
-template <NodeType node>
-static bool is_input_stream(tref v) {
-	return io_var_direction<node>(tree<node>::trim(v)) == 1;
-}
-
 // Every relative io_var of `fm` moved `delta` steps later (x[t-j] becomes
 // x[t-j+delta]), rebuilt in one spelling so that equal formulas compare
 // equal; each variable keeps its input or output side. The caller keeps
@@ -2072,12 +2105,7 @@ static void add_present_twins(
     std::string& skeleton)
 {
 	using tau = tree<node>;
-	size_t next = 0;
-	for (auto& [_, name] : atoms)
-		if (name.size() > 1 && name[0] == 'p'
-			&& std::all_of(name.begin() + 1, name.end(),
-				[](unsigned char c) { return std::isdigit(c); }))
-				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	size_t next = next_prop_index(atoms);
 	const size_t n = atoms.size();
 	for (size_t i = 0; i < n; ++i) {
 		tref a = atoms[i].first;
@@ -2115,12 +2143,7 @@ static void add_input_twins(
     std::vector<std::string>& input_props)
 {
 	using tau = tree<node>;
-	size_t next = 0;
-	for (auto& [_, name] : atoms)
-		if (name.size() > 1 && name[0] == 'p'
-			&& std::all_of(name.begin() + 1, name.end(),
-				[](unsigned char c) { return std::isdigit(c); }))
-				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	size_t next = next_prop_index(atoms);
 	const size_t n = atoms.size();
 	for (size_t i = 0; i < n; ++i) {
 		tref a = atoms[i].first;
@@ -2267,7 +2290,10 @@ static void gate_counter_props(ltl_aba_solution<node>& sol) {
 							{ if (num != "t" && num != "f") ok = false;
 							  lits.emplace_back(-1, pos); keep.push_back(t);
 							  continue; }
-					lits.emplace_back(std::stoi(num), pos);
+					auto idx = parse_decimal_index(num);
+					if (!idx || *idx > (size_t)std::numeric_limits<int>::max())
+						{ ok = false; break; }
+					lits.emplace_back((int)*idx, pos);
 					keep.push_back(t);
 				}
 				if (!ok) { out.clear(); break; }
@@ -2339,7 +2365,7 @@ static tref reindex_to_window_frame(tref fm, int_t shift_add) {
 		int_t new_shift = shift_add + get_io_var_shift<node>(v);
 		size_t type_id = find_ba_type<node>(v);
 		const std::string& name = get_var_name<node>(v);
-		reindex[v] = is_input_var<node>(v)
+		reindex[v] = is_input_stream<node>(v)
 			? tau::trim(tau::build_in_var_at_t_minus(name, (size_t)new_shift, type_id))
 			: tau::trim(tau::build_out_var_at_t_minus(name, (size_t)new_shift, type_id));
 	}
@@ -2769,12 +2795,7 @@ static std::vector<std::string> add_forceability_observations(
 	std::vector<std::string> clauses;
 	const bool single_type =
 		formula_type_set<node>::from_atoms(sol.atoms).single_type();
-	size_t next = 0;
-	for (auto& [_, name] : sol.atoms)
-		if (name.size() > 1 && name[0] == 'p'
-			&& std::all_of(name.begin() + 1, name.end(),
-				[](unsigned char c) { return std::isdigit(c); }))
-				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	size_t next = next_prop_index(sol.atoms);
 	data_quantifier<node> dq;
 	std::set<std::string> seen;
 	auto is_observation = [&](const std::string& name) {
@@ -2950,7 +2971,7 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 // context is carried by the compiled formula that
 // `ltl_to_safety_formula_full` now conjoins (it used to discard it).
 template <NodeType node>
-static tref compile_since_trigger_rec(
+static result<tref> compile_since_trigger_rec(
     tref fm,
     int& counter,
     std::vector<tref>& safety_invs,
@@ -2959,8 +2980,9 @@ static tref compile_since_trigger_rec(
     int spine_pol = 1)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	const auto& t = tau::get(fm);
-	if (!t.has_child()) return fm;
+	if (!t.has_child()) return r.with_value(fm);
 
 	const bool is_outer = (spine_pol > 0);
 	auto nt = t[0].value.nt;
@@ -2978,8 +3000,8 @@ static tref compile_since_trigger_rec(
 		// Compile nested S/T inside the operands first (always inner), so
 		// that the ψ used for the t=0 initial condition below is the
 		// compiled one, matching what goes into the rewritten S.
-		phi = compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
+		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
@@ -2992,7 +3014,7 @@ static tref compile_since_trigger_rec(
 		// With is_outer=false the S contributes only its tracking
 		// invariant G(curr ↔ rhs), and the obligation is encoded below
 		// from the negated compiled formula.
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(tref s_rewr, compile_since_trigger_rec<node>(s_node, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 		tref compiled = tau::build_wff_neg(s_rewr);
 
 		if (is_outer) {
@@ -3011,7 +3033,7 @@ static tref compile_since_trigger_rec(
 			init_conds.push_back(psi_at_0);
 		}
 
-		return compiled;
+		return r.with_value(compiled);
 	}
 
 	// wff_since: φ S ψ
@@ -3023,18 +3045,15 @@ static tref compile_since_trigger_rec(
 		// Any S inside phi or psi is by definition inner (nested), so
 		// pass is_outer=false to suppress the always-true requirement
 		// and the psi-at-0 initial condition for those sub-operators.
-		phi = compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0);
+		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
+		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
 
 		// Atoms: aux[t]=1  and  aux[t-1]=1
-		// build_carrier_eq_aux's report cannot travel further: this
-		// function feeds ltl_to_safety_formula_full, called from
-		// interpreter.tmpl.h, outside this pass's edit boundary.
-		tref curr = build_carrier_eq_aux<node>(aux_name, 0,  1).value_or(nullptr);
-		tref prev = build_carrier_eq_aux<node>(aux_name, -1, 1).value_or(nullptr);
+		TAU_TRY(tref curr, build_carrier_eq_aux<node>(aux_name, 0, 1));
+		TAU_TRY(tref prev, build_carrier_eq_aux<node>(aux_name, -1, 1));
 
 		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).  It is pushed into
 		// `safety_invs` below (in one of two forms, depending on the spine
@@ -3099,7 +3118,7 @@ static tref compile_since_trigger_rec(
 		}
 
 		// Replace φ S ψ with curr ("since holds now").
-		return curr;
+		return r.with_value(curr);
 	}
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
@@ -3116,7 +3135,7 @@ static tref compile_since_trigger_rec(
 	//            drops off the spine entirely.
 	const auto& op = t[0];
 	size_t nc = op.children_size();
-	if (nc == 0) return fm;
+	if (nc == 0) return r.with_value(fm);
 
 	int child_pol = 0;
 	if      (nt == tau::wff_neg) child_pol = -spine_pol;
@@ -3124,28 +3143,28 @@ static tref compile_since_trigger_rec(
 	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
 
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
-		if (new_c == op.first()) return fm;
-		return tau::get(tau::wff, tau::get(nt, new_c));
+		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.first(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		if (new_c == op.first()) return r.with_value(fm);
+		return r.with_value(tau::get(tau::wff, tau::get(nt, new_c)));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
-		if (new_l == op.first() && new_r == op.second()) return fm;
-		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
+		TAU_TRY(tref new_l, compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_r, compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		if (new_l == op.first() && new_r == op.second()) return r.with_value(fm);
+		return r.with_value(tau::get(tau::wff, tau::get(nt, new_l, new_r)));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  counter, safety_invs, init_conds, unanchored_aux, child_pol);
+		TAU_TRY(tref new_a, compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_b, compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.third(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
-			return fm;
+			return r.with_value(fm);
 		// 3-child case: use build_wff_conditional for wff_conditional,
 		// otherwise fall back to initializer_list get.
 		if (nt == tau::wff_conditional)
-			return tau::build_wff_conditional(new_a, new_b, new_c);
+			return r.with_value(tau::build_wff_conditional(new_a, new_b, new_c));
 		tref ch3[3] = { new_a, new_b, new_c };
-		return tau::get(tau::wff, tau::get(nt, ch3, 3));
+		return r.with_value(tau::get(tau::wff, tau::get(nt, ch3, 3)));
 	}
 	// Arity > 3.  This used to `return fm` unchanged, silently leaving any
 	// S/T below a wider node uncompiled — the pure-past fast path then just
@@ -3160,12 +3179,12 @@ static tref compile_since_trigger_rec(
 	new_kids.reserve(nc);
 	bool changed = false;
 	for (tref c : kids) {
-		tref nc_ = compile_since_trigger_rec<node>(c, counter, safety_invs, init_conds, unanchored_aux, child_pol);
+		TAU_TRY(tref nc_, compile_since_trigger_rec<node>(c, counter, safety_invs, init_conds, unanchored_aux, child_pol));
 		if (nc_ != c) changed = true;
 		new_kids.push_back(nc_);
 	}
-	if (!changed) return fm;
-	return tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size()));
+	if (!changed) return r.with_value(fm);
+	return r.with_value(tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size())));
 }
 
 // Top-level S/T compilation pass.
@@ -3190,17 +3209,20 @@ static tref compile_since_trigger_rec(
 //   The interpreter seeds each to bv-0 at t = formula_time_point - 1
 //   (seed_since_aux_bits), encoding S(-1) = false / T(-1) = true.
 template <NodeType node>
-static std::tuple<tref, tref, tref, std::vector<std::string>>
+static result<std::tuple<tref, tref, tref, std::vector<std::string>>>
 compile_since_trigger(tref fm) {
 	using tau = tree<node>;
+	result<std::tuple<tref, tref, tref, std::vector<std::string>>> r;
 	if (!has_past_operators<node>(fm))
-		return {fm, tau::_T(), tau::_T(), {}};
+		return r.with_value(std::tuple{ fm, tau::_T(), tau::_T(),
+			std::vector<std::string>{} });
 
 	std::vector<tref> safety_invs;
 	std::vector<tref> init_conds;
 	std::vector<std::string> unanchored_aux;
 	int counter = 0;
-	tref compiled = compile_since_trigger_rec<node>(fm, counter, safety_invs, init_conds, unanchored_aux);
+	TAU_TRY(tref compiled, compile_since_trigger_rec<node>(fm, counter,
+		safety_invs, init_conds, unanchored_aux));
 
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
@@ -3212,7 +3234,8 @@ compile_since_trigger(tref fm) {
 
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
 	          << counter << " auxiliary variable(s) introduced";
-	return {compiled, safety_fm, init_fm, std::move(unanchored_aux)};
+	return r.with_value(std::tuple{ compiled, safety_fm, init_fm,
+		std::move(unanchored_aux) });
 }
 
 } // namespace idni::tau_lang
