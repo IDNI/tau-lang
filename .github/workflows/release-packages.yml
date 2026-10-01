@@ -12,7 +12,7 @@ env:
 
 jobs:
   linux:
-    name: Linux packages
+    name: Linux x86_64 · package
     runs-on: ubuntu-24.04
     # A hung job fails at its timeout instead of at the six-hour limit.
     timeout-minutes: 170
@@ -60,7 +60,7 @@ jobs:
   # The native arm64 packages are built on an arm host, in the same container
   # their consumers use.
   linux-arm64:
-    name: Linux arm64 packages
+    name: Linux arm64 · package
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     env:
@@ -103,7 +103,7 @@ jobs:
   # produce. The platform tag is the interpreter's, so the file name carries the
   # arm64 tag.
   linux-arm64-wheel:
-    name: Linux arm64 wheel
+    name: Linux arm64 · wheel
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     env:
@@ -113,54 +113,43 @@ jobs:
         with:
           submodules: recursive
 
-      # clang is the release preset's compiler. nanobind and the wheel repair
-      # tool come from the shared venv, never from the system Python, and the
-      # build takes the interpreter from TAU_PYTHON.
-      - name: Install the wheel dependencies
-        run: |
-          ./dev setup-ubuntu-ci-deps.sh
-          sudo apt-get install -y --no-install-recommends clang
-          ./dev dep-python-venv
-
-      # The store is content-addressed; a miss is built here with the preset's
-      # own clang and reused by the next run.
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
         with:
-          path: ~/.tau/store
-          key: tau-store-linux-arm64-${{ github.sha }}
-          restore-keys: |
-            tau-store-linux-arm64-
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      # The target builds the module, packs the wheel and publishes it to the
-      # local store under the linux-arm64 target.
+      # The tau-wheel stage builds the module, packs the wheel and exports it
+      # with its store id. The wheel stamps its zip entries with the commit time.
       - name: Build the arm64 wheel
-        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
-
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+        run: |
+          ./dev docker tau-wheel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_WHEEL_EPOCH="$(git log -1 --format=%ct)" \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_WHEEL_DIR: tau-wheel
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$PWD/tau-wheel" >> "$GITHUB_ENV"
 
       # The repair step retags and rewrites the wheel. Check the repaired
       # artifact before upload: its tag, module, bundled cvc5 runtime and paths.
+      # The runner's python3 is 3.12, the version the wheel is built for.
       - name: Check the wheel contents
         run: |
           TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
           export TAU_WHEEL_PATH
-          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the arm64 wheel
         uses: actions/upload-artifact@v7
@@ -172,7 +161,7 @@ jobs:
   # extension and the bundled cvc5 runtime are all x86_64. auditwheel retags it
   # manylinux, so the file name carries the glibc floor, not linux_x86_64.
   linux-x86_64-wheel:
-    name: Linux x86_64 wheel
+    name: Linux x86_64 · wheel
     runs-on: ubuntu-24.04
     timeout-minutes: 170
     env:
@@ -182,50 +171,43 @@ jobs:
         with:
           submodules: recursive
 
-      # clang is the release preset's compiler. nanobind and the wheel repair
-      # tool come from the shared venv, never from the system Python, and the
-      # build takes the interpreter from TAU_PYTHON.
-      - name: Install the wheel dependencies
-        run: |
-          ./dev setup-ubuntu-ci-deps.sh
-          sudo apt-get install -y --no-install-recommends clang
-          ./dev dep-python-venv
-
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
         with:
-          path: ~/.tau/store
-          key: tau-store-linux-x86_64-${{ github.sha }}
-          restore-keys: |
-            tau-store-linux-x86_64-
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
+      # The tau-wheel stage builds the module, packs the wheel and exports it
+      # with its store id. The wheel stamps its zip entries with the commit time.
       - name: Build the x86_64 wheel
-        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
-
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+        run: |
+          ./dev docker tau-wheel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TESTS=no \
+            --build-arg TAU_WHEEL_EPOCH="$(git log -1 --format=%ct)" \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_WHEEL_DIR: tau-wheel
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$PWD/tau-wheel" >> "$GITHUB_ENV"
 
       # The repair step retags and rewrites the wheel. Check the repaired
       # artifact before upload: its tag, module, bundled cvc5 runtime and paths.
+      # The runner's python3 is 3.12, the version the wheel is built for.
       - name: Check the wheel contents
         run: |
           TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
           export TAU_WHEEL_PATH
-          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+          python3 tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
 
       - name: Upload the x86_64 wheel
         uses: actions/upload-artifact@v7
@@ -236,7 +218,7 @@ jobs:
   # One SDK box per platform, packaged on its own: a cross box cannot share the
   # native box's install path or its toolchain.
   linux-sdk:
-    name: Linux SDK packages (${{ matrix.preset }})
+    name: WebAssembly · SDK (${{ matrix.format }})
     runs-on: ubuntu-24.04
     timeout-minutes: 200
     strategy:
@@ -244,7 +226,9 @@ jobs:
       matrix:
         include:
           - preset: release-wasm-sdk-packages-deb
+            format: deb
           - preset: release-wasm-sdk-packages-rpm
+            format: rpm
     env:
       BUILD_JOBS: 4
     steps:
@@ -252,30 +236,33 @@ jobs:
         with:
           submodules: recursive
 
-      # The toolchain the platform preset cross-compiles with: emsdk from the
-      # same script the wasm gates use. rpm and the archivers are the ones the
-      # Docker package image installs.
-      - name: Install the cross toolchain
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends rpm unzip xz-utils
-          ./dev dep-emsdk
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      # The preset name contains `package`, so ./dev preset builds and packs.
+      # The preset name contains `package`, so the stage builds and packs.
       - name: Build and package the SDK box
-        run: ./dev preset ${{ matrix.preset }} -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+        run: |
+          ./dev docker wasm-sdk-packages \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg SDK_FORMAT=${{ matrix.format }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_PACKAGES_DIR: sdk-packages
 
-      # upload-artifact globs literally and will not expand ~,
-      # so hand it an absolute path through the env
       - name: Locate Linux packages
-        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+        run: echo "PKG_DIR=$PWD/sdk-packages" >> "$GITHUB_ENV"
 
       - name: Upload the SDK package
         uses: actions/upload-artifact@v7
@@ -284,7 +271,7 @@ jobs:
           path: ${{ env.PKG_DIR }}
 
   macos:
-    name: macOS packages
+    name: macOS arm64 · package
     runs-on: macos-15
     timeout-minutes: 240
     env:
@@ -330,14 +317,14 @@ jobs:
       - name: Upload macOS packages
         uses: actions/upload-artifact@v7
         with:
-          name: release-packages-macos
+          name: packages-darwin-arm64
           path: ${{ env.PKG_DIR }}
 
   # The macOS wheel is arm64 (the macos-15 image) and delocate retags it
   # macosx_*_arm64. nanobind and delocate come from pip. The cvc5 runtime
   # resolves from the store with AppleClang.
   macos-wheel:
-    name: macOS wheel
+    name: macOS arm64 · wheel
     runs-on: macos-15
     timeout-minutes: 240
     env:
@@ -367,6 +354,10 @@ jobs:
 
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
+      - name: Set the wheel time
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
       - name: Build the macOS wheel
         run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
@@ -398,7 +389,7 @@ jobs:
   # The MSVC wheel needs the developer command prompt for cl.exe and the MSVC
   # dependency store. delvewheel bundles the cvc5 DLLs into the wheel.
   windows-msvc-wheel:
-    name: Windows wheel (MSVC)
+    name: Windows MSVC · wheel
     runs-on: windows-latest
     timeout-minutes: 240
     defaults:
@@ -445,6 +436,10 @@ jobs:
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
+      # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
+      - name: Set the wheel time
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
       - name: Build the MSVC wheel
         run: |
           ./dev preset release-msvc-binding-python --target tau_wheel \
@@ -474,18 +469,251 @@ jobs:
           name: packages-windows-x86_64-msvc-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
 
+  # The Intel macOS package, on its own runner, as the arm64 one.
+  macos-x86_64:
+    name: macOS x86_64 · package
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-x86_64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build macOS packages (.dmg + .zip)
+        run: ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate macOS packages
+        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-darwin-x86_64
+          path: ${{ env.PKG_DIR }}
+
+  # The Intel macOS wheel. delocate retags it macosx_*_x86_64.
+  macos-x86_64-wheel:
+    name: macOS x86_64 · wheel
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Create the wheel venv
+        run: ./dev dep-python-venv
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-x86_64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
+      - name: Set the wheel time
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
+      - name: Build the macOS wheel
+        run: ./dev preset release-binding-python --target tau_wheel -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls "$WHEEL_DIR"/*.whl)"
+          export TAU_WHEEL_PATH
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the macOS wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-darwin-x86_64-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
+  # tau.exe with its DLLs and licenses, as an NSIS installer with the SDK box
+  # and as a zip. Both presets build in build/release-msvc.
+  windows-msvc:
+    name: Windows MSVC · package
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # cl.exe is on PATH only inside a developer command prompt.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # The windows-latest image has no NSIS, and CPack needs makensis.
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          Add-Content $env:GITHUB_PATH "${env:ProgramFiles(x86)}\NSIS"
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: tau-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The Spot package is a host tool built with MSYS2 UCRT64 g++ (nothing
+      # links it); the runner ships MSYS2 but not always this toolchain.
+      - name: Install the MSYS2 UCRT64 toolchain
+        if: steps.cache-store.outputs.cache-hit != 'true'
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
+
+      - name: Build the NSIS installer
+        run: ./dev preset release-msvc-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build the zip package
+        run: ./dev preset release-msvc-packages-zip -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      # upload-artifact reads a Windows path, not the Git Bash form of $HOME.
+      - name: Locate the Windows packages
+        run: echo "PKG_DIR=$(cygpath -m "$HOME")/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload the Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-windows-x86_64-msvc
+          path: |
+            ${{ env.PKG_DIR }}/*.exe
+            ${{ env.PKG_DIR }}/*.zip
+          if-no-files-found: error
+
+  # The npm package of the wasm library. The build folder is the package:
+  # configure writes its package.json. No registry publish.
+  wasm-npm:
+    name: WebAssembly · npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build and pack the npm package
+        run: |
+          ./dev docker wasm-npm \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_NPM_DIR: npm
+
+      - name: Upload the npm package
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-wasm-npm
+          path: npm/*.tgz
+          if-no-files-found: error
+
   publish:
-    name: Publish release
+    name: Publish
     needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
-      macos, macos-wheel, windows-msvc-wheel ]
+      macos, macos-wheel, macos-x86_64, macos-x86_64-wheel, windows-msvc,
+      windows-msvc-wheel, wasm-npm ]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Creating the release needs contents: write; the build jobs keep the
-    # workflow-level read-only token.
+    # workflow-level read-only token. The Spot source step reads the store.
     permissions:
       contents: write
+      packages: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       # merge-multiple flattens both artifacts into one directory
       - name: Download packages
@@ -495,13 +723,18 @@ jobs:
           merge-multiple: true
           path: packages
 
-      # The macOS job uploads under its own name, so the packages-* pattern
-      # does not reach it.
-      - name: Download macOS packages
-        uses: actions/download-artifact@v8
-        with:
-          name: release-packages-macos
-          path: packages
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The packages ship the GPLv3 Spot tools, so the release also carries
+      # their Corresponding Source. The script takes the tarball from a Spot
+      # store package and downloads it from the Spot server only when no
+      # package holds it. It fails if either file is missing.
+      - name: Add the Spot source
+        run: scripts/spot-source.sh packages
 
       - name: Read version and date
         run: |

@@ -231,6 +231,7 @@ jobs:
         run: |
           ./dev docker tau-wheel \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_WHEEL_EPOCH="$(git log -1 --format=%ct)" \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BAS=${{ env.PACK }} \
             --secret id=gh_token,env=GH_TOKEN \
