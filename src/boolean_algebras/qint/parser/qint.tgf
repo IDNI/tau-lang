@@ -24,7 +24,7 @@ qint     => "top"                        :qint_top
           | "bottom"                     :qint_bot
           | '0'                          :qint_bot
           | '1'                          :qint_top
-          | interval                     :qint_single
+          | interval                     :qint_interval
           | ( interval _ '|' _ qint )    :qint_union.
 
 interval => '[' _ endpoint _ ',' _ endpoint _ ')'.

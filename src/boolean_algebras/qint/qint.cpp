@@ -380,7 +380,7 @@ std::optional<qint> qint_eval_parse_tree(
 	case type::qint_bot:
 		return qint::bottom();
 
-	case type::qint_single: {
+	case type::qint_interval: {
 		auto children = (n | tt::children)();
 		if (children.empty()) return std::nullopt;
 		return qint_eval_interval(children[0]);
