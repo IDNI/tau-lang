@@ -149,9 +149,11 @@ Hashing is done in `uint64_t` regardless of the platform's `size_t` width
 of a constant) goes through `tau_string_hash` (`src/tau_string_hash.h`). It uses
 the public-domain MurmurHash64A of the parser, which gives the 64-bit libstdc++
 `std::hash` values. `-DTAU_USE_PORTABLE_HASH=OFF` uses `std::hash` instead, for
-benchmarks. Do not use `std::hash<std::string>` for a hash that can
-give an order: libstdc++, libc++ and MSVC give different values. Hash order is observable in printed
-output — compare with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
+benchmarks. Do not use `std::hash<std::string>` for a hash that can give an
+order: libstdc++, libc++ and MSVC give different values. Hash order is
+observable in printed output. `tests/unit/test_hash_order.cpp` pins tree hashes
+and printed orders, so a platform that orders differently fails there. Every
+other test compares with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
 (`tests/test_helpers.h`) rather than pinning a spelling.
 
 ## Running Tests
@@ -332,7 +334,8 @@ build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies 
 `LICENSE.md` and the test scripts its `files` list names, so the build directory is
 the installable package. `tau_js_publish` runs the `dep-tau-js` producer,
 which puts exactly those listed files into the local store like every other package.
-There is no npm registry and no npm token anywhere in the build or CI. The package
+There is no npm registry and no npm token anywhere in the build or CI, and
+`"private": true` makes `npm publish` refuse the package. The package
 is the library only, never the REPL; its threading follows the preset, so
 `release-wasm-nothreads` yields a library without `-pthread`.
 
