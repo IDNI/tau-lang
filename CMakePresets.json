@@ -1208,6 +1208,28 @@
 			]
 		},
 		{
+			"name": "release-msvc-packages",
+			"displayName": "MSVC NSIS installer with the SDK box",
+			"inherits": [
+				"release-msvc",
+				"_windows-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"displayName": "MSVC zip package with the SDK box",
+			"inherits": [
+				"release-msvc",
+				"_windows-zip-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
 			"name": "release-w64-sdk-packages-deb",
 			"displayName": "w64 SDK box, DEB package (no executable)",
 			"inherits": ["release-w64", "_sdk-deb-package"]
@@ -1740,6 +1762,14 @@
 		{
 			"name": "release-w64-packages-zip",
 			"configurePreset": "release-w64-packages-zip"
+		},
+		{
+			"name": "release-msvc-packages",
+			"configurePreset": "release-msvc-packages"
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"configurePreset": "release-msvc-packages-zip"
 		},
 		{
 			"name": "release-w64-sdk-packages-deb",

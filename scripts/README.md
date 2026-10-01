@@ -142,6 +142,8 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-packages-deb
 ./dev preset release-packages-rpm
 ./dev preset release-w64-packages
+./dev preset release-msvc-packages          # MSVC NSIS installer with the SDK box
+./dev preset release-msvc-packages-zip      # MSVC zip
 ./dev preset release-w64-sdk-packages-deb   # SDK box only, DEB
 ./dev preset release-w64-sdk-packages-rpm
 ./dev preset release-wasm-sdk-packages-deb  # the wasm box, DEB
@@ -172,7 +174,8 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 - `packages` — legacy: DEB then RPM in `build-Release/packages`
 - `w64-packages` — legacy: Windows NSIS and ZIP
 - Preset: `./dev preset release-packages-deb`, `./dev preset release-packages-rpm`,
-  `./dev preset release-w64-packages`
+  `./dev preset release-w64-packages`, `./dev preset release-msvc-packages`,
+  `./dev preset release-msvc-packages-zip`
 
 The deb and rpm packages split in two. `tau` runs and interprets specs.
 `tau-sdk` compiles specs into programs and links against Tau.

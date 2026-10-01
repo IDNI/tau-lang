@@ -829,6 +829,11 @@ endif (TAU_BUILD_DOC)
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${TAU_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+# Both macOS targets make the same package format, and so do the MinGW and
+# MSVC builds, so each release asset names its target.
+if(TAU_MACOS_PACKAGE OR (MSVC AND (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)))
+	string(APPEND CPACK_PACKAGE_FILE_NAME "-${TAU_DEPS_TARGET}")
+endif()
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
@@ -847,9 +852,8 @@ set(TAU_PKG_DOCS_DESTINATION "share/doc/tau")
 if (TAU_WINDOWS_PACKAGE)
 	set(TAU_PKG_COMPONENT "WindowsFiles")
 elseif (TAU_WINDOWS_ZIP_PACKAGE)
+	# The NSIS layout: tau compile finds the SDK box from bin/tau.exe.
 	set(TAU_PKG_COMPONENT "win-standalone")
-	set(TAU_PKG_DESTINATION ".")
-	set(TAU_PKG_DOCS_DESTINATION ".")
 elseif (TAU_MACOS_PACKAGE)
 	set(TAU_PKG_COMPONENT "MacOSFiles")
 	set(TAU_PKG_DESTINATION ".")
@@ -899,6 +903,14 @@ install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
+
+# tau.exe of an MSVC build needs the Visual C++ runtime DLLs, which a clean
+# Windows install does not always have.
+if(MSVC AND TAU_BUILD_EXECUTABLE AND (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE))
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${TAU_PKG_DESTINATION}")
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT "${TAU_PKG_COMPONENT}")
+	include(InstallRequiredSystemLibraries)
+endif()
 
 # Install cvc5 runtime dependencies, only when a BA of the configured pack
 # requires cvc5. A pack that does not must neither reference cvc5::cvc5 nor
@@ -968,6 +980,14 @@ if(TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
 endif()
 if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_GENERATOR "NSIS")
+	# The installer puts tau.exe in bin and the SDK box in lib/tau/sdk, where
+	# `tau compile` looks for it.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+		set(CPACK_COMPONENT_LIBRARY_DISPLAY_NAME "SDK")
+		set(CPACK_COMPONENT_LIBRARY_DESCRIPTION
+			"The tau static SDK: the library, its headers, TauConfig and the compile script")
+	endif()
 	# NSIS (Windows Installer) specific settings
 	set(CPACK_NSIS_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.exe")
 	set(CPACK_PACKAGE_INSTALL_DIRECTORY "tau-lang-${CPACK_PACKAGE_VERSION}")
@@ -981,6 +1001,11 @@ if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+	# One zip holds tau.exe in bin and the SDK box in lib/tau/sdk.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+		set(CPACK_COMPONENTS_GROUPING "ALL_COMPONENTS_IN_ONE")
+	endif()
 elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)

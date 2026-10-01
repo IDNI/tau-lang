@@ -89,6 +89,7 @@ Other presets: `{release,devel,debug}-{tests,tau,all}`, `relwithdebinfo-{tests,t
 only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-packages-zip`,
 `{release,devel,debug}-arm64-{tests,all}`,
 `{release,devel,debug}-msvc-{tau,tests,all}`, `{release,devel,debug}-msvc-all-clang-cl`,
+`release-msvc-packages` (NSIS installer with the SDK box), `release-msvc-packages-zip`,
 `{release,devel,debug}-binding-python`,
 `{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
 `release-all`), `msvc-all` (alias of `release-msvc-all`).
