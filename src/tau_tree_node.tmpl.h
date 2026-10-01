@@ -275,7 +275,7 @@ void hash_ba_constant_data(std::uint64_t& seed, size_t data) {
 	// TODO (HIGH) dropped error: ba_constants::get's report -- the node constructor is noexcept, so a miss folds to alternative 0.
 	const auto c = tau_lang::ba_constants<node_t>::get(data)
 		.value_or(constant_t{});
-	hash_combine(seed, c.index(), table[c.index()](c));
+	hash_combine(seed, table[c.index()](c));
 }
 
 template <typename... BAs>
