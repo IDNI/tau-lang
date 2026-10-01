@@ -1,0 +1,17 @@
+# Spot source
+
+This package holds three Spot tools: ltlsynt, autfilt and ltlfilt. They
+come from Spot version @TAU_SPOT_VERSION@.
+
+Spot is free software under the GNU General Public License, version 3
+(GPLv3). The license text is in the file COPYING in this folder. Tau runs
+these tools as separate programs. Tau does not link Spot.
+
+The source of these tools is in the same GitHub release as this package:
+
+- `spot-@TAU_SPOT_VERSION@.tar.gz` is the Spot source release.
+- `spot-build-scripts-@TAU_SPOT_VERSION@.tar.gz` holds the scripts that
+  build the tools from that source.
+
+The Spot source release is also at @TAU_SPOT_URL@.
+The Spot home page is https://spot.lre.epita.fr/.

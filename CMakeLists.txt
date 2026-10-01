@@ -902,7 +902,8 @@ install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 		"${CMAKE_CURRENT_SOURCE_DIR}/README.md"
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
-	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
+	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
+	PATTERN "*.in" EXCLUDE)
 
 # tau.exe of an MSVC build needs the Visual C++ runtime DLLs, which a clean
 # Windows install does not always have.
@@ -977,6 +978,23 @@ if(TAU_BUILD_EXECUTABLE AND TAU_SPOT_PREFIX)
 		DESTINATION "libexec/tau/spot" COMPONENT ${TAU_PKG_COMPONENT})
 	install(DIRECTORY "${TAU_SPOT_PREFIX}/share/licenses/"
 		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT ${TAU_PKG_COMPONENT})
+	# The GPLv3 source notice. The version and the URL come from the producer
+	# recipe, the one place that names them.
+	set(_tau_spot_recipe "${PROJECT_SOURCE_DIR}/scripts/dep/common/spot.sh")
+	file(STRINGS "${_tau_spot_recipe}" _tau_spot_version REGEX "^SPOT_VERSION=")
+	string(REGEX REPLACE "^SPOT_VERSION=\"\\$\\(dep_var SPOT_VERSION ([^)]+)\\)\"$" "\\1"
+		TAU_SPOT_VERSION "${_tau_spot_version}")
+	file(STRINGS "${_tau_spot_recipe}" _tau_spot_url REGEX "https://[^\"]*\\.tar\\.gz")
+	string(REGEX MATCH "https://[^\"]*\\.tar\\.gz" _tau_spot_url "${_tau_spot_url}")
+	string(REPLACE "\${SPOT_VERSION}" "${TAU_SPOT_VERSION}" TAU_SPOT_URL "${_tau_spot_url}")
+	if(NOT TAU_SPOT_VERSION MATCHES "^[0-9.]+$" OR NOT TAU_SPOT_URL MATCHES "^https://")
+		message(FATAL_ERROR "cannot read the Spot version and URL from ${_tau_spot_recipe}")
+	endif()
+	configure_file("${CMAKE_CURRENT_SOURCE_DIR}/licenses/spot/SOURCE.md.in"
+		"${CMAKE_CURRENT_BINARY_DIR}/licenses/spot/SOURCE.md" @ONLY)
+	install(FILES "${CMAKE_CURRENT_BINARY_DIR}/licenses/spot/SOURCE.md"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses/spot"
 		COMPONENT ${TAU_PKG_COMPONENT})
 endif()
 

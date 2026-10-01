@@ -23,7 +23,8 @@ DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
 DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-# Spot 2.16 release tarball digest, fetched from the URL below.
+# Digest of the Spot 2.16 release tarball from the URL below. The package keeps
+# that tarball as src/spot-<version>.tar.gz, the copy a release attaches.
 SPOT_SHA256="688463cb2fa393c51d9cf938fb01a716b91e4c8122aeb52fd116a3bbfddab869"
 
 # A target file overrides the ones it needs before it sources this file.
@@ -168,6 +169,10 @@ PY
 		rm -rf "$work"
 		return 1
 	fi
+	# Copied after the path rewrite, which must not touch the verified bytes.
+	mkdir -p "$staging_prefix/src"
+	cp "$tarball" "$staging_prefix/src/spot-${SPOT_VERSION}.tar.gz" \
+		|| { echo "dep-spot: cannot keep the source tarball" >&2; rm -rf "$work"; return 1; }
 	rm -rf "$work"
 	return 0
 }
