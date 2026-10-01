@@ -217,8 +217,10 @@ function(_tau_add_test_target N src work_dir)
 	target_setup(${N})
 	target_include_directories(${N} PUBLIC ${work_dir})
 	# extern template declarations for the test BA packs, instantiated in libTAU
-	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's
-	if(NOT "${N}" STREQUAL "test_cvc5")
+	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's;
+	# test_platform_macros too: it defines its macros before any header
+	set(_no_test_pack test_cvc5 test_platform_macros)
+	if(NOT "${N}" IN_LIST _no_test_pack)
 		target_compile_options(${N} PUBLIC
 			-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
 	endif()

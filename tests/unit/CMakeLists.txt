@@ -63,6 +63,7 @@ set(TESTS
 	algorithm_d
 	ltl_aba_open_points
 	cli_options
+	platform_macros
 	codegen_parity
 	cpp_codegen
 	cpp_codegen_pwr

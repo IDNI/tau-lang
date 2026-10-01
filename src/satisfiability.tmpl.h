@@ -2397,7 +2397,7 @@ bool for_each_static_path(tref fm, const auto& f) {
 		return eq_neq(x, y) || eq_neq(y, x);
 	};
 	// The and/or skeleton of fm, with its leaves numbered by literal
-	enum kind_t { AND, OR, LIT, TRUE, FALSE };
+	enum kind_t { AND, OR, LIT, CONSTANT_TRUE, CONSTANT_FALSE };
 	struct part { kind_t kind; std::vector<size_t> sub; size_t lit = 0; };
 	std::vector<part> parts;
 	trefs lits;
@@ -2411,8 +2411,8 @@ bool for_each_static_path(tref fm, const auto& f) {
 					? get_cnf_wff_clauses<node>(g)
 					: get_dnf_wff_clauses<node>(g))
 				p.sub.push_back(build(c));
-		} else if (t.equals_T()) p.kind = TRUE;
-		else if (t.equals_F()) p.kind = FALSE;
+		} else if (t.equals_T()) p.kind = CONSTANT_TRUE;
+		else if (t.equals_F()) p.kind = CONSTANT_FALSE;
 		else {
 			p.kind = LIT;
 			auto [it, fresh] = lit_ids.emplace(g, lits.size());
@@ -2451,7 +2451,7 @@ bool for_each_static_path(tref fm, const auto& f) {
 			break;
 		case OR:
 			if (std::ranges::any_of(p.sub, [&](size_t c) {
-				return parts[c].kind == TRUE
+				return parts[c].kind == CONSTANT_TRUE
 					|| (parts[c].kind == LIT
 						&& held[parts[c].lit]);
 			})) cont = go();
@@ -2472,8 +2472,8 @@ bool for_each_static_path(tref fm, const auto& f) {
 				--held[p.lit], path.pop_back();
 			}
 			break;
-		case TRUE: cont = go(); break;
-		case FALSE: break;
+		case CONSTANT_TRUE: cont = go(); break;
+		case CONSTANT_FALSE: break;
 		}
 		todo.push_back(g);
 		return cont;
