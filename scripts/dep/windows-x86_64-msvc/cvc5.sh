@@ -91,7 +91,9 @@ _dep_cvc5_target_setup() {
 	DEP_CVC5_PREFIX_MAP=OFF
 	# clang-cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
 	# spaces, and clang-cl sits under "Program Files".
-	_DEP_CVC5_TARGET_ARGS=(--ninja production)
+	# The try_run version checks of cvc5 link the Release CaDiCaL and GMP, so
+	# they build in Release too.
+	_DEP_CVC5_TARGET_ARGS=(--ninja production -DCMAKE_TRY_COMPILE_CONFIGURATION=Release)
 	_py="$(_dep_cvc5_python || true)"
 	if [ -n "$_py" ]; then
 		_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
