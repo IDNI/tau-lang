@@ -103,9 +103,13 @@ template <NodeType node> size_t qlt_type_id();
 // dense linear order without endpoints over the rationals, which is
 // ω-categorical (all countable models are isomorphic) and hence admits
 // quantifier elimination.  The project supports it because of ω-categoricity,
-// not because it is a BA.  The C++ implementation uses finite normalised
-// unions of intervals as a convenient representation of definable subsets of
-// Q, but qlt values are rational POINTS, not sets.
+// not because it is a BA.  A qlt variable or stream denotes one rational
+// POINT; a qlt constant denotes a definable subset of Q, held as a finite
+// normalised union of intervals.  Where a term combines a variable x with
+// constants, x reads as the singleton {x}: `c & x != 0` says x lies in c,
+// `x = c` that c is {x}, and `x = 0`, `x = 1` never hold.  Quantifiers over
+// qlt variables are eliminated by qlt_qe.tmpl.h and solved by
+// qlt_solver.tmpl.h with that reading.
 //
 // Interval endpoints are exact rationals p/q (long long numerator, positive
 // denominator, reduced by gcd), together with a bound_type flag for each end:

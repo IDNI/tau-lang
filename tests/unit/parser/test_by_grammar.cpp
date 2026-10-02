@@ -412,7 +412,8 @@ TEST_CASE("[SHAPE-M-12] dyadic: (o1={[0,1)}) until (G(F(o2={[1/4,3/4)})))") { tr
 
 // qlt type (Q,<-ordered dense linear order — NOT a Boolean algebra, but an omega-categorical theory)
 TEST_CASE("[SHAPE-M-13] qlt: F(F(F(o1>{0}:qlt)))") { tref fm = spec("F (F (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-14] qlt: G(F(o1={(0,1)}:qlt))") { tref fm = spec("G (F (o1[t]:qlt = {(0, 1)}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+// A qlt output is a point, and no point equals the interval (0, 1).
+TEST_CASE("[SHAPE-M-14] qlt: G(F(o1={(0,1)}:qlt))") { tref fm = spec("G (F (o1[t]:qlt = {(0, 1)}:qlt))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
 TEST_CASE("[SHAPE-M-15] qlt: (o1={1/2}) until (G(F(o2>{0})))") { tref fm = spec("(o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // nlang type

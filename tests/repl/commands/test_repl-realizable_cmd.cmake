@@ -640,7 +640,8 @@ add_repl_test(realizable_cmd-by_grammar-shape_m_10_dyadic_f_f_f_o1_1_4_3_4 "real
 add_repl_test(realizable_cmd-by_grammar-shape_m_11_dyadic_g_f_o1_1_0_1_2 "realizable G (F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_12_dyadic_o1_0_1_u_g_f_o2_1_4_3_4 "realizable (o1[t]:qint = {[0, 1)}:qint) until (G (F (o2[t]:qint = {[1/4, 3/4)}:qint)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_13_qlt_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_m_14_qlt_g_f_o1_0_1_qlt "realizable G (F (o1[t]:qlt = {(0, 1)}:qlt))." ": T" REQUIRES ltlsynt)
+# A qlt output is a point, and no point equals the interval (0, 1).
+add_repl_test(realizable_cmd-by_grammar-shape_m_14_qlt_g_f_o1_0_1_qlt "realizable G (F (o1[t]:qlt = {(0, 1)}:qlt))." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_15_qlt_o1_1_2_u_g_f_o2_0 "realizable (o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_16_nlang_f_f_f_o1_it_is_raining_nlang "realizable F (F (F (o1[t]:nlang = {it is raining}:nlang)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_17_nlang_g_f_o1_the_sun_is_shining_nlang "realizable G (F (o1[t]:nlang = {the sun is shining}:nlang))." ": T" REQUIRES ltlsynt)

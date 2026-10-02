@@ -613,10 +613,15 @@ TEST_SUITE("qlt interval collector") {
 		CHECK( sat("x : qlt < {7}:qlt && x : qlt > {5}:qlt.") == true );
 	}
 
-	// GitHub #189
-	TEST_CASE("a closed conjunct without the variable declines") {
-		CHECK( !sat("x : qlt > {5}:qlt && ex y : qlt (y < {0}:qlt && y > {1}:qlt).") );
-		CHECK( !sat("x : qlt > {5}:qlt && all y : qlt (y > {1}:qlt).") );
+	// GitHub #189: the interval collector cannot read the closed conjunct,
+	// so the cells decide the body as a whole.
+	TEST_CASE("a closed conjunct without the variable is not dropped") {
+		CHECK( sat("x : qlt > {5}:qlt && ex y : qlt (y < {0}:qlt && y > {1}:qlt).")
+			== false );
+		CHECK( sat("x : qlt > {5}:qlt && all y : qlt (y > {1}:qlt).")
+			== false );
+		CHECK( sat("x : qlt > {5}:qlt && ex y : qlt (y > {1}:qlt).")
+			== true );
 	}
 	TEST_CASE("a conjunct on another free variable is the caller's") {
 		CHECK( sat("x : qlt > {5}:qlt && a : qlt < {0}:qlt.") == true );

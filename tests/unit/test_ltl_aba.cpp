@@ -1812,22 +1812,28 @@ TEST_SUITE("LTL dyadic type with nontrivial constants") {
 
 TEST_SUITE("LTL qlt type with nontrivial constants") {
 
-	TEST_CASE("F(o1:qlt = {(0, 1)}:qlt) is REALIZABLE") {
+	TEST_CASE("F(o1:qlt = {(0, 1)}:qlt) is UNREALIZABLE") {
 		tref fm = spec("F (o1[t]:qlt = {(0, 1)}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		// A qlt output is a point, and no point equals the interval
+		// or union of points this formula needs it to equal.
+		CHECK_FALSE(sat(fm));
 	}
 
-	TEST_CASE("F(o1:qlt = {[1/3, 2/3]}:qlt) is REALIZABLE") {
+	TEST_CASE("F(o1:qlt = {[1/3, 2/3]}:qlt) is UNREALIZABLE") {
 		tref fm = spec("F (o1[t]:qlt = {[1/3, 2/3]}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		// A qlt output is a point, and no point equals the interval
+		// or union of points this formula needs it to equal.
+		CHECK_FALSE(sat(fm));
 	}
 
-	TEST_CASE("F(o1:qlt = {(-2, -1) | (1, 2)}:qlt) is REALIZABLE") {
+	TEST_CASE("F(o1:qlt = {(-2, -1) | (1, 2)}:qlt) is UNREALIZABLE") {
 		tref fm = spec("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		// A qlt output is a point, and no point equals the interval
+		// or union of points this formula needs it to equal.
+		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("F((o1:qlt & i1:qlt) = {top}:qlt) is UNREALIZABLE") {
@@ -1863,11 +1869,12 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 		CHECK(sat(fm));
 	}
 
-	TEST_CASE("F(o1:qlt = {3}:qlt | {-2}:qlt) is REALIZABLE (union of two singletons)") {
-		// System can output either the singleton {3} or {-2}; chooses one.
+	TEST_CASE("F(o1:qlt = {3}:qlt | {-2}:qlt) is UNREALIZABLE (union of two singletons)") {
 		tref fm = spec("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		// A qlt output is a point, and no point equals the interval
+		// or union of points this formula needs it to equal.
+		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("F((o1:qlt & i1:qlt) = {3}:qlt) is UNREALIZABLE (env blocks singleton)") {
@@ -1928,12 +1935,12 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	// c and d.  The interval is non-empty whenever c < d in the chosen model.
 	// This is a symbolic BA element: its concreteness depends on c's and d's values.
 
-	TEST_CASE("F(o1:qlt = {(c0, c1)}:qlt) is REALIZABLE (named-endpoint interval)") {
-		// {(c0, c1)}:qlt is the open interval between two symbolic constants.
-		// System can always output this symbolic interval.
+	TEST_CASE("F(o1:qlt = {(c0, c1)}:qlt) is UNREALIZABLE (named-endpoint interval)") {
 		tref fm = spec("F (o1[t]:qlt = {(c0, c1)}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		// A qlt output is a point, and no point equals the interval
+		// or union of points this formula needs it to equal.
+		CHECK_FALSE(sat(fm));
 	}
 }
 
@@ -2944,10 +2951,12 @@ TEST_CASE("qlt: ((o1={3}) until (o2=i2[t-2])) weak_until (i1={(0,1)}) is REALIZA
     CHECK(sat(fm));
 }
 
-TEST_CASE("qlt: (o1=i1[t-1]) until ((o2={top}) weak_until (o1={[-1,1]})) is REALIZABLE") {
+TEST_CASE("qlt: (o1=i1[t-1]) until ((o2={top}) weak_until (o1={[-1,1]})) is UNREALIZABLE") {
     tref fm = spec("(o1[t]:qlt = i1[t-1]:qlt) until ((o2[t]:qlt = {top}:qlt) weak_until (o1[t]:qlt = {[-1,1]}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("qlt: ((o2={1/2}) weak_until (o1=i2[t])) until (i1={3}) is UNREALIZABLE — env never sends i1={3}") {
@@ -3090,10 +3099,12 @@ TEST_CASE("SBF: Realizable weak until with nested release and past input") {
     CHECK(sat(fm));
 }
 
-TEST_CASE("QLT: Realizable nested until with past input equality and constant") {
+TEST_CASE("QLT: Unrealizable nested until with past input equality and constant") {
     tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i1[t-1]:qlt)) until (o1[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("QLT: Unrealizable due to forcing past input to two different constants") {
@@ -3223,10 +3234,12 @@ TEST_CASE("[SU-14] G((o1:sbf | i1:sbf) = 0) is UNREALIZABLE") {
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
-TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) since (o1[t]:qlt={0}:qlt)) until (i2[t-2]:qlt={1/2}:qlt)) since (o2[t]:qlt={[0,1]}:qlt) is REALIZABLE") {
+TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) since (o1[t]:qlt={0}:qlt)) until (i2[t-2]:qlt={1/2}:qlt)) since (o2[t]:qlt={[0,1]}:qlt) is UNREALIZABLE") {
     tref fm = spec("(((o2[t]:qlt = i1[t-1]:qlt) since (o1[t]:qlt = {0}:qlt)) until (i2[t-2]:qlt = {1/2}:qlt)) since (o2[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm)); // S compile-away implemented
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("[SU-16] F((o1:sbf={X}) until ((o2:sbf={Y}) since (i1[t]:sbf={Z}))) is UNREALIZABLE") {
@@ -3307,10 +3320,12 @@ TEST_CASE("[SU-28] ((o1:sbf={X&Y}) since (o2:sbf=1)) until ((i1[t-2]:sbf={Z}) si
     CHECK(sat(fm)); // S compile-away implemented
 }
 
-TEST_CASE("[SU-29] (o1:qlt={3}) S (o2:qlt={[0,1]}) is REALIZABLE") {
+TEST_CASE("[SU-29] (o1:qlt={3}) S (o2:qlt={[0,1]}) is UNREALIZABLE") {
     tref fm = spec("(o1[t]:qlt = {3}:qlt) since (o2[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("[SU-30] F(G(o1:sbf={X})) is REALIZABLE") {
@@ -3337,10 +3352,12 @@ TEST_CASE("[SU-33] ((i1[t-3]:sbf={Y}) since (o2:sbf={X|Z})) until (o1:sbf=i2[t-2
     CHECK(sat(fm));
 }
 
-TEST_CASE("[SU-34] F((o1:qlt={(0,1)}) && (o2:qlt={0})) is REALIZABLE") {
+TEST_CASE("[SU-34] F((o1:qlt={(0,1)}) && (o2:qlt={0})) is UNREALIZABLE") {
     tref fm = spec("F ((o1[t]:qlt = {(0,1)}:qlt) && (o2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm)); // S compile-away implemented
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("[SU-35] G((o1:sbf=i1[t-1]:sbf) until (i2[t]:sbf={Y&Z})) is UNREALIZABLE") {
@@ -3389,10 +3406,12 @@ TEST_CASE("[SU-41] (o1:sbf={X}) until (((o2:sbf=i1[t-2]:sbf) since (i2[t-3]:sbf=
     CHECK(realizable(fm));
 }
 
-TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is REALIZABLE") {
+TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is UNREALIZABLE") {
     tref fm = spec("F (G (o2[t]:qlt = {[0,1]}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm)); // No S operator — correctly REALIZABLE
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("[SU-43] ((o1:sbf=i1[t-1]:sbf) since (o2:sbf={X&Z})) until (i2[t]:sbf={Y}) is UNREALIZABLE") {
@@ -3437,10 +3456,12 @@ TEST_CASE("[SU-49] (o1:sbf={X&Y}) release (o2[t-1]:sbf={X|Z}) is REALIZABLE") {
     CHECK(sat(fm));
 }
 
-TEST_CASE("[SU-50] (o1:qlt={3}) until (((o2:qlt={1/2}) since (i1[t-3]:qlt={0})) until (o2[t-2]:qlt={(0,1)})) is REALIZABLE") {
+TEST_CASE("[SU-50] (o1:qlt={3}) until (((o2:qlt={1/2}) since (i1[t-3]:qlt={0})) until (o2[t-2]:qlt={(0,1)})) is UNREALIZABLE") {
     tref fm = spec("(o1[t]:qlt = {3}:qlt) until (((o2[t]:qlt = {1/2}:qlt) since (i1[t-3]:qlt = {0}:qlt)) until (o2[t-2]:qlt = {(0,1)}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm)); // S compile-away implemented
+    // A qlt output is a point, and no point equals the interval
+    // or union of points this formula needs it to equal.
+    CHECK_FALSE(sat(fm));
 }
 
 } // TEST_SUITE("DeepSeek: 50 S/U mixed nesting")

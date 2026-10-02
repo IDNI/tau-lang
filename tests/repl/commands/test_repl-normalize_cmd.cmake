@@ -293,9 +293,8 @@ add_repl_test(normalize_cmd-tau_absolute_time_one "set charvar off. normalize { 
 add_repl_test(normalize_cmd-tau_absolute_time_fixed_point_zero "set charvar off. normalize { (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0) }:tau = 0" ": F")
 add_repl_test(normalize_cmd-tau_absolute_time_constraint_zero "set charvar off. normalize { (always ([t < 2] -> i1[t] = 0)) && (always ((o4[t-2] = 1 && o1[t] = o4[t-2]) -> o1[t] = 1)) }:tau = 0" ": F")
 
-# GitHub #197: a point is an atom, so a qlt variable met by one point p only as
-# `p & y` and `p & y'` has two cases, y containing p or not, and no value makes
-# both meets nonzero.
+# GitHub #197: a qlt variable y is a point, so `p & y` for the point p is p or
+# 0 by whether y is p, and no value makes both meets nonzero.
 add_repl_test(normalize_cmd-qlt_point_meet_ex
 	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0))" ": F")
 add_repl_test(normalize_cmd-qlt_point_meet_valid
@@ -323,15 +322,13 @@ add_repl_test(normalize_cmd-qlt_point_interval_meet_ex
 	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({[0,1]}:qlt & y') != 0))" ": T")
 add_repl_test(normalize_cmd-qlt_point_interval_meet_all
 	"normalize all y:qlt ((({3}:qlt & y) = 0) || (({[0,1]}:qlt & y') = 0))" ": F")
-# qlt has atoms, so a block is not distributed over its disequations: with no
-# point witness the binder stays rather than answering T.
-add_repl_test(normalize_cmd-qlt_two_points_meet_kept
-	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y) != 0))" ": ex b1 ")
-add_repl_test(normalize_cmd-qlt_point_meet_open_kept
-	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0) && ((x:qlt & y) != 0))" ": ex b1 ")
-# An ordering atom stays with the interval computation.
-add_repl_test(normalize_cmd-qlt_point_meet_order_kept
-	"normalize ex y:qlt (y > {5}:qlt && ({3}:qlt & y) = 0)" ": ex b1 ")
+# A point is not both 3 and 5, whatever x is, and a point above 5 is not 3.
+add_repl_test(normalize_cmd-qlt_two_points_meet_both
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y) != 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_open
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0) && ((x:qlt & y) != 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_order
+	"normalize ex y:qlt (y > {5}:qlt && ({3}:qlt & y) = 0)" ": T")
 add_repl_test(normalize_cmd-qlt_point_meet_order_empty
 	"normalize ex y:qlt (y < {1}:qlt && y > {5}:qlt && ({3}:qlt & y) != 0)" ": F")
 # Without the atomless law a qlt disequation still decides: excluding finitely
@@ -342,3 +339,43 @@ add_repl_test(normalize_cmd-qlt_excluded_vars_ex
 	"normalize ex x:qlt (x != a:qlt && x != b:qlt)" ": T")
 add_repl_test(normalize_cmd-qlt_pinned_and_excluded_ex
 	"normalize ex b:qlt (b != {[0,1]}:qlt && (b & {[0,1]}:qlt' | b' & {[0,1]}:qlt) = 0)" ": F")
+
+# qlt variables are points and qlt constants sets of points: `c & x != 0` says
+# that x lies in c, `x = c` that c is the point x, and `x & y' = 0` that x is
+# y. A quantifier is decided by one point per cell of the constants' endpoints.
+add_repl_test(normalize_cmd-qlt_points_equals_interval
+	"normalize ex x:qlt (x = {[0,1]}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_points_equals_point
+	"normalize ex x:qlt (x = {1/2}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_points_inclusion_is_equality
+	"normalize ex x:qlt ex y:qlt (x & y' = 0 && x != y)" ": F")
+add_repl_test(normalize_cmd-qlt_points_inclusion_residual
+	"normalize ex x:qlt (x & y:qlt' = 0 && x & z:qlt' = 0 && y != z)" ": F")
+add_repl_test(normalize_cmd-qlt_points_interval_cell_ex
+	"normalize ex x:qlt (({[0,1]}:qlt & x != 0) && x > {1/2}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_points_interval_cell_all
+	"normalize all x:qlt (({(0,1)}:qlt & x != 0) -> x < {1}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_points_interval_cell_all_f
+	"normalize all x:qlt (({[0,1]}:qlt & x != 0) -> x < {1}:qlt)" ": F")
+# x = 3 lies in [2, 4], which holds other points too.
+add_repl_test(normalize_cmd-qlt_points_membership_f
+	"normalize ex x:qlt (({3}:qlt & x != 0) && ({[2,4]}:qlt & x' = 0))" ": F")
+add_repl_test(normalize_cmd-qlt_points_membership_t
+	"normalize ex x:qlt (({3}:qlt & x != 0) && ({[2,4]}:qlt & x' != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_points_proper_part
+	"normalize ex x:qlt (x != 0 && x' != 0)" ": T")
+add_repl_test(normalize_cmd-qlt_points_two_vars_order
+	"normalize ex x:qlt ex y:qlt (x < y && {[0,1]}:qlt & x != 0 && {[2,3]}:qlt & y != 0)" ": T")
+add_repl_test(normalize_cmd-qlt_points_two_vars_order_f
+	"normalize ex x:qlt ex y:qlt (x > y && {[0,1]}:qlt & x != 0 && {[2,3]}:qlt & y != 0)" ": F")
+add_repl_test(normalize_cmd-qlt_points_all_ex
+	"normalize all x:qlt ex y:qlt (x < y && {[0,1]}:qlt & y != 0)" ": F")
+# With one other free variable the answer is the set of its points that work.
+add_repl_test(normalize_cmd-qlt_points_residual_membership
+	"normalize ex x:qlt (x > y:qlt && {[0,1]}:qlt & x != 0)" ": y\\{ \\(-inf, 1\\) \\}:qlt != 0")
+add_repl_test(normalize_cmd-qlt_points_residual_meet
+	"normalize ex x:qlt (x = y:qlt & {3}:qlt)" ": \\{ 3 \\}:qlt y != 0")
+add_repl_test(normalize_cmd-qlt_points_qelim
+	"qelim ex x:qlt (x = {[0,1]}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_points_sat
+	"sat ex x:qlt (x = {[0,1]}:qlt)" ": F")

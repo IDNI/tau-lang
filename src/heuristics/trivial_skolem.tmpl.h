@@ -281,6 +281,15 @@ tref trivial_skolem_ex(const trefs& vars, tref phi) {
 			kept_vars.push_back(v);
 			continue;
 		}
+		// A variable of a non-ABA omega-categorical type is a point,
+		// and the isolated side need not denote one: the owner's
+		// elimination decides it.
+		if (pack_type_is_non_aba_omcat<node>(
+			tau::get(v).get_ba_type()))
+		{
+			kept_vars.push_back(v);
+			continue;
+		}
 		size_t occurrence = atoms.size();
 		for (size_t i = 0; i < atoms.size(); ++i)
 			if (contains<node>(atoms[i], v)) { occurrence = i; break; }

@@ -1193,6 +1193,14 @@ bool contains(tref fm, tref sub_fm);
 template <NodeType node>
 bool is_atomic_fm(tref n);
 
+/**
+ * @brief Return `true` if the term @p term denotes one point of
+ * @p ba_type, a non-ABA omega-categorical type whose variables are points:
+ * a variable, or a constant its owner orders against itself.
+ */
+template <NodeType node>
+bool is_point_term(size_t ba_type, tref term);
+
 /** @brief Return `true` if @p n is a CLI command node. */
 template <NodeType node>
 bool is_cli_cmd(tref n);

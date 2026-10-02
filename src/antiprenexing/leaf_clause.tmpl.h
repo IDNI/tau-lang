@@ -151,15 +151,13 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(tau::build_wff_and(indep, kept));
 	}
 
-	// ---- qlt: DLO quantifier elimination (AN-1/AN-10) --------------------
+	// ---- Non-ABA omega-categorical types: the owner's elimination ---------
 	//
-	// A qlt/omcat-typed binder is decided by dense-linear-order interval
-	// computation, not by the squeeze below: the squeeze cannot read an
-	// ordering atom (`bf_lt` and friends are not squeezable conjuncts), so
-	// without this branch the partition would freeze the component and the
-	// binder would never be decided. Ported from the deleted
-	// `treat_ex_quantified_clause` and generalised to a whole block: the
-	// block is peeled one variable at a time, innermost first. For the
+	// A variable of such a type (qlt, a dense linear order over the
+	// rationals) denotes a point, not an element of a Boolean algebra, so
+	// neither the squeeze below nor its atomless laws apply to it, and the
+	// owner's elimination decides every binder of the block: the block is
+	// peeled one variable at a time, innermost first. For the
 	// variable under peel every OTHER variable -- bound outside it or
 	// already kept -- is a symbolic free endpoint, exactly what
 	// the owning BA's AN-1 rules are sound for: a determined non-empty
@@ -170,95 +168,76 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// conjuncts; outer variables then see that kept subformula as an
 	// opaque conjunct and stay undetermined themselves, which nests the
 	// surviving binders in their original order.
-	//
-	// Ordering-free omcat content (e.g. meet-equalities) skips the peel
-	// entirely: the atomless machinery below handles it, as the old
-	// per-variable flow allowed.
-	auto is_ordering_atom = [](tref m) {
-		const auto& t = tau::get(m);
-		return t.is(tau::bf_lt) || t.is(tau::bf_gt)
-		    || t.is(tau::bf_lteq) || t.is(tau::bf_gteq)
-		    || t.is(tau::bf_nlt) || t.is(tau::bf_ngt)
-		    || t.is(tau::bf_nlteq) || t.is(tau::bf_ngteq);
-	};
 	if (pack_type_is_non_aba_omcat<node>(clause_type)) {
-		bool has_ordering = false;
-		for (tref c : conjs)
-			if (tau::get(c).find_top(is_ordering_atom)) {
-				has_ordering = true;
-				break;
-			}
-		if (has_ordering) {
-			trefs vars(block);
-			trefs rem(conjs);
-			// First drop, in any order and until nothing
-			// changes, every binder the theory decides outright
-			// (existentials commute). The innermost-first peel
-			// below wraps an undetermined binder around its
-			// conjuncts, which freezes every outer binder that
-			// conjunct mentions; in `x2 < x1 && x1 < x3` x1 is
-			// two-sided, yet one-sided once x2 is gone.
-			for (bool progress = true; progress && !vars.empty();) {
-				progress = false;
-				for (size_t vi = vars.size(); vi-- > 0;) {
-					tref v = vars[vi];
-					trefs mine, rest;
-					for (tref c : rem)
-						(contains<node>(c, v) ? mine
-							: rest).push_back(c);
-					if (!mine.empty()) {
-						auto sat = pack_omcat_qe<node>(
-							clause_type, v,
-							tau::build_wff_and(mine));
-						if (!sat) continue;
-						if (!*sat)
-							return r.with_value(
-								_F<node>());
-						rem = std::move(rest);
-					}
-					erase_at(vars, vi);
-					progress = true;
-				}
-			}
-			while (!vars.empty()) {
-				tref v = vars.back();
-				vars.pop_back();
+		trefs vars(block);
+		trefs rem(conjs);
+		// First drop, in any order and until nothing
+		// changes, every binder the theory decides outright
+		// (existentials commute). The innermost-first peel
+		// below wraps an undetermined binder around its
+		// conjuncts, which freezes every outer binder that
+		// conjunct mentions; in `x2 < x1 && x1 < x3` x1 is
+		// two-sided, yet one-sided once x2 is gone.
+		for (bool progress = true; progress && !vars.empty();) {
+			progress = false;
+			for (size_t vi = vars.size(); vi-- > 0;) {
+				tref v = vars[vi];
 				trefs mine, rest;
 				for (tref c : rem)
-					(contains<node>(c, v) ? mine : rest)
-						.push_back(c);
-				if (mine.empty()) { // unconstrained binder drops
-					continue;
-				}
-				tref scoped_v = tau::build_wff_and(mine);
-				if (auto sat = pack_omcat_qe<node>(
-					clause_type, v, scoped_v); sat) {
-					if (!*sat) return r.with_value(_F<node>());
-					// Satisfiable for every value of the
-					// outer/kept endpoints: the conjuncts
-					// and the binder go.
+					(contains<node>(c, v) ? mine
+						: rest).push_back(c);
+				if (!mine.empty()) {
+					auto sat = pack_omcat_qe<node>(
+						clause_type, v,
+						tau::build_wff_and(mine));
+					if (!sat) continue;
+					if (!*sat)
+						return r.with_value(
+							_F<node>());
 					rem = std::move(rest);
-					continue;
 				}
-				// A bound by other variables on both sides is
-				// eliminated symbolically: `ex x (a < x &&
-				// x < b)` is `a < b`.
-				if (tref res = pack_omcat_qe_residual<node>(
-					clause_type, v, scoped_v); res) {
-					rest.push_back(res);
-					rem = std::move(rest);
-					continue;
-				}
-				// Undetermined (AN-1): keep this binder around
-				// its own conjuncts.
-				rest.push_back(tau::build_wff_ex(v, scoped_v,
-					false));
-				rem = std::move(rest);
+				erase_at(vars, vi);
+				progress = true;
 			}
-			if (rem.empty()) return r.with_value(indep);
-			return r.with_value(tau::build_wff_and(indep,
-				tau::build_wff_and(rem)));
 		}
+		while (!vars.empty()) {
+			tref v = vars.back();
+			vars.pop_back();
+			trefs mine, rest;
+			for (tref c : rem)
+				(contains<node>(c, v) ? mine : rest)
+					.push_back(c);
+			if (mine.empty()) { // unconstrained binder drops
+				continue;
+			}
+			tref scoped_v = tau::build_wff_and(mine);
+			if (auto sat = pack_omcat_qe<node>(
+				clause_type, v, scoped_v); sat) {
+				if (!*sat) return r.with_value(_F<node>());
+				// Satisfiable for every value of the
+				// outer/kept endpoints: the conjuncts
+				// and the binder go.
+				rem = std::move(rest);
+				continue;
+			}
+			// A bound by other variables on both sides is
+			// eliminated symbolically: `ex x (a < x &&
+			// x < b)` is `a < b`.
+			if (tref res = pack_omcat_qe_residual<node>(
+				clause_type, v, scoped_v); res) {
+				rest.push_back(res);
+				rem = std::move(rest);
+				continue;
+			}
+			// Undetermined (AN-1): keep this binder around
+			// its own conjuncts.
+			rest.push_back(tau::build_wff_ex(v, scoped_v,
+				false));
+			rem = std::move(rest);
+		}
+		if (rem.empty()) return r.with_value(indep);
+		return r.with_value(tau::build_wff_and(indep,
+			tau::build_wff_and(rem)));
 	}
 
 	// ---- Partition the block by eliminability component ------------------
