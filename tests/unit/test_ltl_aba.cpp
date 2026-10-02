@@ -6117,7 +6117,7 @@ TEST_SUITE("safety encoding of a Mealy strategy") {
 		sol.aut.num_states = 2;
 		sol.aut.initial_state = 0;
 		sol.aut.edges = { { hoa_edge{ "t", 1, false } },
-			{ hoa_edge{ "t", second_dst, false } } };
+			{ hoa_edge{ "t", static_cast<size_t>(second_dst), false } } };
 		sol.aut.state_accepting = { false, false };
 		return sol;
 	}

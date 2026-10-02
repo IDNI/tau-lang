@@ -371,7 +371,8 @@ TEST_SUITE("bounded_cache — benchmark") {
 			    std::chrono::duration<double, std::nano>(t1 - t0).count();
 			rows.push_back({
 			    lbl, cache.size(), cache.evictions(),
-			    ns / total, static_cast<double>(hits) / total
+			    ns / static_cast<double>(total),
+			    static_cast<double>(hits) / static_cast<double>(total)
 			});
 		};
 		{ bounded_cache<int, int>                                   c; run("unbounded",     c); }

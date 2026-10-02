@@ -95,7 +95,7 @@ static formula make_formula(mt19937& rng, int depth,
 	if (depth == 0 || (depth <= 2 && rng() % 3 == 0))
 		return atoms[rng() % N_ATOMS];
 
-	int op = rng() % 9; // 0-2: unary, 3-8: binary (includes S since)
+	int op = static_cast<int>(rng() % 9); // 0-2: unary, 3-8: binary (includes S since)
 	if (op < 3) {
 		auto child = make_formula(rng, depth - 1, atoms);
 		switch (op) {
