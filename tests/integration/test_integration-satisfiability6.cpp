@@ -1126,3 +1126,203 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 		}
 	}
 }
+
+TEST_SUITE("satisfiability argument guards and limits") {
+
+	template <typename R>
+	static bool rejected_with(const R& res, code c) {
+		return !res.has_value() && report_has_code(res.report(), c);
+	}
+
+	TEST_CASE("a null formula is an invalid argument everywhere") {
+		CHECK( rejected_with(is_run_satisfiable<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(pin_written_warm_ups<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_formula_sat<node_t>(nullptr, 0, false),
+			code::invalid_argument) );
+		CHECK( rejected_with(transform_to_execution<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_impl<node_t>(nullptr, tau::_T()),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_impl<node_t>(tau::_T(), nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(nullptr, tau::_T()),
+			code::invalid_argument) );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(tau::_T(), nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(simp_tau_unsat_valid<node_t>(nullptr, 0, false),
+			code::invalid_argument) );
+	}
+
+	TEST_CASE("implication between CTL* formulas is not decided") {
+		tref ctl = create_spec("A (always o5[t]:tau = 0).");
+		REQUIRE( ctl != nullptr );
+		CHECK( rejected_with(is_tau_impl<node_t>(ctl, tau::_T()),
+			code::unsupported_operation) );
+		CHECK( rejected_with(is_tau_impl<node_t>(tau::_T(), ctl),
+			code::unsupported_operation) );
+	}
+
+	TEST_CASE("equivalence of full-LTL formulas is not decided") {
+		tref until = create_spec("(o6[t]:tau = 1) until (o6[t]:tau = 0).");
+		tref always = create_spec("always o6[t]:tau = 1.");
+		REQUIRE( until != nullptr );
+		REQUIRE( always != nullptr );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(until, always),
+			code::unsupported_operation) );
+	}
+
+	// The delay chain needs at least four unrolling steps (see
+	// find_fixpoint_chi above), so a cap of two gives up with an error
+	// instead of a partial continuation.
+	TEST_CASE("find_fixpoint_chi gives up at the fixpoint step limit") {
+		tref chi_base = spec_always_body("always o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1].");
+		tref st = spec_always_body("always o4[t] = 1.");
+		REQUIRE( chi_base != nullptr );
+		REQUIRE( st != nullptr );
+		trefs io_vars = io_vars_of(tau::build_wff_and(chi_base, st));
+		std::set<std::pair<std::string, int_t>> initials;
+		const size_t saved = max_fixpoint_steps;
+		max_fixpoint_steps = 2;
+		auto weakened = find_fixpoint_chi<node_t>(chi_base, st, io_vars,
+			initials, 1);
+		max_fixpoint_steps = saved;
+		CHECK( rejected_with(weakened, code::solver_error) );
+		// without a target the continuation strengthens instead, and the
+		// chain still reaches its fixpoint within the default cap
+		auto plain = find_fixpoint_chi<node_t>(chi_base, tau::_T(), io_vars,
+			initials, 1);
+		REQUIRE( plain.has_value() );
+		CHECK( !tau::get(plain.value().first).equals_F() );
+	}
+
+	TEST_CASE("print_fixpoint_info writes to stderr in debug output mode") {
+		std::stringstream captured;
+		auto* old = std::cerr.rdbuf(captured.rdbuf());
+		const bool saved = use_debug_output_in_sat;
+		use_debug_output_in_sat = true;
+		print_fixpoint_info("fixpoint message", "fixpoint result", true);
+		print_fixpoint_info("not printed", "not printed", false);
+		use_debug_output_in_sat = saved;
+		std::cerr.rdbuf(old);
+		CHECK( captured.str() == "fixpoint message\nfixpoint result\n" );
+	}
+}
+
+TEST_SUITE("solver entry points") {
+
+	static std::map<std::string, std::string> as_strings(
+		const solution<node_t>& s)
+	{
+		std::map<std::string, std::string> m;
+		for (const auto& [k, v] : s)
+			m.emplace(tau::get(k).to_str(), tau::get(v).to_str());
+		return m;
+	}
+
+	// A raw (hook-free) variable-free equality, as hooks would have
+	// folded it to T or F on construction.
+	static tref raw_eq_0(tref lhs) {
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::build_bf_eq_0(lhs);
+	}
+
+	static tref raw_neq_0(tref lhs) {
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::build_bf_neq_0(lhs);
+	}
+
+	TEST_CASE("lgrs reports why it failed") {
+		auto null_eq = lgrs<node_t>(nullptr);
+		CHECK( !null_eq.has_value() );
+		CHECK( report_has_code(null_eq.report(), code::invalid_argument) );
+		auto t = lgrs<node_t>(tau::_T());
+		REQUIRE( t.has_value() );
+		CHECK( t.value().empty() );
+		// x | a = 0 needs a = 0, so it has no solution
+		tref eq = create_spec("x | { a }:sbf = 0.");
+		REQUIRE( eq != nullptr );
+		eq = apply_all_xor_def<node_t>(norm_all_equations<node_t>(eq));
+		auto none = lgrs<node_t>(eq);
+		CHECK( !none.has_value() );
+		CHECK( report_has_code(none.report(), code::unsat) );
+	}
+
+	TEST_CASE("solve answers T, F and null directly") {
+		solver_options gen{ .mode = solver_mode::general };
+		auto null_fm = solve<node_t>(static_cast<tref>(nullptr), gen);
+		CHECK( !null_fm.has_value() );
+		CHECK( report_has_code(null_fm.report(), code::invalid_argument) );
+		auto t = solve<node_t>(tau::_T(), gen);
+		REQUIRE( t.has_value() );
+		CHECK( t.value().empty() );
+		auto f = solve<node_t>(tau::_F(), gen);
+		CHECK( !f.has_value() );
+		CHECK( report_has_code(f.report(), code::unsat) );
+	}
+
+	// x = 0 || y' = 0: the first path leaves y at its extreme, the
+	// second pins y to 1; only one of them is extreme in each mode.
+	TEST_CASE("solve keeps the extreme solution over all paths") {
+		tref fm = create_spec("x = 0 || y' = 0.");
+		REQUIRE( fm != nullptr );
+		auto mn = solve<node_t>(fm, { .mode = solver_mode::minimum });
+		REQUIRE( mn.has_value() );
+		CHECK( as_strings(mn.value())
+			== std::map<std::string, std::string>{ { "x", "0" } } );
+		auto mx = solve<node_t>(fm, { .mode = solver_mode::maximum });
+		REQUIRE( mx.has_value() );
+		CHECK( as_strings(mx.value())
+			== std::map<std::string, std::string>{ { "y", "1" } } );
+	}
+
+	TEST_CASE("solve reads through a sometimes") {
+		tref fm = create_spec("sometimes x = 0 && y = 0.");
+		REQUIRE( fm != nullptr );
+		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
+		REQUIRE( s.has_value() );
+		CHECK( as_strings(s.value()) == std::map<std::string, std::string>{
+			{ "x", "0" }, { "y", "0" } } );
+	}
+
+	TEST_CASE("solve does not solve an unresolved reference") {
+		tref fm = create_spec("p(x) && x = 0.");
+		REQUIRE( fm != nullptr );
+		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
+		CHECK( !s.has_value() );
+		CHECK( report_has_code(s.report(), code::unsupported_operation) );
+	}
+
+	TEST_CASE("a variable-free true equality has the empty solution") {
+		const size_t sbf = sbf_type_id<node_t>();
+		tref zero_eq = raw_eq_0(tau::_0(sbf));
+		auto s = find_solution<node_t>(zero_eq);
+		REQUIRE( s.has_value() );
+		CHECK( s.value().empty() );
+		equation_system<node_t> sys{ zero_eq, {} };
+		CHECK( find_maximal_solution<node_t>(sys).has_value() );
+		CHECK( find_minimal_solution<node_t>(sys).has_value() );
+	}
+
+	// var_free_holds reduces the bf terms of the equality only, so an
+	// equality whose sides are already reduced constants is never
+	// rebuilt and never turns into F.
+	TEST_CASE("a variable-free false equality has no solution"
+		* doctest::should_fail())
+	{
+		const size_t sbf = sbf_type_id<node_t>();
+		tref one_eq = raw_eq_0(tau::_1(sbf));
+		tref zero_neq = raw_neq_0(tau::_0(sbf));
+		CHECK( !find_solution<node_t>(one_eq).has_value() );
+		CHECK( !find_maximal_solution<node_t>(
+			equation_system<node_t>{ one_eq, {} }).has_value() );
+		CHECK( !find_minimal_solution<node_t>(
+			equation_system<node_t>{ one_eq, {} }).has_value() );
+		CHECK( !find_maximal_solution<node_t>(
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).has_value() );
+		CHECK( !find_minimal_solution<node_t>(
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).has_value() );
+	}
+}

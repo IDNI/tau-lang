@@ -988,6 +988,96 @@ TEST_SUITE("Normalizer modular value cover") {
 	}
 }
 
+TEST_SUITE("Normalizer entry points") {
+
+	static tref main_of(const char* sample) {
+		return get_nso_rr(sample).value().main->get();
+	}
+
+	template <typename R>
+	static bool invalid(const R& res) {
+		return !res.has_value()
+			&& report_has_code(res.report(), code::invalid_argument);
+	}
+
+	TEST_CASE("a null formula is an invalid argument") {
+		CHECK( invalid(normalize<node_t>(nullptr)) );
+		CHECK( invalid(normalize_non_temp<node_t>(nullptr)) );
+		CHECK( invalid(normalize_with_temp_simp<node_t>(nullptr)) );
+		CHECK( invalid(normalizer<node_t>(static_cast<tref>(nullptr))) );
+		CHECK( invalid(has_no_boolean_combs_of_models<node_t>(nullptr)) );
+		CHECK( invalid(is_non_temp_nso_satisfiable<node_t>(nullptr)) );
+		CHECK( invalid(is_non_temp_nso_unsat<node_t>(nullptr)) );
+		CHECK( invalid(is_nso_impl<node_t>(nullptr, tau::_T())) );
+		CHECK( invalid(is_nso_impl<node_t>(tau::_T(), nullptr)) );
+	}
+
+	TEST_CASE("are_nso_equivalent compares references by their call") {
+		tref px = main_of("p(x).");
+		tref qx = main_of("q(x).");
+		tref eq = main_of("x = 0.");
+		CHECK( are_nso_equivalent<node_t>(px, main_of("p(x).")) );
+		CHECK( !are_nso_equivalent<node_t>(px, qx) );
+		CHECK( !are_nso_equivalent<node_t>(px, eq) );
+		CHECK( !are_nso_equivalent<node_t>(eq, px) );
+	}
+
+	// The reference fast path compares the name and the first offset of
+	// the two calls, never their arguments.
+	TEST_CASE("are_nso_equivalent tells calls with different arguments apart"
+		* doctest::should_fail())
+	{
+		CHECK( !are_nso_equivalent<node_t>(main_of("p(x)."),
+			main_of("p(y).")) );
+	}
+
+	TEST_CASE("per-formula preprocessing blasts to an equivalent formula") {
+		tref fm = main_of("x:bv[8] + y:bv[8] = { 4 }:bv[8] "
+			"&& x:bv[8] > { 2 }:bv[8].");
+		auto base = normalizer<node_t>(fm);
+		REQUIRE( base.has_value() );
+		const bool saved_pre = preprocessing;
+		const bool saved_blast = bv_blasting;
+		const auto saved_site = preprocess_placement;
+		const auto saved_mode = preprocess_method;
+		preprocessing = true;
+		bv_blasting = true;
+		preprocess_placement = preprocess_site::per_formula;
+		preprocess_method = preprocess_mode::anti_prenex_result;
+		auto blasted = normalizer<node_t>(fm);
+		preprocessing = saved_pre;
+		bv_blasting = saved_blast;
+		preprocess_placement = saved_site;
+		preprocess_method = saved_mode;
+		REQUIRE( blasted.has_value() );
+		CHECK( !tau::get(blasted.value()).find_top(is<node_t, tau::bf_add>) );
+		CHECK( tau::get(base.value()).find_top(is<node_t, tau::bf_add>) );
+		CHECK( are_nso_equivalent<node_t>(blasted.value(), base.value()) );
+	}
+
+	// A functional quantifier over arithmetic stays a binder; its bound
+	// variable is not the free variable of the same name next to it.
+	TEST_CASE("a functional quantifier over arithmetic keeps its body") {
+		auto r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fall z:bv[8] (z * { 2 }:bv[8])."));
+		REQUIRE( r.has_value() );
+		CHECK( tau::get(r.value()).find_top(is<node_t, tau::bf_mul>) );
+	}
+
+	TEST_CASE("a functional quantifier does not capture a free variable of "
+		"its name" * doctest::should_fail())
+	{
+		auto fall_r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fall y:bv[8] (y * { 2 }:bv[8])."));
+		REQUIRE( fall_r.has_value() );
+		CHECK( tau::get(fall_r.value()).find_top(is<node_t, tau::bf_mul>) );
+		auto fex_r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fex y:bv[8] (y + { 1 }:bv[8])."));
+		REQUIRE( fex_r.has_value() );
+		CHECK( tau::get(fex_r.value()).find_top(is<node_t, tau::bf_add>) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

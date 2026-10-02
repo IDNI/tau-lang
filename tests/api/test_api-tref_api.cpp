@@ -834,3 +834,220 @@ TEST_SUITE("Tau API - tref - definition/stream edges") {
 		CHECK( !tau_api::get_stream_def("").has_value() );
 	}
 }
+
+// Each entry point rejects an argument of the wrong kind with a report
+// naming code::invalid_argument (or code::parse_error for text that does
+// not parse), never a value.
+TEST_SUITE("Tau API - tref - argument guards") {
+	TEST_CASE_FIXTURE(api_fixture, "function and predicate definitions "
+			"check the kind of their body") {
+		auto pred_as_fun = tau_api::get_function_def("ag_f(x) := x = 0");
+		CHECK(!pred_as_fun.has_value());
+		CHECK(report_has_code(pred_as_fun.report(), code::invalid_argument));
+		auto fun_as_pred = tau_api::get_predicate_def("ag_p(x) := x'");
+		CHECK(!fun_as_pred.has_value());
+		CHECK(report_has_code(fun_as_pred.report(), code::invalid_argument));
+		auto bad_fun = tau_api::get_function_def("ag_f(x) :=");
+		CHECK(!bad_fun.has_value());
+		CHECK(report_has_code(bad_fun.report(), code::parse_error));
+		auto bad_pred = tau_api::get_predicate_def(":= x = 0");
+		CHECK(!bad_pred.has_value());
+		CHECK(report_has_code(bad_pred.report(), code::parse_error));
+		// a rejected definition is not registered: the call stays a ref
+		auto applied = tau_api::apply_all_defs(
+			tau_api::get_formula("ag_p(y)").value());
+		REQUIRE(applied.has_value());
+		CHECK(tau_api::contains(applied.value(), tau::ref));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a spec that does not parse reports "
+			"its parse errors") {
+		auto bad = tau_api::get_spec(") = (");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::parse_error));
+		auto bad_as_written = tau_api::get_spec_as_written(") = (");
+		CHECK(!bad_as_written.has_value());
+		CHECK(report_has_code(bad_as_written.report(), code::parse_error));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "null expressions are invalid arguments") {
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		REQUIRE(x != nullptr);
+		auto check_invalid = [](const auto& res) {
+			CHECK(!res.has_value());
+			CHECK(report_has_code(res.report(), code::invalid_argument));
+		};
+		check_invalid(tau_api::apply_defs(subtree_set<node_t>{}, nullptr));
+		check_invalid(tau_api::apply_all_defs(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::substitute(static_cast<tref>(nullptr),
+			std::map<tref, tref>{ { x, x } }));
+		check_invalid(tau_api::substitute(x,
+			std::map<tref, tref>{ { x, nullptr } }));
+		check_invalid(tau_api::normalize_formula(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::normalize_term(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::anti_prenex(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::eliminate_quantifiers(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::unrealizable(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::unsat(static_cast<tref>(nullptr)));
+		check_invalid(tau_api::unsat_core(static_cast<tref>(nullptr)));
+		tref fm = tau_api::get_formula("x = 0").value_or(nullptr);
+		REQUIRE(fm != nullptr);
+		check_invalid(tau_api::onf(fm, static_cast<tref>(nullptr)));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a substitution pair mixing a term "
+			"and a formula is rejected") {
+		tref fm = tau_api::get_formula("x = 0").value_or(nullptr);
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		REQUIRE(fm != nullptr);
+		REQUIRE(x != nullptr);
+		auto r = tau_api::substitute(x, std::map<tref, tref>{ { x, fm } });
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+		auto r2 = tau_api::substitute(fm, std::map<tref, tref>{ { x, fm } });
+		CHECK(!r2.has_value());
+		CHECK(report_has_code(r2.report(), code::invalid_argument));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "formula procedures reject a term and "
+			"term procedures reject a formula") {
+		tref term = tau_api::get_term("x & y").value_or(nullptr);
+		tref fm = tau_api::get_formula("x & y = 0").value_or(nullptr);
+		REQUIRE(term != nullptr);
+		REQUIRE(fm != nullptr);
+		auto nf = tau_api::normalize_formula(term);
+		CHECK(!nf.has_value());
+		CHECK(report_has_code(nf.report(), code::invalid_argument));
+		auto nt = tau_api::normalize_term(fm);
+		CHECK(!nt.has_value());
+		CHECK(report_has_code(nt.report(), code::invalid_argument));
+		auto s = tau_api::sat(term);
+		CHECK(!s.has_value());
+		CHECK(report_has_code(s.report(), code::invalid_argument));
+		auto core = tau_api::unsat_core(term);
+		CHECK(!core.has_value());
+		CHECK(report_has_code(core.report(), code::invalid_argument));
+		auto l = tau_api::lgrs(term);
+		CHECK(!l.has_value());
+		CHECK(report_has_code(l.report(), code::invalid_argument));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve rejects a temporal quantifier") {
+		auto fm_r = tau_api::get_formula("always o1[t] = 0");
+		REQUIRE(fm_r.has_value());
+		auto s = tau_api::solve(fm_r.value(), solver_mode::general);
+		CHECK(!s.has_value());
+		CHECK(report_has_code(s.report(), code::invalid_argument));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "an interpreter is not built for a "
+			"specification with free variables") {
+		tau_spec<node_t> spec;
+		REQUIRE(spec.parse("o1[t] = x."));
+		auto i = tau_api::get_interpreter(spec);
+		CHECK(!i.has_value());
+		CHECK(report_has_code(i.report(), code::invalid_argument));
+	}
+}
+
+// tau_spec built from added trees and parsed parts together.
+TEST_SUITE("tau_spec - added and parsed parts") {
+	static bool has_error_with(const tau_spec<node_t>& spec, const char* text) {
+		for (const auto& e : spec.errors())
+			if (e.find(text) != std::string::npos) return true;
+		return false;
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a second added main is refused") {
+		tref w1 = tau_api::get_formula("x = 0").value_or(nullptr);
+		tref w2 = tau_api::get_formula("y = 0").value_or(nullptr);
+		REQUIRE(w1 != nullptr);
+		REQUIRE(w2 != nullptr);
+		tau_spec<node_t> spec;
+		CHECK(spec.add(w1));
+		CHECK(!spec.add(w2));
+		CHECK(has_error_with(spec, "Multiple main formulas"));
+		CHECK(!spec.get().has_value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a parsed main after an added one is a "
+			"second main") {
+		tref w1 = tau_api::get_formula("x = 0").value_or(nullptr);
+		REQUIRE(w1 != nullptr);
+		tau_spec<node_t> spec;
+		CHECK(spec.add(w1));
+		CHECK(spec.parse("o1[t] = 0."));
+		auto got = spec.get();
+		CHECK(!got.has_value());
+		CHECK(report_has_code(got.report(), code::parse_error));
+		CHECK(has_error_with(spec, "Multiple main formulas"));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "parsed definitions join an added main") {
+		tref main = tau_api::get_formula("ts_h(x) = 0").value_or(nullptr);
+		REQUIRE(main != nullptr);
+		tau_spec<node_t> spec;
+		CHECK(spec.add(main));
+		CHECK(spec.parse("ts_h(x) := x."));
+		auto got = spec.get();
+		REQUIRE(got.has_value());
+		CHECK(tau::get(got.value()).to_str() == "ts_h(x) := x. ts_h(x) = 0.");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "an added definition is type checked "
+			"with the parsed main") {
+		tau_spec<node_t> helper;
+		REQUIRE(helper.parse("ts_k(x) := x:sbf. o9[t]:sbf = ts_k(i9[t])."));
+		auto h = helper.get();
+		REQUIRE(h.has_value());
+		trefs defs = tau::get(h.value()).select_all(
+			is<node_t, tau::rec_relation>);
+		REQUIRE(defs.size() == 1);
+		tau_spec<node_t> spec;
+		CHECK(spec.add(defs[0]));
+		CHECK(spec.parse("o8[t]:tau = ts_k(y)."));
+		auto got = spec.get();
+		CHECK(!got.has_value());
+		CHECK(report_has_code(got.report(), code::parse_error));
+		CHECK(has_error_with(spec, "type inference failed"));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "an added spec brings its definitions") {
+		tau_spec<node_t> helper;
+		REQUIRE(helper.parse("i7 : sbf := in console. "
+			"o7 : sbf := out console. "
+			"ts_g(x:sbf) := x'. o7[t] = ts_g(i7[t])."));
+		auto h = helper.get();
+		REQUIRE(h.has_value());
+		tau_spec<node_t> spec;
+		CHECK(spec.add(h.value()));
+		auto got = spec.get();
+		REQUIRE(got.has_value());
+		// the definitions come first, then the stream definitions
+		CHECK(tau::get(got.value()).to_str() == "ts_g(x) := x'. "
+			"i7:sbf := in console. o7:sbf := out console. "
+			"o7[t]:sbf = ts_g(i7[t]:sbf).");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a type declared twice keeps one "
+			"declaration") {
+		typename tau::get_options opts;
+		opts.parse.start = tau::type_def;
+		opts.infer_ba_types = false;
+		tref pt = tau::get("type Pt = {a: sbf, b: sbf}", opts).value_or(nullptr);
+		tref qt = tau::get("type Qt = {a: sbf}", opts).value_or(nullptr);
+		REQUIRE(pt != nullptr);
+		REQUIRE(qt != nullptr);
+		tau_spec<node_t> spec;
+		CHECK(spec.add(pt));
+		CHECK(spec.add(qt));
+		CHECK(spec.add(pt));
+		CHECK(spec.parse("ex x:Pt x = 0."));
+		auto got = spec.get();
+		REQUIRE(got.has_value());
+		CHECK(spec.errors().empty());
+		// the tuple is flattened into one variable per member
+		CHECK(tau::get(got.value()).select_all(
+			is<node_t, tau::variable>).size() >= 2);
+	}
+}

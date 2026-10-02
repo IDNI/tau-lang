@@ -2389,6 +2389,98 @@ TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
 	}
 }
 
+TEST_SUITE("ba_types_inference: io definitions, binders and fallbacks") {
+
+	// A bv[8] function recurrence for the fallback calls below.
+	static const std::string g_bv8 =
+		"g[n](x:bv[8]) := g[n-1](x). g[0](x:bv[8]) := x. ";
+
+	TEST_CASE("a typed io definition seeds its stream") {
+		tref parsed = tree<node_t>::get(
+			"i1 : sbf := in console. o1[t] = i1[t].",
+			parse_opts_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		trefs streams = tree<node_t>::get(inferred).select_top(
+			is<node_t, tau::variable>);
+		CHECK( streams.size() == 2 );
+		for (tref v : streams) {
+			CAPTURE( get_var_name<node_t>(v) );
+			CHECK( tree<node_t>::get(v).get_ba_type()
+				== sbf_type_id<node_t>() );
+		}
+	}
+
+	TEST_CASE("an io definition needs a complete type and one type") {
+		// a bare family has no sibling to take its parameter from
+		CHECK( !infers_spec("i1 : bv := in console. o1[t] = i1[t].") );
+		CHECK( !infers_spec("i1 : sbf := in console. "
+				    "i1 : tau := in console. o1[t] = i1[t].") );
+		CHECK( !infers_spec("i1 : sbf := in console. o1[t] = i1[t]:tau.") );
+	}
+
+	TEST_CASE("definition heads and bodies reject conflicting annotations") {
+		CHECK( !infers_defs("f(x:sbf, x:tau) := x.") );
+		CHECK( !infers_defs("p(x:sbf, x:tau) := x = 0.") );
+		CHECK( !infers_defs("f(x:sbf):tau := x.") );
+		CHECK( !infers_defs("f(x) := x:sbf | x:tau.") );
+		CHECK( !infers_defs("f(x):tau := y:sbf.") );
+		CHECK( !infers_defs("f(x) := 1:sbf | 1:tau.") );
+		CHECK( !infers_defs("f(x) := x | { 1 }:sbf | { 0 }:tau.") );
+	}
+
+	TEST_CASE("a call inside a definition must match the callee's type") {
+		CHECK( !infers_defs("g(x:sbf) := x. f(x:tau) := g(x).") );
+		CHECK( !infers_defs("g(x):sbf := x. f(x):tau := g(x).") );
+		CHECK( infers_defs("g(x:sbf) := x. f(x:sbf) := g(x).") );
+	}
+
+	TEST_CASE("a binder must agree with a cast operand it binds") {
+		CHECK( !infers_wff("ex x:bv[8] ((bv[16]) x:bv[4] = 0)") );
+		CHECK( !infers_wff("ex x:bv[8] ((bv[16]) (x:bv[4] & x:bv[8]) = 0)") );
+		CHECK( infers_wff("ex x:bv[8] ((bv[16]) x:bv[8] = 0)") );
+	}
+
+	TEST_CASE("terms, commands and reference arguments reject conflicts") {
+		CHECK( !infers_bf("x:sbf & x:tau") );
+		CHECK( !infers("n x:sbf & x:tau", parse_opts_cli_no_infer) );
+		CHECK( !infers("n x:sbf = x:tau", parse_opts_cli_no_infer) );
+		CHECK( !infers("n f(x:sbf) & f(x:tau)", parse_opts_cli_no_infer) );
+		CHECK( infers("n x:sbf = 0", parse_opts_cli_no_infer) );
+		CHECK( !infers_wff("all x:sbf p(x:tau)") );
+		CHECK( !infers_wff("all x:sbf p(x:tau, y)") );
+		CHECK( !infers_spec("f(x) := x. f(x:sbf, x:tau) = 0.") );
+		CHECK( !infers_spec("f(x:sbf) := x. f(y:tau) = 0.") );
+		CHECK( !infers_spec("f(x:sbf) := x. ex x:sbf f(x:tau) = 0.") );
+	}
+
+	TEST_CASE("a fallback call checks its arguments and its fallback") {
+		CHECK( !infers_spec(g_bv8 + "g(x:sbf, x:tau) fallback 0 = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x) fallback (x:sbf | x:tau) = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x:bv[8]):sbf fallback 0 = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x:bv[8]) fallback y:sbf = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x:sbf) fallback y:bv[8] = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x) fallback (1:sbf | 1:tau) = 0.") );
+		CHECK( !infers_spec(g_bv8 + "g(x) fallback (1:bv[8] | { 2 }:bv[16]) = 0.") );
+		CHECK( !infers_spec("h(x:sbf) := x. g[n](x) := g[n-1](x). "
+				    "g[0](x) := x. g(x:bv[8]) fallback h(x) = 0.") );
+		CHECK( !infers_spec("h(x:sbf) := x. g[n](x) := g[n-1](x). "
+				    "g[0](x) := x. g(x) fallback h(x):tau = 0.") );
+		CHECK( !infers_spec("p[n](x) := p[n-1](x). p[0](x:sbf) := x = 0. "
+				    "p(x:sbf, x:tau) fallback T.") );
+		// a fallback agreeing with its enclosing binder is accepted
+		CHECK( infers_spec(g_bv8 + "all x:bv[8] g(x) fallback x:bv[8] = 0.") );
+	}
+
+	TEST_CASE("a predicate fallback may itself be a reference") {
+		CHECK( infers_spec("q(x:sbf) := x = 0. p[n](x) := p[n-1](x). "
+				   "p[0](x:sbf) := x = 0. p(x:sbf) fallback q(x).") );
+		CHECK( infers_spec("q(x) := x = 0. p[n](x) := p[n-1](x). "
+				   "p[0](x) := x = 0. p(x) fallback q(x).") );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

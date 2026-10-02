@@ -394,6 +394,21 @@ TEST_SUITE("Tau API - runtime limits") {
 			CHECK( tau_api::get_ba_option(name).has_value() );
 	}
 
+	// A family the pack owns, asked for an option it does not declare,
+	// is a different miss from a family the pack lacks; both are not_found.
+	TEST_CASE("BA options tell an unknown option from an unknown family") {
+		const auto names = tau_api::ba_option_names();
+		if (names.empty()) return;
+		const std::string family = names.front().substr(0,
+			names.front().find('-'));
+		auto no_option = tau_api::get_ba_option(family + "-no-such-option");
+		CHECK_FALSE( no_option.has_value() );
+		CHECK( report_has_code(no_option.report(), code::not_found) );
+		auto no_family = tau_api::get_ba_option("nosuchfamily-x");
+		CHECK_FALSE( no_family.has_value() );
+		CHECK( report_has_code(no_family.report(), code::not_found) );
+	}
+
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("BA options round-trip through the api") {
 		const auto names = tau_api::ba_option_names();
