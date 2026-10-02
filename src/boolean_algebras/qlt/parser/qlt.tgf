@@ -28,7 +28,8 @@ qlt      => "top"                      :qlt_top
           | "bottom"                   :qlt_bot
           | singleton                  :qlt_singleton
           | interval                   :qlt_interval
-          | ( interval _ '|' _ qlt )   :qlt_union.
+          | ( piece _ '|' _ qlt )      :qlt_union.
+piece    => interval | singleton.
 
 # Four bracket combinations; bound type is encoded in the nonterminal,
 # so the C++ evaluator never needs to inspect the bracket characters.

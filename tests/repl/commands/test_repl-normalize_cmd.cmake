@@ -345,6 +345,9 @@ add_repl_test(normalize_cmd-qlt_order_vars
 	"normalize ex x:qlt ex y:qlt (x & y' = 0 && x != y)" ": T")
 add_repl_test(normalize_cmd-qlt_order_vars_expand
 	"normalize x:qlt < y:qlt" ": xy' = 0 && (y != x|x != y)")
+# qlt prints a union whose pieces include points the way it reads one back
+add_repl_test(normalize_cmd-qlt_union_with_points_reads_back
+	"normalize {0 | [1/2, 1]}:qlt = {[1/2, 1] | 0}:qlt" ": T")
 add_repl_test(normalize_cmd-qlt_ex_interval_value
 	"normalize ex x:qlt (x = {[0,1]}:qlt)" ": T")
 add_repl_test(normalize_cmd-qlt_point_meet_order_empty

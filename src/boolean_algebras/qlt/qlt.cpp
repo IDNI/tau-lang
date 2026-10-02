@@ -619,6 +619,21 @@ std::optional<qlt> qlt_eval_interval(
 	return qlt{{ { qlt_endpoint{lo_r, lo_b}, qlt_endpoint{hi_r, hi_b} } }};
 }
 
+// The set holding the one point a singleton node names.
+static std::optional<qlt> qlt_eval_point(
+	const qlt_parser::tree::traverser& singleton_node)
+{
+	using tt = qlt_parser::tree::traverser;
+	auto s = singleton_node | tt::terminals;
+	qlt_rational val;
+	if (!qlt_rational::parse(s, val)) return std::nullopt;
+	if (val.is_pos_inf() || val.is_neg_inf()) return std::nullopt;
+	return qlt{{ {
+		qlt_endpoint{val, qlt_bound::CLOSED},
+		qlt_endpoint{val, qlt_bound::CLOSED}
+	}}};
+}
+
 result<qlt> qlt_eval_parse_tree(
 	const qlt_parser::tree::traverser& t)
 {
@@ -639,14 +654,9 @@ result<qlt> qlt_eval_parse_tree(
 	case type::qlt_singleton: {
 		auto children = (n | tt::children)();
 		if (children.empty()) return r;
-		auto s = children[0] | tt::terminals;
-		qlt_rational val;
-		if (!qlt_rational::parse(s, val)) return r;
-		if (val.is_pos_inf() || val.is_neg_inf()) return r;
-		return r.with_value(qlt{{ {
-			qlt_endpoint{val, qlt_bound::CLOSED},
-			qlt_endpoint{val, qlt_bound::CLOSED}
-		}}});
+		auto p = qlt_eval_point(children[0]);
+		if (!p) return r;
+		return r.with_value(*p);
 	}
 
 	case type::qlt_interval: {
@@ -658,11 +668,14 @@ result<qlt> qlt_eval_parse_tree(
 	}
 
 	case type::qlt_union: {
-		// qlt_union children = [interval, qlt] (after __E_qlt_0 inlining)
+		// qlt_union children = [piece, qlt]; a piece is an interval or a
+		// point
 		auto children = (n | tt::children)();
 		if (children.size() < 2) return r;
-
-		auto left = qlt_eval_interval(children[0]);
+		auto part = (children[0] | tt::children)();
+		if (part.empty()) return r;
+		auto left = (part[0] | tt::nonterminal) == type::singleton
+			? qlt_eval_point(part[0]) : qlt_eval_interval(part[0]);
 		if (!left) return r;
 
 		TAU_TRY(auto right, qlt_eval_parse_tree(children[1]));

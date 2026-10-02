@@ -282,6 +282,19 @@ TEST_CASE("qlt: parse interval with internal whitespace [ 0 , 1 )") {
 	CHECK(result.found);
 }
 
+// A union may hold points anywhere, as qlt prints them.
+TEST_CASE("qlt: parse union starting with a point 0 | [1/2, 1]") {
+	auto result = qlt_parser_instance::instance()
+		.parse("0 | [1/2, 1]", 12);
+	CHECK(result.found);
+}
+
+TEST_CASE("qlt: parse union of points 0 | 2 | (3, 4)") {
+	auto result = qlt_parser_instance::instance()
+		.parse("0 | 2 | (3, 4)", 14);
+	CHECK(result.found);
+}
+
 TEST_CASE("qlt: parse union with extra whitespace around |") {
 	auto result = qlt_parser_instance::instance()
 		.parse("[0, 1)  |  [2, 3)", 17);
