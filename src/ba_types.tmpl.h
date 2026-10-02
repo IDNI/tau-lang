@@ -180,8 +180,13 @@ size_t ba_types<node>::id(tref ba_type) {
 	// node::ba_type stores this id, so it must not outgrow that field.
 	DBG(assert(type_trees().size()
 		< std::numeric_limits<decltype(node::ba_type)>::max());)
-	return type_tree_to_idx().emplace(ba_type, type_trees().size()),
-		type_trees().push_back(tau::geth(ba_type)), type_trees().size() - 1;
+	// The lookup ignores a right sibling, the stored tree must not keep one:
+	// an annotation read in place (the `typed` child of a stream
+	// definition) still links to the node after it, and the first tree
+	// stored is the one every later lookup of the type answers with.
+	tref t = tau::trim_right_sibling(ba_type);
+	return type_tree_to_idx().emplace(t, type_trees().size()),
+		type_trees().push_back(tau::geth(t)), type_trees().size() - 1;
 }
 
 // A ba_type_id past the end of type_trees() means the id was corrupted
