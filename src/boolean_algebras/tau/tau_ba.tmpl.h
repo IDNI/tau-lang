@@ -252,7 +252,8 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
  * with pairwise disjoint free supports -- the shape a constant takes when
  * independent clauses accumulate into it -- every question pays for all
  * units, although the answer factors: a model of each unit assigns only its
- * own variables, so models over disjoint supports compose, and validity
+ * own variables, so models over disjoint supports compose where no unit
+ * refers to absolute time (`refers_to_absolute_time`), and validity
  * distributes over conjunction. `factored_tau_sat`/`factored_tau_valid`
  * decide per unit group and cache the verdicts per group (the `create_cache`
  * discipline of `cached_tau_ba_predicate`, compute before emplace), so a
@@ -267,7 +268,8 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
  *
  * Conservative gates, each falling back to the monolithic path: any embedded
  * BA constant inside a unit (its support is invisible from the outside), any
- * free variable without a printable name, fewer than two groups. A single
+ * free variable without a printable name, fewer than two groups, and any
+ * unit that refers to absolute time (`refers_to_absolute_time`). A single
  * `always` hull is split into per-unit hulls first (`always` distributes
  * over conjunction). Both decisions are taken at start time 0, which is the
  * only start time the callers use.
@@ -306,6 +308,40 @@ inline bool ba_component_factoring_enabled() {
 	return env ? *env : ba_component_factoring;
 }
 
+// In the body of an `always` unit: a constraint on the time point, a stream
+// read at a fixed time point, or a temporal operator of its own.
+template <typename node>
+static bool at_absolute_time(tref t) {
+	using tau = tree<node>;
+	const auto& n = tau::get(t);
+	return n.is(tau::constraint)
+		|| (n.child_is(tau::io_var) && is_io_initial<node>(t))
+		|| is_temporal_quantifier<node>(t);
+}
+
+/**
+ * @brief Whether a unit refers to absolute time.
+ *
+ * The decision of a formula takes quantities from the formula as a whole,
+ * among them the step from which its always part is enforced; a unit or a
+ * group decided on its own takes them from itself. An `always` unit whose
+ * streams are read at the current step and at steps back from it says the
+ * same from every step, so its verdict does not depend on that step. A
+ * `sometimes` clause, a stream read at a fixed time point and a constraint
+ * on the time point refer to absolute time: their verdict can depend on
+ * that step. Two kinds of unit are left to the decision of the whole
+ * formula with them: a unit that is no `always` unit, and an `always` unit
+ * whose body holds a temporal operator of its own, for which the decision
+ * of the whole formula may take another procedure than the decision of a
+ * group.
+ */
+template <typename node>
+static bool refers_to_absolute_time(tref unit) {
+	using tau = tree<node>;
+	return !tau::get(unit).child_is(tau::wff_always)
+		|| tau::get(tau::trim2(unit)).find_top(at_absolute_time<node>);
+}
+
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
@@ -313,9 +349,13 @@ static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
+	// one pass over the body of a unit finds an embedded constant and a
+	// reference to absolute time
 	for (tref u : units)
-		if (tau::get(u).find_top([](tref t) {
-			return tree<node>::get(t).is_ba_constant(); }))
+		if (!tau::get(u).child_is(tau::wff_always)
+			|| tau::get(tau::trim2(u)).find_top([](tref t) {
+				return tree<node>::get(t).is_ba_constant()
+					|| at_absolute_time<node>(t); }))
 			return -1;
 	std::vector<std::vector<std::string>> supp(units.size());
 	for (size_t i = 0; i < units.size(); ++i)
@@ -394,6 +434,11 @@ static int factored_tau_valid(tref fm) {
 			all = it->second;
 			continue;
 		}
+		// the units before this one are valid. A unit that is not valid
+		// ends the loop, and the units after it are not read: it does
+		// not refer to absolute time, so it is not valid from any step,
+		// and neither is the conjunction.
+		if (refers_to_absolute_time<node>(units[i])) return -1;
 		auto imp = is_tau_impl<node>(tau::_T(), units[i]);
 		bool vres = imp.has_value() && imp.value();
 		pin_decided_key<node>(units[i]);

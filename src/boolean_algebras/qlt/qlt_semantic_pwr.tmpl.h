@@ -96,61 +96,6 @@ tref build_win_formula(
 }
 
 // ---------------------------------------------------------------------------
-// Build the Win_0 formula (initial state entry condition).
-//
-// Win_0 = the data-atom condition of the patterns reachable from THE fixed
-// initial memory ρ₀ = result.init_rho, provided (q_init, ρ₀) ∈ W.
-//
-// LG-12: this used to take the union over ALL winning ρ₀ — the ∃ρ₀ reading
-// whose phantom initial memories the fixed convention (F) retired (see
-// alg_d::initial_memory).  result.init_rho is -1 when unrealizable (or on a
-// hand-built result that never ran the solver), which yields nullptr here.
-// ---------------------------------------------------------------------------
-
-template <NodeType node>
-tref build_win0_formula(
-	const alg_d::alg_d_result& result,
-	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::qlt_type3>& T3,
-	const std::vector<int>& type_A)
-{
-	const int K = result.K;
-	const size_t T1_size = result.T1_size;
-	const size_t q_init = result.synth_game.init;
-	const int rho0 = result.init_rho;
-	if (rho0 < 0 || static_cast<size_t>(rho0) >= T1_size) return nullptr;
-	if (!result.winning_region.count(q_init * T1_size
-			+ static_cast<size_t>(rho0)))
-		return nullptr;
-
-	// Collect D-patterns reachable from the fixed initial ρ₀.
-	std::set<int> init_patterns;
-	for (size_t t = 0; t < T3.size(); ++t) {
-		if (T3[t].pos_m == rho0)
-			init_patterns.insert(type_A[t]);
-	}
-
-	if (init_patterns.empty()) return nullptr;
-
-	// Build formula (same logic as build_win_formula but restricted to init).
-	tref win0 = nullptr;
-	for (int pat : init_patterns) {
-		tref conj = nullptr;
-		for (int i = 0; i < K; ++i) {
-			// i is a loop index, so it is a valid atom index here.
-			const auto& atom = atoms[(size_t) i];
-			tref literal = (pat & (1 << i))
-				? atom.first
-				: build_wff_neg<node>(atom.first);
-			conj = conj ? build_wff_and<node>(conj, literal) : literal;
-		}
-		if (!conj) continue;
-		win0 = win0 ? build_wff_or<node>(win0, conj) : conj;
-	}
-	return win0;
-}
-
-// ---------------------------------------------------------------------------
 // Semantic PWR optimal mode: try Algorithm D on clause ∧ update.
 //
 // Given a spec clause C and full update ψ:
@@ -184,9 +129,9 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	if (has_input) return r.with_value(nullptr);
 	if (!is_algorithm_a_applicable<node>(atoms)) return r.with_value(nullptr);
 
-	// LS-2: the encoding below is Algorithm A's T_3 encoding, but it used to
-	// run WITHOUT either of the two soundness guards `solve_ltl_aba` applies
-	// to that same encoding.  Both matter here for the same reasons:
+	// The encoding below is Algorithm A's T_3 encoding, so it needs the two
+	// soundness guards qlt_try_propositional_synthesis applies to that same
+	// encoding, for the same reasons:
 	//
 	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
 	//     constant) gives `qlt_atom_holds_in_type3 == atom_verdict::undecided`

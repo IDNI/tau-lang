@@ -3,6 +3,7 @@
 #include "satisfiability.h"
 #include "normalizer.h"
 #include "ltl_aba.h"
+#include "solver_types.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "heuristics/preprocess_placement.h"
 
@@ -59,6 +60,7 @@ size_t verdict_budget_fingerprint() {
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
 	mix(preprocessing);
+	mix(max_constant_size);
 	return ltl_verdict_budget_fingerprint(
 		pack_ba_options_fingerprint<node>(seed));
 }
@@ -849,6 +851,10 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 		return false;
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
+		// a solver question left without an answer ends the search: no
+		// step after it gives a result to trust
+		if (!time_budget_exhausted().empty())
+			return r.with_value(std::pair<tref, int_t>{ nullptr, step_num });
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi
@@ -976,6 +982,10 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	while (step_num < lookback || !(weakening ? impl(chi, chi_prev)
 						: impl(chi_prev, chi)))
 	{
+		if (!time_budget_exhausted().empty())
+			return r.with_error(code::solver_error,
+				"the search stopped once a solver question went "
+				"unanswered");
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// Same contract as find_fixpoint_phi: a give-up yields no
@@ -1122,8 +1132,8 @@ tref build_prev_flag_on_lookback(tref io_var_node,
  * Held in one place, per node type, instead of as a function-local `static`
  * inside `transform_ctn_to_streams`: callers reset it explicitly via that
  * function's `reset_ctn_id` argument, and tests can inspect or reset it
- * directly. Still process-global (and therefore still single-thread only, like
- * the rest of this subsystem), but no longer hidden.
+ * directly. Process-global, and therefore single-thread only, like the rest
+ * of this subsystem.
  * @tparam node Tree node type.
  * @return Reference to the counter for @p node.
  * @endinternal
@@ -1874,10 +1884,13 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	const int_t flag_search_limit = flag_boundary + 1
 					+ (int_t)max_flag_search_steps;
 	for (int_t i = s + 1; true; ++i) {
+		if (!time_budget_exhausted().empty())
+			return r.with_error(code::solver_error,
+				"the search stopped once a solver question went "
+				"unanswered");
 		if (flag_search_bounded && i > flag_search_limit) {
-			// A bounded give-up is no verdict: it used to report F,
-			// which callers read as a proof of unsatisfiability. Surface
-			// it as an error instead.
+			// A bounded give-up is no verdict: F would read as a proof
+			// of unsatisfiability. Surface it as an error instead.
 			print_fixpoint_info("Temporal normalization of Tau "
 				"specification gave up after " +
 				std::to_string(steps) + " fixpoint steps and " +
@@ -1917,12 +1930,12 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
-	// Make sure that no function/predicate symbol is still present
+	// A function/predicate symbol still present has no definition that
+	// applies to it: no verdict can be given about it
 	if (auto ref = tau::get(fm).find_top(is<node, tau::ref>); ref) {
-		return r.with_error(code::internal_error,
-			"an unresolved function or predicate symbol survived "
-			"to the execution transform",
-			{{label::value, truncate_for_message(TAU_TO_STR(ref))}});
+		return r.with_error(code::not_found, "unresolved function or "
+			"predicate symbol: no definition applies to it",
+			{{ label::value, truncate_for_message(TAU_TO_STR(ref)) }});
 	}
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
@@ -2152,13 +2165,18 @@ result<tref> pin_written_warm_ups(tref fm) {
 	};
 	bool failed = false;
 	// Deepest lookback left once the non-temporal parts of @p n are
-	// normalized, each on its own.
+	// normalized, each on its own. The part is rebuilt through the
+	// construction hooks first: that is the tree every caller normalizes
+	// after `tau::reget`, and the normal form of the raw tree is computed
+	// by no path but this one; its rows in the memo tables are keyed by
+	// raw nodes.
 	auto kept_lookback = [&](tref n) -> int_t {
 		int_t kept = 0;
 		trefs parts = tau::get(n).select_top([&](tref x) {
 			return tau::get(x).is(tau::wff) && !is_temporal(x); });
 		for (tref part : parts) {
-			auto nf = r.merge_take(normalize_non_temp<node>(part));
+			auto nf = r.merge_take(normalize_non_temp<node>(
+				tau::reget(part)));
 			if (!nf) { failed = true; return 0; }
 			if (*nf) kept = std::max(kept, get_max_shift<node>(
 				shifted_vars(*nf)));
@@ -2346,20 +2364,31 @@ result<tref> pin_written_warm_ups(tref fm) {
 // The stream is renamed as well as re-tagged: resolve_io_vars stamps every
 // io_var from the io context and then the name prefix, so a stream still
 // called i1 would be read as an input again on any path that parses or
-// normalizes the formula. The new name is an output by prefix and is
-// registered nowhere.
+// normalizes the formula. The new name is an output by prefix, is
+// registered nowhere, and is not the name of any other stream of fm, so an
+// input is never merged with an output the user named after it.
 template <NodeType node>
 tref inputs_as_outputs(tref fm) {
 	using tau = tree<node>;
+	const trefs io_vars = tau::get(fm).select_all([](tref n) {
+		return tau::get(n).is(tau::io_var); });
+	std::set<std::string> used;
+	for (tref v : io_vars) used.insert(get_var_name<node>(v));
+	std::map<std::string, std::string> renamed;
+	auto fresh = [&](const std::string& in) {
+		if (auto it = renamed.find(in); it != renamed.end())
+			return it->second;
+		std::string out = "o_in_" + in;
+		while (used.count(out)) out += "_";
+		used.insert(out);
+		return renamed[in] = out;
+	};
 	subtree_map<node, tref> flip;
-	for (tref v : tau::get(fm).select_all([](tref n) {
-		const auto& t = tau::get(n);
-		return t.is(tau::io_var) && t.is_input_variable(); }))
-	{
+	for (tref v : io_vars) {
 		const auto& t = tau::get(v);
+		if (!t.is_input_variable()) continue;
 		trefs ch;
-		ch.push_back(build_var_name<node>(
-			"o_in_" + get_var_name<node>(v)));
+		ch.push_back(build_var_name<node>(fresh(get_var_name<node>(v))));
 		for (size_t i = 1; i < t.children_size(); ++i)
 			ch.push_back(t.child(i));
 		flip.emplace(v, tau::get(node::output_variable(), ch));
@@ -2578,6 +2607,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			"witnesses range over every input branch, which is "
 			"stricter than E; satisfiability could not be decided");
 	};
+	// the memos are keyed on the formula as given; fm is rewritten below
+	[[maybe_unused]] const tref key_fm = fm;
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, bool,
 				subtree_pair_less<node, int_t>>;
@@ -2613,7 +2644,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 #endif // TAU_CACHE
 	auto memoize = [&](bool value) {
 #ifdef TAU_CACHE
-		cache.emplace(std::make_pair(fm, start_time), value);
+		cache.emplace(std::make_pair(key_fm, start_time), value);
 #endif // TAU_CACHE
 		r = value;
 	};
@@ -2667,7 +2698,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			if (rv || reduction->exact) memoize(rv);
 			else {
 #ifdef TAU_CACHE
-				undecided.emplace(std::make_pair(fm, start_time), true);
+				undecided.emplace(std::make_pair(key_fm, start_time), true);
 #endif // TAU_CACHE
 				mark_undecided();
 			}
@@ -2698,8 +2729,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			// no verdict at all
 			r.merge(std::move(realizable));
 			return r.with_assert_check_error(code::solver_error,
-				"UNKNOWN: the synthesis backend failed or produced no "
-				"verdict; satisfiability could not be decided");
+				messages::unknown_satisfiability_no_verdict);
 		}
 		// Keep the decision's report on the success path too: it carries
 		// the ltlsynt call count, which PWR-R6-01 measures.

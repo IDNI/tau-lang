@@ -11,7 +11,7 @@
 //   6.  Safety fragment regression.
 //   7.  Printer: F/U/R/W/G round-trip through to_str().
 //   8.  NNF: push_negation_in produces correct LTL NNF duals.
-//   9.  ltl_to_safety_formula: single-state strategy extraction for execution.
+//   9.  ltl_to_safety_formula_full: single-state strategy extraction for execution.
 //   10. Normalization correctness.
 //   11. LTL equivalences.
 //   12. Multi-atom and multi-variable formulas.
@@ -119,6 +119,12 @@ static bool guard_feasible(const std::string& guard,
 	auto r = guard_is_aba_feasible<node_t>(guard, aps, atoms);
 	REQUIRE(r.has_value());
 	return r.value();
+}
+
+// The safety formula ltl_to_safety_formula_full builds for `fm`.
+static result<tref> safety_formula(tref fm) {
+	return ltl_to_safety_formula_full<node_t>(fm).transform(
+		[](auto&& full) { return std::get<0>(full); });
 }
 
 // ── 1. Parser tests ───────────────────────────────────────────────────────────
@@ -606,14 +612,14 @@ TEST_SUITE("LTL NNF rules") {
 	}
 }
 
-// ── 9. ltl_to_safety_formula ─────────────────────────────────────────────────
+// ── 9. ltl_to_safety_formula_full ────────────────────────────────────────────
 
 TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("F(output = 0) converts to always(output = 0)") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -624,7 +630,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("F(output = 0) safety formula is realizable") {
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -635,7 +641,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("G(F(output = 0)) converts to always formula") {
 		tref fm = spec("G (F (o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -645,7 +651,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("(o=1) R (o=0) converts to always formula") {
 		tref fm = spec("(o1[t] = 1) release (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -656,7 +662,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// The system cannot force inputs; the formula is unrealizable.
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		CHECK(safety == nullptr);
@@ -666,7 +672,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		// always(o=0) |= F(o=0), so the derived safety formula is consistent.
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -677,7 +683,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	TEST_CASE("W operator safety formula is realizable") {
 		tref fm = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -999,8 +1005,8 @@ TEST_SUITE("LTL skeleton builder") {
 // ── 15. Multi-state Mealy strategy encoding ───────────────────────────────────
 //
 // Formulas that require multi-state strategies from ltlsynt are encoded using
-// one-hot auxiliary state bitvector variables (o__ltl_s0__, ...) so the
-// interpreter pipeline can execute them.
+// one-hot auxiliary state outputs of the Boolean carrier type (o__ltl_ms0__,
+// ...) so the interpreter pipeline can execute them.
 
 TEST_SUITE("Multi-state Mealy strategy") {
 
@@ -1008,14 +1014,14 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	// ltlsynt produces a 2-state automaton: state 0 → output p0=true → state 1,
 	//                                        state 1 → output p0=false → state 0.
 	// encode_mealy_as_safety should produce an always(phi) formula with lookback.
-	TEST_CASE("G(F(o=0)) && G(F(o!=0)) multi-state: ltl_to_safety_formula non-null") {
+	TEST_CASE("G(F(o=0)) && G(F(o!=0)) multi-state: ltl_to_safety_formula_full non-null") {
 		// This formula requires alternation — a 2-state Mealy machine.
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		// Must be realizable
 		CHECK(sat(fm));
-		// ltl_to_safety_formula must succeed (multi-state encoding)
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		// ltl_to_safety_formula_full must succeed (multi-state encoding)
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1025,7 +1031,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("G(F(o=0)) && G(F(o!=0)) safety formula is realizable") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1036,7 +1042,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	TEST_CASE("multi-state safety formula has auxiliary state vars") {
 		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1053,7 +1059,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 		// Regression: verify single-state path unchanged after multi-state addition
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		auto safety_r = ltl_to_safety_formula<node_t>(fm);
+		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
 		tref safety = safety_r.value();
 		REQUIRE(safety != nullptr);
@@ -1067,7 +1073,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 // ── 16. Interpreter (run) dispatch ───────────────────────────────────────────
 //
 // Verifies that the full CLI `run` path — normalizer →
-// realizability_has_game_operators → ltl_to_safety_formula →
+// realizability_has_game_operators → ltl_to_safety_formula_full →
 // make_interpreter — succeeds for LTL formulas.
 // Prior to the normalize_with_temp_simp guard, anti_prenex inside normalize()
 // would silently convert wff_sometimes → wff_sometimes, causing the LTL guard in
@@ -4895,6 +4901,74 @@ TEST_SUITE("Data game strategy") {
 		CHECK(without_i1);
 	}
 
+	// With a node table of one node the codes do not fit and the game is
+	// decided on formulas: the strategy has no Mealy view, and the inputs
+	// its step reads are the free variables of its labels and moves.
+	TEST_CASE("a strategy over formulas reads the inputs of its formulas") {
+		tref fm = spec("(sometimes o1[t]:bv[1] = i3[t]:bv[1]) "
+			"&& (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		const long saved = ltl_data_game_max_nodes_param;
+		ltl_data_game_max_nodes_param = 1;
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		auto r = ltl_to_safety_formula_full<node_t>(fm, &data);
+		ltl_data_game_max_nodes_param = saved;
+		REQUIRE(r.has_value());
+		REQUIRE(data != nullptr);
+		CHECK(std::dynamic_pointer_cast<formula_strategy<node_t>>(data)
+			!= nullptr);
+		CHECK(data->view == nullptr);
+		auto first = data->reads();
+		REQUIRE(first.has_value());
+		CHECK(*first == std::set<std::string>{ "i1", "i2", "i3" });
+	}
+
+	// A strategy on the bits of a bitvector wider than 4 bits is a Mealy
+	// machine too: its guards read the bits of i1 its moves depend on, and
+	// its outputs are values of the type.
+	TEST_CASE("a strategy on bits has a Mealy view over the bits it reads") {
+		tref fm = spec("(always (i1[t]:bv[8] > {100}:bv[8] "
+			"-> o1[t]:bv[8] = {7}:bv[8])) && (sometimes (i1[t]:bv[8] "
+			"> {100}:bv[8] || o1[t]:bv[8] = {200}:bv[8])).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		REQUIRE(ltl_to_safety_formula_full<node_t>(fm, &data).has_value());
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		bool bit = false, value = false;
+		for (const auto& [a, _] : data->view->atoms) {
+			const std::string x = tau::get(a).to_str();
+			// (i1[t] & {b}) != 0, the conjunction printed as juxtaposition
+			bit = bit || (x.find("i1[t]") != std::string::npos
+				&& x.find("!= 0") != std::string::npos);
+			value = value || x.find("o1[t]") != std::string::npos;
+		}
+		CHECK(bit);
+		CHECK(value);
+		// fewer edges than values of i1: the guards split only the bits
+		// that decide i1 > 100
+		size_t edges = 0;
+		for (const auto& es : data->machine) edges += es.size();
+		CHECK(edges < 256);
+	}
+
+	// A strategy on the order types of qlt values is a Mealy machine whose
+	// atoms place each value among the last ones and the constants.
+	TEST_CASE("a strategy on order types has a Mealy view") {
+		tref fm = spec("((i1[t-1]:qlt <= i1[t]:qlt "
+			"&& i1[t-1]:qlt > o1[t-1]:qlt)) U ((o1[t]:qlt != i1[t]:qlt "
+			"&& o1[t-1]:qlt != i1[t-1]:qlt)).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		REQUIRE(ltl_to_safety_formula_full<node_t>(fm, &data).has_value());
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		CHECK(data->view->aut.num_states >= 1);
+		CHECK_FALSE(data->view->history.empty());
+	}
+
 	// The running goal o1[t-2] = 1 cannot be met once o1 stays 0; the
 	// revision keeps the update and lets the goal go, as pointwise
 	// revision does when the running goals are not executable along it.
@@ -4991,9 +5065,11 @@ TEST_SUITE("Data game strategy") {
 TEST_SUITE("Data game node collection") {
 
 	struct node_table {
-		const size_t saved = data_game_max_nodes;
-		explicit node_table(size_t n) { data_game_max_nodes = n; }
-		~node_table() { data_game_max_nodes = saved; }
+		const long saved = ltl_data_game_max_nodes_param;
+		explicit node_table(size_t n) {
+			ltl_data_game_max_nodes_param = (long) n;
+		}
+		~node_table() { ltl_data_game_max_nodes_param = saved; }
 	};
 
 	static std::optional<bool> realizable_in(size_t nodes, const char* s) {
@@ -5118,9 +5194,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 		}
 	}
 
-	// issue #131: a term is not a formula. It used to reach the backends
-	// as one (a bv term aborted on a cvc5 exception; an sbf term answered
-	// UNREALIZABLE).
+	// A term is not a formula, so it never reaches the backends as one.
 	TEST_CASE("a term is an invalid argument, not a verdict") {
 		tref eq = wff("x = 0");
 		REQUIRE(eq != nullptr);
@@ -5234,7 +5308,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 
 
 // build_carrier_eq_aux's bare-reparsed S-operator auxiliary atom
-// (o__ltl_s0__) now registers as a real output stream too, so a stepped run
+// (o__ltl_s0__) registers as a real output stream too, so a stepped run
 // with real vector I/O succeeds and the S semantics hold at step 0.
 TEST_SUITE("Since (S) operator: executed safety path") {
 
@@ -5475,9 +5549,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(guard_feasible("0&1 | 1&0", aps, atoms));
 	}
 
-	// A leading '(' made the old lexer emit an EMPTY literal list, which the
-	// per-type check then read as the empty conjunction `T` — every
-	// parenthesised guard was declared feasible unchecked.
+	// A guard with a leading '(' is parsed in full: an empty literal list
+	// would read as the empty conjunction `T` and declare the edge feasible
+	// unchecked.
 	TEST_CASE("[GF-03] parenthesised guard is not vacuously accepted") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
@@ -5607,14 +5681,13 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_feasible("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
-	// ── Batch O8: exact mixed-type coverage ───────────────────────────────
+	// ── Exact mixed-type coverage ─────────────────────────────────────────
 	//
 	// The single-type semantic COVER check cannot span independent BA
-	// types, so mixed-type guards used to stop at the syntactic subset
-	// test — a false UNREALIZABLE whenever the feasible input classes only
-	// JOINTLY cover an infeasible product's class.  The exact check
+	// types, and the syntactic subset test misses feasible input classes
+	// that only JOINTLY cover an infeasible product's class.  The exact check
 	// expands I_k ∧ ⋀_j ¬I_j into literal products (capped by the runtime
-	// parameter max_cover_products) and calls I_k covered iff every
+	// parameter max_cover_products_param) and calls I_k covered iff every
 	// product has some BA type's sub-conjunction infeasible.
 	// Fixture: p0 = (i1:qlt = 1/4), p1 = (i2:sbf = X) — inputs of two
 	// different types — and the jointly-infeasible qlt output pair
@@ -5644,11 +5717,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(guard_feasible("2&3", aps, atoms));
 	}
 
-	// The plan's flip fixture: the input-unconstrained product 2&3 is
+	// The input-unconstrained product 2&3 is
 	// infeasible, and the two feasible products' input classes p1 / ¬p1
 	// JOINTLY cover every input valuation.  The syntactic subset test
-	// cannot see that ({p1} ⊄ ∅), so this edge was refused pre-O8; the
-	// exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
+	// cannot see that ({p1} ⊄ ∅); the exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
 	TEST_CASE("[GF-31] jointly-covering mixed-type classes accept the edge") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
@@ -5681,20 +5753,20 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	// The expansion cap: negating GF-33's two-literal class {p0, p1}
-	// doubles the product count, so max_cover_products = 1 blows the cap
-	// and the pre-O8 syntactic verdict stands (refused, logged) — sound,
-	// at worst incomplete.  Restoring the default restores the exact
-	// answer.  (GF-31's single-literal classes never grow the expansion
+	// doubles the product count, so a cap of 1 is exceeded
+	// and the syntactic verdict stands (refused, logged; an UNREALIZABLE
+	// verdict is then undecided).  Restoring the default restores the
+	// exact answer.  (GF-31's single-literal classes never grow the expansion
 	// past one product, so that guard stays exact under any cap ≥ 1.)
 	TEST_CASE("[GF-34] the max_cover_products cap degrades to the syntactic verdict") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		const size_t saved = max_cover_products;
-		max_cover_products = 1;
+		const long saved = max_cover_products_param;
+		max_cover_products_param = 1;
 		CHECK_FALSE(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
-		max_cover_products = saved;
+		max_cover_products_param = saved;
 		CHECK(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
 	}
@@ -5906,14 +5978,11 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
-	// `call_ltlsynt` used to special-case only exit 127 (binary not on
-	// PATH). Every other failure -- in particular exit 143, which is
-	// 128 + SIGTERM, exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends --
-	// fell through to a definitive UNREALIZABLE. A slow-but-realizable
-	// specification thus got a WRONG ANSWER with only a LOG_DEBUG trace
-	// behind it.
+	// A failed ltlsynt -- in particular exit 143, which is 128 + SIGTERM,
+	// exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends -- is no
+	// UNREALIZABLE verdict.
 	//
-	// The exit-code convention now lives entirely inside spawn_capture
+	// The exit-code convention lives entirely inside spawn_capture
 	// (backends/spot/spot.h), which decides it once from a real spawn and
 	// never returns the raw code; these cases drive that decision with
 	// small `sh` stubs instead of a synthetic (exit_code, stdout) pair.
@@ -6037,6 +6106,34 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 #endif
 	}
 
+}
+
+TEST_SUITE("safety encoding of a Mealy strategy") {
+
+	// ltlsynt's machines are input-complete and in range, so these
+	// automata are built by hand.
+	ltl_aba_solution<node_t> two_states(int second_dst) {
+		ltl_aba_solution<node_t> sol;
+		sol.aut.num_states = 2;
+		sol.aut.initial_state = 0;
+		sol.aut.edges = { { hoa_edge{ "t", 1, false } },
+			{ hoa_edge{ "t", second_dst, false } } };
+		sol.aut.state_accepting = { false, false };
+		return sol;
+	}
+
+	TEST_CASE("an edge to a state the automaton lacks is an error in the report") {
+		auto encoded = encode_mealy_as_safety<node_t>(two_states(5));
+		CHECK_FALSE(encoded.has_value());
+		CHECK(report_has_code(encoded.report(), code::out_of_range));
+	}
+
+	TEST_CASE("a well-formed machine encodes as an always formula") {
+		auto encoded = encode_mealy_as_safety<node_t>(two_states(0));
+		REQUIRE(encoded.has_value());
+		REQUIRE(encoded.value() != nullptr);
+		CHECK(tau::get(encoded.value())[0].is(tau::wff_always));
+	}
 }
 
 

@@ -147,13 +147,15 @@ cli::options tau_options() {
 	// on mostly-feasible atoms; a fired cap is sound (false UNREALIZABLE
 	// at worst, warned loudly), an uncapped walk is a hang.
 	opts["max-consistency-subsets"] =
-		cli::option("max-consistency-subsets", 'j', "4096")
+		cli::option("max-consistency-subsets", 'j', "")
 		.set_description("cap k-ary consistency subset checks per atom "
-			"group (default 4096; 0 = unlimited)");
+			"group (default: TAU_LTL_MAX_CONSISTENCY_SUBSETS or 4096; "
+			"0 = unlimited)");
 	opts["max-cover-products"] =
-		cli::option("max-cover-products", 'n', "256")
+		cli::option("max-cover-products", 'n', "")
 		.set_description("cap the ABA oracle's mixed-type coverage "
-			"expansion (default 256; 0 = unlimited)");
+			"expansion (default: TAU_LTL_MAX_COVER_PRODUCTS or 256; "
+			"0 = unlimited)");
 	opts["max-constant-size"] =
 		cli::option("max-constant-size", 'u', "2000")
 		.set_description("largest region of fresh values, in tree nodes, "
@@ -195,6 +197,24 @@ cli::options tau_options() {
 		.set_description("cap the strategy paths the multi-step window "
 			"oracle examines per check (default: "
 			"TAU_LTL_WINDOW_MAX_PATHS or 4096; 0 = unlimited)");
+	opts["ltl-closed-regions-timeout"] =
+		cli::option("ltl-closed-regions-timeout", 'K', "")
+		.set_description("cap in seconds the data game's attempt on regions "
+			"that keep their quantifiers, all its questions together, "
+			"each at most a quarter of it (default: "
+			"TAU_LTL_CLOSED_REGIONS_TIMEOUT or 20; 0 = no such "
+			"attempt)");
+	opts["ltl-data-game-max-nodes"] =
+		cli::option("ltl-data-game-max-nodes", '\0', "")
+		.set_description("cap the live nodes of the BDD of a data game "
+			"over codes; a full table leaves the game undecided "
+			"(default: TAU_LTL_DATA_GAME_MAX_NODES or 8388608; "
+			"0 = unlimited)");
+	opts["ltl-data-game-max-memo"] =
+		cli::option("ltl-data-game-max-memo", '\0', "")
+		.set_description("cap the operation memo entries of the BDD of a "
+			"data game over codes; a full memo is emptied (default: "
+			"TAU_LTL_DATA_GAME_MAX_MEMO or 33554432; 0 = unlimited)");
 	opts["tref-budget"] = cli::option("tref-budget", 'y', "")
 		.set_description("cap the live interned tree nodes; an api call "
 			"that starts with the store at or above the cap fails "
@@ -452,8 +472,6 @@ int main(int argc, char** argv) {
 	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
 	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
-	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
-	tau_api::set_max_cover_products(optnum("max-cover-products"));
 	tau_api::set_max_constant_size(optnum("max-constant-size"));
 	tau_api::set_cache_bound(optnum("cache-bound"));
 	// An option with an environment fallback is applied only when it was
@@ -498,6 +516,16 @@ int main(int argc, char** argv) {
 		tau_api::set_ltl_max_refinement_rounds(*n);
 	if (auto n = given_count("ltl-window-max-paths"); n)
 		tau_api::set_ltl_window_max_paths(*n);
+	if (auto n = given_count("ltl-closed-regions-timeout"); n)
+		tau_api::set_ltl_closed_regions_timeout(*n);
+	if (auto n = given_count("ltl-data-game-max-nodes"); n)
+		tau_api::set_ltl_data_game_max_nodes(*n);
+	if (auto n = given_count("ltl-data-game-max-memo"); n)
+		tau_api::set_ltl_data_game_max_memo(*n);
+	if (auto n = given_count("max-consistency-subsets"); n)
+		tau_api::set_max_consistency_subsets(*n);
+	if (auto n = given_count("max-cover-products"); n)
+		tau_api::set_max_cover_products(*n);
 	if (auto n = given_count("tref-budget"); n)
 		tau_api::set_tref_budget(*n);
 	if (auto n = given_count("tref-budget-soft"); n)

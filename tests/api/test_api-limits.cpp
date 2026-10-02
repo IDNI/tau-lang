@@ -135,6 +135,7 @@ TEST_SUITE("Tau API - runtime limits") {
 		const long s2 = ltl_guard_max_cubes_param;
 		const long s3 = ltl_max_refinement_rounds_param;
 		const long s4 = ltl_window_max_paths_param;
+		const long s5 = ltl_closed_regions_timeout_param;
 		tau_api::set_ltl_hoa_max_states(77);
 		CHECK( ltl_hoa_max_states() == 77 );
 		tau_api::set_ltl_hoa_max_states(0);
@@ -147,13 +148,46 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( ltl_max_refinement_rounds() == 0 );
 		tau_api::set_ltl_window_max_paths(11);
 		CHECK( ltl_window_max_paths() == 11 );
+		tau_api::set_ltl_closed_regions_timeout(3);
+		CHECK( ltl_closed_regions_timeout() == 3 );
+		tau_api::set_ltl_closed_regions_timeout(0);
+		CHECK( ltl_closed_regions_timeout() == 0 );
+		ltl_closed_regions_timeout_param = s5;
 		ltl_hoa_max_states_param = s1;
 		ltl_guard_max_cubes_param = s2;
 		ltl_max_refinement_rounds_param = s3;
 		ltl_window_max_paths_param = s4;
 	}
 
-	// Each of the four game caps resolves parameter > environment >
+	TEST_CASE("data game and consistency caps write their parameters "
+	          "verbatim") {
+		const long s1 = ltl_data_game_max_nodes_param;
+		const long s2 = ltl_data_game_max_memo_param;
+		const long s3 = max_consistency_subsets_param;
+		const long s4 = max_cover_products_param;
+		tau_api::set_ltl_data_game_max_nodes(1234);
+		CHECK( ltl_data_game_max_nodes() == 1234 );
+		tau_api::set_ltl_data_game_max_nodes(0);
+		CHECK( ltl_data_game_max_nodes() == 0 );
+		tau_api::set_ltl_data_game_max_memo(4321);
+		CHECK( ltl_data_game_max_memo() == 4321 );
+		tau_api::set_ltl_data_game_max_memo(0);
+		CHECK( ltl_data_game_max_memo() == 0 );
+		tau_api::set_max_consistency_subsets(13);
+		CHECK( max_consistency_subsets() == 13 );
+		tau_api::set_max_consistency_subsets(0);
+		CHECK( max_consistency_subsets() == 0 );
+		tau_api::set_max_cover_products(17);
+		CHECK( max_cover_products() == 17 );
+		tau_api::set_max_cover_products(0);
+		CHECK( max_cover_products() == 0 );
+		ltl_data_game_max_nodes_param = s1;
+		ltl_data_game_max_memo_param = s2;
+		max_consistency_subsets_param = s3;
+		max_cover_products_param = s4;
+	}
+
+	// Each of these caps resolves parameter > environment >
 	// default, like the timeout and the QE cap before them, so a script
 	// can set one without a flag and a flag always wins over the script.
 	TEST_CASE("ltl game caps: parameter beats environment, garbage keeps "
@@ -174,7 +208,22 @@ TEST_SUITE("Tau API - runtime limits") {
 				&ltl_max_refinement_rounds, 64 },
 			{ "TAU_LTL_WINDOW_MAX_PATHS",
 				&ltl_window_max_paths_param,
-				&ltl_window_max_paths, 4096 }
+				&ltl_window_max_paths, 4096 },
+			{ "TAU_LTL_CLOSED_REGIONS_TIMEOUT",
+				&ltl_closed_regions_timeout_param,
+				&ltl_closed_regions_timeout, 20 },
+			{ "TAU_LTL_DATA_GAME_MAX_NODES",
+				&ltl_data_game_max_nodes_param,
+				&ltl_data_game_max_nodes, size_t(1) << 23 },
+			{ "TAU_LTL_DATA_GAME_MAX_MEMO",
+				&ltl_data_game_max_memo_param,
+				&ltl_data_game_max_memo, size_t(1) << 25 },
+			{ "TAU_LTL_MAX_CONSISTENCY_SUBSETS",
+				&max_consistency_subsets_param,
+				&max_consistency_subsets, 4096 },
+			{ "TAU_LTL_MAX_COVER_PRODUCTS",
+				&max_cover_products_param,
+				&max_cover_products, 256 }
 		};
 		for (const auto& c : caps) {
 			const long saved = *c.param;
@@ -183,7 +232,8 @@ TEST_SUITE("Tau API - runtime limits") {
 			CHECK( c.effective() == c.dflt );
 			setenv(c.var, "7", 1);
 			CHECK( c.effective() == 7 );
-			// 0 is a value, not an absence: it means unlimited.
+			// 0 is a value, not an absence: it means unlimited (no attempt
+			// for the closed regions).
 			setenv(c.var, "0", 1);
 			CHECK( c.effective() == 0 );
 			setenv(c.var, "-3", 1);
@@ -213,6 +263,24 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 
+	// A full node table leaves a data game undecided, so the node cap can
+	// change a verdict; the memo cap is in the fingerprint as a budget of
+	// the same game.
+	TEST_CASE("data game caps are part of the budget fingerprint") {
+		const size_t base = verdict_budget_fingerprint<node_t>();
+		const long s1 = ltl_data_game_max_nodes_param;
+		const long s2 = ltl_data_game_max_memo_param;
+		tau_api::set_ltl_data_game_max_nodes(
+			ltl_data_game_max_nodes() + 1);
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		ltl_data_game_max_nodes_param = s1;
+		tau_api::set_ltl_data_game_max_memo(
+			ltl_data_game_max_memo() + 1);
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		ltl_data_game_max_memo_param = s2;
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
+	}
+
 	// An environment fallback is part of the same fingerprint: a memo made
 	// under one budget must not answer a query made under another, however
 	// the budget was set.
@@ -228,13 +296,35 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_window_max_paths_param = saved;
 	}
 
+	TEST_CASE("the new environment fallbacks move the budget fingerprint") {
+		const char* vars[] = { "TAU_LTL_DATA_GAME_MAX_NODES",
+			"TAU_LTL_DATA_GAME_MAX_MEMO",
+			"TAU_LTL_MAX_CONSISTENCY_SUBSETS",
+			"TAU_LTL_MAX_COVER_PRODUCTS" };
+		long* params[] = { &ltl_data_game_max_nodes_param,
+			&ltl_data_game_max_memo_param,
+			&max_consistency_subsets_param,
+			&max_cover_products_param };
+		for (size_t i = 0; i < 4; ++i) {
+			const long saved = *params[i];
+			*params[i] = -1;
+			unsetenv(vars[i]);
+			const size_t base = verdict_budget_fingerprint<node_t>();
+			setenv(vars[i], "13", 1);
+			CHECK( verdict_budget_fingerprint<node_t>() != base );
+			unsetenv(vars[i]);
+			CHECK( verdict_budget_fingerprint<node_t>() == base );
+			*params[i] = saved;
+		}
+	}
+
 	// The verdict memos are keyed on the formula; the budget fingerprint
 	// is what tells them a runtime budget moved in between.
 	TEST_CASE("verdict budget fingerprint moves with every budget") {
 		const size_t base = verdict_budget_fingerprint<node_t>();
 		const size_t saved_fp = max_fixpoint_steps;
 		const size_t saved_fl = max_flag_search_steps;
-		const size_t saved_cs = max_consistency_subsets;
+		const long   saved_cs = max_consistency_subsets_param;
 		const long   saved_to = ltl_timeout_sec_param;
 		const std::string saved_alg = ltl_algorithm_param;
 		max_fixpoint_steps = saved_fp + 1;
@@ -244,9 +334,10 @@ TEST_SUITE("Tau API - runtime limits") {
 		max_flag_search_steps = saved_fl + 1;
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		max_flag_search_steps = saved_fl;
-		max_consistency_subsets = saved_cs + 1;
+		tau_api::set_max_consistency_subsets(
+			max_consistency_subsets() + 1);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
-		max_consistency_subsets = saved_cs;
+		max_consistency_subsets_param = saved_cs;
 		tau_api::set_ltl_timeout_sec(ltl_timeout_sec() + 1);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_timeout_sec_param = saved_to;

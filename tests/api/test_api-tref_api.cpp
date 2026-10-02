@@ -531,6 +531,22 @@ TEST_SUITE("Tau API - tref - procedures") {
 		REQUIRE(n_r.has_value());
 		CHECK(tau_api::to_str(n_r.value()) == "T");
 	}
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE_FIXTURE(api_fixture,
+		"normalize_formula on two bv[1] variables")
+	{
+		auto fm_r = tau_api::get_formula("x:bv[1] = 1 || y:bv[1] = 0");
+		REQUIRE(fm_r.has_value());
+		auto n_r = tau_api::normalize_formula(fm_r.value());
+		REQUIRE(n_r.has_value());
+		tref spec = tau::get("x:bv[1] = 1 || y:bv[1] = 0.")
+			.value_or(nullptr);
+		REQUIRE(spec != nullptr);
+		auto s_r = tau_api::normalize_formula(spec);
+		REQUIRE(s_r.has_value());
+		CHECK(tau::get(n_r.value()) == tau::get(s_r.value()));
+	}
+#endif // TAU_PACK_HAS_BA_BV
 	TEST_CASE_FIXTURE(api_fixture, "anti_prenex") {
 		// r(x, y) is an undefined predicate reference, so the existential
 		// cannot be resolved away as a trivially-closed subformula; it

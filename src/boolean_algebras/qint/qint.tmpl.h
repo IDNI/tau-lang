@@ -14,6 +14,16 @@ result<qint> parse_qint_grammar(const std::string& src) {
 	result<qint> r;
 	auto parsed = qint_parser::instance().parse(src.c_str(), src.size());
 	if (!parsed.found) {
+		// A bare number other than 0 / 1 reads as a point, which qint has
+		// not; say so instead of reporting a bare syntax error.
+		if (qint_rational v; qint_detail::parse_endpoint(src, v)
+			&& !v.is_inf())
+		{
+			r.error(code::parse_error, "`" + src + "` is not a qint "
+				"element: qint has no points, write an interval "
+				"such as [n, n+1), or 0 / 1 for bottom / top");
+			return r;
+		}
 		r.error(code::parse_error, parsed.parse_error
 			.to_str(qint_parser::error::info_lvl::INFO_BASIC));
 		return r;

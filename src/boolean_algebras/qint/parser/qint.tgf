@@ -5,7 +5,8 @@
 #
 # Supported top-level literals:
 #   top | bot | bottom
-#   0 (bottom), 1 (top), n (bare integer: maps to [n, n+1))
+#   0 (bottom), 1 (top); any other bare number is rejected: qint has no
+#   points, so write the interval [n, n+1) instead
 #   [lo, hi) | [lo, hi) | [lo2, hi2) | ...   (union of intervals)
 #
 # Endpoint syntax (validated and read exactly by qint_detail::parse_endpoint):
@@ -21,8 +22,9 @@ start    => _ qint _.
 qint     => "top"                        :qint_top
           | "bot"                        :qint_bot
           | "bottom"                     :qint_bot
-          | integer                      :qint_integer
-          | interval                     :qint_single
+          | '0'                          :qint_bot
+          | '1'                          :qint_top
+          | interval                     :qint_interval
           | ( interval _ '|' _ qint )    :qint_union.
 
 interval => '[' _ endpoint _ ',' _ endpoint _ ')'.
@@ -31,10 +33,8 @@ endpoint => ep_char+.
 
 ep_char  => digit | alpha | '+' | '-' | '.' | '/'.
 
-integer  => [ '-' ] digit+.
-
 _        => [ space _ ].
 
 @trim _.
-@trim all terminals except children of endpoint, ep_char, integer.
+@trim all terminals except children of endpoint, ep_char.
 @inline char classes.

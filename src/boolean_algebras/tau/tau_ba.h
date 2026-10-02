@@ -27,7 +27,8 @@ namespace idni::tau_lang {
 
 /// Support-component factoring of the Tau-BA constant/valid tests
 /// (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h): a conjunction whose
-/// conjuncts share no variables is satisfiable exactly when every component
+/// conjuncts share no variables and refer to no absolute time
+/// (`refers_to_absolute_time`) is satisfiable exactly when every component
 /// is, and validity distributes over conjunction, so the whole-constant
 /// decision of an accumulating spec is replaced by one decision per
 /// component, each remembered across steps. On by default (GitHub #92: the

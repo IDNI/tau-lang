@@ -944,6 +944,31 @@ if(TEST "test_repl-realizable_cmd-bv_falling_output")
 		PROPERTIES TIMEOUT 120)
 endif()
 
+# Products of two 16-bit values: the regions keep the quantifiers the
+# normalizer leaves standing and are decided whole. The environment keeps i1
+# at 0, so o1 * o2 != 0 needs o1 != 0, and o1 <= 0 * o1 never holds.
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_wide_product
+	"realizable (G (i1[t]:bv[16] != (o1[t]:bv[16] * o2[t]:bv[16]))) && (G (F (o1[t]:bv[16] <= (i1[t]:bv[16] * o1[t]:bv[16]))))" ": F")
+# with the attempt on closed regions switched off, the same game is undecided
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_off
+	"realizable (G (i1[t]:bv[16] != (o1[t]:bv[16] * o2[t]:bv[16]))) && (G (F (o1[t]:bv[16] <= (i1[t]:bv[16] * o1[t]:bv[16]))))"
+	"the strategy|UNKNOWN" NO_TRACE FAIL_REGEX "%[0-9]+: [TF]"
+	FLAGS --ltl-closed-regions-timeout 0)
+# no inputs: the system picks every value, products of two 12-bit values of
+# different steps among them; its slowest question needs 6 to 8 s alone and
+# over 10 s under a loaded test run, so the case gives the attempt 240 s, a
+# quarter of which (60 s) bounds each question
+add_repl_test(realizable_cmd-data_game_bv_closed_regions_product_of_steps
+	"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))"
+	": T" TIMEOUT 400 FLAGS --ltl-closed-regions-timeout 240)
+
+# A consistency question with a product of two 12-bit values, and one with
+# products of 8-bit values of different steps, stop on their time budget
+add_repl_budget_test(realizable_cmd-bv_budget_wide_product
+	"realizable (((i1[t]:bv[12] = (o2[t-1]:bv[12] + o1[t]:bv[12])) && (o2[t]:bv[12] != i1[t]:bv[12])) U ((i1[t]:bv[12] = o2[t-1]:bv[12]) || ((o2[t]:bv[12] * o1[t]:bv[12]) < (o1[t]:bv[12] + o1[t]:bv[12]))))")
+add_repl_budget_test(realizable_cmd-bv_budget_products_of_steps
+	"realizable (always (((o2[t]:bv[8] * {1}:bv[8]) <= o1[t-1]:bv[8]) && (o1[t-2]:bv[8] = i1[t-1]:bv[8]))) && (sometimes (((o2[t]:bv[8] - o2[t-1]:bv[8]) != (o1[t]:bv[8] * o2[t-2]:bv[8])) || ((o1[t-1]:bv[8] * {3}:bv[8]) < (i1[t-2]:bv[8] * i1[t-1]:bv[8])))) && (sometimes ((o2[t]:bv[8] != (i1[t-2]:bv[8] + {2}:bv[8])) || ((o2[t]:bv[8] * o1[t-2]:bv[8]) != i1[t]:bv[8])))")
+
 # Streams of a dense order read through order comparisons are played on the
 # order type of the window: how its values and the constants compare.
 # The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.

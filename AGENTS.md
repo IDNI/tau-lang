@@ -426,10 +426,10 @@ a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
 type no BA owns, asked about its own type — do not add a second capability for
 that, `bv[1]`'s literals already are `1`/`0`. `print_constant` is how a BA whose
 own `operator<<` formats a constant unhelpfully (bv prints SMT-LIB) says how Tau
-should render it. Each fold's empty case is chosen deliberately — `pack_solve`
-static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
-and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
-type" is ordinary. When writing a fold, name the capability as a concept in
+should render it. Each fold's empty case is chosen deliberately —
+`pack_bool_carrier_type` static_asserts (reaching it means a gate drifted),
+while `pack_solve`, `pack_zero_constant` and `pack_type_has_arith_ops` return
+nullopt/nullptr/false because "no BA owns this type" is ordinary. When writing a fold, name the capability as a concept in
 `ba_descriptor.h` and test the name with `if constexpr` inside
 `pack_visit_all` or `pack_owner_apply`; never nest a `requires`-expression
 inside the fold's lambda (gcc 13 crashes on it), never use `?:` in a fold
@@ -483,7 +483,7 @@ Checks whether a Tau specification is satisfiable. `solver.h` handles the underl
 
 ### LTL(ABA) realizability and synthesis (`src/ltl_aba*.h`)
 
-Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for ω-categorical types live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`; the qlt type enumeration and semantic revision live with the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_semantic_pwr.tmpl.h`). `gr1_detect.h`, `liveness_decomp.h` and `mealy_extract.h` are staged and not wired into the dispatch.
+Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for ω-categorical types live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`; the qlt type enumeration and semantic revision live with the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_semantic_pwr.tmpl.h`).
 
 ### Code generation, revision and bindings
 

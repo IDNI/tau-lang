@@ -15,13 +15,13 @@
 namespace idni::tau_lang {
 
 // The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
-// (ltl_aba.h): `--ltl-timeout`, REPL `set ltltimeout`,
+// (ltl_aba_limits.h): `--ltl-timeout`, REPL `set ltltimeout`,
 // `api::set_ltl_timeout_sec`, with TAU_LTL_TIMEOUT_SEC as the environment
 // fallback. `ltl_timeout_sec()` there resolves the precedence.
 
 // ltlsynt_available() is declared in ltl_aba.h and used throughout the test
-// suites as a doctest::skip() gate; the name stays, delegating to the
-// backend so there is exactly one PATH probe.
+// suites as a doctest::skip() gate; it delegates to the backend so there is
+// exactly one PATH probe.
 inline bool ltlsynt_available() { return available(); }
 
 // ── stderr side channels (opt-in debug output; no report, no return value) ─
@@ -155,8 +155,9 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	// parameter `ltl_hoa_max_states()` (0 = unlimited).
 	const size_t cap = ltl_hoa_max_states();
 	const long max_states = cap
-		? (long) std::min<size_t>(cap, (size_t) LONG_MAX)
-		: LONG_MAX;
+		? (long) std::min<size_t>(cap, (size_t) INT_MAX)
+		: INT_MAX;
+	long start = 0;
 	bool seen_states = false;
 
 	auto num_of = [](const tt& n) -> long {
@@ -185,14 +186,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			aut.edges.assign(aut.num_states, {});
 			aut.state_accepting.assign(aut.num_states, false);
 		} else if (auto sl = tt(h) | hoa::start_line; sl.has_value()) {
-			long n = num_of(sl);
-			if (n < 0)
-				return r.with_error(code::parse_error,
-					"the HOA strategy has a malformed start "
-					"state",
-					{{label::value, truncate_for_message(
-						sl | tt::terminals)}});
-			aut.initial_state = static_cast<size_t>(n);
+			start = num_of(sl);
 		} else if (auto ap = tt(h) | hoa::ap_line; ap.has_value()) {
 			long n = num_of(ap);
 			long taken = 0;
@@ -205,8 +199,13 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 						| tt::terminals));
 				++taken;
 			}
-			// the count promised more names than the line holds
-			for (; taken < n; ++taken) aut.aps.push_back("");
+			if (n < 0 || taken < n) {
+				return r.with_error(code::parse_error,
+					"the HOA strategy's AP count does not match "
+					"the names it lists",
+					{{label::value, std::string(
+						ap | hoa::num | tt::terminals)}});
+			}
 		}
 	}
 
@@ -214,11 +213,12 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 		return r.with_error(code::parse_error,
 			"the HOA strategy has no `States:` header");
 	}
-	if (aut.initial_state >= aut.num_states) {
+	if (start < 0 || static_cast<size_t>(start) >= aut.num_states) {
 		return r.with_error(code::parse_error,
-			"the HOA strategy has a start state outside the state table",
-			{{label::value, std::to_string(aut.initial_state)}});
+			"the HOA strategy's `Start:` state is not one of its states",
+			{{label::value, std::to_string(start)}});
 	}
+	aut.initial_state = static_cast<size_t>(start);
 
 	std::optional<size_t> cur_state;
 	auto body = root | hoa::body;
@@ -263,14 +263,10 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 // ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
 //
 // Declared in algorithm_d_game.h and defined here so it can use the same
-// backend `call_ltlsynt` uses (LS-10).
-//
-// It used to be popen + an inline `--formula="…"` with hand-rolled escaping of
-// only `" \ $ \``.  That is the exact pattern `call_ltlsynt` retired: a single
-// argument is capped at the Linux MAX_ARG_STRLEN of 131072, so a grown φ*
-// (Algorithm B with many constants, or the semantic-PWR fallback) hits E2BIG
-// and comes back as an empty game — which every caller reads as
-// "unrealizable".  `-F path` has no such cap and needs no escaping at all.
+// backend `call_ltlsynt` uses. The formula goes in a file (`-F path`), not
+// in an argument: a single argument is capped at the Linux MAX_ARG_STRLEN
+// of 131072, which a grown φ* (Algorithm B with many constants, or the
+// semantic-PWR fallback) exceeds.
 
 namespace alg_d {
 
@@ -280,6 +276,18 @@ inline result<synth_game> call_ltlsynt_game(
 	const std::vector<std::string>& outs,
 	const std::string& algo)
 {
+	// ltlsynt's default construction may name the condition Streett, which
+	// is no parity game. ACD usually gives the smallest parity game; the
+	// determinized one always gives one.
+	if (algo.empty()) {
+		result<synth_game> game;
+		for (const char* a : { "acd", "sd" }) {
+			game = call_ltlsynt_game(phi_prop, ins, outs, a);
+			if (!game.has_value() || (game.value().acc_known
+				&& !game.value().multi_colored)) break;
+		}
+		return game;
+	}
 	result<synth_game> r;
 
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
@@ -304,9 +312,9 @@ inline result<synth_game> call_ltlsynt_game(
 
 	int timeout_sec = ltl_timeout_sec();
 
-	// SY-R1: a timeout, a missing binary or a usage error is a backend
-	// error, not the EMPTY game every caller used to read as a definitive
-	// UNREALIZABLE. Nothing transient is cached.
+	// A timeout, a missing binary or a usage error is a backend error, not
+	// an empty game a caller would read as UNREALIZABLE. Nothing transient
+	// is cached.
 	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec,
 		algo));
 

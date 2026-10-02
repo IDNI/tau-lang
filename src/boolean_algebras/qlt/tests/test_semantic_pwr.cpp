@@ -3,11 +3,8 @@
 // Tests for semantic PWR (Optimal Mode) — winning-region-based revision.
 //
 // Tests the Algorithm D-based fallback.
-// LS-18: the production code builds θ = ψ ∧ G(Win) ONLY (see
-// semantic_pwr_optimal) -- Win_0 is not conjoined; build_win0_formula is
-// exercised by these tests but has no production caller, and nothing
-// verifies Win_0 ⊆ Win (realizability only guarantees SOME initial ρ
-// wins). Keep that in mind when reading the SPWR-O cases.
+// The production code builds θ = ψ ∧ G(Win) only (see
+// qlt_semantic_pwr_optimal): no initial-state condition is conjoined.
 //
 // Test categories:
 //   SPWR-S-*   Safety regression (optimal mode matches fast mode)
@@ -281,27 +278,6 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		CHECK(result_formula == nullptr);
 	}
 
-	TEST_CASE("[SPWR-W-02] build_win0_formula: empty winning region returns nullptr") {
-		alg_d::alg_d_result result;
-		result.T1_size = 1;
-		result.synth_game.num_states = 1;
-		result.synth_game.init = 0;
-		result.K = 1;
-
-		std::vector<omcat::qlt_type3> T3;
-		omcat::qlt_type3 t3;
-		t3.pos_m = 0;
-		T3.push_back(t3);
-		std::vector<int> type_A = {1};
-
-		tref atom0 = spec("o1[t] = 1.");
-		REQUIRE(atom0 != nullptr);
-		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
-
-		tref result_formula = build_win0_formula<node_t>(result, atoms, T3, type_A);
-		CHECK(result_formula == nullptr);
-	}
-
 	TEST_CASE("[SPWR-W-03] build_win_formula: single atom, bit set returns the atom itself") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
@@ -432,15 +408,13 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		CHECK(with_stub == atom0);
 	}
 
-	TEST_CASE("[SPWR-W-08] build_win_formula vs build_win0_formula: all-states vs initial-state-only") {
+	TEST_CASE("[SPWR-W-08] build_win_formula: every winning state contributes its pattern") {
 		alg_d::alg_d_result result;
 		result.T1_size = 2;
 		result.synth_game.num_states = 2;
 		result.synth_game.init = 0;
 		result.K = 1;
 		result.winning_region = {0, 3};
-		// LG-12: Win₀ reads the FIXED initial memory from init_rho now
-		// (the solver sets it; hand-built results must set it too).
 		result.init_rho = 0;
 
 		std::vector<omcat::qlt_type3> T3;
@@ -460,10 +434,6 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		REQUIRE(win != nullptr);
 		tref expected_win = build_wff_or<node_t>(build_wff_neg<node_t>(atom0), atom0);
 		CHECK(win == expected_win);
-
-		tref win0 = build_win0_formula<node_t>(result, atoms, T3, type_A);
-		REQUIRE(win0 != nullptr);
-		CHECK(win0 == atom0);
 	}
 
 }

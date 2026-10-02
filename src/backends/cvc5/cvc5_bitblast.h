@@ -45,10 +45,13 @@ namespace idni::tau_lang {
  * two values that are neither constant nor the same are multiplied at more
  * than 10 bits, an operator has no circuit here (division, remainder, and
  * anything not built by the make_term_* / make_bitvector_* builders), or
- * the BDD outgrows @p max_nodes. nullopt says nothing about the formula.
+ * the BDD outgrows @p max_nodes, or the time @p deadline passes, which
+ * sets @p late. nullopt says nothing about the formula.
  */
 inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
-	size_t max_width, size_t max_nodes)
+	size_t max_width, size_t max_nodes,
+	data_bdd::clock::time_point deadline = data_bdd::clock::time_point::max(),
+	bool* late = nullptr)
 {
 	using cvc5::Kind;
 	using cvc5::Term;
@@ -113,6 +116,11 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 	// the memo of the operations grows with them; past four entries a
 	// node the attempt costs more than it is worth
 	data_bdd bdd(max_nodes, 4 * max_nodes);
+	bdd.stop_at(deadline);
+	struct tell_late {
+		const data_bdd& bdd; bool* late;
+		~tell_late() { if (late) *late = bdd.late; }
+	} tell{ bdd, late };
 
 	// A Boolean term takes one entry, a bit-vector term one per bit.
 	std::unordered_map<Term, bits> val;

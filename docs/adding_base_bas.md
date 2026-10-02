@@ -116,6 +116,13 @@ against the line naming it:
   a `result<tref>`, described below)
 - **parsing** — `parse`
 
+Declare `atomless = false` whenever your algebra has an atom, even if it is
+infinite. Core then never distributes a quantifier over several disequations
+(`ex x (A && B) == ex x A && ex x B` for negated atoms), a law that holds only
+without atoms (`pack_type_is_atomic`). It keeps that law's `F`, which holds in
+any Boolean algebra, asks your `omcat_qe` otherwise, and keeps the binder
+when neither decides.
+
 `is_one`, `is_zero`, `is_closed`, `normalize`, `splitter`, and
 `simplify_term` can each run a full decision or rewrite procedure. Each one
 can fail. Give each the same
@@ -169,7 +176,7 @@ need solver or LTL types, which sit beside their single consumer:
 
 | member | what core asks it for | resolution |
 |---|---|---|
-| `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
+| `solve(fm)` | your own decision procedure for a whole formula of your types; its answer must convert to the caller's `optional<solution>` | owner of the formula's type |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch. A failure reports the reason (see [Preprocessing](#preprocessing)) | every declarer, chained in pack order, stopping at the first failure |
 | `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |
@@ -180,7 +187,8 @@ need solver or LTL types, which sit beside their single consumer:
 | `term_is_blasteable(term)` | whether a term with an arithmetic operator can be blasted | owner of the term's type |
 | `arith_ops` | that the grammar's arithmetic term operators apply to your type | owner |
 | `zero_constant(ba_type)`, `value_constant(ba_type, v)` | the type's default zero, when it is not `bf_f`; a constant holding a plain integer | owner |
-| `modular_width(ba_type)`, `modular_value(ba_type, c)` | that the type's values are the integers below 2^n with unsigned modular semantics (bitwise Boolean operators, `+ - *` modulo 2^n, unsigned `/ %` and comparisons, logical shifts), and the integer a constant holds; 0 / `nullopt` when not. The data game then plays such a stream on its n bits (bv declares it, answering 0 while widening is on) | owner |
+| `modular_width(ba_type)`, `modular_value(ba_type, c)` | that the type's values are the integers below 2^n with unsigned modular semantics (bitwise Boolean operators, `+ - *` modulo 2^n, unsigned `/ %` and comparisons, logical shifts), and the integer a constant holds; 0 / `nullopt` when not. The data game then plays such a stream on its n bits, and normalization folds a disjunction pinning one variable to every value of the type to `T` (dually, a conjunction excluding every value to `F`) (bv declares it, answering 0 while widening is on) | owner |
+| `decide_closed(form)` | the truth of a closed formula over the type whatever its quantifier prefix, with no quantifier eliminated first; `nullopt` when undecided. The data game then keeps, as the regions of a game over streams of that one type, the formulas whose quantifiers the normalizer leaves standing, and decides them whole (bv declares it) | owner |
 | `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (qlt declares it) | owner |
 | `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
 | `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
@@ -202,18 +210,22 @@ need solver or LTL types, which sit beside their single consumer:
 
 **Pack order is semantic** wherever the rule above says *first*, *any* or
 *chained*: `-DTAU_BAS=a,b` and `-DTAU_BAS=b,a` can differ there. Owner-gated
-members never depend on it, and the two single-declarer members refuse a second
-claimant at compile time so no build resolves them by order.
+members never depend on it, and the single-declarer member refuses a second
+claimant at compile time so no build resolves it by order.
 
 Declaring both `arith_ops` and `solve` is what makes core instantiate the
 arithmetic pipeline (predicate blasting, the arithmetic skip, the theory
-solver) for packs containing you; there is nothing else to switch on.
+solver) for packs containing you; there is nothing else to switch on. The
+theory solver hands your `solve` the atoms of a clause whose types you own, all
+of them in one formula (a cast lets one variable span two of your types), so
+several solving algebras can share a pack.
 
 Every fold's empty case is deliberate. `pack_zero_constant` and
-`pack_value_constant` return `nullptr`, and `pack_type_has_arith_ops` returns
-`false`, because "no BA owns this type" is an ordinary runtime outcome;
-`pack_solve` `static_assert`s, because its call sites are gated and reaching it
-means a gate drifted. When writing one, test the capability's concept with
+`pack_value_constant` return `nullptr`, `pack_type_has_arith_ops` returns
+`false`, and `pack_solve` returns `nullopt` (no owner, or an owner without
+`solve`), because "no BA owns this type" is an ordinary runtime outcome;
+`pack_bool_carrier_type` `static_assert`s, because a pack with nothing to carry
+a bit cannot build core at all. When writing one, test the capability's concept with
 `if constexpr` inside `pack_visit_all` or `pack_owner_apply`: a `?:` in a fold
 expression instantiates both arms for every BA, and a `requires`-expression
 nested in the fold's lambda crashes gcc 13.

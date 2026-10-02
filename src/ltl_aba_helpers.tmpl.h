@@ -155,12 +155,9 @@ bool realizability_has_game_operators(tref fm) {
 // ── extract_data_atoms ────────────────────────────────────────────────────────
 
 // Recursive helper: walk the AST.  Any ABA comparison that contains an io_var
-// is recorded as a data atom, whether or not it is inside a temporal operator.
-// The `inside_temporal` flag is kept for future extensibility but is no longer
-// used to gate atom extraction — every io_var-containing comparison is a data
-// atom regardless of depth.  This is required so that atoms introduced by the
-// S/T compile-away pass (which appear at the top level of the conjunction) are
-// correctly represented in the propositional LTL skeleton.
+// is recorded as a data atom, whether or not it is inside a temporal operator
+// (`inside_temporal` does not gate it), so the atoms the S/T compile-away
+// pass puts at the top level of the conjunction reach the skeleton too.
 template <NodeType node>
 static void collect_atoms(
     tref n,
@@ -182,8 +179,6 @@ static void collect_atoms(
 	}
 
 	// If this is an ABA comparison with io_vars, record it as a data atom.
-	// (Previously gated on inside_temporal, but that excluded top-level atoms
-	// produced by S/T compile-away.)
 	if (is_aba_comparison<node>(n) && has_io_var<node>(n)) {
 		for (auto& [existing, _] : atoms)
 			if (tau::subtree_equals(existing, n)) return; // deduplicate
@@ -402,15 +397,13 @@ static result<std::vector<tref>> collect_hoist_conjuncts(
 	return r.with_assert_check_value(std::move(hoist));
 }
 
-// ── Propositional LTL skeleton (LT-16(c): ONE walker) ───────────────────────
+// ── Propositional LTL skeleton (one walker) ─────────────────────────────────
 //
-// skeleton_str used to be a verbatim copy of skeleton_str_with_testers
-// minus the ppLTLTT tester emission, so a guard added to one walker could
-// silently miss the other (that is how IN-R3 happened).  It is now a thin
-// wrapper delegating to the tester-emitting walker with a scratch vector.
-// Every ltl_skeleton call site is gated on !has_past, so past content
-// reaching this entry is refused (LT-12) rather than emitted as a partial
-// formula ltlsynt would misread.
+// skeleton_str is a thin wrapper delegating to the tester-emitting walker
+// (skeleton_str_with_testers) with a scratch vector, so a guard added to
+// the walker reaches both. Every ltl_skeleton call site is gated on
+// !has_past, so past content reaching this entry is refused rather than
+// emitted as a partial formula ltlsynt would misread.
 
 // Where a subformula sits: `pos` its polarity, `univ` whether it must hold
 // at every position of its scope (an obligation, as in a G body) or at some
@@ -569,15 +562,16 @@ static result<std::string> skeleton_wff_with_testers(
 		TAU_TRY(auto phi, sk(inner.first(), c.neg()));
 		return r.with_value("!" + phi);
 	}
-	case tau::wff_and: {
-		TAU_TRY(auto phi, sk(inner.first(), c));
-		TAU_TRY(auto psi, sk(inner.second(), c));
-		return r.with_value("(" + phi + " & " + psi + ")");
-	}
+	case tau::wff_and:
 	case tau::wff_or: {
-		TAU_TRY(auto phi, sk(inner.first(), c));
-		TAU_TRY(auto psi, sk(inner.second(), c));
-		return r.with_value("(" + phi + " | " + psi + ")");
+		// N-ary: every child, not only the first two
+		const std::string op = nt == tau::wff_and ? " & " : " | ";
+		std::string out;
+		for (size_t i = 0; i < inner.children_size(); ++i) {
+			TAU_TRY(auto x, sk(inner.child(i), c));
+			out += (i ? op : "") + x;
+		}
+		return r.with_value("(" + out + ")");
 	}
 	case tau::wff_imply: {
 		TAU_TRY(auto phi, sk(inner.first(), c.neg()));
@@ -713,9 +707,18 @@ static result<std::string> skeleton_wff_with_testers(
 			return r.with_error(code::solver_error,
 				"skeleton_wff_with_testers: normalization failed");
 		}
-		bool is_f = tree<node>::get(normalized.value()).equals_F();
+		tref nf_ref = normalized.value();
 		r.merge(std::move(normalized));
-		return r.with_value(is_f ? "0" : "1");
+		const auto& nf = tree<node>::get(nf_ref);
+		if (nf.equals_T()) return r.with_value("1");
+		if (nf.equals_F()) return r.with_value("0");
+		// a residue whose value normalization cannot find: a constant
+		// would answer a different question
+		return r.with_error(code::unsupported_operation,
+			std::string("the LTL skeleton has no proposition for a ")
+			+ node::name(static_cast<size_t>(nt)) + " without streams that normalizes to "
+			"neither T nor F (" + truncate_for_message(nf.to_str())
+			+ "); realizability could not be decided");
 	}
 	}
 }

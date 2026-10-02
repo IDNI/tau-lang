@@ -833,10 +833,15 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    the regions still need outgrow its node limit (nodes no region needs any
    more are freed as the table fills), a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
-   UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
+   UNREALIZABLE or UNKNOWN answer of (4) and (5). When a quantifier stays
+   and every stream is of one bitvector type, the game is played once more
+   on formulas that keep their quantifiers, each region decided whole on
+   the bits of its values or by the solver, all of them within
+   `--ltl-closed-regions-timeout` (20 seconds, each question at most a
+   quarter of it); such a game gives a verdict but no strategy to `run`. The steps before step 0
    are played like any other step, their inputs by the environment and
    their outputs by the system. The game answers UNKNOWN only when a
-   quantifier cannot be eliminated or a fixpoint reaches the
+   quantifier cannot be eliminated or decided, or a fixpoint reaches the
    refinement-round cap; (4) and (5) then keep their answer.
 
 A formula is **realizable** iff its data game is won; where that game is
@@ -854,12 +859,25 @@ the edge the inputs take, asks the solver for outputs within the move of
 the vertex reached (a value no stream holds when its code says so), and
 follows the edge those outputs take. The values before step 0 are its own:
 every input 0 and outputs for which the start is won. A strategy of the game
-on codes of values and equalities (not on bits or order types) is also a finite Mealy machine over atoms that compare the current
+on codes is also a finite Mealy machine over atoms that compare the current
 values with 0, 1, the elements of their type and the last values of the
-streams: a state is a game vertex with the pattern of equalities among the
-last values, and the machine is minimized. The run plays that machine, which
+streams: a state is a game vertex with what the last values hold for the
+steps to come, and the machine is minimized. On codes of values and
+equalities, a state holds the pattern of equalities among the last values.
+On the bits of a bitvector wider than 4 bits, it holds the bits a later step
+reads, a step reads an input bit by bit (`(i1[t] & 4) != 0`), only as far as
+its move depends on the bits, and an output is a value of its type. On the
+order types of `qlt` values, it holds how the last values and the constants
+compare, a step places an input among them (`i1[t] < o1[t-1]`,
+`{1}:qlt < i1[t]`, `i1[t] = {0}:qlt`), and an output is the point it equals
+or lies strictly between its neighbours below and above. A machine is built
+only within 4096 states and 65536 edges; past them, or for a strategy of the
+game over formulas, the run plays the game's moves directly. The run plays that machine, which
 the Mealy introspection (the cached solution, its current state) shows, and
-a step reads only the inputs its move depends on. A revision of the
+a step reads only the inputs its move depends on. A strategy over formulas
+reads an input at a step only when the edge labels of its vertex or the
+moves it can take there name it, and at every step one that any of them
+names at an earlier step. A revision of the
 specification is made as in any run: the running specification is revised
 pointwise by the update, and the data game is solved again for the revised
 specification. The game starts from the values already played when it is
@@ -915,6 +933,11 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
+| `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
+| `TAU_LTL_DATA_GAME_MAX_NODES` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited); a full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. Environment fallback of `--ltl-data-game-max-nodes` / REPL `set ltldatagamemaxnodes`. |
+| `TAU_LTL_DATA_GAME_MAX_MEMO` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited); a memo that reaches the cap is emptied, which costs recomputation, never a verdict. Environment fallback of `--ltl-data-game-max-memo` / REPL `set ltldatagamemaxmemo`. |
+| `TAU_LTL_MAX_CONSISTENCY_SUBSETS` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited); a fired cap is sound but may answer unrealizable. Environment fallback of `--max-consistency-subsets` / REPL `set maxsubsets`. |
+| `TAU_LTL_MAX_COVER_PRODUCTS` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited); beyond it the syntactic verdict stands. Environment fallback of `--max-cover-products` / REPL `set maxcoverproducts`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
 a CLI flag, a REPL option and an `api::set_*` setter (see the CLI and REPL
@@ -939,7 +962,13 @@ the fast path in front of Algorithm B enumerates, default 100,
 **Other environment variables.** Three Boolean switches keep an environment
 fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
 value other than `0` enables, `0` disables; read once, then it overrides
-`--ba-component-factoring` / `set factoring`), `TAU_BV_CASE_SPLIT` (`0`
+`--ba-component-factoring` / `set factoring`; the decision by components
+is taken on a formula of `always` clauses that read their streams at the
+current step and at steps back, and declined where a unit refers to
+absolute time, through a `sometimes` clause, a stream read at a fixed time
+point or a constraint on the time point, and where an `always` clause holds
+a temporal operator of its own, so that the whole formula decides),
+`TAU_BV_CASE_SPLIT` (`0`
 disables, any other value enables; overrides `bv-case-split` in both
 directions) and `TAU_BV_QF_DECISION` (a value other than `0` enables the
 quantifier-free bitvector decision; `bv-quantifier-free-decision` enables it
@@ -953,7 +982,7 @@ opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula
 that the data game does not decide,
-`ltl_to_safety_formula` converts the winning Mealy strategy to an executable
+`ltl_to_safety_formula_full` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
 self-loop guard directly.  Multi-state strategies are encoded using one-hot
 auxiliary output bitvector variables (`o__ltl_ms0__`, `o__ltl_ms1__`, …) and
@@ -1995,7 +2024,7 @@ that reason:
 2. the Boolean algebra of simple Boolean functions (`sbf`)
 3. the Boolean algebra of bitvectors of fixed bit width (`bv`)
 4. the ω-categorical theory of dense linear order without endpoints (`qlt`) — rationals under `<`; ω-categorical and decidable, hence supported
-5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — right-closed, left-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
+5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — left-closed, right-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
 6. the Natural Language Boolean Algebra (`nlang`)
 7. the Boolean algebra of lex-half-open polyhedra in ℝ^d (`hsb`) — generalizes `qint` from 1D to d dimensions using canonical halfspaces
 
@@ -2198,7 +2227,7 @@ The Tau Language currently supports the following base types:
 2. `sbf`: the type of simple Boolean functions,
 3. `bv[n]`: the type of bitvectors of bit width `n`,
 4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
-5. `qint`: the Boolean algebra of right-closed, left-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
+5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
 6. `nlang`: the Natural Language Boolean Algebra (its oracle needs `TAU_LLM_API_KEY` or `OPENAI_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
@@ -2256,9 +2285,19 @@ solver for the values (`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`,
 `o2 := 0`).  When no strategy exists, `run` says the specification is
 unrealizable.
 
+A point is an atom of the `qlt` constants: `{3}:qlt & x` is either `0` or
+`{3}:qlt`.  So a quantified `qlt` variable that meets one point `p` only as
+`p & x` and `p & x'` is decided by its two cases, `x := p` and another point
+(`ex x ((({3}:qlt & x) != 0) && (({3}:qlt & x') != 0))` is `F`).  Otherwise a
+closed quantifier whose `qlt` terms are Boolean combinations of constants is
+`T` (for `ex`) or `F` (for `all`) when a point at, between or beyond the
+constants' endpoints is a witness or a counterexample, and an existential
+whose body only excludes values (`x != t`, each `t` free of `x`) is `T`; when
+none of these applies, the binder stays.
+
 #### `qint` — atomless Boolean algebra of rational intervals
 
-`qint` represents the atomless Boolean algebra of right-closed, left-open
+`qint` represents the atomless Boolean algebra of left-closed, right-open
 intervals `[a, b)` over the rationals on the extended real line.  Elements
 are finite unions of such intervals.  The sentinels `-inf` and `+inf` are
 supported as endpoints.
@@ -2268,9 +2307,9 @@ so `1/3` and `0.3333333333333333` are different endpoints.  Rational (`1/4`),
 decimal (`0.25`, `2e-3`) and integer endpoint syntaxes are accepted, plus
 `-inf`/`+inf`; a literal whose exact value does not fit is rejected rather
 than rounded.  An endpoint prints as an integer, a terminating decimal or
-`p/q`.  Bare integers inside `{...}:qint` have a special meaning:
-`{0}` and `{1}` are the algebraic bottom and top, and any other integer `n`
-denotes the interval `[n, n+1)`; write `[0,1)` and `[1,2)` explicitly.
+`p/q`.  Inside `{...}:qint`, a bare `0` and `1` are the algebraic bottom
+and top; any other bare number is rejected, because `qint` has no points --
+write an interval such as `[n, n+1)` instead.
 
 Elements are written as interval expressions inside `{...}:qint`:
 
@@ -2282,8 +2321,9 @@ Elements are written as interval expressions inside `{...}:qint`:
 { [0,1/2) | [1,2) }:qint -- union of two intervals
 ```
 
-Only right-closed, left-open intervals are representable as single atoms;
-arbitrary Boolean combinations produce finite unions of such intervals.
+Each piece is a left-closed, right-open interval, and every Boolean
+combination is again a finite union of such intervals. `qint` is atomless:
+it has no atoms and no points, so a single point cannot be written.
 
 #### `hsb` — lex-half-open polyhedra
 
@@ -2897,8 +2937,8 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
 | -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default `TAU_TREF_BUDGET` or 0; 0 = unlimited) |
 | -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
-| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
-| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
+| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default `TAU_LTL_MAX_CONSISTENCY_SUBSETS` or 4096; 0 = unlimited) |
+| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default `TAU_LTL_MAX_COVER_PRODUCTS` or 256; 0 = unlimited) |
 | -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
@@ -2908,6 +2948,9 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
+| -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
+|     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default `TAU_LTL_DATA_GAME_MAX_NODES` or 8388608; 0 = unlimited) |
+|     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default `TAU_LTL_DATA_GAME_MAX_MEMO` or 33554432; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -2929,15 +2972,22 @@ closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-bitblast-max-nodes` (the BDD nodes a question over
 bitvectors of at most 16 bits may keep in use at once when Tau decides it on
 the bits of its values, before the solver takes it instead; 1048576 by default, `0`
-leaves every question to the solver), `--bv-widening` (exact, widened bitvector arithmetic
+leaves every question to the solver), `--bv-solve-timeout` (the seconds a
+bitvector question with quantifiers may take on the bits of its values, and,
+when it multiplies or divides two values that are not constants, in the
+solver, which then runs it in a separate process stopped at the limit; a
+question stopped there has no answer, so the command asking it answers
+UNKNOWN, naming the limit; 60 by default, `0` runs the solver in the process
+with no limit), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
 the width widening may compute at; `0` leaves the current cap unchanged,
 1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
-`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`, `--bv-widening`
-and `--bv-max-width` are not recognized options at all.
+`--bv-quantifier-free-decision`, `--bv-bitblast-max-nodes`,
+`--bv-solve-timeout`, `--bv-widening` and `--bv-max-width` are not
+recognized options at all.
 
 ## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
 
@@ -2967,8 +3017,10 @@ on every failure, with the reason in the `compile failed:` message (see
 spec](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).  The
 program makes the moves `run` makes, because `tau compile` asks the
 interpreter what it executes.  When `run` plays the Mealy machine of the data
-game's strategy, the program carries that machine.  Otherwise `run` solves as
-it goes: each step through the safety pipeline, and, for a strategy of the
+game's strategy, the program carries that machine as a table of up to 400
+edges.  A larger table would take the C++ compiler longer than the program
+below, which builds the machine when it starts, as `run` does.  Otherwise `run`
+solves as it goes: each step through the safety pipeline, and, for a strategy of the
 abstraction or of a data game with no such machine, that game or synthesis
 when it starts.  The program then executes the embedded spec the same way,
 with the same solver, so it needs `ltlsynt` where `run` does.
@@ -3084,9 +3136,9 @@ preprocessing pass, e.g. bv's own predicate blasting (see below) — off
 disables all of them regardless of their own setting. It's on by default.
 
 * `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
-tau-algebra constant tests: a constant whose clauses share no variables is
-decided per component, each decision remembered across steps, instead of as a
-whole. It's on by default (the REPL starts with the value of the
+tau-algebra constant tests: a constant whose clauses share no variables and
+refer to no absolute time is decided per component, each decision remembered
+across steps, instead of as a whole. It's on by default (the REPL starts with the value of the
 `-K, --ba-component-factoring` command line option).
 
 * `Z|pwrsemantic`: Can be on/off. Enables the semantic (winning-region)
@@ -3192,11 +3244,13 @@ characters (`--spec-size-warn`). 0 (off) by default.
 specification part (`--max-revision-alts`). Unlimited by default.
 
 * `maxsubsets`: cap on the k-ary consistency subset checks per atom group in
-LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default; a fired cap
-is sound but may answer unrealizable.
+LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default, or
+`TAU_LTL_MAX_CONSISTENCY_SUBSETS` when that is set; a fired cap is sound but
+may answer unrealizable.
 
 * `maxcoverproducts`: cap on the ABA oracle's mixed-type coverage expansion
-(`--max-cover-products`). 256 by default.
+(`--max-cover-products`). 256 by default, or `TAU_LTL_MAX_COVER_PRODUCTS` when
+that is set.
 
 * `maxconstantsize`: largest region of fresh values, in tree nodes, that a run
 keeps across steps (`--max-constant-size`). Each value a run commits shrinks
@@ -3238,6 +3292,22 @@ examines per check (`--ltl-window-max-paths`). 4096 by default, or
 `TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
 likewise answers UNKNOWN.
 
+* `ltlclosedregionstimeout`: seconds the data game may spend on regions that
+keep their quantifiers, all their questions together, each question at most
+a quarter of it (`--ltl-closed-regions-timeout`). 20 by default, or
+`TAU_LTL_CLOSED_REGIONS_TIMEOUT` when that is set; 0 skips the attempt. Past
+either bound that attempt is undecided, and the other routes keep deciding.
+
+* `ltldatagamemaxnodes`: cap on the live nodes of the BDD a data game over
+codes builds (`--ltl-data-game-max-nodes`). 8388608 (2^23) by default, or
+`TAU_LTL_DATA_GAME_MAX_NODES` when that is set; 0 = unlimited. A full table
+leaves the game undecided.
+
+* `ltldatagamemaxmemo`: cap on the operation memo entries of that BDD
+(`--ltl-data-game-max-memo`). 33554432 (2^25) by default, or
+`TAU_LTL_DATA_GAME_MAX_MEMO` when that is set; 0 = unlimited. A memo that
+reaches the cap is emptied, which costs recomputation only.
+
 Changing any of these, the two temporal-normalization caps, `preprocessing`
 or an option an algebra declares (below) between two queries drops the
 verdict memos, so the next `sat`/`realizable` is decided
@@ -3271,7 +3341,11 @@ binders are all of one kind quantifier-free, mirroring
 (the BDD budget, in nodes in use at once, of the decision on the bits of
 values of at most 16 bits,
 mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
-question to the solver), `bv-widening` (the
+question to the solver), `bv-solve-timeout` (the seconds a bitvector question
+with quantifiers may take, on its bits and, when it multiplies or divides two
+values that are not constants, in the solver, before the command asking it
+answers UNKNOWN,
+mirroring `--bv-solve-timeout`; 60 by default, 0 = no limit), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
 mirroring `--bv-widening`; off by default) and `bv-max-width` (cap on the
 width widening may compute at, mirroring `--bv-max-width`; 1024 by default,
@@ -3685,18 +3759,13 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 
 | Header | Purpose |
 |--------|---------|
-| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. `Pre_over_T1`, `nu_fixpoint`/`mu_fixpoint` over 2^{T_1} and `reachable_from` are staged helpers that Algorithm D does not use yet. |
+| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. |
 | `src/boolean_algebras/qlt/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings (at most 18 fractional digits); `collect_qlt_constants(fm)` harvesting named constants from a formula. |
-| `src/omcat_oracle_cache.h` | Thread-safe runtime cache for atomic oracle answers (tp(m,x) and achievability-set A_{ρ,J}). |
 
 ## Supporting infrastructure
 
 | Header | Purpose |
 |--------|---------|
-| `src/gr1_detect.h` | `is_gr1_fragment(fm, &n_safety, &n_liveness)` classifier for `⋀ G(ψ_safe) ∧ ⋀ GF(ψ_live)`. Staged: not wired into the synthesis dispatch, exercised by unit tests only. |
-| `src/liveness_decomp.h` | `decompose_liveness(fm)` splits GR(1)-shaped formulas into safety part + GF bodies. Staged, unit tests only. |
-| `src/mealy_extract.h` | Mealy-machine extraction helpers. Staged, unit tests only. |
-| `src/decomposed_spec.h` | `decomposed_spec { transient; invariant; reactive }` with `decompose_spec(fm)` classifier. |
 | `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
 | `src/tau_lang_api.h` | Documentation header for the library entry points (`is_tau_formula_sat`, `get_nso_rr`, `run`); there is no `tau_lang_is_realizable` symbol. |
 
@@ -3788,7 +3857,9 @@ carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOptio
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
 (`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
-`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`) have no counterpart
+`set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`,
+`set_ltl_closed_regions_timeout`,
+`set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`) have no counterpart
 there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
 
@@ -3833,9 +3904,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * Mealy strategies with any number of states are executable.
   * `S` (since) and `T` (trigger) past LTL operators are decided through the
     ppLTLTT temporal-tester encoding on the synthesis path and compiled away
-    to auxiliary output variables for pure-past execution; the tester
-    integration is complete, the compile-away pass's `aux_pairs` output is
-    unused.
+    to auxiliary output variables for pure-past execution.
   * `nlang` type requires `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) to be set;
     without it every oracle question is answered `false` (not cached), so
     verdicts are not reliable.
@@ -3861,10 +3930,8 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
   game (Zielonka's recursive algorithm over priorities derived from the Büchi,
   co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
-  formulas.  The separate μ/ν fixpoint formulation over 2^{T₁} in
-  `src/omcat_types.h` (`Pre_over_T1`, `nu_fixpoint`, `mu_fixpoint`) is staged
-  and not used by the solver; extending D to input-bearing formulas (the T₂
-  dimension in the environment states) is the open design item.
+  formulas; extending D to input-bearing formulas (the T₂ dimension in the
+  environment states) is the open design item.
 * **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
   T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
   BDD-based type encoding: the type of a BA element relative to the formula's

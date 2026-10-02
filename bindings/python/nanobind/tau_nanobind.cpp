@@ -225,13 +225,15 @@ NB_MODULE(tau, m) {
 			&tau_api::set_max_consistency_subsets,
 			"k-ary consistency subset checks per atom group in "
 			"LTL(ABA) synthesis (--max-consistency-subsets); "
-			"default 4096, 0 = unlimited." },
+			"default TAU_LTL_MAX_CONSISTENCY_SUBSETS or 4096, "
+			"0 = unlimited." },
 		{ "set_cache_bound", &tau_api::set_cache_bound,
 			"Bound of the string-keyed synthesis caches "
 			"(--cache-bound); default 4096, 0 = unbounded." },
 		{ "set_max_cover_products", &tau_api::set_max_cover_products,
 			"The ABA oracle's mixed-type coverage expansion "
-			"(--max-cover-products); default 256, 0 = unlimited." },
+			"(--max-cover-products); default "
+			"TAU_LTL_MAX_COVER_PRODUCTS or 256, 0 = unlimited." },
 		{ "set_max_constant_size", &tau_api::set_max_constant_size,
 			"Largest region of fresh values, in tree nodes, a run "
 			"keeps across steps (--max-constant-size); default 2000, "
@@ -256,6 +258,22 @@ NB_MODULE(tau, m) {
 			&tau_api::set_ltl_window_max_paths,
 			"Strategy paths the multi-step window oracle examines "
 			"per check (--ltl-window-max-paths); 0 = unlimited." },
+		{ "set_ltl_closed_regions_timeout",
+			&tau_api::set_ltl_closed_regions_timeout,
+			"Seconds the data game may spend on regions that keep "
+			"their quantifiers, each question at most a quarter of "
+			"it (--ltl-closed-regions-timeout); default 20, 0 = no "
+			"such attempt." },
+		{ "set_ltl_data_game_max_nodes",
+			&tau_api::set_ltl_data_game_max_nodes,
+			"Live nodes of the BDD of a data game over codes "
+			"(--ltl-data-game-max-nodes); a full table leaves the "
+			"game undecided. 0 = unlimited." },
+		{ "set_ltl_data_game_max_memo",
+			&tau_api::set_ltl_data_game_max_memo,
+			"Operation memo entries of the BDD of a data game over "
+			"codes (--ltl-data-game-max-memo); a full memo is "
+			"emptied. 0 = unlimited." },
 		{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
 			"Decided tau-algebra rows whose key tree is kept alive "
 			"across the step sweep (--ba-decision-pins); default "

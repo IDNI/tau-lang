@@ -120,3 +120,12 @@ add_repl_test(temporal_ops-whatis_A_is_wff
 	"fragment ctl_star. whatis A (always o1[t] = 1)" "node type: wff")
 add_repl_test(temporal_ops-whatis_E_is_wff
 	"fragment ctl_star. whatis E (sometimes o1[t] = 1)" "node type: wff")
+
+# A constant next to a temporal formula needs no temporal quantifier of its
+# own: it does not depend on time.
+add_repl_test(temporal_ops-always_and_T
+	"sat (always o1[t] = 1) && T" ": T")
+add_repl_test(temporal_ops-always_and_F
+	"sat (always o1[t] = 1) && F" ": F")
+add_repl_test(temporal_ops-ctl_star_and_T
+	"fragment ctl_star. sat (A F o51[t] = 1) && T" ": T")

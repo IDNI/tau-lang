@@ -144,6 +144,8 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_constant_size|max-constant-size|u|300|maxconstantsize|300"
 	"tref_budget|tref-budget|y|4096|trefbudget|4096"
 	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
+	"ltl_data_game_max_nodes|ltl-data-game-max-nodes||4096|ltldatagamemaxnodes|4096"
+	"ltl_data_game_max_memo|ltl-data-game-max-memo||4096|ltldatagamemaxmemo|4096"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")
@@ -181,6 +183,11 @@ add_repl_test(cli-bv_blastdepth_flag
 add_repl_test(cli-bv_case_split_max_tests_flag
 	"get bv-case-split-max-tests" "bv-case-split-max-tests: *5" NO_TRACE
 	FLAGS --bv-case-split-max-tests 5)
+
+# --- bv-solve-timeout CLI flag (BA-declared option) --------------------------
+add_repl_test(cli-bv_solve_timeout_flag
+	"get bv-solve-timeout" "bv-solve-timeout: *7" NO_TRACE
+	FLAGS --bv-solve-timeout 7)
 
 # --- preprocessing default (GitHub #74) --------------------------------------
 # The CLI's own option table used to hardcode its own default of `true`, so

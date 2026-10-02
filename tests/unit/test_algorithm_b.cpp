@@ -150,6 +150,26 @@ static bool alg_b_realizable(const char* s) {
 	return result;
 }
 
+// With TAU_LTL_ALG set to `alg`, qlt's propositional synthesis declines a
+// full-LTL formula over an input atom (neither A nor D encodes inputs, and
+// B is not the requested algorithm), and the default ABA-oracle path still
+// decides it REALIZABLE. Returns {declined, realizable}.
+static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
+	setenv("TAU_LTL_ALG", alg, 1);
+	bdd_init<Bool>();
+	tref fm = spec("G (F (o1[t]:qlt > i1[t]:qlt)).");
+	bool declined = false, realizable = false;
+	if (fm != nullptr) {
+		auto claim = pack_try_propositional_synthesis<node_t>(fm,
+			extract_data_atoms<node_t>(fm));
+		declined = claim.has_value() && !claim.value().has_value();
+		auto r = is_tau_formula_sat<node_t>(fm);
+		realizable = r.has_value() && r.value();
+	}
+	unsetenv("TAU_LTL_ALG");
+	return { declined, realizable };
+}
+
 TEST_SUITE("[Algorithm B: integration]") {
 
 	TEST_CASE("[ALG-B-10] G(o1 > {0}) REALIZABLE: output-only regression") {
@@ -188,32 +208,20 @@ TEST_SUITE("[Algorithm B: integration]") {
 			"G (o1[t]:qlt > {1/2}:qlt) && G (o1[t]:qlt < {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-B-17] TAU_LTL_ALG=A falls back to B when inputs are present") {
-		setenv("TAU_LTL_ALG", "A", 1);
-		bdd_init<Bool>();
-		tref fm = spec("G (o1[t]:qlt > i1[t]:qlt).");
-		bool result = false;
-		if (fm != nullptr) {
-			auto r = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(r.has_value());
-			result = r.value();
-		}
-		unsetenv("TAU_LTL_ALG");
-		CHECK(result);
+	TEST_CASE("[ALG-B-17] TAU_LTL_ALG=A declines a formula with an input atom"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		auto [declined, realizable] = qlt_driver_declines_input_atom("A");
+		CHECK(declined);
+		CHECK(realizable);
 	}
 
-	TEST_CASE("[ALG-B-18] TAU_LTL_ALG=D falls back to B when inputs are present") {
-		setenv("TAU_LTL_ALG", "D", 1);
-		bdd_init<Bool>();
-		tref fm = spec("G (o1[t]:qlt > i1[t]:qlt).");
-		bool result = false;
-		if (fm != nullptr) {
-			auto r = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(r.has_value());
-			result = r.value();
-		}
-		unsetenv("TAU_LTL_ALG");
-		CHECK(result);
+	TEST_CASE("[ALG-B-18] TAU_LTL_ALG=D declines a formula with an input atom"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		auto [declined, realizable] = qlt_driver_declines_input_atom("D");
+		CHECK(declined);
+		CHECK(realizable);
 	}
 
 	TEST_CASE("[ALG-B-19] input lookback still routes through P-bit encoding") {

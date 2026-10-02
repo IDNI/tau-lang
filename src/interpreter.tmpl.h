@@ -857,10 +857,18 @@ post_normalization:
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		bool unrealizable = false;
-		TAU_TRY(auto full,
-			ltl_to_safety_formula_full<node>(spec, &data_strategy,
-				counter_route, &unrealizable));
-		std::tie(safety_spec, sol_opt, unanchored_aux) = std::move(full);
+		auto full = ltl_to_safety_formula_full<node>(spec, &data_strategy,
+			counter_route, &unrealizable);
+		if (!full.has_value()) {
+			fold_rejected(safety_failures, false);
+			r.merge(std::move(full));
+			return r.with_assert_check_error(code::unsat,
+				"Tau specification is not executable: no strategy "
+				"was synthesised (see `realizable`)");
+		}
+		std::tie(safety_spec, sol_opt, unanchored_aux) =
+			std::move(full.value());
+		r.merge(std::move(full));
 		// The data game decided the spec: its strategy chooses every
 		// step's outputs, so no spec part is solved.
 		if (data_strategy) {
@@ -895,8 +903,12 @@ post_normalization:
 		// `realizable` tells which
 		if (!safety_spec && counter_route) {
 			fold_rejected(safety_failures, false);
-			return r.with_assert_check_error(code::unsat,
-				"Tau specification is unsat");
+			if (unrealizable) return r.with_assert_check_error(
+				code::unsat, "Tau specification is unsat");
+			return r.with_assert_check_error(code::solver_error,
+				"UNKNOWN: whether the Tau specification is "
+				"realizable could not be decided, so it cannot "
+				"be executed");
 		}
 		if (!safety_spec && unrealizable) {
 			fold_rejected(safety_failures, false);
@@ -1652,6 +1664,17 @@ struct data_game_step_provider : step_provider<node> {
 		const assignment<node>& memory, int_t time_point, int_t) override
 	{
 		result<std::optional<solution<node>>> r;
+		// the first step after a reset carries what solving again reported
+		r.append(std::move(reset_report));
+		reset_report = {};
+		if (unsolved_after_reset) {
+			return r.with_error(code::solver_error,
+				unrealizable_after_reset
+				? "after the reset, the revised specification is "
+					"unrealizable from step 0"
+				: "UNKNOWN: after the reset, the data game does not "
+					"decide the revised specification from step 0");
+		}
 		auto get = [&](const std::string& name, size_t tid, bool input,
 			int_t time) -> tref
 		{
@@ -1733,7 +1756,30 @@ struct data_game_step_provider : step_provider<node> {
 		return get_max_initial<node>(tree<node>::get(spec->get())
 			.select_top(is_child<node, tree<node>::io_var>));
 	}
+	// A reset restarts the revised spec at step 0, its fixed steps where
+	// it states them, so a strategy solved from a later step is solved
+	// again. Set when that gives no strategy, and whether the game
+	// refuted the spec rather than leaving it undecided.
+	bool unsolved_after_reset = false;
+	bool unrealizable_after_reset = false;
+	// what solving it again reported
+	report reset_report;
 	void reset() override {
+		unsolved_after_reset = unrealizable_after_reset = false;
+		reset_report = {};
+		if (offset && spec) {
+			std::shared_ptr<data_game_strategy<node>> next;
+			bool unrealizable = false;
+			auto full = ltl_to_safety_formula_full<node>(spec->get(),
+				&next, true, &unrealizable);
+			if (full.has_value() && next) strategy = std::move(next);
+			else {
+				unsolved_after_reset = true;
+				unrealizable_after_reset = full.has_value()
+					&& unrealizable;
+			}
+			reset_report = std::move(full).report();
+		}
 		offset = 0;
 		strategy->reset();
 	}
@@ -3199,6 +3245,22 @@ result<typename interpreter<node>::update_plan>
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
 		return r;
+	}
+	// The game builds values of every stream's type, and the update may
+	// name a stream without one: it takes the type of the running
+	// stream of that name, or the default for a new one.
+	{
+		subtree_map<node, size_t> running_types;
+		for (tref v : tau::get(dg->spec->get()).select_top(
+			is_child<node, tau::io_var>))
+				running_types.emplace(v, tau::get(v).get_ba_type());
+		tref typed = infer_ba_types<node>(update, &running_types).first;
+		if (!typed) {
+			r.warning("the update gives a stream a type other than "
+				"the running one; no update was performed");
+			return r;
+		}
+		update = typed;
 	}
 	// As in plan_update: the fixed steps of the update count from
 	// time_point, and the values in memory replace the ones it reads.

@@ -209,4 +209,17 @@ add_repl_test(sat_cmd-bv_falling_output "sat always o1[t]:bv[8] < o1[t-1]:bv[8] 
 # A product under alternating quantifiers: whatever r is, s = -r leaves no u
 # with s - u < s + r = 0.
 add_repl_test(sat_cmd-bv_alternating_product "sat all p:bv[8] ex q:bv[8] ex r:bv[8] all s:bv[8] ex u:bv[8] (r * q != p && s - u < s + r)" ": F" TIMEOUT 120)
-
+# Products of two 16-bit values under an until and of two 8-bit values of
+# different steps: questions that stop on their time budget, not hang.
+add_repl_budget_test(sat_cmd-bv_budget_wide_product
+	"sat (((i1[t]:bv[16] = (o2[t-1]:bv[16] + o1[t]:bv[16])) && (o2[t]:bv[16] != i1[t]:bv[16])) U ((i1[t]:bv[16] = o2[t-1]:bv[16]) || ((o2[t]:bv[16] * o1[t]:bv[16]) < (o1[t]:bv[16] + o1[t]:bv[16]))))")
+add_repl_budget_test(sat_cmd-bv_budget_product_of_steps
+	"sat (always (((o1[t-1]:bv[8] - i1[t-1]:bv[8]) <= (o1[t]:bv[8] + i1[t-1]:bv[8])) || (i1[t-1]:bv[8] = o1[t]:bv[8]))) && (sometimes (((o1[t-1]:bv[8] - o1[t-1]:bv[8]) <= (o1[t-1]:bv[8] * {0}:bv[8])) && (o1[t-1]:bv[8] <= (i1[t]:bv[8] * i1[t-1]:bv[8])))) && (sometimes ((i1[t-1]:bv[8] - i1[t-1]:bv[8]) < o1[t-1]:bv[8]))")
+# asked twice, the question stops on its budget twice: nothing the first
+# command computed from the missing answer serves the second
+add_repl_budget_test(sat_cmd-bv_budget_asked_twice
+	"sat (G ((o2[t]:bv[16] * o2[t]:bv[16]) <= i1[t-1]:bv[16])) && (F ((i1[t]:bv[16] + o2[t]:bv[16]) < (i1[t-1]:bv[16] + o2[t-1]:bv[16]))). sat (G ((o2[t]:bv[16] * o2[t]:bv[16]) <= i1[t-1]:bv[16])) && (F ((i1[t]:bv[16] + o2[t]:bv[16]) < (i1[t-1]:bv[16] + o2[t-1]:bv[16])))")
+if(TEST "test_repl-sat_cmd-bv_budget_asked_twice")
+	set_tests_properties("test_repl-sat_cmd-bv_budget_asked_twice" PROPERTIES
+		PASS_REGULAR_EXPRESSION "passed its time budget.*passed its time budget")
+endif()

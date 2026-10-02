@@ -1126,7 +1126,9 @@ result<bool> missing_temp_quants(tref fm) {
 	if (fms.empty()) return r.with_value(false);
 	auto atom = [](tref n) {
 		const tau& n_t = tau::get(n);
-		if (n_t.is(tau::wff)         || n_t.is(tau::wff_or) ||
+		// A constant does not depend on time, so it needs no scope.
+		if (n_t.is(tau::wff_t)       || n_t.is(tau::wff_f) ||
+			n_t.is(tau::wff)         || n_t.is(tau::wff_or) ||
 			n_t.is(tau::wff_and)     || n_t.is(tau::wff_neg) ||
 			n_t.is(tau::wff_xor)     ||
 			n_t.is(tau::wff_imply)   || n_t.is(tau::wff_rimply) ||

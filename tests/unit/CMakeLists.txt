@@ -18,6 +18,7 @@ set(TESTS
 	ba_types
 	ba_types_inference
 	bounded_cache
+	bounded_call
 	data_bdd
 	canonicalize_tref
 	hash_order
@@ -61,7 +62,9 @@ set(TESTS
 	algorithm_a
 	algorithm_b
 	algorithm_d
+	ltl_aba_open_points
 	cli_options
+	platform_macros
 	codegen_parity
 	cpp_codegen
 	cpp_codegen_pwr
@@ -69,9 +72,6 @@ set(TESTS
 	cpp_codegen_bench
 	cpp_codegen_data_atoms
 	cpp_codegen_program_desc
-	gr1_detect
-	liveness_decomp
-	mealy_extract
 	leaf_clause
 	normal_forms
 	nso_ba
@@ -80,7 +80,6 @@ set(TESTS
 	ocltl_runtime_witness
 	ocltl_types
 	rr
-	spec_decompose
 	product_ba
 	tau_bdd
 	tau_tree

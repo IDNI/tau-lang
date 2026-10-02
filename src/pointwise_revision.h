@@ -2,15 +2,15 @@
 
 // Pointwise revision for nested-temporal LTL(ABA).
 //
-// Implements the hybrid semantic-syntactic algorithm from pwr-ltl.tex:
+// Implements a hybrid semantic-syntactic algorithm:
 //   - Semantic per-step formula ((∃o. α∧β) → α) ∧ β at atomic leaves
 //   - REAL checks at temporal operator nodes for commitment-side selection
 //   - And-distribution into invariant slots for clause-level granularity
 //   - Semantic optimal mode fallback: winning-region
 //     revision via Algorithm D when fast mode drops a clause
 //
-// On safety inputs G(α) * G(β), this produces exactly the old per-step
-// formula G(((∃o.α∧β)→α) ∧ β), ensuring backward compatibility.
+// On safety inputs G(α) * G(β), this produces the per-step formula
+// G(((∃o.α∧β)→α) ∧ β).
 
 #ifndef __IDNI__TAU__POINTWISE_REVISION_H__
 #define __IDNI__TAU__POINTWISE_REVISION_H__
@@ -19,13 +19,10 @@
 
 namespace idni::tau_lang {
 
-/// Enable the semantic ("optimal mode", pwr-ltl.tex Sec.11) fallback of the
-/// temporal pointwise revision below: when the syntactic revision drops a
-/// spec clause, re-derive it from Algorithm D's winning region
-/// (`pack_semantic_pwr_optimal`). OFF by default (PW-N4): that route reaches
-/// the parity-game solver whose dead-end override is known to under-correct
-/// (AL-R1), so a wrong winning region would silently shape the revised spec.
-/// A runtime parameter by policy -- `--pwr-semantic` on the CLI,
+/// Enable the semantic ("optimal mode") fallback of the temporal pointwise
+/// revision below: when the syntactic revision drops a spec clause,
+/// re-derive it from Algorithm D's winning region
+/// (`pack_semantic_pwr_optimal`). OFF by default. A runtime parameter by policy -- `--pwr-semantic` on the CLI,
 /// `api::set_pwr_semantic_fallback`. Lives here, not in the qlt plugin that
 /// implements the fallback itself: this file is its only reader, and core
 /// must not depend on a plugin-owned global.
@@ -619,9 +616,9 @@ result<tref> pointwise_revision_temporal(
 	if (tau::get(update).equals_T()) return r.with_value(spec);
 	if (tau::get(spec).equals_T())   return r.with_value(update);
 
-	// PW-R6: one memo for the whole revision — Step 1/Step 2/early-exit
+	// One memo for the whole revision: Step 1/Step 2/early-exit
 	// conjunctions are often the same hash-consed tref, and each repeat
-	// used to be a fresh ltlsynt subprocess.
+	// would otherwise run ltlsynt again.
 	pwr_sat_memo memo;
 
 	// Step 0: And-distribute into invariant slots, then split into clauses
@@ -674,13 +671,9 @@ result<tref> pointwise_revision_temporal(
 			// Optimal mode fallback: if fast mode
 			// returned the update clause unchanged (dropped the spec
 			// clause), try semantic winning-region revision.
-			// PW-N5: structural comparison -- revise() rebuilds nodes,
-			// so pointer identity missed an unchanged result.
-			// PW-N4: gated by the pwr_semantic_fallback runtime
-			// parameter (default OFF): the fallback runs Algorithm D's
-			// game solver, whose dead-end override is known to
-			// under-correct (AL-R1), and it is the one production
-			// route to that solver.
+			// Structural comparison: revise() rebuilds nodes, so pointer
+			// identity would miss an unchanged result. Gated by the
+			// pwr_semantic_fallback runtime parameter (default OFF).
 			if (pwr_semantic_fallback
 				&& (tau::subtree_equals(rev_clause, best)
 					|| tau::subtree_equals(rev_clause, update))) {

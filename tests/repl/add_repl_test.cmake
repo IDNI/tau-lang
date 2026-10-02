@@ -76,6 +76,16 @@ function(add_repl_test test_name test_cmd test_regex)
 	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
 endfunction()
 
+# `test_cmd` asks a bitvector question that neither the bits nor cvc5 decide
+# within a budget of 3 seconds (--bv-solve-timeout): the answer is UNKNOWN,
+# naming the budget, and never a verdict.
+function(add_repl_budget_test test_name test_cmd)
+	add_repl_test(${test_name} "${test_cmd}"
+		"UNKNOWN: a bitvector question passed its time budget [(]bv-solve-timeout, 3 s"
+		FLAGS --bv-solve-timeout 3 NO_TRACE
+		FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 120)
+endfunction()
+
 # add_echo_repl_test(<name> <cmd> <regex> [ENV <VAR=value>...]
 #     [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
 #     [REQUIRES ltlsynt|hostfs|<ba-id> ...])

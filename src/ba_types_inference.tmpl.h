@@ -439,14 +439,21 @@ std::variant<tref, inference_error, parse_error> update_arith_symbol(tref n,
 
 // Hoists the reference's type onto its bf_ref wrapper: takes the first
 // BA type found anywhere in the subtree (reference head or arguments),
-// strips the type annotations from the inner ref, and rebuilds the
-// bf_ref carrying that type.
+// or, when the subtree carries none, the type @p types gives the
+// reference itself, strips the type annotations from the inner ref, and
+// rebuilds the bf_ref carrying that type.
 template<NodeType node>
-tref update_bf_ref(tref n) {
+tref update_bf_ref(tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
 	auto type = find_ba_type<node>(n);
 	auto new_n = untype<node>(tau::get(n).child(0)); //ref
+	// A call without arguments, k(), has no subtree to carry its type:
+	// only its scope knows it, from the definition or the other side of
+	// its atom. Left untyped, it never matches the typed head of k.
+	if (type == 0)
+		if (auto it = types.find(canonize<node>(new_n)); it != types.end())
+			type = it->second;
 	return tau::get_typed(tau::bf_ref, new_n, type);
 }
 
@@ -700,9 +707,9 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
-	// close the body scope
-	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
+	// First we update the ba_constant, the variables, bf_t/bf_f and the
+	// calls (tau::ref, see update_bf_ref) in the rr and close the body scope
+	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable, tau::ref }, options);
 	if (std::holds_alternative<inference_error>(updated))
 		return std::get<inference_error>(updated);
 	if (std::holds_alternative<parse_error>(updated))
@@ -1042,9 +1049,13 @@ std::variant<tref, inference_error, parse_error> update(
 			}
 			case tau::bf_ref: {
 				auto nn = update_default<node>(n, changes);
-				if(!to_be_updated.contains(nt)) break;
+				// An atom's scope lists its references (tau::ref): it
+				// is the only scope that knows the type of a call
+				// without arguments.
+				if (!to_be_updated.contains(nt)
+					&& !to_be_updated.contains(tau::ref)) break;
 				// TODO (HIGH) check if we need to pass options
-				if (auto updated = update_bf_ref<node>(nn); updated != n)
+				if (auto updated = update_bf_ref<node>(nn, types); updated != n)
 					changes.insert_or_assign(n, updated);
 				break;
 			}

@@ -28,6 +28,11 @@ add_repl_test(normalize_cmd_wff_nonmem "normalize T" ": T")
 add_repl_test(normalize_cmd_wff_mem_rel "T. normalize %-0" "T")
 add_repl_test(normalize_cmd_wff_mem_abs "T. normalize %1" "T")
 
+# bv[1] has two values, so pinning a variable to both is a tautology
+add_repl_test(normalize_cmd-bv1_excluded_middle "normalize x:bv[1] = 1 || x:bv[1] = 0" ": T")
+add_repl_test(normalize_cmd-bv1_excluded_middle_stream "normalize o1[t]:bv[1] = 0 || o1[t]:bv[1] = 1" ": T")
+add_repl_test(normalize_cmd-bv1_excluded_middle_dual "normalize x:bv[1] != 1 && x:bv[1] != 0" ": F")
+
 # AP-N3 regression: get_type_and_arg() used to deref a null child.
 add_repl_test(normalize_cmd-multiindex_fixed_point_call
 	"g[0, 0](Y) := Y = 0. g[n, 0](Y) := g[n - 1, 0](Y). normalize g(Y)"
@@ -280,3 +285,60 @@ add_repl_test(normalize_cmd-issue185_definition_ref_kept
 	"f(x, y) := x | y. g(x) := f(x, x). normalize g(a) = 0." "%1[^%]*: a = 0")
 add_repl_test(normalize_cmd-issue185_fallback_max
 	"g[0](x:bv[2]) := {0}:bv[2]. g[n](x:bv[2]) := g[n-1](x:bv[2])'. normalize (g({1}:bv[2]) fallback max({0}:bv[2], {2}:bv[2])) = {2}:bv[2]." "%1[^%]*: T")
+
+# The zero test and the test for one of a constant whose formula refers to
+# absolute time are decided on the formula as a whole.
+add_repl_test(normalize_cmd-tau_absolute_time_zero "set charvar off. normalize { (always o2[t] = 1) && (always o1[t-2] = 0) && (sometimes o2[t-1] = 0) }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_one "set charvar off. normalize { sometimes ((o1[t-2] != 0 && [t < 2]) || (o3[t] = o3[1] && i1[t] = o3[t-1]) || (o4[1] = 0 && [t >= 3])) }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_fixed_point_zero "set charvar off. normalize { (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0) }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_constraint_zero "set charvar off. normalize { (always ([t < 2] -> i1[t] = 0)) && (always ((o4[t-2] = 1 && o1[t] = o4[t-2]) -> o1[t] = 1)) }:tau = 0" ": F")
+
+# GitHub #197: a point is an atom, so a qlt variable met by one point p only as
+# `p & y` and `p & y'` has two cases, y containing p or not, and no value makes
+# both meets nonzero.
+add_repl_test(normalize_cmd-qlt_point_meet_ex
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_valid
+	"valid all y:qlt ((({3}:qlt & y) = 0) || (({3}:qlt & y') = 0))" ": T")
+add_repl_test(normalize_cmd-qlt_point_meet_sat
+	"sat ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_one_side
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') = 0))" ": T")
+add_repl_test(normalize_cmd-qlt_point_meet_all_either
+	"normalize all y:qlt ((({3}:qlt & y) != 0) || (({3}:qlt & y') != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_point_meet_subst_same
+	"normalize (({3}:qlt & {3}:qlt) != 0) && (({3}:qlt & {3}:qlt') != 0)" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_subst_other
+	"normalize (({3}:qlt & {5}:qlt) != 0) && (({3}:qlt & {5}:qlt') != 0)" ": F")
+# A point witness decides an existential, a point counterexample a universal.
+add_repl_test(normalize_cmd-qlt_interval_meet_ex
+	"normalize ex y:qlt ((({[0,1]}:qlt & y) != 0) && (({[0,1]}:qlt & y') != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_interval_meet_all
+	"normalize all y:qlt ((({[0,1]}:qlt & y) = 0) || (({[0,1]}:qlt & y') = 0))" ": F")
+add_repl_test(normalize_cmd-qlt_two_points_meet_ex
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y') != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_two_points_meet_all
+	"normalize all y:qlt ((({3}:qlt & y) = 0) || (({5}:qlt & y') = 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_interval_meet_ex
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({[0,1]}:qlt & y') != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_point_interval_meet_all
+	"normalize all y:qlt ((({3}:qlt & y) = 0) || (({[0,1]}:qlt & y') = 0))" ": F")
+# qlt has atoms, so a block is not distributed over its disequations: with no
+# point witness the binder stays rather than answering T.
+add_repl_test(normalize_cmd-qlt_two_points_meet_kept
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y) != 0))" ": ex b1 ")
+add_repl_test(normalize_cmd-qlt_point_meet_open_kept
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0) && ((x:qlt & y) != 0))" ": ex b1 ")
+# An ordering atom stays with the interval computation.
+add_repl_test(normalize_cmd-qlt_point_meet_order_kept
+	"normalize ex y:qlt (y > {5}:qlt && ({3}:qlt & y) = 0)" ": ex b1 ")
+add_repl_test(normalize_cmd-qlt_point_meet_order_empty
+	"normalize ex y:qlt (y < {1}:qlt && y > {5}:qlt && ({3}:qlt & y) != 0)" ": F")
+# Without the atomless law a qlt disequation still decides: excluding finitely
+# many values leaves one, and the necessary condition's F stands.
+add_repl_test(normalize_cmd-qlt_excluded_values_ex
+	"normalize ex o:qlt (o != {[0,1]}:qlt && o != i:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_excluded_vars_ex
+	"normalize ex x:qlt (x != a:qlt && x != b:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_pinned_and_excluded_ex
+	"normalize ex b:qlt (b != {[0,1]}:qlt && (b & {[0,1]}:qlt' | b' & {[0,1]}:qlt) = 0)" ": F")

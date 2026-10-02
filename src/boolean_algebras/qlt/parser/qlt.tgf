@@ -27,7 +27,7 @@ qlt      => "top"                      :qlt_top
           | "bot"                      :qlt_bot
           | "bottom"                   :qlt_bot
           | singleton                  :qlt_singleton
-          | interval                   :qlt_single
+          | interval                   :qlt_interval
           | ( interval _ '|' _ qlt )   :qlt_union.
 
 # Four bracket combinations; bound type is encoded in the nonterminal,

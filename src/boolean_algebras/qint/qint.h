@@ -35,10 +35,8 @@ template <NodeType node> size_t qint_type_id();
 // Bottom element: empty map
 //
 // Integer-literal semantics (BA1-7): in `{n}:qint` sources the bare integers
-// 0 and 1 are the ALGEBRAIC constants bottom and top, NOT intervals; every
-// other integer n denotes the interval [n, n+1). Consequently [0,1) and
-// [1,2) are unreachable through bare-integer syntax -- write them as
-// explicit intervals instead.
+// 0 and 1 are the ALGEBRAIC constants bottom and top, NOT intervals; any
+// other bare number is rejected, since qint has no points.
 // -----------------------------------------------------------------------------
 
 /**
@@ -129,9 +127,9 @@ tref simplify_qint_symbol(tref sym);
 tref simplify_qint_term(tref t);
 /// BA1-5 contract note: unlike sbf_splitter (which honors every
 /// splitter_type and always makes progress), this splitter ignores @p st
-/// and MAY RETURN @p x UNCHANGED when the element is atomic/degenerate
-/// (e.g. a singleton piece). Callers looping "split until proper subset"
-/// must guard against a fixpoint.
+/// and MAY RETURN @p x UNCHANGED when the cut (h-1, l+1 or the midpoint)
+/// does not fit a 64-bit numerator and denominator. Callers looping "split
+/// until proper subset" must guard against a fixpoint.
 qint qint_splitter(const qint& x, splitter_type st);
 qint qint_splitter_one();
 

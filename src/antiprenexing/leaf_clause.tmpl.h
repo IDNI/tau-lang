@@ -142,9 +142,9 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// per path on a blasted DAG.
 	for (tref c : conjs) pre_order<node>(c).visit_unique(type_scan);
 	if (!types_homogeneous) {
-		LOG_ERROR << "eliminate_block_over_clause: dependent conjuncts "
-			"mix BA types, keeping the quantifier block: "
-			<< LOG_FM(clause);
+		r.warning("dependent conjuncts mix BA types, keeping the "
+			"quantifier block",
+			{{label::value, truncate_for_message(TAU_TO_STR(clause))}});
 		tref kept = tau::build_wff_and(conjs);
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			kept = build_wff_ex<node>(*v, kept, false);
@@ -558,14 +558,20 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// is F, while this construction (no positives, f_0 = f_1 = 0) builds
 		// `(g_0 | g_1) != 0` per disequation and answers T for both.
 		//
-		// The guard names both atomic (finite) BA families -- bv and bool --
-		// spelled exactly as step 2a's own atomlessness guard spells it
-		// (`profile_block_atoms`, block_atom_profile.tmpl.h). `bool` is the
-		// two-element BA, so it is maximally atomic and breaks this law even
-		// harder than bv[1] does; nothing floors it, so a bool-typed block
-		// reaches this squeeze. Where the guard declines, the existing
-		// decline path applies: re-wrap the binder, exactly as the
-		// heterogeneous-type and unrecognised-shape branches do. The
+		// The guard asks the owner whether the type has atoms
+		// (`pack_type_is_atomic`), with `bool` beside it, exactly as step
+		// 2a's own atomlessness guard does (`profile_block_atoms`,
+		// block_atom_profile.tmpl.h). `bool` is the two-element BA, so it is
+		// maximally atomic and breaks this law even harder than bv[1] does;
+		// nothing floors it, so a bool-typed block reaches this squeeze. An
+		// infinite algebra with atoms breaks it too: the meet of an atom a
+		// with x is 0 or a, so `a x != 0 && a x' != 0` is F. Where the guard
+		// declines, the existing decline path applies: re-wrap the binder,
+		// exactly as the heterogeneous-type and unrecognised-shape branches
+		// do -- at once for a type with arithmetic, whose solver and
+		// blasting paths own it, and otherwise only after the
+		// construction, whose F holds in any Boolean algebra, and the
+		// owner's elimination (`pack_omcat_qe`) leave it open. The
 		// positive-only construction underneath (`f_0 f_1 = 0`) is Boole's
 		// consistency condition and is valid in any Boolean algebra, so only
 		// the `neqs` case is guarded.
@@ -588,14 +594,17 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 			return r.with_value(normalize_atomic_formula_operators<node>(
 				with_kept(tbnf)));
 		}
-		if (!neqs.empty() && type_v > 0
-			&& pack_type_has_arith_ops<node>(type_v)) {
+		const bool atomic_neqs = !neqs.empty()
+			&& pack_type_is_atomic<node>(type_v);
+		auto keep_binder = [&]() {
 			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
 				"with disequations, keeping the binder: "
 				<< LOG_FM(scoped) << "\n";)
 			return r.with_value(normalize_atomic_formula_operators<node>(
 				with_kept(tau::build_wff_ex(var, scoped, false))));
-		}
+		};
+		if (atomic_neqs && pack_type_has_arith_ops<node>(type_v))
+			return keep_binder();
 		tref f = squeeze_positives<node>(scoped, type_v);
 		tref f_0 = f ? rewriter::replace<node>(f, var,
 			tau::_0_trimmed(type_v)) : tau::_0(type_v);
@@ -648,6 +657,16 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// the same clause comes back spelled `bf_neq` from the
 		// single-variable path and `!(= 0)` from the block path.
 		TAU_TRY(tref tbnf, term_boole_normal_form<node>(out));
+		// With atoms the construction is only necessary: a solution x
+		// lies between f_0 and f_1', so g(x) <= f_1' g_1 | f_0' g_0. Its
+		// F stands; anything else is the owner's to decide, or the
+		// binder stays.
+		if (atomic_neqs && !tau::get(tbnf).equals_F()) {
+			if (auto sat = pack_omcat_qe<node>(type_v, var, scoped))
+				return *sat ? r.with_value(with_kept(_T<node>()))
+					: r.with_value(_F<node>());
+			return keep_binder();
+		}
 		return r.with_value(normalize_atomic_formula_operators<node>(
 			with_kept(tbnf)));
 	}
@@ -687,8 +706,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// J1 = {f = 0}: it distributes the block over the disequations, keeping
 	// `ex X (f = 0)` and one `ex X (f' g != 0)` per negative. Same atomless
 	// precondition as the single-variable `neqs` construction above, same
-	// atomic (finite) BA families -- bv and bool, the same pair and the same
-	// spelling step 2a's guard uses -- same bv[1] counterexample, same decline:
+	// guard -- a type with atoms, or bool, as step 2a's guard spells it --
+	// same bv[1] counterexample, same decline:
 	// re-wrap the live block around the scoped part, the shape the
 	// unrecognised-conjunct branch above already uses. `scoped` is already in
 	// the `!(= 0)` spelling here, so unlike the single-variable path this needs
@@ -712,8 +731,7 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		TAU_TRY(tref tbnf, term_boole_normal_form<node>(expanded));
 		return r.with_value(with_kept(tbnf));
 	}
-	if (!neg.empty() && clause_type > 0
-		&& pack_type_has_arith_ops<node>(clause_type)) {
+	if (!neg.empty() && pack_type_is_atomic<node>(clause_type)) {
 		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
 			"negated conjuncts, keeping the block: "
 			<< LOG_FM(scoped) << "\n";)

@@ -202,10 +202,18 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		CHECK(true);
 	}
 
-	TEST_CASE("pack_solver_count counts the BAs declaring solve") {
-		static_assert(pack_solver_count<conv_node>() == 1);
-		static_assert(pack_solver_count<mini_node>() == 0);
-		CHECK(true);
+	TEST_CASE("bv alone solves, and owns every width under one pack position") {
+		static_assert(ba_has_solve<conv_node, bv>);
+		static_assert(!ba_has_solve<conv_node, qint>);
+		const size_t bv8 = ba_descriptor<bv, conv_node>::type_id_for(8);
+		const size_t bv16 = ba_descriptor<bv, conv_node>::type_id_for(16);
+		const size_t qint_id = ba_types<conv_node>::id(
+			ba_descriptor<qint, conv_node>::type_tree());
+		CHECK(pack_owner_index<conv_node>(bv8)
+			== pack_owner_index<conv_node>(bv16));
+		CHECK(pack_owner_index<conv_node>(bv8)
+			!= pack_owner_index<conv_node>(qint_id));
+		CHECK_FALSE(pack_owner_index<conv_node>(size_t{0}).has_value());
 	}
 
 	TEST_CASE("exactly one BA may claim propositional synthesis") {

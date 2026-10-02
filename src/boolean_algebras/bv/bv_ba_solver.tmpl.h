@@ -562,6 +562,97 @@ bool has_alternating_quantifiers(tref form) {
 	return false;
 }
 
+/**
+ * @brief Whether cvc5 may not return on @p t: it holds a quantifier and a
+ * product, quotient or remainder of two values neither of which is a
+ * constant.
+ *
+ * Only such a question goes to a child process. cvc5 decides a
+ * quantifier-free one by bit-blasting, and linear arithmetic under
+ * quantifiers by its invertibility conditions, both in bounded time; a
+ * child costs a fork and a copy of every page the solver writes, which the
+ * many small quantified questions of tests/benchmark/fixtures/satisfiability
+ * would pay several times over.
+ */
+inline bool bv_needs_bound(const cvc5::Term& t) {
+	std::unordered_set<uint64_t> seen;
+	std::vector<cvc5::Term> stack{ t };
+	bool quantified = false, nonlinear = false;
+	while (!stack.empty() && !(quantified && nonlinear)) {
+		cvc5::Term x = stack.back(); stack.pop_back();
+		if (!seen.insert(x.getId()).second) continue;
+		const auto k = x.getKind();
+		if (k == cvc5::Kind::FORALL || k == cvc5::Kind::EXISTS)
+			quantified = true;
+		if (k == cvc5::Kind::BITVECTOR_MULT
+			|| k == cvc5::Kind::BITVECTOR_UDIV
+			|| k == cvc5::Kind::BITVECTOR_UREM)
+		{
+			size_t open = 0;
+			for (size_t i = 0; i < x.getNumChildren(); ++i)
+				if (!x[i].isBitVectorValue()) ++open;
+			if (open > 1) nonlinear = true;
+		}
+		for (size_t i = 0; i < x.getNumChildren(); ++i)
+			stack.push_back(x[i]);
+	}
+	return quantified && nonlinear;
+}
+
+inline std::string bv_solve_timeout_message() {
+	return "UNKNOWN: a bitvector question passed its time budget "
+		"(bv-solve-timeout, " + std::to_string(bv_solve_timeout)
+		+ " s; 0 = unbounded), so no answer is given";
+}
+
+/// When a question asked now runs out: at the deadline of a scope that
+/// shares one, else of `bv_solve_timeout`; never when that budget is 0 or no
+/// child process can bound it.
+inline std::chrono::steady_clock::time_point bv_question_deadline() {
+	if (!bounded_calls_available())
+		return std::chrono::steady_clock::time_point::max();
+	if (!shared_deadline() && !bv_solve_timeout)
+		return std::chrono::steady_clock::time_point::max();
+	return budget_deadline(std::chrono::seconds(bv_solve_timeout));
+}
+
+/**
+ * @brief The verdict of @p solver's single checkSat; with @p bounded, run in
+ * a child process killed at @p deadline.
+ *
+ * A child that passes the deadline, or ends without answering, gives
+ * unknown, sets @p ran_out and notes the budget for the boundary of the unit
+ * of work.
+ */
+inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
+	std::chrono::steady_clock::time_point deadline, bool& ran_out)
+{
+	auto verdict = [&solver] {
+		auto r = solver.checkSat();
+		return r.isSat() ? bv_sat_status::sat
+			: r.isUnknown() ? bv_sat_status::unknown
+			: bv_sat_status::unsat;
+	};
+	using namespace std::chrono;
+	if (!bounded || deadline == steady_clock::time_point::max())
+		return verdict();
+	const auto left = duration_cast<milliseconds>(
+		deadline - steady_clock::now()).count();
+	bounded_outcome out;
+	out.status = bounded_outcome::timed_out;
+	if (left > 0) out = run_bounded([&] { return (uint8_t)verdict(); },
+		(uint64_t)left);
+	if (out.status == bounded_outcome::done
+		&& out.value <= (uint8_t)bv_sat_status::unknown)
+			return (bv_sat_status)out.value;
+	ran_out = true;
+	note_time_budget_exhausted(out.status == bounded_outcome::timed_out
+		? bv_solve_timeout_message()
+		: "UNKNOWN: the process deciding a bitvector question ended "
+			"without an answer, so no answer is given");
+	return bv_sat_status::unknown;
+}
+
 template <NodeType node>
 std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
@@ -581,16 +672,32 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// split per `preprocessing` setting) there is nothing else to key on.
 	// nullopt is cached too: a formula the translator rejects gets rejected the
 	// same way every time, and re-deriving that costs a full tree walk.
-	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
+	// A query that ran out of its time budget is remembered as such, so a
+	// later ask notes the budget again instead of reading a bare unknown.
+	using cache_t = std::unordered_map<tref,
+		std::pair<std::optional<bv_sat_status>, bool>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	tref key = tau::trim_right_sibling(form);
-	if (auto it = cache.find(key); it != end(cache)) return it->second;
-	auto memo = [&key](std::optional<bv_sat_status> r) {
-		return cache.emplace(key, r).first->second;
+	if (auto it = cache.find(key); it != end(cache)) {
+		if (it->second.second)
+			note_time_budget_exhausted(bv_solve_timeout_message());
+		return it->second.first;
+	}
+	bool ran_out = false;
+	auto memo = [&key, &ran_out](std::optional<bv_sat_status> r) {
+		return cache.emplace(key, std::pair{ r, ran_out }).first
+			->second.first;
 	};
 #else
+	bool ran_out = false;
 	auto memo = [](std::optional<bv_sat_status> r) { return r; };
 #endif // TAU_CACHE
+	// Once a budget ran out, the unit of work asking has no answer to
+	// give, and nothing it asks later can change that.
+	if (!time_budget_exhausted().empty()) {
+		ran_out = true;
+		return memo(bv_sat_status::unknown);
+	}
 
 	subtree_map<node, bv> vars, free_vars;
 	// Opt-in quantifier-free decision (bv_quantifier_free_decision). A closed
@@ -656,9 +763,11 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 					return memo(std::nullopt);
 				}
 				qf_solver.assertFormula(qf_expr.value());
-				auto qf_result = qf_solver.checkSat();
-				if (qf_result.isSat()) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
-				if (qf_result.isUnknown()) {
+				auto qf_result = bv_check_sat(qf_solver, false,
+					std::chrono::steady_clock::time_point::max(),
+					ran_out);
+				if (qf_result == bv_sat_status::sat) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
+				if (qf_result == bv_sat_status::unknown) {
 					LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << qf_expr.value();
 					return memo(bv_sat_status::unknown);
 				}
@@ -704,19 +813,28 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// Exact on the bits of narrow values, where cvc5's quantifier
 	// instantiation can run for minutes; what the BDD cannot hold goes on
 	// to cvc5.
-	if (bv_bitblast_max_nodes)
-		if (auto v = cvc5_bitblast_sat(expr.value(),
-			bv_bitblast_max_width, bv_bitblast_max_nodes))
+	// The bits and cvc5 share the question's time budget: one they
+	// cannot decide within it is unknown.
+	const auto deadline = bv_question_deadline();
+	if (bv_bitblast_max_nodes) {
+		bool late = false;
+		if (auto v = cvc5_bitblast_sat(expr.value(), bv_bitblast_max_width,
+			bv_bitblast_max_nodes, deadline, &late))
 				return memo(*v ? bv_sat_status::sat
 					: bv_sat_status::unsat);
-	solver.assertFormula(expr.value());
-	auto result = solver.checkSat();
-	if (result.isSat()) return memo(bv_sat_status::sat);
-	if (result.isUnknown()) {
-		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
-		return memo(bv_sat_status::unknown);
+		if (late) {
+			ran_out = true;
+			note_time_budget_exhausted(bv_solve_timeout_message());
+			return memo(bv_sat_status::unknown);
+		}
 	}
-	return memo(bv_sat_status::unsat);
+	solver.assertFormula(expr.value());
+	// the questions of a scope sharing one budget all count against it
+	auto result = bv_check_sat(solver, shared_deadline().has_value()
+		|| bv_needs_bound(expr.value()), deadline, ran_out);
+	if (result == bv_sat_status::unknown)
+		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+	return memo(result);
 }
 
 template <NodeType node>

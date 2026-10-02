@@ -22,6 +22,7 @@
 #include "ltl_aba_limits.h"
 #include <cerrno>
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 
 #include <algorithm>
@@ -202,7 +203,7 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 // ── HOA guard → DNF (sum of products) ────────────────────────────────────
 //
 // The evaluator above answers "does this label hold under this assignment".
-// Consumers that must EMIT code for a label (tau_codegen) or reason about it
+// Consumers that must EMIT code for a label (cpp_codegen.tmpl.h) or reason about it
 // symbolically (the ABA oracle) need its cubes instead, and both must call
 // `to_dnf` rather than hand-lex the label.  The digit loop
 // `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')` SKIPS '|', '('
@@ -242,14 +243,15 @@ inline bool normalise_cube(cube& c) {
 }
 
 /// @brief Recursive-descent parser turning a guard label into DNF cubes,
-/// failing when the expansion exceeds `max_cubes`.
+/// failing when the expansion exceeds `max_cubes` (0 = unlimited).
 struct parser {
 	const std::string& s;
 	size_t i = 0;
 	size_t max_cubes;
 	bool failed = false;
 
-	explicit parser(const std::string& str, size_t cap) : s(str), max_cubes(cap) {}
+	explicit parser(const std::string& str, size_t cap)
+		: s(str), max_cubes(cap ? cap : SIZE_MAX) {}
 
 	static std::vector<cube> dnf_true()  { return { cube{} }; }
 	static std::vector<cube> dnf_false() { return {}; }
@@ -349,7 +351,7 @@ struct parser {
  * `max_cubes` (see the section comment above: callers must REFUSE the edge
  * in that case).  An empty label is the unconditional guard.
  * @param label Guard label over AP indices.
- * @param max_cubes Cap on the number of cubes produced.
+ * @param max_cubes Cap on the number of cubes produced (0 = unlimited).
  * @return The cubes, or `std::nullopt`.
  */
 inline std::optional<std::vector<cube>> to_dnf(
@@ -565,19 +567,26 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 					for (size_t q = 0; q < players.size() && q < g.player.size(); ++q)
 						g.player[q] = players[q];
 				}
-			} else if (line.find("acc-name:") != std::string::npos) {
-				if (line.find(" all") != std::string::npos) is_all = true;
-				else if (line.find("Buchi") != std::string::npos &&
-				         line.find("co-Buchi") == std::string::npos) is_buchi = true;
-				else if (line.find("co-Buchi") != std::string::npos) is_cobuchi = true;
-				else if (line.find("parity") != std::string::npos) {
+			} else if (size_t at = line.find("acc-name:");
+				at != std::string::npos)
+			{
+				// by the exact name: generalized-Buchi and
+				// generalized-co-Buchi contain the plain names, and
+				// any other condition (Streett, Rabin, ...) is left
+				// unknown, so the game is refused
+				std::istringstream nl(line.substr(at + 9));
+				std::string name;
+				nl >> name;
+				if (name == "all") is_all = true;
+				else if (name == "Buchi") is_buchi = true;
+				else if (name == "co-Buchi") is_cobuchi = true;
+				else if (name == "parity") {
 					// LG-3: capture the flavor; normalized to
 					// max-odd (the solver's convention) below.
 					is_parity   = true;
 					parity_min  = line.find(" min")  != std::string::npos;
 					parity_even = line.find(" even") != std::string::npos;
 				}
-				// else: Streett acceptance (handled via n_colors)
 			} else if (line.substr(0,11) == "Acceptance:") {
 				std::istringstream al(line.substr(11));
 				al >> g.n_colors;
@@ -742,7 +751,8 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
  * @param phi_prop Propositional LTL formula in Spot syntax.
  * @param ins Input proposition names.
  * @param outs Output proposition names.
- * @param algo ltlsynt's `--algo=` value; empty keeps its default.
+ * @param algo ltlsynt's `--algo=` value; empty asks for a parity game
+ * (`acd`, then `sd`), since the default construction may give a Streett one.
  * @return The parsed synthesis game, or an error result.
  */
 result<synth_game> call_ltlsynt_game(
@@ -924,6 +934,19 @@ inline result<product_game> build_product_game(
 			{{label::limit, ltl_max_game_aps},
 			 {label::value, std::to_string(n_aps)}});
 	}
+	// Colours of a condition other than all, Buchi, co-Buchi or parity
+	// (Streett, generalized Buchi, ...) are not priorities.
+	if (G.multi_colored || (!G.acc_known && G.n_colors > 0))
+		return r.with_value(product_game{});
+	// A parsed game's colours sit two above the priority of a run that
+	// sees none, as in build_data_arena. A game built by hand, with no
+	// acceptance declared, keeps the priorities it was given.
+	const bool lift = G.acc_known;
+	const int uncolored = G.acc_accepts_uncolored ? 1 : 0;
+	auto state_prio = [&](int q) {
+		if (!lift) return G.state_priority[q];
+		return G.state_color[q] < 0 ? uncolored : G.state_priority[q] + 2;
+	};
 
 	// Fast feasibility lookup: given (pos_m, pos_y, D_pattern), does any T3 type match?
 	// Index: rho * T1_size * (2^K) + rho_prime * (2^K) + D_pattern  → bool
@@ -951,7 +974,7 @@ inline result<product_game> build_product_game(
 			static_cast<size_t>(type_A[t])) = true;
 	}
 
-	// Batch O7: precise environment edges.  An env edge exists only when its
+	// Precise environment edges.  An env edge exists only when its
 	// guard's D-pattern is feasible from ρ, not merely when the guard is
 	// satisfiable by any propositional assignment (the guard's D-content is
 	// data, and data feasibility from ρ is the same fact regardless of which
@@ -1054,7 +1077,7 @@ inline result<product_game> build_product_game(
 	// (see initial_memory above) — not position 0, not a solver choice.
 	// Out of range is a caller bug (assert); in Release the bad index is
 	// left as-is, which downstream membership tests read as UNREALIZABLE —
-	// fail-safe, unlike a silent clamp back to the old position-0 phantom.
+	// fail-safe, unlike a silent clamp to position 0.
 	assert(0 <= init_rho && static_cast<size_t>(init_rho) < T1_size);
 	pg.init = G.init * T1_size + static_cast<size_t>(init_rho);
 	pg.player.assign(pg.n_states, 0);
@@ -1066,7 +1089,7 @@ inline result<product_game> build_product_game(
 		for (size_t rho = 0; rho < T1_size; ++rho) {
 			const size_t s = q * T1_size + rho;
 			pg.player[s]   = G.player[q];
-			pg.priority[s] = G.state_priority[q]; // overridden by edge stubs if needed
+			pg.priority[s] = state_prio(q); // overridden by edge stubs if needed
 		}
 	}
 
@@ -1074,7 +1097,7 @@ inline result<product_game> build_product_game(
 	for (size_t i = 0; i < stubs.size(); ++i) {
 		const size_t s = stub_base + i;
 		pg.player[s]   = 0; // pass-through: single successor, player irrelevant
-		pg.priority[s] = stubs[i].priority;
+		pg.priority[s] = lift ? stubs[i].priority + 2 : stubs[i].priority;
 	}
 
 	// Build transitions
@@ -1224,7 +1247,7 @@ static std::pair<StateSet,StateSet> solve(
 		for (size_t v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
-	// NOTE on dead ends (LG-32 / Batch O7): they are decided ONCE, BEFORE
+	// NOTE on dead ends: they are decided ONCE, BEFORE
 	// this recursion, in `zielonka_win_player1`'s textbook preprocessing —
 	// deliberately NOT here.  Inside the recursion "no successor in V" is
 	// not the same statement as "cannot move": the sub-games Zielonka
@@ -1281,7 +1304,7 @@ static std::pair<StateSet,StateSet> solve(
 /**
  * @brief Returns the set of states where player 1 (sys) wins.
  *
- * LG-32 / AL-R1 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
+ * TEXTBOOK dead-end semantics.  Parity-game
  * semantics say the player who cannot move LOSES the finite play, while
  * `solve` scores every state by its priority's parity — so dead ends are
  * decided here, BEFORE the parity recursion, the standard way:

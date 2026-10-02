@@ -4,8 +4,8 @@
  *
  * Lifts the BA operators (AND, OR, XOR, NOT, bool comparisons) to
  * `std::variant<BAs...>` by dispatching to the active alternative.
- * If the two operands hold different alternatives, a debug or devel build
- * asserts. A release build returns a default-constructed variant.
+ * If the two operands hold different alternatives, every build prints a
+ * message and aborts: no value of either algebra is a correct result.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
@@ -13,12 +13,24 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__
 
+#include <cstdlib>
+#include <iostream>
 #include <variant>
 
 #include "tau_tree.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
+
+/// @brief Stop on a binary operator applied to two different algebras.
+/// Typing gives both operands of every in-tree call one type, so reaching
+/// this is a broken invariant; a default value would be a silent wrong
+/// constant.
+[[noreturn]] inline void variant_ba_mismatch(const char* op) {
+	std::cerr << "variant operator" << op
+		<< ": mismatched alternatives\n";
+	std::abort();
+}
 
 /// @brief Component-wise bitwise AND on matching-alternative variants.
 template <typename... BAs>
@@ -30,8 +42,7 @@ std::variant<BAs...> operator&(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l & r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			DBG(assert(false && "variant operator&: mismatched alternatives");)
-			return std::variant<BAs...>{};}
+			variant_ba_mismatch("&");}
 	), l, r);
 }
 
@@ -45,8 +56,7 @@ std::variant<BAs...> operator|(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l | r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			DBG(assert(false && "variant operator|: mismatched alternatives");)
-			return std::variant<BAs...>{};}
+			variant_ba_mismatch("|");}
 	), l, r);
 }
 
@@ -60,8 +70,7 @@ std::variant<BAs...> operator^(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l ^ r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			DBG(assert(false && "variant operator^: mismatched alternatives");)
-			return std::variant<BAs...>{};}
+			variant_ba_mismatch("^");}
 	), l, r);
 }
 

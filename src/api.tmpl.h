@@ -275,7 +275,7 @@ void api<node>::set_max_revision_alts(size_t n) {
 template <NodeType node>
 void api<node>::set_max_consistency_subsets(size_t n) {
 	option_change_guard<node> guard;
-	max_consistency_subsets = n;
+	max_consistency_subsets_param = (long) n;
 }
 
 template <NodeType node>
@@ -286,11 +286,12 @@ void api<node>::set_cache_bound(size_t n) {
 template <NodeType node>
 void api<node>::set_max_cover_products(size_t n) {
 	option_change_guard<node> guard;
-	max_cover_products = n;
+	max_cover_products_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_max_constant_size(size_t n) {
+	option_change_guard<node> guard;
 	max_constant_size = n;
 }
 
@@ -335,6 +336,24 @@ template <NodeType node>
 void api<node>::set_ltl_window_max_paths(size_t n) {
 	option_change_guard<node> guard;
 	ltl_window_max_paths_param = (long) n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_closed_regions_timeout(size_t seconds) {
+	option_change_guard<node> guard;
+	ltl_closed_regions_timeout_param = (long) seconds;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_data_game_max_nodes(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_game_max_nodes_param = (long) n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_data_game_max_memo(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_game_max_memo_param = (long) n;
 }
 
 template <NodeType node>
@@ -1144,7 +1163,7 @@ result<tref> api<node>::eliminate_quantifiers(tref fm) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
 		// Quantifier elimination works on a formula; a term given here
-		// used to come back unchanged as if it had been eliminated.
+		// would come back unchanged as if it had been eliminated.
 		if (!tau::get(fm).is(tau::wff)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
@@ -1302,8 +1321,6 @@ result<bool> api<node>::realizable(tref fm) {
 			r = is_ltl_aba_realizable<node>(target, 0, true);
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
-			// (a spec root is not a formula: sat() used to reject it with
-			// an error here, which fell through the same way)
 			// unsat(fm) => unrealizable(fm): reject without running
 			// synthesis. An undecided sat (error) is not a decided
 			// false, so it falls through to the real check below.
@@ -1346,8 +1363,8 @@ result<bool> api<node>::sat(tref fm) {
 		// downstream safety pipeline sees one wff_always.  Non-mergeable
 		// Boolean combinations (disjunction, negation, F-on-non-singletons,
 		// etc.) survive flatten unchanged and are routed to the full-LTL
-		// pipeline by is_tau_formula_sat itself — there's no longer a
-		// pre-check that rejects them at this layer.
+		// pipeline by is_tau_formula_sat itself; this layer does not
+		// reject them.
 		fm = flatten_always_conjuncts<node>(simplified);
 		if (!fm || !is_formula(fm)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
@@ -1787,7 +1804,11 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		// A spec root is always unwrapped, whether or not it holds a ref: a
 		// spec handed whole to the normalizer as its main formula is negated
-		// as if it were a wff by the syntactic simplifier.
+		// as if it were a wff by the syntactic simplifier. A parsed spec
+		// comes as `start`, which holds the spec.
+		if (tau::get(expr).is(tau::start)
+			&& tau::get(expr).child_is(tau::spec))
+				expr = tau::get(expr).first();
 		if (tau::get(expr).is(tau::spec)) {
 			TAU_TRY(nso_rr, tau_lang::get_nso_rr<node>(ctx, expr));
 		} else {

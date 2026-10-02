@@ -23,6 +23,11 @@
 
 namespace idni::tau_lang {
 
+// The most edges of a Mealy view `tau compile` carries as a table: past a
+// few hundred edges the C++ compiler takes longer over the table than over
+// the program that solves the spec as it runs.
+inline size_t compile_max_table_edges = 400;
+
 namespace compile_detail {
 
 // Marks a directory `tau gen` owns, so a later run may write into it and a
@@ -728,11 +733,12 @@ result<codegen_result> gen_spec(
 
 	// 2. Follow what `run` executes: make_interpreter chooses it, so a
 	// program and a run of the spec make the same moves. When the run
-	// plays the Mealy view of the data game's strategy, a finite machine,
-	// the program carries that machine. Otherwise the run solves as it
-	// goes (each step, the game or the abstraction when it starts, and a
-	// revision when the update stream asks for one), and the program
-	// executes the embedded spec the same way.
+	// plays the Mealy view of the data game's strategy, a finite machine
+	// of at most compile_max_table_edges edges, the program carries that
+	// machine. Otherwise the run solves as it goes (each step, the game or
+	// the abstraction when it starts, and a revision when the update
+	// stream asks for one), and the program executes the embedded spec the
+	// same way.
 	std::optional<ltl_aba_solution<Node>> sol;
 	bool solves_each_step = false;
 	// the output streams `run` prints, with their types
@@ -751,8 +757,13 @@ result<codegen_result> gen_spec(
 		const bool revises = std::ranges::any_of(run_outputs,
 			[](const auto& o) { return o.first == "u"
 				&& o.second == get_ba_type_id<Node>(tau_type<Node>()); });
-		if (run.plays_data_game() && run.cached_solution && !revises)
-			sol = run.cached_solution;
+		size_t edges = 0;
+		if (run.cached_solution)
+			for (const auto& es : run.cached_solution->aut.edges)
+				edges += es.size();
+		if (run.plays_data_game() && run.cached_solution && !revises
+			&& edges <= compile_max_table_edges)
+				sol = run.cached_solution;
 		else solves_each_step = true;
 	}
 	r.merge(std::move(run_r));

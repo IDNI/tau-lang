@@ -30,15 +30,6 @@ namespace idni::tau_lang {
 /// option `lgrsmaxvars`.
 inline size_t lgrs_max_vars = 8;
 
-/// Largest region of fresh values, in tree nodes, that a
-/// `fresh_element_ledger` keeps: every committed value shrinks the region by
-/// its complement, so the region grows with each step of a run, and each
-/// shrink decides the Tau constants it holds. Past the budget the ledger
-/// stops tracking the region and values come from the general solver.
-/// 0 = unlimited; set via `api::set_max_constant_size`,
-/// `--max-constant-size` or the REPL option `maxconstantsize`.
-inline size_t max_constant_size = 2000;
-
 /// How many times a solver call gave up on a value because building it
 /// passed `max_constant_size`; `solve` reads it to tell that apart from a
 /// system without solutions.

@@ -16,6 +16,7 @@
 
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
+#include "bounded_call.h"
 
 namespace idni::tau_lang {
 
@@ -170,8 +171,10 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * merged), each other conjunct headed by `always`, `sometimes`, `U`, `R` or
  * `W`, or the whole formula when it has no temporal operator. Normalization
  * can drop the literal that carries that lookback, a tautology such as
- * `o1[t-2] = o1[t-2]` or one absorbed by another always statement. Such a
- * clause gets the literal `o__warmup[t-k] = 0` on a fresh output of the
+ * `o1[t-2] = o1[t-2]` or one absorbed by another always statement; whether
+ * it does is read off the body rebuilt through the construction hooks,
+ * the tree the decision procedures normalize. Such a clause gets the
+ * literal `o__warmup[t-k] = 0` on a fresh output of the
  * Boolean carrier type, `k` the written lookback; execution never prints
  * this stream. A clause read positively gets it conjoined to its body. A
  * clause read under a negation gets its negation disjoined, so that the

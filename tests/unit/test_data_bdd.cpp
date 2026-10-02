@@ -1,6 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+
+#include <chrono>
 #include "backends/bdds/data_bdd.h"
 
 #include <bit>
@@ -187,5 +189,68 @@ TEST_SUITE("data_bdd collection") {
 		for (uint32_t v = nv; v-- > 0; ) p = bdd.exor(bdd.var(v), p);
 		CHECK( !bdd.full );
 		CHECK( eval(bdd, p, 1) );
+	}
+
+	TEST_CASE("a passed deadline fills the table for good") {
+		data_bdd bdd(size_t{1} << 16);
+		bdd.stop_at(data_bdd::clock::now() - std::chrono::seconds(1));
+		// the clock is read once per 2^14 new nodes or memo entries, the
+		// first one included
+		id p = data_bdd::F;
+		for (uint32_t v = nv; v-- > 0 && !bdd.full; )
+			p = bdd.exor(bdd.var(v), p);
+		CHECK( bdd.full );
+		CHECK( bdd.late );
+		CHECK( !bdd.worth_redoing(0) );
+		bdd.collect([](auto&&) {});
+		CHECK( bdd.full );
+	}
+
+	TEST_CASE("a deadline not passed changes nothing") {
+		data_bdd bdd(size_t{1} << 16);
+		bdd.stop_at(data_bdd::clock::now() + std::chrono::hours(1));
+		id p = data_bdd::F;
+		for (uint32_t v = nv; v-- > 0; ) p = bdd.exor(bdd.var(v), p);
+		CHECK( !bdd.full );
+		CHECK( !bdd.late );
+		for (uint32_t a = 0; a < (1u << nv); ++a)
+			CHECK( eval(bdd, p, a) == (std::popcount(a) % 2 == 1) );
+	}
+}
+
+TEST_SUITE("data_bdd memo cap") {
+
+	TEST_CASE("a memo cap that clears keeps the results and the table") {
+		constexpr size_t pool = 8, cap = 64;
+		data_bdd capped(size_t{1} << 20, cap,
+			data_bdd::memo_policy::clear);
+		data_bdd unbounded(size_t{1} << 20);
+		std::vector<id> pc, pf;
+		for (uint32_t v = 0; v < pool; ++v) {
+			pc.push_back(capped.var(v));
+			pf.push_back(unbounded.var(v));
+		}
+		random_ops gen(20260929);
+		for (size_t step = 0; step < 2000; ++step) {
+			const auto o = gen.next(pool);
+			pc[o.to] = run(capped, o, pc);
+			pf[o.to] = run(unbounded, o, pf);
+			REQUIRE( !capped.full );
+			REQUIRE( capped.memo_size() < cap );
+		}
+		for (size_t i = 0; i < pool; ++i)
+			CHECK( truth_table(capped, pc[i])
+				== truth_table(unbounded, pf[i]) );
+		CHECK( capped.memo_clears > 0 );
+		CHECK( unbounded.memo_clears == 0 );
+	}
+
+	TEST_CASE("a memo cap that gives up fills the table") {
+		data_bdd bdd(size_t{1} << 16, 4);
+		id p = data_bdd::F;
+		for (uint32_t v = 0; v < nv && !bdd.full; ++v)
+			p = bdd.exor(p, bdd.conj(bdd.var(v), bdd.var((v + 3) % nv)));
+		CHECK( bdd.full );
+		CHECK( bdd.memo_clears == 0 );
 	}
 }

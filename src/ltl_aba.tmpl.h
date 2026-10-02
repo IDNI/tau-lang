@@ -15,6 +15,7 @@
 #include "algorithm_d_game.h"
 #include "satisfiability.h"
 #include "backends/bdds/data_bdd.h"
+#include "reset_hooks.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ltl_aba"
@@ -22,6 +23,8 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <charconv>
+#include <limits>
 #include <map>
 #include <set>
 #include <cstdio>
@@ -29,9 +32,11 @@
 #include <cerrno>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 

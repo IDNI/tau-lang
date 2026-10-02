@@ -140,48 +140,57 @@ auto pack_owner_apply(size_t ba_type, F&& f) {
 	return out;
 }
 
-namespace detail {
-
-template <typename Node, typename Form, typename First, typename... Rest>
-auto pack_solve_impl(Form form) {
-	if constexpr (ba_has_solve<Node, First>)
-		return ba_descriptor<First, Node>::solve(form);
-	else if constexpr (sizeof...(Rest) > 0)
-		return pack_solve_impl<Node, Form, Rest...>(form);
-	else static_assert(sizeof...(Rest) > 0,
-		"pack_solve: no BA in this pack provides solve()");
-}
-
-} // namespace detail
-
-/** @brief How many BAs of @p Node's pack declare `solve`. */
+/**
+ * @brief Position in @p Node's pack of the BA owning @p ba_type, or nullopt
+ *        when no BA owns it.
+ *
+ * Two type ids answer the same position exactly when one BA owns both (every
+ * width of a parameterised family), which is how a caller groups the atoms
+ * one BA's solver must see together.
+ */
 template <typename Node>
-constexpr std::size_t pack_solver_count() {
-	return []<std::size_t... Is>(std::index_sequence<Is...>) {
-		return (std::size_t{0} + ... + std::size_t{ba_has_solve<Node,
-			std::tuple_element_t<Is, typename Node::bas_tuple>>});
-	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+std::optional<size_t> pack_owner_index(size_t ba_type) {
+	using pack = typename Node::bas_tuple;
+	std::optional<size_t> out;
+	if (!ba_type) return out;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		// A lambda called inside the fold pattern crashes clang 17 and 19.
+		auto step = [&]<std::size_t I>() {
+			using BA = std::tuple_element_t<I, pack>;
+			if (out) return;
+			if constexpr (ba_has_descriptor_v<Node, BA>)
+				if (ba_descriptor<BA, Node>::owns_type(ba_type)) out = I;
+		};
+		(step.template operator()<Is>(), ...);
+	}(std::make_index_sequence<std::tuple_size_v<pack>>{});
+	return out;
 }
 
 /**
- * @brief Solve @p form with the single BA whose descriptor offers a solver.
+ * @brief Solve @p form, whose atoms are of the type @p ba_type, with the
+ *        solver of the BA owning that type.
  *
- * Resolution: the one BA declaring `solve`; two are refused at compile time,
- * since this takes no type id and would otherwise pick by pack order.
- * Templated on @p Form and returning `auto` so core need not name the solution
- * type, which would pull solver headers into these traits.
+ * nullopt when no BA owns @p ba_type, when its owner declares no `solve`, or
+ * when the owner's solver finds no solution: the caller treats all three as
+ * "not solved here". @p Solution is the caller's solution type, so these
+ * traits need no solver header; the owner's answer must convert to
+ * `std::optional<Solution>`.
  */
-template <typename Node, typename Form>
-auto pack_solve(Form form) {
-	static_assert(pack_solver_count<Node>() <= 1,
-		"pack_solve routes to the first BA declaring solve; a pack with "
-		"two solvers needs owner-gated routing (pass the partition's type "
-		"id and use pack_owner_apply) before it can be built");
-	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		return detail::pack_solve_impl<Node, Form,
-			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
+template <typename Node, typename Solution, typename Form>
+std::optional<Solution> pack_solve(size_t ba_type, Form form) {
+	return pack_owner_apply<Node>(ba_type,
+		[&]<typename BA>() -> std::optional<Solution> {
+			if constexpr (ba_has_solve<Node, BA>) {
+				using answer_t = decltype(
+					ba_descriptor<BA, Node>::solve(form));
+				static_assert(std::is_convertible_v<answer_t,
+						std::optional<Solution>>,
+					"pack_solve: the owner's solve() answer does not "
+					"convert to the caller's solution type");
+				return ba_descriptor<BA, Node>::solve(form);
+			}
+			return std::nullopt;
+		});
 }
 
 /** @brief `true` when some BA in the pack can solve @p form at all. */
@@ -513,14 +522,26 @@ bool pack_type_is_atomless(size_t ba_type) {
 		}).value_or(false);
 }
 
+/**
+ * @brief `true` when a BA of the pack owns type id @p ba_type and does not
+ * declare it atomless.
+ *
+ * Not the negation of @ref pack_type_is_atomless: a type no BA owns is
+ * neither. Guards the laws that hold only in an atomless Boolean algebra.
+ */
+template <typename Node>
+bool pack_type_is_atomic(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return !ba_descriptor<BA, Node>::atomless;
+		}).value_or(false);
+}
 
 /**
  * @brief Canonical zero constant for @p ba_type, from the BA that owns it.
  *
  * Returns nullptr when no BA in the pack owns the type or offers the
- * capability, so callers branch on the result rather than on a BA name. Unlike
- * pack_solve, reaching the empty case here is an ordinary runtime outcome, not
- * a sign that a gate has drifted.
+ * capability, so callers branch on the result rather than on a BA name.
  */
 template <typename Node>
 tref pack_zero_constant(size_t ba_type) {
@@ -565,6 +586,35 @@ size_t pack_modular_width(size_t ba_type) {
 				return ba_descriptor<BA, Node>::modular_width(ba_type);
 			return std::nullopt;
 		}).value_or(0);
+}
+
+/**
+ * @brief Whether the BA owning @p ba_type decides closed formulas over it
+ * whatever their quantifier prefix (see ba_has_closed_decision).
+ */
+template <typename Node>
+bool pack_type_decides_closed(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_closed_decision<Node, BA>)
+				return true;
+			return std::nullopt;
+		}).value_or(false);
+}
+
+/**
+ * @brief The truth of the closed formula @p form over @p ba_type, decided by
+ * the BA owning the type with no quantifier eliminated first; nullopt when
+ * undecided or when the owner does not decide closed formulas.
+ */
+template <typename Node>
+std::optional<bool> pack_decide_closed(size_t ba_type, tref form) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_closed_decision<Node, BA>)
+				return ba_descriptor<BA, Node>::decide_closed(form);
+			return std::nullopt;
+		});
 }
 
 /**

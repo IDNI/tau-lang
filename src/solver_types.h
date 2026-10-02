@@ -21,6 +21,17 @@
 
 namespace idni::tau_lang {
 
+/// Largest region of fresh values, in tree nodes, that a
+/// `fresh_element_ledger` keeps: every committed value shrinks the region by
+/// its complement, so the region grows with each step of a run, and each
+/// shrink decides the Tau constants it holds. Past the budget the ledger
+/// stops tracking the region and values come from the general solver.
+/// 0 = unlimited; set via `api::set_max_constant_size`,
+/// `--max-constant-size` or the REPL option `maxconstantsize`. Declared here
+/// rather than in solver.h: the verdict fingerprint of satisfiability.tmpl.h
+/// reads it, and that header cannot include solver.h.
+inline size_t max_constant_size = 2000;
+
 /**
  * @typedef typed_nso
  * @brief Alias for tau tree node.

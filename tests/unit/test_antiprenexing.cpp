@@ -1069,7 +1069,7 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 		CHECK( !p.skip_content );
 		CHECK( p.negatives == 1 );
 		CHECK( p.others == 0 );
-		CHECK( p.finite_ba_content );
+		CHECK( p.atomic_ba_content );
 		CHECK( !p.all_negated() );
 	}
 
@@ -1077,18 +1077,18 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 		// Control: the same shape over the default (atomless) type must keep
 		// firing, so the new guard is not simply blocking everything.
 		auto p = profile_skipping_nothing("ex x (x y != 0 && x z != 0).");
-		CHECK( !p.finite_ba_content );
+		CHECK( !p.atomic_ba_content );
 		CHECK( p.all_negated() );
 	}
 
 	TEST_CASE("step 2b is not gated on atomlessness") {
 		// all_positive() needs no atomlessness: squeezing
 		// `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over a
-		// disjunction are valid in any Boolean algebra. finite_ba_content is
+		// disjunction are valid in any Boolean algebra. atomic_ba_content is
 		// therefore not even computed for a positive census.
 		auto p = profile_skipping_nothing("ex x (x y = 0 && x z = 0).");
 		CHECK( p.all_positive() );
-		CHECK( !p.finite_ba_content );
+		CHECK( !p.atomic_ba_content );
 	}
 }
 // Quantifier ids are canonicalised once at pipeline entry and once at exit, and
@@ -1840,7 +1840,7 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 // `ex x:bool (x != 0 && x' != 0)` came back as T -- while in a two-element
 // algebra it is F (no x satisfies both). eliminate_block_over_clause now
 // expands a bool-typed binder as the finite disjunction phi[x/0] | phi[x/1]
-// instead (leaf_clause.tmpl.h); block_atom_profile's finite_ba_content guards
+// instead (leaf_clause.tmpl.h); block_atom_profile's atomic_ba_content guards
 // paper step 2a for the same class.
 TEST_SUITE("AN-2 finite BA quantifier elimination") {
 
@@ -1908,11 +1908,17 @@ TEST_SUITE("AN-7 heterogeneous block guard") {
 					tau_type_id<node_t>()),
 				x_bf)));
 		term_handle<node_t>::order order;
-		tref res = eliminate_block_over_clause<node_t>(clause,
-			trefs{ x }, block_eliminability<node_t>{}, order).value();
+		auto rr = eliminate_block_over_clause<node_t>(clause,
+			trefs{ x }, block_eliminability<node_t>{}, order);
+		REQUIRE( rr.has_value() );
+		tref res = rr.value();
 		REQUIRE( res != nullptr );
 		// The quantifier survives (elimination declined).
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
 			!= nullptr );
+		// and the report says why
+		std::ostringstream os;
+		rr.report().print(os);
+		CHECK( os.str().find("mix BA types") != std::string::npos );
 	}
 }

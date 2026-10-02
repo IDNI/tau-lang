@@ -1726,8 +1726,8 @@ bool is_ordering_atom(tref n) {
 }
 
 // omcat_solve_inequality_system dispatcher: asks the BA owning ba_type_id to
-// solve a pure ordering system itself. Distinct from pack_solve, which answers
-// with the pack's first solver regardless of type.
+// solve a pure ordering system itself, where pack_solve hands the owner a
+// whole formula.
 template <typename Node>
 static std::optional<solution<Node>> pack_omcat_solve(size_t ba_type_id,
 	const inequality_system<Node>& sys, const solver_options& opts)
@@ -2145,7 +2145,8 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 		// the atoms of an ordered type as the path states them, before
 		// the Boolean-algebra rewriting below
 		std::map<size_t, subtree_set<node>> order_atoms;
-		std::optional<size_t> bv_partition_key;
+		// per owning BA (pack position), the key of its arithmetic partition
+		std::map<size_t, size_t> arith_partition_key;
 		// Partition types
 		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
@@ -2193,14 +2194,18 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				conj = norm_equation<node>(conj);
 				conj = apply_all_xor_def<node>(conj);
 			} else {
-				// Every bitvector width goes into ONE partition: a cast
+				// Every type of one BA goes into ONE partition: a cast
 				// lets the same variable occur in atoms of two widths
 				// (`((bv[16]) d:bv[8]) ... && d:bv[8] != 0`), and solving
 				// those atoms separately assigned d twice, the second
-				// value silently overwriting the first. The bv branch
-				// below regroups by width where it still matters (lgrs).
-				if (!bv_partition_key) bv_partition_key = type;
-				type = bv_partition_key.value();
+				// value silently overwriting the first. The arithmetic
+				// branch below regroups by type where it still matters
+				// (lgrs), and hands the partition to its key's owner.
+				// pack_type_has_arith_ops found the owner
+				const auto owner = pack_owner_index<node>(type);
+				DBG(assert(owner.has_value());)
+				type = arith_partition_key.try_emplace(
+					owner.value_or(0), type).first->second;
 			}
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
 				it->second.insert(conj);
@@ -2301,7 +2306,7 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 							theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(remaining)); theory_solution.has_value()) {
+					if (auto theory_solution = pack_solve<node, solution<node>>(type, tau::build_wff_and(remaining)); theory_solution.has_value()) {
 						theory_sat = true;
 						for (const auto& [var, value] : read_off)
 							clause_solution[var] = value;
