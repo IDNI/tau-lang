@@ -11,42 +11,20 @@ namespace idni::tau_lang {
 // DNF clause of fm at a time (replacing it by 0 for terms, F for
 // formulas; clauses with temporary io streams are kept when check_temps)
 // and offers each reduced formula to callback. Returns the first reduced
-// formula callback accepts, or fm unchanged when it accepts none. Only
-// splitter_type::upper is implemented; other types assert.
+// formula callback accepts, or fm unchanged when it accepts none.
 template<typename ... BAs> requires BAsPack<BAs...>
-tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& callback) {
+tref split_path(tref fm, bool check_temps, const auto& callback) {
 	using node = node<BAs...>;
 	using tau = tree<node>;
-	switch (st) {
-		// nso_tau_splitter() implements a single clause-removal strategy
-		// and only special-cases splitter_type::bad at its entry point;
-		// middle/lower requests reach here tagged with their originally
-		// requested type but must be split the same way as upper.
-		case splitter_type::upper:
-		case splitter_type::middle:
-		case splitter_type::lower: {
-			// Remove exactly one clause
-			auto remove_clause = [&](tref clause) {
-				// Do not delete temporary streams
-				if (check_temps && has_temporary_io_var<node>(clause))
-					return clause;
-				return tau::get(fm).is_term()
-					       ? tau::_0(find_ba_type<node>(fm))
-					       : tau::_F();
-			};
-			auto cb = [&callback](tref curr_fm) {
-				return callback(curr_fm);
-			};
-			return expression_paths<node>(fm).apply_only_if(
-				remove_clause, cb);
-		}
-		case splitter_type::bad:
-			// nso_tau_splitter() returns tau_bad_splitter() before ever
-			// calling split_path() with st == bad; this case must not
-			// happen.
-			assert(false);
-	}
-	return fm;
+	auto remove_clause = [&](tref clause) {
+		// Do not delete temporary streams
+		if (check_temps && has_temporary_io_var<node>(clause))
+			return clause;
+		return tau::get(fm).is_term()
+			       ? tau::_0(find_ba_type<node>(fm))
+			       : tau::_F();
+	};
+	return expression_paths<node>(fm).apply_only_if(remove_clause, callback);
 }
 
 // Splits the BA constant held by t: delegates to the element's own BA
@@ -112,7 +90,7 @@ result<bool> is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 // or clause unchanged when no candidate passes is_splitter.
 template <typename... BAs>
 requires BAsPack<BAs...>
-result<tref> good_splitter_using_function(tref f, splitter_type st, tref clause,
+result<tref> good_splitter_using_function(tref f, tref clause,
 	tref fm_without_clause, tref original_fm, tref spec_clause) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
@@ -134,7 +112,7 @@ result<tref> good_splitter_using_function(tref f, splitter_type st, tref clause,
 			original_fm, splitter_candidate, spec_clause));
 		return splits.has_value() && splits.value();
 	};
-	tref s = split_path<BAs...>(func, st, true, check_splitter);
+	tref s = split_path<BAs...>(func, true, check_splitter);
 	if (tau::get(s) != tau::get(func)) return r.with_value(new_clause);
 	// Find possible coefficient in each disjunct of f
 	tref curr_path = nullptr;
@@ -408,7 +386,7 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 			}
 			auto s = r.merge_take(
 				good_splitter_using_function<BAs...>(
-					neq, st, curr_clause, curr_fm, fm,
+					neq, curr_clause, curr_fm, fm,
 					spec_clause));
 			if (r.has_error()) return false;
 			if (s.has_value()
@@ -437,7 +415,7 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 		if (r.has_error()) return false;
 		return splits.has_value() && splits.value();
 	};
-	splitter = split_path<BAs...>(fm, st, true, check_splitter);
+	splitter = split_path<BAs...>(fm, true, check_splitter);
 	if (r.has_error()) return r;
 	// Guard against null: split_path returns nullptr when fm has no paths
 	// (e.g. F, which has an empty DNF). Falls through to bad splitter.
@@ -541,9 +519,10 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		} else return r.with_value(tau::build_wff_and(
 			tau::build_wff_always(tau_bad_splitter<BAs...>()), fm));
 	} else {
-		// By assumption there is more than one clause and all not redundant
-		return r.with_value(
-			split_path<BAs...>(fm, st, false, idni::all));
+		// No clause left implies another one: dropping a clause is the
+		// splitter for every type, bad included.
+		clauses.pop_back();
+		return r.with_value(tau::build_wff_or(clauses));
 	}
 }
 

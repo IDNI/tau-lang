@@ -132,23 +132,9 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 }
 
-// SO-26: the formula-level ("nso") middle/lower splitter suites that used to
-// live here are gone for good reason, not just commented out by accident:
-// splitter.tmpl.h's split_path() explicitly does `assert(false)` for
-// splitter_type::middle and splitter_type::lower ("For now we only support
-// upper splitters ... TODO: bring back middle and lower splitter?"), so
-// nso_tau_splitter()/tau_splitter(tref, splitter_type) (the overload behind
-// get_nso_rr_tau_splitter()) cannot be exercised with middle/lower without
-// hitting that assertion in debug builds (and silently no-op'ing in release).
-//
-// Per review finding SO-20, middle and lower are, however, still fully
-// implemented one layer down, directly on BA constants: see
-// bdd_handle.h's hbdd::splitter(), which dispatches to
-// rm_all_except_one_clause() (lower) and rm_half_clauses() (middle). That is
-// the code path reachable via the constant-node tau_splitter(const tree&,
-// splitter_type) overload (splitter.tmpl.h:44) used by e.g. sbf_splitter().
-// The suites below exercise that surviving code path directly on sbf_ba
-// constants instead of going through the disabled formula-level splitter.
+// A formula splits the same way for middle and lower as for upper; the two
+// types differ on BA constants, where bdd_handle's splitter() implements
+// them, so the suites below exercise sbf_ba constants directly.
 namespace idni::tau_lang {
 inline sbf_ba parse_sbf_value(const char* src) {
 	auto opt = parse_sbf<bv, sbf_ba>(src);
@@ -443,6 +429,19 @@ TEST_SUITE("Tau_splitter clause paths") {
 		}
 		CHECK( kept_bare );
 		CHECK( split_aw );
+	}
+
+	// Every clause reports a bad splitter when bad is asked for, so the
+	// disjunction itself has to be split.
+	TEST_CASE("a bad splitter of a temporal disjunction drops a clause") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0) || (G o1[t] = 1).", splitter_type::bad);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( tau::get(s) != tau::get(fm) );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
 	}
 
 	TEST_CASE("a clause implied by another is dropped before splitting") {
