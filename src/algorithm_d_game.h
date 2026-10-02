@@ -943,7 +943,7 @@ inline result<product_game> build_product_game(
 	// acceptance declared, keeps the priorities it was given.
 	const bool lift = G.acc_known;
 	const int uncolored = G.acc_accepts_uncolored ? 1 : 0;
-	auto state_prio = [&](int q) {
+	auto state_prio = [&](size_t q) {
 		if (!lift) return G.state_priority[q];
 		return G.state_color[q] < 0 ? uncolored : G.state_priority[q] + 2;
 	};

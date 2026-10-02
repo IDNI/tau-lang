@@ -981,8 +981,7 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 			// its condition
 			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
 			// an always part and a sometimes clause, both reading the past
-			"(always o2[t] = 1 && o1[t-2] = 0) && "
-				"(sometimes o3[t] = o3[t-1]).",
+			"(always o2[t] = 1 && o1[t-2] = 0) && (sometimes o3[t] = o3[t-1]).",
 			// no temporal operator
 			"o2[t] = 1 && i1[t-1] = 0.",
 		};
@@ -1016,8 +1015,7 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 				": o2[t]:bv[8] = { 1 }).",
 #endif
 			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
-			"(always o2[t] = 1 && o1[t-2] = 0) && "
-				"(sometimes o3[t] = o3[t-1]).",
+			"(always o2[t] = 1 && o1[t-2] = 0) && (sometimes o3[t] = o3[t-1]).",
 		};
 		for (const char* spec : specs) {
 			CAPTURE( spec );
