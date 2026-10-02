@@ -29,6 +29,12 @@ template <NodeType node>
 static tref qlt_dlo_fm_residual(tref var, tref body);
 
 template <NodeType node>
+static tref qlt_cells_residual(tref var, tref body);
+
+template <NodeType node>
+static tref qlt_point_meets(tref body);
+
+template <NodeType node>
 static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 	const inequality_system<node>& sys, const solver_options& options);
 
@@ -247,13 +253,13 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief Decide a quantifier over a qlt variable by DLO elimination,
-	 * or, without ordering atoms, by excluded values and point instances
+	 * @brief Decide a quantifier over a qlt variable, a point, by DLO
+	 * elimination or by the cells the constants' endpoints cut Q into
 	 * (see qlt_omcat_qe).
 	 *
 	 * Answers satisfiability rather than the satisfying interval, which stays
-	 * qlt's own: nullopt says neither decides the body, and core falls
-	 * through to its generic path.
+	 * qlt's own: nullopt says the truth depends on the other variables, and
+	 * core asks @ref omcat_qe_residual or keeps the binder.
 	 */
 	static std::optional<bool> omcat_qe(tref var, tref body) {
 		return qlt_omcat_qe<node_t>(var, body);
@@ -261,10 +267,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 	/**
 	 * @brief Eliminate an existential qlt variable bounded on both sides
-	 * by other terms (Fourier-Motzkin for a dense order).
+	 * by other terms (Fourier-Motzkin for a dense order), or whose body has
+	 * one other free variable y, as the set of points y may take
+	 * (qlt_cells_residual). A meet of two variables compared with 0 is
+	 * read as the (dis)equality of the points first (qlt_point_meets).
 	 */
 	static tref omcat_qe_residual(tref var, tref body) {
-		return qlt_dlo_fm_residual<node_t>(var, body);
+		body = qlt_point_meets<node_t>(body);
+		if (tref r = qlt_dlo_fm_residual<node_t>(var, body)) return r;
+		return qlt_cells_residual<node_t>(var, body);
 	}
 
 	/** @brief A rational witness for @p var, spelled for generated C++. */

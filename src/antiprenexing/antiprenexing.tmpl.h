@@ -310,6 +310,29 @@ result<tref> anti_prenex_block(tref formula, const trefs& block,
 	// Goal: push the quantifier block as far into clause as possible.
 	if (!has_block_var(formula)) return r.with_value(formula);
 
+	// A variable of a non-ABA omega-categorical type is a point, not an
+	// element of a Boolean algebra, so none of the steps below holds for
+	// it: the owner's elimination takes the block, through
+	// eliminate_block_over_clause, once it is pushed into each disjunct.
+	if (std::ranges::any_of(block, [](tref v) {
+		return pack_type_is_non_aba_omcat<node>(
+			tau::get(v).get_ba_type()); }))
+	{
+		if (tau::get(formula).child_is(tau::wff_or)) {
+			tref acc = _F<node>();
+			for (tref d : get_dnf_wff_clauses<node>(formula)) {
+				TAU_TRY(tref rd, anti_prenex_block<node>(d, block,
+					used_atms, quant_pattern, order, el,
+					splits_left, elim));
+				acc = tau::build_wff_or(acc, rd);
+				if (tau::get(acc).equals_T()) break;
+			}
+			return r.with_value(acc);
+		}
+		return eliminate_block_over_clause<node>(formula, block, elim,
+			order);
+	}
+
 	// Chapter 5 steps 2a and 2b: the two whole-formula fast paths, tried
 	// before any Boole decomposition (the paper's a, b, c, then d order).
 	//
@@ -2071,6 +2094,12 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					if (el.skip(var)
 						|| order.find(var) == order.end())
 						break;
+					// `ex x f = 0 <=> f_0 f_1 = 0` reads x as
+					// an element of the algebra; a point is
+					// the owner's to eliminate.
+					if (pack_type_is_non_aba_omcat<node>(
+						tau::get(var).get_ba_type()))
+						break;
 					if (is_child<node>(n, tau::wff_ex)) {
 						quants.emplace_back(var, bdd::ex);
 					} else {
@@ -2300,18 +2329,19 @@ using tau = tree<node>;
 					tau::get(var).get_ba_type())) {
 				// A non-ABA omega-categorical theory (e.g. qlt, a dense
 				// linear order over the rationals) is decided by the
-				// owning BA's own quantifier elimination, not by the
-				// atomless-BA path above, which cannot reason about
-				// ordering atoms. Only a closed scope can be settled to
-				// T/F here.
-				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty()) {
-					if (auto sat = pack_omcat_qe<node>(
-						tau::get(var).get_ba_type(), var, n);
-						sat)
-							return *sat ? tau::_T() : tau::_F();
-					// Undetermined: fall through to general solver
-				} else excluded.insert(n);
+				// owning BA's own quantifier elimination: its variables
+				// are points, which the atomless-BA path above does not
+				// read. A verdict holds for every value of the other
+				// free variables; an existential the owner cannot
+				// settle may still have a residual over them.
+				const size_t type = tau::get(var).get_ba_type();
+				if (auto sat = pack_omcat_qe<node>(type, var, n))
+					return *sat ? tau::_T() : tau::_F();
+				if (is_child<node>(n, tau::wff_ex))
+					if (tref res = pack_omcat_qe_residual<node>(
+						type, var, n)) return res;
+				if (!get_free_vars<node>(n).empty())
+					excluded.insert(n);
 			}
 		}
 		return n;

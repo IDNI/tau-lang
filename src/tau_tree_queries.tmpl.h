@@ -183,6 +183,13 @@ bool contains(tref fm, tref sub_fm) {
 	return is_contained;
 }
 
+template <NodeType node>
+bool is_point_term(size_t ba_type, tref term) {
+	using tau = tree<node>;
+	if (tau::get(term).child_is(tau::variable)) return true;
+	return pack_dense_order_compare<node>(ba_type, term, term) == 0;
+}
+
 // Returns true if n is a wff wrapping an atomic Boolean formula predicate.
 // Note: bf_interval and wff_ref are deliberately excluded as they are not
 // treated as atomic predicates for normalization purposes.

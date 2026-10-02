@@ -33,6 +33,15 @@ template <NodeType node>
 tref preorder(tref var, tref ex_clause) {
 	using tau = tree<node>;
 	tref found = nullptr;
+	// A variable of a non-ABA omega-categorical type is a point, so only a
+	// term denoting a point is a witness for it.
+	const size_t type = tau::get(var).get_ba_type();
+	const bool point = pack_type_is_non_aba_omcat<node>(type);
+	auto witness = [&](tref t) {
+		return !contains<node>(t, var)
+			&& (!point || is_point_term<node>(type,
+				tau::get(tau::bf, t)));
+	};
 
 	auto visit = [&](tref n) {
 		if (is<node>(n, tau::bf_eq)) {
@@ -42,11 +51,9 @@ tref preorder(tref var, tref ex_clause) {
 			// Occurs-check: ex x (x = t && phi(x)) ≡ phi(t) only holds
 			// when x does not occur in t; otherwise substituting t for x
 			// and dropping the quantifier leaks the bound variable free
-			if (tau::get(left) == tau::get(var)
-					&& !contains<node>(right, var))
+			if (tau::get(left) == tau::get(var) && witness(right))
 				found = right;
-			else if (tau::get(right) == tau::get(var)
-					&& !contains<node>(left, var))
+			else if (tau::get(right) == tau::get(var) && witness(left))
 				found = left;
 		}
 	};
