@@ -1136,3 +1136,424 @@ TEST_SUITE("tree::cold builders") {
 		CHECK(tau::get(tau::build_wff_semantic_neg(tau::_F())).equals_T());
 	}
 }
+
+// ── tree<node> node-level API ───────────────────────────────────────────────
+TEST_SUITE("tree node-level API") {
+
+	TEST_CASE("children given as nodes are wrapped into trees") {
+		node_t a(tau::var_name, dict("a"));
+		node_t b(tau::var_name, dict("b"));
+		node_t args(tau::ref_args);
+		tref one = tau::get(args, a);
+		REQUIRE( tau::get(one).children_size() == 1 );
+		CHECK( tau::get(one)[0].get_string() == "a" );
+		tref two = tau::get(args, a, b);
+		REQUIRE( tau::get(two).children_size() == 2 );
+		CHECK( tau::get(two)[1].get_string() == "b" );
+		const node_t arr[] = { a, b, a };
+		tref three = tau::get(args, arr, 3);
+		CHECK( tau::get(three).children_size() == 3 );
+		CHECK( tau::get(args, std::vector<node_t>{ a, b }) == two );
+		CHECK( tau::get(args, std::initializer_list<node_t>{ a, b }) == two );
+		tref ch[] = { tau::get(a), tau::get(b) };
+		CHECK( tau::get(tau::ref_args, ch, 2) == two );
+	}
+
+	TEST_CASE("typed construction carries the type id") {
+		const size_t ty = tau_type_id<node_t>();
+		tref vn = tau::build_var_name(std::string("x"));
+		tref ch[] = { vn };
+		tref v1 = tau::get_typed(tau::variable, ch, 1, ty);
+		tref v2 = tau::get_typed(tau::variable, trefs{ vn }, ty);
+		tref v3 = tau::get_typed(tau::variable,
+			std::initializer_list<tref>{ vn }, ty);
+		CHECK( v1 == v2 );
+		CHECK( v1 == v3 );
+		CHECK( tau::get(v1).get_ba_type() == ty );
+		tref s = tau::get_typed(tau::var_name, std::string("y"), ty);
+		CHECK( tau::get(s).get_string() == "y" );
+		CHECK( tau::get(s).get_ba_type() == ty );
+	}
+
+	TEST_CASE("structural accessors") {
+		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
+		tref fm = tau::get("x = 0 ? y = 0 : z = 0", o).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		const tau& cond = tau::get(fm)[0];
+		REQUIRE( cond.is(tau::wff_conditional) );
+		CHECK( cond.second_tree().get() == cond.second() );
+		CHECK( cond.third_tree().get() == cond.third() );
+		CHECK( tau::get(fm).only_child_tree().get() == cond.get() );
+		CHECK( tau::get(fm).trim() == cond.get() );
+		tref ch[3];
+		size_t len = 3;
+		REQUIRE( cond.get_children(ch, len) );
+		CHECK( len == 3 );
+		CHECK( ch[2] == cond.third() );
+		size_t n = 0;
+		for (const auto& c : cond.children_trees()) { (void)c; ++n; }
+		CHECK( n >= 1 );
+		CHECK( tau::geth(tau::get(fm))->get() == fm );
+	}
+
+	TEST_CASE("child_data reads the first child's payload") {
+		tref sh = tau::build_shift(std::string("x"), 4);
+		const tau& t = tau::get(sh);
+		// shift = variable, num
+		CHECK( tau::get(t.second()).get_num() == 4 );
+		tref n = tau::get(tau::offset, tau::get_num(7));
+		CHECK( tau::get(n).child_data() == 7 );
+	}
+
+	TEST_CASE("is_num accepts a history id, is_term_nt reads ref by its parent") {
+		tref h = tau::get(node_t(tau::history_id, 3));
+		CHECK( tau::get(h).is_num() );
+		CHECK( tau::is_term_nt(tau::ref, tau::bf_ref) );
+		CHECK( !tau::is_term_nt(tau::ref, tau::wff_ref) );
+		CHECK( tau::is_term_nt(tau::bf_and, tau::wff) );
+	}
+
+	TEST_CASE("input and output variables are told apart") {
+		const size_t ty = tau_type_id<node_t>();
+		tref i = tau::build_in_var_at_n(std::string("i1"), 0, ty);
+		tref o = tau::build_out_var_at_n(std::string("o1"), 0, ty);
+		CHECK( tau::get(i).is_input_variable() );
+		CHECK( !tau::get(i).is_output_variable() );
+		CHECK( tau::get(o).is_output_variable() );
+		CHECK( !tau::get(o).is_input_variable() );
+	}
+
+	TEST_CASE("substitute canonizes the quantifiers a replacement brings in") {
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref y = tau::build_variable(std::string("y"), tau_type_id<node_t>());
+		tref a = x_eq_0("a");
+		tref b = x_eq_0("b");
+		tref fm = tau::build_wff_and(a, b);
+		tref with = tau::build_wff_ex(x, x_eq_0("x"), false);
+		tref with2 = tau::build_wff_all(y, x_eq_0("y"), false);
+		tref r1 = tau::get(fm).substitute(a, with);
+		CHECK( tau::get(r1).to_str() == "(ex b1 b1 = 0) && b = 0" );
+		subtree_map<node_t, tref> changes{ { a, with }, { b, with2 } };
+		tref r2 = tau::get(fm).substitute(changes);
+		CHECK( tau::get(r2).to_str() == "(ex b1 b1 = 0) && (all b1 b1 = 0)" );
+		subtree_map<node_t, tref> plain{ { a, b } };
+		CHECK( tau::get(fm).substitute(plain) == tau::build_wff_and(b, b) );
+	}
+
+	TEST_CASE("constants built from a source, an id or a typed pair") {
+#ifdef TAU_PACK_HAS_BA_SBF
+		auto c = tau::get_ba_constant(std::string("a"), sbf_type<node_t>());
+		REQUIRE( c.has_value() );
+		CHECK( tau::get(c.value()).to_str() == "{ a }:sbf" );
+		const size_t cid = tau::get(c.value()).get_ba_constant_id();
+		auto again = tau::get_ba_constant(cid, sbf_type_id<node_t>());
+		REQUIRE( again.has_value() );
+		CHECK( again.value() == c.value() );
+		auto k = tau::get(c.value()).get_ba_constant();
+		CHECK( tau::get_ba_constant(std::make_pair(k, sbf_type<node_t>()))
+			== c.value() );
+		CHECK( tau::get_ba_constant(std::optional<std::pair<
+			node_t::constant, tref>>{ std::make_pair(k, sbf_type<node_t>()) })
+			== c.value() );
+#endif
+		CHECK( tau::get_ba_constant(std::optional<std::pair<
+			node_t::constant, tref>>{}) == nullptr );
+		CHECK( tau::get_ba_constant(size_t(-1), tau_type_id<node_t>())
+			.has_error() );
+	}
+}
+
+// ── tree<node> builder wrappers ─────────────────────────────────────────────
+TEST_SUITE("tree builder wrappers") {
+
+	TEST_CASE("constant trees") {
+		CHECK( tau::get_F().equals_F() );
+		CHECK( tau::get_T().equals_T() );
+		CHECK( tau::get_F_trimmed().is(tau::wff_f) );
+		CHECK( tau::get_T_trimmed().is(tau::wff_t) );
+		const size_t ty = tau_type_id<node_t>();
+		CHECK( tau::get_0_trimmed(ty).is(tau::bf_f) );
+		CHECK( tau::get_1_trimmed(ty).is(tau::bf_t) );
+		CHECK( tau::get(tau::build_bf_t_type(ty)).equals_1() );
+	}
+
+	TEST_CASE("past and weak temporal connectives") {
+		tref a = x_eq_0("a");
+		tref b = x_eq_0("b");
+		CHECK( tau::get(tau::build_wff_weak_until(a, b)).to_str() == "a = 0 W b = 0" );
+		CHECK( tau::get(tau::build_wff_since(a, b)).to_str() == "a = 0 S b = 0" );
+		CHECK( tau::get(tau::build_wff_trigger(a, b)).to_str() == "a = 0 T b = 0" );
+	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("bitvector arithmetic builders") {
+		const size_t ty = bv8_type_id<node_t>;
+		tref x = tau::build_bf_variable(std::string("x"), ty);
+		tref y = tau::build_bf_variable(std::string("y"), ty);
+		CHECK( tau::get(tau::build_bf_shl(x, y)).to_str() == "x<<y" );
+		CHECK( tau::get(tau::build_bf_shr(x, y)).to_str() == "x>>y" );
+		CHECK( tau::get(tau::build_bf_add(x, y)).to_str() == "x+y" );
+		CHECK( tau::get(tau::build_bf_sub(x, y)).to_str() == "x-y" );
+		CHECK( tau::get(tau::build_bf_mul(x, y)).to_str() == "x*y" );
+		CHECK( tau::get(tau::build_bf_div(x, y)).to_str() == "x/y" );
+		CHECK( tau::get(tau::build_bf_mod(x, y)).to_str() == "x%y" );
+		CHECK( tau::get(tau::build_bf_min(x, y)).to_str() == "min(x, y)" );
+		CHECK( tau::get(tau::build_bf_max(x, y)).to_str() == "max(x, y)" );
+		tref c = bv_constant<node_t>(8, 5);
+		const auto k = tau::get(c).get_ba_constant();
+		CHECK( tau::build_ba_constant(k, ty) == c );
+		tref bc = tau::build_bf_ba_constant(k, ty);
+		CHECK( tau::get(bc).is(tau::bf) );
+		CHECK( tau::get(bc)[0].get() == c );
+	}
+#endif
+
+	TEST_CASE("variable builders") {
+		const size_t ty = tau_type_id<node_t>();
+		tref vn = tau::build_var_name(dict("v"));
+		CHECK( vn == tau::build_var_name(std::string("v")) );
+		CHECK( tau::build_variable(vn, ty)
+			== tau::build_variable(std::string("v"), ty) );
+		CHECK( tau::build_bf_variable(vn, ty)
+			== tau::build_bf_variable(std::string("v"), ty) );
+		tref f1 = tau::build_variable(ty);
+		tref f2 = tau::build_variable(ty);
+		CHECK( f1 != f2 );
+		CHECK( get_var_name<node_t>(f1).starts_with("_X") );
+		tref bf = tau::build_bf_variable(ty);
+		CHECK( tau::get(bf).is(tau::bf) );
+		CHECK( get_var_name<node_t>(bf).starts_with("_X") );
+		tref u = tau::build_bf_uconst("p", "q", ty);
+		CHECK( tau::get(u).to_str() == "<p:q>" );
+		tref io = tau::build_canonized_io_var("i3");
+		CHECK( tau::get(io).is(tau::variable) );
+		CHECK( tau::get(io)[0].is(tau::io_var) );
+		CHECK( get_var_name<node_t>(io) == "i3" );
+	}
+
+	TEST_CASE("stream builders") {
+		const size_t ty = tau_type_id<node_t>();
+		auto stream = [](tref v) {
+			std::string s = tau::get(v).to_str();
+			auto colon = s.find(':');
+			return colon == std::string::npos ? s : s.substr(0, colon);
+		};
+		tref in_n = tau::build_var_name(std::string("in"));
+		tref out_n = tau::build_var_name(std::string("out"));
+		tref off = tau::get(tau::offset, tau::get_num(2));
+		CHECK( stream(tau::build_in_var(in_n, ty)) == "in" );
+		CHECK( stream(tau::build_in_var(in_n, off, ty)) == "in[2]" );
+		CHECK( stream(tau::build_in_var_at_n(in_n, 4, ty)) == "in[4]" );
+		CHECK( stream(tau::build_in_var_at_t(in_n, ty)) == "in[t]" );
+		CHECK( stream(tau::build_in_var_at_t_minus(in_n, 1, ty)) == "in[t-1]" );
+		CHECK( stream(tau::build_in_var_at_t_minus(std::string("in"), 3, ty)) == "in[t-3]" );
+		CHECK( stream(tau::build_out_var(out_n, ty)) == "out" );
+		CHECK( stream(tau::build_out_var(out_n, off, ty)) == "out[2]" );
+		CHECK( stream(tau::build_out_var_at_n(out_n, 4, ty)) == "out[4]" );
+		CHECK( stream(tau::build_out_var_at_t(out_n, ty)) == "out[t]" );
+		CHECK( stream(tau::build_out_var_at_t_minus(out_n, 1, ty)) == "out[t-1]" );
+		CHECK( stream(tau::build_out_var_at_t_minus(std::string("out"), 3, ty)) == "out[t-3]" );
+		CHECK( tau::get(tau::build_in_var(in_n, ty)).is_input_variable() );
+		CHECK( tau::get(tau::build_out_var(out_n, ty)).is_output_variable() );
+	}
+
+	TEST_CASE("reference builders") {
+		const size_t ty = tau_type_id<node_t>();
+		CHECK( tau::build_sym(dict("g")) == tau::build_sym(std::string("g")) );
+		tref n = tau::build_variable(std::string("n"), untyped_type_id<node_t>());
+		tref offs = tau::build_offsets(trefs{ n });
+		CHECK( offs == tau::build_offsets(std::string("n")) );
+		tref x = tau::build_variable(std::string("x"), ty);
+		tref sh = tau::build_shift(x, 2);
+		CHECK( tau::get(sh).is(tau::shift) );
+		CHECK( tau::get(sh)[1].get_num() == 2 );
+		tref args = tau::build_ref_args(strings{ "x", "y" }, ty);
+		CHECK( tau::get(args).children_size() == 2 );
+		CHECK( args == tau::build_ref_args(trefs{
+			tau::build_bf_variable(std::string("x"), ty),
+			tau::build_bf_variable(std::string("y"), ty) }) );
+		tref r = tau::build_ref(tau::build_sym(std::string("g")),
+			trefs{ tau::build_bf_variable(std::string("x"), ty) });
+		CHECK( tau::get(r).to_str() == "g(x)" );
+	}
+
+	TEST_CASE("build_spec rebuilds a spec from its rr") {
+		auto nso_rr = get_nso_rr("g(x) := x = 0. g(y).");
+		REQUIRE( nso_rr.has_value() );
+		tref spec = tau::build_spec(nso_rr.value());
+		REQUIRE( spec != nullptr );
+		CHECK( tau::get(spec).is(tau::spec) );
+		CHECK( tau::get(spec).to_str() == "g(x) := (x = 0). g(y)." );
+	}
+}
+
+// ── printers ────────────────────────────────────────────────────────────────
+TEST_SUITE("tree printers") {
+
+	static tref raw_tree(const std::string& src,
+		typename node_t::type start = tau::spec)
+	{
+		tau::get_options o; o.parse.start = start; o.reget_with_hooks = false;
+		return tau::get(src, o).value_or(nullptr);
+	}
+
+	static std::string raw(const char* src,
+		typename node_t::type start = tau::spec)
+	{
+		tref t = raw_tree(src, start);
+		return t ? tau::get(t).to_str() : std::string("<parse failed>");
+	}
+
+	// The printed form parses back to the same tree.
+	static bool round_trips(const char* src,
+		typename node_t::type start = tau::spec)
+	{
+		tref t = raw_tree(src, start);
+		if (!t) return false;
+		return raw_tree(tau::get(t).to_str(), start) == t;
+	}
+
+	TEST_CASE("comparisons and connectives the hooks would rewrite") {
+		for (const char* src : { "x <= y.", "x !<= y.", "x > y.", "x !> y.",
+			"x >= y.", "x !>= y.", "x <= y <= z.", "x = 0 -> y = 0.",
+			"x = 0 <-> y = 0." })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			CHECK( raw(src) == src );
+			CHECK( round_trips(src) );
+		}
+	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("bitvector operators") {
+		CHECK( raw("x:bv[8] / y = 0.") == "x/y = 0." );
+		CHECK( raw("x:bv[8] % y = 0.") == "x%y = 0." );
+		CHECK( raw("x:bv[8] << y = 0.") == "x<<y = 0." );
+		CHECK( raw("x:bv[8] >> y = 0.") == "x>>y = 0." );
+	}
+#endif
+
+	TEST_CASE("functional quantifiers and constraints") {
+		CHECK( raw("(fall x, y xy) = 0.") == "fall x, y xy = 0." );
+		CHECK( raw("(fex x xy) = 0.") == "fex x xy = 0." );
+		for (const char* src : { "[n != 2].", "[n >= 2].", "[n > 2].",
+			"[n <= 2].", "[n < 2]." })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			CHECK( raw(src) == src );
+		}
+	}
+
+	TEST_CASE("references with a fixpoint fallback") {
+		for (const char* src : {
+			"g[n](x) := g[n-1](x). g[0](x) := T. g(x) fallback first.",
+			"g[n](x) := g[n-1](x). g[0](x) := T. g(x) fallback last." })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			CHECK( raw(src) == src );
+			CHECK( round_trips(src) );
+		}
+	}
+
+	TEST_CASE("repl commands") {
+		CHECK( raw("nnf %-1", tau::cli) == "nnf %-1" );
+		CHECK( raw("mnf %2", tau::cli) == "mnf %2" );
+		CHECK( raw("dnf x = 0. cnf x = 0", tau::cli) == "dnf x = 0. cnf x = 0" );
+		CHECK( raw("defs. defs 1", tau::cli) == "defs . defs 1" );
+		CHECK( raw("history. history %1", tau::cli) == "history . history %1" );
+		CHECK( raw("quit. version. clear. help", tau::cli)
+			== "quit . version . clear . help " );
+		for (const char* src : { "nnf %-1", "mnf %2", "dnf x = 0. cnf x = 0",
+			"defs. defs 1", "history. history %1",
+			"quit. version. clear. help", "get", "toggle charvar",
+			"valid x = 0. sat x = 0",
+			"unsat x = 0. run x = 0. normalize x = 0. solve x = 0" })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			CHECK( round_trips(src, tau::cli) );
+		}
+	}
+
+	// The command printer drops the separators of the commands below:
+	// `onf x x = 0` prints `onf xx = 0`, `set charvar off` prints
+	// `set charvaroff`, the substitution brackets print `[x0]` instead of
+	// `[x / 0]`, and a stored formula gains a `history ` prefix.
+	TEST_CASE("repl commands that do not print back to themselves"
+		* doctest::should_fail())
+	{
+		for (const char* src : { "onf x x = 0", "set charvar off",
+			"instantiate x = 0 [x / 0]", "substitute x = 0 [x / y]",
+			"x = 0 ? y = 0 : z = 0" })
+		{
+			const std::string input = src, printed = raw(src, tau::cli);
+			CAPTURE(input);
+			CAPTURE(printed);
+			CHECK( round_trips(src, tau::cli) );
+		}
+	}
+
+	TEST_CASE("bound-variable names start past the largest b<n> in the formula") {
+		CHECK( raw("all x b3x = 0.") == "all b4 b3 b4 = 0." );
+		CHECK( raw("all x bxx = 0.") == "all b1 bb1 b1 = 0." );
+		// a name too long for int_t saturates the fresh id
+		CHECK( raw("all x b99999999999999999999x = 0.")
+			== "all b2147483647 b99999999999999999999 b2147483647 = 0." );
+	}
+
+	TEST_CASE("highlighting and indenting decorate the output") {
+		tref t = raw_tree("all x x = 0 && (y = 0 || z = 0).");
+		REQUIRE( t != nullptr );
+		const std::string plain = tau::get(t).to_str();
+		pretty_printer_highlighting = true;
+		const std::string hl = tau::get(t).to_str();
+		pretty_printer_highlighting = false;
+		pretty_printer_indenting = true;
+		const std::string ind = tau::get(t).to_str();
+		pretty_printer_indenting = false;
+		CHECK( plain == "all b1 b1 = 0 && (y = 0 || z = 0)." );
+		CHECK( hl.find("\033[") != std::string::npos );
+		CHECK( ind == "all b1 b1 = 0 && (\n\t\ty = 0 || z = 0)\n\t." );
+		CHECK( tau::get(t).to_str() == plain );
+	}
+
+	TEST_CASE("a ba_constant node with an id outside the pool prints INVALID") {
+		std::stringstream ss;
+		ss << node_t::ba_constant(size_t(1) << 40, tau_type_id<node_t>());
+		CHECK( ss.str().find("{ INVALID }") != std::string::npos );
+	}
+
+	TEST_CASE("io_context lists remapped streams") {
+		io_context<node_t> ctx;
+		ctx.input_remaps.emplace("i1", nullptr);
+		ctx.output_remaps.emplace("o1", nullptr);
+		std::stringstream ss;
+		ss << ctx;
+		CHECK( ss.str().find("IO variables:    none\n") != std::string::npos );
+		CHECK( ss.str().find("Input remaps:  i1\n") != std::string::npos );
+		CHECK( ss.str().find("Output remaps: o1\n") != std::string::npos );
+	}
+
+	TEST_CASE("dump renders rules and recurrence relations") {
+		auto nso_rr = get_nso_rr("g(x) := x = 0. g(y).");
+		REQUIRE( nso_rr.has_value() );
+		const auto& rr_ = nso_rr.value();
+		REQUIRE( rr_.rec_relations.size() == 1 );
+		std::string one = dump_to_str<node_t>(rr_.rec_relations[0]);
+		std::string all = dump_to_str<node_t>(rr_.rec_relations);
+		std::string whole = dump_to_str<node_t>(rr_);
+		CHECK( one == all );
+		CHECK( whole.starts_with(all) );
+		CHECK( whole.size() > all.size() );
+		CHECK( one.find(" := ") != std::string::npos );
+		std::stringstream ss;
+		auto* old = std::cout.rdbuf(ss.rdbuf());
+		const tau& m = tau::get(rr_.main).dump();
+		std::cout.rdbuf(old);
+		CHECK( &m == &tau::get(rr_.main) );
+		CHECK( ss.str() == tau::get(rr_.main).dump_to_str() );
+	}
+}

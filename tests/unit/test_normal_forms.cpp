@@ -1405,3 +1405,179 @@ TEST_SUITE("normalizer helpers") {
 		CHECK( tau::get(moved)[1].get_num() == 2 );
 	}
 }
+
+// Trees parsed with the hooks off keep the shapes the construction hooks
+// would rewrite away (double negations, sugar connectives, constant
+// operands), which is what reaches these passes from a Tau-BA constant.
+TEST_SUITE("normal form passes over hook-free trees") {
+	static tref raw_wff(const char* src) {
+		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
+		tref t = tau::get(src, o).value_or(nullptr);
+		REQUIRE( t != nullptr );
+		return t;
+	}
+	static tref raw_bf(const char* src) {
+		tau::get_options o; o.parse.start = tau::bf; o.reget_with_hooks = false;
+		tref t = tau::get(src, o).value_or(nullptr);
+		REQUIRE( t != nullptr );
+		return t;
+	}
+	static std::string str(tref t) { return tau::get(t).to_str(); }
+
+	TEST_CASE("to_nnf removes a double negation") {
+		CHECK( str(to_nnf<node_t>(raw_wff("!!(x = 0)"))) == "x = 0" );
+	}
+
+	TEST_CASE("to_nnf dualises the past operators") {
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 S y = 0)"))) == "x != 0 T y != 0" );
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 T y = 0)"))) == "x != 0 S y != 0" );
+	}
+
+	TEST_CASE("to_nnf dualises negated sugar connectives") {
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 <- y = 0)"))) == "y = 0 && x != 0" );
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 <-> y = 0)")))
+			== "x != 0 && y = 0 || y != 0 && x = 0" );
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 ^^ y = 0)")))
+			== "(x != 0 || y = 0) && (y != 0 || x = 0)" );
+		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 ? y = 0 : z = 0)")))
+			== "(x != 0 || y != 0) && (x = 0 || z != 0)" );
+	}
+
+	TEST_CASE("push_negation_in removes a double complement of a term") {
+		CHECK( str(push_negation_in<node_t, false>(raw_bf("x''"))) == "x" );
+	}
+
+	TEST_CASE("to_dnf distributes a product of sums of a term") {
+		auto r = to_dnf<node_t, false>(raw_bf("(a|b)(c|d)"));
+		REQUIRE( r.has_value() );
+		CHECK( str(r.value()) == "ac|ad|cb|db" );
+	}
+
+	TEST_CASE("reduce drops clauses decided by a constant literal") {
+		auto r1 = reduce<node_t>(raw_wff("x = 0 || F"));
+		REQUIRE( r1.has_value() );
+		CHECK( str(r1.value()) == "x = 0" );
+		auto r2 = reduce<node_t, true>(raw_wff("x = 0 && T"));
+		REQUIRE( r2.has_value() );
+		CHECK( str(r2.value()) == "x = 0" );
+		auto r3 = reduce<node_t>(raw_wff("x = 0 || !T"));
+		REQUIRE( r3.has_value() );
+		CHECK( str(r3.value()) == "x = 0" );
+		auto r4 = reduce<node_t>(raw_wff("x = 0 || !F"));
+		REQUIRE( r4.has_value() );
+		CHECK( tau::get(r4.value()).equals_T() );
+		auto r5 = reduce<node_t, true>(raw_wff("x = 0 && !F"));
+		REQUIRE( r5.has_value() );
+		CHECK( str(r5.value()) == "x = 0" );
+		auto r6 = reduce<node_t, true>(raw_wff("x = 0 && !T"));
+		REQUIRE( r6.has_value() );
+		CHECK( tau::get(r6.value()).equals_F() );
+	}
+
+	TEST_CASE("reduce of a constant formula") {
+		auto t_cnf = reduce<node_t, true>(raw_wff("T"));
+		REQUIRE( t_cnf.has_value() );
+		CHECK( tau::get(t_cnf.value()).equals_T() );
+		auto f_cnf = reduce<node_t, true>(raw_wff("F"));
+		REQUIRE( f_cnf.has_value() );
+		CHECK( tau::get(f_cnf.value()).equals_F() );
+		auto f_dnf = reduce<node_t>(raw_wff("F"));
+		REQUIRE( f_dnf.has_value() );
+		CHECK( tau::get(f_dnf.value()).equals_F() );
+	}
+
+	TEST_CASE("reduce leaves a bitvector term to the path simplifier") {
+		tref t = tau::get(raw_wff("x:bv[8] + y = 0"))[0].first();
+		auto r = reduce<node_t>(t);
+		REQUIRE( r.has_value() );
+		CHECK( str(r.value()) == "x+y" );
+	}
+
+	TEST_CASE("bf_reduce_canonical reduces the arguments of a reference") {
+		tref t = raw_bf("f(ab|ab')");
+		tref res = tt(t) | bf_reduce_canonical<node_t>() | tt::ref;
+		REQUIRE( res != nullptr );
+		// the argument reduces to `a`, then f(a) expands on a
+		CHECK( str(res) == "f(1)a|f(0)a'" );
+	}
+
+	TEST_CASE("replace_free_vars_by assigns every free variable") {
+		tref t = tau::get(raw_wff("xy | z = 0"))[0].first();
+		tref zero = tau::_0_trimmed(find_ba_type<node_t>(t));
+		tref res = replace_free_vars_by<node_t>(t, zero);
+		CHECK( get_free_vars<node_t>(res).empty() );
+		CHECK( tau::get(res).equals_0() );
+	}
+}
+
+TEST_SUITE("variable_order_for_simplification") {
+	static tref var_of(tref bf) { return tau::get(bf).first(); }
+
+	TEST_CASE("initial points come before relative ones, inputs before outputs") {
+		const size_t ty = tau_type_id<node_t>();
+		auto cmp = variable_order_for_simplification<node_t>;
+		tref i0  = var_of(tau::build_in_var_at_n(std::string("i1"), 0, ty));
+		tref it  = var_of(tau::build_in_var_at_t(tau::build_var_name(std::string("i1")), ty));
+		tref it1 = var_of(tau::build_in_var_at_t_minus(std::string("i1"), 1, ty));
+		tref i2t1 = var_of(tau::build_in_var_at_t_minus(std::string("i2"), 1, ty));
+		tref ot1 = var_of(tau::build_out_var_at_t_minus(std::string("o1"), 1, ty));
+		tref plain = tau::build_variable(std::string("x"), ty);
+		CHECK( cmp(i0, it) );
+		CHECK( !cmp(it, i0) );
+		CHECK( cmp(it1, it) );
+		CHECK( !cmp(it, it1) );
+		CHECK( cmp(it1, ot1) );
+		CHECK( !cmp(ot1, it1) );
+		CHECK( !cmp(it1, i2t1) );
+		CHECK( !cmp(i2t1, it1) );
+		CHECK( cmp(it, plain) );
+		CHECK( !cmp(plain, it) );
+		CHECK( !cmp(it, it) );
+	}
+}
+
+TEST_SUITE("squeeze_absorb") {
+	static tref main_of(const char* src) {
+		return get_nso_rr(src).value().main->get();
+	}
+	static size_t count(tref t, typename node_t::type nt) {
+		return tau::get(t).select_all([nt](tref n) {
+			return tau::get(n).is(nt); }).size();
+	}
+
+	TEST_CASE("disjoined inequalities sharing a variable are squeezed") {
+		tref fm = main_of("xy != 0 || xz != 0.");
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK( tau::get(res).to_str() == "xy|xz != 0" );
+		CHECK( count(res, tau::bf_neq) == 1 );
+		CHECK( are_nso_equivalent<node_t>(fm, res) );
+	}
+
+	TEST_CASE("disjoined inequalities on the variable are squeezed") {
+		tref fm = main_of("xy != 0 || xz != 0.");
+		tref var = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( var != nullptr );
+		tref res = squeeze_absorb<node_t>(fm, var);
+		CHECK( count(res, tau::bf_neq) == 1 );
+		CHECK( are_nso_equivalent<node_t>(fm, res) );
+	}
+
+	TEST_CASE("conjunctions inside a disjunction use the dual assumptions") {
+		for (const char* src : {
+			"(xy = 0 && xz != 0) || x = 0.",
+			"(xy != 0 && xz != 0) || x != 0.",
+			"(xy = 0 || xz = 0) && x != 0.",
+			"(xy != 0 || xz = 0) && x = 0." })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			tref fm = main_of(src);
+			tref res = squeeze_absorb<node_t>(fm);
+			CHECK( are_nso_equivalent<node_t>(fm, res) );
+			tref var = tau::get(fm).find_top(is<node_t, tau::variable>);
+			REQUIRE( var != nullptr );
+			tref res_v = squeeze_absorb<node_t>(fm, var);
+			CHECK( are_nso_equivalent<node_t>(fm, res_v) );
+		}
+	}
+}
