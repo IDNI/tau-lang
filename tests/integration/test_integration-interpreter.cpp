@@ -159,6 +159,81 @@ TEST_SUITE("Execution: revision stream continuity") {
 		remove_temp(file_b);
 		CHECK( u2.find("o2") != std::string::npos );
 	}
+
+	// The tuple streams of an ADT group share one physical stream; an
+	// accepted revision rebuilds the stream maps, and that physical stream
+	// (with its position) must carry over, both for a file declared in the
+	// spec and for a caller-supplied stream.
+	TEST_CASE("revision keeps a tuple file stream's position and content") {
+		bdd_init<Bool>();
+		std::string pt_in = random_file(".in");
+		std::string pt_out = random_file(".out");
+		std::string upd_in = random_file(".in");
+		{
+			std::ofstream f(pt_in);
+			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n"
+				<< "{ a: \"1\", b: \"1\" }\n";
+		}
+		{
+			std::ofstream f(upd_in);
+			f << "T.\n" << "o2[t] = 1.\n" << "T.\n";
+		}
+		io_context<node_t> ctx;
+		std::string sample = "type Point = {a: sbf, b: sbf}.\n"
+			"p:Point := in file(\"" + pt_in + "\").\n"
+			"q:Point := out file(\"" + pt_out + "\").\n"
+			"i1 : tau := in file(\"" + upd_in + "\").\n"
+			"q[t] = p[t] && u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		std::vector<std::string> lines;
+		{
+			std::ifstream f(pt_out);
+			for (std::string l; std::getline(f, l);)
+				if (!l.empty()) lines.push_back(l);
+		}
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(pt_in);
+		remove_temp(pt_out);
+		remove_temp(upd_in);
+		REQUIRE( lines.size() == 3 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"1\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
+		CHECK( lines[2] == "{ a: \"1\", b: \"1\" }" );
+	}
+
+	TEST_CASE("revision keeps a caller-supplied tuple stream's position") {
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Point = {a: sbf, b: sbf}. "
+			"p:Point := in console. q:Point := out console. "
+			"q[t] = p[t] && u[t] = i1[t].",
+			{ .context = &ctx }).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		strings p_values = {
+			"{ a: \"0\", b: \"1\" }",
+			"{ a: \"1\", b: \"0\" }",
+			"{ a: \"1\", b: \"1\" }"
+		};
+		ctx.add_input("p", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(p_values));
+		auto q = std::make_shared<vector_output_stream>();
+		ctx.add_output("q", tau_type_id<node_t>(), q);
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(
+				strings{ "T.", "o2[t] = 1.", "T." }));
+		ctx.add_output("u", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		CHECK( q->get_values() == p_values );
+	}
 }
 
 TEST_SUITE("Execution") {
@@ -1585,6 +1660,24 @@ TEST_SUITE("with inputs and outputs") {
 		auto maybe_i = run<node_t>(spec, ctx, 2);
 		CHECK( maybe_i.has_value() );
 		CHECK ( o1->get_values() == strings{ "10", "2" } );
+	}
+
+	// always parts over different algebras are normalized one by one,
+	// since merging them into one always body would mix the types.
+	TEST_CASE("always parts over different algebras run side by side") {
+		bdd_init<Bool>();
+		auto spec = create_spec(
+			"(always o1[t]:sbf = {a}:sbf) && (always o2[t]:bv[8] = 1).");
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		ctx.add_output("o2", bv_type_id<node_t>(8), o2);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		CHECK ( o1->get_values() == strings{ "a", "a" } );
+		// 1 is the top of bv[8], all bits set
+		CHECK ( o2->get_values() == strings{ "255", "255" } );
 	}
 #endif // TAU_PACK_HAS_BA_BV
 

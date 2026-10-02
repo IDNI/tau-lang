@@ -842,6 +842,114 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(adt_wire_hint<node_t>(layout) == "{ a: \"\", p: { x: \"\" } }");
 	}
 
+	TEST_CASE("reader rejects a nested object where a leaf is expected") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: { z: \"0\" }, p: { x: \"1\" } }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader answers nullopt for a path outside the layout") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", p: { x: \"1\" } }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("0"));
+		CHECK(reader.leaf(0, { dict("p") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader reports a failed physical read") {
+		// A file stream whose open failed reports end-of-stream as
+		// nullopt, unlike an exhausted vector stream's empty string.
+		const std::string missing =
+			(suite_scratch_dir() / "tau_test_io_context_adt_absent").string();
+		std::error_code ec;
+		std::filesystem::remove(missing, ec);
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<file_input_stream>(missing), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("writer reports a failed physical write") {
+		const std::string bad =
+			(suite_scratch_dir() / "tau_test_io_context_adt_absent_dir"
+				/ "out.txt").string();
+		REQUIRE(!std::filesystem::exists(
+			std::filesystem::path(bad).parent_path()));
+		auto layout = adt_test_layout();
+		adt_tuple_writer<node_t> writer(
+			std::make_unique<file_output_stream>(bad), layout);
+		REQUIRE(writer.collect(0, { dict("a") }, "0").has_value());
+		auto complete = writer.collect(0, { dict("p"), dict("x") }, "1");
+		REQUIRE(complete.has_error());
+		CHECK(report_has_code(complete.report(), code::io_error));
+	}
+
+	TEST_CASE("member input adapters read their own leaf, sequentially and "
+		"after rebuild")
+	{
+		auto layout = adt_test_layout();
+		auto reader = std::make_shared<adt_tuple_reader<node_t>>(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", p: { x: \"1\" } }",
+				"{ a: \"10\", p: { x: \"11\" } }"
+			}), layout);
+		auto a = std::make_shared<adt_member_input_stream<node_t>>();
+		a->reader = reader;
+		a->path = { dict("a") };
+		auto x = std::make_shared<adt_member_input_stream<node_t>>();
+		x->reader = reader;
+		x->path = { dict("p"), dict("x") };
+		CHECK(a->get() == std::optional<std::string>("0"));
+		CHECK(x->get() == std::optional<std::string>("1"));
+		CHECK(a->get() == std::optional<std::string>("10"));
+		// The rebuilt adapter shares the reader and keeps the path; its
+		// sequential cursor starts again at time point 0, which the
+		// reader no longer holds.
+		auto rebuilt = x->rebuild();
+		REQUIRE(rebuilt != nullptr);
+		CHECK(rebuilt->get(1) == std::optional<std::string>("11"));
+		auto rm = std::dynamic_pointer_cast<adt_member_input_stream<node_t>>(
+			rebuilt);
+		REQUIRE(rm != nullptr);
+		CHECK(rm->reader == reader);
+		CHECK(rm->path == x->path);
+	}
+
+	TEST_CASE("member output adapters complete a record, sequentially and "
+		"after rebuild")
+	{
+		auto layout = adt_test_layout();
+		auto values = std::make_shared<std::vector<std::string>>();
+		auto writer = std::make_shared<adt_tuple_writer<node_t>>(
+			std::make_unique<vector_output_stream>(values), layout);
+		auto a = std::make_shared<adt_member_output_stream<node_t>>();
+		a->writer = writer;
+		a->path = { dict("a") };
+		auto x = std::make_shared<adt_member_output_stream<node_t>>();
+		x->writer = writer;
+		x->path = { dict("p"), dict("x") };
+		CHECK(a->put("0"));
+		CHECK(x->put("1"));
+		REQUIRE(values->size() == 1);
+		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
+		// a's cursor is at time point 1 now; the rebuilt x starts at 0
+		// again, whose record is already written, so it is put by time.
+		CHECK(a->put("10"));
+		auto rebuilt = x->rebuild();
+		REQUIRE(rebuilt != nullptr);
+		CHECK(rebuilt->put("11", 1));
+		REQUIRE(values->size() == 2);
+		CHECK(values->at(1) == "{ a: \"10\", p: { x: \"11\" } }");
+		// A repeated member at a pending time point fails the put.
+		CHECK(a->put("20"));
+		CHECK_FALSE(a->put("21", 2));
+	}
+
 	TEST_CASE("find_adt_stream_for_member resolves members and rejects strangers") {
 		// Built through the real registration path (a tuple io def flattened
 		// into ctx), not a hand-rolled layout: the lookup compares against
@@ -859,6 +967,33 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(find_adt_stream_for_member<node_t>(ctx, stranger) == nullptr);
 		ctx.clear();
 		CHECK(ctx.adt_streams.empty());
+	}
+}
+
+TEST_SUITE("io_context registration") {
+
+	TEST_CASE("add_output_file registers an output bound to its file") {
+		io_context<node_t> ctx;
+		tref var = ctx.add_output_file("o7", tau_type_id<node_t>(),
+			"some_output_file.txt");
+		REQUIRE(var != nullptr);
+		htref h = tree<node_t>::geth(var);
+		REQUIRE(ctx.outputs.contains(h));
+		CHECK(ctx.outputs.at(h) == dict("some_output_file.txt"));
+		CHECK(ctx.type_of(var) == tau_type_id<node_t>());
+		CHECK_FALSE(ctx.inputs.contains(h));
+	}
+
+	TEST_CASE("a stream named neither as an input nor as an output is "
+		"rejected")
+	{
+		io_context<node_t> ctx;
+		auto parsed = tau::get("always zzz[t] = 0.", { .context = &ctx });
+		CHECK_FALSE(parsed.has_value());
+		CHECK(report_has_code(parsed.report(), code::invalid_input_stream));
+		std::ostringstream oss;
+		parsed.print(oss);
+		CHECK(oss.str().find("zzz") != std::string::npos);
 	}
 }
 

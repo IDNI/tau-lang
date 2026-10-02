@@ -392,6 +392,89 @@ TEST_SUITE("table_step_provider") {
 		for (size_t k = 1; k < steps; ++k) CHECK(v2[k] == v1[k - 1]);
 	}
 
+	// A data-game table plays its strategy from step 0 and so knows its
+	// state, its lookback and which inputs a step reads; a reset puts the
+	// strategy back in its initial state.
+	TEST_CASE("data-game table: read set, state, lookback and reset"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		const char* spec =
+			"(always o2[t] = i1[t-1]) && (sometimes o2[t-2] = 1).";
+		strings i1_vals = { "T.", "F.", "T.", "T.", "F.", "T.", "F." };
+		io_context<node_t> ctx;
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_vals));
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto nfm = normalizer<node_t>(fm);
+		REQUIRE(nfm.has_value());
+		auto r = solve_ltl_aba<node_t>(nfm.value());
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		const size_t initial = r.value()->aut.initial_state;
+		auto table = make_table_provider<node_t>(*r.value());
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
+		REQUIRE(provider != nullptr);
+		CHECK(provider->lookback() == 2);
+		CHECK(provider->strategy_state() == std::optional<size_t>(initial));
+		auto reads = provider->read_set({
+			build_in_var_at_n<node_t>("i1", 0, tau_type_id<node_t>()),
+			build_in_var_at_n<node_t>("i9", 0, tau_type_id<node_t>()) });
+		REQUIRE(reads.has_value());
+		REQUIRE(reads->size() == 1);
+		CHECK(get_var_name<node_t>(reads->front()) == "i1");
+
+		auto probe = provider->live_probe_atoms();
+		auto interp = interpreter<node_t>::make_table_interpreter(ctx,
+			provider, bounds.first, bounds.second, probe);
+		REQUIRE(interp.has_value());
+		for (size_t k = 0; k < 4; ++k)
+			REQUIRE(api<node_t>::step(*interp).has_value());
+		auto v = o2->get_values();
+		REQUIRE(v.size() == 4);
+		// o2 follows i1 one step late once the strategy reads it.
+		for (size_t k = 2; k < 4; ++k) CHECK(v[k] == i1_vals[k - 1].substr(0, 1));
+		CHECK(provider->strategy_state() != std::optional<size_t>(initial));
+		REQUIRE(interp.value().reset().has_value());
+		CHECK(provider->strategy_state() == std::optional<size_t>(initial));
+		CHECK(interp.value().time_point == 0);
+		CHECK(api<node_t>::step(*interp).has_value());
+	}
+
+	// A table that does not play the data game has no state, lookback or
+	// read set of its own.
+	TEST_CASE("abstraction table: no state, lookback or read set"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		std::string spec = "G(o1[t]" + ct + " = {1}" + ct
+			+ " <-> i1[t]" + ct + " = {1}" + ct + ").";
+		io_context<node_t> ctx;
+		ctx.add_input("i1", carrier_tid, std::make_shared<vector_input_stream>(
+			strings{ "1", "0" }));
+		ctx.add_output("o1", carrier_tid, std::make_shared<vector_output_stream>());
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		REQUIRE_FALSE(r.value()->data_game);
+		auto table = make_table_provider<node_t>(*r.value());
+		REQUIRE(table.has_value());
+		auto provider = table.value().first;
+		REQUIRE(provider != nullptr);
+		CHECK(provider->lookback() == 0);
+		CHECK_FALSE(provider->strategy_state().has_value());
+		CHECK_FALSE(provider->read_set({ build_in_var_at_n<node_t>(
+			"i1", 0, carrier_tid) }).has_value());
+	}
+
 	TEST_CASE("atoms over earlier outputs without a Mealy view: no table"
 		* doctest::skip(!ltlsynt_available()))
 	{

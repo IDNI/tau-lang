@@ -20,6 +20,9 @@
 #include "interpreter.h"
 #include "preferences.h"
 
+#include <set>
+#include <sstream>
+
 using namespace idni::tau_lang;
 
 // Parse a tau spec string and construct an interpreter.
@@ -37,6 +40,14 @@ static std::optional<interpreter<node_t>> make(const char* s) {
 static tref parse_formula(const char* s) {
 	auto r = api<node_t>::get_formula(std::string(s));
 	return r.has_value() ? r.value() : nullptr;
+}
+
+// The rendered report of a call, for checking the reason it gives.
+template <typename R>
+static std::string report_text(const R& res) {
+	std::ostringstream oss;
+	res.print(oss);
+	return oss.str();
 }
 
 // ============================================================================
@@ -89,6 +100,40 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 		REQUIRE(i.has_value());
 		REQUIRE(i->committed_approval_hash.empty());
 	}
+
+	TEST_CASE("[IAX-INSP-06] accumulator_state reads the last committed value") {
+		auto i = make("o1[t] = {a}:sbf.");
+		REQUIRE(i.has_value());
+		REQUIRE(i->step().has_value());
+		auto acc = i->accumulator_state("o1");
+		REQUIRE(acc.has_value());
+		CHECK(acc.value() == "a");
+
+		auto j = make("o1[t] = 1.");
+		REQUIRE(j.has_value());
+		REQUIRE(j->step().has_value());
+		REQUIRE(j->step().has_value());
+		auto acc_j = j->accumulator_state("o1");
+		REQUIRE(acc_j.has_value());
+		CHECK(acc_j.value() == "T");
+	}
+
+	TEST_CASE("[IAX-INSP-07] accumulator_state finds an acc_-prefixed stream") {
+		io_context<node_t> ctx;
+		ctx.add_output("acc_total", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("acc_total[t] = 1.",
+			{ .context = &ctx }).value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto ir = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE(ir.has_value());
+		REQUIRE(ir.value().step().has_value());
+		auto acc = ir.value().accumulator_state("total");
+		REQUIRE(acc.has_value());
+		CHECK(acc.value() == "T");
+	}
+
 }
 
 // ============================================================================
@@ -187,6 +232,71 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		REQUIRE(i.has_value());
 		REQUIRE(i->boundary_traces(0).empty());
 	}
+
+	TEST_CASE("[IAX-MEALY-08] a multi-state strategy renders, determinises "
+		"and traces its machine")
+	{
+		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
+		REQUIRE(i.has_value());
+		REQUIRE(i->cached_solution.has_value());
+		const hoa_automaton& cached = i->cached_solution->aut;
+		REQUIRE(cached.num_states > 1);
+
+		hoa_automaton aut = i->determinise();
+		CHECK(aut.num_states == cached.num_states);
+		CHECK(aut.initial_state == cached.initial_state);
+
+		std::string dot = i->visualise_mealy_dot();
+		CHECK(dot.rfind("digraph mealy {\n", 0) == 0);
+		CHECK(dot.find("__init -> " + std::to_string(aut.initial_state)
+			+ ";") != std::string::npos);
+		for (size_t s = 0; s < aut.num_states; ++s)
+			CHECK(dot.find(std::to_string(s) + " [label=\"q"
+				+ std::to_string(s)) != std::string::npos);
+		for (size_t s = 0; s < aut.edges.size(); ++s)
+			for (const auto& e : aut.edges[s])
+				CHECK(dot.find(std::to_string(s) + " -> "
+					+ std::to_string(e.dst) + " [label=\"")
+					!= std::string::npos);
+		if (!aut.aps.empty())
+			CHECK(dot.find("// APs: 0=" + aut.aps[0]) != std::string::npos);
+
+		auto is_edge = [&](size_t u, size_t v) {
+			if (u >= aut.edges.size()) return false;
+			for (const auto& e : aut.edges[u]) if (e.dst == v) return true;
+			return false;
+		};
+		auto traces = i->boundary_traces(2, 3);
+		REQUIRE_FALSE(traces.empty());
+		CHECK(traces.size() <= 2);
+		for (size_t k = 0; k < traces.size(); ++k) {
+			const auto& tr = traces[k];
+			REQUIRE_FALSE(tr.empty());
+			CHECK(tr.size() <= 3);
+			CHECK(tr.front() == aut.initial_state);
+			if (k > 0) CHECK(traces[k - 1].size() >= tr.size());
+			for (size_t j = 1; j < tr.size(); ++j)
+				CHECK(is_edge(tr[j - 1], tr[j]));
+			std::set<size_t> seen(tr.begin(), tr.end());
+			CHECK(seen.size() == tr.size());
+		}
+		// The longest simple path from the initial state leaves it.
+		CHECK(traces.front().size() > 1);
+		CHECK(i->boundary_traces(3, 0).empty());
+		CHECK(i->boundary_traces(-1).empty());
+	}
+
+	TEST_CASE("[IAX-MEALY-09] without a synthesised machine there is "
+		"nothing to render or trace")
+	{
+		auto i = make("o1[t] = 1.");
+		REQUIRE(i.has_value());
+		REQUIRE_FALSE(i->cached_solution.has_value());
+		CHECK(i->visualise_mealy_dot().empty());
+		CHECK(i->determinise().num_states == 0);
+		CHECK(i->boundary_traces(5).empty());
+	}
+
 }
 
 // ============================================================================
@@ -419,6 +529,57 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		}
 		CHECK(i->memory.size() <= at_10 + 2);
 	}
+
+	TEST_CASE("[IAX-PWR-10] an update reaching before step 0 is refused") {
+		auto i = make("o1[t] = 1.");
+		REQUIRE(i.has_value());
+		REQUIRE(i->step().has_value());
+		const std::string before = i->current_spec();
+		tref psi = parse_formula("o1[-3] = 1");
+		REQUIRE(psi != nullptr);
+		auto ur = i->update(psi);
+		REQUIRE(ur.has_value());
+		CHECK_FALSE(ur.value());
+		CHECK(report_text(ur).find("below 0") != std::string::npos);
+		CHECK(i->current_spec() == before);
+	}
+
+	TEST_CASE("[IAX-PWR-11] a data-game update is refused when it retypes a "
+		"stream or reaches outside the run")
+	{
+		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
+		REQUIRE(i.has_value());
+		REQUIRE(i->plays_data_game());
+		REQUIRE(i->step().has_value());
+		REQUIRE(i->step().has_value());
+		const std::string before = i->current_spec();
+
+		tref retype = parse_formula("always o1[t]:sbf = {a}:sbf");
+		REQUIRE(retype != nullptr);
+		auto r1 = i->update(retype);
+		REQUIRE(r1.has_value());
+		CHECK_FALSE(r1.value());
+		CHECK(report_text(r1).find("a type other than the running one")
+			!= std::string::npos);
+
+		tref early = parse_formula("o1[-3] = 1");
+		REQUIRE(early != nullptr);
+		auto r2 = i->update(early);
+		REQUIRE(r2.has_value());
+		CHECK_FALSE(r2.value());
+		CHECK(report_text(r2).find("below 0") != std::string::npos);
+
+		// o5 was never committed, so its value one step back is unknown.
+		tref unknown = parse_formula("o5[-1] = 1");
+		REQUIRE(unknown != nullptr);
+		auto r3 = i->update(unknown);
+		REQUIRE(r3.has_value());
+		CHECK_FALSE(r3.value());
+		CHECK(report_text(r3).find("invalid memory access")
+			!= std::string::npos);
+		CHECK(i->current_spec() == before);
+	}
+
 }
 
 // ============================================================================
@@ -484,6 +645,8 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		CHECK(result == spec_tref);
 	}
 }
+
+
 
 
 TEST_SUITE("Cleanup") {

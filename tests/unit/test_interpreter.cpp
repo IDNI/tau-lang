@@ -15,6 +15,7 @@
 #include "repl_evaluator.h"
 
 #include <algorithm>
+#include <sstream>
 
 using tau_api = api<node_t>;
 
@@ -236,6 +237,22 @@ TEST_SUITE("interpreter: misbehaving streams") {
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
 		REQUIRE(maybe_i.has_value());
 		CHECK(!tau_api::step(maybe_i.value()).has_value());
+	}
+
+	// A tau formula with a free variable is no stream value.
+	TEST_CASE("an open formula as an input value fails the step with a reason") {
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "x = 0.", "T." });
+		opts.output_remaps["o"] = std::make_shared<vector_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto stepped = tau_api::step(maybe_i.value());
+		CHECK(!stepped.has_value());
+		CHECK(stepped.report().has_error());
+		std::ostringstream oss;
+		stepped.print(oss);
+		CHECK(oss.str().find("must be closed") != std::string::npos);
 	}
 
 	TEST_CASE("an output stream that refuses the write makes the step fail") {
