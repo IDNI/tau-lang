@@ -85,11 +85,13 @@ TEST_SUITE("hash order") {
 #ifdef TAU_PACK_HAS_BA_QLT
 	TEST_CASE("qlt") {
 		check_hashes({
-			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt", 12917797719874598464ull },
+			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt", 5261306770044578063ull },
 		});
 		check_prints({
 			{ "x:qlt > {0}:qlt && y:qlt < {1}:qlt && z:qlt > {2}:qlt",
-				"y < { 1 }:qlt && { 2 }:qlt < z && { 0 }:qlt < x" },
+				"x != { 0 }:qlt && { (-inf, 1) | (1, +inf) }:qlt y = 0"
+				" && z != { 2 }:qlt && { 2 }:qlt z' = 0"
+				" && x'{ 0 }:qlt = 0 && y != { 1 }:qlt" },
 		});
 	}
 #endif

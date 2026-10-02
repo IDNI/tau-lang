@@ -1007,15 +1007,13 @@ State: 1
 		CHECK(result);
 	}
 
+	// < is strict inclusion, so nothing lies above the input 1.
 	TEST_CASE("[ALG-D-30] ALG-D-gate falls through when input variables are present") {
-		// Algorithm D's current product game is output-only.  Input formulas must
-		// fall through to Algorithm B instead of using the T1-only product.
-		CHECK(alg_d_realizable("G (o1[t]:qlt > i1[t]:qlt)."));
+		CHECK_FALSE(alg_d_realizable("G (o1[t]:qlt > i1[t]:qlt)."));
 	}
 
 	TEST_CASE("[ALG-D-31] ALG-D-gate falls through for input lookback variables") {
-		// Input lookback still requires Algorithm B's P-bit encoding.
-		CHECK(alg_d_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
+		CHECK_FALSE(alg_d_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
 	}
 }
 

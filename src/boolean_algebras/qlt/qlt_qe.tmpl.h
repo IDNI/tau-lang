@@ -2,531 +2,371 @@
 
 /**
  * @file qlt_qe.tmpl.h
- * @brief Quantifier elimination for qlt, the dense linear order over rationals.
+ * @brief Quantifier elimination for qlt, whose variables denote sets of
+ * rationals: finite unions of intervals.
  *
  * Included from qlt_descriptor.tmpl.h and nowhere else, so it instantiates only
- * when qlt is in the pack -- which is why the interval computation needs no
- * "is qlt in the pack" guard of its own.
+ * when qlt is in the pack.
+ *
+ * A closed formula is decided exactly by cells. Its constants partition Q into
+ * finitely many regions, the nonempty minterms of the constants. Under values
+ * of the variables bound so far, each region splits into cells, one per choice
+ * of membership in each of those variables, and every term is a union of
+ * cells. An equation asks only which cells are empty, so a formula's truth
+ * depends only on the number of points of each cell: infinitely many when the
+ * cell holds a nondegenerate interval, the count of its points otherwise. A
+ * quantifier over x splits each cell of n points into two cells of a and n - a
+ * points, any 0 <= a <= n being realised by a finite union of intervals (an
+ * infinite cell splits into an infinite part and a part of any size). With d
+ * quantifiers still to come, counts of 2^d and above behave alike, so each
+ * count is kept saturated at 2^d and the search is finite.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_QE_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_QE_TMPL_H__
+
+#include <map>
 
 #include "boolean_algebras/qlt/qlt.h"
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
 
-// DLO interval computation for (Q,<).
-// Collects the satisfying interval I for ∃var. body where body is a
-// conjunction of DLO comparison atoms "var op {c}:qlt" (c finite singleton).
-// Returns the interval if determined, nullopt if undetermined. A conjunct
-// that does not mention var is the caller's when it has a free variable and
-// declines the whole computation when it has none: a closed conjunct (a
-// nested binder, an unfolded constant atom) may be false.
-//   ∃var. body satisfiable  ↔  !result.is_empty()
-//   ∀var. body tautology    ↔   result.is_full()
-template<NodeType node>
-static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
-	using tau = tree<node>;
-	qlt acc = qlt::top();
-	bool undetermined = false;
-	// Free-variable endpoint bounds (symbolic DLO reasoning).
-	// Used to detect contradictions like (a < var && var < a) where a is free.
-	// Keys: the RHS tree (the free-var side of the constraint).
-	subtree_set<node> lower_strict;    // { fv : fv < var }
-	subtree_set<node> lower_nonstrict; // { fv : fv <= var }
-	subtree_set<node> upper_strict;    // { fv : var < fv }
-	subtree_set<node> upper_nonstrict; // { fv : var <= fv }
-	subtree_set<node> eq_free;         // { fv : var = fv }
-	subtree_set<node> neq_free;        // { fv : var != fv }
-	std::function<void(tref)> collect = [&](tref n) {
-		if (!n || undetermined || acc.is_empty()) return;
-		const auto& t = tau::get(n);
-		if (t.equals_T()) return;
-		if (t.equals_F()) { acc = qlt::bottom(); return; }
-		if (!t.is(tau::wff)) { undetermined = true; return; }
-		if (!t.has_child()) return;
-		size_t op = t[0].value.get_nt();
-		if (op == tau::wff_and) {
-			collect(t[0].first());
-			collect(t[0].second());
-			return;
-		}
-		if (!contains<node>(n, var)) {
-			if (get_free_vars<node>(n).empty()) undetermined = true;
-			return;
-		}
-		// Helper lambda: given (raw_op, lhs, rhs, negate), accumulate the
-		// corresponding DLO interval into acc. raw_op is the comparison
-		// operator before direction-flip and optional negation.
-		auto accumulate_interval = [&](size_t raw_op, tref lhs_t, tref rhs_t, bool negate) {
-			bool var_in_lhs = contains<node>(lhs_t, var);
-			bool var_in_rhs = contains<node>(rhs_t, var);
-			if (var_in_lhs && var_in_rhs) { undetermined = true; return; }
-			// The side holding var must be var itself: a compound such
-			// as `x & {3}` is no bound on x.
-			const auto& var_side = tau::get(var_in_lhs ? lhs_t : rhs_t);
-			if (!var_side.is(tau::bf) || !var_side.has_child()
-				|| tau::get(var_side.first()) != tau::get(var)) {
-				undetermined = true; return;
-			}
-			const auto& cst = tau::get(var_in_lhs ? rhs_t : lhs_t)[0];
-			if (!cst.is_ba_constant()) {
-				// Handle typed zero (bf_f = -∞) and typed one (bf_t = +∞) as DLO bounds
-				if (cst.is(tau::bf_f) || cst.is(tau::bf_t)) {
-					bool cst_is_min = cst.is(tau::bf_f); // bf_f = -∞, bf_t = +∞
-					// No point is an end of the order: var = 1 never
-					// holds, var != 1 always does (qlt's wff_eq hook
-					// folds a bare variable's case before it gets here).
-					if (raw_op == tau::bf_eq || raw_op == tau::bf_neq) {
-						bool holds = raw_op == tau::bf_neq;
-						if (negate) holds = !holds;
-						if (holds) return;
-						acc = qlt::bottom(); return;
-					}
-					// Determine if constraint is trivially satisfied (i.e., no restriction on x)
-					// x > -∞, x >= -∞ are trivially true; x < +∞, x <= +∞ are trivially true
-					bool trivially_sat;
-					if (var_in_lhs) {
-						trivially_sat = cst_is_min
-							? (raw_op == tau::bf_gt || raw_op == tau::bf_gteq)
-							: (raw_op == tau::bf_lt || raw_op == tau::bf_lteq);
-					} else {
-						// cst op x: -∞ < x, -∞ <= x are trivially true
-						trivially_sat = cst_is_min
-							? (raw_op == tau::bf_lt || raw_op == tau::bf_lteq)
-							: (raw_op == tau::bf_gt || raw_op == tau::bf_gteq);
-					}
-					if (negate) trivially_sat = !trivially_sat;
-					if (trivially_sat) return; // no constraint added
-					acc = qlt::bottom(); return; // contradiction
-				}
-				// ∃x.(x ≠ free_var) ≡ T over DLO for any free_var.
-				// bf_neq is symmetric so direction flip doesn't change it.
-				if (raw_op == tau::bf_neq && !negate) {
-					neq_free.insert(var_in_lhs ? rhs_t
-						: lhs_t);
-					return;
-				}
-				// Symbolic free-variable endpoints: classify into lower/upper
-				// bounds so we can detect contradictions like a<var && var<a.
-				// Determine effective direction (normalise to var <op> fv).
-				tref fv_tree = var_in_lhs ? rhs_t : lhs_t;
-				auto eff_op = raw_op;
-				if (var_in_rhs) {
-					if      (raw_op == tau::bf_lt)   eff_op = tau::bf_gt;
-					else if (raw_op == tau::bf_gt)   eff_op = tau::bf_lt;
-					else if (raw_op == tau::bf_lteq) eff_op = tau::bf_gteq;
-					else if (raw_op == tau::bf_gteq) eff_op = tau::bf_lteq;
-				}
-				if (negate) {
-					if      (eff_op == tau::bf_lt)   eff_op = tau::bf_gteq;
-					else if (eff_op == tau::bf_gt)   eff_op = tau::bf_lteq;
-					else if (eff_op == tau::bf_lteq) eff_op = tau::bf_gt;
-					else if (eff_op == tau::bf_gteq) eff_op = tau::bf_lt;
-					else if (eff_op == tau::bf_eq)   eff_op = tau::bf_neq;
-					else if (eff_op == tau::bf_neq)  eff_op = tau::bf_eq;
-				}
-				// eff_op is now in "var <op> fv" form.
-				if      (eff_op == tau::bf_lt)    upper_strict.insert(fv_tree);
-				else if (eff_op == tau::bf_lteq)  upper_nonstrict.insert(fv_tree);
-				else if (eff_op == tau::bf_gt)    lower_strict.insert(fv_tree);
-				else if (eff_op == tau::bf_gteq)  lower_nonstrict.insert(fv_tree);
-				else if (eff_op == tau::bf_eq)    eq_free.insert(fv_tree);
-				else if (eff_op == tau::bf_neq)   neq_free.insert(fv_tree);
-				else { undetermined = true; }
-				return;
-			}
-			auto cv = cst.get_ba_constant();
-			if (!std::holds_alternative<qlt>(cv)) { undetermined = true; return; }
-			const qlt& qba = std::get<qlt>(cv);
-			if (qba.pieces.size() != 1) { undetermined = true; return; }
-			const auto& piece = qba.pieces[0];
-			if (piece.lo.val != piece.hi.val) { undetermined = true; return; }
-			if (!piece.lo.val.is_finite()) { undetermined = true; return; }
-			const qlt_rational& c = piece.lo.val;
-			auto eff_op = raw_op;
-			if (var_in_rhs) {
-				if      (raw_op == tau::bf_lt)   eff_op = tau::bf_gt;
-				else if (raw_op == tau::bf_gt)   eff_op = tau::bf_lt;
-				else if (raw_op == tau::bf_lteq) eff_op = tau::bf_gteq;
-				else if (raw_op == tau::bf_gteq) eff_op = tau::bf_lteq;
-			}
-			if (negate) {
-				if      (eff_op == tau::bf_lt)   eff_op = tau::bf_gteq;
-				else if (eff_op == tau::bf_gt)   eff_op = tau::bf_lteq;
-				else if (eff_op == tau::bf_lteq) eff_op = tau::bf_gt;
-				else if (eff_op == tau::bf_gteq) eff_op = tau::bf_lt;
-				else if (eff_op == tau::bf_eq)   eff_op = tau::bf_neq;
-				else if (eff_op == tau::bf_neq)  eff_op = tau::bf_eq;
-			}
-			qlt interval;
-			auto neg_inf = qlt_rational::make_neg_inf();
-			auto pos_inf = qlt_rational::make_pos_inf();
-			qlt_piece p;
-			if (eff_op == tau::bf_lt) {
-				p.lo = qlt_endpoint{neg_inf, qlt_bound::OPEN};
-				p.hi = qlt_endpoint{c, qlt_bound::OPEN};
-				interval = qlt{{p}};
-			} else if (eff_op == tau::bf_lteq) {
-				p.lo = qlt_endpoint{neg_inf, qlt_bound::OPEN};
-				p.hi = qlt_endpoint{c, qlt_bound::CLOSED};
-				interval = qlt{{p}};
-			} else if (eff_op == tau::bf_gt) {
-				p.lo = qlt_endpoint{c, qlt_bound::OPEN};
-				p.hi = qlt_endpoint{pos_inf, qlt_bound::OPEN};
-				interval = qlt{{p}};
-			} else if (eff_op == tau::bf_gteq) {
-				p.lo = qlt_endpoint{c, qlt_bound::CLOSED};
-				p.hi = qlt_endpoint{pos_inf, qlt_bound::OPEN};
-				interval = qlt{{p}};
-			} else if (eff_op == tau::bf_eq) {
-				p.lo = qlt_endpoint{c, qlt_bound::CLOSED};
-				p.hi = qlt_endpoint{c, qlt_bound::CLOSED};
-				interval = qlt{{p}};
-			} else if (eff_op == tau::bf_neq) {
-				qlt_piece p1, p2;
-				p1.lo = qlt_endpoint{neg_inf, qlt_bound::OPEN};
-				p1.hi = qlt_endpoint{c, qlt_bound::OPEN};
-				p2.lo = qlt_endpoint{c, qlt_bound::OPEN};
-				p2.hi = qlt_endpoint{pos_inf, qlt_bound::OPEN};
-				interval = qlt{{p1, p2}};
-			} else { undetermined = true; return; }
-			acc = acc & interval;
-		};
-		// Handle negated comparison: ¬(var op c) → var op' c
-		if (op == tau::wff_neg) {
-			tref inner = t[0].first();
-			const auto& ti = tau::get(inner);
-			if (!ti.is(tau::wff) || !ti.has_child()) {
-				undetermined = true; return;
-			}
-			size_t iop = ti[0].value.get_nt();
-			// Normalize NNF negated-comparison variants (bf_nXxx → positive)
-			if      (iop == tau::bf_ngt)   iop = tau::bf_lteq;
-			else if (iop == tau::bf_nlt)   iop = tau::bf_gteq;
-			else if (iop == tau::bf_ngteq) iop = tau::bf_lt;
-			else if (iop == tau::bf_nlteq) iop = tau::bf_gt;
-			if (iop != tau::bf_lt  && iop != tau::bf_lteq &&
-			    iop != tau::bf_gt  && iop != tau::bf_gteq &&
-			    iop != tau::bf_eq  && iop != tau::bf_neq) {
-				undetermined = true; return;
-			}
-			accumulate_interval(iop, ti[0].first(), ti[0].second(), true);
-			return;
-		}
-		// NNF converts ¬(x op c) to bf_nXxx(x,c). Normalize to positive form.
-		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
-		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
-		else if (op == tau::bf_ngteq) op = tau::bf_lt;
-		else if (op == tau::bf_nlteq) op = tau::bf_gt;
-		if (op != tau::bf_lt  && op != tau::bf_lteq  &&
-		    op != tau::bf_gt  && op != tau::bf_gteq  &&
-		    op != tau::bf_eq  && op != tau::bf_neq) {
-			undetermined = true; return;
-		}
-		// Comparison atom: wff(bf_op(lhs_bf, rhs_bf))
-		accumulate_interval(op, t[0].first(), t[0].second(), false);
-	};
-	collect(body);
-	// Symbolic contradiction detection via free-variable endpoints.
-	// (fv < var && var < fv)  → empty (fv < fv impossible).
-	// (fv <= var && var < fv) → empty (fv <= var < fv impossible).
-	// (fv < var && var <= fv) → empty.
-	// (var = fv1 && var = fv2) with fv1 != fv2 syntactically → empty.
-	// (var = fv && var < fv) → empty.
-	// (var = fv && var > fv) → empty.
-	// (var = fv && var != fv), (fv <= var <= fv && var != fv) → empty.
-	auto has_same = [](const subtree_set<node>& a, const subtree_set<node>& b) {
-		for (tref t : a) if (b.contains(t)) return true;
-		return false;
-	};
-	auto pinned_and_excluded = [&] {
-		for (tref t : neq_free)
-			if (eq_free.contains(t) || (lower_nonstrict.contains(t)
-				&& upper_nonstrict.contains(t))) return true;
-		return false;
-	};
-	if (has_same(lower_strict, upper_strict)
-	 || has_same(lower_strict, upper_nonstrict)
-	 || has_same(lower_nonstrict, upper_strict)
-	 || has_same(lower_strict, eq_free)
-	 || has_same(upper_strict, eq_free)
-	 || pinned_and_excluded())
-		acc = qlt::bottom();
-	// Two distinct equalities to different free vars → contradictory iff
-	// we can't prove they're equal. Stay undetermined in this case.
-	if (eq_free.size() > 1) undetermined = true;
-	// AN-1: symbolic endpoints are recorded above but never
-	// intersected into `acc`, so a non-empty verdict is sound only
-	// when they cannot shrink the interval to empty. A one-sided
-	// symbolic bound is harmless over (Q,<) iff `acc` is unbounded
-	// on that side (a point beyond any finite set of free endpoints
-	// always exists). Anything whose truth depends on the ORDER of
-	// free endpoints -- bounds on both sides, or an equality
-	// combined with any other constraint -- is undetermined, not T:
-	// `ex x (a < x && x < b)` is `a < b`, false at a = b.
-	if (!undetermined && !acc.is_empty()) {
-		const bool has_lower = !lower_strict.empty()
-					|| !lower_nonstrict.empty();
-		const bool has_upper = !upper_strict.empty()
-					|| !upper_nonstrict.empty();
-		if (!eq_free.empty()) {
-			if (has_lower || has_upper || !acc.is_full())
-				undetermined = true;
-		} else if (has_lower && has_upper) {
-			// Exception: a non-strict cycle through one
-			// shared endpoint (fv <= var && var <= fv) is
-			// satisfied by var := fv for ANY fv, provided
-			// nothing else restricts var. Any other
-			// two-sided combination depends on the free
-			// endpoints' order.
-			if (!(lower_strict.empty()
-				&& upper_strict.empty()
-				&& lower_nonstrict.size() == 1
-				&& upper_nonstrict.size() == 1
-				&& upper_nonstrict.contains(
-					*lower_nonstrict.begin())
-				&& acc.is_full()))
-				undetermined = true;
-		}
-		else if (has_lower && !acc.pieces.back()
-					.hi.val.is_pos_inf())
-			undetermined = true;
-		else if (has_upper && !acc.pieces.front()
-					.lo.val.is_neg_inf())
-			undetermined = true;
-	}
-	// A symbolic disequality removes one point: it cannot empty a set with
-	// an interior point, but it can empty a point (an equality, the
-	// non-strict cycle through one endpoint, or a constant singleton).
-	if (!undetermined && !acc.is_empty() && !neq_free.empty()) {
-		const bool pinned_sym = !eq_free.empty()
-			|| (!lower_nonstrict.empty() && !upper_nonstrict.empty());
-		bool has_interior = false;
-		for (const auto& piece : acc.pieces)
-			if (qlt_sem_cmp(piece.lo.val, piece.hi.val)
-				== std::partial_ordering::less)
-				has_interior = true;
-		if (pinned_sym || !has_interior) undetermined = true;
-	}
-	if (undetermined) {
-		// If we already derived an empty interval symbolically, prefer that
-		// (it is a definitive answer; the BA fallback would wrongly say SAT).
-		if (acc.is_empty()) return acc;
-		return std::nullopt;
-	}
-	return acc;
+namespace qlt_cells_detail {
+
+// Variables a decision takes: one bit each in a 32-bit cell mask.
+inline constexpr size_t max_vars = 5;
+// Regions a decision takes.
+inline constexpr size_t max_regions = 64;
+// Splits a decision tries before it declines.
+inline constexpr size_t max_splits = size_t{1} << 22;
+
+// For each region, the cells a term covers: bit b stands for the cell whose
+// membership in variable j is bit j of b.
+using masks = std::vector<uint32_t>;
+
+// A formula compiled against the regions. `zero` holds when no nonempty cell
+// lies in `cells`; `ex`/`all` bind variable `var` over kids[0]; `depth` is the
+// quantifier nesting depth of the subformula and `free` the variables its truth
+// depends on, one bit each.
+struct formula {
+	enum kind_t : uint8_t { truth, zero, conj, disj, neg, ex, all } kind;
+	bool value = false;
+	size_t var = 0;
+	size_t depth = 0;
+	masks cells;
+	std::vector<size_t> kids;
+	uint32_t free = 0;
+};
+
+// A nonempty cell: its region, its membership bits and its saturated count.
+struct cell {
+	uint32_t region;
+	uint32_t bits;
+	size_t count;
+};
+
+// Number of points of a nonempty set, SIZE_MAX for infinitely many.
+inline size_t points_of(const qlt& r) {
+	for (const auto& p : r.pieces)
+		if (qlt_sem_cmp(p.lo.val, p.hi.val) == std::partial_ordering::less)
+			return SIZE_MAX;
+	return r.pieces.size();
 }
 
-// The finite rational p of a qlt constant that is exactly the point [p,p].
-template<NodeType node>
-static std::optional<qlt_rational> qlt_point_constant(const tree<node>& c) {
-	if (!c.is_ba_constant()) return std::nullopt;
-	auto v = c.get_ba_constant();
-	if (!std::holds_alternative<qlt>(v)) return std::nullopt;
-	const qlt& q = std::get<qlt>(v);
-	if (q.inexact || q.pieces.size() != 1) return std::nullopt;
-	const auto& p = q.pieces[0];
-	if (!p.lo.val.is_finite() || p.lo.val != p.hi.val
-		|| p.lo.bound != qlt_bound::CLOSED
-		|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
-	return p.lo.val;
+// No over-approximation and no named endpoint, so set operations are exact.
+inline bool exact(const qlt& q) {
+	if (q.inexact) return false;
+	for (const auto& p : q.pieces)
+		if (p.lo.val.is_sym() || p.hi.val.is_sym()) return false;
+	return true;
 }
 
-// The bf constant of one point p when every occurrence of var in body is an
-// operand of `p & var` or `p & var'`, nullptr otherwise.
-template<NodeType node>
-static tref qlt_point_meet_of(tref var, tref body) {
-	using tau = tree<node>;
-	tref point = nullptr;
-	bool ok = true;
-	auto is_bare_var = [&](tref n) {
-		const auto& t = tau::get(n);
-		return t.child_is(tau::variable)
-			&& tau::get(t.first()) == tau::get(var);
-	};
-	auto is_var_or_neg = [&](tref n) {
-		const auto& t = tau::get(n);
-		if (t.child_is(tau::bf_neg)) return is_bare_var(t[0].first());
-		return is_bare_var(n);
-	};
-	auto meets_point = [&](tref cst, tref other) {
-		const auto& c = tau::get(cst);
-		if (!c.is(tau::bf) || !c.has_child() || !is_var_or_neg(other))
-			return false;
-		auto p = qlt_point_constant<node>(c[0]);
-		if (!p) return false;
-		if (!point) { point = cst; return true; }
-		return *p == *qlt_point_constant<node>(tau::get(point)[0]);
-	};
-	std::function<void(tref)> walk = [&](tref n) {
-		if (!ok) return;
-		const auto& t = tau::get(n);
-		if (t.is(tau::variable)) {
-			if (t == tau::get(var)) ok = false;
-			return;
-		}
-		if (t.is(tau::bf) && t.child_is(tau::bf_and)) {
-			tref a = t[0].first(), b = t[0].second();
-			if (meets_point(a, b) || meets_point(b, a)) return;
-		}
-		for (tref c : t.children()) walk(c);
-	};
-	walk(body);
-	return ok ? point : nullptr;
-}
+} // namespace qlt_cells_detail
 
-// The truth of a closed formula whose terms are qlt constants combined by the
-// Boolean operations, or nullopt when it holds anything else.
+// The truth of the closed formula fm, nullopt when it has a free variable, a
+// shape outside equations and order comparisons between Boolean combinations
+// of qlt constants and variables, or exceeds the bounds above.
 template<NodeType node>
-static std::optional<bool> qlt_ground_truth(tref fm) {
+static std::optional<bool> qlt_decide_closed(tref fm) {
 	using tau = tree<node>;
-	std::function<std::optional<qlt>(tref)> term
-		= [&](tref n) -> std::optional<qlt> {
-		const auto& t = tau::get(n);
-		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
-		if (t.child_is(tau::bf_t)) return qlt::top();
-		if (t.child_is(tau::bf_f)) return qlt::bottom();
-		if (t[0].is_ba_constant()) {
-			auto v = t[0].get_ba_constant();
-			if (!std::holds_alternative<qlt>(v)) return std::nullopt;
-			const qlt& q = std::get<qlt>(v);
-			if (q.inexact) return std::nullopt;
-			return q;
-		}
-		std::optional<qlt> r;
-		if (t.child_is(tau::bf_neg)) {
-			auto a = term(t[0].first());
-			if (a) r = ~*a;
-		} else if (t.child_is(tau::bf_and) || t.child_is(tau::bf_or)
-			|| t.child_is(tau::bf_xor))
-		{
-			auto a = term(t[0].first()), b = term(t[0].second());
-			if (a && b) r = t.child_is(tau::bf_and) ? *a & *b
-				: t.child_is(tau::bf_or) ? *a | *b : *a ^ *b;
-		}
-		if (!r || r->inexact) return std::nullopt;
-		return r;
-	};
-	std::function<std::optional<bool>(tref)> truth
-		= [&](tref n) -> std::optional<bool> {
-		const auto& t = tau::get(n);
-		if (t.equals_T()) return true;
-		if (t.equals_F()) return false;
-		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
-		const auto op = t[0].value.nt;
-		if (op == tau::wff_neg) {
-			auto a = truth(t[0].first());
-			if (!a) return std::nullopt;
-			return !*a;
-		}
-		if (op == tau::wff_and || op == tau::wff_or) {
-			auto a = truth(t[0].first());
-			if (!a || *a == (op == tau::wff_or)) return a;
-			return truth(t[0].second());
-		}
-		if (op == tau::bf_eq || op == tau::bf_neq) {
-			auto a = term(t[0].first()), b = term(t[0].second());
-			if (!a || !b) return std::nullopt;
-			const qlt d = *a ^ *b;
-			if (d.inexact) return std::nullopt;
-			return d.is_empty() == (op == tau::bf_eq);
-		}
-		return std::nullopt;
-	};
-	return truth(fm);
-}
-
-// The truth of closed body with var := the point v of type ba_type, or
-// nullopt when qlt_ground_truth cannot decide it.
-template<NodeType node>
-static std::optional<bool> qlt_point_instance(tref var, tref body,
-	const qlt_rational& v, size_t ba_type)
-{
-	using tau = tree<node>;
-	qlt point;
-	point.pieces.push_back({ qlt_endpoint{ v, qlt_bound::CLOSED },
-		qlt_endpoint{ v, qlt_bound::CLOSED } });
-	tref value = tau::get(tau::bf, { tau::get_ba_constant(
-		typename tau::constant(point), ba_type) });
-	subtree_map<node, tref> changes;
-	for (tref occ : tau::get(body).select_all([&](tref n) {
-		const auto& t = tau::get(n);
-		return t.child_is(tau::variable)
-			&& tau::get(t.first()) == tau::get(var); }))
-		changes.emplace(occ, value);
-	return qlt_ground_truth<node>(rewriter::replace<node>(body, changes));
-}
-
-// `ex var phi` (or `all var phi` when universal) for a closed phi in which var
-// meets one point p only as `p & var` and `p & var'`. p is an atom whether var
-// denotes a point or a set, so each such term is 0 or p by whether var
-// contains p; var := p and var := p + 1 are the two cases.
-template<NodeType node>
-static std::optional<bool> qlt_point_meet_qe(tref var, tref body,
-	bool universal)
-{
-	using tau = tree<node>;
-	tref point = qlt_point_meet_of<node>(var, body);
-	if (!point) return std::nullopt;
-	const auto& pc = tau::get(point)[0];
-	const qlt_rational p = *qlt_point_constant<node>(pc);
-	const size_t type = pc.get_ba_type();
-	auto in = qlt_point_instance<node>(var, body, p, type);
-	if (!in || *in != universal) return in;
-	return qlt_point_instance<node>(var, body, p + qlt_rational(1, 1), type);
-}
-
-// A point witness of `ex var phi` (T), or a point counterexample of
-// `all var phi` (F), for a closed phi; nullopt when no candidate is one. A
-// point is a value of var whether var denotes a point or a set, so only that
-// direction is answered. The candidates are the finite endpoints of the qlt
-// constants, the midpoints between consecutive ones and a point beyond each
-// end.
-template<NodeType node>
-static std::optional<bool> qlt_point_witness_qe(tref var, tref body,
-	bool universal)
-{
-	using tau = tree<node>;
-	std::vector<qlt_rational> ends;
-	size_t type = 0;
-	for (tref c : tau::get(body).select_all([](tref n) {
+	using namespace qlt_cells_detail;
+	if (!get_free_vars<node>(fm).empty()) return std::nullopt;
+	// The regions: the nonempty minterms of the constants.
+	std::vector<qlt> regions{ qlt::top() };
+	for (tref c : tau::get(fm).select_all([](tref n) {
 		return tau::get(n).is_ba_constant(); }))
 	{
-		const auto& t = tau::get(c);
-		auto v = t.get_ba_constant();
-		if (!std::holds_alternative<qlt>(v)) continue;
-		type = t.get_ba_type();
-		for (const auto& piece : std::get<qlt>(v).pieces)
-			for (const auto& e : { piece.lo.val, piece.hi.val })
-				if (e.is_finite()) ends.push_back(e);
+		auto v = tau::get(c).get_ba_constant();
+		if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+		const qlt& q = std::get<qlt>(v);
+		if (!exact(q)) return std::nullopt;
+		std::vector<qlt> next;
+		for (const qlt& r : regions)
+			for (qlt part : { r & q, r & ~q }) {
+				if (!exact(part)) return std::nullopt;
+				if (!part.is_empty()) next.push_back(std::move(part));
+			}
+		if (next.size() > max_regions) return std::nullopt;
+		regions = std::move(next);
 	}
-	if (!type) return std::nullopt;
-	std::sort(ends.begin(), ends.end());
-	ends.erase(std::unique(ends.begin(), ends.end()), ends.end());
-	// Each candidate re-evaluates the whole body.
-	if (ends.size() > 32) return std::nullopt;
-	std::vector<qlt_rational> candidates;
-	if (ends.empty()) candidates.emplace_back(0, 1);
-	else {
-		candidates.push_back(ends.front() + qlt_rational(-1, 1));
-		for (size_t i = 0; i < ends.size(); ++i) {
-			if (i) candidates.push_back(ends[i - 1].midpoint(ends[i]));
-			candidates.push_back(ends[i]);
+	const size_t nr = regions.size();
+	trefs vars;
+	for (tref q : tau::get(fm).select_all([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::wff_ex) || t.is(tau::wff_all); }))
+	{
+		tref v = tau::get(q).first();
+		if (std::none_of(vars.begin(), vars.end(), [&](tref w) {
+			return tau::get(w) == tau::get(v); })) vars.push_back(v);
+	}
+	if (vars.size() > max_vars) return std::nullopt;
+	const size_t k = vars.size();
+	const uint32_t all_cells = k == max_vars ? UINT32_MAX
+		: (uint32_t{1} << (uint32_t{1} << k)) - 1;
+	auto var_index = [&](tref v) {
+		size_t j = 0;
+		while (tau::get(vars[j]) != tau::get(v)) ++j;
+		return j;
+	};
+	std::function<std::optional<masks>(tref)> term
+		= [&](tref n) -> std::optional<masks> {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
+		if (t.child_is(tau::bf_t)) return masks(nr, all_cells);
+		if (t.child_is(tau::bf_f)) return masks(nr, 0);
+		if (t[0].is_ba_constant()) {
+			const qlt q = std::get<qlt>(t[0].get_ba_constant());
+			masks m(nr, 0);
+			for (size_t i = 0; i < nr; ++i)
+				if (!(regions[i] & q).is_empty()) m[i] = all_cells;
+			return m;
 		}
-		candidates.push_back(ends.back() + qlt_rational(1, 1));
-	}
-	for (const auto& v : candidates)
-		if (auto in = qlt_point_instance<node>(var, body, v, type);
-			in && *in != universal) return in;
-	return std::nullopt;
+		if (t.child_is(tau::variable)) {
+			const size_t j = var_index(t.first());
+			uint32_t in = 0;
+			for (uint32_t b = 0; b < (uint32_t{1} << k); ++b)
+				if (b >> j & 1) in |= uint32_t{1} << b;
+			return masks(nr, in);
+		}
+		if (t.child_is(tau::bf_neg)) {
+			auto a = term(t[0].first());
+			if (!a) return std::nullopt;
+			for (auto& m : *a) m = ~m & all_cells;
+			return a;
+		}
+		const bool is_and = t.child_is(tau::bf_and);
+		const bool is_or = t.child_is(tau::bf_or);
+		if (!is_and && !is_or && !t.child_is(tau::bf_xor))
+			return std::nullopt;
+		std::optional<masks> acc;
+		for (size_t c = 0; c < t[0].children_size(); ++c) {
+			auto b = term(t[0].child(c));
+			if (!b) return std::nullopt;
+			if (!acc) { acc = std::move(b); continue; }
+			for (size_t i = 0; i < nr; ++i)
+				(*acc)[i] = is_and ? (*acc)[i] & (*b)[i]
+					: is_or ? (*acc)[i] | (*b)[i]
+					: (*acc)[i] ^ (*b)[i];
+		}
+		return acc;
+	};
+	std::vector<formula> fs;
+	auto add = [&](formula f) {
+		for (size_t c : f.kids) {
+			f.depth = std::max(f.depth, fs[c].depth);
+			f.free |= fs[c].free;
+		}
+		if (f.kind == formula::ex || f.kind == formula::all) {
+			++f.depth;
+			f.free &= ~(uint32_t{1} << f.var);
+		}
+		// A cell set depends on x_j when flipping bit j of some cell
+		// moves it in or out of the set.
+		if (f.kind == formula::zero)
+			for (size_t j = 0; j < k; ++j)
+				for (uint32_t m : f.cells)
+					for (uint32_t b = 0; b < (uint32_t{1} << k); ++b)
+						if ((m >> b & 1) != (m >> (b ^ (uint32_t{1} << j)) & 1))
+							f.free |= uint32_t{1} << j;
+		fs.push_back(std::move(f));
+		return fs.size() - 1;
+	};
+	auto zero_of = [&](const masks& a, const masks& b, bool sym) {
+		masks d(nr);
+		for (size_t i = 0; i < nr; ++i)
+			d[i] = sym ? a[i] ^ b[i] : a[i] & ~b[i];
+		return add({ formula::zero, false, 0, 0, std::move(d), {} });
+	};
+	auto negate = [&](size_t f) {
+		return add({ formula::neg, false, 0, 0, {}, { f } });
+	};
+	auto join = [&](formula::kind_t kind, std::vector<size_t> kids) {
+		return add({ kind, false, 0, 0, {}, std::move(kids) });
+	};
+	// a < b in the Boolean order: a & b' = 0 and a != b.
+	auto strict = [&](const masks& a, const masks& b) {
+		return join(formula::conj, { zero_of(a, b, false),
+			negate(zero_of(a, b, true)) });
+	};
+	std::function<std::optional<size_t>(tref)> compile
+		= [&](tref n) -> std::optional<size_t> {
+		const auto& t = tau::get(n);
+		if (t.equals_T()) return add({ formula::truth, true, 0, 0, {}, {} });
+		if (t.equals_F()) return add({ formula::truth, false, 0, 0, {}, {} });
+		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
+		const auto op = t[0].value.nt;
+		if (op == tau::wff_ex || op == tau::wff_all) {
+			auto body = compile(t[0].second());
+			if (!body) return std::nullopt;
+			return add({ op == tau::wff_ex ? formula::ex : formula::all,
+				false, var_index(t[0].first()), 0, {}, { *body } });
+		}
+		if (op == tau::wff_neg || op == tau::wff_and || op == tau::wff_or
+			|| op == tau::wff_imply || op == tau::wff_equiv
+			|| op == tau::wff_xor)
+		{
+			std::vector<size_t> kids;
+			for (size_t c = 0; c < t[0].children_size(); ++c) {
+				auto a = compile(t[0].child(c));
+				if (!a) return std::nullopt;
+				kids.push_back(*a);
+			}
+			if (op == tau::wff_neg) return negate(kids[0]);
+			if (op == tau::wff_and) return join(formula::conj, kids);
+			if (op == tau::wff_or) return join(formula::disj, kids);
+			if (kids.size() != 2) return std::nullopt;
+			const size_t a = kids[0], b = kids[1];
+			if (op == tau::wff_imply)
+				return join(formula::disj, { negate(a), b });
+			const size_t same = join(formula::disj, {
+				join(formula::conj, { a, b }),
+				join(formula::conj, { negate(a), negate(b) }) });
+			return op == tau::wff_equiv ? same : negate(same);
+		}
+		if (op != tau::bf_eq && op != tau::bf_neq
+			&& op != tau::bf_lt && op != tau::bf_nlt
+			&& op != tau::bf_lteq && op != tau::bf_nlteq
+			&& op != tau::bf_gt && op != tau::bf_ngt
+			&& op != tau::bf_gteq && op != tau::bf_ngteq)
+				return std::nullopt;
+		auto a = term(t[0].first()), b = term(t[0].second());
+		if (!a || !b) return std::nullopt;
+		switch (op) {
+		case tau::bf_eq:    return zero_of(*a, *b, true);
+		case tau::bf_neq:   return negate(zero_of(*a, *b, true));
+		case tau::bf_lteq:  return zero_of(*a, *b, false);
+		case tau::bf_nlteq: return negate(zero_of(*a, *b, false));
+		case tau::bf_gteq:  return zero_of(*b, *a, false);
+		case tau::bf_ngteq: return negate(zero_of(*b, *a, false));
+		case tau::bf_lt:    return strict(*a, *b);
+		case tau::bf_nlt:   return negate(strict(*a, *b));
+		case tau::bf_gt:    return strict(*b, *a);
+		default:            return negate(strict(*b, *a));
+		}
+	};
+	auto root = compile(fm);
+	if (!root) return std::nullopt;
+	size_t splits = 0;
+	bool exhausted = false;
+	std::map<std::vector<size_t>, bool> memo;
+	std::function<bool(size_t, const std::vector<cell>&)> holds
+		= [&](size_t f, const std::vector<cell>& in) -> bool {
+		if (exhausted) return false;
+		const formula& x = fs[f];
+		switch (x.kind) {
+		case formula::truth: return x.value;
+		case formula::zero:
+			for (const cell& c : in)
+				if (x.cells[c.region] >> c.bits & 1) return false;
+			return true;
+		case formula::neg: return !holds(x.kids[0], in);
+		case formula::conj:
+			for (size_t c : x.kids) if (!holds(c, in)) return false;
+			return true;
+		case formula::disj:
+			for (size_t c : x.kids) if (holds(c, in)) return true;
+			return false;
+		default: break;
+		}
+		// Cells the formula cannot tell apart merge: same region, same
+		// membership in the variables it depends on.
+		const size_t own_cap = size_t{1} << x.depth;
+		std::vector<cell> cells;
+		for (const cell& c : in) {
+			const uint32_t bits = c.bits & x.free;
+			auto it = std::find_if(cells.begin(), cells.end(),
+				[&](const cell& d) {
+					return d.region == c.region && d.bits == bits; });
+			if (it == cells.end()) cells.push_back({ c.region, bits,
+				std::min(c.count, own_cap) });
+			else it->count = std::min(it->count + c.count, own_cap);
+		}
+		std::sort(cells.begin(), cells.end(), [](const cell& a, const cell& b) {
+			return std::tie(a.region, a.bits, a.count)
+				< std::tie(b.region, b.bits, b.count); });
+		std::vector<size_t> key{ f };
+		for (const cell& c : cells) {
+			key.push_back(c.region);
+			key.push_back(c.bits);
+			key.push_back(c.count);
+		}
+		if (auto it = memo.find(key); it != memo.end()) return it->second;
+		auto remember = [&](bool v) {
+			if (!exhausted) memo.emplace(std::move(key), v);
+			return v;
+		};
+		// Every way of splitting each cell into its parts in and out of
+		// the bound variable, counted at the body's saturation.
+		const bool universal = x.kind == formula::all;
+		const size_t body = x.kids[0];
+		const size_t cap = size_t{1} << fs[body].depth;
+		const uint32_t bit = uint32_t{1} << x.var;
+		std::vector<std::vector<std::pair<size_t, size_t>>> ways;
+		for (const cell& c : cells) {
+			std::vector<std::pair<size_t, size_t>> w;
+			for (size_t a = 0; a <= c.count; ++a) {
+				std::pair<size_t, size_t> p{ std::min(a, cap),
+					std::min(c.count - a, cap) };
+				if (std::find(w.begin(), w.end(), p) == w.end())
+					w.push_back(p);
+			}
+			ways.push_back(std::move(w));
+		}
+		std::vector<size_t> pick(cells.size(), 0);
+		std::vector<cell> next;
+		for (;;) {
+			if (++splits > max_splits) { exhausted = true; return false; }
+			next.clear();
+			for (size_t i = 0; i < cells.size(); ++i) {
+				const auto [in, out] = ways[i][pick[i]];
+				if (in) next.push_back({ cells[i].region,
+					cells[i].bits | bit, in });
+				if (out) next.push_back({ cells[i].region,
+					cells[i].bits & ~bit, out });
+			}
+			if (holds(body, next) != universal)
+				return remember(!universal);
+			if (exhausted) return false;
+			size_t i = 0;
+			while (i < cells.size() && ++pick[i] == ways[i].size())
+				pick[i++] = 0;
+			if (i == cells.size()) return remember(universal);
+		}
+	};
+	const size_t cap = size_t{1} << fs[*root].depth;
+	std::vector<cell> cells;
+	for (size_t i = 0; i < nr; ++i)
+		cells.push_back({ (uint32_t) i, 0,
+			std::min(points_of(regions[i]), cap) });
+	const bool value = holds(*root, cells);
+	if (exhausted) return std::nullopt;
+	return value;
 }
 
 // True when body is a conjunction of disequations `var != t` with t free of
-// var. Such a body excludes finitely many values from infinitely many, points
-// or sets alike, so `ex var body` holds.
+// var. Such a body excludes finitely many of the infinitely many values of var,
+// so `ex var body` holds.
 template<NodeType node>
 static bool qlt_only_excludes(tref var, tref body) {
 	using tau = tree<node>;
@@ -540,8 +380,11 @@ static bool qlt_only_excludes(tref var, tref body) {
 		const auto& t = tau::get(n);
 		if (t.equals_T()) return true;
 		if (!t.is(tau::wff) || !t.has_child()) return false;
-		if (t[0].is(tau::wff_and))
-			return check(t[0].first()) && check(t[0].second());
+		if (t[0].is(tau::wff_and)) {
+			for (size_t c = 0; c < t[0].children_size(); ++c)
+				if (!check(t[0].child(c))) return false;
+			return true;
+		}
 		const tree<node>* at = &t[0];
 		if (t[0].is(tau::wff_neg)) {
 			const auto& ti = tau::get(t[0].first());
@@ -558,218 +401,38 @@ static bool qlt_only_excludes(tref var, tref body) {
 	return check(body) && any;
 }
 
-// The omcat_qe capability: answers satisfiability rather than handing core the
-// interval, which stays qlt's own. body is either a bare existential scoped
-// conjunction or a wff_ex/wff_all node, whose quantifier decides which end of
-// the interval is asked about.
+// The omcat_qe capability: the truth of `ex var body`, or of body itself when
+// body is var's own `ex`/`all` node; nullopt when undecided.
 template<NodeType node>
 static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 	using tau = tree<node>;
-	tref inner = body;
-	bool universal = false;
-	if (const auto& t = tau::get(body); t.has_child()) {
-		if (auto op = t[0].value.nt; op == tau::wff_ex) inner = t[0].second();
-		else if (op == tau::wff_all) {
-			inner = t[0].second();
-			universal = true;
+	const auto& t = tau::get(body);
+	const bool own = t.has_child()
+		&& (t[0].is(tau::wff_ex) || t[0].is(tau::wff_all))
+		&& tau::get(t[0].first()) == tau::get(var);
+	tref fm = own ? body : tau::build_wff_ex(var, body, false);
+	if (auto r = qlt_decide_closed<node>(fm)) return r;
+	tref inner = own ? t[0].second() : body;
+	if (own && t[0].is(tau::wff_all)) return std::nullopt;
+	if (qlt_only_excludes<node>(var, inner)) return true;
+	// The conjuncts free of other variables are necessary: when no value
+	// satisfies them, none satisfies the body.
+	trefs closed;
+	std::function<void(tref)> split = [&](tref n) {
+		const auto& c = tau::get(n);
+		if (c.has_child() && c[0].is(tau::wff_and)) {
+			for (size_t i = 0; i < c[0].children_size(); ++i)
+				split(c[0].child(i));
+			return;
 		}
-	}
-	auto interval = qlt_dlo_qe_interval<node>(var, inner);
-	if (!interval) {
-		if (!universal && qlt_only_excludes<node>(var, inner))
-			return true;
-		// An ordering atom is the interval computation's alone: a
-		// substituted point would make a compound side such as
-		// `x & {3}` comparable through the order's 0/1 ends.
-		if (tau::get(inner).find_top([](tref n) {
-			const auto& t = tau::get(n);
-			return t.is(tau::bf_lt) || t.is(tau::bf_lteq)
-				|| t.is(tau::bf_gt) || t.is(tau::bf_gteq)
-				|| t.is(tau::bf_nlt) || t.is(tau::bf_nlteq)
-				|| t.is(tau::bf_ngt) || t.is(tau::bf_ngteq); }))
-			return std::nullopt;
-		if (auto r = qlt_point_meet_qe<node>(var, inner, universal))
-			return r;
-		return qlt_point_witness_qe<node>(var, inner, universal);
-	}
-	return universal ? interval->is_full() : !interval->is_empty();
-}
-
-// Fourier-Motzkin elimination for the dense order without
-// endpoints that qlt_dlo_qe_interval reasons in. For body a conjunction of
-// atoms `L op var` / `var op U` (op among <, <=, >, >= and their negations)
-// whose var side is var itself and whose other side does not mention var,
-//   ex var (/\ L_i <_i var  /\  var <_j U_j)  ==  /\ L_i <_ij U_j
-// where <_ij is strict iff either bound is strict. Density gives a point
-// strictly between L and U, and the absence of endpoints the one-sided case
-// (which qlt_dlo_qe_interval already decides, so only the two-sided case is
-// answered here). A variable pinned to one term t -- by `var = t` or by
-// `t <= var && var <= t` -- is eliminated by substituting t, whatever the
-// other conjuncts are. Disequalities `var != c_k` beside one lower bound L
-// and one upper bound U are eliminated by density: an interval with an
-// interior point is not exhausted by finitely many points, so
-//   ex var (L <  var ... var <  U && /\ var != c_k)  ==  L < U  (either strict)
-//   ex var (L <= var && var <= U && /\ var != c_k)
-//       ==  L < U || (L = U && /\ L != c_k)
-// (L a variable or a constant, so never a typed 0/1). Anything else -- a
-// disequality beside several bounds, a compound term, a typed 0/1 sentinel
-// (an endpoint) -- returns nullptr and leaves the binder in place.
-template<NodeType node>
-static tref qlt_dlo_fm_residual(tref var, tref body) {
-	using tau = tree<node>;
-	tref inner = body;
-	if (const auto& t = tau::get(body); t.has_child()
-		&& t[0].value.nt == tau::wff_ex) inner = t[0].second();
-	std::vector<std::pair<tref, bool>> lower, upper; // (term, strict)
-	auto is_bare_var = [&](tref side) {
-		const auto& st = tau::get(side);
-		return st.is(tau::bf) && st.has_child()
-			&& tau::get(st.first()) == tau::get(var);
+		for (tref fv : get_free_vars<node>(n))
+			if (tau::get(fv) != tau::get(var)) return;
+		closed.push_back(n);
 	};
-	auto is_sentinel = [](tref side) {
-		const auto& st = tau::get(side);
-		return st.has_child() && (st[0].is(tau::bf_f) || st[0].is(tau::bf_t));
-	};
-	// A bound on var read off one atom, normalised to `var op other` with
-	// op among <, <=, >, >= and =; nullopt for any other atom.
-	struct bound { typename node::T op; tref other; };
-	auto read_bound = [&](tref n) -> std::optional<bound> {
-		const auto& t = tau::get(n);
-		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
-		auto op = t[0].value.nt;
-		bool negate = false;
-		const tree<node>* at = &t[0];
-		if (op == tau::wff_neg) {
-			const auto& ti = tau::get(t[0].first());
-			if (!ti.is(tau::wff) || !ti.has_child()) return std::nullopt;
-			at = &ti[0];
-			op = ti[0].value.nt;
-			negate = true;
-		}
-		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
-		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
-		else if (op == tau::bf_ngteq) op = tau::bf_lt;
-		else if (op == tau::bf_nlteq) op = tau::bf_gt;
-		if (op == tau::bf_eq && negate) return std::nullopt;
-		if (op != tau::bf_lt && op != tau::bf_lteq && op != tau::bf_eq
-			&& op != tau::bf_gt && op != tau::bf_gteq) return std::nullopt;
-		tref lhs = at->first(), rhs = at->second();
-		const bool in_l = contains<node>(lhs, var);
-		const bool in_r = contains<node>(rhs, var);
-		if (in_l == in_r) return std::nullopt;
-		if (!is_bare_var(in_l ? lhs : rhs)) return std::nullopt;
-		tref other = in_l ? rhs : lhs;
-		if (is_sentinel(other)) return std::nullopt;
-		// Normalise to `var op other`.
-		if (in_r) {
-			if      (op == tau::bf_lt)   op = tau::bf_gt;
-			else if (op == tau::bf_gt)   op = tau::bf_lt;
-			else if (op == tau::bf_lteq) op = tau::bf_gteq;
-			else if (op == tau::bf_gteq) op = tau::bf_lteq;
-		}
-		if (negate) {
-			if      (op == tau::bf_lt)   op = tau::bf_gteq;
-			else if (op == tau::bf_gt)   op = tau::bf_lteq;
-			else if (op == tau::bf_lteq) op = tau::bf_gt;
-			else                         op = tau::bf_lt;
-		}
-		return bound{ static_cast<size_t>(op), other };
-	};
-	trefs conjs;
-	std::function<void(tref)> flatten = [&](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::wff) && t.has_child()
-			&& t[0].value.nt == tau::wff_and)
-			flatten(t[0].first()), flatten(t[0].second());
-		else conjs.push_back(n);
-	};
-	flatten(inner);
-	// ex var (var = t && phi) == phi[var := t], and t <= var <= t is var = t.
-	// The pin must not be rebound inside the scope, or substituting it there
-	// would capture it.
-	auto rebinds = [&](tref term) {
-		for (tref v : get_free_vars<node>(term))
-			if (tau::get(inner).find_top([&](tref m) {
-				return is_quantifier<node>(m)
-					&& tau::get(tau::get(m)[0].first())
-						== tau::get(v); }))
-				return true;
-		return false;
-	};
-	trefs le, ge;
-	for (tref c : conjs) {
-		auto b = read_bound(c);
-		if (!b) continue;
-		tref pin = nullptr;
-		if (b->op == tau::bf_eq) pin = b->other;
-		else if (b->op == tau::bf_lteq) {
-			for (tref g : ge) if (tau::get(g) == tau::get(b->other)) pin = g;
-			le.push_back(b->other);
-		} else if (b->op == tau::bf_gteq) {
-			for (tref l : le) if (tau::get(l) == tau::get(b->other)) pin = l;
-			ge.push_back(b->other);
-		}
-		if (pin && !rebinds(pin)) {
-			subtree_map<node, tref> changes;
-			for (tref occ : tau::get(inner).select_all(is_bare_var))
-				changes.emplace(occ, pin);
-			return rewriter::replace<node>(inner, changes);
-		}
-	}
-	// The c of a disequality `var != c`, spelled `var != c` or `!(var = c)`.
-	auto read_excluded = [&](tref n) -> tref {
-		const auto& t = tau::get(n);
-		if (!t.is(tau::wff) || !t.has_child()) return nullptr;
-		const tree<node>* at = &t[0];
-		if (t[0].is(tau::wff_neg)) {
-			const auto& ti = tau::get(t[0].first());
-			if (!ti.is(tau::wff) || !ti.has_child()
-				|| !ti[0].is(tau::bf_eq)) return nullptr;
-			at = &ti[0];
-		} else if (!t[0].is(tau::bf_neq)) return nullptr;
-		tref lhs = at->first(), rhs = at->second();
-		const bool in_l = contains<node>(lhs, var);
-		const bool in_r = contains<node>(rhs, var);
-		if (in_l == in_r || !is_bare_var(in_l ? lhs : rhs)) return nullptr;
-		return in_l ? rhs : lhs;
-	};
-	trefs excluded;
-	for (tref c : conjs) {
-		if (tau::get(c).equals_T()) continue;
-		if (auto b = read_bound(c); b && b->op != tau::bf_eq) {
-			if (b->op == tau::bf_lt || b->op == tau::bf_lteq)
-				upper.emplace_back(b->other, b->op == tau::bf_lt);
-			else lower.emplace_back(b->other, b->op == tau::bf_gt);
-			continue;
-		}
-		tref e = read_excluded(c);
-		if (!e) return nullptr;
-		// No point is an end of the order, so `var != 0/1` always holds.
-		if (!is_sentinel(e)) excluded.push_back(e);
-	}
-	if (lower.empty() || upper.empty()) return nullptr;
-	if (!excluded.empty()) {
-		if (lower.size() != 1 || upper.size() != 1) return nullptr;
-		const auto& [l, ls] = lower.front();
-		const auto& [u, us] = upper.front();
-		if (ls || us) return tau::build_bf_lt(l, u);
-		// L = U is the single-point case: L must be a point for `L != c`
-		// to be all it takes.
-		const auto& lt = tau::get(l);
-		if (!lt.is(tau::bf) || !lt.has_child()
-			|| !(lt[0].is(tau::variable) || lt[0].is_ba_constant()))
-			return nullptr;
-		trefs point{ tau::build_bf_eq(l, u) };
-		for (tref e : excluded) point.push_back(tau::build_bf_neq(l, e));
-		return tau::build_wff_or(tau::build_bf_lt(l, u),
-			tau::build_wff_and(point));
-	}
-	trefs out;
-	for (const auto& [l, ls] : lower)
-		for (const auto& [u, us] : upper)
-			out.push_back(ls || us ? tau::build_bf_lt(l, u)
-				: tau::build_bf_lteq(l, u));
-	return tau::build_wff_and(out);
+	split(inner);
+	if (!closed.empty() && qlt_decide_closed<node>(tau::build_wff_ex(
+		var, tau::build_wff_and(closed), false)) == false) return false;
+	return std::nullopt;
 }
 
 } // namespace idni::tau_lang

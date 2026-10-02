@@ -81,11 +81,13 @@ add_repl_test(realizable_cmd-qlt-positive_always_sat "realizable (always o1[t]:q
 add_repl_test(realizable_cmd-qlt-constant_equality_sat "realizable (always o1[t]:qlt = {1/2}:qlt)." ": T")
 add_repl_test(realizable_cmd-qlt-contradictory_bounds_unsat "realizable (always o1[t]:qlt > {3/4}:qlt) && (always o1[t]:qlt < {1/4}:qlt)." ": F")
 add_repl_test(realizable_cmd-qlt-contradictory_equalities_unsat "realizable (always o1[t]:qlt = {1/3}:qlt) && (always o1[t]:qlt = {2/3}:qlt)." ": F")
-add_repl_test(realizable_cmd-qlt-open_interval_sat "realizable (always o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt)." ": T")
-add_repl_test(realizable_cmd-qlt-negative_open_interval_sat "realizable (always o1[t]:qlt > {-1}:qlt && o1[t]:qlt < {0}:qlt)." ": T")
+# A qlt stream holds a set at each step and < is strict inclusion, so no set
+# lies strictly between two points: these bounds cannot be met.
+add_repl_test(realizable_cmd-qlt-open_interval_sat "realizable (always o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt)." ": F")
+add_repl_test(realizable_cmd-qlt-negative_open_interval_sat "realizable (always o1[t]:qlt > {-1}:qlt && o1[t]:qlt < {0}:qlt)." ": F")
 add_repl_test(realizable_cmd-qlt-degenerate_open_interval_unsat "realizable (always o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {1/2}:qlt)." ": F")
 add_repl_test(realizable_cmd-qlt-sometimes_positive_sat "realizable (sometimes o1[t]:qlt > {0}:qlt)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-qlt-always_positive_sometimes_below_one_sat "realizable (always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {1}:qlt)." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-qlt-always_positive_sometimes_below_one_sat "realizable (always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {1}:qlt)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-qlt-always_half_conflicts_sometimes_above_three_quarter_unsat "realizable (always o1[t]:qlt = {1/2}:qlt) && (sometimes o1[t]:qlt > {3/4}:qlt)." ": F")
 add_repl_test(realizable_cmd-qlt-strictly_increasing_sat "realizable (always o1[t]:qlt > o1[t-1]:qlt)." ": T")
 
@@ -184,7 +186,7 @@ add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_06_f_qlt_f_sbf_both_reacha
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_07_g_qlt_past_g_sbf_current_real "realizable G ((o1[t]:qlt > {0}:qlt) && (o1[t-1]:qlt >= {0}:qlt)) && G ((o2[t]:sbf = {X & Y}:sbf))." ": T")
 
 # ltl: soundness_regression
-add_repl_test(realizable_cmd-ltl_soundness_regression-three_qlt_atoms_in_f_each_individually_feasible "realizable F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt) && (o1[t]:qlt > {1/2}:qlt))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_soundness_regression-three_qlt_atoms_in_f_each_individually_feasible "realizable F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt) && (o1[t]:qlt > {1/2}:qlt))." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_soundness_regression-three_sbf_atoms_in_g_all_mutually_consistent "realizable G ((o1[t]:sbf = {X & Y}:sbf) && (o2[t]:sbf = {X | Y}:sbf) && (o3[t]:sbf = {X & Y & Z}:sbf))." ": T")
 add_repl_test(realizable_cmd-ltl_soundness_regression-three_bv_atoms_independent_variables "realizable G ((o1[t]:bv[8] = {181}:bv[8]) && (o2[t]:bv[8] = {240}:bv[8]) && (o3[t]:bv[8] = {15}:bv[8]))." ": T")
 add_repl_test(realizable_cmd-ltl_soundness_regression-triple_over_single_qlt_output_unsat "realizable G ((o1[t]:qlt = {1/4}:qlt) && (o1[t]:qlt = {1/2}:qlt) && (o1[t]:qlt = {3/4}:qlt))." ": F")
@@ -195,7 +197,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0001_qlt_bv_g_implication_across
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0002_qlt_bv_f_conjunction_both_satisfiable_independently "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8]))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0003_qlt_bv_unreal_contradictory_implication_forces_impossible_bv "realizable G (o1[t]:qlt > {0}:qlt && (o1[t]:qlt > {0}:qlt -> o2[t]:bv[8] = {0}:bv[8] && o2[t]:bv[8] = {255}:bv[8]))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0004_qlt_bv_until_across_types "realizable (o1[t]:qlt > {0}:qlt) until (o2[t]:bv[8] = {15}:bv[8])." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0005_qlt_sbf_g_safety_with_both_types_constrained "realizable G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o2[t]:sbf = {X & Y}:sbf)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0005_qlt_sbf_g_safety_with_both_types_constrained "realizable G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o2[t]:sbf = {X & Y}:sbf)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0006_qlt_sbf_unreal_qlt_contradiction_poisons_conjunction "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt && o2[t]:sbf = {X}:sbf)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0007_qlt_sbf_past_reference_on_qlt_current_sbf "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:sbf = {X | (Y & Z)}:sbf)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0008_qlt_hsb_g_conjunction_both_realizable "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:hsb = {top}:hsb)." ": T")
@@ -283,7 +285,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0089_qlt_sbf_tau_g_safety_three_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0090_qlt_sbf_tau_unreal_tau_g_f_contradiction "realizable (G (o1[t]:qlt > {0}:qlt && o2[t]:sbf = {X}:sbf && o3[t]:tau = {T.}:tau)) && (F (o3[t]:tau = {F.}:tau))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0091_qlt_sbf_tau_f_liveness_three_types "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o3[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0092_qlt_sbf_tau_implication_from_sbf_to_tau "realizable G (o1[t]:qlt > {0}:qlt && (o2[t]:sbf = {X}:sbf -> o3[t]:tau = {T.}:tau))." ": T")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0093_qlt_sbf_tau_f_on_sbf_and_tau_with_qlt_guard "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && (F (o2[t]:sbf = {X & Y}:sbf)) && (F (o3[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0093_qlt_sbf_tau_f_on_sbf_and_tau_with_qlt_guard "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && (F (o2[t]:sbf = {X & Y}:sbf)) && (F (o3[t]:tau = {T.}:tau))." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0094_qlt_hsb_qint_g_safety_three_types "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:hsb = {top}:hsb && o3[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0095_qlt_hsb_qint_f_liveness_three_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:hsb != {bot}:hsb)) && (F (o3[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0096_qlt_hsb_qint_unreal_qlt_contradiction "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt && o2[t]:hsb = {top}:hsb && o3[t]:qint = {[0, 1)}:qint)." ": F")
@@ -586,11 +588,11 @@ add_repl_test(realizable_cmd-by_grammar-shape_d_09_bf_gteq_f_f_f_o1_0_qlt "reali
 add_repl_test(realizable_cmd-by_grammar-shape_d_10_bf_ngteq_f_f_f_o1_1_qlt "realizable F (F (F (o1[t]:qlt !>= {1}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_11_bf_eq_nested_g_f_o1_0_qlt "realizable G (F (o1[t]:qlt = {0}:qlt))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_12_bf_gt_in_u_g_a2_u_o1_0_qlt "realizable G ((o2[t]:qlt > {0}:qlt) until (o1[t]:qlt > {0}:qlt))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_e_01_f_f_f_0_o1_1_qlt "realizable F (F (F ({0}:qlt <= o1[t]:qlt <= {1}:qlt)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_e_02_g_0_o1_1_qlt "realizable G ({0}:qlt <= o1[t]:qlt <= {1}:qlt)." ": T")
-add_repl_test(realizable_cmd-by_grammar-shape_e_03_f_g_f_1_o1_2_qlt "realizable F (G (F ({-1}:qlt <= o1[t]:qlt <= {2}:qlt)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_e_04_interval_u_interval "realizable ({0}:qlt <= o1[t]:qlt <= {1}:qlt) until ({0}:qlt <= o2[t]:qlt <= {1}:qlt)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_e_05_g_interval_interval "realizable G (({0}:qlt <= o1[t]:qlt <= {1}:qlt) && ({0}:qlt <= o2[t]:qlt <= {1}:qlt))." ": T")
+add_repl_test(realizable_cmd-by_grammar-shape_e_01_f_f_f_0_o1_1_qlt "realizable F (F (F ({0}:qlt <= o1[t]:qlt <= {1}:qlt)))." ": F" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-by_grammar-shape_e_02_g_0_o1_1_qlt "realizable G ({0}:qlt <= o1[t]:qlt <= {1}:qlt)." ": F")
+add_repl_test(realizable_cmd-by_grammar-shape_e_03_f_g_f_1_o1_2_qlt "realizable F (G (F ({-1}:qlt <= o1[t]:qlt <= {2}:qlt)))." ": F" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-by_grammar-shape_e_04_interval_u_interval "realizable ({0}:qlt <= o1[t]:qlt <= {1}:qlt) until ({0}:qlt <= o2[t]:qlt <= {1}:qlt)." ": F" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-by_grammar-shape_e_05_g_interval_interval "realizable G (({0}:qlt <= o1[t]:qlt <= {1}:qlt) && ({0}:qlt <= o2[t]:qlt <= {1}:qlt))." ": F")
 add_repl_test(realizable_cmd-by_grammar-shape_f_01_bf_and_f_f_f_o1_x_y_sbf "realizable F (F (F (o1[t]:sbf = {X & Y}:sbf)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_f_02_bf_or_f_f_f_o1_x_y_z_sbf "realizable F (F (F (o1[t]:sbf = {X | (Y & Z)}:sbf)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_f_03_bf_xor_f_f_f_o1_x_y_sbf "realizable F (F (F (o1[t]:sbf = {X ^ Y}:sbf)))." ": T" REQUIRES ltlsynt)
@@ -735,14 +737,14 @@ add_repl_test(realizable_cmd-by_grammar-shape_u_15_f_f_always_unrealizable "real
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_01_g_half "realizable G (o1[t]:qlt = {1/2}:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_02_g_two_thirds "realizable G (o1[t]:qlt = {2/3}:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_03_f_one_third "realizable F (o1[t]:qlt = {1/3}:qlt)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_04_g_open_interval_0_1 "realizable G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)." ": T")
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_05_g_open_interval_half_three_quarters "realizable G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {3/4}:qlt)." ": T")
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_04_g_open_interval_0_1 "realizable G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)." ": F")
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_05_g_open_interval_half_three_quarters "realizable G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {3/4}:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_06_g_mirror_i1 "realizable G (o1[t]:qlt = i1[t]:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_07_g_mirror_lookback_i1 "realizable G (o1[t]:qlt = i1[t-1]:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_08_g_neq_i1 "realizable G (o1[t]:qlt != i1[t]:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_10_u_gt0_eq_half "realizable (o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_11_g_half_or_two_thirds "realizable G (o1[t]:qlt = {1/2}:qlt || o1[t]:qlt = {2/3}:qlt)." ": T")
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_12_f_gt_third_and_g_lt1 "realizable F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt)." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_12_f_gt_third_and_g_lt1 "realizable F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_13_s_quarter_three_quarters "realizable (o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_14_g_lookback_lt_strictly_increasing "realizable G (o1[t-1]:qlt < o1[t]:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_15_g_gt_lookback_increasing "realizable G (o1[t]:qlt > o1[t-1]:qlt)." ": T")
@@ -971,9 +973,9 @@ add_repl_budget_test(realizable_cmd-bv_budget_products_of_steps
 
 # Streams of a dense order read through order comparisons are played on the
 # order type of the window: how its values and the constants compare.
-# The environment keeps i1 decreasing below o1[t-1], so o1 never repeats.
+# The empty set lies below every input, so o1 can stay empty.
 add_repl_test(realizable_cmd-data_game_order_types_input_below_output
-	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": F" REQUIRES ltlsynt)
+	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": T" REQUIRES ltlsynt)
 # the environment keeps i1 constant
 add_repl_test(realizable_cmd-data_game_order_types_until_input_changes
 	"realizable (({1/2}:qlt > i1[t]:qlt) U (i1[t]:qlt != i1[t-1]:qlt))" ": F" REQUIRES ltlsynt)

@@ -789,6 +789,10 @@ result<std::optional<minterm_system<node>>> add_minterm_to_disjoint(
 					<< "/[case4]/s: " << LOG_FM(s) << "\n";)
 
 				const auto& st = tau::get(s);
+				// An atom has no proper part, so two minterms cannot
+				// both meet it: this choice of minterms has no solution.
+				if ((d_cte & ~st) == false)
+					return r.with_value(std::nullopt);
 				new_disjoint.insert((st & tau::get(d)).get());
 				new_m = tt(~st & tau::get(new_m))
 					| bf_reduce_canonical<node>() | tt::ref;

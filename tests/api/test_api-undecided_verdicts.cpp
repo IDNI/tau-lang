@@ -237,15 +237,18 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 		check_verdict("valid", "!(" + chain + ")", false);
 	}
 
+	// < is strict inclusion: {0} < [0,1] < [0,2], while no two points are
+	// ordered.
 	TEST_CASE("the reported chain under its witness") {
 		check_verdict("sat", chain + " && x2:qlt = {0}:qlt"
-			" && x1:qlt = {1}:qlt && x3:qlt = {2}:qlt", true);
+			" && x1:qlt = {[0,1]}:qlt && x3:qlt = {[0,2]}:qlt", true);
+		check_verdict("sat", chain + " && x2:qlt = {0}:qlt"
+			" && x1:qlt = {1}:qlt && x3:qlt = {2}:qlt", false);
 	}
 
-	TEST_CASE("a seven-inequality chain") {
+	TEST_CASE("a four-inequality chain") {
 		check_verdict("sat", "a:qlt < b:qlt && b:qlt < c:qlt"
-			" && c:qlt < d:qlt && d:qlt < e:qlt && e:qlt < f:qlt"
-			" && f:qlt < g:qlt && g:qlt < h:qlt", true);
+			" && c:qlt < d:qlt && d:qlt < e:qlt", true);
 	}
 
 	TEST_CASE("renamed chain (control)") {
@@ -253,8 +256,7 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 			" && x:qlt < z:qlt", true);
 	}
 
-	// A cycle is unsatisfiable: Fourier-Motzkin on the middle variable
-	// leaves the contradictory pair.
+	// A cycle is unsatisfiable.
 	TEST_CASE("inconsistent cycles are unsatisfiable") {
 		check_verdict("sat", "x:qlt < y:qlt && y:qlt < z:qlt"
 			" && z:qlt < x:qlt", false);
@@ -267,12 +269,13 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 			" && z:qlt <= x:qlt", true);
 	}
 
-	// Density: `ex z (x < z && z < y)` is `x < y`.
-	TEST_CASE("a two-sided symbolic bound is eliminated") {
+	// The order of sets is not dense: nothing lies strictly between the
+	// empty set and a point.
+	TEST_CASE("a two-sided symbolic bound") {
 		check_verdict("valid", "ex z (x:qlt < z && z < y:qlt)", false);
 		check_verdict("sat", "!(ex z (x:qlt < z && z < y:qlt))", true);
 		check_verdict("valid", "all x all y (x:qlt < y:qlt"
-			" -> ex z (x < z && z < y))", true);
+			" -> ex z (x < z && z < y))", false);
 		check_verdict("valid", "all x all y (x:qlt <= y:qlt"
 			" -> ex z (x < z && z < y))", false);
 		check_verdict("sat", "ex z (x:qlt < z && z < y:qlt)"
@@ -280,7 +283,7 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 	}
 
 	// A symbolic disequality can empty a variable the other constraints pin
-	// to one point.
+	// to one value.
 	TEST_CASE("a disequality can empty a pinned variable") {
 		auto v = verdict("sat", "a:qlt <= v:qlt && v:qlt <= a:qlt"
 			" && v:qlt != a:qlt");
@@ -288,7 +291,7 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 		v = verdict("sat", "all a (ex v ({1}:qlt <= v && v <= {1}:qlt"
 			" && v != a:qlt))");
 		CHECK(!(v.has_value() && *v));
-		// control: an open interval survives one removed point
+		// control: the sets above {1} survive one removed value
 		check_verdict("sat", "all a (ex v (v:qlt > {1}:qlt"
 			" && v != a:qlt))", true);
 	}

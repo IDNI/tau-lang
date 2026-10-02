@@ -151,10 +151,10 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(tau::build_wff_and(indep, kept));
 	}
 
-	// ---- qlt: DLO quantifier elimination (AN-1/AN-10) --------------------
+	// ---- Non-ABA omcat: owner's quantifier elimination (AN-1/AN-10) -------
 	//
-	// A qlt/omcat-typed binder is decided by dense-linear-order interval
-	// computation, not by the squeeze below: the squeeze cannot read an
+	// A binder of a non-aba omcat type is decided by its owner's elimination
+	// over the order, not by the squeeze below: the squeeze cannot read an
 	// ordering atom (`bf_lt` and friends are not squeezable conjuncts), so
 	// without this branch the partition would freeze the component and the
 	// binder would never be decided. Ported from the deleted
@@ -610,6 +610,22 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 			tau::_0_trimmed(type_v)) : tau::_0(type_v);
 		tref f_1 = f ? rewriter::replace<node>(f, var,
 			tau::_1_trimmed(type_v)) : tau::_0(type_v);
+		// With f_0 | f_1 = 1 the positives hold at x = f_0 alone, so in
+		// any Boolean algebra the binder goes by substituting f_0.
+		if (atomic_neqs && f && tau::get(typename tau::traverser(
+			tau::build_bf_or(f_0, f_1)) | bf_reduce_canonical<node>()
+			| tau::traverser::ref).equals_1())
+		{
+			trefs parts{ tau::build_bf_eq_0(tau::build_bf_and(f_0, f_1)) };
+			for (tref neq : neqs) parts.push_back(tau::build_bf_neq_0(
+				rewriter::replace<node>(tau::trim(
+					norm_trimmed_equation<node>(neq)),
+					var, tau::trim(f_0))));
+			TAU_TRY(tref tbnf, term_boole_normal_form<node>(
+				tau::build_wff_and(parts)));
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(tbnf)));
+		}
 		tref out = _T<node>();
 		if (neqs.size()) {
 			tref nneqs = tau::_T();
@@ -732,6 +748,14 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(with_kept(tbnf));
 	}
 	if (!neg.empty() && pack_type_is_atomic<node>(clause_type)) {
+		// The owner's elimination may decide the whole block at once.
+		tref rest = scoped;
+		for (auto v = still_live.rbegin(); v + 1 != still_live.rend(); ++v)
+			rest = build_wff_ex<node>(*v, rest, false);
+		if (auto sat = pack_omcat_qe<node>(clause_type,
+			still_live.front(), rest))
+				return *sat ? r.with_value(with_kept(_T<node>()))
+					: r.with_value(_F<node>());
 		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
 			"negated conjuncts, keeping the block: "
 			<< LOG_FM(scoped) << "\n";)

@@ -93,19 +93,16 @@ template <NodeType node> tref qlt_type();
 template <NodeType node> size_t qlt_type_id();
 
 
-// Type definitions for qlt (Q,<)
-
-
 // -----------------------------------------------------------------------------
-// qlt — the theory (Q, <).
+// qlt — the Boolean algebra of finite unions of intervals of Q.
 //
-// NOTE: qlt is NOT a Boolean algebra.  It is the first-order theory of the
-// dense linear order without endpoints over the rationals, which is
-// ω-categorical (all countable models are isomorphic) and hence admits
-// quantifier elimination.  The project supports it because of ω-categoricity,
-// not because it is a BA.  The C++ implementation uses finite normalised
-// unions of intervals as a convenient representation of definable subsets of
-// Q, but qlt values are rational POINTS, not sets.
+// A qlt value, constant or variable alike, is a SET of rationals: a finite
+// union of intervals with exact rational endpoints, each end open or closed,
+// possibly unbounded (-inf / +inf).  The Boolean operations are union,
+// intersection and complement, 0 is the empty set and 1 is all of Q, and the
+// order `<` is the order of the algebra, strict inclusion.  Every nonzero
+// element lies above an atom (a point it holds), yet an interval is no finite
+// join of atoms.
 //
 // Interval endpoints are exact rationals p/q (long long numerator, positive
 // denominator, reduced by gcd), together with a bound_type flag for each end:

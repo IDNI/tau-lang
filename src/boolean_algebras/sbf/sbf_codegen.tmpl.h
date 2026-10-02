@@ -86,7 +86,7 @@ inline result<std::string> sbf_value_expr(const sbf_ba& v) {
 
 // A self-contained C++ expression of type tref: an IIFE that rebuilds the
 // exact sbf BDD via sbf_value_expr and registers it through the BA's own
-// constant pool, mirroring qlt_witness_expr / bv_witness_expr.
+// constant pool, mirroring qlt_constant_expr / bv_witness_expr.
 template <NodeType node>
 inline result<std::string> sbf_constant_expr(const sbf_ba& v) {
 	result<std::string> r;

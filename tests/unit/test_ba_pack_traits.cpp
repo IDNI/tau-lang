@@ -176,7 +176,8 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 #ifdef TAU_PACK_HAS_BA_QLT
 		const size_t q = qlt_type_id<node_t>();
 		CHECK(pack_type_is_dense_order<node_t>(q));
-		tref zero = pack_zero_constant<node_t>(q);
+		CHECK(pack_zero_constant<node_t>(q) == nullptr);
+		tref zero = pack_dense_order_between<node_t>(q, nullptr, nullptr);
 		tref mid = pack_dense_order_between<node_t>(q, nullptr, nullptr);
 		REQUIRE(zero != nullptr);
 		REQUIRE(mid != nullptr);

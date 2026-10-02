@@ -118,9 +118,9 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 			== ba_descriptor<sbf_ba, mini_node>::type_tree() );
 	}
 
-	TEST_CASE("qlt is classified as a non-aba omcat, unlike qint") {
+	TEST_CASE("qlt is an atomic Boolean algebra, qint an atomless one") {
 		CHECK_FALSE( ba_descriptor<qlt, conv_node>::atomless );
-		CHECK( ba_descriptor<qlt, conv_node>::non_aba_omcat );
+		CHECK_FALSE( ba_descriptor<qlt, conv_node>::non_aba_omcat );
 		CHECK( ba_descriptor<qint, conv_node>::atomless );
 		CHECK_FALSE( ba_descriptor<qint, conv_node>::non_aba_omcat );
 	}
@@ -143,15 +143,15 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		static_assert(ba_has_set_charvar<N, sbf_ba> && !ba_has_set_charvar<N, bv>);
 		static_assert(ba_has_component_factoring<N, tau_t>);
 		static_assert(!ba_has_component_factoring<N, sbf_ba>);
-		static_assert(ba_has_zero_constant<N, bv> && ba_has_zero_constant<N, qlt>);
-		static_assert(!ba_has_zero_constant<N, sbf_ba>);
+		static_assert(ba_has_zero_constant<N, bv>);
+		static_assert(!ba_has_zero_constant<N, sbf_ba> && !ba_has_zero_constant<N, qlt>);
 		static_assert(ba_has_value_constant<N, bv> && ba_has_value_constant<N, sbf_ba>);
 		static_assert(!ba_has_value_constant<N, qlt>);
 		static_assert(ba_has_bool_carrier_type<N, bv> && !ba_has_bool_carrier_type<N, sbf_ba>);
 		static_assert(ba_has_omcat_qe<N, qlt> && ba_has_semantic_pwr<N, qlt>);
 		static_assert(!ba_has_omcat_qe<N, bv> && !ba_has_semantic_pwr<N, bv>);
-		static_assert(ba_has_codegen_witness<N, bv> && ba_has_codegen_witness<N, qlt>);
-		static_assert(!ba_has_codegen_witness<N, sbf_ba>);
+		static_assert(ba_has_codegen_witness<N, bv>);
+		static_assert(!ba_has_codegen_witness<N, sbf_ba> && !ba_has_codegen_witness<N, qlt>);
 		static_assert(ba_has_codegen_constant_expr<N, sbf_ba>);
 		static_assert(ba_has_codegen_constant_expr<N, bv> && ba_has_codegen_constant_expr<N, qlt>);
 		static_assert(!ba_has_codegen_constant_expr<N, hsb>);

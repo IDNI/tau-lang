@@ -38,21 +38,28 @@ TEST_SUITE("qlt: always") {
 	}
 }
 
+// < is strict inclusion: a set lies strictly between {1/4} and [1/4,3/4], none
+// between two points.
 TEST_SUITE("qlt: interval constraints") {
-	TEST_CASE("open interval sat") {
-		tref spec = create_spec("(always o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt).");
+	TEST_CASE("between a point and an interval sat") {
+		tref spec = create_spec("(always o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {[1/4,3/4]}:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
 		CHECK(sat.value());
 	}
-	TEST_CASE("negative open interval sat") {
-		tref spec = create_spec("(always o1[t]:qlt > {-1}:qlt && o1[t]:qlt < {0}:qlt).");
+	TEST_CASE("between two points unsat") {
+		tref spec = create_spec("(always o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt).");
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(!sat.value());
+	}
+	TEST_CASE("between a point and a negative interval sat") {
+		tref spec = create_spec("(always o1[t]:qlt > {-1}:qlt && o1[t]:qlt < {[-1,0)}:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
 		CHECK(sat.value());
 	}
 	TEST_CASE("degenerate open interval unsat") {
-		// (x > 1/2) && (x < 1/2) is empty in DLO
 		tref spec = create_spec("(always o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {1/2}:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
@@ -70,15 +77,19 @@ TEST_SUITE("qlt: sometimes") {
 }
 
 TEST_SUITE("qlt: always and sometimes") {
-	TEST_CASE("always positive sometimes below one sat") {
-		// can always be 1/2, which is > 0 and < 1
-		tref spec = create_spec("(always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {1}:qlt).");
+	TEST_CASE("always above a point sometimes below an interval sat") {
+		tref spec = create_spec("(always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {[0,1]}:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
 		CHECK(sat.value());
 	}
+	TEST_CASE("always above a point sometimes below another unsat") {
+		tref spec = create_spec("(always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {1}:qlt).");
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(!sat.value());
+	}
 	TEST_CASE("always half conflicts sometimes above three-quarter unsat") {
-		// always = 1/2, but 1/2 is not > 3/4
 		tref spec = create_spec("(always o1[t]:qlt = {1/2}:qlt) && (sometimes o1[t]:qlt > {3/4}:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
@@ -88,7 +99,7 @@ TEST_SUITE("qlt: always and sometimes") {
 
 TEST_SUITE("qlt: loopback") {
 	TEST_CASE("strictly increasing sat") {
-		// In DLO, an infinite strictly increasing sequence exists
+		// {0}, {0, 1}, {0, 1, 2}, ... increases strictly forever
 		tref spec = create_spec("(always o1[t]:qlt > o1[t-1]:qlt).");
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());

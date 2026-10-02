@@ -16,24 +16,13 @@
 // so it is safe here; needed for `result<...>` before ltl_aba_result.h.
 #include "tau_diagnostics.h"
 #include "ltl_aba_result.h"
-#include "solver_types.h"
 
 namespace idni::tau_lang {
 
-// Defined in the qlt_qe / qlt_solver templates this file includes at its end;
+// Defined in the templates this file includes at its end;
 // declared here so the descriptor's own definition context can name them.
 template <NodeType node>
 static std::optional<bool> qlt_omcat_qe(tref var, tref body);
-
-template <NodeType node>
-static tref qlt_dlo_fm_residual(tref var, tref body);
-
-template <NodeType node>
-static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
-	const inequality_system<node>& sys, const solver_options& options);
-
-template <NodeType node>
-static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
 
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_constant_expr(tref cst);
@@ -45,9 +34,34 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 template <NodeType node>
 result<tref> qlt_semantic_pwr_optimal(tref clause, tref update);
 
-template <NodeType node>
+/**
+ * @brief Compare two qlt singleton constants: -1/0/+1, or nullopt if either
+ * side is not a finite qlt singleton.
+ */
+template<NodeType node>
 static std::optional<int> qlt_singleton_cmp(
-	const tree<node>& c1, const tree<node>& c2);
+	const tree<node>& c1, const tree<node>& c2)
+{
+	if (!c1.is_ba_constant() || !c2.is_ba_constant()) return {};
+	auto v1 = c1.get_ba_constant();
+	auto v2 = c2.get_ba_constant();
+	if (!std::holds_alternative<qlt>(v1) || !std::holds_alternative<qlt>(v2))
+		return {};
+	const auto& q1 = std::get<qlt>(v1);
+	const auto& q2 = std::get<qlt>(v2);
+	if (q1.pieces.size() != 1 || q2.pieces.size() != 1) return {};
+	const auto& p1 = q1.pieces[0];
+	const auto& p2 = q2.pieces[0];
+	if (p1.lo.val != p1.hi.val || p2.lo.val != p2.hi.val) return {};
+	if (p1.lo.bound != qlt_bound::CLOSED || p1.hi.bound != qlt_bound::CLOSED)
+		return {};
+	if (p2.lo.bound != qlt_bound::CLOSED || p2.hi.bound != qlt_bound::CLOSED)
+		return {};
+	if (!p1.lo.val.is_finite() || !p2.lo.val.is_finite()) return {};
+	if (p1.lo.val < p2.lo.val) return -1;
+	if (p1.lo.val > p2.lo.val) return +1;
+	return 0;
+}
 
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
@@ -60,9 +74,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/** @brief The 64-bit content hash: std::hash<qlt> keeps 32 bits on wasm32. */
 	static std::uint64_t hash_constant(const qlt& x) { return qlt_hash(x); }
 
-	/** @brief qlt is ω-categorical but not a Boolean algebra. */
+	/**
+	 * @brief qlt values are sets of rationals: every nonzero element lies
+	 * above an atom (any point it holds), so the algebra is not atomless.
+	 */
 	static constexpr bool atomless = false;
-	static constexpr bool non_aba_omcat = true;
+	static constexpr bool non_aba_omcat = false;
 
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
@@ -173,22 +190,6 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief The singleton `{0}`, wrapped as a bf constant.
-	 *
-	 * A dense linear order has no bottom element, so qlt's default is the
-	 * finite rational 0 rather than bf_f.
-	 */
-	static tref zero_constant(size_t ba_type) {
-		qlt z;
-		qlt_piece p;
-		p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
-		p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
-		z.pieces.push_back(p);
-		return tau::get(tau::bf, { tau::get_ba_constant(
-			typename node_t::constant(z), ba_type) });
-	}
-
-	/**
 	 * @brief The order of two qlt singleton constants. `0` and `1` are the
 	 * order's sentinels below and above every point, not points, so they
 	 * compare as nothing here.
@@ -247,32 +248,16 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief Decide a quantifier over a qlt variable by DLO elimination,
-	 * or, without ordering atoms, by excluded values and point instances
-	 * (see qlt_omcat_qe).
-	 *
-	 * Answers satisfiability rather than the satisfying interval, which stays
-	 * qlt's own: nullopt says neither decides the body, and core falls
+	 * @brief Decide a quantifier over a qlt variable: exactly when the
+	 * quantified formula is closed (see qlt_decide_closed), and `ex` of a
+	 * body that only excludes values; nullopt otherwise, and core falls
 	 * through to its generic path.
 	 */
 	static std::optional<bool> omcat_qe(tref var, tref body) {
 		return qlt_omcat_qe<node_t>(var, body);
 	}
 
-	/**
-	 * @brief Eliminate an existential qlt variable bounded on both sides
-	 * by other terms (Fourier-Motzkin for a dense order).
-	 */
-	static tref omcat_qe_residual(tref var, tref body) {
-		return qlt_dlo_fm_residual<node_t>(var, body);
-	}
-
-	/** @brief A rational witness for @p var, spelled for generated C++. */
-	static std::optional<std::string> codegen_witness(tref var, tref conj) {
-		return qlt_codegen_witness<node_t>(var, conj);
-	}
-
-	/** @brief @p cst's own rational, spelled for generated C++. */
+	/** @brief @p cst's own set, spelled for generated C++. */
 	static std::optional<std::string> codegen_constant_expr(tref cst) {
 		return qlt_codegen_constant_expr<node_t>(cst);
 	}
@@ -292,21 +277,11 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static result<tref> semantic_pwr_optimal(tref clause, tref update) {
 		return qlt_semantic_pwr_optimal<node_t>(clause, update);
 	}
-
-	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */
-	static std::optional<solution<node_t>> omcat_solve_inequality_system(
-		const inequality_system<node_t>& sys,
-		const solver_options& options)
-	{
-		return qlt_omcat_solve_inequality_system<node_t>(sys, options);
-	}
 };
 
 } // namespace idni::tau_lang
 
-#include "boolean_algebras/qlt/qlt_ba_hooks_ext.tmpl.h"
 #include "boolean_algebras/qlt/qlt_qe.tmpl.h"
-#include "boolean_algebras/qlt/qlt_solver.tmpl.h"
 #include "boolean_algebras/qlt/qlt_codegen.tmpl.h"
 #include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
 #include "boolean_algebras/qlt/qlt_semantic_pwr.tmpl.h"

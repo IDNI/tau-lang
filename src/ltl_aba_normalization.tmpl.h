@@ -206,23 +206,22 @@ static void ocltl_swap_crosscheck(tref fm, bool solver_result) {
 	}
 }
 
-// ── LT-4: joint satisfiability of a conjunction of qlt order atoms ───────────
+// ── LT-4: joint satisfiability of a conjunction of order atoms ───────────────
 //
-// `aba_existential_feasible`'s qlt fast path eliminates each free variable
-// SEPARATELY against the original formula, and `qlt_dlo_qe` only detects a
-// contradiction when the same subtree bounds the eliminated variable from both
-// sides.  A transitivity chain over three or more variables —
-// `o1 < o2 ∧ o2 < o3 ∧ ¬(o1 < o3)` — therefore survives every single
-// elimination while being jointly UNSAT, so the oracle passes an infeasible
-// strategy edge and the specification comes back falsely REALIZABLE.
+// `aba_existential_feasibility`'s fast path for a non-aba omcat type
+// eliminates each free variable SEPARATELY against the original formula, and
+// an owner's per-variable elimination only detects a contradiction when the
+// same subtree bounds the eliminated variable from both sides.  A transitivity
+// chain over three or more variables — `o1 < o2 ∧ o2 < o3 ∧ ¬(o1 < o3)` —
+// therefore survives every single elimination while being jointly UNSAT, so the
+// oracle passes an infeasible strategy edge and the specification comes back
+// falsely REALIZABLE.
 //
-// `qlt_dlo_qe`'s API returns an interval, not a residual formula, so the
-// "eliminate sequentially, substituting the residual" variant of the fix is not
-// available.  Instead: qlt's comparisons are a dense linear order, and a
-// conjunction of order literals over one is unsatisfiable exactly when the
-// implied ≤-graph contains a cycle carrying at least one strict edge.  Build
-// that graph over the atoms' operand subtrees — structurally equal operands are
-// interned to the same tref, so identity is the right key — and close it.
+// Such an order is linear, and a conjunction of order literals over one is
+// unsatisfiable exactly when the implied ≤-graph contains a cycle carrying at
+// least one strict edge.  Build that graph over the atoms' operand subtrees —
+// structurally equal operands are interned to the same tref, so identity is
+// the right key — and close it.
 //
 // The check is ONE-DIRECTIONAL by construction: `true` means "provably UNSAT",
 // `false` means only "not proven UNSAT".  Disjunctions, `≠` literals and order
@@ -234,14 +233,13 @@ template <NodeType node>
 static bool qlt_order_conj_unsat(tref fm) {
 	using tau = tree<node>;
 
-	// Term identity MUST be structural, not tref identity.  `o1[t]:qlt`
-	// occurring in `o1 < o2` and again in `!(o1 < o3)` is the same term but not
+	// Term identity MUST be structural, not tref identity.  `o1[t]` occurring
+	// in `o1 < o2` and again in `!(o1 < o3)` is the same term but not
 	// necessarily the same tref — that is exactly why the codebase carries
 	// `subtree_map` / `subtree_set` (see extract_data_atoms' "structural
-	// equality (subtree_equals)" note, and `qlt_dlo_qe`, which only detects
-	// `fv < var && var < fv` across two atoms because its endpoint sets are
-	// `subtree_set`).  Keying by raw tref turned the three chain variables into
-	// six disconnected graph nodes, so no cycle could ever close.
+	// equality (subtree_equals)" note).  Keying by raw tref turned the three
+	// chain variables into six disconnected graph nodes, so no cycle could
+	// ever close.
 	std::vector<tref> terms;
 	subtree_map<node, int> term_idx;
 	auto idx_of = [&](tref n) -> int {
@@ -276,8 +274,8 @@ static bool qlt_order_conj_unsat(tref fm) {
 		}
 		if (op == tau::wff) { walk(t[0].first(), neg); return; }
 
-		// Order atoms only.  An atom whose BA type is known and is NOT in the
-		// omcat/qlt family is skipped; an atom whose type cannot be determined
+		// Order atoms only.  An atom whose BA type is known and is not a
+		// non-aba omcat type is skipped; an atom whose type cannot be determined
 		// still participates, since operands only ever join the graph when
 		// they are the same subtree and a strict-order cycle is a
 		// contradiction in any linearly ordered BA.

@@ -2296,22 +2296,18 @@ using tau = tree<node>;
 					if (pre.value() != n) return pre.value();
 				}
 				excluded.insert(n);
-			} else if (pack_type_is_non_aba_omcat<node>(
-					tau::get(var).get_ba_type())) {
-				// A non-ABA omega-categorical theory (e.g. qlt, a dense
-				// linear order over the rationals) is decided by the
-				// owning BA's own quantifier elimination, not by the
-				// atomless-BA path above, which cannot reason about
-				// ordering atoms. Only a closed scope can be settled to
-				// T/F here.
-				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty()) {
-					if (auto sat = pack_omcat_qe<node>(
-						tau::get(var).get_ba_type(), var, n);
-						sat)
-							return *sat ? tau::_T() : tau::_F();
-					// Undetermined: fall through to general solver
-				} else excluded.insert(n);
+			} else if (const size_t var_type = tau::get(var).get_ba_type();
+				get_free_vars<node>(n).empty()) {
+				// A closed scope the owning BA's own quantifier
+				// elimination decides settles to T/F here; undetermined
+				// falls through to the general solver.
+				if (auto sat = pack_omcat_qe<node>(var_type, var, n); sat)
+					return *sat ? tau::_T() : tau::_F();
+			} else if (pack_type_is_non_aba_omcat<node>(var_type)) {
+				// A non-ABA omega-categorical theory reasons about
+				// ordering atoms the atomless-BA path above cannot, so
+				// an open scope is left to it.
+				excluded.insert(n);
 			}
 		}
 		return n;

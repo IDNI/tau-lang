@@ -153,7 +153,8 @@ static bool alg_b_realizable(const char* s) {
 // With TAU_LTL_ALG set to `alg`, qlt's propositional synthesis declines a
 // full-LTL formula over an input atom (neither A nor D encodes inputs, and
 // B is not the requested algorithm), and the default ABA-oracle path still
-// decides it REALIZABLE. Returns {declined, realizable}.
+// decides it: UNREALIZABLE, since the input may be 1. Returns {declined,
+// realizable}.
 static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
 	setenv("TAU_LTL_ALG", alg, 1);
 	bdd_init<Bool>();
@@ -185,14 +186,13 @@ TEST_SUITE("[Algorithm B: integration]") {
 		CHECK(alg_b_realizable("G F (o1[t]:qlt > {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-B-13] G(o1 > i1) REALIZABLE: input-variable, system tracks input type") {
-		// System always picks y > x.  P_σ lets system observe x's T₁ type.
-		CHECK(alg_b_realizable("G (o1[t]:qlt > i1[t]:qlt)."));
+	// < is strict inclusion: nothing lies above the input 1.
+	TEST_CASE("[ALG-B-13] G(o1 > i1) UNREALIZABLE: the input may be 1") {
+		CHECK_FALSE(alg_b_realizable("G (o1[t]:qlt > i1[t]:qlt)."));
 	}
 
-	TEST_CASE("[ALG-B-14] G(o1 > i1[t-1]) REALIZABLE: output > previous input") {
-		// System always picks y > prev_x.
-		CHECK(alg_b_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
+	TEST_CASE("[ALG-B-14] G(o1 > i1[t-1]) UNREALIZABLE: the input may be 1") {
+		CHECK_FALSE(alg_b_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
 	}
 
 	TEST_CASE("[ALG-B-15] G(o1>i1) && G(o1<i1) UNREALIZABLE: o1>i1 and o1<i1 simultaneously") {
@@ -213,7 +213,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 	{
 		auto [declined, realizable] = qlt_driver_declines_input_atom("A");
 		CHECK(declined);
-		CHECK(realizable);
+		CHECK_FALSE(realizable);
 	}
 
 	TEST_CASE("[ALG-B-18] TAU_LTL_ALG=D declines a formula with an input atom"
@@ -221,7 +221,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 	{
 		auto [declined, realizable] = qlt_driver_declines_input_atom("D");
 		CHECK(declined);
-		CHECK(realizable);
+		CHECK_FALSE(realizable);
 	}
 
 	TEST_CASE("[ALG-B-19] input lookback still routes through P-bit encoding") {
@@ -235,7 +235,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 			result = r.value();
 		}
 		unsetenv("TAU_LTL_ALG");
-		CHECK(result);
+		CHECK_FALSE(result);
 	}
 }
 

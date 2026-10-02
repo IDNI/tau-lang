@@ -119,42 +119,35 @@ add_repl_test(solver_cmd-qlt-solve_system-relational
 
 add_repl_test(solver_cmd-qlt-solve-neq0
 	"solve x : qlt != 0." "solution: \\{") # qlt.cpp:105-107
-# The typed 0 and 1 are the ends of the qlt order, not points, so `x != 0`
-# and `x != 1` constrain nothing and every mode solves them.
-add_repl_test(solver_cmd-qlt-solve-neq0-min
-	"solve --min (x : qlt != 0)." "solution: \\{") # qlt.cpp:108
+# The typed 0 and 1 are the empty set and all of Q: no nonzero set is least,
+# and no proper one greatest.
 add_repl_test(solver_cmd-qlt-solve-neq0-max
 	"solve --max (x : qlt != 0)." "solution: \\{") # qlt.cpp:109
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1
 	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{") # qlt.cpp:112-114
-add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
-	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:115
-add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
-	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:116
 add_repl_test(solver_cmd-qlt-solve-two_vars
 	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:119-121
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
 	"solve x : qlt = 0 && x : qlt != 0." "no solution") # qlt.cpp:124-126
 
-# Regression: <= normalizes to a negated ordering atom (bf_nlteq); the omcat
-# gate must still route it to qlt's own solver instead of falling through to
-# the ABA solve_inequality_system, which cannot handle ordering atoms and
-# used to abort the process.
+# The order is inclusion: x lies between {0} and [0,1], and no set lies
+# strictly below the point {0} but the empty one.
 add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
-	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{") # qlt.cpp:130-133
-
-# Relations between qlt variables are solved jointly: the model satisfies them
-# and a satisfiable chain has a solution.
+	"solve {0}:qlt <= x:qlt && x:qlt <= {[0,1]}:qlt." "x := \\{ \\[0, 1\\] \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-strict_pair
-	"solve x:qlt < y:qlt" "y := \\{ 1 \\}:qlt")
+	"solve x:qlt < y:qlt" "x := \\{ bot \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-strict_pair_reversed
-	"solve y:qlt < x:qlt" "x := \\{ 1 \\}:qlt")
+	"solve y:qlt < x:qlt" "x := \\{ top \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-increasing_chain
-	"solve x:qlt < y:qlt && y:qlt < z:qlt" "z := \\{ 2 \\}:qlt")
+	"solve x:qlt < y:qlt && y:qlt < z:qlt" "z := \\{ top \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-decreasing_chain
-	"solve z:qlt < y:qlt && y:qlt < x:qlt" "x := \\{ 2 \\}:qlt")
+	"solve z:qlt < y:qlt && y:qlt < x:qlt" "x := \\{ top \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-bounded_chain
-	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "x := \\{ -1 \\}:qlt")
+	"solve x:qlt < y:qlt && y:qlt < {[0,1]}:qlt" "x := \\{ bot \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-below_point_chain
+	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "no solution")
+add_repl_test(solver_cmd-qlt-solve-proper_subset
+	"solve x:qlt != 0 && x:qlt' != 0." "x := \\{ \\(0, 1\\) \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-inconsistent_cycle
 	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution")
 

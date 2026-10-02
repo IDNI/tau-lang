@@ -326,15 +326,9 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 #endif // TAU_PACK_HAS_BA_BV
 }
 
-// AN-1: qlt_dlo_qe records free-variable (symbolic) endpoints only for
-// contradiction detection; absent a contradiction it still returns its `top`
-// accumulator as a *determined* interval.  The old leaf elimination accepted
-// that verdict unconditionally, so `ex x (a < x && x < b)` with free a, b was
-// rewritten to T -- but over Q the truth is `a < b`, false at a = b.
-// resolve_quantifiers' omcat branch already gates on a closed scope; the
-// leaf-clause call site (eliminate_block_over_clause's qlt/DLO branch) keeps
-// the binder when an ordering atom survives an undetermined interval, unless
-// the owning BA eliminates it into a residual formula.
+// AN-1: a qlt variable is a set and `<` is strict inclusion, so with free a, b
+// `ex x (a < x && x < b)` asks for at least two values between a and b: no
+// formula over a and b alone is to be invented, and the binder stays.
 #ifdef TAU_PACK_HAS_BA_QLT
 TEST_SUITE("AN-1 symbolic qlt bounds") {
 
@@ -343,18 +337,17 @@ TEST_SUITE("AN-1 symbolic qlt bounds") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( !tau::get(res).equals_T() );
-		// Density eliminates the binder exactly, leaving `a < b`.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
-			== nullptr );
-		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>)
 			!= nullptr );
 	}
 
 	TEST_CASE("closed qlt scope is still resolved (AN-1 control)") {
-		const char* sample = "ex x:qlt ({1/4}:qlt < x && x < {3/4}:qlt).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm).value();
-		CHECK( tau::get(res).equals_T() );
+		tref fm = get_nso_rr("ex x:qlt ({1/4}:qlt < x "
+			"&& x < {[1/4,3/4]}:qlt).").value().main->get();
+		CHECK( tau::get(anti_prenex<node_t>(fm).value()).equals_T() );
+		fm = get_nso_rr("ex x:qlt ({1/4}:qlt < x && x < {3/4}:qlt).")
+			.value().main->get();
+		CHECK( tau::get(anti_prenex<node_t>(fm).value()).equals_F() );
 	}
 }
 #endif // TAU_PACK_HAS_BA_QLT

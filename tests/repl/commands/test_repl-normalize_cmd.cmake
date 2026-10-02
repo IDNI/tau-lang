@@ -177,20 +177,20 @@ add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 
-# GitHub #188: the typed 0 and 1 of qlt are the ends of the order, not points,
-# so a point variable never equals either; every path (the equality hook, the
-# substitution heuristic, the interval collector) agrees.
+# GitHub #188: the typed 0 and 1 of qlt are the empty set and all of Q, values
+# a qlt variable may take like any other.
 add_repl_test(normalize_cmd-qlt_end_is_no_point_ex
 	"normalize ex x:qlt (x = 1 && all y:qlt (y < x))" ": F")
 add_repl_test(normalize_cmd-qlt_end_is_no_point_all
 	"normalize all x:qlt (x < 1) && ex y:qlt (y = 1)" ": F")
-add_repl_test(normalize_cmd-qlt_var_eq_end "normalize x:qlt = 1" ": F")
-add_repl_test(normalize_cmd-qlt_var_neq_end "normalize x:qlt != 0" ": T")
-add_repl_test(normalize_cmd-qlt_all_below_end "normalize all x:qlt (x < 1)" ": T")
+add_repl_test(normalize_cmd-qlt_var_eq_end "normalize x:qlt = 1" ": x' = 0")
+add_repl_test(normalize_cmd-qlt_var_neq_end "normalize x:qlt != 0" ": x != 0")
+add_repl_test(normalize_cmd-qlt_all_below_end "normalize all x:qlt (x < 1)" ": F")
+add_repl_test(normalize_cmd-qlt_all_at_most_end "normalize all x:qlt (x <= 1)" ": T")
+add_repl_test(normalize_cmd-qlt_ex_eq_ends "normalize ex x:qlt (x = 0) && ex y:qlt (y = 1)" ": T")
 
 # GitHub #189: a closed conjunct that does not mention the variable under
-# elimination (here the inner scope, folded to `ex z F`) is not dropped by the
-# interval collector; the outer closed scope declines instead of reading T.
+# elimination is not dropped.
 add_repl_test(normalize_cmd-qlt_closed_conjunct_not_dropped
 	"normalize ex x:qlt ex z:qlt all w:qlt ((x != w && (x > w || z > x) && z >= x) || (x = w && z < x))" ": F")
 add_repl_test(normalize_cmd-qlt_nested_equiv_valid
@@ -198,11 +198,10 @@ add_repl_test(normalize_cmd-qlt_nested_equiv_valid
 add_repl_test(normalize_cmd-qlt_nested_xor_unsat
 	"normalize ex x:qlt ex z:qlt all w:qlt (((x != w) && ((x > w) || (z > x))) ^^ (z < x))" ": F")
 
-# GitHub #187: a compound term holding a qlt variable is no bound on it, so the
-# interval collector declines `(x & {3}) < {1}` instead of reading it as
-# `x < {1}` and contradicting `x > {5}`; the binder stays.
+# GitHub #187: a compound term holding a qlt variable is no bound on it:
+# x & {3} = 0 lies strictly below {1} while x contains {5} and more.
 add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
-	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")
+	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": T")
 
 # GitHub #183: Boole's elimination law does not hold for arithmetic, so a
 # bitvector variable under `-` keeps its binder for the solver paths
@@ -235,8 +234,8 @@ add_repl_test(normalize_cmd-issue185_juxtaposed_min_printed
 add_repl_test(normalize_cmd-issue185_juxtaposed_min_sat
 	"sat x:bv[2] min(x:bv[2], {2}:bv[2]) = {2}:bv[2]." "%1[^%]*: T")
 
-# GitHub #148: a disequality next to a qlt variable pinned to one value is kept,
-# not dropped as harmless over a dense order.
+# GitHub #148: a disequality next to a qlt variable pinned to one value is kept:
+# the pin is substituted for the variable.
 add_repl_test(normalize_cmd-qlt_pinned_neq_sat
 	"sat a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" ": F")
 add_repl_test(normalize_cmd-qlt_pinned_neq_valid
@@ -258,13 +257,13 @@ add_repl_test(normalize_cmd-fex_binder_solve
 add_repl_test(normalize_cmd-fex_equals_body
 	"normalize (fex y (x & y)) = x" ": T")
 
-# GitHub #148 follow-up: disequalities beside one lower and one upper bound are
-# eliminated by density, ex x (L <= x <= U && x != c) being
-# L < U || (L = U && L != c), and L < U when a bound is strict.
+# GitHub #148 follow-up: disequalities beside a lower and an upper bound. In
+# the order of sets ex x (L <= x <= U && x != c) is L < U || (L = U && L != c);
+# with free bounds the binder stays, a closed formula is decided.
 add_repl_test(normalize_cmd-qlt_density_residual
-	"normalize ex x:qlt (a:qlt <= x && x <= b:qlt && x != c:qlt)" ": a < b \\|\\| a = b && [ab] != c")
+	"normalize ex x:qlt (a:qlt <= x && x <= b:qlt && x != c:qlt)" ": ex b1 ")
 add_repl_test(normalize_cmd-qlt_density_strict
-	"normalize ex x:qlt (a:qlt < x && x <= b:qlt && x != c:qlt && x != d:qlt)" ": a < b\n")
+	"normalize ex x:qlt (a:qlt < x && x <= b:qlt && x != c:qlt && x != d:qlt)" ": ex b1 ")
 add_repl_test(normalize_cmd-qlt_density_closed_some
 	"normalize ex a:qlt ex b:qlt ex x:qlt (a <= x && x <= b && x != a && x != b)" ": T")
 add_repl_test(normalize_cmd-qlt_density_closed_all
@@ -293,9 +292,8 @@ add_repl_test(normalize_cmd-tau_absolute_time_one "set charvar off. normalize { 
 add_repl_test(normalize_cmd-tau_absolute_time_fixed_point_zero "set charvar off. normalize { (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0) }:tau = 0" ": F")
 add_repl_test(normalize_cmd-tau_absolute_time_constraint_zero "set charvar off. normalize { (always ([t < 2] -> i1[t] = 0)) && (always ((o4[t-2] = 1 && o1[t] = o4[t-2]) -> o1[t] = 1)) }:tau = 0" ": F")
 
-# GitHub #197: a point is an atom, so a qlt variable met by one point p only as
-# `p & y` and `p & y'` has two cases, y containing p or not, and no value makes
-# both meets nonzero.
+# GitHub #197: a point is an atom, so no set y meets both {3} and its
+# complement inside {3}; an interval, or two points, splits.
 add_repl_test(normalize_cmd-qlt_point_meet_ex
 	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0))" ": F")
 add_repl_test(normalize_cmd-qlt_point_meet_valid
@@ -310,7 +308,6 @@ add_repl_test(normalize_cmd-qlt_point_meet_subst_same
 	"normalize (({3}:qlt & {3}:qlt) != 0) && (({3}:qlt & {3}:qlt') != 0)" ": F")
 add_repl_test(normalize_cmd-qlt_point_meet_subst_other
 	"normalize (({3}:qlt & {5}:qlt) != 0) && (({3}:qlt & {5}:qlt') != 0)" ": F")
-# A point witness decides an existential, a point counterexample a universal.
 add_repl_test(normalize_cmd-qlt_interval_meet_ex
 	"normalize ex y:qlt ((({[0,1]}:qlt & y) != 0) && (({[0,1]}:qlt & y') != 0))" ": T")
 add_repl_test(normalize_cmd-qlt_interval_meet_all
@@ -323,19 +320,37 @@ add_repl_test(normalize_cmd-qlt_point_interval_meet_ex
 	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({[0,1]}:qlt & y') != 0))" ": T")
 add_repl_test(normalize_cmd-qlt_point_interval_meet_all
 	"normalize all y:qlt ((({3}:qlt & y) = 0) || (({[0,1]}:qlt & y') = 0))" ": F")
-# qlt has atoms, so a block is not distributed over its disequations: with no
-# point witness the binder stays rather than answering T.
-add_repl_test(normalize_cmd-qlt_two_points_meet_kept
-	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y) != 0))" ": ex b1 ")
-add_repl_test(normalize_cmd-qlt_point_meet_open_kept
-	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0) && ((x:qlt & y) != 0))" ": ex b1 ")
-# An ordering atom stays with the interval computation.
-add_repl_test(normalize_cmd-qlt_point_meet_order_kept
-	"normalize ex y:qlt (y > {5}:qlt && ({3}:qlt & y) = 0)" ": ex b1 ")
+add_repl_test(normalize_cmd-qlt_two_points_meet_both
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({5}:qlt & y) != 0))" ": T")
+add_repl_test(normalize_cmd-qlt_two_points_split_three
+	"normalize ex x:qlt ex y:qlt ex z:qlt (((({3}:qlt|{5}:qlt) & x) != 0) && ((({3}:qlt|{5}:qlt) & y) != 0) && ((({3}:qlt|{5}:qlt) & z) != 0) && (x & y) = 0 && (x & z) = 0 && (y & z) = 0)" ": F")
+add_repl_test(normalize_cmd-qlt_interval_split_three
+	"normalize ex x:qlt ex y:qlt ex z:qlt ((({(0,1)}:qlt & x) != 0) && (({(0,1)}:qlt & y) != 0) && (({(0,1)}:qlt & z) != 0) && (x & y) = 0 && (x & z) = 0 && (y & z) = 0)" ": T")
+# Conjuncts on y alone that no y satisfies refute the scope whatever x is.
+add_repl_test(normalize_cmd-qlt_point_meet_open
+	"normalize ex y:qlt ((({3}:qlt & y) != 0) && (({3}:qlt & y') != 0) && ((x:qlt & y) != 0))" ": F")
+add_repl_test(normalize_cmd-qlt_point_meet_order
+	"normalize ex y:qlt (y > {5}:qlt && ({3}:qlt & y) = 0)" ": T")
+# The order of sets: {1} < x < {[0,3]} holds for x = {0, 1}, nothing lies
+# strictly between {1} and {3}, and 1 is above every other set.
+add_repl_test(normalize_cmd-qlt_order_is_inclusion_const
+	"normalize {1}:qlt < {3}:qlt" ": F")
+add_repl_test(normalize_cmd-qlt_order_is_inclusion_interval
+	"normalize {1}:qlt < {[0,3]}:qlt" ": T")
+add_repl_test(normalize_cmd-qlt_order_between_sets
+	"normalize ex x:qlt ({1}:qlt < x && x < {[0,3]}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_order_between_points
+	"normalize ex x:qlt ({1}:qlt < x && x < {3}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_vars
+	"normalize ex x:qlt ex y:qlt (x & y' = 0 && x != y)" ": T")
+add_repl_test(normalize_cmd-qlt_order_vars_expand
+	"normalize x:qlt < y:qlt" ": xy' = 0 && (y != x|x != y)")
+add_repl_test(normalize_cmd-qlt_ex_interval_value
+	"normalize ex x:qlt (x = {[0,1]}:qlt)" ": T")
 add_repl_test(normalize_cmd-qlt_point_meet_order_empty
 	"normalize ex y:qlt (y < {1}:qlt && y > {5}:qlt && ({3}:qlt & y) != 0)" ": F")
-# Without the atomless law a qlt disequation still decides: excluding finitely
-# many values leaves one, and the necessary condition's F stands.
+# Excluding finitely many values leaves one, and Boole's necessary condition's
+# F stands.
 add_repl_test(normalize_cmd-qlt_excluded_values_ex
 	"normalize ex o:qlt (o != {[0,1]}:qlt && o != i:qlt)" ": T")
 add_repl_test(normalize_cmd-qlt_excluded_vars_ex
