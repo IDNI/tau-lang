@@ -672,21 +672,18 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// split per `preprocessing` setting) there is nothing else to key on.
 	// nullopt is cached too: a formula the translator rejects gets rejected the
 	// same way every time, and re-deriving that costs a full tree walk.
-	// A query that ran out of its time budget is remembered as such, so a
-	// later ask notes the budget again instead of reading a bare unknown.
-	using cache_t = std::unordered_map<tref,
-		std::pair<std::optional<bv_sat_status>, bool>>;
+	// An unknown left by a spent time budget is not: it is an answer of that
+	// budget, not of the formula, and a later ask under a fresh budget must
+	// decide again. While the budget stays spent, the check below answers
+	// without the cache.
+	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	tref key = tau::trim_right_sibling(form);
-	if (auto it = cache.find(key); it != end(cache)) {
-		if (it->second.second)
-			note_time_budget_exhausted(bv_solve_timeout_message());
-		return it->second.first;
-	}
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
 	bool ran_out = false;
 	auto memo = [&key, &ran_out](std::optional<bv_sat_status> r) {
-		return cache.emplace(key, std::pair{ r, ran_out }).first
-			->second.first;
+		if (!ran_out) cache.emplace(key, r);
+		return r;
 	};
 #else
 	bool ran_out = false;

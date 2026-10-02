@@ -149,12 +149,6 @@ TEST_SUITE("bv width completion") {
 	}
 }
 
-#ifdef TAU_CACHE
-constexpr bool tau_cache_enabled = true;
-#else
-constexpr bool tau_cache_enabled = false;
-#endif
-
 TEST_SUITE("bv solver budgets and declines") {
 
 	static tref closed_form(const char* sample) {
@@ -193,12 +187,10 @@ TEST_SUITE("bv solver budgets and declines") {
 		CHECK( !st.has_value() );
 	}
 
-	// Under TAU_CACHE the spent budget is cached with the formula and noted
-	// again on every later ask, so the last check fails there. Kept last in
-	// the suite: that note leaves every later bv question unknown.
-	TEST_CASE("a shared budget already spent leaves the question unknown"
-		* doctest::should_fail(tau_cache_enabled))
-	{
+	// The unknown of a spent budget answers for that budget only: the
+	// formula is decided again once the scope closes, and nothing of the
+	// scope's budget reaches a later question.
+	TEST_CASE("a shared budget already spent leaves the question unknown") {
 		tref fm = closed_form(
 			"ex x:bv[8] (x + { 3 }:bv[8] = { 5 }:bv[8]).");
 		{
@@ -208,6 +200,10 @@ TEST_SUITE("bv solver budgets and declines") {
 			CHECK( scope.ran_out() );
 		}
 		CHECK( bv_formula_sat_status<node_t>(fm) == bv_sat_status::sat );
+		CHECK( time_budget_exhausted().empty() );
+		CHECK( bv_formula_sat_status<node_t>(closed_form(
+			"ex x:bv[8] (x + { 4 }:bv[8] = { 5 }:bv[8])."))
+			== bv_sat_status::sat );
 	}
 }
 
