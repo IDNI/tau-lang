@@ -41,7 +41,7 @@ function(tau_js_add_target target output_name suffix extra_link_options wrapper)
 	target_include_directories(${target} PRIVATE
 		"${CMAKE_SOURCE_DIR}/src"
 		"${CMAKE_SOURCE_DIR}/parser"
-		"${CMAKE_SOURCE_DIR}/external/parser/src"
+		${TAU_PARSER_SOURCE_INCLUDE}
 		"${TAU_PACK_INCLUDE_DIR}"
 		"${TAU_GENERATED_PARSER_DIR}")
 	target_link_libraries(${target} PRIVATE
