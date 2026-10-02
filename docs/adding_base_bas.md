@@ -123,6 +123,17 @@ without atoms (`pack_type_is_atomic`). It keeps that law's `F`, which holds in
 any Boolean algebra, asks your `omcat_qe` otherwise, and keeps the binder
 when neither decides.
 
+Declare `non_aba_omcat = true` only for a theory whose variables denote
+points of an ω-categorical structure rather than elements of a Boolean
+algebra, its constants being sets of such points (qlt). Core then hands every
+binder of your type to `omcat_qe` and `omcat_qe_residual`, and keeps the
+binder when both decline: no Boolean-algebra law reaches it, since
+`ex x (x = c)`, for one, holds only when `c` is a point. `solve` asks your
+`omcat_solve_inequality_system` for every system of your type, in every mode,
+and both `solve` and the substitution heuristics put a variable of your type
+equal to a term only when the term is a point: another variable, or a
+constant your `dense_order_compare` orders against itself.
+
 `is_one`, `is_zero`, `is_closed`, `normalize`, `splitter`, and
 `simplify_term` can each run a full decision or rewrite procedure. Each one
 can fail. Give each the same
@@ -191,9 +202,9 @@ need solver or LTL types, which sit beside their single consumer:
 | `decide_closed(form)` | the truth of a closed formula over the type whatever its quantifier prefix, with no quantifier eliminated first; `nullopt` when undecided. The data game then keeps, as the regions of a game over streams of that one type, the formulas whose quantifiers the normalizer leaves standing, and decides them whole (bv declares it) | owner |
 | `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (qlt declares it) | owner |
 | `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
-| `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
-| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`); `nullptr` keeps the binder | owner |
-| `omcat_solve_inequality_system(sys, opts)` | solve a pure ordering system over your theory | owner |
+| `omcat_qe(var, body)` | decide a quantifier over your own theory, for every value of the other free variables; `nullopt` asks `omcat_qe_residual` (a `non_aba_omcat` type) or falls through to the atomless path | owner |
+| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`, and `ex x (x > y && {[0,1]}:qlt & x != 0)` into `{ (-inf, 1) }:qlt & y != 0`); `nullptr` keeps the binder | owner |
+| `omcat_solve_inequality_system(sys, opts)` | a model of a system over your theory, every one of a `non_aba_omcat` type (qlt answers with one point per variable) | owner |
 | `try_propositional_synthesis(fm, atoms)` | synthesise a propositional strategy for your own atoms | the single declarer |
 | `semantic_pwr_optimal(clause, update)` | revise a clause through your winning region | first declarer that answers |
 | `codegen_witness(var, conj)`, `codegen_constant_expr(cst)` | C++ spellings of a witness / a constant for generated code | owner |
