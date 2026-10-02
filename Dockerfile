@@ -719,6 +719,9 @@ ARG BUILD_PRESET=release-wasm
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes
 
+# Argument TAU_WASM_NOTHREADS_TESTS=no skips the no-thread suite
+ARG TAU_WASM_NOTHREADS_TESTS=yes
+
 # The remote store: configure reads a missing wasm package from it before it
 # builds one (cmake/tau-deps.cmake).
 ARG TAU_STORE_REMOTE=
@@ -757,7 +760,7 @@ RUN --mount=type=secret,id=gh_token \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi && \
-	if [ "$TESTS" = "yes" ]; then \
+	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
@@ -770,6 +773,7 @@ FROM wasm-node-resolve AS wasm-node
 ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release-wasm
 ARG TESTS=yes
+ARG TAU_WASM_NOTHREADS_TESTS=yes
 
 # The -all-tests preset builds the library, the suite and the CLI from one
 # configure, so the fetched dependencies compile once.
@@ -786,7 +790,7 @@ RUN --mount=type=secret,id=gh_token \
 
 RUN --mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
-	if [ "$TESTS" = "yes" ]; then \
+	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
 	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
@@ -801,7 +805,7 @@ RUN if [ "$TESTS" = "yes" ]; then \
 	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
-RUN if [ "$TESTS" = "yes" ]; then \
+RUN if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running wasm no-thread tests" && \
 	ctest --preset "${BUILD_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
 fi

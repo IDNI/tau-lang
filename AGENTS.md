@@ -340,12 +340,13 @@ is the library only, never the REPL; its threading follows the preset, so
 `release-wasm-nothreads` yields a library without `-pthread`.
 
 CI splits the wasm gate in two: the `wasm-node` Docker target builds the library,
-the suite under emsdk's node (the pthread suite and the `release-wasm-nothreads`
-suite) and the parity check, and `wasm-browser` builds the browser REPL page, runs
-the compiled suite in headless Chrome and checks the page starts. Both derive from
-the `wasm-deps` image, which installs only emsdk; Boost, FTXUI, unordered_dense
-and the parser SDK resolve from the store at configure time, with the pthread
-variant in the id.
+the pthread suite under emsdk's node and the parity check, and `wasm-browser`
+builds the browser REPL page, runs the compiled suite in headless Chrome and
+checks the page starts. Both derive from the `wasm-deps` image, which installs
+only emsdk; Boost, FTXUI, unordered_dense and the parser SDK resolve from the
+store at configure time, with the pthread variant in the id. The `wasm-node`
+target also runs the `release-wasm-nothreads` suite unless the build argument
+`TAU_WASM_NOTHREADS_TESTS=no` turns it off, as CI does.
 
 ## Architecture
 

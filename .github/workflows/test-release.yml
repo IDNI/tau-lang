@@ -558,6 +558,7 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-wasm-deps \
@@ -572,6 +573,7 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-wasm-deps \
             --cache-from type=gha,scope=tau-deps \
