@@ -544,6 +544,32 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		CHECK(i->current_spec() == before);
 	}
 
+	// A running safety specification has no strategy for a nested
+	// temporal update: it is refused with a reason, not executed.
+	TEST_CASE("[IAX-PWR-12] a nested temporal update of a safety "
+		"specification is refused")
+	{
+		for (const char* nested : { "sometimes (always o2[t]:tau = 1)",
+			"always (sometimes o2[t]:tau = 1)" })
+		{
+			CAPTURE(nested);
+			auto i = make("o1[t] = 1.");
+			REQUIRE(i.has_value());
+			REQUIRE_FALSE(i->plays_data_game());
+			REQUIRE(i->step().has_value());
+			const std::string before = i->current_spec();
+			tref psi = parse_formula(nested);
+			REQUIRE(psi != nullptr);
+			auto ur = i->update(psi);
+			REQUIRE(ur.has_value());
+			CHECK_FALSE(ur.value());
+			CHECK(report_text(ur).find("a temporal operator nested")
+				!= std::string::npos);
+			CHECK(i->current_spec() == before);
+			CHECK(i->step().has_value());
+		}
+	}
+
 	TEST_CASE("[IAX-PWR-11] a data-game update is refused when it retypes a "
 		"stream or reaches outside the run")
 	{

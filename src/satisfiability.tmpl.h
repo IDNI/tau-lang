@@ -1714,8 +1714,15 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 
 	using tau = tree<node>;
 	result<tref> r;
-	DBG({ auto nbc = has_no_boolean_combs_of_models<node>(ubd_aw_continuation);
-		assert(nbc.has_value() && nbc.value()); })
+	{
+		TAU_TRY(bool nbc, has_no_boolean_combs_of_models<node>(
+			ubd_aw_continuation));
+		if (!nbc) return r.with_error(code::internal_error,
+			"the always part of an unbounded continuation holds a "
+			"Boolean combination of models",
+			{{ label::value, truncate_for_message(
+				TAU_TO_STR(ubd_aw_continuation)) }});
+	}
 	DBG(assert(is_child<node>(ev_var_flags, tau::wff_sometimes));)
 
 	tref st_flags = tau::trim2(ev_var_flags);
@@ -1936,6 +1943,23 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		return r.with_error(code::not_found, "unresolved function or "
 			"predicate symbol: no definition applies to it",
 			{{ label::value, truncate_for_message(TAU_TO_STR(ref)) }});
+	}
+	// The flag-based unrolling below decides an always part and sometimes
+	// clauses whose bodies hold no temporal operator. A nesting such as
+	// `sometimes (always ...)` belongs to the LTL(ABA) pipeline.
+	{
+		auto is_aw_or_st = [](tref n) {
+			return is_child<node>(n, tau::wff_always)
+				|| is_child<node>(n, tau::wff_sometimes);
+		};
+		for (tref t : tau::get(fm).select_top(is_aw_or_st))
+			if (tau::get(tau::get(t)[0].first()).find_top(is_aw_or_st))
+				return r.with_error(code::unsupported_operation,
+					"a temporal operator nested in an always or "
+					"sometimes clause cannot be executed by the "
+					"always/sometimes unrolling",
+					{{ label::value, truncate_for_message(
+						TAU_TO_STR(t)) }});
 	}
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
