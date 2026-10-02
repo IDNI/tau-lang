@@ -147,6 +147,9 @@ RUN cd /tau-lang && ./dev dep-python-venv
 # shared prefix is /root/.tau in this image, so this is the venv the line
 # above created.
 ENV TAU_PYTHON=/root/.tau/py312/bin/python3
+# The wheel repair finds patchelf on PATH. The venv goes last, so python3
+# stays the system one.
+ENV PATH=${PATH}:/root/.tau/py312/bin
 
 
 # ------------------------------------------------------------
