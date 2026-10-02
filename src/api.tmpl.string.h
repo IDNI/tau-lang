@@ -72,20 +72,53 @@ result<std::string> api<node>::apply_defs(
 			}
 			tdefs.insert(*d);
 		}
-		TAU_TRY(tref parsed, get_spec_or_term(expr));
-		TAU_TRY(tref a, apply_defs(tdefs, parsed));
-		// get_spec_or_term() parses a bare formula as a one-line spec
-		// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
-		// that shape rather than unwrapping it the way its ref branch
-		// does (via tau_lang::get_nso_rr's main -> wff/bf navigation),
-		// so content round-trips through nso_rr_apply but the shape
-		// stays spec-wrapped. Only to_str() sees the difference: a
-		// spec-shaped tree renders with the trailing '.' every other
-		// string overload's result lacks. Unwrap here, at the point
-		// content becomes a string, so the tref-level overloads --
-		// which other callers (e.g. get_interpreter) rely on staying
-		// spec-shaped -- are untouched.
+		// A formula or a term is read untyped, as the definitions are: a
+		// spec infers default types into the call's arguments, and a typed
+		// call no longer matches an untyped definition head. Only an input
+		// that is no formula or term, a spec with its own definitions,
+		// is read as a spec.
+		tref parsed = nullptr;
+		{
+			auto fot = get_formula_or_term(expr);
+			if (fot.has_value()) {
+				parsed = fot.value();
+				r.merge(std::move(fot));
+			} else {
+				auto spec = get_spec_or_term(expr);
+				if (!spec.has_value()) {
+					r.merge(std::move(fot));
+					r.merge(std::move(spec));
+					DBG(assert(r.is_well_formed());)
+					return r;
+				}
+				parsed = spec.value();
+				r.merge(std::move(spec));
+				auto sc = r.open("rejected candidate");
+				r.info("the input is not a single formula or term",
+					{{label::value, truncate_for_message(expr)}});
+				report cand = std::move(fot).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+			}
+		}
+		// A bare call parses as a predicate call; it is a function call
+		// when a function definition of the same signature is given.
 		using tt = typename tau::traverser;
+		if (tref call = tau::get(parsed).is(tau::wff)
+			? tt(parsed) | tau::wff_ref | tau::ref | tt::ref : nullptr)
+		{
+			const rr_sig sig = get_rr_sig<node>(call);
+			for (tref def : tdefs)
+				if (tau::get(def).first_tree().is(tau::ref)
+					&& get_rr_sig<node>(tau::get(def).first()) == sig)
+				{
+					TAU_TRY(parsed, get_term(expr));
+					break;
+				}
+		}
+		TAU_TRY(tref a, apply_defs(tdefs, parsed));
+		// A spec keeps its spec shape through the application, which
+		// renders with a trailing '.'; the result is its main formula.
 		if (tau::get(a).is(tau::spec)) {
 			tref main = tt(a) | tau::main | tau::wff | tt::ref;
 			if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;

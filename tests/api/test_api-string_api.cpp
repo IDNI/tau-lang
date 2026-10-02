@@ -19,19 +19,7 @@ TEST_SUITE("Tau API - string") {
 		}
 	}
 
-	// apply_defs()/apply_all_defs() parse via get_spec_or_term(), which
-	// tries get_spec() first; a bare formula like "x = 0" parses fine as
-	// a one-line spec (spec(main(wff(...)))). Because that tree contains
-	// no `ref`, api<node>::get_nso_rr's no-ref branch kept the whole
-	// spec-shaped tree as nso_rr.main instead of unwrapping it the way
-	// its ref branch does (via tau_lang::get_nso_rr's main -> wff/bf
-	// navigation), so nso_rr_apply carried the spec shape through and
-	// to_str() rendered it with spec grammar's trailing '.' -- unlike
-	// every neighbouring string overload (substitute, dnf, cnf, nnf, ...)
-	// which route through get_formula_or_term() and never carry the
-	// artifact. Fixed by unwrapping the spec shape in the string overload
-	// itself, right before to_str(); apply_def/apply_all_defs share the
-	// same underlying apply_defs(defs, string) so both are covered.
+	// A bare formula comes back without the trailing '.' of a spec.
 	TEST_CASE_FIXTURE(api_fixture, "apply_defs/apply_all_defs on a bare formula") {
 		auto all = tau_api::apply_all_defs("x = 0");
 		REQUIRE(all.has_value());
@@ -42,15 +30,8 @@ TEST_SUITE("Tau API - string") {
 		CHECK(some.value() == "x = 0");
 	}
 
-	// Input that genuinely carries a spec's own inline definitions must
-	// still round-trip correctly: it reaches api<node>::get_nso_rr's ref
-	// branch (a `ref` to apply_all_defs_f is present), which already
-	// unwraps to the bare main formula via tau_lang::get_nso_rr, so this
-	// path was correct both before and after the fix above -- pinned here
-	// so the string-overload change above cannot regress it. Mirrors the
-	// tref-level "apply_all_defs" case in test_api-tref_api.cpp, whose
-	// spec (apply_all_defs_f(x) := x'.\napply_all_defs_f(z) = 0.) already
-	// established z' = 0 as the correct unwrapped result.
+	// A spec carrying its own definitions is read as a spec and comes back
+	// as its main formula.
 	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs on a spec with real definitions") {
 		auto applied = tau_api::apply_all_defs(
 			"str_apply_all_defs_f(x) := x'.\n"
@@ -763,7 +744,7 @@ TEST_SUITE("Tau API - string - substitution success paths") {
 		auto r = tau_api::apply_defs(
 			std::set<std::string>{ "f(x) := x + 1" }, "f(y)");
 		REQUIRE( r.has_value() );
-		CHECK( !r->empty() );
+		CHECK( *r == "y+1" );
 	}
 }
 
@@ -1118,16 +1099,29 @@ TEST_SUITE("Tau API - string - solution and definition rendering") {
 			{ "x", "{ a }:sbf" } });
 	}
 
-	// The tref overload expands a call through the definition it is given
-	// (test_api-tref_api.cpp, "apply_def"); the string overload returns
-	// the call unexpanded.
-	TEST_CASE_FIXTURE(api_fixture, "apply_def expands the call it is given"
-		* doctest::should_fail())
-	{
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands the call it is given") {
 		auto a = tau_api::apply_def("str_apply_def_f(x) := x'",
 			"str_apply_def_f(y)");
 		REQUIRE(a.has_value());
 		CHECK(a.value() == "y'");
+		auto b = tau_api::apply_def("str_apply_def_g(x) := x + 1",
+			"str_apply_def_g(y)");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y+1");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a call inside a formula") {
+		auto a = tau_api::apply_def("str_apply_def_gg(x) := x'",
+			"str_apply_def_gg(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a predicate call") {
+		auto a = tau_api::apply_def("str_apply_def_hh(x) := x = 0",
+			"str_apply_def_hh(y)");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y = 0");
 	}
 }
 
