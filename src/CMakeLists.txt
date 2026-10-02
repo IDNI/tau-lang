@@ -141,6 +141,11 @@ target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_B
 if (TAU_BUILD_PIC AND NOT MSVC)
 	target_compile_options(${TAU_STATIC_LIB_NAME} PRIVATE -fPIC)
 endif()
+# An instrumented archive needs the gcov runtime wherever it is linked, the
+# program a `tau compile` builds included.
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+	target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE --coverage)
+endif()
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
