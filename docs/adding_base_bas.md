@@ -250,7 +250,7 @@ own and the CLI will not shadow it with the option's default. Read the
 variable in the getter with `env_limit_count` (`env_limits.h`), keep the
 setter writing a parameter that the getter prefers when set, and the option
 then resolves option > environment > default like core's own limits do;
-`qlt-t3-cap` (`TAU_QLT_T3_CAP`) is the example. Name the default in the help
+`nlang-http-timeout` (`TAU_NLANG_HTTP_TIMEOUT`) is the example. Name the default in the help
 string: the CLI registers the option with an empty default, so `--help` shows
 the help string alone.
 

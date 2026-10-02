@@ -43,7 +43,7 @@
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
 7. [Web IDE](#web-ide)
-8. [Developer infrastructure for ω-categorical synthesis](#developer-infrastructure-for-ω-categorical-synthesis)
+8. [Developer infrastructure for LTL(ABA) synthesis](#developer-infrastructure-for-ltlaba-synthesis)
 9. [The C++ API and language bindings](#the-c-api-and-language-bindings)
 10. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
 11. [Known issues](#known-issues)
@@ -781,14 +781,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    stream variables — are extracted from the formula.
 2. Each data atom is replaced by a propositional variable `d_i`; the result is a
    pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}).
-3. A type enumeration over the named constants in the formula (T₁ for output
-   memory, T₂ for (memory, input) pairs) builds a propositional formula that
-   encodes which (memory-type, data-pattern) triples are feasible.  The formula
-   also adds input propositions (P-bits) that expose the current input's T₁ type
-   to the synthesizer, enabling type-aware strategies.
-4. Spot's `ltlsynt` decides realizability of the propositional formula and
+3. Spot's `ltlsynt` decides realizability of the propositional formula and
    extracts a winning Mealy strategy automaton (HOA format).
-5. The **ABA oracle** (tau-lang's own quantifier-elimination engine) checks
+4. The **ABA oracle** (tau-lang's own quantifier-elimination engine) checks
    the strategy against the data. Each transition, and each window of
    consecutive transitions as deep as the deepest lookback, must have data
    satisfying its guards; a transition or path without such data is blocked
@@ -884,22 +879,11 @@ carries the fixed steps. The external tool
 
 #### Synthesis algorithms
 
-The LTL(ABA) implementation currently exposes the following synthesis paths:
-
-| Algorithm | `TAU_LTL_ALG` | Description |
-|-----------|--------------|-------------|
-| **Algorithm B** | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
-| **Algorithm A** | automatic for pure-output formulas, or `A` for pure-output formulas | Uses only R-bits for memory type with no input propositions. Fast for pure-output formulas. When input variables are present, Algorithm A is intentionally bypassed because it cannot observe the environment's T₁ type. |
-| **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. Input-variable formulas fall through to Algorithm B. |
-
-These algorithms encode the order types of a dense linear order and are
-reached only through an algebra's `try_propositional_synthesis`. No algebra of
-the tree declares it since `qlt` values are sets (see
-[qlt](#qlt--finite-unions-of-rational-intervals)), so every formula takes the
-default ABA-oracle path and `TAU_LTL_ALG` has no effect on them. Algorithm B
-would be the default for formulas with input variables and A for pure-output
-ones; D is output-only. The algorithm picker follows the same soundness rule:
-A and D are excluded when input variables are present.
+Every formula takes the ABA-oracle path described above, with the data game
+over the streams' values. The synthesis algorithms A, B and D, which encoded
+the order types of a dense linear order, are gone with qlt's points (see
+[qlt](#qlt--finite-unions-of-rational-intervals)); `--ltl-alg` /
+`TAU_LTL_ALG` is still read but selects nothing.
 
 **Synthesis timeout**: by default, `ltlsynt` is given 60 seconds to solve
 the propositional skeleton.  Set the environment variable `TAU_LTL_TIMEOUT_SEC`
@@ -919,9 +903,9 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 | `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
 | `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the existential quantifier-elimination fast path of a non-aba omega-categorical type (no in-tree algebra is one). Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
-| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing formulas, Algorithm A for pure-output ones, of an algebra that claims them) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
+| `TAU_LTL_ALG` | _unset_ (no synthesis algorithm reads it any more) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
 | `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
-| `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
+| `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the synthesis game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
 | `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
@@ -943,12 +927,8 @@ would mean nothing there.
 
 The caps an algebra declares about itself follow the same three surfaces,
 addressed `--<ba>-<option>` on the command line and `<ba>-<option>` in the
-REPL, and are present when that algebra is in the pack: `qlt` declares
-`--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at most 30,
-`TAU_QLT_T3_CAP`) and `--qlt-const-output-max` (constant-output assignments
-the fast path in front of Algorithm B enumerates, default 100,
-`TAU_QLT_CONST_OUTPUT_MAX`), which no longer take effect since qlt claims no
-synthesis algorithm; `nlang` declares `--nlang-http-timeout`
+REPL, and are present when that algebra is in the pack: `nlang` declares
+`--nlang-http-timeout`
 (seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`).
 
 **Other environment variables.** Three Boolean switches keep an environment
@@ -2285,8 +2265,22 @@ quantifier over a formula with other free variables keeps its binder.
 
 `solve`, `run` and the programs of `tau compile` give a `qlt` variable or
 output any set: `solve x:qlt != 0 && x' != 0.` answers `x := { (0, 1) }:qlt`,
-and `run always o1[t]:qlt = {[0,1]}:qlt.` prints `o1[0] := [0, 1]`.  When no
-strategy exists, `run` says the specification is unrealizable.
+and `run always o1[t]:qlt = {[0,1]}:qlt.` prints `o1[0] := [0, 1]`; a printed
+union such as `0 | [1/2, 1]` reads back as the same set.  When no strategy
+exists, `run` says the specification is unrealizable.
+
+The closed decision has bounds: at most 16 variables, 64 regions, a
+quantifier nesting of 20 and 2^20 splits, and inside the data game the time
+budget of its closed regions (`--ltl-closed-regions-timeout`); past them it
+answers nothing and the question stays undecided.  Over time the order of
+sets is not finite the way a dense order of points was: some specifications
+reach no fixpoint and answer UNKNOWN at the step cap of the temporal
+normalization (`--max-fixpoint-steps`), or, inside the data game, past its
+bounds.  `realizable G (o1[t]:qlt > o1[t-1]:qlt).`, a strictly increasing
+chain of sets, is realizable, yet each step of its normalization asks for one
+more set above the last, which no formula over qlt states finitely: it runs
+until that cap (500 steps by default, long since every step grows) and
+answers UNKNOWN.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 
@@ -2938,7 +2932,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
 | -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default `TAU_LTL_HOA_MAX_STATES` or 4194304; 0 = unlimited) |
-| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
+| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the synthesis game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
 | -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
@@ -3257,8 +3251,8 @@ new values come from the general solver. 2000 by default, 0 = unlimited.
 (`--ltl-timeout`). 60 by default, or `TAU_LTL_TIMEOUT_SEC` when that is set;
 0 disables the watchdog. `get ltltimeout` shows the effective value.
 
-* `ltlalg`: the omcat synthesis algorithm, `A`, `B`, `D` or `auto`
-(`--ltl-alg`). `auto` by default, or `TAU_LTL_ALG` when that is set.
+* `ltlalg`: `A`, `B`, `D` or `auto` (`--ltl-alg`), `auto` by default, or
+`TAU_LTL_ALG` when that is set; no synthesis algorithm reads it any more.
 
 * `ltlqemaxvars`: free-variable cap of the omcat quantifier-elimination fast
 path (`--ltl-qe-max-vars`). 2 by default, or `TAU_LTL_OMCAT_QE_MAX_VARS` when
@@ -3270,7 +3264,7 @@ strategy (`--ltl-hoa-max-states`). 4194304 by default, or
 effective value, as it does for every limit below.
 
 * `ltlguardmaxcubes`: cap on the DNF cubes a HOA guard may expand into in the
-Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default, or
+synthesis game (`--ltl-guard-max-cubes`). 512 by default, or
 `TAU_LTL_GUARD_MAX_CUBES` when that is set; 0 = unlimited.
 
 * `ltlrefinementrounds`: cap on the ABA-oracle refinement rounds of one
@@ -3734,29 +3728,13 @@ Generated code can be inserted at cursor or replace the editor content with one
 click.
 
 
-# **Developer infrastructure for ω-categorical synthesis**
+# **Developer infrastructure for LTL(ABA) synthesis**
 
-The following headers (all standalone, header-only, test-covered) implement
-tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
-
-## Core synthesis algorithms
-
-| Header | Status | Purpose |
-|--------|--------|---------|
-| `src/algorithm_b_skeleton.h` | **Default path** | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
-| `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
-| `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. HOA guard evaluator (`eval_guard`); synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
-| Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25 (D2): Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up is kept outside this repository. |
-
-## Type enumeration (ω-categorical theories)
-
-These enumerate the types of a dense linear order for the Algorithms A, B and
-D, which no in-tree algebra claims (see [Synthesis algorithms](#synthesis-algorithms)).
+## The synthesis game
 
 | Header | Purpose |
 |--------|---------|
-| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. |
-| `src/boolean_algebras/qlt/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings (at most 18 fractional digits); `collect_qlt_constants(fm)` harvesting named constants from a formula. |
+| `src/algorithm_d_game.h` | The synthesis game of `ltlsynt --print-game-hoa`: HOA guard evaluator (`eval_guard`, `hoa_guard::to_dnf`), game parser (`parse_synth_game_hoa`) and the call producing it (`call_ltlsynt_game`), read by the data game and the generated programs. |
 
 ## Supporting infrastructure
 
@@ -3764,13 +3742,6 @@ D, which no in-tree algebra claims (see [Synthesis algorithms](#synthesis-algori
 |--------|---------|
 | `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
 | `src/tau_lang_api.h` | Documentation header for the library entry points (`is_tau_formula_sat`, `get_nso_rr`, `run`); there is no `tau_lang_is_realizable` symbol. |
-
-## Algorithm A/B soundness rule
-
-Algorithm A has no input propositions, so it is sound only when the formula has
-no input variables. If a formula contains input variables, the dispatcher
-uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
-for the current T₂ type, making the synthesized strategy type-aware.
 
 # **The C++ API and language bindings**
 
@@ -3848,7 +3819,7 @@ carries the same budgets and switches under the camelCase form of those names
 (`tau.setMaxFixpointSteps(1000)`, `tau.setTrefBudget(n)`,
 `tau.setPreprocessing(false)`, `tau.setMaxConstantSize(n)`, `tau.trefCount()`,
 ...), reads the constant size budget back with `tau.getMaxConstantSize()`, and
-carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
+carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("nlang-http-timeout", 5)`,
 `tau.getBaOption(name)`, which return the value now in force, or `null` with
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
@@ -3904,8 +3875,6 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * `nlang` type requires `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) to be set;
     without it every oracle question is answered `false` (not cached), so
     verdicts are not reliable.
-  * **Algorithm A** is intentionally restricted to pure-output formulas. If
-    input variables are present, the dispatcher uses Algorithm B.
 
 
 # **Future work**
@@ -3921,20 +3890,10 @@ This is a short list of known issues that will be fixed in a subsequent release:
   the current DeepSeek oracle.
 * **qlt/qint synthesis**: `qlt` values are sets, and LTL(ABA) over `qlt` takes
   the default ABA-oracle path, which leaves some specifications undecided
-  (`G (o1[t]:qlt > o1[t-1]:qlt)`, a strictly increasing chain of sets, runs
-  out of budget); a decision procedure for the order of sets over time is
+  (`G (o1[t]:qlt > o1[t-1]:qlt)`, a strictly increasing chain of sets,
+  answers UNKNOWN at the fixpoint step cap); a decision procedure for the
+  order of sets over time is
   open, as is further polish of the oracle over `qint`.
-* **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
-  game (Zielonka's recursive algorithm over priorities derived from the Büchi,
-  co-Büchi or parity acceptance `ltlsynt` prints) for output-only formulas
-  of an algebra that claims it (none in the tree); extending D to input-bearing formulas (the T₂ dimension in the
-  environment states) is the open design item.
-* **BA type encoding for Algorithm B**: no in-tree type uses the T₁/T₂
-  type-enumeration path, which encodes a dense linear order.  Extension to other BA types (sbf, bv, tau) requires
-  BDD-based type encoding: the type of a BA element relative to the formula's
-  named constants is determined by which atom of the subalgebra generated by those
-  constants the element falls in — equivalently, the element's BDD restricted to
-  the constant variables.
 * **Term algebras**: support for term algebras (theory of trees) as a concrete domain
   — decidable ω-categorical theories admitting quantifier elimination.
 * **Explicit template instantiations**: reduce compile times by moving hot function
