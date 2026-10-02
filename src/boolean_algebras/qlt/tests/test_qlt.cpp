@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Comprehensive tests for qlt — the dense linear order (Q, <).
+// Comprehensive tests for qlt — the Boolean algebra of finite unions of
+// intervals of Q.
 // Covers: qlt_rational arithmetic/parsing, interval helpers (piece_empty,
 // overlap, adjacent, merge), BA operations (|, &, ~, ^), normalisation,
 // splitter, is_zero/is_one, and to_string.
-// Parser and LTL integration are tested separately in test_qlt_grammar.cpp
-// and test_qlt_oracle.cpp.
+// The parser is tested separately in test_qlt_grammar.cpp.
 
 #include "test_init.h"
 #include "boolean_algebras/qlt/qlt.h"

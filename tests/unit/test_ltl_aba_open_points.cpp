@@ -132,20 +132,9 @@ struct path_stubs {
 const char* logging_ltlsynt =
 	"#!/bin/sh\necho \"$*\" >> @DIR@/log\nexec @REAL_ltlsynt@ \"$@\"\n";
 
-// ltlsynt that synthesizes as usual but prints no game, so no data game
-// is ever built; Algorithm D's own game (outputs d_0, d_1, ...) is kept.
-const char* no_data_game_ltlsynt =
-	"#!/bin/sh\n"
-	"game=0; dprops=0\n"
-	"for a in \"$@\"; do\n"
-	"  [ \"$a\" = \"--print-game-hoa\" ] && game=1\n"
-	"  case \"$a\" in --outs=d_*) dprops=1;; esac\n"
-	"done\n"
-	"[ $game = 1 ] && [ $dprops = 0 ] && exit 2\n"
-	"exec @REAL_ltlsynt@ \"$@\"\n";
-
-// no_data_game_ltlsynt that also logs each call's arguments, temporary
-// file paths removed, one line per call to @DIR@/log.
+// ltlsynt that synthesizes as usual but prints no game, so no data game is
+// ever built, and logs each call's arguments, temporary file paths removed,
+// one line per call to @DIR@/log.
 const char* logging_no_data_game_ltlsynt =
 	"#!/bin/sh\n"
 	"echo \"$*\" | sed 's#/tmp/[^ ]*##' >> @DIR@/log\n"
@@ -176,26 +165,6 @@ const char* refuting_ltlsynt =
 	"#!/bin/sh\n"
 	"for a in \"$@\"; do [ \"$a\" = \"--print-game-hoa\" ] && exit 2; done\n"
 	"echo UNREALIZABLE\nexit 1\n";
-
-struct ltl_alg_scope {
-	explicit ltl_alg_scope(const std::string& alg) {
-		api<node_t>::set_ltl_algorithm(alg);
-	}
-	~ltl_alg_scope() { api<node_t>::set_ltl_algorithm(""); }
-};
-
-// Algorithm D's product over one memory type in which exactly the
-// D-patterns of `allowed` are feasible; returns whether the system wins.
-bool alg_d_product_wins(const alg_d::synth_game& g, int K,
-	const std::vector<int>& allowed)
-{
-	std::vector<omcat::qlt_type3> T3(allowed.size());
-	auto pg_r = alg_d::build_product_game(g, 1, T3, allowed, K, 0);
-	REQUIRE(pg_r.has_value());
-	const auto& pg = pg_r.value();
-	if (pg.n_states == 0) return false;
-	return alg_d::zielonka_win_player1(pg).count(pg.init) != 0;
-}
 
 } // namespace
 
@@ -263,113 +232,7 @@ TEST_SUITE("LTL(ABA) open points: pairwise consistency") {
 	}
 }
 
-TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
-
-	// ltlsynt's default algorithm prints the game of `GF d_0 -> GF d_1`
-	// with Streett acceptance `Fin(0) | Inf(1)`. With `d_1` infeasible on
-	// data, the system wins by never raising `d_0`, a play whose edges
-	// carry no colour.
-	TEST_CASE("Algorithm D wins a Streett game through its uncoloured edges"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		auto g = alg_d::call_ltlsynt_game("G F d_0 -> G F d_1", {},
-			{"d_0", "d_1"});
-		REQUIRE(g.has_value());
-		const auto& G = g.value();
-		REQUIRE(G.num_states > 0);
-		INFO("acc_known=" << G.acc_known << " n_colors=" << G.n_colors);
-		// patterns 0b00 and 0b01 (d_0 only) are the feasible ones
-		CHECK(alg_d_product_wins(G, 2, {0, 1}));
-	}
-
-	TEST_CASE("Algorithm D realizes a spec won by never raising a premise"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		// o14 <= 0 forever falsifies the premise; the conclusion's atoms
-		// can never hold together
-		const char* s = "(G F (o14[t]:qlt > {0}:qlt)) -> "
-			"(G F (o14[t]:qlt > {1}:qlt && o14[t]:qlt < {0}:qlt)).";
-		auto control = op_realizable(s);
-		REQUIRE(control.has_value());
-		REQUIRE(control.value());
-		ltl_alg_scope alg("D");
-		auto r = op_realizable(s);
-		REQUIRE(r.has_value());
-		CHECK(r.value());
-	}
-
-	TEST_CASE("Algorithm D refuses a generalized Buchi game") {
-		// Only colour 0 is ever seen, so Inf(1) fails and the system
-		// cannot win; reading the condition as plain Buchi says it can.
-		auto parsed = alg_d::parse_synth_game_hoa(
-			"HOA: v1\nStates: 2\nStart: 0\nAP: 1 \"d_0\"\n"
-			"acc-name: generalized-Buchi 2\n"
-			"Acceptance: 2 Inf(0)&Inf(1)\n"
-			"properties: trans-labels explicit-labels trans-acc\n"
-			"spot-state-player: 0 1\ncontrollable-AP: 0\n--BODY--\n"
-			"State: 0\n[t] 1\n"
-			"State: 1\n[0] 0 {0}\n[!0] 0 {0}\n--END--\n");
-		REQUIRE(parsed.has_value());
-		const auto& G = parsed.value();
-		REQUIRE(G.num_states == 2);
-		CHECK_FALSE(G.acc_known);
-		CHECK_FALSE(alg_d_product_wins(G, 1, {0, 1}));
-	}
-}
-
-TEST_SUITE("LTL(ABA) open points: Algorithm D gates") {
-
-	// D's single output slot would read o11 > 0 && o12 < 0 as
-	// Y > 0 && Y < 0.
-	TEST_CASE("Algorithm D keeps two output streams apart"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		for (const char* s : {
-			"F (o10[t]:qlt > {0}:qlt && o12[t]:qlt < {0}:qlt).",
-			"G F (o11[t]:qlt > {0}:qlt && o12[t]:qlt < {0}:qlt).",
-		}) {
-			const std::string text = s;
-			CAPTURE(text);
-			auto control = op_realizable(s);
-			REQUIRE(control.has_value());
-			REQUIRE(control.value());
-			ltl_alg_scope alg("D");
-			auto r = op_realizable(s);
-			REQUIRE(r.has_value());
-			CHECK(r.value());
-		}
-	}
-
-	TEST_CASE("Algorithm D does not realize a contradiction on top"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		ltl_alg_scope alg("D");
-		auto r = op_realizable(
-			"F (o13[t]:qlt = {top}:qlt) && G (o13[t]:qlt != {top}:qlt).");
-		REQUIRE(r.has_value());
-		CHECK_FALSE(r.value());
-	}
-}
-
 TEST_SUITE("LTL(ABA) open points: Spot processes") {
-
-	TEST_CASE("constant-output fast path honours the LTL timeout"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		tref fm = op_spec("F (o15[t]:qlt > {0}:qlt).");
-		REQUIRE(fm != nullptr);
-		auto atoms = extract_data_atoms<node_t>(fm);
-		REQUIRE(!atoms.empty());
-		path_stubs stubs({{"ltlfilt", "#!/bin/sh\nexec sleep 5\n"}});
-		api<node_t>::set_ltl_timeout_sec(1);
-		auto t0 = std::chrono::steady_clock::now();
-		(void) constant_output_realizable<node_t>(fm, atoms);
-		const double elapsed = seconds_since(t0);
-		api<node_t>::set_ltl_timeout_sec(-1);
-		// three constant outputs, each one ltlfilt call: 15 s unbounded
-		INFO("elapsed " << elapsed << " s");
-		CHECK(elapsed < 10.0);
-	}
 
 	TEST_CASE("tautology check takes a formula beyond the argument limit"
 		* doctest::skip(!ltlsynt_available()))
@@ -469,8 +332,8 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
-		tref fm = op_spec("G F (o21[t]:qlt > o22[t]:qlt && "
-			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
+		tref fm = op_spec("G F (o21[t]:bv[8] > o22[t]:bv[8] && "
+			"o22[t]:bv[8] > o23[t]:bv[8] && o23[t]:bv[8] > o21[t]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 3);
@@ -496,7 +359,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a stream-free residue in the skeleton is refused") {
 		tref fm = op_spec("F (o24[t]:qlt = {0}:qlt) && "
-			"G (o24[t]:qlt = {0}:qlt || {c}:qlt > {0}:qlt).");
+			"G (o24[t]:qlt = {0}:qlt || c:qlt != {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel = ltl_skeleton_with_testers<node_t>(fm, atoms);
@@ -598,39 +461,6 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 			io_context<node_t> ctx;
 			auto nso = get_nso_rr<node_t>(ctx,
 				tau::get(s + ".").value_or(nullptr));
-			REQUIRE(nso.has_value());
-			auto i = interpreter<node_t>::make_interpreter(
-				nso.value().main->get(), ctx);
-			INFO(report_text(i.report()));
-			CHECK(i.has_value());
-		}
-	}
-
-	TEST_CASE("a spec decided by Algorithm B runs when the data game declines"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		path_stubs stubs({{"ltlsynt", no_data_game_ltlsynt}});
-		for (const char* s : {
-			"G F (o61[t]:qlt > i61[t]:qlt)",
-			"G F (o61[t]:qlt > i61[t]:qlt) && G F (o61[t]:qlt < {0}:qlt)",
-			"G (F (o61[t]:qlt > i61[t]:qlt) && F (o61[t]:qlt < i61[t]:qlt))",
-			"F G (o61[t]:qlt >= i61[t]:qlt || o61[t]:qlt = {3}:qlt)",
-		}) {
-			const std::string text = s;
-			CAPTURE(text);
-			tref fm = op_spec((std::string(s) + ".").c_str());
-			REQUIRE(fm != nullptr);
-			auto fast = solve_ltl_aba<node_t>(fm);
-			REQUIRE(fast.has_value());
-			REQUIRE(fast.value().has_value());
-			REQUIRE_FALSE(fast.value()->executable);
-			auto rz = api<node_t>::realizable(std::string(s));
-			INFO(report_text(rz.report()));
-			REQUIRE(rz.has_value());
-			REQUIRE(rz.value());
-			io_context<node_t> ctx;
-			auto nso = get_nso_rr<node_t>(ctx,
-				tau::get(std::string(s) + ".").value_or(nullptr));
 			REQUIRE(nso.has_value());
 			auto i = interpreter<node_t>::make_interpreter(
 				nso.value().main->get(), ctx);
@@ -848,68 +678,6 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 		}
 	}
 }
-
-TEST_SUITE("LTL(ABA) open points: initial memory") {
-
-	// Algorithm A lets the first move follow any previous type, while
-	// Algorithm D fixes it to the type of 0, the value the interpreter
-	// supplies. On a step-0 read of o[t-1] the two must still agree, and a
-	// realizable verdict must be one run can execute.
-	TEST_CASE("Algorithms A and D agree on a first step reading the past"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		for (const char* spec_text : {
-			"G (o111[t-1]:qlt = {1}:qlt) && F (o111[t]:qlt > {0}:qlt)",
-			"G F (o112[t-1]:qlt = {1}:qlt && o112[t]:qlt > {0}:qlt)",
-			"F (o113[t-1]:qlt = {1}:qlt)",
-			"G (o114[t-1]:qlt = {1}:qlt || o114[t]:qlt = {5}:qlt) && "
-				"F (o114[t]:qlt < {0}:qlt)",
-		}) {
-			const std::string s = spec_text;
-			CAPTURE(s);
-			std::map<std::string, std::optional<bool>> verdict;
-			for (const char* alg : {"", "A", "D"}) {
-				ltl_alg_scope scope(alg);
-				auto r = api<node_t>::realizable(s);
-				verdict[alg] = r.has_value()
-					? std::optional<bool>(r.value()) : std::nullopt;
-			}
-			REQUIRE(verdict["A"].has_value());
-			CHECK(verdict["A"] == verdict["D"]);
-			CHECK(verdict["A"] == verdict[""]);
-			io_context<node_t> ctx;
-			auto nso = get_nso_rr<node_t>(ctx,
-				tau::get(s + ".").value_or(nullptr));
-			REQUIRE(nso.has_value());
-			auto i = interpreter<node_t>::make_interpreter(
-				nso.value().main->get(), ctx);
-			CHECK(i.has_value() == *verdict["A"]);
-			if (i.has_value()) CHECK(i.value().step().has_value());
-		}
-	}
-
-	// A formula reading the past needs a step guard, and solve_ltl_aba
-	// offers no step-guarded formula to the qlt fast paths: A never sees
-	// a first step reading o[t-1], so its props stay p_i, not d_i.
-	TEST_CASE("Algorithm A is not offered a formula reading the past"
-		* doctest::skip(!ltlsynt_available()))
-	{
-		ltl_alg_scope alg("A");
-		tref fm = op_spec("F (o115[t]:qlt > {1}:qlt) && "
-			"G (o115[t]:qlt > o115[t-1]:qlt).");
-		REQUIRE(fm != nullptr);
-		REQUIRE_FALSE(collect_step_guards<node_t>(fm).empty());
-		auto solved = solve_ltl_aba<node_t>(fm);
-		REQUIRE(solved.has_value());
-		REQUIRE(solved.value().has_value());
-		for (const auto& [_, prop] : solved.value()->atoms) {
-			CAPTURE(prop);
-			CHECK(prop.rfind("d_", 0) != 0);
-		}
-	}
-}
-
-
 
 TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 

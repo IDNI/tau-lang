@@ -82,9 +82,6 @@ add_repl_test(ltl_env-qe_flag_beats_env
 	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_OMCAT_QE_MAX_VARS=4)
 # BA-declared knobs promoted from header constants. The option exists only
 # when its algebra is in the pack, so each is gated on its own BA.
-add_repl_test(ltl_env-qlt_t3_cap_option
-	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
-	FLAGS --qlt-t3-cap 12)
 add_repl_test(ltl_env-nlang_http_timeout_option
 	"set nlang-http-timeout 3" "nlang-http-timeout: *3" NO_FAIL_REGEX NO_TRACE)
 add_repl_test(ltl_env-refinement_rounds_flag
@@ -110,9 +107,6 @@ add_repl_test(ltl_env-closed_regions_timeout_flag_beats_env
 add_repl_test(ltl_env-pwr_semantic_flag
 	"get pwrsemantic" "pwrsemantic: *on" NO_FAIL_REGEX NO_TRACE
 	FLAGS --pwr-semantic)
-add_repl_test(ltl_env-qlt_const_output_max_flag
-	"get qlt-const-output-max" "qlt-const-output-max: *3" NO_FAIL_REGEX NO_TRACE
-	FLAGS --qlt-const-output-max 3)
 # The -K short flag belongs to --ba-component-factoring; --ltl-qe-max-vars is -k.
 add_repl_test(ltl_env-qe_short_flag_is_lowercase_k
 	"get ltlqemaxvars" "ltlqemaxvars: *3" NO_FAIL_REGEX NO_TRACE
@@ -193,31 +187,19 @@ add_repl_test(ltl_env-cover_products_flag_beats_env
 	ENV TAU_LTL_MAX_COVER_PRODUCTS=0 FLAGS --max-cover-products 9)
 # The same three surfaces for the caps an algebra declares about itself; each
 # exists only when its algebra is in the pack, so the family gates each one.
-add_repl_test(ltl_env-qlt_t3_cap_env_is_the_fallback
-	"get qlt-t3-cap" "qlt-t3-cap: *14" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_T3_CAP=14)
-add_repl_test(ltl_env-qlt_t3_cap_flag_beats_env
-	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_T3_CAP=14 FLAGS --qlt-t3-cap 12)
-add_repl_test(ltl_env-qlt_t3_cap_garbage_warns
-	"get qlt-t3-cap" "TAU_QLT_T3_CAP='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_T3_CAP=abc)
-add_repl_test(ltl_env-qlt_const_output_max_env_is_the_fallback
-	"get qlt-const-output-max" "qlt-const-output-max: *4" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_CONST_OUTPUT_MAX=4)
-add_repl_test(ltl_env-qlt_const_output_max_flag_beats_env
-	"get qlt-const-output-max" "qlt-const-output-max: *3" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_CONST_OUTPUT_MAX=4 FLAGS --qlt-const-output-max 3)
 add_repl_test(ltl_env-nlang_http_timeout_env_is_the_fallback
 	"get nlang-http-timeout" "nlang-http-timeout: *9" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_NLANG_HTTP_TIMEOUT=9)
 add_repl_test(ltl_env-nlang_http_timeout_flag_beats_env
 	"get nlang-http-timeout" "nlang-http-timeout: *3" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_NLANG_HTTP_TIMEOUT=9 FLAGS --nlang-http-timeout 3)
+add_repl_test(ltl_env-nlang_http_timeout_garbage_warns
+	"get nlang-http-timeout" "TAU_NLANG_HTTP_TIMEOUT='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_NLANG_HTTP_TIMEOUT=abc)
 # A BA-declared count option left unset keeps the algebra's own default: the
 # CLI passes nothing, so an algebra's environment fallback is not shadowed.
-add_repl_test(ltl_env-qlt_t3_cap_default_without_flag
-	"get qlt-t3-cap" "qlt-t3-cap: *20" NO_FAIL_REGEX NO_TRACE)
+add_repl_test(ltl_env-nlang_http_timeout_default_without_flag
+	"get nlang-http-timeout" "nlang-http-timeout: *15" NO_FAIL_REGEX NO_TRACE)
 
 # TAU_TREF_BUDGET is the memory budget's environment form: it shows through
 # `get` when the flag is unset, and the flag wins when both are given.

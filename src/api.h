@@ -428,7 +428,7 @@ struct api {
 	/**
 	 * @brief Set an option an algebra of the pack declares about itself,
 	 * named `<family>-<option>` as on the command line without its dashes
-	 * (`bv-widening`, `bv-defelim-max-atoms`, `qlt-t3-cap`) and as in the
+	 * (`bv-widening`, `bv-defelim-max-atoms`, `nlang-http-timeout`) and as in the
 	 * REPL `set` command.
 	 *
 	 * A flag is switched on by a non-zero @p value; a count takes @p value.

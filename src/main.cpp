@@ -185,7 +185,7 @@ cli::options tau_options() {
 	opts["ltl-guard-max-cubes"] =
 		cli::option("ltl-guard-max-cubes", 'U', "")
 		.set_description("cap the DNF cubes a HOA guard may expand into "
-			"in the Algorithm D game (default: "
+			"in the synthesis game (default: "
 			"TAU_LTL_GUARD_MAX_CUBES or 512; 0 = unlimited)");
 	opts["ltl-refinement-rounds"] =
 		cli::option("ltl-refinement-rounds", 'D', "")

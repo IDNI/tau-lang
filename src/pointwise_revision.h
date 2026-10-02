@@ -701,8 +701,7 @@ result<tref> pointwise_revision_temporal(
 	// LS-14: an optimal-mode clause is θ = update ∧ G(Win), so `update`
 	// appears twice in the assembly for those. Harmless (idempotent
 	// conjunct) and kept: fast-revised clauses do need the update here,
-	// and semantic_pwr_optimal's θ-carries-update contract is load-bearing
-	// (see test_semantic_pwr.cpp LS-2/LS-16 suite).
+	// and semantic_pwr_optimal's θ-carries-update contract is load-bearing.
 	tref assembly = update;
 	for (tref rc : revised)
 		assembly = build_wff_and<node>(assembly, rc);

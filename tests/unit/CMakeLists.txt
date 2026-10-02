@@ -59,8 +59,6 @@ set(TESTS
 	ltl_many_sorted
 	ltl_strategy_exec
 
-	algorithm_a
-	algorithm_b
 	algorithm_d
 	ltl_aba_open_points
 	cli_options

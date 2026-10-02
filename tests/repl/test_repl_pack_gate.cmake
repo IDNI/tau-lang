@@ -20,7 +20,6 @@ endfunction()
 expect("i2:bv[8] := in console." TRUE)
 expect("type byte = bv[8]" TRUE)
 expect("realizable F o1[t]:qlt = {1/2}:qlt" TRUE)
-expect("get qlt-t3-cap" TRUE)
 expect("set nlang-http-timeout 3" TRUE)
 expect("i1:qint := in file(\"/src/tests/data.in\"). run 3 steps G (o1[t]:qint = i1[t]:qint)." TRUE)
 

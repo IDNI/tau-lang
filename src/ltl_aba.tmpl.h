@@ -10,8 +10,6 @@
 
 #include "ltl_aba.h"
 #include "formula_type_set.h"
-#include "algorithm_a_skeleton.h"
-#include "algorithm_b_skeleton.h"
 #include "algorithm_d_game.h"
 #include "satisfiability.h"
 #include "backends/bdds/data_bdd.h"

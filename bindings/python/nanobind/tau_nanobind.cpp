@@ -323,7 +323,7 @@ NB_MODULE(tau, m) {
 		"Live interned tree node count, what set_tref_budget caps.");
 
 	// Options an algebra of the pack declares about itself, named
-	// <family>-<option> as on the command line (bv-widening, qlt-t3-cap).
+	// <family>-<option> as on the command line (bv-widening, nlang-http-timeout).
 	m.def("ba_option_names", &tau_api::ba_option_names,
 		"Names of the options the algebras of this build declare.");
 	m.def("set_ba_option",
