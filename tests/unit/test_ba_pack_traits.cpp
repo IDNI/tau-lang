@@ -174,27 +174,12 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK(pack_dense_order_between<node_t>(size_t{0}, nullptr, nullptr)
 			== nullptr);
 #ifdef TAU_PACK_HAS_BA_QLT
+		// qlt values are sets, ordered by inclusion: no dense order
 		const size_t q = qlt_type_id<node_t>();
-		CHECK(pack_type_is_dense_order<node_t>(q));
+		CHECK_FALSE(pack_type_is_dense_order<node_t>(q));
 		CHECK(pack_zero_constant<node_t>(q) == nullptr);
-		tref zero = pack_dense_order_between<node_t>(q, nullptr, nullptr);
-		tref mid = pack_dense_order_between<node_t>(q, nullptr, nullptr);
-		REQUIRE(zero != nullptr);
-		REQUIRE(mid != nullptr);
-		CHECK(pack_dense_order_compare<node_t>(q, zero, mid) == 0);
-		tref above = pack_dense_order_between<node_t>(q, zero, nullptr);
-		tref below = pack_dense_order_between<node_t>(q, nullptr, zero);
-		REQUIRE(above != nullptr);
-		REQUIRE(below != nullptr);
-		CHECK(pack_dense_order_compare<node_t>(q, below, zero) == -1);
-		CHECK(pack_dense_order_compare<node_t>(q, above, zero) == 1);
-		tref between = pack_dense_order_between<node_t>(q, below, zero);
-		REQUIRE(between != nullptr);
-		CHECK(pack_dense_order_compare<node_t>(q, below, between) == -1);
-		CHECK(pack_dense_order_compare<node_t>(q, between, zero) == -1);
-		// the type's 0 is no point of the order
-		CHECK_FALSE(pack_dense_order_compare<node_t>(q, zero,
-			build_bf_f_type<node_t>(q)).has_value());
+		CHECK(pack_dense_order_between<node_t>(q, nullptr, nullptr)
+			== nullptr);
 #endif
 	}
 	TEST_CASE("pack_type_is_atomless agrees with every descriptor's flag") {

@@ -865,6 +865,8 @@ result<tref> pack_semantic_pwr_optimal(tref clause, tref update) {
 			if (opt.has_value()) r.emplace(std::move(*opt));
 		}
 	});
+	// No owner in the pack: no revision, not a failure.
+	if (!r.has_value() && !r.has_error()) r.emplace(nullptr);
 	return r;
 }
 

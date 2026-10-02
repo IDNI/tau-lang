@@ -148,7 +148,7 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		static_assert(ba_has_value_constant<N, bv> && ba_has_value_constant<N, sbf_ba>);
 		static_assert(!ba_has_value_constant<N, qlt>);
 		static_assert(ba_has_bool_carrier_type<N, bv> && !ba_has_bool_carrier_type<N, sbf_ba>);
-		static_assert(ba_has_omcat_qe<N, qlt> && ba_has_semantic_pwr<N, qlt>);
+		static_assert(ba_has_omcat_qe<N, qlt> && !ba_has_semantic_pwr<N, qlt>);
 		static_assert(!ba_has_omcat_qe<N, bv> && !ba_has_semantic_pwr<N, bv>);
 		static_assert(ba_has_codegen_witness<N, bv>);
 		static_assert(!ba_has_codegen_witness<N, sbf_ba> && !ba_has_codegen_witness<N, qlt>);
