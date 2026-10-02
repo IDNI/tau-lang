@@ -111,9 +111,10 @@ result<std::optional<solution<node>>> solve_system(
 /**
  * @brief Solves the given set of equations.
  *
- * A model from the owning BA's ordering solver
- * (`omcat_solve_inequality_system`) is checked against every atom before it
- * is returned; a model that does not hold falls through to the general path.
+ * For a non-ABA omega-categorical type, whose variables are points, the
+ * owning BA's point solver (`omcat_solve_inequality_system`) answers the
+ * whole system, and its model is checked against every atom before it is
+ * returned.
  * @tparam node Tree node type.
  * @param eqs The set of equations to solve.
  * @param options The solver options.

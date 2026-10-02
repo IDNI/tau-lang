@@ -94,54 +94,67 @@ add_repl_test(solver_cmd-qint-solve-two_vars
 add_repl_test(solver_cmd-qint-solve-unsatisfiable
 	"solve x : qint = 0 && x : qint != 0." "no solution") # qint.cpp:123-125
 
-# qlt -- tests/integration/solver/test_integration-solver-qlt.cpp
+# qlt -- src/boolean_algebras/qlt/tests/test_integration-solver-qlt.cpp
+#
+# A qlt variable is a point and a qlt constant a set of points, so every value
+# solve gives a qlt variable is one rational.
 
 add_repl_test(solver_cmd-qlt-find_solution-one_var
-	"solve {(0, 1)}:qlt x = 0." "solution: \\{") # qlt.cpp:19-21
+	"solve {(0, 1)}:qlt x = 0." "x := \\{ 0 \\}:qlt")
 add_repl_test(solver_cmd-qlt-find_solution-two_vars
-	"solve {(0, 1)}:qlt x | {[1, 2)}:qlt y = 0." "solution: \\{") # qlt.cpp:23-25
+	"solve {(0, 1)}:qlt x | {[1, 2)}:qlt y = 0." "solution: \\{")
 add_repl_test(solver_cmd-qlt-find_solution-complement
-	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0." "solution: \\{") # qlt.cpp:27-29
+	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0." "y := \\{ 1/2 \\}:qlt")
 
+# x would lie in (0, 1) and outside it.
 add_repl_test(solver_cmd-qlt-ineq_system-complement
-	"solve {(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0." "solution: \\{") # qlt.cpp:38-43
+	"solve {(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0." "no solution")
 add_repl_test(solver_cmd-qlt-ineq_system-two_vars
-	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:45-50
+	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
+# No point is the empty set or the whole order, so any point will do.
 add_repl_test(solver_cmd-qlt-ineq_system-generic_complement
-	"solve x : qlt != 0 && (x : qlt)' != 0." "solution: \\{") # qlt.cpp:52-57
+	"solve x : qlt != 0 && (x : qlt)' != 0." "x := \\{ 0 \\}:qlt")
 
 add_repl_test(solver_cmd-qlt-solve_system-basic
-	"solve {(0, 1)}:qlt x = 0 && {(0, 1)}:qlt' x != 0." "solution: \\{") # qlt.cpp:67-72
+	"solve {(0, 1)}:qlt x = 0 && {(0, 1)}:qlt' x != 0." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve_system-shared_coeff
-	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:75-80
+	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
+# x & y' = 0 says x = y for points, so the symmetric difference is 0.
 add_repl_test(solver_cmd-qlt-solve_system-relational
-	"solve x : qlt & (y : qlt)' = 0 && (x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0)." "solution: \\{") # qlt.cpp:82-87
+	"solve x : qlt & (y : qlt)' = 0 && (x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0)." "no solution")
+# A variable equals a constant only when the constant is one point.
+add_repl_test(solver_cmd-qlt-solve-equals_interval
+	"solve x:qlt = {[0, 1]}:qlt." "no solution")
+add_repl_test(solver_cmd-qlt-solve-equals_point
+	"solve x:qlt = {1/2}:qlt." "x := \\{ 1/2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-membership_and_order
+	"solve x:qlt < y:qlt && {[0, 1]}:qlt & y != 0 && x != {0}:qlt." "x := \\{ -1 \\}:qlt")
 
 add_repl_test(solver_cmd-qlt-solve-neq0
-	"solve x : qlt != 0." "solution: \\{") # qlt.cpp:105-107
+	"solve x : qlt != 0." "solution: \\{")
 # The typed 0 and 1 are the ends of the qlt order, not points, so `x != 0`
 # and `x != 1` constrain nothing and every mode solves them.
 add_repl_test(solver_cmd-qlt-solve-neq0-min
-	"solve --min (x : qlt != 0)." "solution: \\{") # qlt.cpp:108
+	"solve --min (x : qlt != 0)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-neq0-max
-	"solve --max (x : qlt != 0)." "solution: \\{") # qlt.cpp:109
+	"solve --max (x : qlt != 0)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1
-	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{") # qlt.cpp:112-114
+	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
-	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:115
+	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
-	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{") # qlt.cpp:116
+	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-two_vars
-	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{") # qlt.cpp:119-121
+	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
-	"solve x : qlt = 0 && x : qlt != 0." "no solution") # qlt.cpp:124-126
+	"solve x : qlt = 0 && x : qlt != 0." "no solution")
 
 # Regression: <= normalizes to a negated ordering atom (bf_nlteq); the omcat
 # gate must still route it to qlt's own solver instead of falling through to
 # the ABA solve_inequality_system, which cannot handle ordering atoms and
 # used to abort the process.
 add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
-	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{") # qlt.cpp:130-133
+	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{")
 
 # Relations between qlt variables are solved jointly: the model satisfies them
 # and a satisfiable chain has a solution.

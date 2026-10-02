@@ -1795,35 +1795,19 @@ result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 		}
 		else system.second.insert(eq);
 	}
-	// For an omcat ordering system, the owning BA's own solver is
-	// authoritative: the BA-level solve_inequality_system cannot handle
-	// bf_lt/bf_gt atoms. bf_neq atoms are compatible too: the owning BA's
-	// quantifier elimination can puncture the satisfying interval at the
-	// excluded point (the U/W execution encoding produces exactly this
-	// mix, e.g. `{0} < o1[t] && o1[t] != {1/2}`).
+	// A variable of a non-ABA omega-categorical type is a point, so the
+	// owning BA's point solver answers the whole system, in every mode:
+	// the Boolean-algebra solve below would answer with elements of the
+	// constants' algebra, which are no points.
+	if (pack_type_is_non_aba_omcat<node>(options.type_id)) {
+		inequality_system<node> all(system.second);
+		for (tref eq : eqs)
+			if (tau::get(eq).child_is(tau::bf_eq)) all.insert(eq);
+		return r.with_value(omcat_solve_verified<node>(all, options));
+	}
 	bool has_ordering = false;
 	for (tref neq : system.second)
 		if (is_ordering_atom<node>(neq)) { has_ordering = true; break; }
-	if (has_ordering && !system.first.has_value()
-	    && pack_type_is_non_aba_omcat<node>(options.type_id))
-	{
-		bool dlo_compatible = true;
-		for (tref neq : system.second)
-			if (!is_ordering_atom<node>(neq)
-				&& !tau::get(neq).child_is(tau::bf_neq))
-				{ dlo_compatible = false; break; }
-		// A failed attempt (e.g. a bf_neq in XOR-encoded rather than
-		// comparison form, which the owning BA's QE cannot read) falls
-		// through to the solve-then-verify path below.
-		// The owning BA's model is checked against every atom before it
-		// is returned, as the fallback path below does: qlt skips the
-		// disequalities it cannot read and relies on this. A model that
-		// does not verify falls through like a decline.
-		if (dlo_compatible)
-			if (auto s = omcat_solve_verified<node>(system.second,
-					options); s)
-				return r.with_value(std::move(s));
-	}
 	// SO-1: a system that still contains an ordering atom cannot be handed
 	// to solve_system as-is: check_extreme_solution only rejects on
 	// equals_F() after bf_reduce_canonical, so an extreme solution violating
@@ -2124,7 +2108,18 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					tau::get(n).get_ba_type()))
 				return false;
 			const tau& n_t = tau::get(n);
-			if (n_t[0].child_is(tau::variable)) {
+			// A variable of a non-ABA omega-categorical type is a
+			// point: it takes another variable or a constant that
+			// is one point, never a set. Any other equation stays
+			// for the owner's point solver.
+			const size_t type = find_ba_type<node>(n);
+			auto assignable = [&](tref term) {
+				return !pack_type_is_non_aba_omcat<node>(type)
+					|| is_point_term<node>(type, term);
+			};
+			if (n_t[0].child_is(tau::variable)
+				&& assignable(n_t.second()))
+			{
 				// First child is a single variable
 				tref var = n_t.first();
 				tref term = n_t.second();
@@ -2132,7 +2127,9 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					assignment_check, var, term))
 					normalize_and_add_assignment<node>(
 						var_assignments, var, term);
-			} else if (n_t[1].child_is(tau::variable)) {
+			} else if (n_t[1].child_is(tau::variable)
+				&& assignable(n_t.first()))
+			{
 				// Second child is a single variable
 				tref var = n_t.second();
 				tref term = n_t.first();
@@ -2330,16 +2327,15 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				op.splitter_one = node::ba::splitter_one(type_tree);
 				// A variable of an ordered type that is no Boolean
 				// algebra stands for one point of the order, so its
-				// model comes from the owner's point solver. The
+				// model comes from the owner's point solver, in every
+				// mode: points have no least or greatest model. The
 				// Boolean-algebra solve below answers with elements
-				// (top, bot, intervals) that are no points; a minimum
-				// or maximum is asked of it only in those elements.
-				std::optional<solution<node>> points;
-				if (options.mode == solver_mode::general
-					&& pack_type_is_non_aba_omcat<node>(type))
-					points = omcat_solve_verified<node>(
+				// (top, bot, intervals) that are no points, so it is
+				// never asked.
+				if (pack_type_is_non_aba_omcat<node>(type)) {
+					auto points = omcat_solve_verified<node>(
 						order_atoms[type], op);
-				if (points) {
+					if (!points) { skip = true; break; }
 					for (const auto& [var, value]: points.value())
 						clause_solution[var] = value;
 				} else {
@@ -2367,8 +2363,7 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					// Skip already solved variables
 					if (clause_solution.contains(fv)) continue;
 					const size_t fv_type = find_ba_type<node>(fv);
-					if (options.mode == solver_mode::general
-						&& pack_type_is_non_aba_omcat<node>(fv_type))
+					if (pack_type_is_non_aba_omcat<node>(fv_type))
 						if (tref pt = pack_zero_constant<node>(
 							fv_type); pt)
 						{
