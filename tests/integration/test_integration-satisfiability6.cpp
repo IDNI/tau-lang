@@ -933,3 +933,195 @@ TEST_SUITE("satisfiability regression") {
 		for (tref v : io_vars)
 			CHECK( is_io_initial<node_t>(v) );
 	}
+// -----------------------------------------------------------------------------
+// pin_written_warm_ups reads the lookback a clause keeps off the body rebuilt
+// through the construction hooks, the tree the decision procedures normalize
+// (src/satisfiability.h, pin_written_warm_ups).
+TEST_SUITE("pin_written_warm_ups on the folded body") {
+
+	// The body of the statement @p stmt (a wff wrapping wff_always or
+	// wff_sometimes), as in spec_always_body.
+	static tref statement_body(tref stmt) {
+		REQUIRE( stmt != nullptr );
+		return tau::trim2(stmt);
+	}
+
+	// Deepest lookback the normal form of @p body keeps once the body is
+	// rebuilt through the construction hooks.
+	static int_t folded_kept_lookback(tref body) {
+		auto nf = normalize_non_temp<node_t>(tau::reget(body));
+		REQUIRE( nf.has_value() );
+		return nf.value() ? get_max_shift<node_t>(io_vars_of(nf.value()))
+			: 0;
+	}
+
+	// Deepest lookback @p body is written with.
+	static int_t written_lookback(tref body) {
+		return get_max_shift<node_t>(io_vars_of(body));
+	}
+
+	// A clause whose normal form keeps the lookback it is written with
+	// needs no marker: the formula comes back as the node it was given,
+	// in both polarities and without temporal operator.
+	TEST_CASE("pin_written_warm_ups: a clause that keeps its lookback is returned as is") {
+		const char* specs[] = {
+#ifdef TAU_PACK_HAS_BA_BV
+			// a definition over the previous value and an input, and a
+			// conditional second output
+			"always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8] && "
+				"(i1[t]:bv[8] = { 0 } ? o2[t]:bv[8] = o1[t-1]:bv[8] "
+				": o2[t]:bv[8] = { 1 }).",
+			// the same always part under a negation
+			"!(always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]).",
+#endif
+			// a conditional whose branches differ keeps the lookback of
+			// its condition
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
+			// an always part and a sometimes clause, both reading the past
+			"(always o2[t] = 1 && o1[t-2] = 0) && "
+				"(sometimes o3[t] = o3[t-1]).",
+			// no temporal operator
+			"o2[t] = 1 && i1[t-1] = 0.",
+		};
+		for (const char* spec : specs) {
+			CAPTURE( spec );
+			tref fm = spec_as_written(spec);
+			REQUIRE( fm != nullptr );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( r.value() == fm );
+			CHECK( warm_up_pin(r.value()) == -1 );
+		}
+		// the always body of the conditional whose branches differ
+		// keeps its lookback once folded
+		tref body = statement_body(tau::get(spec_as_written(
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0)."))
+			.find_top(is_child<node_t, tau::wff_always>));
+		CHECK( written_lookback(body) == 2 );
+		CHECK( folded_kept_lookback(body) == 2 );
+	}
+
+	// Without a marker the tree the decision procedures receive is the
+	// folded one: built as written, pinned and rebuilt through the hooks,
+	// it is the node the folded build gives, and so are its normal form
+	// and its execution form.
+	TEST_CASE("pin_written_warm_ups: without a marker the decided tree is the folded one") {
+		const char* specs[] = {
+#ifdef TAU_PACK_HAS_BA_BV
+			"always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8] && "
+				"(i1[t]:bv[8] = { 0 } ? o2[t]:bv[8] = o1[t-1]:bv[8] "
+				": o2[t]:bv[8] = { 1 }).",
+#endif
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
+			"(always o2[t] = 1 && o1[t-2] = 0) && "
+				"(sometimes o3[t] = o3[t-1]).",
+		};
+		for (const char* spec : specs) {
+			CAPTURE( spec );
+			// the folded side first, before the specification is pinned
+			tref folded = tau::reget(create_spec(spec));
+			REQUIRE( folded != nullptr );
+			auto folded_nf = normalize_with_temp_simp<node_t>(folded);
+			REQUIRE( folded_nf.has_value() );
+			auto folded_ex = transform_to_execution<node_t>(folded);
+			REQUIRE( folded_ex.has_value() );
+			const std::string folded_nf_str =
+				tau::get(folded_nf.value()).to_str();
+			const std::string folded_ex_str =
+				tau::get(folded_ex.value()).to_str();
+
+			tref raw = spec_as_written(spec);
+			REQUIRE( raw != nullptr );
+			auto pinned = pin_written_warm_ups<node_t>(raw);
+			REQUIRE( pinned.has_value() );
+			REQUIRE( pinned.value() == raw );
+			tref decided = tau::reget(pinned.value());
+			CHECK( decided == folded );
+			auto nf = normalize_with_temp_simp<node_t>(decided);
+			REQUIRE( nf.has_value() );
+			CHECK( nf.value() == folded_nf.value() );
+			CHECK( tau::get(nf.value()).to_str() == folded_nf_str );
+			auto ex = transform_to_execution<node_t>(decided);
+			REQUIRE( ex.has_value() );
+			CHECK( ex.value() == folded_ex.value() );
+			CHECK( tau::get(ex.value()).to_str() == folded_ex_str );
+		}
+	}
+
+	// A clause whose folded body drops the literal that carries its
+	// lookback keeps the marker at the lookback it is written with: a
+	// tautology, an absorbed literal, and a conditional the hooks fold
+	// to one branch; the cases over bv[8] run where the pack holds bv.
+	TEST_CASE("pin_written_warm_ups: the marker follows the normal form of the folded body") {
+		struct pin_case { const char* spec; int_t k; };
+		const pin_case always_cases[] = {
+			{ "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+				"(sometimes o2[t-1] = 0).", 2 },
+			{ "(always o2[t] = 1 && (o1[t-2] | o1[t-2]') = 1) && "
+				"(sometimes o2[t-1] = 0).", 2 },
+			// a conditional whose branches are the same folds to its
+			// branch and drops the literal that carries the lookback
+			{ "always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 1).", 2 },
+			{ "(always o3[t] = 1 && "
+				"(o1[t-3] = 0 ? o2[t] = o2[t-1] : o2[t] = o2[t-1])) && "
+				"(sometimes o3[t-1] = 0).", 3 },
+#ifdef TAU_PACK_HAS_BA_BV
+			{ "(always o2[t]:bv[8] = 1 && "
+				"o1[t-2]:bv[8] = o1[t-2]:bv[8]) && "
+				"(sometimes o2[t-1]:bv[8] = 0).", 2 },
+			{ "always o1[0]:bv[8] = { 3 } && o1[1]:bv[8] = { 2 } && "
+				"o1[2]:bv[8] = { 0 } && "
+				"(o1[t-1]:bv[8] = { 2 } ? "
+				"(o1[t-1]:bv[8] = o1[t-3]:bv[8] ? "
+				"o1[t]:bv[8] = o1[t-1]:bv[8] : o1[t]:bv[8] = o1[t-1]:bv[8]) "
+				": o1[t]:bv[8] = i1[t]:bv[8]).", 3 },
+			// a conditional on a constant folds to one branch
+			{ "always o1[0]:bv[8] = { 3 } && "
+				"({ 3 }:bv[8] < { 200 }:bv[8] ? o1[t]:bv[8] = i1[t]:bv[8] "
+				": o1[t]:bv[8] = o1[t-2]:bv[8]).", 2 },
+#endif
+		};
+		for (const auto& c : always_cases) {
+			CAPTURE( c.spec );
+			tref fm = spec_as_written(c.spec);
+			REQUIRE( fm != nullptr );
+			tref body = statement_body(tau::get(fm)
+				.find_top(is_child<node_t, tau::wff_always>));
+			CHECK( written_lookback(body) == c.k );
+			CHECK( folded_kept_lookback(body) < c.k );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( r.value() != fm );
+			CHECK( warm_up_pin(r.value()) == c.k );
+		}
+		// a sometimes clause
+		{
+			const char* spec = "(always o2[t] = 1 && o3[t-1] = 0) && "
+				"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).";
+			tref fm = spec_as_written(spec);
+			REQUIRE( fm != nullptr );
+			tref body = statement_body(tau::get(fm)
+				.find_top(is_child<node_t, tau::wff_sometimes>));
+			CHECK( written_lookback(body) == 1 );
+			CHECK( folded_kept_lookback(body) < 1 );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( warm_up_pin(r.value()) == 1 );
+		}
+		// under a negation, and two always statements, one absorbing a
+		// literal of the other
+		{
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(
+				"!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+				"(sometimes o2[t-1] = 0))."));
+			REQUIRE( r.has_value() );
+			CHECK( warm_up_pin(r.value()) == 2 );
+			auto a = pin_written_warm_ups<node_t>(spec_as_written(
+				"(always o2[t] = 1) && "
+				"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+				"(sometimes o2[t-1] = 0)."));
+			REQUIRE( a.has_value() );
+			CHECK( warm_up_pin(a.value()) == 2 );
+		}
+	}
+}
