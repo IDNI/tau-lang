@@ -206,150 +206,6 @@ static void ocltl_swap_crosscheck(tref fm, bool solver_result) {
 	}
 }
 
-// ── LT-4: joint satisfiability of a conjunction of order atoms ───────────────
-//
-// `aba_existential_feasibility`'s fast path for a non-aba omcat type
-// eliminates each free variable SEPARATELY against the original formula, and
-// an owner's per-variable elimination only detects a contradiction when the
-// same subtree bounds the eliminated variable from both sides.  A transitivity
-// chain over three or more variables — `o1 < o2 ∧ o2 < o3 ∧ ¬(o1 < o3)` —
-// therefore survives every single elimination while being jointly UNSAT, so the
-// oracle passes an infeasible strategy edge and the specification comes back
-// falsely REALIZABLE.
-//
-// Such an order is linear, and a conjunction of order literals over one is
-// unsatisfiable exactly when the implied ≤-graph contains a cycle carrying at
-// least one strict edge.  Build that graph over the atoms' operand subtrees —
-// structurally equal operands are interned to the same tref, so identity is
-// the right key — and close it.
-//
-// The check is ONE-DIRECTIONAL by construction: `true` means "provably UNSAT",
-// `false` means only "not proven UNSAT".  Disjunctions, `≠` literals and order
-// facts between distinct constants are ignored, which can only ever hide a
-// contradiction (making the caller fall through to the general solver), never
-// invent one.  That is the safe direction: a spurious "infeasible" would turn
-// into a spurious UNREALIZABLE verdict.
-template <NodeType node>
-static bool qlt_order_conj_unsat(tref fm) {
-	using tau = tree<node>;
-
-	// Term identity MUST be structural, not tref identity.  `o1[t]` occurring
-	// in `o1 < o2` and again in `!(o1 < o3)` is the same term but not
-	// necessarily the same tref — that is exactly why the codebase carries
-	// `subtree_map` / `subtree_set` (see extract_data_atoms' "structural
-	// equality (subtree_equals)" note).  Keying by raw tref turned the three
-	// chain variables into six disconnected graph nodes, so no cycle could
-	// ever close.
-	std::vector<tref> terms;
-	subtree_map<node, int> term_idx;
-	auto idx_of = [&](tref n) -> int {
-		if (auto it = term_idx.find(n); it != term_idx.end()) return it->second;
-		int id = (int)terms.size();
-		terms.push_back(n);
-		term_idx.emplace(n, id);
-		return id;
-	};
-
-	// rel: 0 = ignore, 1 = a <= b, 2 = a < b, 3 = a == b.
-	std::vector<std::tuple<int,int,int>> rels; // (lhs_idx, rhs_idx, rel)
-
-	std::function<void(tref,bool)> walk = [&](tref n, bool neg) {
-		const auto& t = tau::get(n);
-		if (!t.has_child()) return;
-		auto op = t[0].value.nt;
-		if (op == tau::wff_neg) { walk(t[0].first(), !neg); return; }
-		// Only descend through connectives that are conjunctive under the
-		// current polarity; anything else is ignored (see the one-directional
-		// note above).  ¬(A ∧ B) is a disjunction and must NOT be split.
-		//
-		// wff_and / wff_or are N-ARY: `A && B && C` is ONE node with three
-		// children, not a nested pair.  Reading only first()/second() silently
-		// dropped every conjunct past the second, which is precisely long
-		// enough to hide a three-variable transitivity chain.
-		if ((!neg && op == tau::wff_and) || (neg && op == tau::wff_or)) {
-			const auto& cop = t[0];
-			for (size_t i = 0; i < cop.children_size(); ++i)
-				walk(cop.child(i), neg);
-			return;
-		}
-		if (op == tau::wff) { walk(t[0].first(), neg); return; }
-
-		// Order atoms only.  An atom whose BA type is known and is not a
-		// non-aba omcat type is skipped; an atom whose type cannot be determined
-		// still participates, since operands only ever join the graph when
-		// they are the same subtree and a strict-order cycle is a
-		// contradiction in any linearly ordered BA.
-		{
-			size_t atom_ti = find_ba_type<node>(n);
-			if (atom_ti != 0 && !pack_type_is_non_aba_omcat<node>(atom_ti)) return;
-		}
-
-		tref l = t[0].first();
-		tref r = t[0].second();
-		if (!l || !r) return;
-
-		// Normalise to (lhs, rhs, rel) with the "n"-prefixed spellings the
-		// tau tree uses for already-negated comparisons folded in.
-		int rel = 0;
-		bool flip = false;
-		switch (op) {
-		case tau::bf_lt:    rel = 2;              break;  // l <  r
-		case tau::bf_lteq:  rel = 1;              break;  // l <= r
-		case tau::bf_gt:    rel = 2; flip = true; break;  // r <  l
-		case tau::bf_gteq:  rel = 1; flip = true; break;  // r <= l
-		case tau::bf_eq:    rel = 3;              break;  // l == r
-		case tau::bf_nlt:   rel = 1; flip = true; break;  // !(l<r)  ≡ r <= l
-		case tau::bf_nlteq: rel = 2; flip = true; break;  // !(l<=r) ≡ r <  l
-		case tau::bf_ngt:   rel = 1;              break;  // !(l>r)  ≡ l <= r
-		case tau::bf_ngteq: rel = 2;              break;  // !(l>=r) ≡ l <  r
-		default:            return;                       // incl. bf_neq
-		}
-		if (neg) {
-			// Complement: ¬(a<b) ≡ b<=a, ¬(a<=b) ≡ b<a; a negated equality
-			// carries no order content.
-			if      (rel == 2) { rel = 1; flip = !flip; }
-			else if (rel == 1) { rel = 2; flip = !flip; }
-			else               return;
-		}
-		if (flip) { tref tmp = l; l = r; r = tmp; }
-		rels.emplace_back(idx_of(l), idx_of(r), rel);
-	};
-	walk(fm, false);
-
-	const int n = (int)terms.size();
-	if (n == 0 || rels.empty()) return false;
-
-	// best[i][j]: 0 = no known relation, 1 = i <= j, 2 = i < j.
-	const size_t n_sz = static_cast<size_t>(n);
-	std::vector<int> best(n_sz * n_sz, 0);
-	auto at = [&](int i, int j) -> int& {
-		// i and j come from idx_of, so both are in [0, n).
-		return best[static_cast<size_t>(i) * n_sz + static_cast<size_t>(j)];
-	};
-	for (auto& [i, j, rel] : rels) {
-		if (rel == 3) {                       // i == j: both directions, ≤
-			at(i, j) = std::max(at(i, j), 1);
-			at(j, i) = std::max(at(j, i), 1);
-		} else {
-			at(i, j) = std::max(at(i, j), rel);
-		}
-	}
-	// Transitive closure keeping track of whether a strict edge is on the path.
-	for (int k = 0; k < n; ++k)
-		for (int i = 0; i < n; ++i) {
-			if (!at(i, k)) continue;
-			for (int j = 0; j < n; ++j) {
-				if (!at(k, j)) continue;
-				int w = (at(i, k) == 2 || at(k, j) == 2) ? 2 : 1;
-				if (w > at(i, j)) at(i, j) = w;
-			}
-		}
-	// A cycle through a strict edge means some x satisfies x < x.
-	for (int i = 0; i < n; ++i)
-		if (at(i, i) == 2) return true;
-	return false;
-}
-
 template <NodeType node>
 static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	using tau = tree<node>;
@@ -384,14 +240,8 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 		// then pass an infeasible strategy edge and report a false
 		// REALIZABLE.
 		//
-		// Two complementary guards are applied:
-		//   * `qlt_order_conj_unsat` proves joint UNSAT for order chains --
-		//     it is what actually catches the transitivity case, since
-		//     neither the per-variable QE nor `is_non_temp_nso_satisfiable`
-		//     does; despite its name it is pack-generic (any dense-order
-		//     omcat family), not qlt-specific;
-		//   * the free-variable cap below keeps the per-variable path from
-		//     claiming SAT in the ≥3-variable cases it cannot decide.
+		// The free-variable cap below keeps the per-variable path from
+		// claiming SAT in the ≥3-variable cases it cannot decide.
 		// With at most two free variables the residual after eliminating one
 		// is a constraint on a single remaining variable, so per-variable
 		// emptiness and joint emptiness coincide and the fast path is exact.
@@ -402,10 +252,6 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 		// `api::set_ltl_qe_max_vars`, with TAU_LTL_OMCAT_QE_MAX_VARS as
 		// the environment fallback (default 2; see ltl_qe_max_vars() in
 		// ltl_aba_limits.h).
-
-		// Joint check first: it is the only thing that catches a
-		// transitivity chain, and it is exact when it fires.
-		if (qlt_order_conj_unsat<node>(fm)) return false;
 
 		const trefs& free_vars = tau::get(fm).get_free_vars();
 		const size_t qe_max_vars = ltl_qe_max_vars();
@@ -1031,11 +877,8 @@ static result<bool> guard_is_aba_feasible(
 // initial-value convention makes lookback atoms appear unconditionally
 // infeasible from t=0, which is incorrect in the LTL context.
 //
-// That "initial lookback values are 0" convention is one of the three t=0
-// conventions in the codebase; the authoritative statement of all three
-// (this one, Algorithm D's initial memory ρ₀ = type_of(0), and the LA-N3
-// inner-S auxiliary anchor S(-1) = false) lives at `alg_d::initial_memory`
-// in algorithm_d_game.h.
+// That "initial lookback values are 0" convention sits beside the LA-N3
+// inner-S auxiliary anchor S(-1) = false.
 template <NodeType node>
 static bool atom_has_lookback(tref atom) {
 	using tau = tree<node>;

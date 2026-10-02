@@ -90,13 +90,13 @@ add_ltl_run_test(data_game_strategy_bv_bits
 	"o2\\[0\\] := 335"
 	"no strategy|not executable|unsat|cannot")
 
-# the strategy of a game on the order types of qlt values: every output is
-# a rational, never the 0 or 1 of the type, and o1 meets 1/2 two steps
-# after a value at most 0
-add_ltl_run_test(data_game_strategy_order_types
+# realizable over qlt sets (o2 := 1, then o1 empty and two steps later
+# {1/2}), but no strategy over the data is found: the run says so instead of
+# playing an unchecked one
+add_ltl_run_test(data_game_strategy_qlt_sets_unchecked
 	"run (((o1[t]:qlt != i1[t-1]:qlt || {1}:qlt <= o2[t-1]:qlt)) U ((o1[t-2]:qlt <= {0}:qlt && o1[t]:qlt = {1/2}:qlt))).\\n{1}\\n{2}\\n{3}\\n{4}\\nq\\nq\\n"
-	"o1\\[[2-4]\\] := 1/2"
-	":= bot|:= top|no strategy|not executable|unsat|no values|no outputs")
+	"not executable"
+	":= ")
 
 # once o1 has met its goal the strategy no longer depends on i1, and the
 # run stops asking for it

@@ -220,7 +220,6 @@ struct formula_regions {
 			if (!sat) { failed = true; return true; }
 			return !*sat;
 		}
-		if (qlt_order_conj_unsat<node>(f)) return true;
 		// an undecided check is no emptiness: the game fails instead
 		auto sat = is_non_temp_nso_satisfiable<node>(f);
 		if (!sat.has_value()) {

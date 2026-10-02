@@ -89,7 +89,11 @@ add_repl_test(realizable_cmd-qlt-degenerate_open_interval_unsat "realizable (alw
 add_repl_test(realizable_cmd-qlt-sometimes_positive_sat "realizable (sometimes o1[t]:qlt > {0}:qlt)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-qlt-always_positive_sometimes_below_one_sat "realizable (always o1[t]:qlt > {0}:qlt) && (sometimes o1[t]:qlt < {1}:qlt)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-qlt-always_half_conflicts_sometimes_above_three_quarter_unsat "realizable (always o1[t]:qlt = {1/2}:qlt) && (sometimes o1[t]:qlt > {3/4}:qlt)." ": F")
-add_repl_test(realizable_cmd-qlt-strictly_increasing_sat "realizable (always o1[t]:qlt > o1[t-1]:qlt)." ": T")
+# A strictly increasing chain of qlt sets has no fixpoint the temporal
+# normalization reaches: each step asks for one more set above the last, a
+# condition no quantifier-free formula over qlt states. The answer is T, and
+# the search gives UNKNOWN at its step cap (--max-fixpoint-steps).
+add_repl_test(realizable_cmd-qlt-strictly_increasing_sat "realizable (always o1[t]:qlt > o1[t-1]:qlt)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 
 # satisfiability: tau_ba
 add_repl_test(realizable_cmd-tau_ba-constant_t_always_sat "realizable (always o1[t] = {T})." ": T")
@@ -179,7 +183,7 @@ add_repl_test(realizable_cmd-ltl_benchmarks-lb_10_priority_arbiter_g_i1_o1_o1_i1
 # ltl: multi_type_oracle
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_01_g_qlt_real_g_sbf_real_real "realizable G ((o1[t]:qlt > {0}:qlt) && (o2[t]:sbf = {X & Y}:sbf))." ": T")
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_02_g_qlt_unreal_g_sbf_real_unreal "realizable G ((o1[t]:qlt > {1}:qlt) && (o1[t]:qlt < {0}:qlt) && (o2[t]:sbf = {X & Y}:sbf))." ": F")
-add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_03_g_qlt_f_bv_real "realizable G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) && F ((o2[t]:bv[8] = {181}:bv[8]))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_03_g_qlt_f_bv_real "realizable G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {[0,1]}:qlt)) && F ((o2[t]:bv[8] = {181}:bv[8]))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_04_g_qlt_g_sbf_g_bv_all_real_real "realizable (G ((o1[t]:qlt = {1/2}:qlt))) && (G ((o2[t]:sbf = {X | (Y & Z)}:sbf))) && (G ((o3[t]:bv[8] = {240}:bv[8])))." ": T")
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_05_g_qlt_g_qint_both_real_real "realizable G ((o1[t]:qlt = {3/4}:qlt)) && G ((o2[t]:qint = {[0,1/2)}:qint))." ": T")
 add_repl_test(realizable_cmd-ltl_multi_type_oracle-mt_06_f_qlt_f_sbf_both_reachable_real "realizable F ((o1[t]:qlt = {1/3}:qlt)) && F ((o2[t]:sbf = {X & Y}:sbf))." ": T" REQUIRES ltlsynt)
@@ -199,7 +203,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0003_qlt_bv_unreal_contradictory
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0004_qlt_bv_until_across_types "realizable (o1[t]:qlt > {0}:qlt) until (o2[t]:bv[8] = {15}:bv[8])." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0005_qlt_sbf_g_safety_with_both_types_constrained "realizable G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o2[t]:sbf = {X & Y}:sbf)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0006_qlt_sbf_unreal_qlt_contradiction_poisons_conjunction "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt && o2[t]:sbf = {X}:sbf)." ": F")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0007_qlt_sbf_past_reference_on_qlt_current_sbf "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:sbf = {X | (Y & Z)}:sbf)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0007_qlt_sbf_past_reference_on_qlt_current_sbf "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:sbf = {X | (Y & Z)}:sbf)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0008_qlt_hsb_g_conjunction_both_realizable "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:hsb = {top}:hsb)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0009_qlt_hsb_f_liveness_across_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:hsb != {bot}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0010_qlt_hsb_implication_from_qlt_to_hsb "realizable G (o1[t]:qlt > {0}:qlt -> o2[t]:hsb = {top}:hsb)." ": T")
@@ -250,20 +254,20 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0054_qlt_bv_sbf_f_liveness_three
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0055_qlt_bv_sbf_until_on_qlt_with_g_on_bv_sbf "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X ^ Y}:sbf))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0056_qlt_bv_sbf_g_f_on_all_three_types "realizable G (F (o1[t]:qlt > {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0057_qlt_bv_sbf_unreal_g_constant_then_f_different "realizable (G (o1[t]:qlt = {0}:qlt)) && (F (o1[t]:qlt = {1}:qlt))." ": F")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0058_qlt_bv_sbf_past_reference_mixed "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0058_qlt_bv_sbf_past_reference_mixed "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0059_qlt_bv_hsb_g_safety_three_outputs "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:bv[8] = {240}:bv[8] && o3[t]:hsb = {top}:hsb)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0060_qlt_bv_hsb_f_liveness_three_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:hsb != {bot}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0061_qlt_bv_hsb_unreal_bv_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o2[t]:bv[8] = {0}:bv[8] && o3[t]:hsb = {top}:hsb)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0062_qlt_bv_hsb_implication_from_qlt_to_bv_with_hsb "realizable G (o3[t]:hsb = {top}:hsb && (o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {255}:bv[8]))." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0063_qlt_bv_hsb_until_on_qlt_f_on_bv_hsb "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8])) && (F (o3[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0064_qlt_bv_hsb_past_reference_on_qlt_g_on_bv_hsb "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0064_qlt_bv_hsb_past_reference_on_qlt_g_on_bv_hsb "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0065_qlt_bv_hsb_unreal_qlt_always_positive_but_f_requires_negative "realizable (G (o1[t]:qlt > {0}:qlt)) && (F (o1[t]:qlt < {0}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0066_qlt_bv_qint_g_safety_three_types "realizable G (o1[t]:qlt = {3/4}:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0067_qlt_bv_qint_f_liveness_three_types "realizable (F (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {42}:bv[8])) && (F (o3[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0068_qlt_bv_qint_unreal_qlt_contradiction "realizable G (o1[t]:qlt = {1/2}:qlt && o1[t]:qlt = {2/3}:qlt && o2[t]:bv[8] = {42}:bv[8])." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0069_qlt_bv_qint_implication_chain_across_three_types "realizable G ((o1[t]:qlt > {0}:qlt -> o2[t]:bv[8] = {255}:bv[8]) && (o2[t]:bv[8] = {255}:bv[8] -> o3[t]:qint = {[0, 1)}:qint))." ": T")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0070_qlt_bv_qint_until_on_bv_with_g_on_qlt_qint "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0071_qlt_bv_qint_past_reference_with_three_types "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0070_qlt_bv_qint_until_on_bv_with_g_on_qlt_qint "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0071_qlt_bv_qint_past_reference_with_three_types "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0072_qlt_bv_tau_g_safety_three_types "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0073_qlt_bv_tau_f_liveness_three_types "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8])) && (F (o3[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0074_qlt_bv_tau_unreal_tau_forced_to_contradictory_values "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:tau = {T.}:tau && o3[t]:tau = {F.}:tau)." ": F")
@@ -274,8 +278,8 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0078_qlt_sbf_hsb_g_safety_three_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0079_qlt_sbf_hsb_f_liveness_three_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:sbf = {X ^ Y}:sbf)) && (F (o3[t]:hsb != {bot}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0080_qlt_sbf_hsb_unreal_qlt_contradiction "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0081_qlt_sbf_hsb_implication_from_sbf_to_hsb "realizable G (o1[t]:qlt > {0}:qlt && (o2[t]:sbf = {X}:sbf -> o3[t]:hsb = {top}:hsb))." ": T")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0082_qlt_sbf_hsb_until_on_sbf_with_g_on_qlt_hsb "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o3[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0083_qlt_sbf_hsb_past_reference_on_qlt_with_sbf_hsb "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0082_qlt_sbf_hsb_until_on_sbf_with_g_on_qlt_hsb "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o3[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0083_qlt_sbf_hsb_past_reference_on_qlt_with_sbf_hsb "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0084_qlt_sbf_qint_g_safety_three_types "realizable G (o1[t]:qlt = {3/4}:qlt && o2[t]:sbf = {X | (Y & Z)}:sbf && o3[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0085_qlt_sbf_qint_f_liveness_three_types "realizable (F (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:sbf = {X ^ Y}:sbf)) && (F (o3[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0086_qlt_sbf_qint_unreal_sbf_contradiction "realizable G (o2[t]:sbf = {X}:sbf && o2[t]:sbf = {X}:sbf' && o1[t]:qlt > {0}:qlt && o3[t]:qint = {[0, 1)}:qint)." ": F")
@@ -330,7 +334,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0134_qlt_bv_sbf_hsb_implication_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0135_qlt_bv_sbf_hsb_until_on_qlt_with_g_on_bv_sbf_hsb "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X | (Y & Z)}:sbf && o4[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0136_qlt_bv_sbf_hsb_g_f_on_all_four_types "realizable G (F (o1[t]:qlt > {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0137_qlt_bv_sbf_hsb_unreal_bv_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {0}:bv[8] && o2[t]:bv[8] = {255}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb)." ": F")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0138_qlt_bv_sbf_hsb_past_reference_on_qlt "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0138_qlt_bv_sbf_hsb_past_reference_on_qlt "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0139_qlt_bv_sbf_hsb_input_output "realizable G ((i1[t]:qlt > {0}:qlt -> o1[t]:bv[8] = {255}:bv[8]) && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0140_qlt_bv_sbf_hsb_until_on_qlt_with_g_on_rest "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0141_qlt_bv_sbf_qint_g_safety_four_types "realizable G (o1[t]:qlt = {3/4}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:qint = {[0, 1)}:qint)." ": T")
@@ -338,7 +342,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0142_qlt_bv_sbf_qint_f_liveness_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0143_qlt_bv_sbf_qint_unreal_sbf_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o3[t]:sbf = {X}:sbf' && o4[t]:qint = {[0, 1)}:qint)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0144_qlt_bv_sbf_qint_implication_chain "realizable G ((o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {255}:bv[8]) && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0145_qlt_bv_sbf_qint_until_on_sbf "realizable (G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o4[t]:qint = {[-1, 0) | [1, 2)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0146_qlt_bv_sbf_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0146_qlt_bv_sbf_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0147_qlt_bv_sbf_qint_unreal_qlt_g_f_contradiction "realizable (G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0148_qlt_bv_sbf_qint_g_f_liveness_on_all_four "realizable G (F (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0149_qlt_bv_sbf_tau_g_safety_four_types "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:tau = {T.}:tau)." ": T")
@@ -353,7 +357,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0157_qlt_bv_hsb_qint_f_liveness_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0158_qlt_bv_hsb_qint_unreal_bv_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {0}:bv[8] && o2[t]:bv[8] = {255}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0159_qlt_bv_hsb_qint_implication "realizable G (o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && (o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {255}:bv[8]))." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0160_qlt_bv_hsb_qint_until_on_qlt_with_g_on_rest "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[-1, 0) | [1, 2)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0161_qlt_bv_hsb_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0161_qlt_bv_hsb_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0162_qlt_bv_hsb_tau_g_safety_four_types "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0163_qlt_bv_hsb_tau_f_liveness_four_types "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:hsb != {bot}:hsb)) && (F (o4[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0164_qlt_bv_hsb_tau_unreal_tau_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:tau = {T.}:tau && o4[t]:tau = {F.}:tau)." ": F")
@@ -364,11 +368,11 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0168_qlt_bv_qint_tau_f_liveness_
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0169_qlt_bv_qint_tau_unreal_qlt_contradiction "realizable G (o1[t]:qlt = {1/2}:qlt && o1[t]:qlt = {2/3}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0170_qlt_bv_qint_tau_until_on_qlt_with_g_on_rest "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0171_qlt_bv_qint_tau_implication_chain "realizable G ((o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {255}:bv[8]) && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)." ": T")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0172_qlt_bv_qint_tau_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0172_qlt_bv_qint_tau_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0173_qlt_sbf_hsb_qint_g_safety_four_types "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:sbf = {X & Y}:sbf && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0174_qlt_sbf_hsb_qint_unreal_sbf_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:sbf = {X}:sbf && o2[t]:sbf = {X}:sbf' && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0175_qlt_sbf_hsb_qint_f_liveness_four_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:sbf = {X ^ Y}:sbf)) && (F (o3[t]:hsb != {bot}:hsb)) && (F (o4[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0176_qlt_sbf_hsb_qint_until_on_sbf_with_g_on_rest "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0176_qlt_sbf_hsb_qint_until_on_sbf_with_g_on_rest "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0177_qlt_sbf_hsb_tau_g_safety_four_types "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:sbf = {X & Y}:sbf && o3[t]:hsb = {top}:hsb && o4[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0178_qlt_sbf_hsb_tau_unreal_tau_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb && o4[t]:tau = {T.}:tau && o4[t]:tau = {F.}:tau)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0179_qlt_sbf_hsb_tau_f_liveness_four_types "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:sbf = {X ^ Y}:sbf)) && (F (o3[t]:hsb != {bot}:hsb)) && (F (o4[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
@@ -390,7 +394,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0194_qlt_bv_sbf_hsb_qint_implica
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0195_qlt_bv_sbf_hsb_qint_until_on_qlt_with_g_on_rest "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0196_qlt_bv_sbf_hsb_qint_unreal_bv_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {0}:bv[8] && o2[t]:bv[8] = {255}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0197_qlt_bv_sbf_hsb_qint_g_f_liveness_five_types "realizable G (F (o1[t]:qlt > {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0198_qlt_bv_sbf_hsb_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0198_qlt_bv_sbf_hsb_qint_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0199_qlt_bv_sbf_hsb_tau_g_safety_five_types "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0200_qlt_bv_sbf_hsb_tau_f_liveness_five_types "realizable (F (o1[t]:qlt = {2/3}:qlt)) && (F (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:sbf = {X ^ Y}:sbf)) && (F (o4[t]:hsb != {bot}:hsb)) && (F (o5[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0201_qlt_bv_sbf_hsb_tau_unreal_tau_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:tau = {T.}:tau && o5[t]:tau = {F.}:tau)." ": F")
@@ -402,7 +406,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0206_qlt_bv_sbf_qint_tau_g_safet
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0207_qlt_bv_sbf_qint_tau_f_liveness_five_types "realizable (F (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8])) && (F (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o4[t]:qint = {[1/4, 3/4)}:qint)) && (F (o5[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0208_qlt_bv_sbf_qint_tau_unreal_qlt_g_f_contradiction "realizable (G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0209_qlt_bv_sbf_qint_tau_until_on_sbf_with_g_on_rest "realizable (G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0210_qlt_bv_sbf_qint_tau_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0210_qlt_bv_sbf_qint_tau_past_reference "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0211_qlt_bv_hsb_qint_tau_g_safety_five_types "realizable G (o1[t]:qlt = {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0212_qlt_bv_hsb_qint_tau_f_liveness_five_types "realizable (F (o1[t]:qlt > {2/3}:qlt)) && (F (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:hsb != {bot}:hsb)) && (F (o4[t]:qint = {[1/4, 3/4)}:qint)) && (F (o5[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0213_qlt_bv_hsb_qint_tau_unreal_bv_contradiction "realizable G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o2[t]:bv[8] = {0}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)." ": F")
@@ -422,15 +426,15 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0226_6_type_unreal_tau_contradic
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0227_6_type_implication_chain_across_all_six "realizable G ((o1[t]:qlt > {1/2}:qlt -> o2[t]:bv[8] = {255}:bv[8]) && (o3[t]:sbf = {X}:sbf -> o6[t]:tau = {T.}:tau) && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0228_6_type_until_on_qlt_with_g_on_five "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0229_6_type_g_f_liveness_on_all_six "realizable G (F (o1[t]:qlt > {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0230_6_type_past_reference_on_qlt_with_five_others "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)." ": T")
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0230_6_type_past_reference_on_qlt_with_five_others "realizable G (o1[t]:qlt > o1[t-1]:qlt && o2[t]:bv[8] = {15}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0231_6_type_input_output_across_six_types "realizable G ((i1[t]:qlt > {0}:qlt -> o1[t]:bv[8] = {255}:bv[8]) && o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0232_6_type_until_on_qlt_with_g_on_five "realizable ((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0233_6_type_unreal_g_always_half_but_f_needs_different "realizable (G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0234_6_type_unreal_bv_always_42_but_f_needs_0 "realizable (G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && (F (o2[t]:bv[8] = {0}:bv[8]))." ": F")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0235_6_type_until_on_bv_with_g_on_five "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {0}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0235_6_type_until_on_bv_with_g_on_five "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {0}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0236_6_type_negation_on_bv_with_five_other_types "realizable G (!(o2[t]:bv[8] = {0}:bv[8]) && o1[t]:qlt > {0}:qlt && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0237_6_type_mixed_temporal_operators_across_all_types "realizable (G (o1[t]:qlt > {0}:qlt && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o6[t]:tau = {T.}:tau)) && (F (o2[t]:bv[8] = {255}:bv[8])) && (F (o5[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0238_6_type_until_on_sbf_with_f_on_bv_and_g_on_rest "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0238_6_type_until_on_sbf_with_f_on_bv_and_g_on_rest "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)) && (F (o2[t]:bv[8] = {181}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0239_6_type_unreal_qlt_positive_forever_but_f_needs_non_positive "realizable (G (o1[t]:qlt > {0}:qlt)) && (F (o1[t]:qlt <= {0}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0240_6_type_disjunction_across_two_types_with_four_constant_guards "realizable G ((o1[t]:qlt > {0}:qlt || o2[t]:bv[8] = {255}:bv[8]) && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0241_6_type_varied_constants_across_all_types "realizable G ((o1[t]:qlt = {-1}:qlt || o1[t]:qlt = {1/2}:qlt) && o2[t]:bv[8] = {181}:bv[8] && o3[t]:sbf = {X | (Y & Z)}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[-1, 0) | [1, 2)}:qint && o6[t]:tau = {T.}:tau)." ": T")
@@ -442,7 +446,7 @@ add_repl_test(realizable_cmd-ltl_many_sorted-ms_0246_6_type_g_f_on_qlt_and_bv_wi
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0247_6_type_unreal_qlt_always_positive_but_f_needs_negative "realizable (G (o1[t]:qlt > {0}:qlt && o6[t]:tau = {T.}:tau)) && (F (o1[t]:qlt < {0}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0248_6_type_g_f_mixed_with_until_across_types "realizable (G (F (o1[t]:qlt > {1/2}:qlt))) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_many_sorted-ms_0249_6_type_complex_implication_with_disjunction_and_negation "realizable G ((!(o1[t]:qlt = {0}:qlt) -> o2[t]:bv[8] = {255}:bv[8] || o3[t]:sbf = {X}:sbf) && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)." ": T")
-add_repl_test(realizable_cmd-ltl_many_sorted-ms_0250_6_type_comprehensive_six_type_with_varied_temporal_ops "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o6[t]:tau = {T.}:tau)) && (F (o2[t]:bv[8] = {181}:bv[8])) && ((o5[t]:qint = {[0, 1)}:qint) until (o5[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-ltl_many_sorted-ms_0250_6_type_comprehensive_six_type_with_varied_temporal_ops "realizable (G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o6[t]:tau = {T.}:tau)) && (F (o2[t]:bv[8] = {181}:bv[8])) && ((o5[t]:qint = {[0, 1)}:qint) until (o5[t]:qint = {[1/4, 3/4)}:qint))." ": T" REQUIRES ltlsynt)
 
 # ltl: correctness
 # EQUIV-01: r1 == r2, and CHECK(r1) -> both T
@@ -746,8 +750,9 @@ add_repl_test(realizable_cmd-ltl_qlt_bv-qr_10_u_gt0_eq_half "realizable (o1[t]:q
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_11_g_half_or_two_thirds "realizable G (o1[t]:qlt = {1/2}:qlt || o1[t]:qlt = {2/3}:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_12_f_gt_third_and_g_lt1 "realizable F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_13_s_quarter_three_quarters "realizable (o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_14_g_lookback_lt_strictly_increasing "realizable G (o1[t-1]:qlt < o1[t]:qlt)." ": T")
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_15_g_gt_lookback_increasing "realizable G (o1[t]:qlt > o1[t-1]:qlt)." ": T")
+# strictly increasing chains: see realizable_cmd-qlt-strictly_increasing_sat
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_14_g_lookback_lt_strictly_increasing "realizable G (o1[t-1]:qlt < o1[t]:qlt)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_15_g_gt_lookback_increasing "realizable G (o1[t]:qlt > o1[t-1]:qlt)." "UNKNOWN" FLAGS --max-fixpoint-steps 10 NO_TRACE FAIL_REGEX "%[0-9]+: [TF]")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_16_g_empty_interval_unreal "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_17_g_eq_i1_and_gt1_unreal "realizable G (o1[t]:qlt = i1[t]:qlt && o1[t]:qlt > {1}:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_18_f_eq_i1_and_lt0_unreal "realizable F (o1[t]:qlt = i1[t]:qlt && o1[t]:qlt < {0}:qlt)." ": F" REQUIRES ltlsynt)
@@ -971,8 +976,7 @@ add_repl_budget_test(realizable_cmd-bv_budget_wide_product
 add_repl_budget_test(realizable_cmd-bv_budget_products_of_steps
 	"realizable (always (((o2[t]:bv[8] * {1}:bv[8]) <= o1[t-1]:bv[8]) && (o1[t-2]:bv[8] = i1[t-1]:bv[8]))) && (sometimes (((o2[t]:bv[8] - o2[t-1]:bv[8]) != (o1[t]:bv[8] * o2[t-2]:bv[8])) || ((o1[t-1]:bv[8] * {3}:bv[8]) < (i1[t-2]:bv[8] * i1[t-1]:bv[8])))) && (sometimes ((o2[t]:bv[8] != (i1[t-2]:bv[8] + {2}:bv[8])) || ((o2[t]:bv[8] * o1[t-2]:bv[8]) != i1[t]:bv[8])))")
 
-# Streams of a dense order read through order comparisons are played on the
-# order type of the window: how its values and the constants compare.
+# qlt streams read through the order of sets, inclusion.
 # The empty set lies below every input, so o1 can stay empty.
 add_repl_test(realizable_cmd-data_game_order_types_input_below_output
 	"realizable (G (o1[t]:qlt <= i1[t]:qlt)) && (F (({0}:qlt != o2[t-1]:qlt && o1[t]:qlt = o1[t-1]:qlt)))" ": T" REQUIRES ltlsynt)
@@ -981,9 +985,11 @@ add_repl_test(realizable_cmd-data_game_order_types_until_input_changes
 	"realizable (({1/2}:qlt > i1[t]:qlt) U (i1[t]:qlt != i1[t-1]:qlt))" ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-data_game_order_types_constant_input_below_one
 	"realizable (always {0}:qlt = o1[t-1]:qlt) && (sometimes (i1[t-1]:qlt = i1[t-1]:qlt || i1[t]:qlt < o1[t-1]:qlt)) && (sometimes (i1[t-1]:qlt != i1[t]:qlt || {1}:qlt <= i1[t]:qlt))" ": F" REQUIRES ltlsynt)
-# an i1 at most 1 is copied into o1, which must stay above 1
+# an i1 at most 1 is copied into o1, which must stay above 1: F, and both this
+# and the next (T) are UNKNOWN, their closed regions past the bounds of qlt's
+# closed decision
 add_repl_test(realizable_cmd-data_game_order_types_copied_input_above_one
-	"realizable (always (o1[t]:qlt = i1[t-1]:qlt && {1}:qlt < o1[t-1]:qlt)) && (sometimes o1[t]:qlt <= o1[t-2]:qlt)" ": F" REQUIRES ltlsynt)
+	"realizable (always (o1[t]:qlt = i1[t-1]:qlt && {1}:qlt < o1[t-1]:qlt)) && (sometimes o1[t]:qlt <= o1[t-2]:qlt)" "UNKNOWN" NO_TRACE FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
 # o2 stays below 1 and o1 climbs from 0 to 1/2 over two steps
 add_repl_test(realizable_cmd-data_game_order_types_outputs_climb
-	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" ": T" REQUIRES ltlsynt)
+	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" "UNKNOWN" NO_TRACE FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)

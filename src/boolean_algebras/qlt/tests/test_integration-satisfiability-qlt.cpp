@@ -98,12 +98,16 @@ TEST_SUITE("qlt: always and sometimes") {
 }
 
 TEST_SUITE("qlt: loopback") {
-	TEST_CASE("strictly increasing sat") {
-		// {0}, {0, 1}, {0, 1, 2}, ... increases strictly forever
+	// {0}, {0, 1}, {0, 1, 2}, ... increases strictly forever, yet each step
+	// of the temporal normalization asks for one more set above the last and
+	// no fixpoint is reached: the answer is UNKNOWN at the step cap.
+	TEST_CASE("strictly increasing is undecided") {
 		tref spec = create_spec("(always o1[t]:qlt > o1[t-1]:qlt).");
+		const size_t saved = max_fixpoint_steps;
+		max_fixpoint_steps = 10;
 		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		max_fixpoint_steps = saved;
+		CHECK_FALSE(sat.has_value());
 	}
 }
 

@@ -473,14 +473,13 @@ TEST_SUITE("codegen_parity") {
 		CHECK_MESSAGE(cli_trace.value(),
 			"CLI-style trace (o1=0, o2=0) should be admissible");
 
-		// "bot" is the order's lower end, not a point a stream can hold.
+		// "bot", the empty set, contains no set strictly.
 		auto end_trace = trace_is_admissible(spec_src,
 			{ {"o1", 0, "bot"}, {"o2", 0, "0"} });
 		INFO(end_trace.report());
 		REQUIRE(end_trace.has_value());
-		CHECK_MESSAGE(!end_trace.value(),
-			"trace (o1=bot, o2=0) puts a qlt stream at the order's end "
-			"and must be inadmissible");
+		CHECK_MESSAGE(end_trace.value(),
+			"trace (o1=bot, o2=0) should be admissible");
 
 		// artifact's rendering of the same witness: o1 prints as "-1/2".
 		auto artifact_trace = trace_is_admissible(spec_src,
@@ -490,13 +489,13 @@ TEST_SUITE("codegen_parity") {
 		CHECK_MESSAGE(artifact_trace.value(),
 			"artifact-style trace (o1=-1/2, o2=42) should be admissible");
 
-		// violating trace: o1=1 > 1/2 forces o2=42, but o2=7.
+		// violating trace: o1=[0,1] > {1/2} forces o2=42, but o2=7.
 		auto violating_trace = trace_is_admissible(spec_src,
-			{ {"o1", 0, "1"}, {"o2", 0, "7"} });
+			{ {"o1", 0, "[0, 1]"}, {"o2", 0, "7"} });
 		INFO(violating_trace.report());
 		REQUIRE(violating_trace.has_value());
 		CHECK_MESSAGE(!violating_trace.value(),
-			"trace (o1=1, o2=7) violates the spec and must be inadmissible");
+			"trace (o1=[0,1], o2=7) violates the spec and must be inadmissible");
 	}
 
 	// Always on: D18 regression pin -- the fix that routes a full-LTL

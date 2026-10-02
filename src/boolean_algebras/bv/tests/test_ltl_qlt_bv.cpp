@@ -21,6 +21,21 @@ static bool realizable(const char* s) {
 	return sat.has_value() && sat.value();
 }
 
+// Whether `s` stays undecided with the temporal normalization capped at 10
+// fixpoint steps: a strictly increasing chain of qlt sets reaches no fixpoint,
+// so its realizability is UNKNOWN at any cap.
+static bool undecided_at_step_cap(const char* s) {
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
+	if (!nso.has_value()) return false;
+	tref fm = nso.value().main->get();
+	if (!fm) return false;
+	const size_t saved = max_fixpoint_steps;
+	max_fixpoint_steps = 10;
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	max_fixpoint_steps = saved;
+	return !sat.has_value();
+}
+
 static strings run_qlt_no_input(const char* formula, size_t steps) {
 	io_context<node_t> ctx;
 	auto o1 = std::make_shared<vector_output_stream>();
@@ -82,6 +97,16 @@ static strings run_bv_with_i1(const char* formula, const strings& i1_vals, size_
 }
 
 // Parse "p/q" or "p" rational string to double for inequality checks.
+// Whether the qlt value @p v, as run prints it, satisfies @p cond, a closed
+// formula in which `X` stands for it.
+static bool value_satisfies(const std::string& v, std::string cond) {
+	const std::string value = "{ " + v + " }:qlt";
+	for (size_t at; (at = cond.find('X')) != std::string::npos; )
+		cond.replace(at, 1, value);
+	auto r = api<node_t>::sat(cond);
+	return r.has_value() && r.value();
+}
+
 static double parse_rational(const std::string& s) {
 	auto slash = s.find('/');
 	if (slash == std::string::npos) return std::stod(s);
@@ -104,12 +129,15 @@ TEST_SUITE("qlt_realizability") {
 		CHECK(realizable("F (o1[t]:qlt = {1/3}:qlt)."));
 	}
 
-	TEST_CASE("QR-04: G(o1>{0}:qlt && o1<{1}:qlt) is REALIZABLE") {
-		CHECK(realizable("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)."));
+	// < is strict inclusion: a set lies strictly between a point and an
+	// interval holding it, none between two points.
+	TEST_CASE("QR-04: G(o1>{0}:qlt && o1<{[0,1]}:qlt) is REALIZABLE") {
+		CHECK(realizable("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt)."));
+		CHECK_FALSE(realizable("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)."));
 	}
 
-	TEST_CASE("QR-05: G(o1>{1/2}:qlt && o1<{3/4}:qlt) is REALIZABLE") {
-		CHECK(realizable("G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {3/4}:qlt)."));
+	TEST_CASE("QR-05: G(o1>{1/2}:qlt && o1<{[1/2,3/4]}:qlt) is REALIZABLE") {
+		CHECK(realizable("G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {[1/2,3/4]}:qlt)."));
 	}
 
 	TEST_CASE("QR-06: G(o1=i1[t]) is REALIZABLE (mirror)") {
@@ -120,7 +148,7 @@ TEST_SUITE("qlt_realizability") {
 		CHECK(realizable("G (o1[t]:qlt = i1[t-1]:qlt)."));
 	}
 
-	TEST_CASE("QR-08: G(o1!=i1[t]) is REALIZABLE (avoid input — Q is dense)") {
+	TEST_CASE("QR-08: G(o1!=i1[t]) is REALIZABLE (avoid input — infinitely many sets)") {
 		CHECK(realizable("G (o1[t]:qlt != i1[t]:qlt)."));
 	}
 
@@ -132,20 +160,21 @@ TEST_SUITE("qlt_realizability") {
 		CHECK(realizable("G (o1[t]:qlt = {1/2}:qlt || o1[t]:qlt = {2/3}:qlt)."));
 	}
 
-	TEST_CASE("QR-12: F(o1>{1/3}:qlt) && G(o1<{1}:qlt) is REALIZABLE") {
-		CHECK(realizable("F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt)."));
+	TEST_CASE("QR-12: F(o1>{1/3}:qlt) && G(o1<{[0,1]}:qlt) is REALIZABLE") {
+		CHECK(realizable("F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {[0,1]}:qlt)."));
 	}
 
 	TEST_CASE("QR-13: (o1={1/4}:qlt) S (o1={3/4}:qlt) is REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)."));
 	}
 
-	TEST_CASE("QR-14: G(o1[t-1]<o1[t]:qlt) is REALIZABLE (strictly increasing)") {
-		CHECK(realizable("G (o1[t-1]:qlt < o1[t]:qlt)."));
+	// Realizable, but undecided: see undecided_at_step_cap.
+	TEST_CASE("QR-14: G(o1[t-1]<o1[t]:qlt) is UNKNOWN (strictly increasing)") {
+		CHECK(undecided_at_step_cap("G (o1[t-1]:qlt < o1[t]:qlt)."));
 	}
 
-	TEST_CASE("QR-15: G(o1>o1[t-1]:qlt) is REALIZABLE (increasing)") {
-		CHECK(realizable("G (o1[t]:qlt > o1[t-1]:qlt)."));
+	TEST_CASE("QR-15: G(o1>o1[t-1]:qlt) is UNKNOWN (increasing)") {
+		CHECK(undecided_at_step_cap("G (o1[t]:qlt > o1[t-1]:qlt)."));
 	}
 
 	TEST_CASE("QR-16: UNREALIZABLE: G(o1>{1}:qlt && o1<{0}:qlt) (empty interval)") {
@@ -200,7 +229,7 @@ TEST_SUITE("qlt_realizability") {
 		CHECK(realizable("(o1[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = {2/3}:qlt)."));
 	}
 
-	TEST_CASE("QR-32: REALIZABLE: G(o1!=o1[t-1]:qlt) (always change — dense Q has infinite choices)") {
+	TEST_CASE("QR-32: REALIZABLE: G(o1!=o1[t-1]:qlt) (always change — infinitely many sets)") {
 		CHECK(realizable("G (o1[t]:qlt != o1[t-1]:qlt)."));
 	}
 
@@ -224,7 +253,7 @@ TEST_SUITE("qlt_realizability") {
 		CHECK(realizable("G (o1[t-1]:qlt = {1/2}:qlt -> o1[t]:qlt = {2/3}:qlt)."));
 	}
 
-	TEST_CASE("QR-39: REALIZABLE: G(o1!=i1[t] && o1!=i1[t-1]) (avoid both inputs — Q dense)") {
+	TEST_CASE("QR-39: REALIZABLE: G(o1!=i1[t] && o1!=i1[t-1]) (avoid both inputs — infinitely many sets)") {
 		CHECK(realizable("G (o1[t]:qlt != i1[t]:qlt && o1[t]:qlt != i1[t-1]:qlt)."));
 	}
 
@@ -271,25 +300,23 @@ TEST_SUITE("qlt_execution") {
 		CHECK(found);
 	}
 
-	TEST_CASE("QE-04: G(o1>{0}:qlt && o1<{1}:qlt) outputs in (0,1)") {
+	TEST_CASE("QE-04: G(o1>{0}:qlt && o1<{[0,1]}:qlt) outputs sets between") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt).", 6);
+		auto vals = run_qlt_no_input("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {[0,1]}:qlt).", 6);
 		REQUIRE(vals.size() == 6);
 		for (auto& v : vals) {
-			double d = parse_rational(v);
-			CHECK(d > 0.0);
-			CHECK(d < 1.0);
+			CAPTURE(v);
+			CHECK(value_satisfies(v, "X > {0}:qlt && X < {[0,1]}:qlt"));
 		}
 	}
 
-	TEST_CASE("QE-05: G(o1>{1/2}:qlt && o1<{3/4}:qlt) outputs in (0.5,0.75)") {
+	TEST_CASE("QE-05: G(o1>{1/2}:qlt && o1<{[1/2,3/4]}:qlt) outputs sets between") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {3/4}:qlt).", 5);
+		auto vals = run_qlt_no_input("G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {[1/2,3/4]}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) {
-			double d = parse_rational(v);
-			CHECK(d > 0.5);
-			CHECK(d < 0.75);
+			CAPTURE(v);
+			CHECK(value_satisfies(v, "X > {1/2}:qlt && X < {[1/2,3/4]}:qlt"));
 		}
 	}
 
@@ -342,15 +369,15 @@ TEST_SUITE("qlt_execution") {
 		for (auto& v : vals) CHECK((v == "1/2" || v == "2/3"));
 	}
 
-	TEST_CASE("QE-11: F(o1>{1/3}:qlt) && G(o1<{1}:qlt) — eventually >1/3 and always <1" * doctest::skip(!ltlsynt_available())) {
+	TEST_CASE("QE-11: F(o1>{1/3}:qlt) && G(o1<{[0,1]}:qlt) — eventually above {1/3}, always below [0,1]" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt).", 8);
+		auto vals = run_qlt_no_input("F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {[0,1]}:qlt).", 8);
 		REQUIRE(vals.size() == 8);
 		bool found = false;
 		for (auto& v : vals) {
-			double d = parse_rational(v);
-			CHECK(d < 1.0);
-			if (d > 1.0/3.0) found = true;
+			CAPTURE(v);
+			CHECK(value_satisfies(v, "X < {[0,1]}:qlt"));
+			if (value_satisfies(v, "X > {1/3}:qlt")) found = true;
 		}
 		CHECK(found);
 	}
@@ -363,20 +390,23 @@ TEST_SUITE("qlt_execution") {
 		CHECK(vals[0] == "3/4");
 	}
 
-	TEST_CASE("QE-13: G(o1[t-1]<o1[t]:qlt) strictly increasing") {
+	// An undecided spec does not run (see undecided_at_step_cap).
+	TEST_CASE("QE-13: G(o1[t-1]<o1[t]:qlt) strictly increasing does not run") {
 		bdd_init<Bool>();
+		const size_t saved = max_fixpoint_steps;
+		max_fixpoint_steps = 10;
 		auto vals = run_qlt_no_input("G (o1[t-1]:qlt < o1[t]:qlt).", 5);
-		REQUIRE(vals.size() == 5);
-		for (size_t i = 1; i < vals.size(); ++i)
-			CHECK(parse_rational(vals[i-1]) < parse_rational(vals[i]));
+		max_fixpoint_steps = saved;
+		CHECK(vals.empty());
 	}
 
-	TEST_CASE("QE-14: G(o1>o1[t-1]:qlt) strictly increasing") {
+	TEST_CASE("QE-14: G(o1>o1[t-1]:qlt) strictly increasing does not run") {
 		bdd_init<Bool>();
+		const size_t saved = max_fixpoint_steps;
+		max_fixpoint_steps = 10;
 		auto vals = run_qlt_no_input("G (o1[t]:qlt > o1[t-1]:qlt).", 5);
-		REQUIRE(vals.size() == 5);
-		for (size_t i = 1; i < vals.size(); ++i)
-			CHECK(parse_rational(vals[i-1]) < parse_rational(vals[i]));
+		max_fixpoint_steps = saved;
+		CHECK(vals.empty());
 	}
 
 

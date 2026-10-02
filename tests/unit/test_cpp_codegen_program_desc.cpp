@@ -243,20 +243,16 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			"PWR revision with data-atom outputs is not supported"));
 	}
 
-	TEST_CASE("build_program_desc: witness output still builds when not revisable" * doctest::skip(!ltlsynt_available())) {
+	// qlt gives no witness to bake in: its output is solved at runtime.
+	TEST_CASE("build_program_desc: a data-atom output still builds when not revisable" * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "witness_ok", /*revisable=*/false);
 		REQUIRE(d.has_value());
-		bool found_witness = false;
-		for (auto& f : d->outputs) if (f.kind == field_kind::witness) found_witness = true;
-		CHECK(found_witness);
-		std::ostringstream os;
-		emit_program(*d, os);
-		std::string s = os.str();
-		CHECK(has(s, "tref o1"));
-		CHECK(has(s, "o.o1 ="));
-		CHECK_FALSE(has(s, "void revise("));
+		bool found_template = false;
+		for (auto& f : d->outputs)
+			if (f.kind == field_kind::witness_template) found_template = true;
+		CHECK(found_template);
 	}
 
 	// ── the Mealy view of a strategy of the data game ─────────────────────
@@ -403,26 +399,15 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
 	}
 
-	// The view of a strategy on the order types of qlt values places each
-	// value among the last ones and the constants.
-	TEST_CASE("compile_spec: the data game's Mealy view on order types is carried as a table") {
-		const std::string m = emitted_main(
-			"((i1[t-1]:qlt <= i1[t]:qlt && i1[t-1]:qlt > o1[t-1]:qlt)) "
-			"U ((o1[t]:qlt != i1[t]:qlt && o1[t-1]:qlt != i1[t-1]:qlt))",
-			"dg_view_order");
-		CHECK(has(m, "table_step_provider<node_t>::from_start"));
-		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
-	}
-
 	// An output atom that also reads its own last value has no constant
-	// witness: o2[t] > o2[t-1] is solved each step for the value o2[t-1]
+	// witness: o2[t] != o2[t-1] is solved each step for the value o2[t-1]
 	// holds.
 	TEST_CASE("build_program_desc: a self-lookback atom of a type with witnesses is solved at runtime") {
-		auto sol = synth("G(o2[t]:qlt > o2[t-1]:qlt)");
+		auto sol = synth("G(o2[t]:bv[8] != o2[t-1]:bv[8])");
 		REQUIRE(sol);
 		REQUIRE(sol->atoms.size() == 1);
 		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
-		auto d = build_program_desc<node_t>(*sol, "self_lookback_qlt");
+		auto d = build_program_desc<node_t>(*sol, "self_lookback_bv");
 		REQUIRE(d.has_value());
 		REQUIRE(d->outputs.size() == 1);
 		CHECK(d->outputs[0].kind == field_kind::witness_template);
@@ -1112,11 +1097,11 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// ── (h) program_desc::atoms (atom_desc) emission ──────────────────────
 
 	// ground_expr reconstructs a single-variable equality atom via build_bf_eq
-	// and the literal's own codegen_constant_expr rendering (qlt_rational(1, 2),
-	// not a re-parsed string).
+	// and the literal's own codegen_constant_expr rendering, not a re-parsed
+	// string.
 	TEST_CASE("build_program_desc: atom_desc captures a ground-equality atom "
 	          "over a real BA type" * doctest::skip(!ltlsynt_available())) {
-		auto sol = synth("G(o1[t]:qlt = {1/2}:qlt)");
+		auto sol = synth("G(o1[t]:bv[8] = {5}:bv[8])");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
 		auto d = build_program_desc<node_t>(*sol, "atom_ground");
 		REQUIRE(d.has_value());
@@ -1124,7 +1109,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(d->atoms[0].prop == sol->atoms[0].second);
 		CHECK(has(d->atoms[0].ground_expr, "build_bf_eq<"));
 		CHECK(has(d->atoms[0].ground_expr, "build_out_var_at_t<"));
-		CHECK(has(d->atoms[0].ground_expr, "qlt_rational(1, 2)"));
+		CHECK(has(d->atoms[0].ground_expr, "make_bitvector_value(8, \"5\", 10)"));
 
 		std::ostringstream os;
 		emit_program(*d, os);

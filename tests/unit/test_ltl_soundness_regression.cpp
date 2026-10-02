@@ -73,9 +73,10 @@ TEST_SUITE("LTL soundness regression (k-ary positive forbids)") {
 	// Regression: any structural tri-atom formula that previously passed
 	// should still pass.  Add a few representative shapes.
 	TEST_CASE("three qlt atoms in F, each individually feasible" * doctest::skip(!ltlsynt_available())) {
+		// < is strict inclusion: {0, 1/2} meets all three
 		CHECK(realizable(
 			"F ((o1[t]:qlt > {0}:qlt)"
-			" && (o1[t]:qlt < {1}:qlt)"
+			" && (o1[t]:qlt < {[0,1]}:qlt)"
 			" && (o1[t]:qlt > {1/2}:qlt))."
 		));
 	}
