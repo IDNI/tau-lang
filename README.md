@@ -376,10 +376,7 @@ only when `realizable` would answer F; when realizability is undecided the
 message says UNKNOWN and names the budget or the reason that stopped it.
 The global options, the budgets among them, are given before the verb
 (`tau --ltl-timeout 120 compile spec.tau`).  A spec `run` cannot execute is
-refused the same way.  An Algorithm-B verdict over the `qlt` type (see the
-synthesis algorithms below), whose strategy is over bookkeeping bits rather
-than the data, is not such a spec: `run` and `tau compile` solve it again by
-the default path and play the strategy of its abstraction or data game.
+refused the same way.
 
 Full worked example: `examples/reactive_program/` (the `Makefile` runs
 `tau compile`; its `main.cpp` documents the shape of the emitted
@@ -823,12 +820,7 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    arithmetic too), has a bitvector type of at most 16 bits (`bv[5]` ..
    `bv[16]`, each value its bits, and the comparisons, bitwise operators,
    `+`, `-`, shifts, `min`, `max` and, while it stays small, `*` circuits
-   over them), or has a dense order (`qlt`) read through `=`, `!=`, `<`,
-   `<=`, `>` and `>=` (each history then only matters up to its *order
-   type*, how its values and the constants of the formula compare, of
-   which there are finitely many; a stream of a dense order takes these
-   codes even when only equalities read it, since the order has no
-   element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
+   over them), a region is a BDD over codes of those
    values and the game runs before (4) and (5); otherwise, or when the nodes
    the regions still need outgrow its node limit (nodes no region needs any
    more are freed as the table fills), a region is a formula whose
@@ -866,11 +858,7 @@ steps to come, and the machine is minimized. On codes of values and
 equalities, a state holds the pattern of equalities among the last values.
 On the bits of a bitvector wider than 4 bits, it holds the bits a later step
 reads, a step reads an input bit by bit (`(i1[t] & 4) != 0`), only as far as
-its move depends on the bits, and an output is a value of its type. On the
-order types of `qlt` values, it holds how the last values and the constants
-compare, a step places an input among them (`i1[t] < o1[t-1]`,
-`{1}:qlt < i1[t]`, `i1[t] = {0}:qlt`), and an output is the point it equals
-or lies strictly between its neighbours below and above. A machine is built
+its move depends on the bits, and an output is a value of its type. A machine is built
 only within 4096 states and 65536 edges; past them, or for a strategy of the
 game over formulas, the run plays the game's moves directly. The run plays that machine, which
 the Mealy introspection (the cached solution, its current state) shows, and
@@ -900,15 +888,18 @@ The LTL(ABA) implementation currently exposes the following synthesis paths:
 
 | Algorithm | `TAU_LTL_ALG` | Description |
 |-----------|--------------|-------------|
-| **Algorithm B** (default for input-bearing `qlt`) | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
+| **Algorithm B** | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
 | **Algorithm A** | automatic for pure-output formulas, or `A` for pure-output formulas | Uses only R-bits for memory type with no input propositions. Fast for pure-output formulas. When input variables are present, Algorithm A is intentionally bypassed because it cannot observe the environment's T₁ type. |
 | **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. Input-variable formulas fall through to Algorithm B. |
 
-Algorithm B is the default for formulas over the `qlt` type that contain input
-variables. Pure-output `qlt` formulas route to Algorithm A because no P-bits are
-needed. Algorithm D is accessible via `TAU_LTL_ALG=D`, but remains output-only.
-The algorithm picker follows the same soundness rule: A and D are excluded when
-input variables are present.
+These algorithms encode the order types of a dense linear order and are
+reached only through an algebra's `try_propositional_synthesis`. No algebra of
+the tree declares it since `qlt` values are sets (see
+[qlt](#qlt--finite-unions-of-rational-intervals)), so every formula takes the
+default ABA-oracle path and `TAU_LTL_ALG` has no effect on them. Algorithm B
+would be the default for formulas with input variables and A for pure-output
+ones; D is output-only. The algorithm picker follows the same soundness rule:
+A and D are excluded when input variables are present.
 
 **Synthesis timeout**: by default, `ltlsynt` is given 60 seconds to solve
 the propositional skeleton.  Set the environment variable `TAU_LTL_TIMEOUT_SEC`
@@ -927,8 +918,8 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | If set to a path, also writes the HOA strategy to that file on success. |
 | `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 | `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
-| `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path. Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
-| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
+| `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the existential quantifier-elimination fast path of a non-aba omega-categorical type (no in-tree algebra is one). Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
+| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing formulas, Algorithm A for pure-output ones, of an algebra that claims them) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
 | `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
@@ -956,7 +947,8 @@ REPL, and are present when that algebra is in the pack: `qlt` declares
 `--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at most 30,
 `TAU_QLT_T3_CAP`) and `--qlt-const-output-max` (constant-output assignments
 the fast path in front of Algorithm B enumerates, default 100,
-`TAU_QLT_CONST_OUTPUT_MAX`); `nlang` declares `--nlang-http-timeout`
+`TAU_QLT_CONST_OUTPUT_MAX`), which no longer take effect since qlt claims no
+synthesis algorithm; `nlang` declares `--nlang-http-timeout`
 (seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`).
 
 **Other environment variables.** Three Boolean switches keep an environment
@@ -2017,13 +2009,12 @@ Constants in the Tau Language are elements of some available Boolean algebra,
 usually different from just `0` and `1`. Constants in a particular Boolean algebra come
 with their own syntax.
 
-In the Tau language, we currently support the following base types.  Most are
-Boolean algebras; `qlt` is ω-categorical and decidable, and is supported for
-that reason:
+In the Tau language, we currently support the following base types, all of
+them Boolean algebras:
 1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
 2. the Boolean algebra of simple Boolean functions (`sbf`)
 3. the Boolean algebra of bitvectors of fixed bit width (`bv`)
-4. the ω-categorical theory of dense linear order without endpoints (`qlt`) — rationals under `<`; ω-categorical and decidable, hence supported
+4. the Boolean algebra of finite unions of rational intervals (`qlt`) — sets of rationals, ordered by inclusion
 5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — left-closed, right-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
 6. the Natural Language Boolean Algebra (`nlang`)
 7. the Boolean algebra of lex-half-open polyhedra in ℝ^d (`hsb`) — generalizes `qint` from 1D to d dimensions using canonical halfspaces
@@ -2226,7 +2217,7 @@ The Tau Language currently supports the following base types:
 1. `tau`: the type of Tau specifications,
 2. `sbf`: the type of simple Boolean functions,
 3. `bv[n]`: the type of bitvectors of bit width `n`,
-4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
+4. `qlt`: the Boolean algebra of finite unions of rational intervals, open, closed or half-open, bounded or not; its elements, constants and variables alike, are sets of rationals (see [qlt](#qlt--finite-unions-of-rational-intervals)),
 5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
 6. `nlang`: the Natural Language Boolean Algebra (its oracle needs `TAU_LLM_API_KEY` or `OPENAI_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
@@ -2249,18 +2240,14 @@ o1[t] : bv[8]
 
 are all valid typed elements.
 
-#### `qlt` — ω-categorical dense linear order
+#### `qlt` — finite unions of rational intervals
 
-`qlt` represents the first-order theory of the rationals under `<`: a dense
-linear order without endpoints.  This theory is ω-categorical, decidable, and
-admits quantifier elimination, which is why tau-lang supports it.  Every
-definable set is a finite Boolean combination of open/half-open/closed
-intervals with rational endpoints.
-
-tau-lang treats `qlt` specially: it is routed through a dedicated DLO
-quantifier-elimination path (`qlt_dlo_qe`), not through the Boolean-algebra
-pipeline (the comparison hooks `<`, `>`, `≤`, `≥` have their own semantics,
-and `bf_*` Boolean-function rewrites do not apply).
+`qlt` is the Boolean algebra of the subsets of the rationals that are finite
+unions of intervals: open, closed or half-open, with exact rational endpoints,
+bounded or not.  Its operations are union (`|`), intersection (`&`) and
+complement (`'`), `0` is the empty set and `1` is all of Q.  Every `qlt`
+value is such a set, constants and variables alike: a `qlt` variable or
+stream stands for a set, not for a point.
 
 Elements are written as interval expressions inside `{...}:qlt`:
 
@@ -2269,8 +2256,8 @@ Elements are written as interval expressions inside `{...}:qlt`:
 { [0.5,2) }:qlt        -- half-open interval; 0.5 parses as 1/2
 { (-inf,0) }:qlt       -- everything less than 0
 { (0,1) | [3,5) }:qlt  -- union of two intervals
-{ 0.45 }:qlt           -- singleton constant (decimal accepted)
-{ 1/3 }:qlt            -- singleton constant (rational form)
+{ 0.45 }:qlt           -- the set holding one point (decimal accepted)
+{ 1/3 }:qlt            -- the set holding one point (rational form)
 ```
 
 Endpoints are exact rationals.  The special symbols `-inf` and `+inf`
@@ -2278,22 +2265,28 @@ represent the extended line endpoints.  Parentheses `(`, `)` exclude the
 endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
 (`0.d…`) literal syntaxes are accepted.
 
-A `qlt` variable or stream stands for one point of the order, so `run` (and a
-program of `tau compile`) gives every `qlt` output a rational at every step,
-never `top`, `bot` or an interval: the step solver asks qlt's own ordering
-solver for the values (`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`,
-`o2 := 0`).  When no strategy exists, `run` says the specification is
-unrealizable.
+The comparisons are the order of the algebra, inclusion: `x <= y` is
+`x & y' = 0`, `x < y` is `x <= y && x != y`, and `>`, `>=` are their
+converses.  So `{1}:qlt < {3}:qlt` is `F` (neither set contains the other)
+while `{1}:qlt < {[0,3]}:qlt` is `T`, and `x = 0`, `x = 1` are ordinary
+equations (`x` empty, `x` everything).
 
-A point is an atom of the `qlt` constants: `{3}:qlt & x` is either `0` or
-`{3}:qlt`.  So a quantified `qlt` variable that meets one point `p` only as
-`p & x` and `p & x'` is decided by its two cases, `x := p` and another point
-(`ex x ((({3}:qlt & x) != 0) && (({3}:qlt & x') != 0))` is `F`).  Otherwise a
-closed quantifier whose `qlt` terms are Boolean combinations of constants is
-`T` (for `ex`) or `F` (for `all`) when a point at, between or beyond the
-constants' endpoints is a witness or a counterexample, and an existential
-whose body only excludes values (`x != t`, each `t` free of `x`) is `T`; when
-none of these applies, the binder stays.
+The algebra has atoms, the one-point sets: every nonzero element contains one,
+yet an interval is no finite union of them.  `{3}:qlt & x` is either `0` or
+`{3}:qlt`, so `ex x ((({3}:qlt & x) != 0) && (({3}:qlt & x') != 0))` is `F`,
+while the same with `{[0,1]}:qlt`, or with `{3}:qlt | {5}:qlt`, is `T`.  A
+closed formula, any quantifier prefix, is decided exactly: its constants cut Q
+into finitely many regions, and a formula only asks which parts of a region
+the variables leave empty, which depends on how many points the region has
+(one, a few, or infinitely many).  An existential whose body only excludes
+values (`x != t`, each `t` free of `x`) is `T`, and a variable the positive
+part pins to one term (`a <= x && x <= a`) is replaced by it.  Otherwise a
+quantifier over a formula with other free variables keeps its binder.
+
+`solve`, `run` and the programs of `tau compile` give a `qlt` variable or
+output any set: `solve x:qlt != 0 && x' != 0.` answers `x := { (0, 1) }:qlt`,
+and `run always o1[t]:qlt = {[0,1]}:qlt.` prints `o1[0] := [0, 1]`.  When no
+strategy exists, `run` says the specification is unrealizable.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 
@@ -3142,9 +3135,9 @@ across steps, instead of as a whole. It's on by default (the REPL starts with th
 `-K, --ba-component-factoring` command line option).
 
 * `Z|pwrsemantic`: Can be on/off. Enables the semantic (winning-region)
-fallback of the temporal pointwise revision, the mode that re-solves the
-revised specification as an Algorithm D game over the `qlt` type
-(`-Z, --pwr-semantic`). It's off by default.
+fallback of the temporal pointwise revision, the mode that revises a clause
+by the winning region an algebra computes for it (`-Z, --pwr-semantic`); no
+in-tree algebra declares one, so the fast mode answers. It's off by default.
 
 * `stepprop|stepdefinitionalpropagation`: Can be on/off. Before a step's
 paths are enumerated, normalizes the step formula once, substitutes every
@@ -3487,9 +3480,9 @@ variables. The available options are:
   Every value in the assignment is a constant: `solve x:bv[2] = y:bv[2]`
   answers `x := { 3 }:bv[2]` and `y := { 3 }:bv[2]`, where `lgrs` gives the
   reproductive solution `x := x|y`, `y := x|y`. An
-  ordering system over `qlt` is solved as a whole, so related variables get
-  distinct values (`solve x:qlt < y:qlt` gives `x` a smaller value than `y`),
-  and its model is checked against every atom before it is printed.
+  ordering system over `qlt` is solved as a Boolean system, the order being
+  inclusion (`solve x:qlt < y:qlt` gives `x := { bot }:qlt` and
+  `y := { top }:qlt`).
 
 * `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
 solution (LGRS) for the given equation.
@@ -3757,6 +3750,9 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 
 ## Type enumeration (ω-categorical theories)
 
+These enumerate the types of a dense linear order for the Algorithms A, B and
+D, which no in-tree algebra claims (see [Synthesis algorithms](#synthesis-algorithms)).
+
 | Header | Purpose |
 |--------|---------|
 | `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. |
@@ -3772,7 +3768,7 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 ## Algorithm A/B soundness rule
 
 Algorithm A has no input propositions, so it is sound only when the formula has
-no input variables. If a `qlt` formula contains input variables, the dispatcher
+no input variables. If a formula contains input variables, the dispatcher
 uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
 for the current T₂ type, making the synthesized strategy type-aware.
 
@@ -3923,17 +3919,18 @@ This is a short list of known issues that will be fixed in a subsequent release:
   integration with ltlsynt for pure past-LTL fragments is planned.
 * **nlang_ba**: support for additional LLM backends (OpenAI, local models) beyond
   the current DeepSeek oracle.
-* **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
-  over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
-  are supported, the dedicated DLO QE path handles the `qlt` ω-categorical theory,
-  and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
+* **qlt/qint synthesis**: `qlt` values are sets, and LTL(ABA) over `qlt` takes
+  the default ABA-oracle path, which leaves some specifications undecided
+  (`G (o1[t]:qlt > o1[t-1]:qlt)`, a strictly increasing chain of sets, runs
+  out of budget); a decision procedure for the order of sets over time is
+  open, as is further polish of the oracle over `qint`.
 * **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
   game (Zielonka's recursive algorithm over priorities derived from the Büchi,
-  co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
-  formulas; extending D to input-bearing formulas (the T₂ dimension in the
+  co-Büchi or parity acceptance `ltlsynt` prints) for output-only formulas
+  of an algebra that claims it (none in the tree); extending D to input-bearing formulas (the T₂ dimension in the
   environment states) is the open design item.
-* **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
-  T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
+* **BA type encoding for Algorithm B**: no in-tree type uses the T₁/T₂
+  type-enumeration path, which encodes a dense linear order.  Extension to other BA types (sbf, bv, tau) requires
   BDD-based type encoding: the type of a BA element relative to the formula's
   named constants is determined by which atom of the subalgebra generated by those
   constants the element falls in — equivalently, the element's BDD restricted to

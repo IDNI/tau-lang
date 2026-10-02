@@ -120,8 +120,9 @@ Declare `atomless = false` whenever your algebra has an atom, even if it is
 infinite. Core then never distributes a quantifier over several disequations
 (`ex x (A && B) == ex x A && ex x B` for negated atoms), a law that holds only
 without atoms (`pack_type_is_atomic`). It keeps that law's `F`, which holds in
-any Boolean algebra, asks your `omcat_qe` otherwise, and keeps the binder
-when neither decides.
+any Boolean algebra, asks your `omcat_qe` otherwise (for a block of several
+variables, the first as `var` and the rest as `ex` binders around the body),
+and keeps the binder when neither decides.
 
 `is_one`, `is_zero`, `is_closed`, `normalize`, `splitter`, and
 `simplify_term` can each run a full decision or rewrite procedure. Each one
@@ -189,10 +190,10 @@ need solver or LTL types, which sit beside their single consumer:
 | `zero_constant(ba_type)`, `value_constant(ba_type, v)` | the type's default zero, when it is not `bf_f`; a constant holding a plain integer | owner |
 | `modular_width(ba_type)`, `modular_value(ba_type, c)` | that the type's values are the integers below 2^n with unsigned modular semantics (bitwise Boolean operators, `+ - *` modulo 2^n, unsigned `/ %` and comparisons, logical shifts), and the integer a constant holds; 0 / `nullopt` when not. The data game then plays such a stream on its n bits, and normalization folds a disjunction pinning one variable to every value of the type to `T` (dually, a conjunction excluding every value to `F`) (bv declares it, answering 0 while widening is on) | owner |
 | `decide_closed(form)` | the truth of a closed formula over the type whatever its quantifier prefix, with no quantifier eliminated first; `nullopt` when undecided. The data game then keeps, as the regions of a game over streams of that one type, the formulas whose quantifiers the normalizer leaves standing, and decides them whole (bv declares it) | owner |
-| `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (qlt declares it) | owner |
+| `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (no in-tree algebra declares it) | owner |
 | `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
 | `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
-| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`); `nullptr` keeps the binder | owner |
+| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (over a dense order, `ex x (a < x && x < b)` is `a < b`); `nullptr` keeps the binder | owner |
 | `omcat_solve_inequality_system(sys, opts)` | solve a pure ordering system over your theory | owner |
 | `try_propositional_synthesis(fm, atoms)` | synthesise a propositional strategy for your own atoms | the single declarer |
 | `semantic_pwr_optimal(clause, update)` | revise a clause through your winning region | first declarer that answers |
@@ -275,9 +276,7 @@ separately, and when your type owns the operator but you declined, it preserves
 the comparison as an atom rather than falling through to the generic Boolean
 definition. So return `nullptr` freely for operands you cannot fold — the atom
 survives for the solver. `wff_eq` and `wff_neq` differ: every algebra has the
-Boolean equation, so when you decline core's own equality rules go on (qlt
-uses them to decide `v = 1` for a point variable, since its typed 0 and 1 are
-the order's ends rather than points).
+Boolean equation, so when you decline core's own equality rules go on.
 
 A hook keeps a fixed signature too, so it cannot carry a report. A hook
 that meets a failure there declines with `nullptr` and names the blocking

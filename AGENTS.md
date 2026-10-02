@@ -355,7 +355,7 @@ target also runs the `release-wasm-nothreads` suite unless the build argument
 The core abstraction. Every BA is a plugin in its own directory:
 - `sbf/` — simple Boolean formulas (BDD-backed)
 - `tau/` — Tau BA (embedding Tau specs as a BA)
-- `qint/` — rational intervals · `qlt/` — dense linear order (non-aba omcat)
+- `qint/` — rational intervals · `qlt/` — finite unions of rational intervals (atomic; values are sets)
 - `hsb/` — half-open polyhedra in R^d · `nlang/` — natural-language BA
 - `bv/` — bitvectors (CVC5 and/or bitblasting); the only *parameterized* type
   (`bv[8]` and `bv[16]` are distinct types of one family)
@@ -484,7 +484,7 @@ Checks whether a Tau specification is satisfiable. `solver.h` handles the underl
 
 ### LTL(ABA) realizability and synthesis (`src/ltl_aba*.h`)
 
-Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for ω-categorical types live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`; the qlt type enumeration and semantic revision live with the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_semantic_pwr.tmpl.h`).
+Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for a dense linear order live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`, its type enumeration and semantic revision in the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_ltl_synthesis.tmpl.h`, `qlt_semantic_pwr.tmpl.h`); no algebra reaches them, since qlt values are sets and qlt declares neither `try_propositional_synthesis` nor `semantic_pwr_optimal`, so qlt formulas take the default ABA-oracle path.
 
 ### Code generation, revision and bindings
 
