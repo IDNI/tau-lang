@@ -2263,9 +2263,11 @@ quantifier over a formula with other free variables keeps its binder.
 
 `solve`, `run` and the programs of `tau compile` give a `qlt` variable or
 output any set: `solve x:qlt != 0 && x' != 0.` answers `x := { (0, 1) }:qlt`,
-and `run always o1[t]:qlt = {[0,1]}:qlt.` prints `o1[0] := [0, 1]`; a printed
-union such as `0 | [1/2, 1]` reads back as the same set.  When no strategy
-exists, `run` says the specification is unrealizable.
+and `run always o1[t]:qlt = {[0,1]}:qlt.` prints `o1[0] := { [0, 1] }:qlt`.
+`run` and compiled programs write every `qlt` output as a typed constant
+(`{ 3 }:qlt`, `{ 0 | [1/2, 1] }:qlt`, `{ bot }:qlt`), which pastes back as
+the same set, and an input stream reads that form as well as the bare one.
+When no strategy exists, `run` says the specification is unrealizable.
 
 The closed decision has bounds: at most 16 variables, 64 regions, a
 quantifier nesting of 20 and 2^20 splits, and inside the data game the time

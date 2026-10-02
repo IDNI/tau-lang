@@ -1113,7 +1113,7 @@ void print_solver_cmd_solution(std::ostream& out,
 		size_t t = find_ba_type<node>(var);
 		if (t == 0) t = type_id;
 		std::stringstream ss;
-		auto ser = serialize_constant<node>(ss, value, t);
+		auto ser = serialize_bare_constant<node>(ss, value, t);
 		if (ser.has_error()) {
 			ser.report().print(out);
 		}
@@ -2539,7 +2539,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
 		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
 		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
-		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"
+		"  ltlguardmaxcubes       synthesis game guard DNF cubes       512\n"
 		"  ltlrefinementrounds    ABA-oracle refinement rounds         64\n"
 		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n"
 		"  ltlclosedregionstimeout data game on closed regions (s)     20\n"

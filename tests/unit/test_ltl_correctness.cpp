@@ -914,10 +914,10 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 
 TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 
-	// Algorithm B path: qlt atoms with an input variable, one output var.
-	// The liveness conjunct F(o1 = 1/2) is exactly the obligation that
-	// `always T` drops on the floor.
-	TEST_CASE("[LT6-EXEC-01] Algorithm-B spec does not execute as `always T`") {
+	// qlt atoms with an input variable, one output var. The liveness
+	// conjunct F(o1 = 1/2) is exactly the obligation that `always T` drops
+	// on the floor.
+	TEST_CASE("[LT6-EXEC-01] an input-reading spec does not execute as `always T`") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
@@ -929,12 +929,9 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 		CHECK((refused || satisfied));
 	}
 
-	// LA-10 correction of this case's original comment: this spec's atoms
-	// include the MIXED atom (i1=1/4 -> o1!=3/4), which the constant-output
-	// fast path cannot evaluate under a fixed output, so realizability is
-	// decided by Algorithm B — whose strategy over bookkeeping bits stays
-	// non-executable. The pin is unchanged: never `always T`.
-	TEST_CASE("[LT6-EXEC-02] Algorithm-B-decided spec does not execute as `always T`") {
+	// This spec's atoms include the MIXED atom (i1=1/4 -> o1!=3/4): it must
+	// never execute as `always T`.
+	TEST_CASE("[LT6-EXEC-02] a mixed-atom spec does not execute as `always T`") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(

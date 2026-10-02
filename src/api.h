@@ -356,8 +356,8 @@ struct api {
 	 */
 	static void set_ltl_hoa_max_states(size_t n);
 	/**
-	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
-	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
+	 * @brief Cap on the DNF cubes a HOA guard label of the synthesis game
+	 * may expand into (`ltl_guard_max_cubes_param`);
 	 * 0 = unlimited. The parameter wins over the
 	 * `TAU_LTL_GUARD_MAX_CUBES` environment fallback (default 512).
 	 */

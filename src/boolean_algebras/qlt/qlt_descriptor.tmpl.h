@@ -44,6 +44,9 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = false;
 
+	/** @brief Outputs are written as qlt constants, which read back. */
+	static constexpr bool typed_output = true;
+
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
 			type_tree, type_name);

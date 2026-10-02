@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// ltl_aba_builders.tmpl.h - Algorithms A/B/C/D, solve, realize, safety, explain, CTL*
+// ltl_aba_builders.tmpl.h - solve, realize, safety, explain, CTL*
 // Split from ltl_aba.tmpl.h for readability.
 
 namespace idni::tau_lang {
@@ -112,9 +112,10 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		collect_hoist_conjuncts<node>(fm, sol.atoms));
 
 	// Past operators (S, T) require the ppLTLTT temporal tester encoding
-	// in the default path.  Algorithm A/B/D use ltl_skeleton() which
-	// passes S/T through as literal operators — those paths don't have
-	// the DFA state-variable machinery.  Skip them when S/T are present.
+	// in the default path.  A BA's propositional synthesis takes
+	// ltl_skeleton(), which passes S/T through as literal operators
+	// without the DFA state-variable machinery: skip it when S/T are
+	// present.
 	const bool has_past = has_past_operators<node>(fm);
 
 	// Ask whichever BA owns these atoms to synthesise propositionally. Past
@@ -1058,8 +1059,8 @@ ltl_to_safety_formula_full(tref fm,
 		}
 	}
 
-	// Algorithm B decides realizability by a route whose strategy is not
-	// expressible over the user's data atoms (the P_σ / D-bit machinery):
+	// A BA's propositional synthesis may decide realizability by a strategy
+	// not expressible over the user's data atoms (its own bookkeeping bits):
 	// `always T` would not encode it, and its default outputs could violate
 	// the spec. Execution is refused; the realizability verdict from
 	// `is_ltl_aba_realizable` is unaffected.
@@ -1067,8 +1068,8 @@ ltl_to_safety_formula_full(tref fm,
 		if (none(); has_data()) return nothing();
 		return r.with_error(code::unsupported_operation,
 			"the specification is REALIZABLE but the synthesised "
-			"strategy cannot be encoded as a safety formula (Algorithm B "
-			"strategy over bookkeeping bits); it is not executable");
+			"strategy cannot be encoded as a safety formula (a strategy "
+			"over bookkeeping bits); it is not executable");
 	}
 
 	// Constant-output strategy: the executable form is the materialised

@@ -523,6 +523,19 @@ bool pack_type_is_atomless(size_t ba_type) {
 }
 
 /**
+ * @brief `true` when the BA owning @p ba_type writes its outputs as typed
+ * constants (see ba_has_typed_output).
+ */
+template <typename Node>
+bool pack_type_has_typed_output(size_t ba_type) {
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_typed_output<Node, BA>) return true;
+			return false;
+		}).value_or(false);
+}
+
+/**
  * @brief `true` when a BA of the pack owns type id @p ba_type and does not
  * declare it atomless.
  *

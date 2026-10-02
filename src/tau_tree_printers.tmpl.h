@@ -198,10 +198,9 @@ std::ostream& print_binding(std::ostream& os, tref var, tref value) {
 			<< tree<node>::get(value).to_str() << "\n";
 }
 
-// Serialize a BA constant of @p type. bf_t/bf_f carry no type of their own, so
-// they render as the type's one/zero. False value if it is not a BA element.
+// A BA constant of @p type, bare; bf_t/bf_f render as the type's one/zero.
 template <NodeType node>
-result<bool> serialize_constant(std::stringstream& ss, tref constant,
+result<bool> serialize_bare_constant(std::stringstream& ss, tref constant,
 	size_t type)
 {
 	using tau = tree<node>;
@@ -222,6 +221,25 @@ result<bool> serialize_constant(std::stringstream& ss, tref constant,
 		} else return r.with_assert_check_value(false);
 	} else ss << (value | tt::ba_constant);
 	return r.with_assert_check_value(true);
+}
+
+// Serialize a BA constant of @p type. bf_t/bf_f carry no type of their own, so
+// they render as the type's one/zero; a type with typed output is written as
+// `{ v }:type`. False value if it is not a BA element.
+template <NodeType node>
+result<bool> serialize_constant(std::stringstream& ss, tref constant,
+	size_t type)
+{
+	result<bool> r;
+	if (pack_type_has_typed_output<node>(type)) {
+		TAU_TRY(std::string name, get_ba_type_name<node>(type));
+		std::stringstream bare;
+		TAU_TRY(bool ok, serialize_bare_constant<node>(bare, constant,
+			type));
+		if (ok) ss << "{ " << bare.str() << " }" << name;
+		return r.with_assert_check_value(ok);
+	}
+	return serialize_bare_constant<node>(ss, constant, type);
 }
 
 template <NodeType node>

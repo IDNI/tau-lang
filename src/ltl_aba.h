@@ -520,11 +520,13 @@ struct data_game_strategy;
 //     "constant strategy": `const_formula` is the executable
 //     `always(⋀ o_k = c_k)` and `const_outputs` lists (stream, "p/q").
 //   - `executable == false` marks a solution that cannot be compiled into a
-//     program over the user's streams (Algorithm B bookkeeping bits);
+//     program over the user's streams (a BA's propositional synthesis
+//     over bookkeeping bits);
 //     ltl_to_safety_formula_full solves the formula again without
 //     propositional synthesis to get a strategy over the data.
 //   - `atoms` carry the AP names the automaton uses (p_i on the default
-//     path, d_i on Algorithms A/D); the oracle and the safety encoding match
+//     path, d_i where a BA's propositional synthesis names them); the
+//     oracle and the safety encoding match
 //     by NAME, so a mismatch makes both vacuous.
 
 /**

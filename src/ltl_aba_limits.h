@@ -40,8 +40,8 @@ namespace idni::tau_lang {
 inline long ltl_hoa_max_states_param = -1;
 
 /**
- * @brief Cap on the DNF cubes a HOA guard label may expand into in the
- * Algorithm D product game; a guard beyond it is refused (no verdict).
+ * @brief Cap on the DNF cubes a HOA guard label of the synthesis game may
+ * expand into; a guard beyond it is refused (no verdict).
  *
  * Runtime parameter by policy (`--ltl-guard-max-cubes`, REPL
  * `set ltlguardmaxcubes`, `api::set_ltl_guard_max_cubes`); 0 = unlimited.

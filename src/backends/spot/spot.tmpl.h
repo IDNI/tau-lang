@@ -494,7 +494,7 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 
 	// -F path avoids both shell-escaping and the Linux MAX_ARG_STRLEN
 	// limit (131072) that an inline --formula="..." argument hits once a
-	// formula grows (Algorithm B with many constants).
+	// formula grows.
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
 
 	std::vector<std::string> argv = {"ltlsynt", "-F", tmp.path()};
@@ -547,9 +547,9 @@ inline result<std::string> synthesize_game(const std::string& formula,
 
 	// --polarity=no: keep the genuine arena (every sys alternative, real
 	// acceptance) instead of ltlsynt's constant-output-substituted one, so
-	// a re-solve under a different feasibility notion is sound (ALG-D-28).
+	// a re-solve under a different feasibility notion is sound.
 	// --decompose=no: a decomposed spec prints one game per part; the
-	// product game needs a single game carrying every atom.
+	// data game needs a single game carrying every atom.
 	std::vector<std::string> argv = {
 	    "ltlsynt", "-F", tmp.path(),
 	    "--polarity=no", "--decompose=no", "--print-game-hoa"};

@@ -6,8 +6,8 @@
 //   - Semantic per-step formula ((∃o. α∧β) → α) ∧ β at atomic leaves
 //   - REAL checks at temporal operator nodes for commitment-side selection
 //   - And-distribution into invariant slots for clause-level granularity
-//   - Semantic optimal mode fallback: winning-region
-//     revision via Algorithm D when fast mode drops a clause
+//   - Semantic optimal mode fallback: winning-region revision by a BA
+//     (semantic_pwr_optimal) when fast mode drops a clause
 //
 // On safety inputs G(α) * G(β), this produces the per-step formula
 // G(((∃o.α∧β)→α) ∧ β).
@@ -21,7 +21,7 @@ namespace idni::tau_lang {
 
 /// Enable the semantic ("optimal mode") fallback of the temporal pointwise
 /// revision below: when the syntactic revision drops a spec clause,
-/// re-derive it from Algorithm D's winning region
+/// re-derive it from a BA's winning region
 /// (`pack_semantic_pwr_optimal`). OFF by default. A runtime parameter by policy -- `--pwr-semantic` on the CLI,
 /// `api::set_pwr_semantic_fallback`. Lives here, not in the qlt plugin that
 /// implements the fallback itself: this file is its only reader, and core

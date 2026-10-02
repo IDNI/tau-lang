@@ -87,8 +87,8 @@ static tref parse_guard_expr(
 			: std::stoi(s.substr(start, pos - start));
 		// User-data atoms map AP-name → atom tref via `atoms`.  APs that
 		// appear in the strategy but are NOT in `atoms` are bookkeeping
-		// propositions added by the synthesis encoding (Algorithm A's
-		// R-bits, Algorithm B's P-bits, etc.).  They have no
+		// propositions added by the synthesis encoding (the step
+		// counter, a BA's own encoding bits, etc.).  They have no
 		// user-visible meaning in the derived safety formula — the
 		// strategy will assign them consistently at runtime — so they
 		// drop out as TRUE (regardless of polarity).  Without this
@@ -1546,7 +1546,7 @@ static result<void> add_consistency_constraints(
 		}
 	}
 
-	// Algorithm B: polarity-complete pairwise constraints.
+	// Polarity-complete pairwise constraints.
 	// Extends the positive pairwise check above with the 3 mixed-polarity
 	// combinations (¬p_i ∧ p_j), (p_i ∧ ¬p_j), (¬p_i ∧ ¬p_j) for each pair.
 	// Uses existential feasibility (∃m,x,y. combo) — same standard as the
@@ -2152,8 +2152,8 @@ struct ltl_aba_solution {
 	// False when realizability was decided by a route whose strategy CANNOT
 	// be re-expressed as a safety formula over the user's data atoms:
 	//
-	//   - Algorithm B: the strategy lives over the P_σ / R bits and the
-	//     returned solution carries no `atoms` at all.
+	//   - a BA's propositional synthesis whose strategy lives over its own
+	//     bookkeeping bits, so the solution carries no `atoms` at all.
 	//
 	// The verdict is sound — `is_ltl_aba_realizable` uses it — but
 	// `ltl_to_safety_formula_full` must not execute such a solution as

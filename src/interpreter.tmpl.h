@@ -166,6 +166,17 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 				"failed to find the type for the stream",
 				{{label::name, get_var_name<node>(var)}});
 		}
+		// An input may carry its stream's type the way a typed
+		// output is written (`{ v }:type`).
+		if (auto name = get_ba_type_name<node>(type); name.has_value()) {
+			const std::string suffix = "}" + name.value();
+			const auto last = line.find_last_not_of(" \t\r\n");
+			if (last != std::string::npos
+				&& last + 1 >= suffix.size()
+				&& line.compare(last + 1 - suffix.size(),
+					suffix.size(), suffix) == 0)
+				line = line.substr(0, last + 2 - suffix.size());
+		}
 		auto cnst = r.merge_take(ba_constants<node>::get(line,
 				get_ba_type_tree<node>(type)));
 		if (!cnst) {

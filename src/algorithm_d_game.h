@@ -380,7 +380,7 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
  * @param hoa_text HOA text to parse.
  * @return The parsed game, or an error result for a text that yields no
  * game: a decomposed multi-game text, a malformed header integer, more
- * atomic propositions than the product game can enumerate, or a text
+ * atomic propositions than a guard can be enumerated over, or a text
  * without a state count.
  */
 inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
@@ -506,15 +506,15 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (line.substr(0,3) == "AP:") {
 				std::istringstream apl(line.substr(3));
 				int n = -1; apl >> n;
-				// The product game enumerates 1 << n_aps assignments:
+				// A guard is enumerated over 1 << n_aps assignments:
 				// a signed shift is undefined at 31 and the loop is
 				// hopeless well before (ltl_max_game_aps).
 				if (n < 0 || n > ltl_max_game_aps) {
 					return r.with_error(
 						code::unsupported_operation,
 						"the synthesis game has more atomic "
-						"propositions than the product game can "
-						"enumerate; refusing",
+						"propositions than its guards can be "
+						"enumerated over; refusing",
 						{{label::limit, ltl_max_game_aps},
 						 {label::value, std::to_string(n)}});
 				}

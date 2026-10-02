@@ -3685,7 +3685,6 @@ TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[
 TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
     // System sets o1=1/2 at t=0 → ψ(0) = (o1=1/2) = true → U trivially satisfied.
     // REALIZABLE (system sets o1=1/2 at t=0, discharging Until immediately).
-    // Algorithm B bug: currently returns UNREALIZABLE (known incompleteness bug).
     tref fm = spec("(F ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))) until (o1[t]:qlt = {1/2}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
@@ -5408,8 +5407,8 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_feasible("", aps, atoms));
 	}
 
-	// APs that are not user atoms (Algorithm A's R-bits, Algorithm B's
-	// P-bits, the ppLTLTT tester state vars) carry no data meaning and must
+	// APs that are not user atoms (a BA's encoding bits, the ppLTLTT tester
+	// state vars) carry no data meaning and must
 	// keep dropping out — regression guard for QE-03/QE-09/QE-15.
 	TEST_CASE("[GF-05] bookkeeping APs still drop out") {
 		bdd_init<Bool>();

@@ -260,13 +260,12 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	return r.with_value(std::move(aut));
 }
 
-// ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
+// ── ltlsynt → parity game ────────────────────────────────────────────────────
 //
 // Declared in algorithm_d_game.h and defined here so it can use the same
 // backend `call_ltlsynt` uses. The formula goes in a file (`-F path`), not
 // in an argument: a single argument is capped at the Linux MAX_ARG_STRLEN
-// of 131072, which a grown φ* (Algorithm B with many constants, or the
-// semantic-PWR fallback) exceeds.
+// of 131072, which a grown φ* exceeds.
 
 namespace alg_d {
 
@@ -333,9 +332,5 @@ inline result<synth_game> call_ltlsynt_game(
 
 } // namespace alg_d
 
-// (SY-R2: the "Algorithm D Phase 1" pair call_ltl2tgba_dpa / parse_dpa_hoa
-// was deleted -- zero production callers, superseded by the game-HOA path in
-// alg_d::call_ltlsynt_game / parse_synth_game_hoa, and it had missed the
-// LT-10 hardening.)
 
 } // namespace idni::tau_lang

@@ -71,8 +71,6 @@ struct messages {
 		= "Execution stopped on a failed step";
 	static constexpr sv failed_to_read_step_input
 		= "Failed to read step input";
-	static constexpr sv algorithm_d_no_verdict
-		= "Algorithm D: the product game could not be built; no verdict";
 	static constexpr sv unknown_realizability_no_verdict
 		= "UNKNOWN: the synthesis backend failed or produced no "
 		  "verdict; realizability could not be decided";

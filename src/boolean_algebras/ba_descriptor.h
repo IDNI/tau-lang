@@ -310,6 +310,13 @@ concept ba_has_literal_incomplete = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::literal_incomplete(s) }
 			-> std::convertible_to<bool>; };
 
+// The values of the type are written as outputs, by `run` and compiled
+// programs, as constants of the type (`{ v }:type`), the form an input reads
+// back, rather than bare.
+template <typename Node, typename BA>
+concept ba_has_typed_output = ba_has_descriptor_v<Node, BA>
+	&& requires { requires ba_descriptor<BA, Node>::typed_output; };
+
 template <typename Node, typename BA>
 concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(std::ostream& os, const BA& x) {

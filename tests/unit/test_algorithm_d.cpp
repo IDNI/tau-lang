@@ -12,9 +12,9 @@
 using namespace idni::tau_lang;
 
 
-// ── Phase 1: guard evaluator and HOA game parser (regression) ────────────
+// ── guard evaluator and HOA game parser ──────────────────────────────────
 
-TEST_SUITE("[Algorithm D: guard evaluator]") {
+TEST_SUITE("[synthesis game: guard evaluator]") {
 
 	TEST_CASE("[ALG-D-01] 't' guard is always true") {
 		CHECK(alg_d::eval_guard("t", 0, 2));
@@ -56,9 +56,9 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 }
 
-// ── Phase 1: HOA game parser ──────────────────────────────────────────────
+// ── HOA game parser ───────────────────────────────────────────────────────
 
-TEST_SUITE("[Algorithm D: HOA game parser]") {
+TEST_SUITE("[synthesis game: HOA game parser]") {
 
 	TEST_CASE("[ALG-D-32] full basic parse: states, aps, controllable, player, "
 	          "trans, all-acceptance priorities") {
@@ -543,7 +543,7 @@ State: 3
 
 // ── CG-RT6: hoa_guard::to_dnf, the guard parser behind six consumers ─────
 
-TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
+TEST_SUITE("[synthesis game: hoa_guard::to_dnf]") {
 
 	using alg_d::hoa_guard::to_dnf;
 
@@ -617,11 +617,9 @@ TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
 		CHECK(as_set(*d) == as_set({{{0,true},{1,true}}, {{0,true},{2,false}}, {{3,true}}}));
 	}
 
-} // TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]")
+} // TEST_SUITE("[synthesis game: hoa_guard::to_dnf]")
 
-// ── Phase 2: product game correctness ────────────────────────────────────
-
-TEST_SUITE("[Algorithm D: ltlsynt game]") {
+TEST_SUITE("[synthesis game: ltlsynt game]") {
 
 	// ── LS-10: call_ltlsynt_game's input mechanism ───────────────────────
 	//

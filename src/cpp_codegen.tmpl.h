@@ -617,7 +617,7 @@ inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
 // literals), the rest mirror `flag_out_ap_idx`'s APs (assignment literals)
 // — see codegen_strategy.h's guard convention. A disjunctive guard (LG-4:
 // spot can merge an edge's alternatives into one guard, e.g. "!0&!1 | 0&1"
-// for a single self-loop) expands via the same DNF parser Algorithm D uses
+// for a single self-loop) expands via the same DNF parser the data game uses
 // (alg_d::hoa_guard::to_dnf, through parse_guard_cubes) into one guard
 // vector per cube; the caller creates one edge_desc per returned vector,
 // all to the same destination. Returns an empty vector when the label does
