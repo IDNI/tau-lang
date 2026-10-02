@@ -1031,11 +1031,12 @@ TEST_SUITE("Normalizer entry points") {
 			main_of("p(y).")) );
 	}
 
+	// The normalizer cache keys on the formula alone, so this formula is
+	// normalized here first, with blasting on, and nowhere else.
 	TEST_CASE("per-formula preprocessing blasts to an equivalent formula") {
-		tref fm = main_of("x:bv[8] + y:bv[8] = { 4 }:bv[8] "
-			"&& x:bv[8] > { 2 }:bv[8].");
-		auto base = normalizer<node_t>(fm);
-		REQUIRE( base.has_value() );
+		tref fm = main_of("x:bv[8] + y:bv[8] = { 77 }:bv[8] "
+			"&& x:bv[8] > { 13 }:bv[8].");
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::bf_add>) );
 		const bool saved_pre = preprocessing;
 		const bool saved_blast = bv_blasting;
 		const auto saved_site = preprocess_placement;
@@ -1051,8 +1052,7 @@ TEST_SUITE("Normalizer entry points") {
 		preprocess_method = saved_mode;
 		REQUIRE( blasted.has_value() );
 		CHECK( !tau::get(blasted.value()).find_top(is<node_t, tau::bf_add>) );
-		CHECK( tau::get(base.value()).find_top(is<node_t, tau::bf_add>) );
-		CHECK( are_nso_equivalent<node_t>(blasted.value(), base.value()) );
+		CHECK( are_nso_equivalent<node_t>(blasted.value(), fm) );
 	}
 
 	// A functional quantifier over arithmetic stays a binder; its bound
