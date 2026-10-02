@@ -882,8 +882,7 @@ carries the fixed steps. The external tool
 Every formula takes the ABA-oracle path described above, with the data game
 over the streams' values. The synthesis algorithms A, B and D, which encoded
 the order types of a dense linear order, are gone with qlt's points (see
-[qlt](#qlt--finite-unions-of-rational-intervals)); `--ltl-alg` /
-`TAU_LTL_ALG` is still read but selects nothing.
+[qlt](#qlt--finite-unions-of-rational-intervals)).
 
 **Synthesis timeout**: by default, `ltlsynt` is given 60 seconds to solve
 the propositional skeleton.  Set the environment variable `TAU_LTL_TIMEOUT_SEC`
@@ -903,7 +902,6 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 | `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
 | `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the existential quantifier-elimination fast path of a non-aba omega-categorical type (no in-tree algebra is one). Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
-| `TAU_LTL_ALG` | _unset_ (no synthesis algorithm reads it any more) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
 | `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the synthesis game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
 | `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
@@ -2929,7 +2927,6 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
-| -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
 | -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default `TAU_LTL_HOA_MAX_STATES` or 4194304; 0 = unlimited) |
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the synthesis game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
@@ -3250,9 +3247,6 @@ new values come from the general solver. 2000 by default, 0 = unlimited.
 * `ltltimeout`: wall-clock cap in seconds on each `ltlsynt` call
 (`--ltl-timeout`). 60 by default, or `TAU_LTL_TIMEOUT_SEC` when that is set;
 0 disables the watchdog. `get ltltimeout` shows the effective value.
-
-* `ltlalg`: `A`, `B`, `D` or `auto` (`--ltl-alg`), `auto` by default, or
-`TAU_LTL_ALG` when that is set; no synthesis algorithm reads it any more.
 
 * `ltlqemaxvars`: free-variable cap of the omcat quantifier-elimination fast
 path (`--ltl-qe-max-vars`). 2 by default, or `TAU_LTL_OMCAT_QE_MAX_VARS` when
@@ -3823,7 +3817,7 @@ carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOptio
 `tau.getBaOption(name)`, which return the value now in force, or `null` with
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
-(`set_ltl_timeout_sec`, `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
+(`set_ltl_timeout_sec`, `set_ltl_hoa_max_states`,
 `set_ltl_guard_max_cubes`, `set_ltl_window_max_paths`,
 `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`) have no counterpart

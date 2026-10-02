@@ -62,8 +62,6 @@ def test_every_setter_takes_a_value():
 	tau.set_gc_growth_factor(1.5)
 	tau.set_ltl_timeout_sec(30)
 	tau.set_ltl_timeout_sec(-1)
-	tau.set_ltl_algorithm("B")
-	tau.set_ltl_algorithm("")
 	assert verdict(tau.sat(SPEC)) is True
 
 def test_tref_budget_refuses_a_call():

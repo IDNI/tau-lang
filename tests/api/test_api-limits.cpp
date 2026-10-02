@@ -98,23 +98,6 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_timeout_sec_param = saved;
 	}
 
-	TEST_CASE("ltl algorithm: parameter beats environment, garbage is auto") {
-		const std::string saved = ltl_algorithm_param;
-		tau_api::set_ltl_algorithm("");
-		unsetenv("TAU_LTL_ALG");
-		CHECK( ltl_algorithm_choice() == "" );
-		setenv("TAU_LTL_ALG", "D", 1);
-		CHECK( ltl_algorithm_choice() == "D" );
-		tau_api::set_ltl_algorithm("b");
-		CHECK( ltl_algorithm_choice() == "B" );
-		tau_api::set_ltl_algorithm("auto");
-		CHECK( ltl_algorithm_choice() == "" );
-		tau_api::set_ltl_algorithm("C");
-		CHECK( ltl_algorithm_choice() == "" );
-		unsetenv("TAU_LTL_ALG");
-		ltl_algorithm_param = saved;
-	}
-
 	TEST_CASE("ltl QE cap: parameter beats environment, garbage keeps 2") {
 		const size_t saved = ltl_qe_max_vars_param;
 		tau_api::set_ltl_qe_max_vars(0);
@@ -326,7 +309,6 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t saved_fl = max_flag_search_steps;
 		const long   saved_cs = max_consistency_subsets_param;
 		const long   saved_to = ltl_timeout_sec_param;
-		const std::string saved_alg = ltl_algorithm_param;
 		max_fixpoint_steps = saved_fp + 1;
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		max_fixpoint_steps = saved_fp;
@@ -341,9 +323,6 @@ TEST_SUITE("Tau API - runtime limits") {
 		tau_api::set_ltl_timeout_sec(ltl_timeout_sec() + 1);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_timeout_sec_param = saved_to;
-		tau_api::set_ltl_algorithm("B");
-		CHECK( verdict_budget_fingerprint<node_t>() != base );
-		ltl_algorithm_param = saved_alg;
 		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 

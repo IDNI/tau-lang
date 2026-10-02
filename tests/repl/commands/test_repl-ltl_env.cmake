@@ -65,15 +65,6 @@ add_repl_test(ltl_env-timeout_flag_beats_env
 add_repl_test(ltl_env-timeout_flag_rejects_garbage
 	"get ltltimeout" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-timeout abc)
-add_repl_test(ltl_env-alg_env_is_the_fallback
-	"get ltlalg" "ltlalg: *D" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_ALG=D)
-add_repl_test(ltl_env-alg_flag_beats_env
-	"get ltlalg" "ltlalg: *A" NO_FAIL_REGEX NO_TRACE
-	FLAGS --ltl-alg A ENV TAU_LTL_ALG=D)
-add_repl_test(ltl_env-alg_garbage_reads_as_auto
-	"get ltlalg" "ltlalg: *auto" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_ALG=C)
 add_repl_test(ltl_env-qe_env_is_validated
 	"get ltlqemaxvars" "keeping the default 2" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)

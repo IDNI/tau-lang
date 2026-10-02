@@ -171,9 +171,6 @@ cli::options tau_options() {
 	opts["ltl-timeout"] = cli::option("ltl-timeout", 'T', "")
 		.set_description("wall-clock cap in seconds on each ltlsynt call "
 			"(0 = no watchdog; default: TAU_LTL_TIMEOUT_SEC or 60)");
-	opts["ltl-alg"] = cli::option("ltl-alg", 'L', "")
-		.set_description("omcat synthesis algorithm: A, B, D or auto "
-			"(default: TAU_LTL_ALG or auto)");
 	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'k', "0")
 		.set_description("free-variable cap of the omcat QE fast path; "
 			"above 2 is not sound (0 = TAU_LTL_OMCAT_QE_MAX_VARS or 2)");
@@ -505,8 +502,6 @@ int main(int argc, char** argv) {
 				"of seconds, got '" + t + "'");
 		tau_api::set_ltl_timeout_sec(v);
 	}
-	if (const string a = opts["ltl-alg"].get<string>(); !a.empty())
-		tau_api::set_ltl_algorithm(a);
 	tau_api::set_ltl_qe_max_vars(optnum("ltl-qe-max-vars"));
 	if (auto n = given_count("ltl-hoa-max-states"); n)
 		tau_api::set_ltl_hoa_max_states(*n);

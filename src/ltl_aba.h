@@ -107,8 +107,8 @@ inline size_t max_cover_products() {
 	return env_limit_count("TAU_LTL_MAX_COVER_PRODUCTS", 256);
 }
 
-// The ltlsynt watchdog, the algorithm choice and the QE cap
-// (`ltl_timeout_sec_param`, `ltl_algorithm_param`, `ltl_qe_max_vars_param`
+// The ltlsynt watchdog and the QE cap
+// (`ltl_timeout_sec_param`, `ltl_qe_max_vars_param`
 // and their accessors) live in ltl_aba_limits.h so the qlt plugin headers,
 // which are compiled before this header is complete, can read them.
 
@@ -129,7 +129,6 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	mix(max_consistency_subsets());
 	mix(max_cover_products());
 	mix((size_t) ltl_timeout_sec());
-	mix(std::hash<std::string>{}(ltl_algorithm_choice()));
 	mix(ltl_qe_max_vars());
 	mix(ltl_hoa_max_states());
 	mix(ltl_guard_max_cubes());

@@ -141,12 +141,12 @@ add_raw_repl_test(ltl_cmd-garbage_output_is_unknown
 	"TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/garbage0:$PATH ${TAU_RUN} -e \"ltl F o1[t] = 1\""
 	"UNKNOWN" FAIL_REGEX "UNREALIZABLE|Aborted|core dumped")
 
-# SY-R1: the Algorithm-D game path classifies backend failures too. The
-# environment prefix keeps the case on bash rather than the ENVIRONMENT
-# property, so it registers through the raw helper; REQUIRES qlt carries the
-# pack gate the command text used to name by hand.
-add_raw_repl_test(realizable-alg_d_no_verdict_is_unknown
-	"TAU_LTL_ALG=D TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH ${TAU_RUN} -e \"realizable F o1[t]:qlt = {1/2}:qlt\""
+# SY-R1: realizability classifies backend failures too. The environment
+# prefix keeps the case on bash rather than the ENVIRONMENT property, so it
+# registers through the raw helper; REQUIRES qlt carries the pack gate the
+# command text used to name by hand.
+add_raw_repl_test(realizable-no_verdict_is_unknown
+	"TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH ${TAU_RUN} -e \"realizable F o1[t]:qlt = {1/2}:qlt\""
 	"UNKNOWN" FAIL_REGEX "Aborted|core dumped" REQUIRES qlt)
 
 # IN-M9 (Batch 6): `run` of a root-positive A never reached the CTL*

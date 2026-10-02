@@ -140,17 +140,6 @@ inline long ltl_timeout_sec_param = -1;
 inline constexpr long ltl_timeout_sec_max = 86400;
 
 /**
- * @brief Synthesis algorithm override for the omcat (qlt) encodings:
- * `"A"`, `"B"` or `"D"`, or `"auto"` for the default routing.
- *
- * Runtime parameter by policy (`--ltl-alg`, REPL `set ltlalg`,
- * `api::set_ltl_algorithm`). Empty means "not set": the environment
- * variable `TAU_LTL_ALG` is consulted and `auto` applies when it is absent.
- * Read through @ref ltl_algorithm_choice, which validates the value once.
- */
-inline std::string ltl_algorithm_param;
-
-/**
  * @brief Free-variable cap of the per-variable omcat quantifier-elimination
  * fast path in `aba_existential_feasible`; above it the joint solver decides.
  *
@@ -195,32 +184,6 @@ inline int ltl_timeout_sec() {
 		} else timeout_sec = (int) v;
 	}
 	return timeout_sec;
-}
-
-/**
- * @brief Effective synthesis algorithm choice: `"A"`, `"B"`, `"D"` or `""`
- * for the default routing.
- *
- * Precedence: @ref ltl_algorithm_param when non-empty, else the
- * `TAU_LTL_ALG` environment variable, else the default. Anything other
- * than A, B, D or auto (case-insensitive) is reported once and read as the
- * default (LS-8): a typo must not silently disable every gate.
- */
-inline std::string ltl_algorithm_choice() {
-	std::string v = ltl_algorithm_param;
-	if (v.empty())
-		if (const char* env = std::getenv("TAU_LTL_ALG"); env) v = env;
-	for (auto& c : v) c = (char) std::toupper((unsigned char) c);
-	if (v.empty() || v == "AUTO") return "";
-	if (v == "A" || v == "B" || v == "D") return v;
-	static std::string warned_for;
-	if (warned_for != v) {
-		warned_for = v;
-		TAU_LOG_WARNING << "[ltl_aba] synthesis algorithm \"" << v
-			<< "\" is not recognised (only A, B, D and auto are); "
-			"using the default routing";
-	}
-	return "";
 }
 
 /**

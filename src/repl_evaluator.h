@@ -89,9 +89,8 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	tref_budget_opt, tref_budget_soft_opt,
 	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
 	cache_bound_opt, cover_products_opt, constant_size_opt,
-	// LTL(ABA) synthesis knobs (ltl_aba.h); ltl_alg_opt takes a word
-	// (A/B/D/auto), the others a count.
-	ltl_timeout_opt, ltl_alg_opt, ltl_qe_max_vars_opt,
+	// LTL(ABA) synthesis knobs (ltl_aba.h), each a count.
+	ltl_timeout_opt, ltl_qe_max_vars_opt,
 	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt,
 	ltl_refinement_rounds_opt, ltl_window_max_paths_opt,
 	ltl_closed_regions_timeout_opt,

@@ -316,9 +316,6 @@ NB_MODULE(tau, m) {
 		"seconds"_a, "Wall-clock cap on each ltlsynt call "
 		"(--ltl-timeout); 0 disables the watchdog, a negative value "
 		"falls back to TAU_LTL_TIMEOUT_SEC or 60.");
-	m.def("set_ltl_algorithm", &tau_api::set_ltl_algorithm,
-		"algorithm"_a, "Omcat synthesis algorithm: A, B, D or auto "
-		"(--ltl-alg); the empty string falls back to TAU_LTL_ALG.");
 	m.def("tref_count", &tau_api::tref_count,
 		"Live interned tree node count, what set_tref_budget caps.");
 

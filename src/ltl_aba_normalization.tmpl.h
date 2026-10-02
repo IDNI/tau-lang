@@ -1551,8 +1551,7 @@ static result<void> add_consistency_constraints(
 	// combinations (¬p_i ∧ p_j), (p_i ∧ ¬p_j), (¬p_i ∧ ¬p_j) for each pair.
 	// Uses existential feasibility (∃m,x,y. combo) — same standard as the
 	// oracle — so we emit exactly the constraints the oracle would later reject.
-	// Gated on the synthesis algorithm choice being B (`--ltl-alg B` /
-	// `set ltlalg B` / TAU_LTL_ALG=B); default behaviour is unchanged.
+	// Gated on `polarity_complete`.
 	//
 	// Pure-input pairs are ALWAYS checked, with the infeasible combinations
 	// added as environment assumptions: over a finite algebra such as
@@ -1563,8 +1562,7 @@ static result<void> add_consistency_constraints(
 	// this for soundness (the per-edge oracle refuses infeasible system
 	// moves), hence the gate above stays for it.
 	{
-		const bool alg_b_mode = ltl_algorithm_choice() == "B";
-		const bool sys_pairs = alg_b_mode || polarity_complete;
+		const bool sys_pairs = polarity_complete;
 		for (size_t i = 0; i < atoms.size(); ++i) {
 			const bool in_i = is_pure_input_atom<node>(atoms[i].first);
 			if (!in_i && !sys_pairs) continue;

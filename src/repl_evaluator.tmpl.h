@@ -1634,7 +1634,6 @@ inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	if (x == "maxcoverproducts")         return cover_products_opt;
 	if (x == "maxconstantsize")          return constant_size_opt;
 	if (x == "ltltimeout")               return ltl_timeout_opt;
-	if (x == "ltlalg")                   return ltl_alg_opt;
 	if (x == "ltlqemaxvars")             return ltl_qe_max_vars_opt;
 	if (x == "ltlhoamaxstates")          return ltl_hoa_max_states_opt;
 	if (x == "ltlguardmaxcubes")         return ltl_guard_max_cubes_opt;
@@ -1776,9 +1775,6 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		const int t = ltl_timeout_sec();
 		out << "ltltimeout:          "
 			<< (t ? std::to_string(t) + "s" : "off") << "\n"; } },
-	{ ltl_alg_opt, [this]() {
-		const std::string a = ltl_algorithm_choice();
-		out << "ltlalg:              " << (a.empty() ? "auto" : a) << "\n"; } },
 	{ ltl_qe_max_vars_opt, [this]() {
 		out << "ltlqemaxvars:        " << ltl_qe_max_vars() << "\n"; } },
 	{ ltl_hoa_max_states_opt, [climit, this]() {
@@ -1993,14 +1989,6 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ ltl_timeout_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_timeout_sec((long) std::min<size_t>(*n,
 			(size_t) ltl_timeout_sec_max)); } },
-	{ ltl_alg_opt, [&]() {
-		std::string a = v;
-		for (auto& c : a) c = (char) std::toupper((unsigned char) c);
-		if (a != "A" && a != "B" && a != "D" && a != "AUTO") {
-			err << "Invalid value: expected A, B, D or auto\n";
-			return;
-		}
-		api<node>::set_ltl_algorithm(a); } },
 	{ ltl_qe_max_vars_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_qe_max_vars(*n); } },
 	{ ltl_hoa_max_states_opt, [&]() { if (auto n = str2count(); n)
@@ -2549,7 +2537,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxcoverproducts       oracle mixed-type coverage products  256\n"
 		"  maxconstantsize        fresh-value region kept (tree nodes) 2000\n"
 		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
-		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
 		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
 		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
 		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"

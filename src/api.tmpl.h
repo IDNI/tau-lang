@@ -303,12 +303,6 @@ void api<node>::set_ltl_timeout_sec(long seconds) {
 }
 
 template <NodeType node>
-void api<node>::set_ltl_algorithm(const std::string& alg) {
-	option_change_guard<node> guard;
-	ltl_algorithm_param = alg;
-}
-
-template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
 	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;

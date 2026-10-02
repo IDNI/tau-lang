@@ -343,13 +343,6 @@ struct api {
 	 */
 	static void set_ltl_timeout_sec(long seconds);
 	/**
-	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
-	 * `"auto"` (`ltl_algorithm_param`); the empty string unsets the
-	 * parameter so the `TAU_LTL_ALG` environment fallback applies again.
-	 * An unrecognised value is reported once and read as `auto`.
-	 */
-	static void set_ltl_algorithm(const std::string& alg);
-	/**
 	 * @brief Free-variable cap of the omcat quantifier-elimination fast
 	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
 	 * that is not sound. 0 unsets the parameter so the
