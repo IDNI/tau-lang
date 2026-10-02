@@ -56,9 +56,12 @@ static __inline int pclose(FILE* stream) {
 	return _pclose(stream);
 }
 
-/* cvc5_types.h uses std::string after only <iosfwd>, which declares no
- * std::string in the MSVC STL. */
+/* cvc5 uses std::string and the stream classes after only <iosfwd>, which
+ * declares no std::string and defines no stream in the MSVC STL. */
 #ifdef __cplusplus
+#include <istream>
+#include <ostream>
+#include <sstream>
 #include <string>
 #endif
 
