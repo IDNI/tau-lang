@@ -2121,13 +2121,18 @@ result<tref> pin_written_warm_ups(tref fm) {
 	};
 	bool failed = false;
 	// Deepest lookback left once the non-temporal parts of @p n are
-	// normalized, each on its own.
+	// normalized, each on its own. The part is rebuilt through the
+	// construction hooks first: that is the tree every caller normalizes
+	// after `tau::reget`, and the normal form of the raw tree is computed
+	// by no path but this one; its rows in the memo tables are keyed by
+	// raw nodes.
 	auto kept_lookback = [&](tref n) -> int_t {
 		int_t kept = 0;
 		trefs parts = tau::get(n).select_top([&](tref x) {
 			return tau::get(x).is(tau::wff) && !is_temporal(x); });
 		for (tref part : parts) {
-			auto nf = r.merge_take(normalize_non_temp<node>(part));
+			auto nf = r.merge_take(normalize_non_temp<node>(
+				tau::reget(part)));
 			if (!nf) { failed = true; return 0; }
 			if (*nf) kept = std::max(kept, get_max_shift<node>(
 				shifted_vars(*nf)));
