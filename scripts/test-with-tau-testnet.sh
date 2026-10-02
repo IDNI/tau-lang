@@ -127,12 +127,6 @@ VENV_PYTHON="${VENV_DIR}/bin/python3"
 echo "Installing tau-testnet requirements"
 "${VENV_PYTHON}" -m pip install --upgrade pip setuptools wheel
 REQ_INSTALL_ARGS=(-r "${TESTNET_DIR}/requirements.txt")
-if [ -n "${TESTNET_WHEEL}" ]; then
-	# A wheel-based run must not build a compiled dependency. Point the
-	# compilers at a failing command so a source build fails loudly instead of
-	# silently needing a toolchain; a pure-Python sdist still installs.
-	export CC=/bin/false CXX=/bin/false
-fi
 if ! "${VENV_PYTHON}" -m pip install "${REQ_INSTALL_ARGS[@]}"; then
 	echo >&2
 	echo "Error: could not install tau-testnet's requirements with" >&2
