@@ -28,34 +28,45 @@
 #include <map>
 
 #include "boolean_algebras/qlt/qlt.h"
+#include "bounded_call.h"
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
 
 namespace qlt_cells_detail {
 
-// Variables a decision takes: one bit each in a 32-bit cell mask.
-inline constexpr size_t max_vars = 5;
-// Regions a decision takes.
+// Variables a decision takes: one bit each in a cell's membership bits.
+inline constexpr size_t max_vars = 16;
+// Regions a decision takes: one bit each in a constant's region mask.
 inline constexpr size_t max_regions = 64;
+// Quantifier nesting a decision takes: counts are kept up to 2^depth.
+inline constexpr size_t max_depth = 20;
 // Splits a decision tries before it declines.
-inline constexpr size_t max_splits = size_t{1} << 22;
+inline constexpr size_t max_splits = size_t{1} << 20;
 
-// For each region, the cells a term covers: bit b stands for the cell whose
-// membership in variable j is bit j of b.
-using masks = std::vector<uint32_t>;
+// A term compiled against the regions: a constant holds the regions it covers,
+// a variable its index; `free` holds the variables it reads, one bit each.
+struct cell_term {
+	enum kind_t : uint8_t { top, bottom, constant, var, neg, conj, disj, sum }
+		kind;
+	uint64_t regions = 0;
+	size_t index = 0;
+	std::vector<size_t> kids = {};
+	uint32_t free = 0;
+};
 
 // A formula compiled against the regions. `zero` holds when no nonempty cell
-// lies in `cells`; `ex`/`all` bind variable `var` over kids[0]; `depth` is the
-// quantifier nesting depth of the subformula and `free` the variables its truth
-// depends on, one bit each.
+// lies in a & b' (a ^ b when `sym`); `ex`/`all` bind variable `var` over
+// kids[0]; `depth` is the quantifier nesting depth of the subformula and `free`
+// the variables its truth depends on, one bit each.
 struct formula {
 	enum kind_t : uint8_t { truth, zero, conj, disj, neg, ex, all } kind;
 	bool value = false;
 	size_t var = 0;
 	size_t depth = 0;
-	masks cells;
-	std::vector<size_t> kids;
+	size_t a = 0, b = 0;
+	bool sym = false;
+	std::vector<size_t> kids = {};
 	uint32_t free = 0;
 };
 
@@ -121,55 +132,72 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 			return tau::get(w) == tau::get(v); })) vars.push_back(v);
 	}
 	if (vars.size() > max_vars) return std::nullopt;
-	const size_t k = vars.size();
-	const uint32_t all_cells = k == max_vars ? UINT32_MAX
-		: (uint32_t{1} << (uint32_t{1} << k)) - 1;
 	auto var_index = [&](tref v) {
 		size_t j = 0;
 		while (tau::get(vars[j]) != tau::get(v)) ++j;
 		return j;
 	};
-	std::function<std::optional<masks>(tref)> term
-		= [&](tref n) -> std::optional<masks> {
+	std::vector<cell_term> ts;
+	auto add_term = [&](cell_term t) {
+		for (size_t c : t.kids) t.free |= ts[c].free;
+		if (t.kind == cell_term::var) t.free |= uint32_t{1} << t.index;
+		ts.push_back(std::move(t));
+		return ts.size() - 1;
+	};
+	std::function<std::optional<size_t>(tref)> compile_term
+		= [&](tref n) -> std::optional<size_t> {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
-		if (t.child_is(tau::bf_t)) return masks(nr, all_cells);
-		if (t.child_is(tau::bf_f)) return masks(nr, 0);
+		if (t.child_is(tau::bf_t)) return add_term({ cell_term::top });
+		if (t.child_is(tau::bf_f)) return add_term({ cell_term::bottom });
 		if (t[0].is_ba_constant()) {
 			const qlt q = std::get<qlt>(t[0].get_ba_constant());
-			masks m(nr, 0);
+			uint64_t in = 0;
 			for (size_t i = 0; i < nr; ++i)
-				if (!(regions[i] & q).is_empty()) m[i] = all_cells;
-			return m;
+				if (!(regions[i] & q).is_empty())
+					in |= uint64_t{1} << i;
+			return add_term({ cell_term::constant, in });
 		}
-		if (t.child_is(tau::variable)) {
-			const size_t j = var_index(t.first());
-			uint32_t in = 0;
-			for (uint32_t b = 0; b < (uint32_t{1} << k); ++b)
-				if (b >> j & 1) in |= uint32_t{1} << b;
-			return masks(nr, in);
-		}
-		if (t.child_is(tau::bf_neg)) {
-			auto a = term(t[0].first());
+		if (t.child_is(tau::variable))
+			return add_term({ cell_term::var, 0, var_index(t.first()) });
+		cell_term::kind_t kind;
+		if (t.child_is(tau::bf_neg)) kind = cell_term::neg;
+		else if (t.child_is(tau::bf_and)) kind = cell_term::conj;
+		else if (t.child_is(tau::bf_or)) kind = cell_term::disj;
+		else if (t.child_is(tau::bf_xor)) kind = cell_term::sum;
+		else return std::nullopt;
+		cell_term c{ kind };
+		for (size_t i = 0; i < t[0].children_size(); ++i) {
+			auto a = compile_term(t[0].child(i));
 			if (!a) return std::nullopt;
-			for (auto& m : *a) m = ~m & all_cells;
-			return a;
+			c.kids.push_back(*a);
 		}
-		const bool is_and = t.child_is(tau::bf_and);
-		const bool is_or = t.child_is(tau::bf_or);
-		if (!is_and && !is_or && !t.child_is(tau::bf_xor))
-			return std::nullopt;
-		std::optional<masks> acc;
-		for (size_t c = 0; c < t[0].children_size(); ++c) {
-			auto b = term(t[0].child(c));
-			if (!b) return std::nullopt;
-			if (!acc) { acc = std::move(b); continue; }
-			for (size_t i = 0; i < nr; ++i)
-				(*acc)[i] = is_and ? (*acc)[i] & (*b)[i]
-					: is_or ? (*acc)[i] | (*b)[i]
-					: (*acc)[i] ^ (*b)[i];
+		return add_term(std::move(c));
+	};
+	// Whether the cell of `region` with membership `bits` lies in term x.
+	std::function<bool(size_t, uint32_t, uint32_t)> in_term
+		= [&](size_t x, uint32_t region, uint32_t bits) -> bool {
+		const cell_term& t = ts[x];
+		switch (t.kind) {
+		case cell_term::top: return true;
+		case cell_term::bottom: return false;
+		case cell_term::constant: return t.regions >> region & 1;
+		case cell_term::var: return bits >> t.index & 1;
+		case cell_term::neg: return !in_term(t.kids[0], region, bits);
+		case cell_term::conj:
+			for (size_t c : t.kids)
+				if (!in_term(c, region, bits)) return false;
+			return true;
+		case cell_term::disj:
+			for (size_t c : t.kids)
+				if (in_term(c, region, bits)) return true;
+			return false;
+		default: {
+			bool v = false;
+			for (size_t c : t.kids) v ^= in_term(c, region, bits);
+			return v;
 		}
-		return acc;
+		}
 	};
 	std::vector<formula> fs;
 	auto add = [&](formula f) {
@@ -181,46 +209,69 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 			++f.depth;
 			f.free &= ~(uint32_t{1} << f.var);
 		}
-		// A cell set depends on x_j when flipping bit j of some cell
-		// moves it in or out of the set.
-		if (f.kind == formula::zero)
-			for (size_t j = 0; j < k; ++j)
-				for (uint32_t m : f.cells)
-					for (uint32_t b = 0; b < (uint32_t{1} << k); ++b)
-						if ((m >> b & 1) != (m >> (b ^ (uint32_t{1} << j)) & 1))
-							f.free |= uint32_t{1} << j;
+		if (f.kind == formula::zero) f.free |= ts[f.a].free | ts[f.b].free;
 		fs.push_back(std::move(f));
 		return fs.size() - 1;
 	};
-	auto zero_of = [&](const masks& a, const masks& b, bool sym) {
-		masks d(nr);
-		for (size_t i = 0; i < nr; ++i)
-			d[i] = sym ? a[i] ^ b[i] : a[i] & ~b[i];
-		return add({ formula::zero, false, 0, 0, std::move(d), {} });
+	auto zero_of = [&](size_t a, size_t b, bool sym) {
+		return add({ formula::zero, false, 0, 0, a, b, sym, {} });
 	};
 	auto negate = [&](size_t f) {
-		return add({ formula::neg, false, 0, 0, {}, { f } });
+		return add({ formula::neg, false, 0, 0, 0, 0, false, { f } });
 	};
 	auto join = [&](formula::kind_t kind, std::vector<size_t> kids) {
-		return add({ kind, false, 0, 0, {}, std::move(kids) });
+		return add({ kind, false, 0, 0, 0, 0, false, std::move(kids) });
 	};
 	// a < b in the Boolean order: a & b' = 0 and a != b.
-	auto strict = [&](const masks& a, const masks& b) {
+	auto strict = [&](size_t a, size_t b) {
 		return join(formula::conj, { zero_of(a, b, false),
 			negate(zero_of(a, b, true)) });
+	};
+	auto group = [&](formula::kind_t kind, std::vector<size_t> kids) {
+		return kids.size() == 1 ? kids[0] : join(kind, std::move(kids));
+	};
+	// The quantifier over variable j of body, scoped as narrowly as it
+	// goes: across the parts of its body free of j, and through the
+	// connective it distributes over, so each search splits only what it
+	// reads.
+	std::function<size_t(bool, size_t, size_t)> quant
+		= [&](bool exists, size_t j, size_t body) -> size_t {
+		const uint32_t bit = uint32_t{1} << j;
+		if (!(fs[body].free & bit)) return body;
+		const auto kind = fs[body].kind;
+		const auto spread = exists ? formula::disj : formula::conj;
+		const auto keep = exists ? formula::conj : formula::disj;
+		if (kind == spread) {
+			std::vector<size_t> kids;
+			for (size_t c : std::vector<size_t>(fs[body].kids))
+				kids.push_back(quant(exists, j, c));
+			return group(spread, std::move(kids));
+		}
+		if (kind == keep) {
+			std::vector<size_t> with, without;
+			for (size_t c : fs[body].kids)
+				(fs[c].free & bit ? with : without).push_back(c);
+			if (!without.empty()) {
+				without.push_back(quant(exists, j,
+					group(keep, std::move(with))));
+				return group(keep, std::move(without));
+			}
+		}
+		return add({ exists ? formula::ex : formula::all, false, j, 0,
+			0, 0, false, { body } });
 	};
 	std::function<std::optional<size_t>(tref)> compile
 		= [&](tref n) -> std::optional<size_t> {
 		const auto& t = tau::get(n);
-		if (t.equals_T()) return add({ formula::truth, true, 0, 0, {}, {} });
-		if (t.equals_F()) return add({ formula::truth, false, 0, 0, {}, {} });
+		if (t.equals_T()) return add({ formula::truth, true });
+		if (t.equals_F()) return add({ formula::truth, false });
 		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
 		const auto op = t[0].value.nt;
 		if (op == tau::wff_ex || op == tau::wff_all) {
 			auto body = compile(t[0].second());
 			if (!body) return std::nullopt;
-			return add({ op == tau::wff_ex ? formula::ex : formula::all,
-				false, var_index(t[0].first()), 0, {}, { *body } });
+			return quant(op == tau::wff_ex, var_index(t[0].first()),
+				*body);
 		}
 		if (op == tau::wff_neg || op == tau::wff_and || op == tau::wff_or
 			|| op == tau::wff_imply || op == tau::wff_equiv
@@ -250,7 +301,7 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 			&& op != tau::bf_gt && op != tau::bf_ngt
 			&& op != tau::bf_gteq && op != tau::bf_ngteq)
 				return std::nullopt;
-		auto a = term(t[0].first()), b = term(t[0].second());
+		auto a = compile_term(t[0].first()), b = compile_term(t[0].second());
 		if (!a || !b) return std::nullopt;
 		switch (op) {
 		case tau::bf_eq:    return zero_of(*a, *b, true);
@@ -266,9 +317,25 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 		}
 	};
 	auto root = compile(fm);
-	if (!root) return std::nullopt;
+	// counts are kept up to 2^depth
+	if (!root || fs[*root].depth > max_depth) return std::nullopt;
 	size_t splits = 0;
 	bool exhausted = false;
+	// A caller sharing a deadline among its questions bounds this one too.
+	std::optional<std::chrono::steady_clock::time_point> deadline;
+	if (shared_deadline()) deadline = budget_deadline(
+		std::chrono::steady_clock::duration::max() / 2);
+	auto out_of_budget = [&] {
+		if (++splits > max_splits) return true;
+		if (deadline && (splits & 1023) == 0
+			&& std::chrono::steady_clock::now() > *deadline)
+		{
+			note_time_budget_exhausted(
+				"a closed qlt decision ran past its time budget");
+			return true;
+		}
+		return false;
+	};
 	std::map<std::vector<size_t>, bool> memo;
 	std::function<bool(size_t, const std::vector<cell>&)> holds
 		= [&](size_t f, const std::vector<cell>& in) -> bool {
@@ -277,8 +344,11 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 		switch (x.kind) {
 		case formula::truth: return x.value;
 		case formula::zero:
-			for (const cell& c : in)
-				if (x.cells[c.region] >> c.bits & 1) return false;
+			for (const cell& c : in) {
+				const bool ia = in_term(x.a, c.region, c.bits);
+				const bool ib = in_term(x.b, c.region, c.bits);
+				if (x.sym ? ia != ib : ia && !ib) return false;
+			}
 			return true;
 		case formula::neg: return !holds(x.kids[0], in);
 		case formula::conj:
@@ -316,27 +386,170 @@ static std::optional<bool> qlt_decide_closed(tref fm) {
 			if (!exhausted) memo.emplace(std::move(key), v);
 			return v;
 		};
+		const bool universal = x.kind == formula::all;
+		// A block of quantifiers of one kind over a quantifier-free body
+		// only asks which of the 2^m parts of each cell are nonempty: at
+		// least one, at most as many as the cell has points.
+		std::vector<size_t> block{ x.var };
+		size_t inner = x.kids[0];
+		while (fs[inner].kind == x.kind && block.size() < 4) {
+			block.push_back(fs[inner].var);
+			inner = fs[inner].kids[0];
+		}
+		if (fs[inner].depth == 0) {
+			const uint32_t parts = uint32_t{1} << block.size();
+			auto spread = [&](uint32_t part, uint32_t bits) {
+				for (size_t b = 0; b < block.size(); ++b) {
+					const uint32_t vb = uint32_t{1} << block[b];
+					bits = part >> b & 1 ? bits | vb : bits & ~vb;
+				}
+				return bits;
+			};
+			// An existential block over a conjunction of (negated)
+			// emptiness atoms: each cell takes parts no positive atom
+			// forbids, and more of them only helps a negated one, so as
+			// many as it has points for.
+			std::vector<size_t> lits;
+			std::function<void(size_t)> flatten = [&](size_t f) {
+				if (fs[f].kind != formula::conj) lits.push_back(f);
+				else for (size_t c : fs[f].kids) flatten(c);
+			};
+			if (!universal) flatten(inner);
+			auto is_zero = [&](size_t f) {
+				return fs[f].kind == formula::zero;
+			};
+			auto is_literal = [&](size_t f) {
+				return is_zero(f) || (fs[f].kind == formula::neg
+					&& is_zero(fs[f].kids[0]));
+			};
+			auto in_diff = [&](const formula& z, uint32_t region,
+				uint32_t bits)
+			{
+				const bool ia = in_term(z.a, region, bits);
+				const bool ib = in_term(z.b, region, bits);
+				return z.sym ? ia != ib : ia && !ib;
+			};
+			if (!lits.empty() && std::all_of(lits.begin(), lits.end(),
+				is_literal))
+			{
+				std::vector<size_t> negs;
+				for (size_t l : lits)
+					if (!is_zero(l)) negs.push_back(fs[l].kids[0]);
+				// per cell, the allowed parts and, per part, the
+				// negated atoms it meets
+				std::vector<std::vector<uint32_t>> choices;
+				for (const cell& c : cells) {
+					std::vector<uint32_t> ok;
+					std::vector<uint32_t> meets;
+					for (uint32_t part = 0; part < parts; ++part) {
+						const uint32_t bits = spread(part, c.bits);
+						bool free_part = true;
+						for (size_t l : lits)
+							if (is_zero(l) && in_diff(fs[l],
+								c.region, bits))
+									free_part = false;
+						if (!free_part) continue;
+						uint32_t m = 0;
+						for (size_t n = 0; n < negs.size(); ++n)
+							if (in_diff(fs[negs[n]], c.region, bits))
+								m |= uint32_t{1} << n;
+						ok.push_back(part);
+						meets.push_back(m);
+					}
+					if (ok.empty()) return remember(false);
+					// the negated atoms met by each choice of
+					// min(count, |ok|) allowed parts
+					const size_t take = std::min(c.count, ok.size());
+					std::vector<uint32_t> met;
+					for (uint32_t m = 1; m < (uint32_t{1} << ok.size()); ++m) {
+						if ((size_t) std::popcount(m) != take) continue;
+						uint32_t u = 0;
+						for (size_t b = 0; b < ok.size(); ++b)
+							if (m >> b & 1) u |= meets[b];
+						if (std::find(met.begin(), met.end(), u) == met.end())
+							met.push_back(u);
+					}
+					choices.push_back(std::move(met));
+				}
+				const uint32_t all_negs = negs.size() >= 32 ? UINT32_MAX
+					: (uint32_t{1} << negs.size()) - 1;
+				std::vector<size_t> pick(cells.size(), 0);
+				for (;;) {
+					if (out_of_budget()) { exhausted = true; return false; }
+					uint32_t u = 0;
+					for (size_t i = 0; i < cells.size(); ++i)
+						u |= choices[i][pick[i]];
+					if ((u & all_negs) == all_negs) return remember(true);
+					size_t i = 0;
+					while (i < cells.size() && ++pick[i] == choices[i].size())
+						pick[i++] = 0;
+					if (i == cells.size()) return remember(false);
+				}
+			}
+			std::vector<std::vector<uint32_t>> subsets;
+			for (const cell& c : cells) {
+				std::vector<uint32_t> w;
+				for (uint32_t m = 1; m < (uint32_t{1} << parts); ++m)
+					if ((size_t) std::popcount(m) <= c.count)
+						w.push_back(m);
+				subsets.push_back(std::move(w));
+			}
+			std::vector<size_t> pick(cells.size(), 0);
+			std::vector<cell> next;
+			for (;;) {
+				if (out_of_budget()) { exhausted = true; return false; }
+				next.clear();
+				for (size_t i = 0; i < cells.size(); ++i) {
+					const uint32_t m = subsets[i][pick[i]];
+					for (uint32_t part = 0; part < parts; ++part)
+						if (m >> part & 1) next.push_back({
+							cells[i].region,
+							spread(part, cells[i].bits), 1 });
+				}
+				if (holds(inner, next) != universal)
+					return remember(!universal);
+				if (exhausted) return false;
+				size_t i = 0;
+				while (i < cells.size() && ++pick[i] == subsets[i].size())
+					pick[i++] = 0;
+				if (i == cells.size()) return remember(universal);
+			}
+		}
 		// Every way of splitting each cell into its parts in and out of
 		// the bound variable, counted at the body's saturation.
-		const bool universal = x.kind == formula::all;
 		const size_t body = x.kids[0];
 		const size_t cap = size_t{1} << fs[body].depth;
 		const uint32_t bit = uint32_t{1} << x.var;
 		std::vector<std::vector<std::pair<size_t, size_t>>> ways;
 		for (const cell& c : cells) {
+			// a count of 2 cap or more splits into every pair one of
+			// whose parts reaches cap; a smaller one is exact
 			std::vector<std::pair<size_t, size_t>> w;
-			for (size_t a = 0; a <= c.count; ++a) {
-				std::pair<size_t, size_t> p{ std::min(a, cap),
-					std::min(c.count - a, cap) };
-				if (std::find(w.begin(), w.end(), p) == w.end())
-					w.push_back(p);
-			}
+			if (c.count >= 2 * cap) {
+				for (size_t a = 0; a <= cap; ++a) w.emplace_back(a, cap);
+				for (size_t b = cap; b-- > 0;) w.emplace_back(cap, b);
+			} else for (size_t a = 0; a <= c.count; ++a)
+				w.emplace_back(std::min(a, cap),
+					std::min(c.count - a, cap));
+			// A witness of `ex` is likelier among splits that keep
+			// both parts large, a counterexample of `all` among those
+			// that empty one: those come first.
+			auto large = [](const std::pair<size_t, size_t>& p) {
+				return std::make_pair(std::min(p.first, p.second),
+					p.first + p.second);
+			};
+			std::stable_sort(w.begin(), w.end(), [&](const auto& x,
+				const auto& y)
+			{
+				return universal ? large(x) < large(y)
+					: large(y) < large(x);
+			});
 			ways.push_back(std::move(w));
 		}
 		std::vector<size_t> pick(cells.size(), 0);
 		std::vector<cell> next;
 		for (;;) {
-			if (++splits > max_splits) { exhausted = true; return false; }
+			if (out_of_budget()) { exhausted = true; return false; }
 			next.clear();
 			for (size_t i = 0; i < cells.size(); ++i) {
 				const auto [in, out] = ways[i][pick[i]];

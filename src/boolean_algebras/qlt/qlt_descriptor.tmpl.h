@@ -10,12 +10,8 @@
 
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
-#include <array>
 #include "ba_types.h"
-// Reaches nothing beyond the standard library itself, unlike normalizer.h,
-// so it is safe here; needed for `result<...>` before ltl_aba_result.h.
 #include "tau_diagnostics.h"
-#include "ltl_aba_result.h"
 
 namespace idni::tau_lang {
 
@@ -28,11 +24,7 @@ template <NodeType node>
 static std::optional<std::string> qlt_codegen_constant_expr(tref cst);
 
 template <NodeType node>
-static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
-	tref fm, const std::vector<std::pair<tref, std::string>>& atoms);
-
-template <NodeType node>
-result<tref> qlt_semantic_pwr_optimal(tref clause, tref update);
+static std::optional<bool> qlt_decide_closed(tref fm);
 
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
@@ -55,48 +47,6 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
 			type_tree, type_name);
-	}
-
-	/// @name qlt-declared CLI/REPL options
-	/// Backing getter/setter for @ref options; plain free functions so they
-	/// decay to the function pointers `ba_option` holds.
-	/// @{
-	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap(); }
-	static void set_t3_cap_option(size_t n) {
-		qlt_t3_encoding_cap_param = (long) n;
-	}
-	static size_t get_const_output_max_option() {
-		return qlt_const_output_max();
-	}
-	static void set_const_output_max_option(size_t n) {
-		qlt_const_output_max_param = (long) n;
-	}
-	/// @}
-
-	/**
-	 * @brief The options qlt declares about itself: `qlt-t3-cap`, the
-	 * data-atom cap of the T3 encodings (Algorithms A/B/D and the semantic
-	 * PWR); above it the default ABA-oracle path decides. Clamped to 30
-	 * (the encodings shift `1 << K`); 0 = that bound.
-	 */
-	static std::array<ba_option, 2> options() {
-		return {{
-			{ "t3-cap", ba_option_kind::count,
-				nullptr, nullptr,
-				get_t3_cap_option, set_t3_cap_option,
-				"cap the data atoms the qlt T3 synthesis encodings "
-				"accept before the ABA-oracle path decides instead "
-				"(default: TAU_QLT_T3_CAP or 20, at most 30; "
-				"0 = 30)" },
-			{ "const-output-max", ba_option_kind::count,
-				nullptr, nullptr,
-				get_const_output_max_option,
-				set_const_output_max_option,
-				"cap the constant-output assignments the fast path "
-				"in front of Algorithm B enumerates (default: "
-				"TAU_QLT_CONST_OUTPUT_MAX or 100; "
-				"0 = unlimited)" },
-		}};
 	}
 
 	static tref type_tree() {
@@ -170,6 +120,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return qlt_omcat_qe<node_t>(var, body);
 	}
 
+	/**
+	 * @brief The truth of the closed formula @p form over qlt, whatever
+	 * its quantifier prefix (see qlt_decide_closed); nullopt when it is
+	 * not qlt's or past the decision's bounds.
+	 */
+	static std::optional<bool> decide_closed(tref form) {
+		return qlt_decide_closed<node_t>(form);
+	}
+
 	/** @brief @p cst's own set, spelled for generated C++. */
 	static std::optional<std::string> codegen_constant_expr(tref cst) {
 		return qlt_codegen_constant_expr<node_t>(cst);
@@ -180,7 +139,5 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 #include "boolean_algebras/qlt/qlt_qe.tmpl.h"
 #include "boolean_algebras/qlt/qlt_codegen.tmpl.h"
-#include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
-#include "boolean_algebras/qlt/qlt_semantic_pwr.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
