@@ -75,3 +75,8 @@ add_repl_test(help_example_cmd    "help example"  "examples")
 # had no case for them and printed nothing)
 add_repl_test(help_stop_cmd     "help stop"     "discard the stored run session")
 add_repl_test(help_fragment_cmd "help fragment" "fragment ctl_star")
+
+add_repl_test(help_version_cmd "help version" "version prints the current Tau version")
+add_repl_test(help_quit_cmd "help quit" "quit exits the Tau repl")
+add_repl_test(help_memory_cmd "help memory"
+	"the memory command prints the running interpreter's current")

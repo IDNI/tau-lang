@@ -245,3 +245,14 @@ add_repl_test(cli-no_charvar_prints_conjunction
 	"normalize (ab:sbf & c_:sbf) = 0:sbf." "(ab&c_|c_&ab) = 0"
 	FLAGS --charvar=false --color=false -S error NO_TRACE
 	FAIL_REGEX "Error|abc_|c_ab")
+
+# make_cli drops ASCII 22 (Ctrl-V) from a line: "&\026&" reads as "&&"
+add_multiline_repl_test(cli-ctrl_v_is_dropped "%1[^:]*: F"
+	NO_FAIL_REGEX STDIN "sat x = 0 &\\026& x != 0\\nq\\n")
+# --ltl-guard-max-cubes lands in the global `get ltlguardmaxcubes` reads
+add_repl_test(cli-ltl_guard_max_cubes_flag "get ltlguardmaxcubes"
+	"ltlguardmaxcubes: *3" FLAGS --ltl-guard-max-cubes 3)
+# a spec file that does not parse is reported and the run ends
+add_raw_repl_test(cli-spec_file_parse_error
+	"printf 'o1[t] = = 1.\\n' > cli_bad_spec_fixture.tau && ${TAU_RUN} cli_bad_spec_fixture.tau -q < /dev/null; r=$?; rm -f cli_bad_spec_fixture.tau; exit $r"
+	"Syntax Error: Unexpected '='" NO_FAIL_REGEX REQUIRES hostfs)

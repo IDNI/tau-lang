@@ -1103,6 +1103,34 @@ TEST_SUITE("Tau API - spec decisions and unsat core") {
 	}
 }
 
+TEST_SUITE("Tau API - string - solution and definition rendering") {
+
+	// A solved value that is a compound BA constant keeps its own
+	// type-tagged spelling instead of going through serialize_constant.
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs keep a compound constant's own spelling") {
+		auto s = tau_api::solve("x:sbf = {a}:sbf", solver_mode::general);
+		REQUIRE(s.has_value());
+		CHECK(s.value() == std::map<std::string, std::string>{
+			{ "x", "{ a }:sbf" } });
+		auto l = tau_api::lgrs("x:sbf = {a}:sbf");
+		REQUIRE(l.has_value());
+		CHECK(l.value() == std::map<std::string, std::string>{
+			{ "x", "{ a }:sbf" } });
+	}
+
+	// The tref overload expands a call through the definition it is given
+	// (test_api-tref_api.cpp, "apply_def"); the string overload returns
+	// the call unexpanded.
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands the call it is given"
+		* doctest::should_fail())
+	{
+		auto a = tau_api::apply_def("str_apply_def_f(x) := x'",
+			"str_apply_def_f(y)");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y'");
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

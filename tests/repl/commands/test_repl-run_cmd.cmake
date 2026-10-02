@@ -668,3 +668,16 @@ add_repl_test(run_cmd-value_past_constant_size_budget
 add_repl_test(run_cmd-values_stay_within_constant_size_budget
 	"set maxconstantsize 4096. i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
 	"o1\\[9\\] := " FAIL_REGEX "Error|passed the constant size budget" REQUIRES hostfs)
+
+# a bounded run leaves its session stored: `run N steps` continues it from
+# where it stopped, `memory` shows what it keeps, `stop` discards it
+add_repl_test(run_cmd-continue_stored_session
+	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). run 2 steps"
+	"o1\\[2\\] := F.*o1\\[3\\] := F")
+add_repl_test(memory_cmd-during_run
+	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). memory"
+	"memory: \\{.*o1\\[1\\]:tau := 0.*1 binding")
+add_repl_test(stop_cmd-stops_stored_run
+	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). stop. run"
+	"run stopped.*no run to continue")
+add_repl_test(run_cmd-nothing_to_continue "run" "no run to continue")

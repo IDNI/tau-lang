@@ -27,3 +27,10 @@ add_repl_test(disable_enable_roundtrip "enable status. disable status" "off")
 # invalid option for bool-only commands
 add_repl_test(enable_cmd-invalid_severity "enable severity" "Invalid option" NO_FAIL_REGEX)
 add_repl_test(disable_cmd-invalid_severity "disable severity" "Invalid option" NO_FAIL_REGEX)
+
+add_repl_test(enable_disable_cmd-preprocessing
+	"disable preprocessing. get preprocessing. enable preprocessing. get preprocessing"
+	"preprocessing: *off.*preprocessing: *on")
+add_repl_test(enable_disable_cmd-factoring
+	"disable factoring. get factoring. enable factoring. get factoring"
+	"factoring: *off.*factoring: *on")

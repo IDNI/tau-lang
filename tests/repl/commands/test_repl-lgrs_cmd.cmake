@@ -35,3 +35,6 @@ add_repl_test(lgrs_cmd-non_boolean
 # lgrs takes an equation: a term argument is rejected instead of the whole
 # line being stored as a term (`lgrs x` used to print `%1: lgrsx`)
 add_repl_test(lgrs_cmd-term_rejected "lgrs x" "Invalid formula" NO_FAIL_REGEX)
+
+# x | {a} = 0 has no solution in sbf, since {a} is not 0
+add_repl_test(lgrs_cmd-no_solution "lgrs x:sbf | {a}:sbf = 0" "no solution")

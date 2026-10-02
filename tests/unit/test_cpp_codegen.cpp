@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+#include "test_tau_helpers.h"
 #include "cpp_codegen.h"
 
 #include <sstream>
@@ -195,4 +196,159 @@ TEST_SUITE("cpp_codegen guard_to_cpp") {
 		CHECK(codegen_detail::guard_to_cpp("t") == "true");
 		CHECK(codegen_detail::guard_to_cpp("f") == "false");
 	}
+
+	TEST_CASE("an empty guard is true and an unknown token passes through") {
+		CHECK(codegen_detail::guard_to_cpp("") == "true");
+		CHECK(codegen_detail::guard_to_cpp("  ") == "true");
+		CHECK(codegen_detail::guard_to_cpp("0^1") == "ap[0]^ap[1]");
+	}
 }
+
+TEST_SUITE("cpp_codegen sanitize") {
+	TEST_CASE("maps a name to a C++ identifier") {
+		CHECK(codegen_detail::sanitize("o_1") == "o_1");
+		CHECK(codegen_detail::sanitize("a-b.c") == "a_b_c");
+		CHECK(codegen_detail::sanitize("9x") == "_9x");
+		CHECK(codegen_detail::sanitize("") == "_");
+	}
+}
+
+static bool has(const std::string& s, const std::string& pat) {
+	return s.find(pat) != std::string::npos;
+}
+
+// A hand-built program_desc reaches the emitter's shapes no small spec
+// synthesizes: step guards next to inputs, a witness output beside a flag.
+TEST_SUITE("cpp_codegen emit_program from a program_desc") {
+
+	TEST_CASE("a flag-only program linking tau matches its step guards") {
+		program_desc d;
+		d.class_name = "Stepped";
+		d.num_states = 1;
+		d.inputs = { { "i", "i", field_kind::flag } };
+		d.outputs = { { "o", "o", field_kind::flag } };
+		d.step_guard_ks = { 3 };
+		d.needs_tau_link = true;
+		d.edges.resize(1);
+		edge_desc e;
+		e.guard = { 1, -1, 1 };
+		d.edges[0].push_back(e);
+		std::ostringstream os;
+		auto r = emit_program(d, os);
+		REQUIRE(r.has_value());
+		const std::string s = os.str();
+		CHECK(has(s, "#include \"codegen_strategy.h\""));
+		CHECK(has(s, "namespace tau_codegen_detail = ::idni::tau_lang::codegen;"));
+		CHECK(!has(s, "namespace tau_codegen_detail {"));
+		CHECK(has(s, "\"__step_ge3\","));
+		CHECK(has(s, "ap[1] = step_ >= 3;"));
+		CHECK(has(s, "++step_;"));
+		CHECK(has(s, "std::size_t step_ = 0;"));
+		CHECK(has(s, "strat_.edges[0].push_back({{1,-1,1}, 0});"));
+	}
+
+	TEST_CASE("a witness-bearing program unrolls each edge's guard") {
+		program_desc d;
+		d.class_name = "Unrolled";
+		d.num_states = 1;
+		d.inputs = { { "i", "i", field_kind::flag } };
+		d.outputs = { { "f", "f", field_kind::flag },
+			{ "w", "w", field_kind::witness } };
+		d.step_guard_ks = { 2 };
+		d.needs_tau_link = true;
+		d.edges.resize(1);
+		edge_desc e0;
+		e0.guard = { 1, -1, 1 };
+		e0.witness_ctors = { { "w", "make_w()" } };
+		edge_desc e1;
+		e1.guard = { -1, 1, -1 };
+		edge_desc e2;
+		e2.guard = { 0, 0, 0 };
+		d.edges[0] = { e0, e1, e2 };
+		std::ostringstream os;
+		auto r = emit_program(d, os);
+		REQUIRE(r.has_value());
+		const std::string s = os.str();
+		CHECK(has(s, "if (in.i && !(step_ >= 2)) {"));
+		CHECK(has(s, "o.f = true;"));
+		CHECK(has(s, "static const tref w_s0_e0_w = make_w();"));
+		CHECK(has(s, "o.w = w_s0_e0_w;"));
+		CHECK(has(s, "else if (!in.i && (step_ >= 2)) {"));
+		CHECK(has(s, "o.f = false;"));
+		CHECK(has(s, "else if (true) {"));
+		CHECK(has(s, "++step_;"));
+		CHECK(has(s, "std::size_t step_ = 0;"));
+		// a witness-bearing step() builds no strategy table
+		CHECK(!has(s, "strat_"));
+	}
+}
+
+#ifdef TAU_PACK_HAS_BA_BV
+static tref parse_wff(const char* s) {
+	tau::get_options opts;
+	opts.parse.start = tau::wff;
+	return tau::get(s, opts).value_or(nullptr);
+}
+
+TEST_SUITE("cpp_codegen atom ground expressions") {
+
+	TEST_CASE("each order comparison is rebuilt with its own builder") {
+		for (auto [src, fn] : std::initializer_list<
+			std::pair<const char*, const char*>>{
+			{ "o1[t]:bv[8] > i1[t]:bv[8]",   "build_bf_gt<" },
+			{ "o1[t]:bv[8] !> i1[t]:bv[8]",  "build_bf_ngt<" },
+			{ "o1[t]:bv[8] >= i1[t]:bv[8]",  "build_bf_gteq<" },
+			{ "o1[t]:bv[8] !>= i1[t]:bv[8]", "build_bf_ngteq<" } })
+		{
+			INFO(std::string(src));
+			tref atom = parse_wff(src);
+			REQUIRE(atom != nullptr);
+			auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+			REQUIRE(e.has_value());
+			INFO(e.value());
+			CHECK(has(e.value(), fn));
+			CHECK(has(e.value(), "\"o1\""));
+			CHECK(has(e.value(), "\"i1\""));
+		}
+	}
+
+	TEST_CASE("each binary operator of an operand is rebuilt with its own builder") {
+		for (auto [src, fn] : std::initializer_list<
+			std::pair<const char*, const char*>>{
+			{ "o1[t]:bv[8] ^ i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_xor<" },
+			{ "o1[t]:bv[8] << i1[t]:bv[8] = o2[t]:bv[8]", "build_bf_shl<" },
+			{ "o1[t]:bv[8] >> i1[t]:bv[8] = o2[t]:bv[8]", "build_bf_shr<" },
+			{ "o1[t]:bv[8] - i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_sub<" },
+			{ "o1[t]:bv[8] * i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_mul<" },
+			{ "o1[t]:bv[8] / i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_div<" },
+			{ "o1[t]:bv[8] % i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_mod<" } })
+		{
+			INFO(std::string(src));
+			tref atom = parse_wff(src);
+			REQUIRE(atom != nullptr);
+			auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+			REQUIRE(e.has_value());
+			INFO(e.value());
+			CHECK(has(e.value(), fn));
+			CHECK(has(e.value(), "build_bf_eq<"));
+			CHECK(has(e.value(), "\"o2\""));
+		}
+	}
+
+	TEST_CASE("an operand over a variable that is no stream is refused") {
+		tref atom = parse_wff("x:bv[8] > o1[t]:bv[8]");
+		REQUIRE(atom != nullptr);
+		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+		CHECK(!e.has_value());
+		CHECK(report_has_code(e.report(), code::unsupported_operation));
+	}
+
+	TEST_CASE("a formula that is no comparison is refused") {
+		tref atom = parse_wff("T");
+		REQUIRE(atom != nullptr);
+		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+		CHECK(!e.has_value());
+		CHECK(report_has_code(e.report(), code::unsupported_operation));
+	}
+}
+#endif // TAU_PACK_HAS_BA_BV

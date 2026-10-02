@@ -79,3 +79,29 @@ add_gen_test(reuse_artifact_dir CASE reuse_dir
 add_gen_test(codegen_alias CASE alias
 	SPEC "${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
 	REQUIRES hostfs)
+
+include(add_repl_test)
+
+add_raw_repl_test(gen_verb-no_spec "${TAU_RUN} gen"
+	"Usage: tau gen <spec.tau>" NO_FAIL_REGEX)
+add_raw_repl_test(gen_verb-empty_spec
+	"d=$(mktemp -d) && : > $d/empty.tau && ${TAU_RUN} gen $d/empty.tau; r=$?; rm -rf $d; exit $r"
+	"Spec file is empty: .*empty.tau" NO_FAIL_REGEX REQUIRES hostfs)
+
+# a table-playing artifact keeps an output's file binding
+add_raw_repl_test(gen_verb-output_file_binding
+	"d=$(mktemp -d) && printf 'o2:sbf := out file(\"o2.out\").\\n(always o1[t-1]:sbf = 0) && (sometimes !(o2[t-1]:sbf = 1)).\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/g && grep add_output_file $d/g/main.cpp; r=$?; rm -rf $d; exit $r"
+	"ctx.add_output_file[(]\"o2\", [0-9]+, \"o2.out\"[)]" NO_FAIL_REGEX REQUIRES hostfs)
+# SUSPECTED BUG: declaring the bv stream the spec already uses
+# (`o2:bv[8] := out console.`) makes `tau gen` refuse the spec with "the
+# Boolean-algebra type is not replayable by an emitted artifact (type
+# name=:bv[8])", while the same spec without the declaration generates and
+# `run` executes it either way. Expected: generated. Marked WILL_FAIL until
+# fixed.
+add_raw_repl_test(gen_verb-declared_bv_stream_is_replayable
+	"d=$(mktemp -d) && printf 'o2:bv[8] := out console.\\n(always o1[t-1]:bv[8] = 0) && (sometimes !(o2[t-1]:bv[8] = 1)).\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/g; r=$?; rm -rf $d; exit $r"
+	"generated:" FAIL_REGEX "not replayable" REQUIRES hostfs bv)
+if(TEST "test_repl-gen_verb-declared_bv_stream_is_replayable")
+	set_tests_properties("test_repl-gen_verb-declared_bv_stream_is_replayable"
+		PROPERTIES WILL_FAIL TRUE)
+endif()

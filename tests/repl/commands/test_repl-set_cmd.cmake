@@ -126,3 +126,20 @@ add_repl_test(set_cmd-option_change_drops_normalizer_cache
 add_repl_test(set_cmd-ba_option_change_drops_normalizer_cache
 	"normalize (x & y) = 0 && x = 0. set bv-definitional-elimination off. normalize (x & y) = 0 && x = 0"
 	"bv-definitional-elimination: *off[^%]*eliminate_arithmetic_and_quantifiers")
+
+# set prints the option it changed; these setters had no case.
+add_repl_test(set_cmd-preprocessing_off "set preprocessing off" "preprocessing: *off")
+add_repl_test(set_cmd-factoring_off "set factoring off" "factoring: *off")
+add_repl_test(set_cmd-maxclauses "set maxclauses 7" "maxclauses: *7")
+add_repl_test(set_cmd-trefbudget "set trefbudget 5000000"
+	"trefbudget: *5000000 [(]live: [0-9]+[)]")
+add_repl_test(set_cmd-trefbudgetsoft "set trefbudgetsoft 50" "trefbudgetsoft: *50%")
+# a flag value that is no on/off spelling leaves the option as it was
+add_repl_test(set_cmd-bool_invalid_value "set status maybe"
+	"Invalid value[\r\n]+status: *on")
+# std::stod throws on "..", which the grammar admits as a decimal
+add_repl_test(set_cmd-gcgrowth_not_a_number "set gcgrowth .."
+	"Invalid value: expected a number[\r\n]+gcgrowth: *1.5")
+# a BA flag option refuses a value that is no on/off spelling
+add_repl_test(set_cmd-ba_flag_invalid_value "set bv-blasting maybe"
+	"Invalid value[\r\n]+bv-blasting: *(on|off)" REQUIRES bv)

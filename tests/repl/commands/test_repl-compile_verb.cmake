@@ -127,3 +127,57 @@ if(TEST "test_repl-compile_verb-plays_formula_strategy")
 	set_tests_properties("test_repl-compile_verb-plays_formula_strategy"
 		PROPERTIES ENVIRONMENT "TAU_LTL_DATA_GAME_MAX_NODES=1")
 endif()
+
+include(add_repl_test)
+
+# argument checks before any codegen
+add_raw_repl_test(compile_verb-no_spec "${TAU_RUN} compile"
+	"Usage: tau compile <spec.tau>" NO_FAIL_REGEX)
+add_raw_repl_test(compile_verb-two_specs
+	"d=$(mktemp -d) && printf 'o1[t] = 1.\\n' > $d/a.tau && printf 'o1[t] = 0.\\n' > $d/b.tau && ${TAU_RUN} compile $d/a.tau $d/b.tau; r=$?; rm -rf $d; exit $r"
+	"tau compile: exactly one spec file is expected" NO_FAIL_REGEX REQUIRES hostfs)
+add_raw_repl_test(compile_verb-empty_spec
+	"d=$(mktemp -d) && : > $d/empty.tau && ${TAU_RUN} compile $d/empty.tau; r=$?; rm -rf $d; exit $r"
+	"Spec file is empty: .*empty.tau" NO_FAIL_REGEX REQUIRES hostfs)
+# `-` names stdin; an empty one is refused after the a.out/a.build defaults
+# (with -o, after <out>.build) are chosen
+add_raw_repl_test(compile_verb-stdin_empty "printf '' | ${TAU_RUN} compile -"
+	"Spec file is empty: -" NO_FAIL_REGEX)
+add_raw_repl_test(compile_verb-stdin_empty_with_output
+	"printf '' | ${TAU_RUN} compile - -o prog"
+	"Spec file is empty: -" NO_FAIL_REGEX)
+# SDK resolution failures: none of these spawns a build
+add_raw_repl_test(compile_verb-sdk_dir_env_missing
+	"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && TAU_SDK_DIR=$d/no_sdk ${TAU_RUN} compile $d/s.tau -o $d/prog; r=$?; rm -rf $d; exit $r"
+	"tau SDK not found at TAU_SDK_DIR=.*no_sdk" NO_FAIL_REGEX
+	REQUIRES hostfs subprocess)
+# a platform with no SDK names the package to install
+foreach(_case "debug-arm64|-linux-arm64" "debug-wasm-nothreads|-wasm32-emscripten"
+		"debug-w64|-windows-x86_64-mingw" "debug-msvc|")
+	string(REPLACE "|" ";" _case "${_case}")
+	list(GET _case 0 _platform)
+	list(LENGTH _case _n)
+	set(_suffix "")
+	if(_n GREATER 1)
+		list(GET _case 1 _suffix)
+	endif()
+	add_raw_repl_test(compile_verb-no_sdk_for_${_platform}
+		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && ${TAU_RUN} compile $d/s.tau --preset ${_platform} -o $d/prog; r=$?; rm -rf $d; exit $r"
+		"no SDK for ${_platform}. install tau-sdk${_suffix} or build it with ./dev preset ${_platform}"
+		NO_FAIL_REGEX REQUIRES hostfs subprocess)
+endforeach()
+# a configure that fails reports the end of compile.log; -G/--generator and
+# -D reach the configure (an unknown generator always fails it)
+if(EXISTS "${CMAKE_BINARY_DIR}/sdk/TauConfig.cmake")
+	add_raw_repl_test(compile_verb-configure_failure_is_reported
+		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && ${TAU_RUN} compile $d/s.tau -G NoSuchGenerator -D FOO=1 -o $d/prog; r=$?; rm -rf $d; exit $r"
+		"compile: the cmake build failed" NO_FAIL_REGEX REQUIRES hostfs subprocess)
+	add_raw_repl_test(compile_verb-generator_long_option
+		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && ${TAU_RUN} compile $d/s.tau --generator NoSuchGenerator --define FOO=1 -o $d/prog; r=$?; rm -rf $d; exit $r"
+		"compile: the cmake build failed" NO_FAIL_REGEX REQUIRES hostfs subprocess)
+	# with --preset and TAU_SDK_DIR, the SDK of the environment drives a
+	# cross configure, which the unknown generator fails the same way
+	add_raw_repl_test(compile_verb-preset_with_sdk_dir_env
+		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && TAU_SDK_DIR=${CMAKE_BINARY_DIR}/sdk ${TAU_RUN} compile $d/s.tau --preset debug-arm64 -G NoSuchGenerator -o $d/prog; r=$?; rm -rf $d; exit $r"
+		"compile: the cmake build failed" NO_FAIL_REGEX REQUIRES hostfs subprocess)
+endif()
