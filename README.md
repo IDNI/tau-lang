@@ -2257,10 +2257,10 @@ admits quantifier elimination, which is why tau-lang supports it.  Every
 definable set is a finite Boolean combination of open/half-open/closed
 intervals with rational endpoints.
 
-tau-lang treats `qlt` specially: it is routed through a dedicated DLO
-quantifier-elimination path (`qlt_dlo_qe`), not through the Boolean-algebra
-pipeline (the comparison hooks `<`, `>`, `≤`, `≥` have their own semantics,
-and `bf_*` Boolean-function rewrites do not apply).
+tau-lang treats `qlt` specially: its quantifiers are decided by qlt's own
+elimination (`qlt_omcat_qe`), not by the Boolean-algebra pipeline (the
+comparison hooks `<`, `>`, `≤`, `≥` have their own semantics, and `bf_*`
+Boolean-function rewrites do not apply).
 
 Elements are written as interval expressions inside `{...}:qlt`:
 
@@ -2278,22 +2278,44 @@ represent the extended line endpoints.  Parentheses `(`, `)` exclude the
 endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
 (`0.d…`) literal syntaxes are accepted.
 
-A `qlt` variable or stream stands for one point of the order, so `run` (and a
-program of `tau compile`) gives every `qlt` output a rational at every step,
-never `top`, `bot` or an interval: the step solver asks qlt's own ordering
-solver for the values (`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`,
-`o2 := 0`).  When no strategy exists, `run` says the specification is
-unrealizable.
+A `qlt` variable or stream stands for one point of the order, while a
+constant `{...}:qlt` stands for a set of points.  Where a term combines a
+variable `x` with constants, `x` reads as the set holding just its point:
 
-A point is an atom of the `qlt` constants: `{3}:qlt & x` is either `0` or
-`{3}:qlt`.  So a quantified `qlt` variable that meets one point `p` only as
-`p & x` and `p & x'` is decided by its two cases, `x := p` and another point
-(`ex x ((({3}:qlt & x) != 0) && (({3}:qlt & x') != 0))` is `F`).  Otherwise a
-closed quantifier whose `qlt` terms are Boolean combinations of constants is
-`T` (for `ex`) or `F` (for `all`) when a point at, between or beyond the
-constants' endpoints is a witness or a counterexample, and an existential
-whose body only excludes values (`x != t`, each `t` free of `x`) is `T`; when
-none of these applies, the binder stays.
+* `c & x != 0` says that `x` lies in `c`, and `c & x = 0` that it does not;
+  `c & x' != 0` says that `c` holds a point other than `x`;
+* `x = c` holds only when `c` is the single point `x`, so
+  `ex x (x = {[0,1]}:qlt)` is `F` and `ex x (x = {1/2}:qlt)` is `T`;
+* `x = 0` and `x = 1` never hold: the typed `0` and `1` are the ends of the
+  order, below and above every point;
+* `x & y' = 0` says that `x` is `y`, and `x & y = 0` that it is not;
+* `<`, `<=`, `>`, `>=` compare points.
+
+A quantifier over a `qlt` variable is decided by cells: the finite endpoints
+of the constants cut the rationals into the endpoints, the open gaps between
+them and the two rays beyond them, and every point of one cell satisfies the
+same atoms.  One point per cell therefore decides `ex` (some cell satisfies
+the body) and `all` (every cell does), exactly.  So
+`ex x ((({3}:qlt & x) != 0) && (({5}:qlt & x) != 0))` is `F` (no point is
+both 3 and 5) and `all x ((({(0,1)}:qlt & x) != 0) -> x < {1}:qlt)` is `T`.
+With one other free variable `y` the result is the set of the points of `y`
+for which the body holds: `ex x (x > y && ({[0,1]}:qlt & x) != 0)` is
+`y{ (-inf, 1) }:qlt != 0`.  An order atom between two variables is
+eliminated by the dense-order rules (`ex x (a < x && x < b)` is `a < b`).
+When none of these applies the binder stays.
+
+`solve`, `run` and a program of `tau compile` give every `qlt` variable or
+output one rational, never `top`, `bot` or an interval: qlt's own solver
+picks the values, preferring simple ones, and `solve` answers `no solution`
+when no points satisfy the system (`solve {(0, 1)}:qlt x = 0` gives
+`x := { 0 }:qlt`; `solve x:qlt = {[0, 1]}:qlt` has no solution).  Points have
+no least or greatest choice, so `--min` and `--max` give a point as well.
+`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
+strategy exists, `run` says the specification is unrealizable.
+
+An order atom against a constant that is not a single point
+(`x < {(0, 1)}:qlt`) is not given a meaning: it is never decided, and a
+quantifier over it keeps its binder.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 
@@ -3489,7 +3511,8 @@ variables. The available options are:
   reproductive solution `x := x|y`, `y := x|y`. An
   ordering system over `qlt` is solved as a whole, so related variables get
   distinct values (`solve x:qlt < y:qlt` gives `x` a smaller value than `y`),
-  and its model is checked against every atom before it is printed.
+  and its model is checked against every atom before it is printed. A `qlt`
+  variable always gets one point (see the `qlt` section).
 
 * `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
 solution (LGRS) for the given equation.
