@@ -6112,7 +6112,7 @@ TEST_SUITE("safety encoding of a Mealy strategy") {
 
 	// ltlsynt's machines are input-complete and in range, so these
 	// automata are built by hand.
-	ltl_aba_solution<node_t> two_states(int second_dst) {
+	ltl_aba_solution<node_t> two_states(size_t second_dst) {
 		ltl_aba_solution<node_t> sol;
 		sol.aut.num_states = 2;
 		sol.aut.initial_state = 0;

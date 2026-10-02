@@ -301,7 +301,7 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 	TEST_CASE("Algorithm D refuses a generalized Buchi game") {
 		// Only colour 0 is ever seen, so Inf(1) fails and the system
 		// cannot win; reading the condition as plain Buchi says it can.
-		auto G = alg_d::parse_synth_game_hoa(
+		auto parsed = alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 2\nStart: 0\nAP: 1 \"d_0\"\n"
 			"acc-name: generalized-Buchi 2\n"
 			"Acceptance: 2 Inf(0)&Inf(1)\n"
@@ -309,6 +309,8 @@ TEST_SUITE("LTL(ABA) open points: Algorithm D acceptance") {
 			"spot-state-player: 0 1\ncontrollable-AP: 0\n--BODY--\n"
 			"State: 0\n[t] 1\n"
 			"State: 1\n[0] 0 {0}\n[!0] 0 {0}\n--END--\n");
+		REQUIRE(parsed.has_value());
+		const auto& G = parsed.value();
 		REQUIRE(G.num_states == 2);
 		CHECK_FALSE(G.acc_known);
 		CHECK_FALSE(alg_d_product_wins(G, 1, {0, 1}));
