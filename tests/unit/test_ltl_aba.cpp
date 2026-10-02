@@ -6134,8 +6134,224 @@ TEST_SUITE("safety encoding of a Mealy strategy") {
 		REQUIRE(encoded.value() != nullptr);
 		CHECK(tau::get(encoded.value())[0].is(tau::wff_always));
 	}
+
+	TEST_CASE("a state without outgoing edges is forbidden as a predecessor") {
+		ltl_aba_solution<node_t> sol;
+		sol.aut.num_states = 2;
+		sol.aut.initial_state = 0;
+		sol.aut.edges = { { hoa_edge{ "t", 1, false } }, {} };
+		sol.aut.state_accepting = { false, false };
+		auto encoded = encode_mealy_as_safety<node_t>(sol);
+		REQUIRE(encoded.has_value());
+		REQUIRE(encoded.value() != nullptr);
+		REQUIRE(tau::get(encoded.value())[0].is(tau::wff_always));
+		// the machine cannot leave state 1, so it can never be there
+		tref body = tau::get(encoded.value())[0].first();
+		tref in_1 = tau::build_wff_and(body,
+			build_state_bit_eq<node_t>("o__ltl_ms1__", -1, true));
+		INFO(tau::get(body).to_str());
+		CHECK_FALSE(sat(tau::build_wff_always(in_1)));
+	}
+
+	TEST_CASE("the warm-up takes one transition per step before the G body") {
+		const std::vector<std::string> sv = { "o__ltl_ms0__", "o__ltl_ms1__" };
+		auto warm = encode_mealy_warmup<node_t>(two_states(0), sv, 3);
+		REQUIRE(warm.has_value());
+		REQUIRE(warm.value() != nullptr);
+		const std::string s = tau::get(warm.value()).to_str();
+		INFO(s);
+		// 0 -> 1 -> 0 -> 1: state 1 after steps 0 and 2, state 0 after step 1
+		for (const char* bit : { "o__ltl_ms1__[0]", "o__ltl_ms0__[1]",
+			"o__ltl_ms1__[2]" })
+			CHECK(s.find(bit) != std::string::npos);
+		CHECK(sat(warm.value()));
+	}
 }
 
+
+// ── skeleton refusals, hoisting scope and atom-free synthesis ────────────────
+
+TEST_SUITE("LTL skeleton builder: refusals") {
+
+	TEST_CASE("a CTL* path quantifier reaching the skeleton is refused") {
+		tref fm = wff("A (G (o1[t] = 0))");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		auto r = ltl_skeleton_with_testers<node_t>(fm, atoms);
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::solver_error));
+		// the realizability check refuses it before any skeleton
+		auto rr = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE(rr.has_value());
+	}
+
+	TEST_CASE("a data quantifier over streams under G has no proposition") {
+		tref fm = wff("G(ex x (o1[t] = x && x != 0))");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		auto r = ltl_skeleton_with_testers<node_t>(fm, atoms);
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::unsupported_operation));
+	}
+
+	TEST_CASE("the non-tester skeleton refuses past operators and step guards") {
+		tref past = wff("G((o1[t] = 0) since (o2[t] = 0))");
+		REQUIRE(past != nullptr);
+		auto r1 = ltl_skeleton<node_t>(past, extract_data_atoms<node_t>(past));
+		CHECK_FALSE(r1.has_value());
+		tref guard = wff("G(F(o1[t] = o1[t-1]))");
+		REQUIRE(guard != nullptr);
+		auto r2 = ltl_skeleton<node_t>(guard, extract_data_atoms<node_t>(guard));
+		CHECK_FALSE(r2.has_value());
+		// the tester walker drives both
+		auto atoms = extract_data_atoms<node_t>(past);
+		auto r3 = ltl_skeleton_with_testers<node_t>(past, atoms);
+		REQUIRE(r3.has_value());
+		CHECK(r3.value().second.size() == 1);
+	}
+}
+
+TEST_SUITE("LTL(ABA) hoisting of positional conjuncts") {
+
+	TEST_CASE("a conjunct mixing a positional and a relative atom is refused") {
+		tref fm = wff("G((o1[0] = 0) || (o2[t] = 0))");
+		REQUIRE(fm != nullptr);
+		auto r = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm));
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::unsupported_operation));
+	}
+
+	TEST_CASE("a positional atom under a temporal operator is refused") {
+		tref fm = wff("(F (o1[0] = 0)) && G(o2[t] = 0)");
+		REQUIRE(fm != nullptr);
+		auto r = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm));
+		CHECK_FALSE(r.has_value());
+	}
+}
+
+TEST_SUITE("LTL(ABA) synthesis without data atoms") {
+
+	struct no_propositional_synthesis {
+		bool saved = ltl_propositional_synthesis;
+		no_propositional_synthesis() { ltl_propositional_synthesis = false; }
+		~no_propositional_synthesis() { ltl_propositional_synthesis = saved; }
+	};
+
+	TEST_CASE("an atom-free formula goes to ltlsynt as it is"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		no_propositional_synthesis guard;
+		tref yes = wff("G(F(T))");
+		REQUIRE(yes != nullptr);
+		auto s1 = solve_ltl(yes);
+		REQUIRE(s1.has_value());
+		CHECK(s1->atoms.empty());
+		CHECK(s1->aut.num_states >= 1);
+		tref no = wff("F(F)");
+		REQUIRE(no != nullptr);
+		CHECK_FALSE(solve_ltl(no).has_value());
+	}
+
+	TEST_CASE("an atom-free past formula is synthesized through its testers"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref yes = wff("G((ex x x != 0) since (ex y y = 0))");
+		REQUIRE(yes != nullptr);
+		auto s1 = solve_ltl(yes);
+		REQUIRE(s1.has_value());
+		INFO(s1->skeleton);
+		CHECK(s1->skeleton.find("__past_s0") != std::string::npos);
+		tref no = wff("G((ex x x != 0) since (ex y y != y))");
+		REQUIRE(no != nullptr);
+		CHECK_FALSE(solve_ltl(no).has_value());
+	}
+}
+
+TEST_SUITE("LTL(ABA) observed abstraction") {
+
+	TEST_CASE("an output atom with lookback gets a present twin"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct observed {
+			bool saved = ltl_observed_abstraction;
+			observed() { ltl_observed_abstraction = true; }
+			~observed() { ltl_observed_abstraction = saved; }
+		} guard;
+		tref fm = wff("G(F(o1[t-1] = 0)) && G(F(o1[t] != 0))");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		INFO(sol->skeleton);
+		// o1[t-1] = 0 read one step later is o1[t] = 0
+		CHECK(sol->skeleton.find("<-> X(p0))") != std::string::npos);
+		CHECK(sol->atoms.size() == 3);
+	}
+}
+
+TEST_SUITE("LTL(ABA) strategy against the data: undecided inputs") {
+
+	TEST_CASE("an empty automaton, a positional atom or a dangling edge is "
+		"undecided")
+	{
+		size_t rounds = 0;
+		ltl_aba_solution<node_t> empty;
+		auto r0 = strategy_wins_on_data<node_t>(empty, 4, rounds);
+		REQUIRE(r0.has_value());
+		CHECK(r0.value() == strategy_data_verdict::undecided);
+
+		ltl_aba_solution<node_t> pos;
+		pos.aut.num_states = 1;
+		pos.aut.edges = { { hoa_edge{ "t", 0, false } } };
+		pos.aut.state_accepting = { false };
+		tref a = wff("o1[0] = 0");
+		REQUIRE(a != nullptr);
+		pos.atoms = { { a, "p0" } };
+		auto r1 = strategy_wins_on_data<node_t>(pos, 4, rounds);
+		REQUIRE(r1.has_value());
+		CHECK(r1.value() == strategy_data_verdict::undecided);
+
+		ltl_aba_solution<node_t> dangling;
+		dangling.aut.num_states = 1;
+		dangling.aut.edges = { { hoa_edge{ "t", 3, false } } };
+		dangling.aut.state_accepting = { false };
+		auto r2 = strategy_wins_on_data<node_t>(dangling, 4, rounds);
+		REQUIRE(r2.has_value());
+		CHECK(r2.value() == strategy_data_verdict::undecided);
+	}
+}
+
+TEST_SUITE("ocltl phi_delta shape match: more shapes") {
+
+	TEST_CASE("a conjunction of two literals gives two asserted atoms") {
+		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) && (o2[t]:tau = {F.}:tau)");
+		REQUIRE(fm != nullptr);
+		auto m = match_ocltl_swap_shape<node_t>(fm);
+		REQUIRE(m.has_value());
+		CHECK(m->atoms.size() == 2);
+		CHECK(m->D == 3);
+	}
+
+	TEST_CASE("a literal that folds to true adds no atom, one that folds to "
+		"false is not this shape")
+	{
+		tref taut = wff("(o1[t]:tau = o1[t]:tau) && (o2[t]:tau = {T.}:tau)");
+		REQUIRE(taut != nullptr);
+		auto m = match_ocltl_swap_shape<node_t>(taut);
+		REQUIRE(m.has_value());
+		CHECK(m->atoms.size() == 1);
+		tref contra = wff("o1[t]:tau != o1[t]:tau");
+		REQUIRE(contra != nullptr);
+		CHECK_FALSE(match_ocltl_swap_shape<node_t>(contra).has_value());
+	}
+
+	TEST_CASE("a constant that is neither zero nor one is not this shape") {
+		tref fm = wff("o1[t]:tau = {o5[t] = 0.}:tau");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(match_ocltl_swap_shape<node_t>(fm).has_value());
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

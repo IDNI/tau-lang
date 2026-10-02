@@ -1278,6 +1278,188 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 } // TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]")
 
 
+TEST_SUITE("[Algorithm D: guard evaluator and parser edge cases]") {
+
+	TEST_CASE("a parenthesised guard groups a disjunction under a conjunction") {
+		// AP 0 true, AP 2 false
+		CHECK(alg_d::eval_guard("(0 | 1) & !2", 0b001, 3));
+		// AP 2 true defeats the conjunction
+		CHECK_FALSE(alg_d::eval_guard("(0 | 1) & !2", 0b101, 3));
+		// neither disjunct holds
+		CHECK_FALSE(alg_d::eval_guard("(0 | 1) & !2", 0b000, 3));
+		CHECK(alg_d::eval_guard("!(0 & 1)", 0b001, 2));
+	}
+
+	TEST_CASE("a guard character outside the grammar reads as false") {
+		CHECK_FALSE(alg_d::eval_guard("x", 0b1, 1));
+		CHECK(alg_d::eval_guard("!x", 0b1, 1));
+	}
+
+	TEST_CASE("a non-integer controllable-AP entry is a parse error") {
+		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: 2 \"p0\" \"d_0\"\n"
+			"controllable-AP: 1x\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n"
+			"--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
+	}
+
+	TEST_CASE("a controllable-AP index outside the AP table is a parse error") {
+		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: 2 \"p0\" \"d_0\"\n"
+			"controllable-AP: 5\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n"
+			"--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
+		std::string neg = "HOA: v1\nStates: 1\nStart: 0\nAP: 2 \"p0\" \"d_0\"\n"
+			"controllable-AP: -1\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n"
+			"--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(neg).has_error());
+	}
+
+	TEST_CASE("a body state number outside the state table is a parse error") {
+		std::string hoa = "HOA: v1\nStates: 2\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\n--BODY--\nState: 7\n[t] 0\n--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
+	}
+
+	TEST_CASE("a transition to a state outside the state table is a parse error") {
+		std::string hoa = "HOA: v1\nStates: 2\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\n--BODY--\nState: 0\n[t] 9\n--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
+	}
+
+	TEST_CASE("a text without a state count yields no game") {
+		std::string hoa = "HOA: v1\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\n--BODY--\n--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
+	}
+
+	TEST_CASE("an edge mark under acceptance all gets the odd priority 1") {
+		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\nAcceptance: 0 t\n--BODY--\nState: 0\n[0] 0 {0}\n"
+			"[!0] 0\n--END--\n";
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		auto g = g_r.value();
+		REQUIRE(g.edge_priority.size() == 1u);
+		REQUIRE(g.edge_priority[0].size() == 2u);
+		CHECK(g.edge_priority[0][0] == 1);
+		CHECK(g.edge_priority[0][1] == -1);
+	}
+}
+
+TEST_SUITE("[Algorithm D: system choices and product game edge cases]") {
+
+	TEST_CASE("sys_choices ranges over the APs that are not D propositions") {
+		alg_d::synth_game g;
+		g.aps = {"d_0", "p", "q"};
+		// "p" is controllable but no d_N name; "q" is an input
+		g.controllable = {true, true, false};
+		auto ch = alg_d::sys_choices(g, 1);
+		// 2 D-patterns times 2^2 assignments of the other APs
+		CHECK(ch.size() == 8u);
+		std::set<std::pair<size_t, int>> s(ch.begin(), ch.end());
+		CHECK(s.size() == 8u);
+		CHECK(s.count({0, 0b000}));
+		CHECK(s.count({0, 0b110}));
+		CHECK(s.count({1, 0b001}));
+		CHECK(s.count({1, 0b111}));
+		// d_0 is set exactly when the D-pattern says so
+		for (auto& [d, a] : ch) CHECK(((a & 1) != 0) == (d == 1));
+	}
+
+	TEST_CASE("a hand-built game with too many APs is refused") {
+		alg_d::synth_game g;
+		g.num_states = 1;
+		g.player = {1};
+		for (int i = 0; i <= ltl_max_game_aps; ++i)
+			g.aps.push_back("p" + std::to_string(i));
+		g.controllable.assign(g.aps.size(), false);
+		g.state_color = {-1};
+		g.state_priority = {1};
+		g.trans.resize(1);
+		g.trans[0].emplace_back("t", 0, -1);
+		g.edge_priority = {{-1}};
+		std::vector<omcat::qlt_type3> T3(1);
+		CHECK(alg_d::build_product_game(g, 1, T3, {0}, 0, 0).has_error());
+	}
+
+	TEST_CASE("a 3-type outside the memory table makes no pattern feasible") {
+		alg_d::synth_game g;
+		g.num_states = 1;
+		g.player = {1};
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1};
+		g.state_priority = {1};
+		g.trans.resize(1);
+		g.trans[0].emplace_back("t", 0, -1);
+		g.edge_priority = {{-1}};
+		std::vector<omcat::qlt_type3> T3(2);
+		T3[0].pos_m = 3; T3[0].pos_y = 0;  // memory position out of range
+		T3[1].pos_m = 0; T3[1].pos_y = 0;
+		std::vector<int> type_A = {0, 4};  // pattern out of range for K = 1
+		auto pg_r = alg_d::build_product_game(g, 1, T3, type_A, 1, 0);
+		REQUIRE(pg_r.has_value());
+		CHECK(pg_r.value().succs[0].empty());
+		CHECK(alg_d::zielonka_win_player1(pg_r.value()).empty());
+	}
+
+	TEST_CASE("an env edge with an acceptance mark goes through a stub") {
+		alg_d::synth_game g;
+		g.num_states = 2;
+		g.init = 0;
+		g.player = {0, 1};       // state 0 = env, state 1 = sys
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1, -1};
+		g.state_priority = {0, 0};
+		g.trans.resize(2);
+		g.trans[0].emplace_back("t", 1, 0);  // marked env edge
+		g.trans[1].emplace_back("t", 0, -1);
+		g.edge_priority = {{1}, {-1}};
+		std::vector<omcat::qlt_type3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		auto pg_r = alg_d::build_product_game(g, 1, T3, {0}, 1, 0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
+		REQUIRE(pg.n_states == 3u);
+		REQUIRE(pg.succs[0].size() == 1u);
+		const size_t stub = pg.succs[0][0];
+		CHECK(stub == 2u);
+		CHECK(pg.priority[stub] == 1);
+		REQUIRE(pg.succs[stub].size() == 1u);
+		CHECK(pg.succs[stub][0] == 1u);
+		// the odd stub recurs on every cycle: sys wins everywhere
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));
+		CHECK(W1.count(1));
+	}
+
+	TEST_CASE("an env edge whose D-content is infeasible does not exist") {
+		alg_d::synth_game g;
+		g.num_states = 2;
+		g.init = 0;
+		g.player = {0, 1};
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1, -1};
+		g.state_priority = {0, 0};
+		g.trans.resize(2);
+		g.trans[0].emplace_back("0", 1, 0);   // marked, needs d_0
+		g.trans[0].emplace_back("0", 1, -1);  // unmarked, needs d_0
+		g.trans[1].emplace_back("t", 0, -1);
+		g.edge_priority = {{1, -1}, {-1}};
+		std::vector<omcat::qlt_type3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		// only the pattern with d_0 false is feasible
+		auto pg_r = alg_d::build_product_game(g, 1, T3, {0}, 1, 0);
+		REQUIRE(pg_r.has_value());
+		auto pg = pg_r.value();
+		CHECK(pg.n_states == 2u);
+		CHECK(pg.succs[0].empty());
+		// an env dead end loses for env
+		CHECK(alg_d::zielonka_win_player1(pg).count(0));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

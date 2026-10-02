@@ -1024,6 +1024,148 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Data game strategies played without a Mealy view: every step decodes the
+// outputs from the codes of the game.
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace {
+
+// Sets the Mealy view bound of the data game strategies for one scope.
+struct no_mealy_view {
+	size_t saved = data_game_mealy_max_states;
+	no_mealy_view() { data_game_mealy_max_states = 0; }
+	~no_mealy_view() { data_game_mealy_max_states = saved; }
+};
+
+} // namespace
+
+TEST_SUITE("LTL Execution: data game strategy without a Mealy view") {
+
+#ifdef TAU_PACK_HAS_BA_QLT
+	TEST_CASE("qlt order types: o1 meets 1/2 two steps after a value at most 0"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		no_mealy_view guard;
+		io_context<node_t> ctx;
+		strings i1_values = {"{1}", "{2}", "{3}", "{4}"};
+		ctx.add_input("i1", qlt_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", qlt_type_id<node_t>(), o1);
+		ctx.add_output("o2", qlt_type_id<node_t>(), o2);
+		auto spec = create_spec(ctx,
+			"((o1[t]:qlt != i1[t-1]:qlt || {1}:qlt <= o2[t-1]:qlt)) U "
+			"((o1[t-2]:qlt <= {0}:qlt && o1[t]:qlt = {1/2}:qlt)).");
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK(maybe_i.has_value());
+		auto v1 = o1->get_values(), v2 = o2->get_values();
+		INFO("o1: " << [&] { std::string s; for (auto& x : v1) s += x + " "; return s; }());
+		REQUIRE(v1.size() >= 3);
+		bool met = false;
+		for (size_t k = 2; k < v1.size(); ++k) met = met || v1[k] == "1/2";
+		CHECK(met);
+		// a qlt stream holds one point of the order at each step
+		for (auto& x : v1) CHECK((x != "bot" && x != "top"));
+		for (auto& x : v2) CHECK((x != "bot" && x != "top"));
+	}
+#endif // TAU_PACK_HAS_BA_QLT
+
+	TEST_CASE("tau: the goal takes a value no stream holds"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		no_mealy_view guard;
+		io_context<node_t> ctx;
+		strings i1_values = {"F", "T", "F"};
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		auto spec = create_spec(ctx,
+			"(always o2[t]:tau = o1[t-1]:tau) && (sometimes o2[t]:tau != 0 "
+			"&& o2[t]:tau != 1 && o2[t]:tau != i1[t]:tau).");
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK(maybe_i.has_value());
+		auto v1 = o1->get_values(), v2 = o2->get_values();
+		REQUIRE(v2.size() == 3);
+		REQUIRE(v1.size() == 3);
+		INFO("o2: " << v2[0] << " " << v2[1] << " " << v2[2]);
+		bool met = false;
+		for (size_t k = 0; k < v2.size(); ++k)
+			met = met || (v2[k] != "F" && v2[k] != "T" && v2[k] != i1_values[k]);
+		CHECK(met);
+		for (size_t k = 1; k < v2.size(); ++k) CHECK(v2[k] == v1[k - 1]);
+	}
+
+	TEST_CASE("tau: complement codes, o1 is the complement of i1 two steps "
+		"before" * doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		no_mealy_view guard;
+		io_context<node_t> ctx;
+		strings i1_values = {"F", "T", "F", "T"};
+		strings i2_values = {"T", "F", "F", "T"};
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		auto spec = create_spec(ctx,
+			"(always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && "
+			"i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && "
+			"o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1])).");
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK(maybe_i.has_value());
+		auto v1 = o1->get_values();
+		REQUIRE(v1.size() == 4);
+		// o1[t] = i1[t-2]'
+		CHECK(v1[2] == "T");
+		CHECK(v1[3] == "F");
+	}
+
+	TEST_CASE("tau: complement codes over values other than 0 and 1"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		no_mealy_view guard;
+		io_context<node_t> ctx;
+		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:x> != 0", "<:y> = 0"};
+		strings i2_values = {"<:x> = 0", "<:x> = 0", "<:y> = 0", "<:x> = 0"};
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		auto spec = create_spec(ctx,
+			"(always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && "
+			"i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && "
+			"o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1])).");
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK(maybe_i.has_value());
+		auto v1 = o1->get_values(), v2 = o2->get_values();
+		REQUIRE(v1.size() == 4);
+		REQUIRE(v2.size() == 4);
+		// o1[t] = i1[t-2]'
+		CHECK(v1[2] == "<:x> != 0");
+		CHECK(v1[3] == "<:y> != 0");
+		// o2[0] = 0, and o1[1] = 1 forces o2[2] = 1
+		CHECK(v2[0] == "F");
+		if (v1[1] == "T") CHECK(v2[2] == "T");
+	}
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
