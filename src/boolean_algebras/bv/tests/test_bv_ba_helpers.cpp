@@ -149,6 +149,57 @@ TEST_SUITE("bv width completion") {
 	}
 }
 
+TEST_SUITE("bv solver budgets and declines") {
+
+	static tref closed_form(const char* sample) {
+		auto r = get_nso_rr(sample);
+		REQUIRE( r.has_value() );
+		return r.value().main->get();
+	}
+
+	TEST_CASE("a zero bv-solve-timeout gives a question no deadline") {
+		const size_t saved = bv_solve_timeout;
+		bv_solve_timeout = 0;
+		const auto none = bv_question_deadline();
+		bv_solve_timeout = 60;
+		const auto bounded = bv_question_deadline();
+		bv_solve_timeout = saved;
+		if (bounded_calls_available()) {
+			CHECK( none == std::chrono::steady_clock::time_point::max() );
+			CHECK( bounded < std::chrono::steady_clock::time_point::max() );
+		} else
+			CHECK( bounded == std::chrono::steady_clock::time_point::max() );
+	}
+
+	TEST_CASE("a shared budget already spent leaves the question unknown") {
+		tref fm = closed_form(
+			"ex x:bv[8] (x + { 3 }:bv[8] = { 5 }:bv[8]).");
+		{
+			time_budget_handled scope(std::chrono::seconds(0));
+			CHECK( bv_formula_sat_status<node_t>(fm)
+				== bv_sat_status::unknown );
+			CHECK( scope.ran_out() );
+		}
+		CHECK( bv_formula_sat_status<node_t>(fm) == bv_sat_status::sat );
+	}
+
+	// The translator has no case for a reference, so both entry points
+	// decline instead of answering.
+	TEST_CASE("solve_bv declines a formula it cannot translate") {
+		CHECK( !solve_bv<node_t>(closed_form(
+			"ex x:bv[8] (x + { 1 }:bv[8] = { 0 }:bv[8] && q(x)).")) );
+	}
+
+	TEST_CASE("the quantifier-free decision declines an untranslatable matrix") {
+		const bool saved = bv_quantifier_free_decision;
+		bv_quantifier_free_decision = true;
+		auto st = bv_formula_sat_status<node_t>(closed_form(
+			"ex x:bv[8] (x + { 2 }:bv[8] = { 0 }:bv[8] && q(x))."));
+		bv_quantifier_free_decision = saved;
+		CHECK( !st.has_value() );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

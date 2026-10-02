@@ -985,3 +985,164 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 #endif // TAU_CACHE
 	}
 }
+
+// revise() and its role helpers called directly: through
+// pointwise_revision_temporal a recursion step is reached only when every
+// check above it fails, so the cases below pin each step on its own.
+TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
+
+	static tref revise_value(tref phi, tref psi, tref psi_f) {
+		auto rr = revise<node_t>(phi, psi, psi_f, 0);
+		REQUIRE(rr.has_value());
+		REQUIRE(rr.value() != nullptr);
+		return rr.value();
+	}
+
+	TEST_CASE("[PWR-RC-01] roles of every binary operator round-trip") {
+		struct { const char* src; temporal_op op; bool inv_is_lhs; } cases[] = {
+			{ "(o1[t] = 0) until (o2[t] = 0).",      temporal_op::U, true },
+			{ "(o1[t] = 0) weak_until (o2[t] = 0).", temporal_op::W, true },
+			{ "(o1[t] = 0) since (o2[t] = 0).",      temporal_op::S, true },
+			{ "(o1[t] = 0) release (o2[t] = 0).",    temporal_op::R, false },
+			{ "(o1[t] = 0) trigger (o2[t] = 0).",    temporal_op::T, false },
+		};
+		for (const auto& c : cases) {
+			CAPTURE(c.src);
+			tref fm = spec(c.src);
+			REQUIRE(fm != nullptr);
+			REQUIRE(get_temporal_op<node_t>(fm) == c.op);
+			tref lhs = tau::get(fm)[0].first();
+			tref rhs = tau::get(fm)[0].child(1);
+			auto [inv, commit] = decompose_roles<node_t>(fm);
+			CHECK(inv == (c.inv_is_lhs ? lhs : rhs));
+			CHECK(commit == (c.inv_is_lhs ? rhs : lhs));
+			CHECK(tau::subtree_equals(
+				rebuild_from_roles<node_t>(c.op, inv, commit), fm));
+		}
+	}
+
+	TEST_CASE("[PWR-RC-02] unary operators have no roles") {
+		tref g = spec("G (o1[t] = 0).");
+		tref a = tau::get(g)[0].first();
+		auto [inv, commit] = decompose_roles<node_t>(g);
+		CHECK(inv == nullptr);
+		CHECK(commit == nullptr);
+		CHECK(rebuild_from_roles<node_t>(temporal_op::ALWAYS, a, a)
+			== nullptr);
+	}
+
+	TEST_CASE("[PWR-RC-03] a conjunctive invariant of R and T distributes") {
+		for (const char* src : {
+			"(o3[t] = 1) release ((o1[t] = 1) && (o2[t] = 1)).",
+			"(o3[t] = 1) trigger ((o1[t] = 1) && (o2[t] = 1))." })
+		{
+			CAPTURE(src);
+			tref fm = spec(src);
+			REQUIRE(fm != nullptr);
+			temporal_op op = get_temporal_op<node_t>(fm);
+			std::vector<tref> conjs;
+			gather_top_conjuncts<node_t>(and_distribute<node_t>(fm), conjs);
+			REQUIRE(conjs.size() == 2);
+			for (tref c : conjs) {
+				CHECK(get_temporal_op<node_t>(c) == op);
+				// The commitment o3 = 1 stays on the left of each copy.
+				CHECK(tau::subtree_equals(tau::get(c)[0].first(),
+					tau::get(fm)[0].first()));
+			}
+		}
+	}
+
+	TEST_CASE("[PWR-RC-04] G vs G revises under the operator") {
+		tref phi = spec("G (o1[t] = 0).");
+		tref psi = spec("G (o1[t] = 1).");
+		tref res = revise_value(phi, psi, psi);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::ALWAYS);
+		CHECK(is_realizable(res));
+		CHECK(entails(res, psi));
+	}
+
+	TEST_CASE("[PWR-RC-05] F vs F revises under the operator"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("F (o1[t] = 0 && o2[t] = 0).");
+		tref psi = spec("F (o1[t] = 1).");
+		tref psi_f = spec("(F (o1[t] = 1)) && (G (o2[t] = 1)).");
+		tref res = revise_value(phi, psi, psi_f);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::SOMETIMES);
+		CHECK(is_realizable(res));
+	}
+
+	TEST_CASE("[PWR-RC-06] a step formula is lifted against an until"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("o1[t] = 0 && o2[t] = 0.");
+		tref psi = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref res = revise_value(phi, psi, psi);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
+		CHECK(is_realizable(res));
+	}
+
+	TEST_CASE("[PWR-RC-07] an until spec meets a step update"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref psi = spec("o1[t] = 0 && o2[t] = 0.");
+		tref res = revise_value(phi, psi, psi);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
+		CHECK(is_realizable(res));
+	}
+
+	TEST_CASE("[PWR-RC-08] R and T specs keep their operator against G"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct { const char* src; temporal_op op; } cases[] = {
+			{ "(o1[t] = 0) release (o2[t] = 0).", temporal_op::R },
+			{ "(o1[t] = 0) trigger (o2[t] = 0).", temporal_op::T },
+		};
+		tref psi = spec("G (o2[t] = 1).");
+		for (const auto& c : cases) {
+			CAPTURE(c.src);
+			tref res = revise_value(spec(c.src), psi, psi);
+			CHECK(get_temporal_op<node_t>(res) == c.op);
+			// The kept candidate is realizable together with the update.
+			CHECK(is_realizable(build_wff_and<node_t>(res, psi)));
+		}
+	}
+
+	TEST_CASE("[PWR-RC-09] conflicting W, T and S pairs revise in place"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct { const char* phi; const char* psi; temporal_op op; } cases[] = {
+			{ "(o1[t] = 0) weak_until (o1[t] = 0 && o2[t] = 1).",
+			  "(o1[t] = 1) weak_until (o1[t] = 1 && o2[t] = 0).",
+			  temporal_op::W },
+			{ "(o1[t] = 0) trigger (o2[t] = 0).",
+			  "(o1[t] = 1) trigger (o2[t] = 1).", temporal_op::T },
+			{ "(o1[t] = 0) since (o2[t] = 0).",
+			  "(o1[t] = 1) since (o2[t] = 1).", temporal_op::S },
+		};
+		for (const auto& c : cases) {
+			CAPTURE(c.phi);
+			tref psi = spec(c.psi);
+			tref res = revise_value(spec(c.phi), psi, psi);
+			CHECK(get_temporal_op<node_t>(res) == c.op);
+			CHECK(is_realizable(res));
+		}
+	}
+
+	TEST_CASE("[PWR-RC-10] the semantic fallback leaves a sound revision"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct fallback_guard {
+			bool saved = pwr_semantic_fallback;
+			~fallback_guard() { pwr_semantic_fallback = saved; }
+		} guard;
+		pwr_semantic_fallback = true;
+		tref s = spec("(o1[t] = 0) until (o2[t] = 0).");
+		tref u = spec("(o1[t] = 1) release (o2[t] = 1).");
+		tref res = revision_value(s, u);
+		REQUIRE(res != nullptr);
+		CHECK(is_realizable(res));
+		CHECK(entails(res, u));
+	}
+}

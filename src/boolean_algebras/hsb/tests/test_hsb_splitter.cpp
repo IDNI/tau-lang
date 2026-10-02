@@ -242,3 +242,125 @@ TEST_SUITE("hsb_splitter — atomlessness (repeated splitting)") {
 	}
 
 } // TEST_SUITE atomlessness
+
+// =============================================================================
+
+// The structural factories (mk_and/mk_or/mk_not) skip the short-circuit
+// simplifications of operator&/|/~, so trees holding top, bot or not_ nodes
+// below the root reach the LRA helpers only when built through them.
+TEST_SUITE("hsb_splitter — unsimplified trees") {
+
+	using idni::tau_lang::hsb_tree;
+	using idni::tau_lang::tref;
+	namespace hd = idni::tau_lang::detail;
+
+	static tref hs_ref(std::vector<double> w, double b) {
+		return make_hs(std::move(w), b).root_ref();
+	}
+
+	TEST_CASE("collect_conjunction: top and bot leaves, nested and_, or_") {
+		tref a = hs_ref({1.0}, -5.0);
+		std::vector<hd::linear_constraint> cs;
+		CHECK(!hd::collect_conjunction(nullptr, cs));
+		CHECK(hd::collect_conjunction(hsb::mk_top(), cs));
+		CHECK(cs.empty());
+		CHECK(!hd::collect_conjunction(hsb::mk_bot(), cs));
+		CHECK(hd::collect_conjunction(hsb::mk_and(a, hsb::mk_top()), cs));
+		CHECK(cs.size() == 1);
+		CHECK(cs[0].strict);
+		cs.clear();
+		CHECK(!hd::collect_conjunction(hsb::mk_and(a, hsb::mk_bot()), cs));
+		cs.clear();
+		// An or_ node is not a conjunction: accepted, but contributes nothing.
+		CHECK(hd::collect_conjunction(hsb::mk_or(a, a), cs));
+		CHECK(cs.empty());
+	}
+
+	TEST_CASE("to_dnf: bot, top, not_ and null") {
+		tref a = hs_ref({1.0}, -5.0);
+		std::vector<std::vector<tref>> dnf;
+		hd::to_dnf(hsb::mk_bot(), dnf);
+		CHECK(dnf.empty());
+		hd::to_dnf(hsb::mk_top(), dnf);
+		REQUIRE(dnf.size() == 1);
+		CHECK(dnf[0].empty());
+		dnf.clear();
+		hd::to_dnf(hsb::mk_not(a), dnf);
+		REQUIRE(dnf.size() == 1);
+		REQUIRE(dnf[0].size() == 1);
+		CHECK(dnf[0][0] == (~make_hs({1.0}, -5.0)).root_ref());
+		hd::to_dnf(nullptr, dnf);
+		CHECK(dnf.empty());
+	}
+
+	TEST_CASE("push_neg: constants, double negation and De Morgan") {
+		tref a = hs_ref({1.0}, -5.0);
+		tref b = hs_ref({-1.0}, -1.0);
+		CHECK(hd::push_neg(nullptr) == hsb::mk_bot());
+		CHECK(hd::push_neg(hsb::mk_bot()) == hsb::mk_top());
+		CHECK(hd::push_neg(hsb::mk_top()) == hsb::mk_bot());
+		CHECK(hd::push_neg(hsb::mk_not(a)) == a);
+		tref na = (~make_hs({1.0}, -5.0)).root_ref();
+		tref nb = (~make_hs({-1.0}, -1.0)).root_ref();
+		CHECK(hd::push_neg(hsb::mk_or(a, b)) == hsb::mk_and(na, nb));
+		CHECK(hd::push_neg(hsb::mk_and(a, b)) == hsb::mk_or(na, nb));
+	}
+
+	TEST_CASE("infer_dim: not_ reads its child, constants have none") {
+		CHECK(hd::infer_dim(nullptr) == 0);
+		CHECK(hd::infer_dim(hsb::mk_bot()) == 0);
+		CHECK(hd::infer_dim(hsb::mk_top()) == 0);
+		CHECK(hd::infer_dim(hsb::mk_not(hs_ref({0.0, 0.0, 1.0}, -1.0))) == 3);
+	}
+
+	TEST_CASE("find_feasible_point: no constraint is the origin") {
+		auto pt = hd::find_feasible_point({}, 2);
+		REQUIRE(pt.has_value());
+		CHECK(*pt == std::vector<double>{0.0, 0.0});
+	}
+
+	TEST_CASE("find_feasible_point: the point satisfies the constraints") {
+		// -x[0] + 3 <= 0, i.e. x[0] >= 3
+		std::vector<hd::linear_constraint> cs{ { {-1.0}, 3.0, false } };
+		auto pt = hd::find_feasible_point(cs, 1);
+		REQUIRE(pt.has_value());
+		CHECK((*pt)[0] >= 3.0);
+	}
+
+	TEST_CASE("find_second_feasible_point: below the given value") {
+		// x[0] >= 0
+		std::vector<hd::linear_constraint> cs{ { {-1.0}, 0.0, false } };
+		CHECK(!hd::find_second_feasible_point(cs, 1, 0, 0.0, false));
+		auto pt = hd::find_second_feasible_point(cs, 1, 0, 5.0, false);
+		REQUIRE(pt.has_value());
+		CHECK((*pt)[0] >= 0.0);
+		CHECK((*pt)[0] < 5.0);
+	}
+
+	TEST_CASE("a contradiction under an and_ root is zero and not split") {
+		tref a = hs_ref({1.0}, -5.0);
+		hsb x(hsb::mk_and(a, hsb::mk_not(a)));
+		CHECK(x.root_kind() == hsb::kind::and_);
+		CHECK(is_hsb_zero(x));
+		// No feasible clause: the input comes back unchanged.
+		CHECK(hsb_splitter(x, splitter_type::lower) == x);
+	}
+
+	TEST_CASE("a disjunction of bottoms is zero") {
+		hsb x(hsb::mk_or(hsb::mk_bot(), hsb::mk_bot()));
+		CHECK(x.root_kind() == hsb::kind::or_);
+		CHECK(is_hsb_zero(x));
+		CHECK(hsb_splitter(x, splitter_type::lower) == x);
+	}
+
+	TEST_CASE("a disjunction of tops is one and splits on a fresh axis") {
+		hsb x(hsb::mk_or(hsb::mk_top(), hsb::mk_top()));
+		CHECK(!is_hsb_zero(x));
+		CHECK(is_hsb_one(x));
+		auto s = hsb_splitter(x, splitter_type::lower);
+		CHECK(s != x);
+		CHECK(!is_hsb_zero(s));          // P1
+		CHECK(is_hsb_zero(s & ~x));      // P2
+		CHECK(!is_hsb_zero(x & ~s));     // P3
+	}
+}

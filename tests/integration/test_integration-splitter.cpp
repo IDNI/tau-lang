@@ -401,3 +401,58 @@ TEST_SUITE("Tau_splitter_temporal (SO-15)") {
 		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
 	}
 }
+
+TEST_SUITE("Tau_splitter clause paths") {
+
+	// Neither literal splits on its own (no constant to bound by, no
+	// coefficient to split), so one disjunct is dropped instead.
+	TEST_CASE("a disjunction of bare equations splits by dropping a clause") {
+		auto [fm, s] = get_nso_rr_tau_splitter("x = 0 || y = 0.",
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_splitter<bas_pack>(fm, s).value() );
+		CHECK( tau::get(s).find_top(is<node_t, tau::wff_or>) == nullptr );
+	}
+
+	// The atomic conjunct is not temporal-wrapped and is passed over; the
+	// always conjunct carries the split. A spec cannot spell an unscoped
+	// atom, so the clause is assembled directly.
+	TEST_CASE("a bare conjunct beside an always clause is passed over") {
+		auto nso_rr = get_nso_rr("G o1[t] = 0.");
+		REQUIRE( nso_rr.has_value() );
+		tref aw = nso_rr.value().main->get();
+		tref bare = tau::get("x = 0", tau::get_options{
+			.parse = { .start = tau::wff } }).value_or(nullptr);
+		REQUIRE( bare != nullptr );
+		tref fm = tau::build_wff_and(aw, bare);
+		auto s_r = tau_splitter<bas_pack>(fm, splitter_type::upper);
+		REQUIRE( s_r.has_value() );
+		tref s = s_r.value();
+		REQUIRE( s != nullptr );
+		CHECK( tau::get(s) != tau::get(fm) );
+		trefs conjs = get_cnf_wff_clauses<node_t>(s);
+		REQUIRE( conjs.size() == 2 );
+		bool kept_bare = false, split_aw = false;
+		for (tref c : conjs) {
+			if (tau::get(c) == tau::get(bare)) kept_bare = true;
+			else if (is_child<node_t>(c, tau::wff_always)) {
+				split_aw = tau::get(c) != tau::get(aw);
+				CHECK( is_tau_impl<node_t>(c, aw).value() );
+			}
+		}
+		CHECK( kept_bare );
+		CHECK( split_aw );
+	}
+
+	TEST_CASE("a clause implied by another is dropped before splitting") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0) || (G (o1[t] = 0 && o2[t] = 0)).",
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
+	}
+}

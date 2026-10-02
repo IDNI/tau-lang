@@ -361,6 +361,83 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 }
 
 
+// An until over one input and one output reaches the propositional fast
+// paths: the T_3 classification and the constant-output pre-check in front of
+// Algorithm B.
+TEST_SUITE("qlt: until with an input") {
+
+	static bool decided_realizable(const char* src) {
+		auto nso = get_nso_rr<node_t>(tau::get(src).value_or(nullptr));
+		REQUIRE(nso.has_value());
+		auto sat = is_tau_formula_sat<node_t>(nso.value().main->get());
+		REQUIRE(sat.has_value());
+		return sat.value();
+	}
+
+	struct qlt_caps_guard {
+		long t3 = qlt_t3_encoding_cap_param;
+		long out = qlt_const_output_max_param;
+		~qlt_caps_guard() {
+			qlt_t3_encoding_cap_param = t3;
+			qlt_const_output_max_param = out;
+		}
+	};
+
+	// A constant output satisfies the commitment whatever the input does.
+	TEST_CASE("constant on the left of every comparison"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		for (const char* src : {
+			"(i1[t]:qlt > {0}:qlt) until ({0}:qlt < o1[t]:qlt).",
+			"(i1[t]:qlt > {0}:qlt) until ({0}:qlt > o1[t]:qlt).",
+			"(i1[t]:qlt > {0}:qlt) until ({0}:qlt <= o1[t]:qlt).",
+			"(i1[t]:qlt > {0}:qlt) until ({0}:qlt >= o1[t]:qlt)." })
+		{
+			CAPTURE(src);
+			CHECK(decided_realizable(src));
+		}
+	}
+
+	// No output value meets the commitment, so the environment wins by
+	// leaving the invariant.
+	TEST_CASE("an unsatisfiable commitment is unrealizable"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		CHECK(!decided_realizable("(i1[t]:qlt > {0}:qlt) until "
+			"({0}:qlt < o1[t]:qlt && {0}:qlt > o1[t]:qlt)."));
+	}
+
+	// The output against its own previous value: no constant output
+	// discharges it, a growing one does.
+	TEST_CASE("a commitment over the previous output"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		CHECK(decided_realizable(
+			"(i1[t]:qlt > {0}:qlt) until (o1[t]:qlt > o1[t-1]:qlt)."));
+	}
+
+	TEST_CASE("the verdict does not depend on the encoding caps"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		qlt_caps_guard guard;
+		const char* yes = "(i1[t]:qlt > {0}:qlt) until ({0}:qlt < o1[t]:qlt).";
+		const char* no = "(i1[t]:qlt > {0}:qlt) until "
+			"({0}:qlt < o1[t]:qlt && {0}:qlt > o1[t]:qlt).";
+		// Above the T_3 atom cap the default ABA-oracle path decides.
+		qlt_t3_encoding_cap_param = 1;
+		CHECK(decided_realizable(yes));
+		CHECK(!decided_realizable(no));
+		qlt_t3_encoding_cap_param = guard.t3;
+		// Unlimited constant-output candidates, then too few for one output.
+		for (long cap : { 0L, 1L }) {
+			CAPTURE(cap);
+			qlt_const_output_max_param = cap;
+			CHECK(decided_realizable(yes));
+			CHECK(!decided_realizable(no));
+		}
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

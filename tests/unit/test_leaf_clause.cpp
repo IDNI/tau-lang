@@ -329,3 +329,30 @@ TEST_SUITE("leaf_clause direct calls") {
 	}
 #endif // TAU_PACK_HAS_BA_BV
 }
+
+#ifdef TAU_PACK_HAS_BA_QLT
+TEST_SUITE("leaf_clause: ordered blocks") {
+
+	tref run(const char* sample) {
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE( nso_rr.has_value() );
+		auto r = anti_prenex<node_t>(nso_rr.value().main->get());
+		REQUIRE( r.has_value() );
+		REQUIRE( r.value() != nullptr );
+		return r.value();
+	}
+
+	// Each binder is bounded by the other on one side, so neither is
+	// decided alone; once one is eliminated into a residual bound, the
+	// other is decided by the order.
+	TEST_CASE("a qlt chain between constants is T") {
+		CHECK( tau::get(run("ex v:qlt, w:qlt ({0}:qlt < w && w < v"
+			" && v < {1}:qlt).")).equals_T() );
+	}
+
+	TEST_CASE("a qlt cycle through a free endpoint is F") {
+		CHECK( tau::get(run("ex v:qlt, w:qlt (a:qlt < w && w < v"
+			" && v < a).")).equals_F() );
+	}
+}
+#endif // TAU_PACK_HAS_BA_QLT

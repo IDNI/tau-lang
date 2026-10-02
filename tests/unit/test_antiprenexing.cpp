@@ -1877,6 +1877,22 @@ TEST_SUITE("AN-2 finite BA quantifier elimination") {
 		tref res = res_r.value();
 		CHECK( tau::get(res).equals_T() );
 	}
+
+	// The block form: in the two-element algebra y is 0 or 1, so x y and
+	// x y' cannot both be nonzero.
+	TEST_CASE("ex x:bool, y:bool (x y != 0 && x y' != 0) is F") {
+		const char* sample = "ex x:bool, y:bool (x y != 0 && x y' != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm).value();
+		CHECK( tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("ex x:bool, y:bool (x y != 0) is T (block control)") {
+		const char* sample = "ex x:bool, y:bool (x y != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm).value();
+		CHECK( tau::get(res).equals_T() );
+	}
 }
 
 // AN-7: the heterogeneous-BA-type runtime guard (now in
@@ -1920,5 +1936,114 @@ TEST_SUITE("AN-7 heterogeneous block guard") {
 		std::ostringstream os;
 		rr.report().print(os);
 		CHECK( os.str().find("mix BA types") != std::string::npos );
+	}
+}
+
+// The placement and budget globals of the block pipeline, each away from its
+// default. Every case restores them through placement_guard.
+TEST_SUITE("BlockPlacementSettings") {
+
+	struct placement_guard {
+		bool pre = preprocessing;
+		preprocess_site site = preprocess_placement;
+		preprocess_mode mode = preprocess_method;
+		solver_site solver = solver_placement;
+		size_t depth = max_blast_reentry_depth;
+		size_t rounds = block_max_rounds;
+		~placement_guard() {
+			preprocessing = pre;
+			preprocess_placement = site;
+			preprocess_method = mode;
+			solver_placement = solver;
+			max_blast_reentry_depth = depth;
+			block_max_rounds = rounds;
+		}
+	};
+
+	// An open bv scope: y and z free, x + 1 blastable arithmetic.
+	static const char* open_bv =
+		"ex x (x:bv[4] + { 1 }:bv[4] = y:bv[4] && x != z:bv[4]).";
+	// Closed once y is substituted: x != x + 1 holds for every x.
+	static const char* closed_bv =
+		"ex x ex y (x:bv[4] + { 1 }:bv[4] = y:bv[4] && x != y).";
+
+	static tref parse(const char* sample) {
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE( nso_rr.has_value() );
+		return nso_rr.value().main->get();
+	}
+
+	static tref normalized(const char* sample) {
+		auto r = normalizer<node_t>(parse(sample));
+		REQUIRE( r.has_value() );
+		REQUIRE( r.value() != nullptr );
+		return r.value();
+	}
+
+	static bool has_add(tref fm) {
+		return tau::get(fm).find_top(is<node_t, tau::bf_add>) != nullptr;
+	}
+
+	TEST_CASE("a round budget of zero returns the formula unprocessed") {
+		placement_guard guard;
+		tref fm = parse("ex x (x a = 0).");
+		block_max_rounds = 0;
+		tref kept = anti_prenex<node_t>(fm).value();
+		CHECK( tau::get(kept).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		block_max_rounds = guard.rounds;
+		CHECK( tau::get(anti_prenex<node_t>(fm).value()).equals_T() );
+	}
+
+	TEST_CASE("per-leaf preprocessing blasts the arithmetic away") {
+		placement_guard guard;
+		preprocessing = false;
+		tref off = normalized(open_bv);
+		CHECK( has_add(off) );
+		preprocessing = true;
+		preprocess_placement = preprocess_site::per_leaf;
+		tref on = normalized(open_bv);
+		CHECK( !has_add(on) );
+		CHECK( tau::get(on) != tau::get(off) );
+		CHECK( tau::get(normalized(closed_bv)).equals_T() );
+	}
+
+	TEST_CASE("per-leaf preprocessing in defer mode keeps the blasted form") {
+		placement_guard guard;
+		preprocessing = true;
+		preprocess_placement = preprocess_site::per_leaf;
+		preprocess_method = preprocess_mode::defer;
+		CHECK( !has_add(normalized(open_bv)) );
+	}
+
+	TEST_CASE("per-leaf preprocessing with a re-entry depth of one") {
+		placement_guard guard;
+		preprocessing = true;
+		preprocess_placement = preprocess_site::per_leaf;
+		max_blast_reentry_depth = 1;
+		CHECK( !has_add(normalized(open_bv)) );
+	}
+
+	TEST_CASE("per-block preprocessing and per-closed-block solving") {
+		placement_guard guard;
+		tref base_open = normalized(open_bv);
+		preprocessing = true;
+		preprocess_placement = preprocess_site::per_block;
+		for (auto mode : { preprocess_mode::anti_prenex_result,
+			preprocess_mode::defer })
+		{
+			preprocess_method = mode;
+			for (size_t depth : { size_t{0}, size_t{1} }) {
+				max_blast_reentry_depth = depth;
+				CHECK( tau::get(normalized(open_bv)) == tau::get(base_open) );
+				CHECK( tau::get(normalized(closed_bv)).equals_T() );
+			}
+		}
+		preprocessing = false;
+		preprocess_placement = guard.site;
+		preprocess_method = guard.mode;
+		max_blast_reentry_depth = guard.depth;
+		solver_placement = solver_site::per_closed_block;
+		CHECK( tau::get(normalized(open_bv)) == tau::get(base_open) );
+		CHECK( tau::get(normalized(closed_bv)).equals_T() );
 	}
 }
