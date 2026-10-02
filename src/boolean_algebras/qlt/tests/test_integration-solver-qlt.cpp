@@ -14,78 +14,114 @@ TEST_SUITE("configuration") {
 	}
 }
 
-TEST_SUITE("find_solution") {
+// A qlt variable is a point and a qlt constant a set of points: `c & x = 0`
+// says that x lies outside c, `c & x != 0` that it lies in c. solve answers
+// with one point per variable, and no solution when no points satisfy the
+// system.
+TEST_SUITE("points") {
+
+	bool test_solve(const std::string& system) {
+		return ::test_solve(system, qlt_type<node_t>());
+	}
+
+	// The model of system, each value spelled as its point; empty when
+	// solve finds none.
+	std::map<std::string, std::string> points(const std::string& system) {
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr))
+			.value().main->get();
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		std::map<std::string, std::string> out;
+		auto s = solve<node_t>(form, options);
+		if (!s.has_value()) return out;
+		for (const auto& [var, value] : s.value()) {
+			const auto& c = tau::get(value)[0];
+			REQUIRE( c.is_ba_constant() );
+			const auto v = c.get_ba_constant();
+			const qlt& q = std::get<qlt>(v);
+			REQUIRE( q.pieces.size() == 1 );
+			REQUIRE( q.pieces[0].lo.val == q.pieces[0].hi.val );
+			out[tau::get(var).to_str()] = q.pieces[0].lo.val.to_string();
+		}
+		return out;
+	}
 
 	TEST_CASE("one var: {(0, 1)}:qlt x = 0.") {
-		CHECK( test_find_solution("{(0, 1)}:qlt x = 0.") );
+		CHECK( test_solve("{(0, 1)}:qlt x = 0.") );
+		CHECK( points("{(0, 1)}:qlt x = 0.")
+			== std::map<std::string, std::string>{ { "x", "0" } } );
 	}
 
 	TEST_CASE("two vars: {(0, 1)}:qlt x | {[1, 2)}:qlt y = 0.") {
-		CHECK( test_find_solution("{(0, 1)}:qlt x | {[1, 2)}:qlt y = 0.") );
+		CHECK( test_solve("{(0, 1)}:qlt x | {[1, 2)}:qlt y = 0.") );
 	}
 
 	TEST_CASE("complement: {(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0.") {
-		CHECK( test_find_solution("{(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0.") );
-	}
-}
-
-TEST_SUITE("solve_inequality_system") {
-
-	bool test_solve_inequality_system(const std::vector<std::string>& inequalities) {
-		return ::test_solve_inequality_system(inequalities, node_t::ba::splitter_one(qlt_type<node_t>()));
+		CHECK( test_solve("{(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0.") );
+		CHECK( points("{(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0.")
+			== std::map<std::string, std::string>{
+				{ "x", "0" }, { "y", "1/2" } } );
 	}
 
+	// x would lie in (0, 1) and outside it.
 	TEST_CASE("{(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0.") {
-		CHECK( test_solve_inequality_system({
-			"{(0, 1)}:qlt x != 0.",
-			"{(0, 1)}:qlt' x != 0."
-		}) );
+		CHECK( !test_solve("{(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0.") );
 	}
 
 	TEST_CASE("{(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0.") {
-		CHECK( test_solve_inequality_system({
-			"{(0, 1)}:qlt x != 0.",
-			"{[1, 2)}:qlt y != 0."
-		}) );
+		CHECK( test_solve("{(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0.") );
+		CHECK( points("{(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0.")
+			== std::map<std::string, std::string>{
+				{ "x", "1/2" }, { "y", "1" } } );
 	}
 
-	// The typed 0 is the order's lower end, not a point, so `x != 0` is no
-	// constraint; two excluded points are.
 	TEST_CASE("x : qlt != {0}:qlt && x : qlt != {1}:qlt.") {
-		CHECK( test_solve_inequality_system({
-			"x : qlt != {0}:qlt.",
-			"x : qlt != {1}:qlt."
-		}) );
-	}
-}
-
-TEST_SUITE("solve_system") {
-
-	bool test_solve_system(const std::string& equality,
-			const std::vector<std::string>& inequalities) {
-		return ::test_solve_system(equality, inequalities, node_t::ba::splitter_one(qlt_type<node_t>()));
+		CHECK( test_solve("x : qlt != {0}:qlt && x : qlt != {1}:qlt.") );
 	}
 
 	TEST_CASE("{(0, 1)}:qlt x = 0 && {(0, 1)}:qlt' x != 0.") {
-		CHECK( test_solve_system(
-			"{(0, 1)}:qlt x = 0.",
-			{"{(0, 1)}:qlt' x != 0."}
-		) );
+		CHECK( test_solve("{(0, 1)}:qlt x = 0 && {(0, 1)}:qlt' x != 0.") );
 	}
 
-	// Both vars share the same qlt coefficient so the disjoint [1,2) inequality is not contradicted.
 	TEST_CASE("{(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0.") {
-		CHECK( test_solve_system(
-			"{(0, 1)}:qlt x | {(0, 1)}:qlt y = 0.",
-			{"{[1, 2)}:qlt y != 0."}
-		) );
+		CHECK( test_solve(
+			"{(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0.") );
 	}
 
-	TEST_CASE("x : qlt < y : qlt") {
-		CHECK( test_solve_system(
-			"x : qlt & (y : qlt)' = 0.",
-			{"x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0."}
-		) );
+	// For points x & y' = 0 says x = y, so x & y' | x' & y, the symmetric
+	// difference of {x} and {y}, is 0: no proper inclusion exists.
+	TEST_CASE("x : qlt & y' = 0 is x = y") {
+		CHECK( !test_solve("x : qlt & (y : qlt)' = 0 && "
+			"x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0.") );
+		CHECK( test_solve("x : qlt & (y : qlt)' = 0 && y : qlt > {2}:qlt.") );
+	}
+
+	// No point is the empty set, the whole order or an interval.
+	TEST_CASE("x : qlt = c needs c to be one point") {
+		CHECK( points("x : qlt != 0 && x : qlt' != 0.")
+			== std::map<std::string, std::string>{ { "x", "0" } } );
+		CHECK( !test_solve("x : qlt = {[0, 1]}:qlt.") );
+		CHECK( points("x : qlt = {1/2}:qlt.")
+			== std::map<std::string, std::string>{ { "x", "1/2" } } );
+	}
+
+	// x is 3 and the interval [2, 4] holds other points.
+	TEST_CASE("membership against a point and an interval") {
+		CHECK( !test_solve("{3}:qlt & x : qlt != 0 && "
+			"{[2, 4]}:qlt & x : qlt' = 0.") );
+		CHECK( points("{3}:qlt & x : qlt != 0 && {[2, 4]}:qlt & x : qlt' != 0.")
+			== std::map<std::string, std::string>{ { "x", "3" } } );
+	}
+
+	TEST_CASE("order and membership between two variables") {
+		CHECK( points("x : qlt < y : qlt && {[0, 1]}:qlt & y : qlt != 0 "
+			"&& x : qlt != {0}:qlt.")
+			== std::map<std::string, std::string>{
+				{ "x", "-1" }, { "y", "0" } } );
+		CHECK( !test_solve("x : qlt > y : qlt && {[0, 1]}:qlt & x : qlt != 0 "
+			"&& {[2, 3]}:qlt & y : qlt != 0.") );
 	}
 }
 
@@ -342,7 +378,7 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 			.mode = solver_mode::general,
 			.type_id = ba_types<node_t>::id(qlt_type<node_t>())
 		};
-		return qlt_omcat_solve_inequality_system<node_t>(sys, options);
+		return qlt_dlo_order_solve<node_t>(sys, options);
 	}
 
 	bool solved_and_satisfied(const trefs& atoms) {
@@ -418,6 +454,26 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 
 	TEST_CASE("an atom outside the ordering fragment declines") {
 		CHECK( !dlo({ atom("x : qlt < y : qlt || y : qlt < x : qlt.") })
+			.has_value() );
+	}
+
+	// Outside the fragment the capability searches the cells instead.
+	TEST_CASE("the capability solves what the ordering solver declines") {
+		inequality_system<node_t> sys;
+		sys.insert(atom("x : qlt < y : qlt || y : qlt < x : qlt."));
+		sys.insert(atom("{[0, 1]}:qlt & x : qlt != 0."));
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general,
+			.type_id = ba_types<node_t>::id(qlt_type<node_t>())
+		};
+		auto sol = qlt_omcat_solve_inequality_system<node_t>(sys, options);
+		REQUIRE( sol.has_value() );
+		for (tref a : sys) CHECK( check_solution<node_t>(a, sol.value()) );
+		// an order against an interval is not read
+		inequality_system<node_t> interval;
+		interval.insert(atom("x : qlt < {(0, 1)}:qlt."));
+		CHECK( !qlt_omcat_solve_inequality_system<node_t>(interval, options)
 			.has_value() );
 	}
 

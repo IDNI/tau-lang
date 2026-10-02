@@ -58,9 +58,9 @@ std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
 //      earlier class that reaches it and strictly below every constant it
 //      reaches (non-empty by density; the closure guarantees lower < upper).
 // Anything outside this fragment declines with nullopt, as does an
-// unsatisfiable system; the caller then falls through to its
-// solve-then-verify path. Disequalities this reader cannot parse are skipped
-// (see below): solve() in solver.tmpl.h checks the model against every atom.
+// unsatisfiable system; qlt_point_search then decides. Disequalities this
+// reader cannot parse are skipped (see below), so its model is checked
+// against every atom.
 namespace qlt_dlo_detail {
 
 enum class rel : uint8_t { none = 0, le = 1, lt = 2 };
@@ -98,10 +98,9 @@ inline qlt_rational pick_between(const std::optional<qlt_rational>& lo,
 
 } // namespace qlt_dlo_detail
 
-// The omcat_solve_inequality_system capability: solves a pure DLO ordering
-// system jointly (see above), or declines.
+// Solves a pure DLO ordering system jointly (see above), or declines.
 template <NodeType node>
-static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
+static std::optional<solution<node>> qlt_dlo_order_solve(
 	const inequality_system<node>& sys, const solver_options& options)
 {
 	using tau = tree<node>;
@@ -292,6 +291,116 @@ static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 		result[node_var[i]] = tau::get(tau::bf, witness_raw);
 	}
 	return result;
+}
+
+// The single-point constant of type_id holding v.
+template <NodeType node>
+static tref qlt_point_constant(const qlt_rational& v, size_t type_id) {
+	using tau = tree<node>;
+	typename tau::constant c = qlt_cells_detail::point_set(v);
+	return tau::get(tau::bf, ba_constants<node>::get(c, type_id));
+}
+
+// True when every atom of sys holds with each variable at its point in s.
+template <NodeType node>
+static bool qlt_model_holds(const inequality_system<node>& sys,
+	const solution<node>& s)
+{
+	using tau = tree<node>;
+	auto ends = qlt_point_eval<node>::ends_of(tau::build_wff_and(
+		trefs(sys.begin(), sys.end())));
+	if (!ends) return false;
+	qlt_point_eval<node> ev(std::move(*ends));
+	for (const auto& [k, value] : s) {
+		const auto& kt = tau::get(k);
+		const auto& vt = tau::get(value);
+		if (!kt.child_is(tau::variable) || !vt.has_child()
+			|| !vt[0].is_ba_constant()) return false;
+		auto c = vt[0].get_ba_constant();
+		if (!std::holds_alternative<qlt>(c)) return false;
+		const qlt& q = std::get<qlt>(c);
+		if (q.pieces.size() != 1 || !q.pieces[0].lo.val.is_finite()
+			|| q.pieces[0].lo.val != q.pieces[0].hi.val) return false;
+		ev.env.emplace_back(kt.first(), q.pieces[0].lo.val);
+	}
+	for (tref a : sys)
+		if (auto h = ev.holds(a); !h || !*h) return false;
+	return true;
+}
+
+// A model of sys in points: each variable in turn tries one point of every
+// cell cut by the constants' endpoints and the values chosen before it,
+// simplest first. By the argument above qlt_point_eval some such choice is a
+// model whenever one exists. nullopt when none exists, or when an atom is
+// outside what qlt_point_eval reads or the budget runs out.
+template <NodeType node>
+static std::optional<solution<node>> qlt_point_search(
+	const inequality_system<node>& sys, const solver_options& options)
+{
+	using tau = tree<node>;
+	using eval = qlt_point_eval<node>;
+	auto ends = eval::ends_of(tau::build_wff_and(
+		trefs(sys.begin(), sys.end())));
+	if (!ends) return {};
+	trefs vars;
+	auto index_of = [&](tref v) {
+		for (size_t i = 0; i < vars.size(); ++i)
+			if (tau::subtree_equals(vars[i], v)) return i;
+		vars.push_back(v);
+		return vars.size() - 1;
+	};
+	// due[i]: the atoms whose last variable is the i-th, so each is
+	// checked as soon as all its variables have a value
+	std::vector<trefs> due(1);
+	for (tref a : sys) {
+		size_t last = 0;
+		for (tref v : get_free_vars<node>(a)) {
+			if (!eval::is_point_var(v)) return {};
+			last = std::max(last, index_of(v) + 1);
+		}
+		if (due.size() <= last) due.resize(last + 1);
+		due[last].push_back(a);
+	}
+	due.resize(vars.size() + 1);
+	eval ev(std::move(*ends));
+	auto check = [&](size_t i) {
+		for (tref a : due[i])
+			if (auto h = ev.holds(a); !h || !*h) return false;
+		return true;
+	};
+	if (!check(0)) return {};
+	std::function<bool(size_t)> search = [&](size_t i) {
+		if (i == vars.size()) return true;
+		std::vector<qlt_rational> pts;
+		for (const auto& c : ev.cells()) pts.push_back(c.point);
+		std::stable_sort(pts.begin(), pts.end(), qlt_cells_detail::simpler);
+		for (const auto& p : pts) {
+			if (!ev.spend()) return false;
+			ev.env.emplace_back(vars[i], p);
+			if (check(i + 1) && search(i + 1)) return true;
+			ev.env.pop_back();
+		}
+		return false;
+	};
+	if (!search(0)) return {};
+	solution<node> result;
+	for (const auto& [v, p] : ev.env)
+		result[tau::get(tau::bf, v)] = qlt_point_constant<node>(p,
+			options.type_id);
+	return result;
+}
+
+// The omcat_solve_inequality_system capability: a model of sys in points. A
+// pure ordering system is solved jointly by qlt_dlo_order_solve, which spreads
+// unrelated variables apart; anything else, or a model of it that misses an
+// atom it skipped, by qlt_point_search.
+template <NodeType node>
+static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
+	const inequality_system<node>& sys, const solver_options& options)
+{
+	if (auto s = qlt_dlo_order_solve<node>(sys, options);
+		s && qlt_model_holds<node>(sys, *s)) return s;
+	return qlt_point_search<node>(sys, options);
 }
 
 } // namespace idni::tau_lang
