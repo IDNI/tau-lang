@@ -492,7 +492,21 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
 			auto impl = is_tau_impl<node>(clauses[j], clauses[i_pos]);
-			if (impl.has_value() && impl.value()) {
+			if (!impl.has_value()) {
+				// An undecided implication keeps the clause.
+				auto sc = r.open("rejected candidate");
+				r.info("whether this clause implies another one is "
+					"undecided",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(clauses[i_pos]))}});
+				report cand = std::move(impl).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+				continue;
+			}
+			const bool implied = impl.value();
+			r.merge(std::move(impl));
+			if (implied) {
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
 				break;

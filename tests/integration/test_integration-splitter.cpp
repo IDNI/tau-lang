@@ -458,6 +458,23 @@ TEST_SUITE("Tau_splitter clause paths") {
 		CHECK( is_tau_impl<node_t>(s, fm).value() );
 	}
 
+	TEST_CASE("an undecided redundancy check is kept in the report") {
+		auto nso_rr = get_nso_rr(
+			"(G o1[t] = 0 && G o3[t] = 0) "
+			"|| (F o1[t] != 0 && G o2[t] = 0) "
+			"|| (G o2[t] = 0 && G o3[t] = 0).");
+		REQUIRE( nso_rr.has_value() );
+		auto r = tau_splitter<bas_pack>(nso_rr.value().main->get(),
+			splitter_type::bad);
+		REQUIRE( r.has_value() );
+		bool found = false;
+		for (const auto& n : r.report().nodes())
+			if (std::string(r.report().str(n.key)).find(
+				"whether this clause implies another one is "
+				"undecided") != std::string::npos) found = true;
+		CHECK( found );
+	}
+
 	TEST_CASE("a clause implied by another is dropped before splitting") {
 		auto [fm, s] = get_nso_rr_tau_splitter(
 			"(G o1[t] = 0) || (G (o1[t] = 0 && o2[t] = 0)).",
