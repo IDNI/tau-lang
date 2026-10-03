@@ -121,13 +121,7 @@ TEST_SUITE("traverser extractors") {
 		CHECK( n == 2 );
 	}
 
-	// tree_range<tree<node>>::iterator advances through
-	// bintree<tree<node>>::get(current).r, which reads the sibling link at
-	// the offset of a bintree whose value is a whole tree, not at the
-	// node's own `r`; the walk stops after the first child.
-	TEST_CASE("children_trees_range iterates the first value's children"
-		* doctest::should_fail())
-	{
+	TEST_CASE("children_trees_range iterates the first value's children") {
 		tref fm = parsed_bf("X & Y");
 		REQUIRE( fm != nullptr );
 		tt conj = tt(fm) | tau::bf_and;
