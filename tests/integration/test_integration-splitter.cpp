@@ -444,6 +444,20 @@ TEST_SUITE("Tau_splitter clause paths") {
 		CHECK( is_tau_impl<node_t>(s, fm).value() );
 	}
 
+	// No clause implies another single one, but the first two together
+	// imply the last: dropping the last would give back the formula.
+	TEST_CASE("a clause the others imply together is not the one dropped") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0 && G o3[t] = 0) "
+			"|| (F o1[t] != 0 && G o2[t] = 0) "
+			"|| (G o2[t] = 0 && G o3[t] = 0).", splitter_type::bad);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
+	}
+
 	TEST_CASE("a clause implied by another is dropped before splitting") {
 		auto [fm, s] = get_nso_rr_tau_splitter(
 			"(G o1[t] = 0) || (G (o1[t] = 0 && o2[t] = 0)).",

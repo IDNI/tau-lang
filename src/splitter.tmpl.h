@@ -518,12 +518,33 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 				tau::build_wff_always(aw_bad_splitter)));
 		} else return r.with_value(tau::build_wff_and(
 			tau::build_wff_always(tau_bad_splitter<BAs...>()), fm));
-	} else {
-		// No clause left implies another one: dropping a clause is the
-		// splitter for every type, bad included.
-		clauses.pop_back();
-		return r.with_value(tau::build_wff_or(clauses));
 	}
+	// No clause left implies another single one, but the others together
+	// may still imply it; dropping a clause they do not imply is the
+	// splitter for every type, bad included.
+	for (size_t k = clauses.size(); k-- > 0;) {
+		trefs others = clauses;
+		others.erase(others.begin() + static_cast<int_t>(k));
+		tref rest = tau::build_wff_or(others);
+		auto implied = is_tau_impl<node>(clauses[k], rest);
+		if (implied.has_value()) {
+			const bool keep = implied.value();
+			r.merge(std::move(implied));
+			if (!keep) return r.with_value(rest);
+			continue;
+		}
+		// An undecided implication rejects the candidate.
+		auto sc = r.open("rejected candidate");
+		r.info("whether the other clauses imply this one is undecided",
+			{{label::value,
+				truncate_for_message(TAU_TO_STR(clauses[k]))}});
+		report cand = std::move(implied).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+	}
+	// No clause can be dropped: conjunct a bad splitter.
+	return r.with_value(tau::build_wff_and(
+		tau::build_wff_always(tau_bad_splitter<BAs...>()), fm));
 }
 
 } // namespace idni::tau_lang
