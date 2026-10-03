@@ -488,13 +488,25 @@ tref eliminate_functional_quantifiers(tref fm) {
 		if (!ex && !q.is(tau::bf_fall)) return n;
 		tref var = q.first(), body = q.second();
 		if (tau::get(body).find_top(is_non_boolean)) {
-			// Only a name that also occurs outside this binder can be
+			// Only a name that also occurs free in the formula can be
 			// captured; leaving the rest alone keeps the pass idempotent.
-			auto count = [&](tref in) {
-				return tau::get(in).select_all([&](tref m) {
-					return tau::get(m) == tau::get(var); }).size();
+			// select_all cannot count it: it visits equal subtrees once,
+			// and a free and a bound occurrence of a name are equal.
+			std::unordered_map<tref, bool> memo;
+			std::function<bool(tref)> occurs_free = [&](tref m) {
+				if (auto it = memo.find(m); it != memo.end())
+					return it->second;
+				const auto& mt = tau::get(m);
+				bool found = mt == tau::get(var);
+				if (!found && !((mt.is(tau::bf_fex) || mt.is(tau::bf_fall))
+					&& tau::get(mt.first()) == tau::get(var)))
+				{
+					for (tref c : mt.children())
+						if (occurs_free(c)) { found = true; break; }
+				}
+				return memo[m] = found;
 			};
-			if (count(fm) == count(n)) return n;
+			if (!occurs_free(fm)) return n;
 			tref nv = fresh(var);
 			tref nb = tau::get(body).replace(var, nv);
 			return ex ? tau::build_bf_fex(nv, nb)

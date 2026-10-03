@@ -1065,7 +1065,7 @@ TEST_SUITE("Normalizer entry points") {
 	}
 
 	TEST_CASE("a functional quantifier does not capture a free variable of "
-		"its name" * doctest::should_fail())
+		"its name")
 	{
 		auto fall_r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
 			"x:bv[8] = fall y:bv[8] (y * { 2 }:bv[8])."));
