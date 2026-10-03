@@ -37,6 +37,14 @@ using namespace idni::tau_lang;
 
 namespace {
 
+// The memos of the satisfiability checks exist only with TAU_CACHE, which
+// the Coverage build type turns off.
+#ifdef TAU_CACHE
+constexpr bool memo_enabled = true;
+#else
+constexpr bool memo_enabled = false;
+#endif
+
 tref op_wff(const char* s) {
 	tau::get_options opts;
 	opts.parse.start = tau::wff;
@@ -416,7 +424,7 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 	}
 
 	TEST_CASE("a repeated full-LTL satisfiability query runs no ltlsynt"
-		* doctest::skip(!ltlsynt_available()))
+		* doctest::skip(!ltlsynt_available() || !memo_enabled))
 	{
 		// flatten_always_conjuncts merges the two always parts, so the
 		// formula the memo stores differs from the one it is asked.

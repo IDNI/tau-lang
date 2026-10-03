@@ -7,7 +7,9 @@ set(TAU_COMPILE_RUN_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_matches_run
 
 # The host platform's artifact preset: the build folder name when it is one of
 # the platform names the SDK carries, else the build type's base folder (the
-# pack variants configure the same way, only the SDK differs).
+# pack variants configure the same way, only the SDK differs). The libTAU
+# interface carries --coverage, so a coverage SDK links under the debug
+# platform.
 if(NOT DEFINED TAU_TEST_PLATFORM)
 	get_filename_component(_tau_build_name "${CMAKE_BINARY_DIR}" NAME)
 	if(EXISTS "${CMAKE_BINARY_DIR}/sdk/cmake/tau-platforms.cmake")
@@ -16,6 +18,11 @@ if(NOT DEFINED TAU_TEST_PLATFORM)
 	if(DEFINED TAU_PLATFORM_NAMES
 			AND _tau_build_name IN_LIST TAU_PLATFORM_NAMES)
 		set(TAU_TEST_PLATFORM "${_tau_build_name}")
+	elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+		# Coverage compiles as Debug does, and its folder,
+		# coverage[-<toolchain>], is no platform: coverage-gcc is debug-gcc.
+		string(REGEX REPLACE "^coverage" "debug" TAU_TEST_PLATFORM
+			"${_tau_build_name}")
 	else()
 		string(TOLOWER "${CMAKE_BUILD_TYPE}" TAU_TEST_PLATFORM)
 	endif()
