@@ -1015,8 +1015,9 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	// equivalence of references
 	tref r1opt = get_ref<node>(n1), r2opt = get_ref<node>(n2);
 	if (r1opt != nullptr && r2opt != nullptr) { // both are refs
-		bool equiv = get_ref_info<node>(r1opt)
-						== get_ref_info<node>(r2opt);
+		// Equal calls are equal trees: the signature and the first
+		// offset alone would make p(x) equivalent to p(y).
+		bool equiv = tau::get(r1opt) == tau::get(r2opt);
 		LOG_DEBUG << "End are_nso_equivalent: " << equiv
 							<< " (equiv refs)";
 		return equiv;

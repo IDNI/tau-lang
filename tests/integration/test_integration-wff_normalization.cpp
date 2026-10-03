@@ -1022,13 +1022,11 @@ TEST_SUITE("Normalizer entry points") {
 		CHECK( !are_nso_equivalent<node_t>(eq, px) );
 	}
 
-	// The reference fast path compares the name and the first offset of
-	// the two calls, never their arguments.
-	TEST_CASE("are_nso_equivalent tells calls with different arguments apart"
-		* doctest::should_fail())
-	{
+	TEST_CASE("are_nso_equivalent tells calls with different arguments apart") {
 		CHECK( !are_nso_equivalent<node_t>(main_of("p(x)."),
 			main_of("p(y).")) );
+		CHECK( are_nso_equivalent<node_t>(main_of("p(x)."),
+			main_of("p(x).")) );
 	}
 
 	// The normalizer cache keys on the formula alone, so this formula is
