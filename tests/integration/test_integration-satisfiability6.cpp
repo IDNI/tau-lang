@@ -1304,14 +1304,13 @@ TEST_SUITE("solver entry points") {
 		equation_system<node_t> sys{ zero_eq, {} };
 		CHECK( find_maximal_solution<node_t>(sys).has_value() );
 		CHECK( find_minimal_solution<node_t>(sys).has_value() );
+		equation_system<node_t> neq_sys{ std::nullopt,
+			{ raw_neq_0(tau::_1(sbf)) } };
+		CHECK( find_maximal_solution<node_t>(neq_sys).has_value() );
+		CHECK( find_minimal_solution<node_t>(neq_sys).has_value() );
 	}
 
-	// var_free_holds reduces the bf terms of the equality only, so an
-	// equality whose sides are already reduced constants is never
-	// rebuilt and never turns into F.
-	TEST_CASE("a variable-free false equality has no solution"
-		* doctest::should_fail())
-	{
+	TEST_CASE("a variable-free false equality has no solution") {
 		const size_t sbf = sbf_type_id<node_t>();
 		tref one_eq = raw_eq_0(tau::_1(sbf));
 		tref zero_neq = raw_neq_0(tau::_0(sbf));

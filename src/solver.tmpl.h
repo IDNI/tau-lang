@@ -157,11 +157,22 @@ trefs get_variables(const equation_system<node>& system) {
 
 // SO-3: a variable-free equation is not automatically satisfied -- reduce it
 // and reject on F instead of reporting an empty solution for e.g. {c} = 0.
+// Reducing leaves a comparison whose sides are constants already as it is,
+// so it is rebuilt with the hooks on, which decide it.
 template <NodeType node>
 bool var_free_holds(tref eq) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	tref v = tt(eq) | bf_reduce_canonical<node>() | tt::ref;
+	if (const auto& w = tau::get(v); w.is(tau::wff)
+		&& (w.child_is(tau::bf_eq) || w.child_is(tau::bf_neq)))
+	{
+		use_hooks_guard<node> hooks_on(true);
+		const auto& c = w[0];
+		v = w.child_is(tau::bf_eq)
+			? tau::build_bf_eq(c.first(), c.second())
+			: tau::build_bf_neq(c.first(), c.second());
+	}
 	return !tau::get(v).equals_F();
 }
 
