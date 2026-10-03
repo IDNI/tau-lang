@@ -1123,6 +1123,27 @@ TEST_SUITE("Tau API - string - solution and definition rendering") {
 		REQUIRE(a.has_value());
 		CHECK(a.value() == "y = 0");
 	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a call in a spec-form formula") {
+		auto a = tau_api::apply_def("str_apply_def_ii(x) := x'",
+			"str_apply_def_ii(y) = 0.");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs applies the registered definitions") {
+		REQUIRE(tau_api::get_definition("str_apply_all_defs_jj(x) := x'")
+			.has_value());
+		auto a = tau_api::apply_all_defs("str_apply_all_defs_jj(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+		auto b = tau_api::apply_all_defs("str_apply_all_defs_jj(y)");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y'");
+		auto c = tau_api::apply_all_defs("str_apply_all_defs_jj(y) = 0.");
+		REQUIRE(c.has_value());
+		CHECK(c.value() == "y' = 0");
+	}
 }
 
 TEST_SUITE("Cleanup") {

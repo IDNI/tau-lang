@@ -52,6 +52,75 @@ result<std::string> api<node>::apply_def(
 	});
 }
 
+// Reads the expression given to the string apply_defs and apply_all_defs.
+// A formula or a term is read untyped, as the definitions are: a spec infers
+// default types into the call's arguments, and a typed call no longer
+// matches an untyped definition head. A formula written as a spec, with the
+// trailing '.', is read the same way. Only an input that is no formula or
+// term, a spec with its own definitions, is read as a spec. A bare call
+// parses as a predicate call; it is a function call when one of @p heads,
+// the heads of the definitions applied, is a function head of its
+// signature.
+template <NodeType node>
+result<tref> read_for_defs(const std::string& expr, const trefs& heads) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	result<tref> r;
+	std::string text = expr;
+	if (size_t last = text.find_last_not_of(" \t\r\n");
+		last != std::string::npos && text[last] == '.')
+			text.resize(last);
+	tref parsed = nullptr;
+	auto fot = api<node>::get_formula_or_term(text);
+	if (fot.has_value()) {
+		parsed = fot.value();
+		r.merge(std::move(fot));
+	} else {
+		auto spec = api<node>::get_spec_or_term(expr);
+		if (!spec.has_value()) {
+			r.merge(std::move(fot));
+			r.merge(std::move(spec));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		parsed = spec.value();
+		r.merge(std::move(spec));
+		auto sc = r.open("rejected candidate");
+		r.info("the input is not a single formula or term",
+			{{label::value, truncate_for_message(expr)}});
+		report cand = std::move(fot).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+	}
+	if (tref call = tau::get(parsed).is(tau::wff)
+		? tt(parsed) | tau::wff_ref | tau::ref | tt::ref : nullptr)
+	{
+		const rr_sig sig = get_rr_sig<node>(call);
+		for (tref head : heads)
+			if (tau::get(head).is(tau::ref)
+				&& get_rr_sig<node>(head) == sig)
+			{
+				TAU_TRY(parsed, api<node>::get_term(text));
+				break;
+			}
+	}
+	return r.with_assert_check_value(parsed);
+}
+
+// A spec keeps its spec shape through the application, which renders with a
+// trailing '.'; the result is its main formula.
+template <NodeType node>
+std::string applied_to_str(tref a) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	if (tau::get(a).is(tau::spec)) {
+		tref main = tt(a) | tau::main | tau::wff | tt::ref;
+		if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
+		if (main) a = main;
+	}
+	return api<node>::to_str(a);
+}
+
 template <NodeType node>
 result<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
@@ -59,6 +128,7 @@ result<std::string> api<node>::apply_defs(
 	return with_budget<node>([&] {
 		result<std::string> r;
 		subtree_set<node> tdefs;
+		trefs heads;
 		// A definition that fails to parse used to be inserted as nullptr and
 		// then silently skipped by the tref-level apply_defs' "if (def)"
 		// guard, so the caller had no way to tell a malformed definition was
@@ -71,67 +141,25 @@ result<std::string> api<node>::apply_defs(
 				return r;
 			}
 			tdefs.insert(*d);
+			heads.push_back(tau::get(*d).first());
 		}
-		// A formula or a term is read untyped, as the definitions are: a
-		// spec infers default types into the call's arguments, and a typed
-		// call no longer matches an untyped definition head. Only an input
-		// that is no formula or term, a spec with its own definitions,
-		// is read as a spec.
-		tref parsed = nullptr;
-		{
-			auto fot = get_formula_or_term(expr);
-			if (fot.has_value()) {
-				parsed = fot.value();
-				r.merge(std::move(fot));
-			} else {
-				auto spec = get_spec_or_term(expr);
-				if (!spec.has_value()) {
-					r.merge(std::move(fot));
-					r.merge(std::move(spec));
-					DBG(assert(r.is_well_formed());)
-					return r;
-				}
-				parsed = spec.value();
-				r.merge(std::move(spec));
-				auto sc = r.open("rejected candidate");
-				r.info("the input is not a single formula or term",
-					{{label::value, truncate_for_message(expr)}});
-				report cand = std::move(fot).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
-			}
-		}
-		// A bare call parses as a predicate call; it is a function call
-		// when a function definition of the same signature is given.
-		using tt = typename tau::traverser;
-		if (tref call = tau::get(parsed).is(tau::wff)
-			? tt(parsed) | tau::wff_ref | tau::ref | tt::ref : nullptr)
-		{
-			const rr_sig sig = get_rr_sig<node>(call);
-			for (tref def : tdefs)
-				if (tau::get(def).first_tree().is(tau::ref)
-					&& get_rr_sig<node>(tau::get(def).first()) == sig)
-				{
-					TAU_TRY(parsed, get_term(expr));
-					break;
-				}
-		}
+		TAU_TRY(tref parsed, read_for_defs<node>(expr, heads));
 		TAU_TRY(tref a, apply_defs(tdefs, parsed));
-		// A spec keeps its spec shape through the application, which
-		// renders with a trailing '.'; the result is its main formula.
-		if (tau::get(a).is(tau::spec)) {
-			tref main = tt(a) | tau::main | tau::wff | tt::ref;
-			if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
-			if (main) a = main;
-		}
-		return r.with_assert_check_value(to_str(a));
+		return r.with_assert_check_value(applied_to_str<node>(a));
 	});
 }
 
 template <NodeType node>
 result<std::string> api<node>::apply_all_defs(const std::string& expr) {
 	return with_budget<node>([&] {
-		return apply_defs(std::set<std::string>{}, expr);
+		result<std::string> r;
+		trefs heads;
+		for (const auto& [head, body] :
+			definitions<node>::instance().get_sym_defs())
+				heads.push_back(head->get());
+		TAU_TRY(tref parsed, read_for_defs<node>(expr, heads));
+		TAU_TRY(tref a, apply_all_defs(parsed));
+		return r.with_assert_check_value(applied_to_str<node>(a));
 	});
 }
 
