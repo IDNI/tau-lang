@@ -753,9 +753,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case def_print_cmd:
 			case def_rr_cmd:
 			case def_list_cmd:      out("defs "); break;
-			case history_list_cmd:  out("history "); break;
-			case history_print_cmd:
-			case history_store_cmd: out("history "); break;
+			case history_list_cmd:
+			case history_print_cmd: out("history "); break;
 			case get_cmd:           out("get "); break;
 			case set_cmd:           out("set "); break;
 			case toggle_cmd:        out("toggle "); break;
@@ -770,10 +769,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case solve_cmd:         out("solve "); break;
 			case run_cmd:           out("run "); break;
 			case normalize_cmd:     out("normalize "); break;
-			case inst_cmd:          track_chpos();
-						out("instantiate "); break;
-			case subst_cmd:         track_chpos();
-						out("substitute "); break;
+			case inst_cmd:          out("instantiate "); break;
+			case subst_cmd:         out("substitute "); break;
+			case inst_group:
+			case subst_group:       track_chpos(); out("["); break;
 			case wff_conditional:   track_chpos(); break;
 			/*case ba_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
@@ -969,13 +968,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case definitions:
 			case spec:              out(" "); break;
 
-			case inst_cmd:
-			case subst_cmd:
-				switch (inc_chpos()) {
-					case 1: out(" ["); break;
-					case 2: out(" / "); break;
-					case 3: chpos_end(); break;
-				}
+			// the command symbol prints with the command itself
+			case onf_cmd:           if (!t.is(onf_sym)) out(" "); break;
+			case set_cmd:           if (!t.is(set_sym)) out(" "); break;
+			case inst_cmd:          if (!t.is(inst_sym)) out(" "); break;
+			case subst_cmd:         if (!t.is(subst_sym)) out(" "); break;
+			// match / replace, match / replace, ...
+			case inst_group:
+			case subst_group:
+				out(inc_chpos() % 2 ? ", " : " / ");
+				break;
 		};
 		return true;
 	};
@@ -997,9 +999,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:	out("."); break;
 			case constraint:
 			case offsets:
-			case subtype:
-			case inst_cmd:
-			case subst_cmd:         out("]"); break;
+			case subtype:           out("]"); break;
+			case inst_group:
+			case subst_group:       chpos.erase(ref); out("]"); break;
 			case type_parents:      out(")"); break;
 			case tuple:             out("}"); break;
 			case offset:            if (pnt == io_var) out("]");

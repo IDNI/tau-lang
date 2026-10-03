@@ -1478,22 +1478,22 @@ TEST_SUITE("tree printers") {
 		}
 	}
 
-	// The command printer drops the separators of the commands below:
-	// `onf x x = 0` prints `onf xx = 0`, `set charvar off` prints
-	// `set charvaroff`, the substitution brackets print `[x0]` instead of
-	// `[x / 0]`, and a stored formula gains a `history ` prefix.
-	TEST_CASE("repl commands that do not print back to themselves"
-		* doctest::should_fail())
-	{
+	TEST_CASE("repl commands with separators print back to themselves") {
 		for (const char* src : { "onf x x = 0", "set charvar off",
 			"instantiate x = 0 [x / 0]", "substitute x = 0 [x / y]",
-			"x = 0 ? y = 0 : z = 0" })
+			"instantiate x = 0 [x / 0, y / 1] [z / 0]",
+			"substitute x = 0 [x / y, y / x] [z / 0]",
+			"x = 0 ? y = 0 : z = 0", "x = 0" })
 		{
 			const std::string input = src, printed = raw(src, tau::cli);
 			CAPTURE(input);
 			CAPTURE(printed);
 			CHECK( round_trips(src, tau::cli) );
 		}
+		CHECK( raw("set charvar off", tau::cli) == "set charvar off" );
+		CHECK( raw("onf x x = 0", tau::cli) == "onf x x = 0" );
+		CHECK( raw("x = 0 ? y = 0 : z = 0", tau::cli)
+			== "x = 0 ? y = 0 : z = 0" );
 	}
 
 	TEST_CASE("bound-variable names start past the largest b<n> in the formula") {
