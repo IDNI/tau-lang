@@ -182,16 +182,22 @@ function runBaOptions(tau) {
 	check(tau.setBaOption('nope-nothing', -1) === null,
 		'setBaOption refuses a negative value');
 
-	const count = 'qlt-t3-cap';
-	check(names.includes(count), `${count} is declared (qlt is in the pack)`);
-	if (!names.includes(count)) return;
-	const saved = tau.getBaOption(count);
-	check(tau.setBaOption(count, 5) === 5, `setBaOption(${count}, 5) -> 5`);
-	check(tau.getBaOption(count) === 5, `getBaOption(${count}) reads 5`);
-	check(tau.setBaOption(count, saved) === saved,
-		`setBaOption(${count}, ${saved}) restores it`);
-	check(tau.getBaOption(count) === saved,
-		`getBaOption(${count}) reads ${saved} again`);
+	// 0 is a valid value of the cell budgets: it lifts the bound.
+	for (const [count, v] of [['qlt-t3-cap', 5], ['qlt-cells-budget', 0],
+		['qlt-cells-max-params', 3]]) {
+		check(names.includes(count),
+			`${count} is declared (qlt is in the pack)`);
+		if (!names.includes(count)) continue;
+		const saved = tau.getBaOption(count);
+		check(tau.setBaOption(count, v) === v,
+			`setBaOption(${count}, ${v}) -> ${v}`);
+		check(tau.getBaOption(count) === v,
+			`getBaOption(${count}) reads ${v}`);
+		check(tau.setBaOption(count, saved) === saved,
+			`setBaOption(${count}, ${saved}) restores it`);
+		check(tau.getBaOption(count) === saved,
+			`getBaOption(${count}) reads ${saved} again`);
+	}
 }
 
 const tauModule = require(WASM_JS);
