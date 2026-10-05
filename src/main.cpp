@@ -126,7 +126,7 @@ cli::options tau_options() {
 	opts["max-flag-search-steps"] =
 		cli::option("max-flag-search-steps", 'F', "500")
 		.set_description("cap the eventual-flag search past the flag "
-			"boundary; give-up reports unsatisfiable "
+			"boundary; a give-up reports an error, not a verdict "
 			"(default 500; 0 = unlimited)");
 	opts["block-squeeze-cap"] = cli::option("block-squeeze-cap", 'z', "0")
 		.set_description("skip block squeezing above this operand-set "

@@ -226,24 +226,23 @@ struct api {
 	static void set_block_squeeze_cap(size_t n);
 	/**
 	 * @brief Cap the temporal-normalization fixpoint searches
-	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); 0 = unlimited (default).
+	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); default 500, 0 = unlimited.
 	 *
-	 * On overrun the search gives up with a log line and returns the
-	 * current (non-fixpoint) iterate.
+	 * Reaching the cap is an error without a verdict.
 	 */
 	static void set_max_fixpoint_steps(size_t n);
 	/**
 	 * @brief Cap the eventual-flag search past the flag boundary in
-	 * `to_unbounded_continuation`; 0 = unlimited (default).
+	 * `to_unbounded_continuation`; default 500, 0 = unlimited.
 	 *
-	 * A bounded give-up reports unsatisfiable — wrong but bounded and
-	 * loud (SO-1).
+	 * Reaching the cap is an error without a verdict, not a proof of
+	 * unsatisfiability.
 	 */
 	static void set_max_flag_search_steps(size_t n);
 	/**
 	 * @brief Cap definition-expansion passes in
-	 * `expand_defs_until_settled`; 0 = unlimited (default). On overrun the
-	 * expansion reports failure (`nullptr`) with a log line.
+	 * `expand_defs_until_settled`; 0 = unlimited (default). Reaching the
+	 * cap is an error.
 	 */
 	static void set_max_def_passes(size_t n);
 	/**

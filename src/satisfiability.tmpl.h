@@ -28,17 +28,16 @@ inline static bool use_debug_output_in_sat = false;
 /// `api::set_max_fixpoint_steps`. SO-1 caveat: these searches have no
 /// convergence guarantee, so an unlimited run on a non-converging spec does
 /// not terminate. The shipped default is therefore FINITE (500, the value the
-/// pre-parameter constant had): a give-up is wrong-but-loud where an
-/// unlimited run hangs `sat`/`run`/pointwise revision. Pass 0 to opt into
-/// unlimited. The CLI default in main.cpp must agree with this value.
+/// pre-parameter constant had): reaching it is an error without a verdict,
+/// where an unlimited run may hang `sat`/`run`/pointwise revision. Pass 0 to
+/// opt into unlimited. The CLI default in main.cpp must agree with this value.
 inline size_t max_fixpoint_steps = 500;
 
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
-/// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps` — and a
-/// bounded give-up here reports unsatisfiable, which is wrong but bounded and
-/// loud. Shipped default 500 (finite, see above); set via
-/// `--max-flag-search-steps`, REPL `flagsteps`, or
-/// `api::set_max_flag_search_steps`.
+/// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps`, and
+/// reaching it is likewise an error without a verdict. Shipped default 500
+/// (finite, see above); set via `--max-flag-search-steps`, REPL `flagsteps`,
+/// or `api::set_max_flag_search_steps`.
 inline size_t max_flag_search_steps = 500;
 
 /**
@@ -816,11 +815,9 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
 	// SO-1: this search has no convergence guarantee; the global
-	// max_fixpoint_steps (0 = unlimited, the default) lets a caller cap the
-	// step count so a non-converging formula fails loudly instead of
-	// hanging forever. This is a safety net, not full error propagation:
-	// callers still receive a (non-fixpoint) result rather than a failure
-	// signal. Real specs settle in a handful of steps (the flag_boundary
+	// max_fixpoint_steps (default 500, 0 = unlimited) caps the step count
+	// so a non-converging formula fails with an error instead of hanging
+	// forever. Real specs settle in a handful of steps (the flag_boundary
 	// tests in tests/integration/test_integration-solver.cpp reach single
 	// digits), so any generous bound leaves a wide margin.
 	//

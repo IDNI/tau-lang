@@ -117,6 +117,12 @@ add_raw_repl_test(cli-help_lists_limit_options
 	"${TAU_RUN} --help"
 	"max-fixpoint-steps" NO_FAIL_REGEX)
 
+# A flag search that reaches its cap gives no verdict (GitHub #191).
+add_raw_repl_test(cli-help_flag_search_giveup_is_no_verdict
+	"${TAU_RUN} --help"
+	"max-flag-search-steps[^\n]*a give-up reports an error, not a verdict"
+	FAIL_REGEX "reports unsatisfiable")
+
 # --- every limit flag, long AND short form (2026-08-17 coverage plan) --------
 # Each row: testname|longflag|shortflag|value|get-option|expected-value.
 # The round trip proves flag -> optnum() -> api setter -> library global -> get.
