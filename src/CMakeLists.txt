@@ -517,6 +517,7 @@ if(TAU_BUILD_EXECUTABLE)
 		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
 			"SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tau_stdin_node.pre.js")
 		set_property(TARGET ${TAU_EXECUTABLE_NAME} APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tau_stdin_node.pre.js)
+		target_compile_definitions(${TAU_EXECUTABLE_NAME} PRIVATE TAU_WASM_NODE_CLI)
 	endif()
 	if(TAU_PARSER_HAS_FTXUI_DEP)
 		target_link_libraries(${TAU_EXECUTABLE_NAME}

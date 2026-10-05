@@ -8,6 +8,10 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef TAU_WASM_NODE_CLI
+#include <unistd.h>
+#endif
+
 #include "tau_pack.h"
 
 #ifdef DEBUG
@@ -679,7 +683,13 @@ int main(int argc, char** argv) {
 	DBG(TAU_LOG_TRACE << "running REPL";)
 	welcome();
 #ifdef TAU_PARSER_HAS_FTXUI
-	if (!opts["legacy-repl"].get<bool>()) {
+	bool use_ftxui = !opts["legacy-repl"].get<bool>();
+#ifdef TAU_WASM_NODE_CLI
+	// repl_ftxui runs interactive under Emscripten whatever stdin is, and
+	// waits forever after the first line of a piped stdin.
+	if (!isatty(STDIN_FILENO)) use_ftxui = false;
+#endif
+	if (use_ftxui) {
 		repl_ftxui<decltype(re)> rftx(re, "tau> ", ".tau_history");
 		re.reprompt();
 		return rftx.run();
