@@ -1736,38 +1736,48 @@ bool is_ordering_atom(tref n) {
 	    || op == tau::bf_nlteq || op == tau::bf_ngteq;
 }
 
-// omcat_solve_inequality_system dispatcher: asks the BA owning ba_type_id to
-// solve a pure ordering system itself, where pack_solve hands the owner a
-// whole formula.
+// omcat_solve_inequality_system dispatcher: asks the BA owning ba_type_id for
+// a model of sys. nullopt says no model exists; an owner without the
+// capability cannot decide, which is an error.
 template <typename Node>
-static std::optional<solution<Node>> pack_omcat_solve(size_t ba_type_id,
-	const inequality_system<Node>& sys, const solver_options& opts)
+static result<std::optional<solution<Node>>> pack_omcat_solve(
+	size_t ba_type_id, const inequality_system<Node>& sys,
+	const solver_options& opts)
 {
-	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
-		-> std::optional<solution<Node>> {
+	using res_t = result<std::optional<solution<Node>>>;
+	auto s = pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
+		-> std::optional<res_t> {
 			if constexpr (requires { ba_descriptor<BA, Node>
 				::omcat_solve_inequality_system(sys, opts); })
 				return ba_descriptor<BA, Node>
 					::omcat_solve_inequality_system(sys, opts);
 			return std::nullopt;
 		});
+	if (s) return std::move(*s);
+	res_t r;
+	return r.with_error(code::solver_error, "UNKNOWN: the type has no "
+		"point solver");
 }
 
-// The owning BA's model of an ordering system, kept only when every atom
-// holds under it.
+// The owning BA's model of sys, checked against every atom.
 template <NodeType node>
-static std::optional<solution<node>> omcat_solve_verified(
+static result<std::optional<solution<node>>> omcat_solve_verified(
 	const inequality_system<node>& sys, const solver_options& options)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto s = pack_omcat_solve<node>(options.type_id, sys, options);
-	if (!s) return {};
+	result<std::optional<solution<node>>> r;
+	TAU_TRY(auto s, pack_omcat_solve<node>(options.type_id, sys, options));
+	if (!s) return r.with_value(std::nullopt);
 	for (tref atom : sys)
 		if (!tau::get(tt(rewriter::replace<node>(atom, s.value()))
 			| bf_reduce_canonical<node>() | tt::ref).equals_T())
-			return {};
-	return s;
+			return r.with_error(code::solver_error,
+				"UNKNOWN: the point solver's model does not "
+				"satisfy an atom",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(atom))}});
+	return r.with_value(std::move(s));
 }
 
 template <NodeType node>
@@ -1803,7 +1813,7 @@ result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 		inequality_system<node> all(system.second);
 		for (tref eq : eqs)
 			if (tau::get(eq).child_is(tau::bf_eq)) all.insert(eq);
-		return r.with_value(omcat_solve_verified<node>(all, options));
+		return omcat_solve_verified<node>(all, options);
 	}
 	bool has_ordering = false;
 	for (tref neq : system.second)
@@ -2332,9 +2342,11 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				// Boolean-algebra solve below answers with elements
 				// (top, bot, intervals) that are no points, so it is
 				// never asked.
+				// A path the point solver cannot decide makes the
+				// whole answer unknown.
 				if (pack_type_is_non_aba_omcat<node>(type)) {
-					auto points = omcat_solve_verified<node>(
-						order_atoms[type], op);
+					TAU_TRY(auto points, omcat_solve_verified<node>(
+						order_atoms[type], op));
 					if (!points) { skip = true; break; }
 					for (const auto& [var, value]: points.value())
 						clause_solution[var] = value;

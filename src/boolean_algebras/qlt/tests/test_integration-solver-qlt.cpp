@@ -469,11 +469,20 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 		};
 		auto sol = qlt_omcat_solve_inequality_system<node_t>(sys, options);
 		REQUIRE( sol.has_value() );
-		for (tref a : sys) CHECK( check_solution<node_t>(a, sol.value()) );
-		// an order against an interval is not read
-		inequality_system<node_t> interval;
-		interval.insert(atom("x : qlt < {(0, 1)}:qlt."));
-		CHECK( !qlt_omcat_solve_inequality_system<node_t>(interval, options)
+		REQUIRE( sol.value().has_value() );
+		for (tref a : sys)
+			CHECK( check_solution<node_t>(a, *sol.value()) );
+		// no points satisfy it: a value, nullopt
+		inequality_system<node_t> unsat;
+		unsat.insert(atom("{3}:qlt & x : qlt != 0."));
+		unsat.insert(atom("{5}:qlt & x : qlt != 0."));
+		auto none = qlt_omcat_solve_inequality_system<node_t>(unsat, options);
+		REQUIRE( none.has_value() );
+		CHECK( !none.value().has_value() );
+		// a compound side of an order atom is not read: an error
+		inequality_system<node_t> unread;
+		unread.insert(atom("(x : qlt & {3}:qlt) < {1}:qlt."));
+		CHECK( !qlt_omcat_solve_inequality_system<node_t>(unread, options)
 			.has_value() );
 	}
 

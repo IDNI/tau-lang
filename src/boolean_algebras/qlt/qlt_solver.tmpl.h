@@ -331,17 +331,26 @@ static bool qlt_model_holds(const inequality_system<node>& sys,
 // A model of sys in points: each variable in turn tries one point of every
 // cell cut by the constants' endpoints and the values chosen before it,
 // simplest first. By the argument above qlt_point_eval some such choice is a
-// model whenever one exists. nullopt when none exists, or when an atom is
-// outside what qlt_point_eval reads or the budget runs out.
+// model whenever one exists, so nullopt says that no points satisfy sys. An
+// error says the search could not decide: an atom qlt_point_eval does not
+// read, a variable of another type, a named endpoint, or a spent budget.
 template <NodeType node>
-static std::optional<solution<node>> qlt_point_search(
+static result<std::optional<solution<node>>> qlt_point_search(
 	const inequality_system<node>& sys, const solver_options& options)
 {
 	using tau = tree<node>;
 	using eval = qlt_point_eval<node>;
-	auto ends = eval::ends_of(tau::build_wff_and(
-		trefs(sys.begin(), sys.end())));
-	if (!ends) return {};
+	result<std::optional<solution<node>>> r;
+	auto undecided = [&](const char* why, tref at) {
+		return r.with_error(code::solver_error,
+			std::string("UNKNOWN: the qlt point solver could not "
+				"decide the system: ") + why,
+			{{label::value, truncate_for_message(TAU_TO_STR(at))}});
+	};
+	const tref all = tau::build_wff_and(trefs(sys.begin(), sys.end()));
+	auto ends = eval::ends_of(all);
+	if (!ends) return undecided("a constant has a named or inexact "
+		"endpoint", all);
 	trefs vars;
 	auto index_of = [&](tref v) {
 		for (size_t i = 0; i < vars.size(); ++i)
@@ -355,7 +364,9 @@ static std::optional<solution<node>> qlt_point_search(
 	for (tref a : sys) {
 		size_t last = 0;
 		for (tref v : get_free_vars<node>(a)) {
-			if (!eval::is_point_var(v)) return {};
+			if (!eval::is_point_var(v))
+				return undecided("a variable is not of the qlt "
+					"type", a);
 			last = std::max(last, index_of(v) + 1);
 		}
 		if (due.size() <= last) due.resize(last + 1);
@@ -363,12 +374,15 @@ static std::optional<solution<node>> qlt_point_search(
 	}
 	due.resize(vars.size() + 1);
 	eval ev(std::move(*ends));
+	tref unread = nullptr;
 	auto check = [&](size_t i) {
-		for (tref a : due[i])
-			if (auto h = ev.holds(a); !h || !*h) return false;
+		for (tref a : due[i]) {
+			auto h = ev.holds(a);
+			if (!h) { if (!unread) unread = a; return false; }
+			if (!*h) return false;
+		}
 		return true;
 	};
-	if (!check(0)) return {};
 	std::function<bool(size_t)> search = [&](size_t i) {
 		if (i == vars.size()) return true;
 		std::vector<qlt_rational> pts;
@@ -382,24 +396,33 @@ static std::optional<solution<node>> qlt_point_search(
 		}
 		return false;
 	};
-	if (!search(0)) return {};
-	solution<node> result;
+	if (!check(0) || !search(0)) {
+		if (ev.exhausted())
+			return undecided("the cell budget is spent", all);
+		if (unread) return undecided("an atom it does not read",
+			unread);
+		return r.with_value(std::nullopt);
+	}
+	solution<node> model;
 	for (const auto& [v, p] : ev.env)
-		result[tau::get(tau::bf, v)] = qlt_point_constant<node>(p,
+		model[tau::get(tau::bf, v)] = qlt_point_constant<node>(p,
 			options.type_id);
-	return result;
+	return r.with_value(std::move(model));
 }
 
-// The omcat_solve_inequality_system capability: a model of sys in points. A
+// The omcat_solve_inequality_system capability: a model of sys in points,
+// nullopt when no points satisfy it, an error when it cannot be decided. A
 // pure ordering system is solved jointly by qlt_dlo_order_solve, which spreads
 // unrelated variables apart; anything else, or a model of it that misses an
 // atom it skipped, by qlt_point_search.
 template <NodeType node>
-static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
-	const inequality_system<node>& sys, const solver_options& options)
+static result<std::optional<solution<node>>>
+	qlt_omcat_solve_inequality_system(const inequality_system<node>& sys,
+		const solver_options& options)
 {
 	if (auto s = qlt_dlo_order_solve<node>(sys, options);
-		s && qlt_model_holds<node>(sys, *s)) return s;
+		s && qlt_model_holds<node>(sys, *s))
+		return result<std::optional<solution<node>>>{ std::move(s) };
 	return qlt_point_search<node>(sys, options);
 }
 

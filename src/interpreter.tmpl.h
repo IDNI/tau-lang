@@ -1502,7 +1502,7 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 		if (!value && !sys.empty() && point) {
 			solver_options opts;
 			opts.type_id = tid;
-			auto got = omcat_solve_verified<node>(sys, opts);
+			TAU_TRY(auto got, omcat_solve_verified<node>(sys, opts));
 			if (!got) return r.with_value(std::nullopt);
 			for (const auto& [k, kv] : *got)
 				if (tau::subtree_equals(tau::get(k).child_is(

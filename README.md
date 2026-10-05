@@ -2308,7 +2308,10 @@ When none of these applies the binder stays.
 output one rational, never `top`, `bot` or an interval: qlt's own solver
 picks the values, preferring simple ones, and `solve` answers `no solution`
 when no points satisfy the system (`solve {(0, 1)}:qlt x = 0` gives
-`x := { 0 }:qlt`; `solve x:qlt = {[0, 1]}:qlt` has no solution).  Points have
+`x := { 0 }:qlt`; `solve x:qlt = {[0, 1]}:qlt` has no solution).  A system
+the solver cannot decide (an atom it does not read, a constant with a named
+endpoint, a spent cell budget) answers `UNKNOWN` with the reason, never
+`no solution`.  Points have
 no least or greatest choice, so `--min` and `--max` give a point as well.
 `always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
 strategy exists, `run` says the specification is unrealizable.

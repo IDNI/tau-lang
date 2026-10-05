@@ -35,8 +35,9 @@ template <NodeType node>
 static tref qlt_point_meets(tref body);
 
 template <NodeType node>
-static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
-	const inequality_system<node>& sys, const solver_options& options);
+static result<std::optional<solution<node>>>
+	qlt_omcat_solve_inequality_system(const inequality_system<node>& sys,
+		const solver_options& options);
 
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
@@ -304,8 +305,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return qlt_semantic_pwr_optimal<node_t>(clause, update);
 	}
 
-	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */
-	static std::optional<solution<node_t>> omcat_solve_inequality_system(
+	/**
+	 * @brief A model of @p sys in points; nullopt when no points satisfy
+	 * it, an UNKNOWN error when it cannot be decided.
+	 */
+	static result<std::optional<solution<node_t>>>
+		omcat_solve_inequality_system(
 		const inequality_system<node_t>& sys,
 		const solver_options& options)
 	{
