@@ -234,7 +234,8 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 	}
 
 	TEST_CASE("[IAX-MEALY-08] a multi-state strategy renders, determinises "
-		"and traces its machine")
+		"and traces its machine"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
 		REQUIRE(i.has_value());
@@ -571,7 +572,8 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 	}
 
 	TEST_CASE("[IAX-PWR-11] a data-game update is refused when it retypes a "
-		"stream or reaches outside the run")
+		"stream or reaches outside the run"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
 		REQUIRE(i.has_value());
