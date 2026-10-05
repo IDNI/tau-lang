@@ -490,12 +490,27 @@ qlt qlt::operator&(const qlt& o) const {
 	return res;
 }
 
+bool qlt_pieces_unordered(const qlt& q) {
+	for (const auto& p : q.pieces)
+		if (qlt_piece_emptiness_undecidable(p)) return true;
+	for (size_t i = 0; i + 1 < q.pieces.size(); ++i)
+		if (qlt_sem_cmp(q.pieces[i].hi.val, q.pieces[i + 1].lo.val)
+			== std::partial_ordering::unordered) return true;
+	return false;
+}
+
 qlt qlt::operator~() const {
 	if (pieces.empty()) return top();
 	// Complementing an over-approximation exactly would under-approximate
 	// (see qlt_piece_intersect); `top` is the smallest over-approximation
 	// of the complement this representation can state.
 	if (inexact) return top();
+	// The gaps between pieces whose order is unknown are unknown too.
+	if (qlt_pieces_unordered(*this)) {
+		qlt t = top();
+		t.inexact = true;
+		return t;
+	}
 	std::vector<qlt_piece> result;
 	// Start from -inf
 	qlt_endpoint cur{ qlt_rational::make_neg_inf(), qlt_bound::OPEN };

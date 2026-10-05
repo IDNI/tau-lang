@@ -2316,6 +2316,14 @@ no least or greatest choice, so `--min` and `--max` give a point as well.
 `always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
 strategy exists, `run` says the specification is unrealizable.
 
+A constant may name an endpoint (`{c}:qlt`, `{(c0, c1)}:qlt`): the name is an
+unknown rational.  A comparison or a quantifier over such constants is decided
+only when it has the same truth wherever the names lie among the other
+endpoints, so `{c}:qlt = {c}:qlt` is `T` and `ex x (x = {c}:qlt)` is `T`, while
+`{c}:qlt != {0}:qlt` and `({c}:qlt & {0}:qlt) = 0` stay as they are (c may be
+0).  An operation whose result would depend on where a name lies is kept as a
+term instead of being folded into one constant.
+
 An order atom against a constant reads every point of it: `x < c` holds when
 `x` is below every point of `c` (below `inf c`, or at it when `c` does not
 hold it), `x <= c` when `x` is at most every point, and `x > c`, `x >= c`

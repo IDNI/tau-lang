@@ -275,6 +275,11 @@ private:
 /// over-approximates (see qlt_piece_empty).
 bool qlt_piece_emptiness_undecidable(const qlt_piece& p);
 
+/// True when the pieces of @p q cannot be placed in the order of Q: a piece's
+/// emptiness, or the order of two consecutive pieces, depends on a named
+/// endpoint. Such a value is exact as a set but cannot be complemented.
+bool qlt_pieces_unordered(const qlt& q);
+
 // --- stream output ---
 std::ostream& operator<<(std::ostream& os, const qlt& q);
 

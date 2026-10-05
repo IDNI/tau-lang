@@ -541,14 +541,19 @@ public:
 		if (op == tau::wff_ex || op == tau::wff_all)
 			return quantified(c.first(), c.second(),
 				op == tau::wff_all);
+		return compare(static_cast<size_t>(op), c.first(), c.second());
+	}
+
+	/// The comparison @p op between the terms @p lhs and @p rhs.
+	std::optional<bool> compare(size_t op, tref lhs, tref rhs) const {
 		if (op == tau::bf_eq || op == tau::bf_neq) {
-			auto a = term(c.first()), b = term(c.second());
+			auto a = term(lhs), b = term(rhs);
 			if (!a || !b) return std::nullopt;
 			const qlt d = *a ^ *b;
 			if (d.inexact) return std::nullopt;
 			return d.is_empty() == (op == tau::bf_eq);
 		}
-		bool strict, swap, negate = false;
+		bool strict, swap;
 		if (op == tau::bf_lt || op == tau::bf_nlt) strict = true, swap = false;
 		else if (op == tau::bf_lteq || op == tau::bf_nlteq)
 			strict = false, swap = false;
@@ -557,9 +562,9 @@ public:
 		else if (op == tau::bf_gteq || op == tau::bf_ngteq)
 			strict = false, swap = true;
 		else return std::nullopt;
-		negate = op == tau::bf_nlt || op == tau::bf_nlteq
+		const bool negate = op == tau::bf_nlt || op == tau::bf_nlteq
 			|| op == tau::bf_ngt || op == tau::bf_ngteq;
-		auto a = operand(c.first()), b = operand(c.second());
+		auto a = operand(lhs), b = operand(rhs);
 		if (!a || !b) return std::nullopt;
 		auto h = swap ? qlt_order_holds(*b, *a, strict)
 			: qlt_order_holds(*a, *b, strict);
@@ -797,9 +802,10 @@ static std::optional<bool> qlt_cells_qe(tref var, tref body, bool universal) {
 
 // `ex var body` with one other free variable y, as the set of the values of y
 // for which it holds: `U & y != 0` for U the union of the cells of y where it
-// does. A body whose constants have one named endpoint c and no other cuts Q
-// at c alone, wherever c lies, so U is spelled with c. nullptr when body has
-// another shape or a cell is undecided.
+// does. With named endpoints U is spelled with the names, and it stands only
+// when it is spelled the same for every position of the names among the
+// finite endpoints. nullptr when body has another shape, a cell is undecided
+// or U depends on where the names lie.
 template<NodeType node>
 static tref qlt_cells_residual(tref var, tref body) {
 	using tau = tree<node>;
@@ -808,36 +814,85 @@ static tref qlt_cells_residual(tref var, tref body) {
 	auto ends = qlt_point_eval<node>::ends_of(body, true);
 	if (!ends) return nullptr;
 	const auto names = qlt_point_eval<node>::names_of(body);
-	if (names.size() > 1 || (names.size() == 1 && !ends->empty()))
-		return nullptr;
+	if (names.size() > qlt_cells_max_params) return nullptr;
 	auto params = qlt_point_params<node>(var, body);
 	if (!params || params->size() != 1) return nullptr;
 	const tref y = params->front();
 	qlt_point_eval<node> ev(std::move(*ends));
-	const qlt_rational at(0, 1);
-	if (!names.empty()) ev.named.emplace_back(names.front(), at);
-	// the endpoint at c's value, spelled as c
+	// an endpoint at a name's value, spelled as the name
 	auto spelled = [&](qlt_endpoint e) {
-		if (!names.empty() && e.val.is_finite() && e.val == at)
-			e.val = qlt_rational::make_sym(names.front());
+		if (e.val.is_finite())
+			for (const auto& [name, v] : ev.named)
+				if (v == e.val) {
+					e.val = qlt_rational::make_sym(name);
+					break;
+				}
 		return e;
 	};
-	qlt sat = qlt::bottom();
-	for (const auto& c : ev.cells()) {
-		ev.env.emplace_back(y, c.point);
-		auto v = ev.quantified(var, body, false);
-		ev.env.pop_back();
-		if (!v) return nullptr;
-		if (*v) sat = sat | qlt{ { { spelled(c.piece.lo),
-			spelled(c.piece.hi) } } };
-	}
-	if (sat.is_empty()) return tau::_F();
-	if (sat.is_full()) return tau::_T();
-	if (sat.inexact) return nullptr;
-	tref values = tau::get(tau::bf, { tau::get_ba_constant(
-		typename tau::constant(sat), tau::get(y).get_ba_type()) });
-	return tau::build_bf_neq_0(tau::build_bf_and(values,
+	std::optional<std::vector<qlt_piece>> sat;
+	bool decided = true;
+	ev.each_naming(names, 0, [&] {
+		std::vector<qlt_piece> pieces;
+		bool open = false; // the last piece may still grow
+		for (const auto& c : ev.cells()) {
+			ev.env.emplace_back(y, c.point);
+			auto v = ev.quantified(var, body, false);
+			ev.env.pop_back();
+			if (!v) return decided = false;
+			if (!*v) { open = false; continue; }
+			if (open) pieces.back().hi = spelled(c.piece.hi);
+			else pieces.push_back({ spelled(c.piece.lo),
+				spelled(c.piece.hi) });
+			open = true;
+		}
+		if (sat && *sat != pieces) return decided = false;
+		sat = std::move(pieces);
+		return true;
+	});
+	if (!decided || ev.exhausted() || !sat) return nullptr;
+	if (sat->empty()) return tau::_F();
+	qlt values = qlt::bottom();
+	for (const auto& p : *sat) values = values | qlt{ { p } };
+	if (values.inexact) return nullptr;
+	if (values.is_full()) return tau::_T();
+	tref cst = tau::get(tau::bf, { tau::get_ba_constant(
+		typename tau::constant(values), tau::get(y).get_ba_type()) });
+	return tau::build_bf_neq_0(tau::build_bf_and(cst,
 		tau::get(tau::bf, y)));
+}
+
+// The truth of the comparison op between two terms without variables that
+// hold named endpoints, when it is the same for every position of the names
+// among the finite endpoints; nullopt otherwise, or when no name occurs.
+template<NodeType node>
+static std::optional<bool> qlt_named_ground_truth(size_t op, tref lhs,
+	tref rhs)
+{
+	using eval = qlt_point_eval<node>;
+	if (!get_free_vars<node>(lhs).empty()
+		|| !get_free_vars<node>(rhs).empty()) return std::nullopt;
+	auto names = eval::names_of(lhs);
+	for (auto& n : eval::names_of(rhs)) names.push_back(std::move(n));
+	std::sort(names.begin(), names.end());
+	names.erase(std::unique(names.begin(), names.end()), names.end());
+	if (names.empty() || names.size() > qlt_cells_max_params)
+		return std::nullopt;
+	auto l = eval::ends_of(lhs, true), r = eval::ends_of(rhs, true);
+	if (!l || !r) return std::nullopt;
+	l->insert(l->end(), r->begin(), r->end());
+	std::sort(l->begin(), l->end());
+	l->erase(std::unique(l->begin(), l->end()), l->end());
+	eval ev(std::move(*l));
+	std::optional<bool> verdict;
+	bool decided = true;
+	ev.each_naming(names, 0, [&] {
+		auto v = ev.compare(op, lhs, rhs);
+		if (!v || (verdict && *verdict != *v)) return decided = false;
+		verdict = v;
+		return true;
+	});
+	if (!decided || ev.exhausted()) return std::nullopt;
+	return verdict;
 }
 
 // True when body is a conjunction of disequations `var != t` with t free of

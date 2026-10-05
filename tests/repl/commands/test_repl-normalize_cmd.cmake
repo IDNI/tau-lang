@@ -418,3 +418,27 @@ add_repl_test(normalize_cmd-qlt_order_not_total
 add_repl_test(normalize_cmd-qlt_order_residual
 	"normalize ex x:qlt (x > y:qlt && x < {(0, 1)}:qlt)" ": y\\{ \\(-inf, 0\\) \\}:qlt != 0")
 
+# A named endpoint is an unknown rational: a comparison is decided only when it
+# has the same truth wherever the name lies, and otherwise kept.
+add_repl_test(normalize_cmd-qlt_named_neq_kept
+	"normalize {c}:qlt != {0}:qlt" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
+add_repl_test(normalize_cmd-qlt_named_meet_kept
+	"normalize ({c}:qlt & {0}:qlt) = 0" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
+add_repl_test(normalize_cmd-qlt_named_self
+	"normalize {c}:qlt = {c}:qlt" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_self_meet
+	"normalize ({c}:qlt & {c}:qlt') = 0" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_order_self
+	"normalize {c}:qlt < {c}:qlt" "%1[^%]*: F")
+add_repl_test(normalize_cmd-qlt_named_ex_point
+	"normalize ex x:qlt (x = {c}:qlt)" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_ex_either
+	"normalize ex x:qlt (x > {c}:qlt || x <= {c}:qlt)" "%1[^%]*: T")
+# with a finite endpoint as well the cells place c against it
+add_repl_test(normalize_cmd-qlt_named_and_finite_uniform
+	"normalize ex x:qlt (x > {c}:qlt && x > {0}:qlt)" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_and_finite_kept
+	"normalize ex x:qlt (x < {c}:qlt && x > {0}:qlt)" "%1[^%]*: ex ")
+add_repl_test(normalize_cmd-qlt_named_residual
+	"normalize ex x:qlt (x > y:qlt && x < {c}:qlt)" "%1[^%]*: y\\{ \\(-inf, c\\) \\}:qlt != 0")
+

@@ -129,6 +129,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 
+	/**
+	 * @brief False for a constant that over-approximates its value, which
+	 * an operation on a named endpoint can produce (`{c} & {0}`), or whose
+	 * pieces have an unknown order (`{c} | {0}`).
+	 */
+	static bool exact_constant(const qlt& x) {
+		return !x.inexact && !qlt_pieces_unordered(x);
+	}
+
 	static bool is_syntactic_one(const qlt& x) { return is_qlt_one(x); }
 
 	static bool is_syntactic_zero(const qlt& x) { return is_qlt_zero(x); }

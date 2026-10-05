@@ -539,9 +539,22 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	return tau::get_raw(v, ch, len, right);
 }
 
+// False when the owning BA reports the folded constant @p c as inexact; the
+// fold then keeps its term (see ba_has_exact_constant).
 template <NodeType node>
-tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, tref right)
+static bool folds_exactly(const auto& c) {
+	return std::visit([](const auto& a) {
+		using BA = std::decay_t<decltype(a)>;
+		if constexpr (ba_has_exact_constant<node, BA>)
+			return static_cast<bool>(
+				ba_descriptor<BA, node>::exact_constant(a));
+		else return true;
+	}, c);
+}
+
+template <NodeType node>
+tref get_hook<node>::cte_or(const node& v, const tref* ch, size_t len,
+	tref right)
 {
 	HOOK_LOGGING(log("cte_or", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -554,12 +567,13 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
 	auto nr = node::ba::normalize(l | r);
 	auto n = nr.has_value() ? nr.value() : (l | r);
+	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, tref right)
+tref get_hook<node>::cte_and(const node& v, const tref* ch, size_t len,
+	tref right)
 {
 	HOOK_LOGGING(log("cte_and", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -572,12 +586,13 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
 	auto nr = node::ba::normalize(l & r);
 	auto n = nr.has_value() ? nr.value() : (l & r);
+	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, tref right)
+tref get_hook<node>::cte_xor(const node& v, const tref* ch, size_t len,
+	tref right)
 {
 	HOOK_LOGGING(log("cte_xor", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -590,12 +605,13 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
 	auto nr = node::ba::normalize(l ^ r);
 	auto n = nr.has_value() ? nr.value() : (l ^ r);
+	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, tref right)
+tref get_hook<node>::cte_neg(const node& v, const tref* ch, size_t len,
+	tref right)
 {
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -611,6 +627,7 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
 	auto nr = node::ba::normalize(~l);
 	auto n = nr.has_value() ? nr.value() : (~l);
+	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);
 }
 

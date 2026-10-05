@@ -310,6 +310,22 @@ concept ba_has_literal_incomplete = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::literal_incomplete(s) }
 			-> std::convertible_to<bool>; };
 
+/**
+ * @brief `true` when @p BA can tell whether a constant is exact.
+ *
+ * Optional capability: a constant whose value depends on an unknown part (qlt's
+ * named endpoints) may be an over-approximation, and folding two constants
+ * into such a value would decide comparisons the operands do not decide. Core
+ * keeps the operation as a term when `exact_constant` answers false. Probed at
+ * the point of use, like `print_constant`; absent means every constant is
+ * exact.
+ */
+template <typename Node, typename BA>
+concept ba_has_exact_constant = ba_has_descriptor_v<Node, BA>
+	&& requires(const BA& x) {
+		{ ba_descriptor<BA, Node>::exact_constant(x) }
+			-> std::convertible_to<bool>; };
+
 template <typename Node, typename BA>
 concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(std::ostream& os, const BA& x) {

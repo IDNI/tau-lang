@@ -112,6 +112,11 @@ static std::optional<qlt_order_side> qlt_constant_side(const tree<node>& c) {
 	return qlt_order_side{ 0, q };
 }
 
+// Defined in qlt_qe.tmpl.h, which the descriptor includes after this file.
+template<NodeType node>
+static std::optional<bool> qlt_named_ground_truth(size_t op, tref lhs,
+	tref rhs);
+
 template <typename... PackBAs>
 struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -139,11 +144,24 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 		return tau::get(value ? tau::_T() : tau::_F(), r);
 	}
 
+	/**
+	 * @brief A comparison of terms without variables that hold named
+	 * endpoints, decided when it has the same truth wherever the names lie.
+	 */
+	static tref named(const tref* ch, tref r) {
+		const auto& c = tau::get(ch[0]);
+		auto h = qlt_named_ground_truth<node_t>(
+			static_cast<size_t>(c.value.nt), c.first(), c.second());
+		if (!h) return nullptr;
+		return decide(ch, r, *h);
+	}
+
 	// `lhs < rhs` (strict) or `lhs <= rhs`, with the sides swapped for
 	// > and >= and the verdict negated for the n-forms.
 	static tref eval(const tref* ch, tref r, bool swap, bool strict,
 		bool negate)
 	{
+		if (tref d = named(ch, r)) return d;
 		auto a = qlt_constant_side<node_t>(arg1_hook(ch));
 		auto b = qlt_constant_side<node_t>(arg2_hook(ch));
 		if (!a || !b) return nullptr;
@@ -186,6 +204,7 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	 * a point.
 	 */
 	static tref end_eq(const tref* ch, tref r, bool is_eq) {
+		if (tref d = named(ch, r)) return d;
 		const auto& a = arg1_hook(ch);
 		const auto& b = arg2_hook(ch);
 		auto is_end = [](const tree<node_t>& t) {
