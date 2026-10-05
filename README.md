@@ -2329,7 +2329,9 @@ only when it has the same truth wherever the names lie among the other
 endpoints, so `{c}:qlt = {c}:qlt` is `T` and `ex x (x = {c}:qlt)` is `T`, while
 `{c}:qlt != {0}:qlt` and `({c}:qlt & {0}:qlt) = 0` stay as they are (c may be
 0).  An operation whose result would depend on where a name lies is kept as a
-term instead of being folded into one constant.
+term instead of being folded into one constant.  This is decided atom by atom,
+so a Boolean combination of such atoms that holds wherever the names lie
+(`{c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt`) still stays as it is.
 
 An order atom against a constant reads every point of it: `x < c` holds when
 `x` is below every point of `c` (below `inf c`, or at it when `c` does not
@@ -3900,6 +3902,7 @@ carries the same budgets and switches under the camelCase form of those names
 `tau.setPreprocessing(false)`, `tau.setMaxConstantSize(n)`, `tau.trefCount()`,
 ...), reads the constant size budget back with `tau.getMaxConstantSize()`, and
 carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
+`tau.setBaOption("qlt-cells-budget", 0)`,
 `tau.getBaOption(name)`, which return the value now in force, or `null` with
 the reason in `tau.getLastError()` when the build declares no such option).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route
@@ -3957,6 +3960,14 @@ This is a short list of known issues that will be fixed in a subsequent release:
     verdicts are not reliable.
   * **Algorithm A** is intentionally restricted to pure-output formulas. If
     input variables are present, the dispatcher uses Algorithm B.
+* `qlt`:
+  * Algorithms A and B read an equality between a stream and an interval
+    constant (`o1[t] = {[0,1]}:qlt`) as membership of the point in the
+    interval, whereas everywhere else it holds only when the constant is that
+    single point.
+  * Ground formulas over named endpoints are decided atom by atom (see the
+    `qlt` section), so a combination that holds for every position of the
+    names can stay undecided.
 
 
 # **Future work**
@@ -3972,7 +3983,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
   the current DeepSeek oracle.
 * **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
   over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
-  are supported, the dedicated DLO QE path handles the `qlt` ω-categorical theory,
+  are supported, qlt's elimination by cells handles the `qlt` ω-categorical theory,
   and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
 * **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
   game (Zielonka's recursive algorithm over priorities derived from the Büchi,
