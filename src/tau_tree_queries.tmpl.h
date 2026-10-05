@@ -190,6 +190,23 @@ bool is_point_term(size_t ba_type, tref term) {
 	return pack_dense_order_compare<node>(ba_type, term, term) == 0;
 }
 
+template <NodeType node>
+bool order_is_total(tref a, tref b) {
+	using tau = tree<node>;
+	auto set_constant = [](tref t, size_t type) {
+		const auto& x = tau::get(t);
+		return x.has_child() && x[0].is_ba_constant()
+			&& !is_point_term<node>(type, t);
+	};
+	for (tref t : { a, b }) {
+		const size_t type = tau::get(t).get_ba_type();
+		if (type && pack_type_is_non_aba_omcat<node>(type)
+			&& (set_constant(a, type) || set_constant(b, type)))
+			return false;
+	}
+	return true;
+}
+
 // Returns true if n is a wff wrapping an atomic Boolean formula predicate.
 // Note: bf_interval and wff_ref are deliberately excluded as they are not
 // treated as atomic predicates for normalization purposes.

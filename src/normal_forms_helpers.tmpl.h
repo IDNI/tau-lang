@@ -80,6 +80,28 @@ tref normalize_atomic_formula_operators(tref fm) {
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& c = tau::get(n)[0];
+		// Where the order is not total on the operands, `>=` is not the
+		// negation of `<`: only swaps and explicit negations apply.
+		const auto nt = c.value.nt;
+		if ((nt == tau::bf_nlteq || nt == tau::bf_nlt
+			|| nt == tau::bf_gteq || nt == tau::bf_gt
+			|| nt == tau::bf_ngteq || nt == tau::bf_ngt)
+			&& !order_is_total<node>(c.first(), c.second()))
+			switch (c.value.nt) {
+			case tau::bf_nlteq: return tau::build_wff_neg(
+				tau::build_bf_lteq(c.first(), c.second()));
+			case tau::bf_nlt: return tau::build_wff_neg(
+				tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gteq:
+				return tau::build_bf_lteq(c.second(), c.first());
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq: return tau::build_wff_neg(
+				tau::build_bf_lteq(c.second(), c.first()));
+			case tau::bf_ngt: return tau::build_wff_neg(
+				tau::build_bf_lt(c.second(), c.first()));
+			default: return n;
+			}
 		switch (c.value.nt) {
 			case tau::bf_neq:
 				return tau::build_wff_neg(

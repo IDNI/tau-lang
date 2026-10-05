@@ -2316,9 +2316,15 @@ no least or greatest choice, so `--min` and `--max` give a point as well.
 `always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
 strategy exists, `run` says the specification is unrealizable.
 
-An order atom against a constant that is not a single point
-(`x < {(0, 1)}:qlt`) is not given a meaning: it is never decided, and a
-quantifier over it keeps its binder.
+An order atom against a constant reads every point of it: `x < c` holds when
+`x` is below every point of `c` (below `inf c`, or at it when `c` does not
+hold it), `x <= c` when `x` is at most every point, and `x > c`, `x >= c`
+dually against `sup c`; for a constant that is one point this is the usual
+order.  Between two constants every point of the left side is compared with
+every point of the right, so `{[0,1]}:qlt <= {[0,1]}:qlt` is `F`.  Such a
+comparison is not total: `x >= c` is not the negation of `x < c`, and core
+keeps the two apart.  An empty constant is the typed `0`, which stays the
+order's lower end.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 

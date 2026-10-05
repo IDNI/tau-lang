@@ -419,7 +419,8 @@ inline qlt point_set(const qlt_rational& v) {
  * Reads Boolean connectives, quantifiers over qlt variables (decided by
  * cells), `=` and `!=` between Boolean combinations of qlt constants,
  * variables and the typed 0 and 1, and the order atoms between variables,
- * single-point constants and the typed 0 and 1. A named endpoint is read
+ * constants and the typed 0 and 1 (every point of one side below every point
+ * of the other, see qlt_order_holds). A named endpoint is read
  * through its value in @ref named. Anything else, a variable or a name
  * without a value or a spent budget is nullopt.
  */
@@ -547,23 +548,23 @@ public:
 			if (d.inexact) return std::nullopt;
 			return d.is_empty() == (op == tau::bf_eq);
 		}
-		std::optional<bool> lt, eq;
-		if (op == tau::bf_lt || op == tau::bf_ngteq) lt = true, eq = false;
-		else if (op == tau::bf_lteq || op == tau::bf_ngt)
-			lt = true, eq = true;
-		else if (op == tau::bf_gt || op == tau::bf_nlteq)
-			lt = false, eq = false;
-		else if (op == tau::bf_gteq || op == tau::bf_nlt)
-			lt = false, eq = true;
+		bool strict, swap, negate = false;
+		if (op == tau::bf_lt || op == tau::bf_nlt) strict = true, swap = false;
+		else if (op == tau::bf_lteq || op == tau::bf_nlteq)
+			strict = false, swap = false;
+		else if (op == tau::bf_gt || op == tau::bf_ngt)
+			strict = true, swap = true;
+		else if (op == tau::bf_gteq || op == tau::bf_ngteq)
+			strict = false, swap = true;
 		else return std::nullopt;
+		negate = op == tau::bf_nlt || op == tau::bf_nlteq
+			|| op == tau::bf_ngt || op == tau::bf_ngteq;
 		auto a = operand(c.first()), b = operand(c.second());
 		if (!a || !b) return std::nullopt;
-		const int cmp = a->first != b->first
-			? (a->first < b->first ? -1 : 1)
-			: a->first ? 0
-			: a->second < b->second ? -1 : b->second < a->second ? 1 : 0;
-		if (cmp == 0) return *eq;
-		return (cmp < 0) == *lt;
+		auto h = swap ? qlt_order_holds(*b, *a, strict)
+			: qlt_order_holds(*a, *b, strict);
+		if (!h) return std::nullopt;
+		return *h != negate;
 	}
 
 	/// `all var body` when @p universal, `ex var body` otherwise.
@@ -685,32 +686,23 @@ private:
 		return r;
 	}
 
-	// An operand of an order atom: -1 for the typed 0 (below every point),
-	// +1 for the typed 1 (above), 0 with the point otherwise.
-	std::optional<std::pair<int, qlt_rational>> operand(tref n) const {
+	// A side of an order atom: the typed 0 or 1, a variable as the set
+	// holding its point, or a constant with its named endpoints valued.
+	std::optional<qlt_order_side> operand(tref n) const {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
 		const auto& c = t[0];
-		if (c.is(tau::bf_f)) return std::pair{ -1, qlt_rational() };
-		if (c.is(tau::bf_t)) return std::pair{ 1, qlt_rational() };
 		if (c.is(tau::variable)) {
 			auto v = value_of(t.first());
 			if (!v) return std::nullopt;
-			return std::pair{ 0, *v };
+			return qlt_order_side{ 0,
+				qlt_cells_detail::point_set(*v) };
 		}
-		if (!c.is_ba_constant()) return std::nullopt;
-		auto v = c.get_ba_constant();
-		if (!std::holds_alternative<qlt>(v)) return std::nullopt;
-		const qlt& q = std::get<qlt>(v);
-		if (q.inexact || q.pieces.size() != 1) return std::nullopt;
-		const auto& p = q.pieces[0];
-		if (p.lo.val.is_pos_inf() || p.lo.val.is_neg_inf()
-			|| p.lo.val != p.hi.val
-			|| p.lo.bound != qlt_bound::CLOSED
-			|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
-		auto pt = value_of(p.lo.val);
-		if (!pt) return std::nullopt;
-		return std::pair{ 0, *pt };
+		auto side = qlt_constant_side<node>(c);
+		if (!side || side->end) return side;
+		auto q = resolved(side->points);
+		if (!q) return std::nullopt;
+		return qlt_order_side{ 0, std::move(*q) };
 	}
 };
 
@@ -943,8 +935,25 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		const auto& st = tau::get(side);
 		return st.has_child() && (st[0].is(tau::bf_f) || st[0].is(tau::bf_t));
 	};
+	// A term denoting a point: a variable or a single-point constant.
+	auto is_point = [](tref term) {
+		const auto& t = tau::get(term);
+		if (!t.is(tau::bf) || !t.has_child()) return false;
+		if (t[0].is(tau::variable)) return true;
+		if (!t[0].is_ba_constant()) return false;
+		auto v = t[0].get_ba_constant();
+		if (!std::holds_alternative<qlt>(v)) return false;
+		const qlt& q = std::get<qlt>(v);
+		return !q.inexact && q.pieces.size() == 1
+			&& q.pieces[0].lo.val.is_finite()
+			&& q.pieces[0].lo.val == q.pieces[0].hi.val
+			&& q.pieces[0].lo.bound == qlt_bound::CLOSED
+			&& q.pieces[0].hi.bound == qlt_bound::CLOSED;
+	};
 	// A bound on var read off one atom, normalised to `var op other` with
-	// op among <, <=, >, >= and =; nullopt for any other atom.
+	// op among <, <=, >, >= and =; nullopt for any other atom. A
+	// bound must be a point: against a constant holding several points the
+	// order reads every one of them.
 	struct bound { typename node::T op; tref other; };
 	auto read_bound = [&](tref n) -> std::optional<bound> {
 		const auto& t = tau::get(n);
@@ -972,7 +981,7 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		if (in_l == in_r) return std::nullopt;
 		if (!is_bare_var(in_l ? lhs : rhs)) return std::nullopt;
 		tref other = in_l ? rhs : lhs;
-		if (is_sentinel(other)) return std::nullopt;
+		if (is_sentinel(other) || !is_point(other)) return std::nullopt;
 		// Normalise to `var op other`.
 		if (in_r) {
 			if      (op == tau::bf_lt)   op = tau::bf_gt;
@@ -997,24 +1006,9 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		else conjs.push_back(n);
 	};
 	flatten(inner);
-	// ex var (var = t && phi) == phi[var := t], and t <= var <= t is var = t,
-	// for a term t denoting a point: a variable or a single-point constant.
+	// ex var (var = t && phi) == phi[var := t], and t <= var <= t is var = t.
 	// The pin must not be rebound inside the scope, or substituting it there
 	// would capture it.
-	auto is_point = [](tref term) {
-		const auto& t = tau::get(term);
-		if (!t.is(tau::bf) || !t.has_child()) return false;
-		if (t[0].is(tau::variable)) return true;
-		if (!t[0].is_ba_constant()) return false;
-		auto v = t[0].get_ba_constant();
-		if (!std::holds_alternative<qlt>(v)) return false;
-		const qlt& q = std::get<qlt>(v);
-		return !q.inexact && q.pieces.size() == 1
-			&& q.pieces[0].lo.val.is_finite()
-			&& q.pieces[0].lo.val == q.pieces[0].hi.val
-			&& q.pieces[0].lo.bound == qlt_bound::CLOSED
-			&& q.pieces[0].hi.bound == qlt_bound::CLOSED;
-	};
 	auto rebinds = [&](tref term) {
 		for (tref v : get_free_vars<node>(term))
 			if (tau::get(inner).find_top([&](tref m) {

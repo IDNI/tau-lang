@@ -1201,6 +1201,15 @@ bool is_atomic_fm(tref n);
 template <NodeType node>
 bool is_point_term(size_t ba_type, tref term);
 
+/**
+ * @brief Return `false` if @p a and @p b compare in a non-ABA
+ * omega-categorical type and one of them is a constant that is not one point.
+ * Such a comparison reads every point of the constant, so the laws of a total
+ * order (`a >= b` is `!(a < b)`, `a <= a`) do not hold for it.
+ */
+template <NodeType node>
+bool order_is_total(tref a, tref b);
+
 /** @brief Return `true` if @p n is a CLI command node. */
 template <NodeType node>
 bool is_cli_cmd(tref n);

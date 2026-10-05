@@ -5,8 +5,9 @@
  * @brief qlt's comparison hooks, reached by core through ba_wff_hooks.
  *
  * qlt is a dense linear order, so a comparison of two ground constants decides
- * outright; anything else stays an atom for the QE and solver path, which core
- * does by passing the node through unchanged. The typed 0 and 1 are the order's
+ * outright (every point of one side below every point of the other); anything
+ * else stays an atom for the QE and solver path, which core does by passing
+ * the node through unchanged. The typed 0 and 1 are the order's
  * ends, not points, so a variable's equality with either decides as well.
  */
 
@@ -60,6 +61,57 @@ static std::optional<int> qlt_singleton_cmp(
 	return 0;
 }
 
+/**
+ * @brief One side of an order comparison: the typed 0 (`end` -1, below every
+ * point), the typed 1 (`end` 1, above every point), or a set of points
+ * (`end` 0), a variable being the set holding its point.
+ */
+struct qlt_order_side {
+	int end = 0;
+	qlt points;
+};
+
+/**
+ * @brief `a < b` (@p strict) or `a <= b` between two sides: every point of
+ * @p a is below (at most) every point of @p b, so an empty side makes it
+ * true. nullopt when an end needed is a named endpoint.
+ */
+inline std::optional<bool> qlt_order_holds(const qlt_order_side& a,
+	const qlt_order_side& b, bool strict)
+{
+	if (a.end == -1 || b.end == 1)
+		return !(strict && a.end == b.end);
+	if (a.end == 1) return b.end == 0 && b.points.is_empty();
+	if (b.end == -1) return a.points.is_empty();
+	if (a.points.is_empty() || b.points.is_empty()) return true;
+	const qlt_endpoint& hi = a.points.pieces.back().hi;
+	const qlt_endpoint& lo = b.points.pieces.front().lo;
+	if (hi.val.is_sym() || lo.val.is_sym()) return std::nullopt;
+	const auto c = qlt_sem_cmp(hi.val, lo.val);
+	if (c == std::partial_ordering::less) return true;
+	if (c == std::partial_ordering::greater) return false;
+	if (c != std::partial_ordering::equivalent) return std::nullopt;
+	return !strict || hi.bound == qlt_bound::OPEN
+		|| lo.bound == qlt_bound::OPEN;
+}
+
+/**
+ * @brief The side a constant, the typed 0 or the typed 1 gives a comparison;
+ * nullopt for anything else or an inexact constant.
+ */
+template<NodeType node>
+static std::optional<qlt_order_side> qlt_constant_side(const tree<node>& c) {
+	using tau = tree<node>;
+	if (c.is(tau::bf_f)) return qlt_order_side{ -1, {} };
+	if (c.is(tau::bf_t)) return qlt_order_side{ 1, {} };
+	if (!c.is_ba_constant()) return std::nullopt;
+	auto v = c.get_ba_constant();
+	if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+	const qlt& q = std::get<qlt>(v);
+	if (q.inexact) return std::nullopt;
+	return qlt_order_side{ 0, q };
+}
+
 template <typename... PackBAs>
 struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -87,36 +139,43 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 		return tau::get(value ? tau::_T() : tau::_F(), r);
 	}
 
-	static tref eval(const tref* ch, tref r, auto holds) {
-		auto cmp = qlt_singleton_cmp<node_t>(
-			arg1_hook(ch), arg2_hook(ch));
-		if (!cmp) return nullptr;
-		return decide(ch, r, holds(*cmp));
+	// `lhs < rhs` (strict) or `lhs <= rhs`, with the sides swapped for
+	// > and >= and the verdict negated for the n-forms.
+	static tref eval(const tref* ch, tref r, bool swap, bool strict,
+		bool negate)
+	{
+		auto a = qlt_constant_side<node_t>(arg1_hook(ch));
+		auto b = qlt_constant_side<node_t>(arg2_hook(ch));
+		if (!a || !b) return nullptr;
+		auto h = swap ? qlt_order_holds(*b, *a, strict)
+			: qlt_order_holds(*a, *b, strict);
+		if (!h) return nullptr;
+		return decide(ch, r, *h != negate);
 	}
 
 	static tref wff_lt(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c < 0; });
+		return eval(ch, r, false, true, false);
 	}
 	static tref wff_nlt(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c >= 0; });
+		return eval(ch, r, false, true, true);
 	}
 	static tref wff_lteq(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c <= 0; });
+		return eval(ch, r, false, false, false);
 	}
 	static tref wff_nlteq(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c > 0; });
+		return eval(ch, r, false, false, true);
 	}
 	static tref wff_gt(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c > 0; });
+		return eval(ch, r, true, true, false);
 	}
 	static tref wff_ngt(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c <= 0; });
+		return eval(ch, r, true, true, true);
 	}
 	static tref wff_gteq(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c >= 0; });
+		return eval(ch, r, true, false, false);
 	}
 	static tref wff_ngteq(const tref* ch, tref r) {
-		return eval(ch, r, [](int c) { return c < 0; });
+		return eval(ch, r, true, false, true);
 	}
 
 	/**

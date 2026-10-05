@@ -379,3 +379,42 @@ add_repl_test(normalize_cmd-qlt_points_qelim
 	"qelim ex x:qlt (x = {[0,1]}:qlt)" ": F")
 add_repl_test(normalize_cmd-qlt_points_sat
 	"sat ex x:qlt (x = {[0,1]}:qlt)" ": F")
+
+# An order against a constant reads every point of it: x < c holds when x is
+# below every point of c, x > c when above every point, and between two
+# constants every point of the left side against every point of the right.
+add_repl_test(normalize_cmd-qlt_order_constants_lt_open
+	"normalize {[0,1]}:qlt < {(1,2)}:qlt" ": T")
+add_repl_test(normalize_cmd-qlt_order_constants_lt_closed
+	"normalize {[0,1]}:qlt < {[1,2)}:qlt" ": F")
+add_repl_test(normalize_cmd-qlt_order_constants_lteq
+	"normalize {[0,1]}:qlt <= {[1,2)}:qlt" ": T")
+add_repl_test(normalize_cmd-qlt_order_constants_lteq_self
+	"normalize {[0,1]}:qlt <= {[0,1]}:qlt" ": F")
+add_repl_test(normalize_cmd-qlt_order_constants_point_self
+	"normalize {1}:qlt <= {1}:qlt" ": T")
+add_repl_test(normalize_cmd-qlt_order_constants_gt_union
+	"normalize {[0,1] | [5,6]}:qlt > {(-1,0)}:qlt" ": T")
+add_repl_test(normalize_cmd-qlt_order_constants_gteq_union
+	"normalize {[0,1] | [5,6]}:qlt >= {[2,3]}:qlt" ": F")
+add_repl_test(normalize_cmd-qlt_order_lt_open
+	"normalize ex x:qlt (x < {(0,1)}:qlt && x >= {0}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_order_lt_closed
+	"normalize ex x:qlt (x < {[0,1]}:qlt && x >= {0}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_lteq_open
+	"normalize ex x:qlt ({0}:qlt < x && x <= {(0,1]}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_lteq_below
+	"normalize ex x:qlt ({-1}:qlt < x && x <= {(0,1]}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_order_gt_union_closed
+	"normalize ex x:qlt (x > {(0,1) | [2,3]}:qlt && x <= {3}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_gt_union_open
+	"normalize ex x:qlt (x > {(0,1) | [2,3)}:qlt && x <= {3}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_order_gteq_closed
+	"normalize ex x:qlt (x >= {[0,1]}:qlt && x < {1}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_gteq_open
+	"normalize ex x:qlt (x >= {[0,1)}:qlt && x <= {1}:qlt)" ": T")
+add_repl_test(normalize_cmd-qlt_order_not_total
+	"normalize all x:qlt (x > {(0,1)}:qlt || x <= {(0,1)}:qlt)" ": F")
+add_repl_test(normalize_cmd-qlt_order_residual
+	"normalize ex x:qlt (x > y:qlt && x < {(0, 1)}:qlt)" ": y\\{ \\(-inf, 0\\) \\}:qlt != 0")
+

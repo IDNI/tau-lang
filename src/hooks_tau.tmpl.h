@@ -432,7 +432,10 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("0 <= $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
-	if (arg1_fm(ch) == arg2_fm(ch)) {
+	// Reflexive only where the order is total on the operands.
+	if (arg1_fm(ch) == arg2_fm(ch)
+		&& order_is_total<node>(arg1_fm(ch).get(), arg2_fm(ch).get()))
+	{
 		HOOK_LOGGING(applied("$X <= $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
@@ -485,7 +488,10 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 		HOOK_LOGGING(applied("0 !<= $X ::= F.");)
 		return _F(v, ch, len, r);
 	}
-	if (arg1_fm(ch) == arg2_fm(ch)) {
+	// Reflexive only where the order is total on the operands.
+	if (arg1_fm(ch) == arg2_fm(ch)
+		&& order_is_total<node>(arg1_fm(ch).get(), arg2_fm(ch).get()))
+	{
 		HOOK_LOGGING(applied("$X !<= $X ::= F.");)
 		return _F(v, ch, len, r);
 	}
@@ -648,7 +654,10 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("1 >= $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
-	if (arg1_fm(ch) == arg2_fm(ch)) {
+	// Reflexive only where the order is total on the operands.
+	if (arg1_fm(ch) == arg2_fm(ch)
+		&& order_is_total<node>(arg1_fm(ch).get(), arg2_fm(ch).get()))
+	{
 		HOOK_LOGGING(applied("$X >= $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
@@ -701,7 +710,10 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 		HOOK_LOGGING(applied("1 !>= $X ::= F.");)
 		return _F(v, ch, len, r);
 	}
-	if (arg1_fm(ch) == arg2_fm(ch)) {
+	// Reflexive only where the order is total on the operands.
+	if (arg1_fm(ch) == arg2_fm(ch)
+		&& order_is_total<node>(arg1_fm(ch).get(), arg2_fm(ch).get()))
+	{
 		HOOK_LOGGING(applied("$X !>= $X ::= F.");)
 		return _F(v, ch, len, r);
 	}

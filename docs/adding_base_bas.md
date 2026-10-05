@@ -133,6 +133,9 @@ binder when both decline: no Boolean-algebra law reaches it, since
 and both `solve` and the substitution heuristics put a variable of your type
 equal to a term only when the term is a point: another variable, or a
 constant your `dense_order_compare` orders against itself.
+A comparison with a constant that is not such a point is not read with the
+laws of a total order (`order_is_total`): `a >= b` stays `b <= a` rather than
+`!(a < b)`, and `a <= a` is left to your hooks.
 
 `is_one`, `is_zero`, `is_closed`, `normalize`, `splitter`, and
 `simplify_term` can each run a full decision or rewrite procedure. Each one

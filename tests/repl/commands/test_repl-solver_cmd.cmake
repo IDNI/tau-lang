@@ -130,6 +130,13 @@ add_repl_test(solver_cmd-qlt-solve-undecided_atom
 	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "UNKNOWN: the qlt point solver could not decide")
 add_repl_test(solver_cmd-qlt-solve-undecided_named
 	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide")
+# x >= c puts x at or above every point of c.
+add_repl_test(solver_cmd-qlt-solve-gteq_interval
+	"solve x:qlt >= {[0,1]}:qlt && x < {2}:qlt." "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-gt_halfopen
+	"solve x:qlt > {[0,1)}:qlt && x <= {1}:qlt." "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-lt_interval
+	"solve x:qlt < {(0,1)}:qlt && x > {-1}:qlt." "x := \\{ 0 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-equals_point
 	"solve x:qlt = {1/2}:qlt." "x := \\{ 1/2 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-membership_and_order
