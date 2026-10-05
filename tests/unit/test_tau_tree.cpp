@@ -1522,7 +1522,7 @@ TEST_SUITE("tree printers") {
 
 	TEST_CASE("a ba_constant node with an id outside the pool prints INVALID") {
 		std::stringstream ss;
-		ss << node_t::ba_constant(size_t(1) << 40, tau_type_id<node_t>());
+		ss << node_t::ba_constant(size_t(1) << 30, tau_type_id<node_t>());
 		CHECK( ss.str().find("{ INVALID }") != std::string::npos );
 	}
 
