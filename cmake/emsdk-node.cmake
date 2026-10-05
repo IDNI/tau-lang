@@ -48,7 +48,21 @@ function(tau_resolve_emsdk_node)
 	endif()
 	set(NODE_EXECUTABLE "${_node}" CACHE FILEPATH
 		"node that runs the wasm tests" FORCE)
-	set(CMAKE_CROSSCOMPILING_EMULATOR "${_node}" CACHE FILEPATH
+	# The CLI links -sJSPI; a node that ships JSPI behind a flag (node 24)
+	# fails its module at load without it.
+	set(_jspi_probe "process.exit(typeof WebAssembly.Suspending==='function'?0:1)")
+	set(_emulator "${_node}")
+	execute_process(COMMAND "${_node}" -e "${_jspi_probe}"
+		RESULT_VARIABLE _jspi_default OUTPUT_QUIET ERROR_QUIET)
+	if(NOT _jspi_default EQUAL 0)
+		execute_process(COMMAND "${_node}" --experimental-wasm-jspi
+			-e "${_jspi_probe}"
+			RESULT_VARIABLE _jspi_flag OUTPUT_QUIET ERROR_QUIET)
+		if(_jspi_flag EQUAL 0)
+			list(APPEND _emulator --experimental-wasm-jspi)
+		endif()
+	endif()
+	set(CMAKE_CROSSCOMPILING_EMULATOR "${_emulator}" CACHE STRING
 		"Path to the emulator for the target system." FORCE)
-	message(STATUS "wasm tests run under ${_node}")
+	message(STATUS "wasm tests run under ${_emulator}")
 endfunction()
