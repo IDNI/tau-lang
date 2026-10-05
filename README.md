@@ -956,7 +956,11 @@ REPL, and are present when that algebra is in the pack: `qlt` declares
 `--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at most 30,
 `TAU_QLT_T3_CAP`) and `--qlt-const-output-max` (constant-output assignments
 the fast path in front of Algorithm B enumerates, default 100,
-`TAU_QLT_CONST_OUTPUT_MAX`); `nlang` declares `--nlang-http-timeout`
+`TAU_QLT_CONST_OUTPUT_MAX`), `--qlt-cells-budget` (formula instances one
+decision by cells evaluates before it is left open, default 65536,
+`TAU_QLT_CELLS_BUDGET`) and `--qlt-cells-max-params` (other free variables,
+and named endpoints, such a decision ranges over, default 2,
+`TAU_QLT_CELLS_MAX_PARAMS`); `nlang` declares `--nlang-http-timeout`
 (seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`).
 
 **Other environment variables.** Three Boolean switches keep an environment
@@ -2302,7 +2306,10 @@ With one other free variable `y` the result is the set of the points of `y`
 for which the body holds: `ex x (x > y && ({[0,1]}:qlt & x) != 0)` is
 `y{ (-inf, 1) }:qlt != 0`.  An order atom between two variables is
 eliminated by the dense-order rules (`ex x (a < x && x < b)` is `a < b`).
-When none of these applies the binder stays.
+When none of these applies the binder stays.  A decision by cells evaluates
+at most `--qlt-cells-budget` instances and ranges over at most
+`--qlt-cells-max-params` other free variables or named endpoints; past either
+it is left open (the binder stays, `solve` answers `UNKNOWN`).
 
 `solve`, `run` and a program of `tau compile` give every `qlt` variable or
 output one rational, never `top`, `bot` or an interval: qlt's own solver

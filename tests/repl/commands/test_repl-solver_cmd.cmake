@@ -137,6 +137,12 @@ add_repl_test(solver_cmd-qlt-solve-gt_halfopen
 	"solve x:qlt > {[0,1)}:qlt && x <= {1}:qlt." "x := \\{ 1 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-lt_interval
 	"solve x:qlt < {(0,1)}:qlt && x > {-1}:qlt." "x := \\{ 0 \\}:qlt")
+# A spent cell budget leaves the system undecided, not unsatisfiable.
+add_repl_test(solver_cmd-qlt-solve-budget_spent
+	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "UNKNOWN: the qlt point solver could not decide the system: the cell budget is spent"
+	FLAGS --qlt-cells-budget 1)
+add_repl_test(solver_cmd-qlt-solve-budget_enough
+	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "no solution")
 add_repl_test(solver_cmd-qlt-solve-equals_point
 	"solve x:qlt = {1/2}:qlt." "x := \\{ 1/2 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-membership_and_order

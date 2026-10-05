@@ -208,6 +208,18 @@ add_repl_test(ltl_env-qlt_const_output_max_env_is_the_fallback
 add_repl_test(ltl_env-qlt_const_output_max_flag_beats_env
 	"get qlt-const-output-max" "qlt-const-output-max: *3" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_QLT_CONST_OUTPUT_MAX=4 FLAGS --qlt-const-output-max 3)
+add_repl_test(ltl_env-qlt_cells_budget_env_is_the_fallback
+	"get qlt-cells-budget" "qlt-cells-budget: *77" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CELLS_BUDGET=77)
+add_repl_test(ltl_env-qlt_cells_budget_flag_beats_env
+	"get qlt-cells-budget" "qlt-cells-budget: *5" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CELLS_BUDGET=77 FLAGS --qlt-cells-budget 5)
+add_repl_test(ltl_env-qlt_cells_max_params_env_is_the_fallback
+	"get qlt-cells-max-params" "qlt-cells-max-params: *3" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CELLS_MAX_PARAMS=3)
+add_repl_test(ltl_env-qlt_cells_max_params_flag_beats_env
+	"get qlt-cells-max-params" "qlt-cells-max-params: *1" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_QLT_CELLS_MAX_PARAMS=3 FLAGS --qlt-cells-max-params 1)
 add_repl_test(ltl_env-nlang_http_timeout_env_is_the_fallback
 	"get nlang-http-timeout" "nlang-http-timeout: *9" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_NLANG_HTTP_TIMEOUT=9)

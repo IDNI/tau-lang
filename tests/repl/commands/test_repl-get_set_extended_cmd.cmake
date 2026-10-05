@@ -79,6 +79,10 @@ add_repl_test(help_set_lists_ltldatagamemaxnodes "help set" "ltldatagamemaxnodes
 add_repl_test(help_set_lists_ltldatagamemaxmemo  "help set" "ltldatagamemaxmemo")
 add_repl_test(get_cmd-qlt_const_output_max "get qlt-const-output-max"   "qlt-const-output-max: *100")
 add_repl_test(set_cmd-qlt_const_output_max "set qlt-const-output-max 7" "qlt-const-output-max: *7")
+add_repl_test(get_cmd-qlt_cells_budget "get qlt-cells-budget"   "qlt-cells-budget: *65536")
+add_repl_test(set_cmd-qlt_cells_budget "set qlt-cells-budget 9" "qlt-cells-budget: *9")
+add_repl_test(get_cmd-qlt_cells_max_params "get qlt-cells-max-params"   "qlt-cells-max-params: *2")
+add_repl_test(set_cmd-qlt_cells_max_params "set qlt-cells-max-params 3" "qlt-cells-max-params: *3")
 
 # GitHub #121: the solver's lgrs-route variable cap is a count option.
 add_repl_test(get_cmd-lgrsmaxvars           "get lgrsmaxvars"        "lgrsmaxvars: *8")

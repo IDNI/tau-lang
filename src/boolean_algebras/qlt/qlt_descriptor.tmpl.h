@@ -90,15 +90,27 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static void set_const_output_max_option(size_t n) {
 		qlt_const_output_max_param = (long) n;
 	}
+	static size_t get_cells_budget_option() { return qlt_cells_budget(); }
+	static void set_cells_budget_option(size_t n) {
+		qlt_cells_budget_param = (long) n;
+	}
+	static size_t get_cells_max_params_option() {
+		return qlt_cells_max_params();
+	}
+	static void set_cells_max_params_option(size_t n) {
+		qlt_cells_max_params_param = (long) n;
+	}
 	/// @}
 
 	/**
 	 * @brief The options qlt declares about itself: `qlt-t3-cap`, the
 	 * data-atom cap of the T3 encodings (Algorithms A/B/D and the semantic
 	 * PWR); above it the default ABA-oracle path decides. Clamped to 30
-	 * (the encodings shift `1 << K`); 0 = that bound.
+	 * (the encodings shift `1 << K`); 0 = that bound. Then
+	 * `qlt-const-output-max`, `qlt-cells-budget` and
+	 * `qlt-cells-max-params` (see qlt.h).
 	 */
-	static std::array<ba_option, 2> options() {
+	static std::array<ba_option, 4> options() {
 		return {{
 			{ "t3-cap", ba_option_kind::count,
 				nullptr, nullptr,
@@ -114,6 +126,21 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 				"cap the constant-output assignments the fast path "
 				"in front of Algorithm B enumerates (default: "
 				"TAU_QLT_CONST_OUTPUT_MAX or 100; "
+				"0 = unlimited)" },
+			{ "cells-budget", ba_option_kind::count,
+				nullptr, nullptr,
+				get_cells_budget_option, set_cells_budget_option,
+				"cap the formula instances one qlt decision by "
+				"cells evaluates before it is left open "
+				"(default: TAU_QLT_CELLS_BUDGET or 65536; "
+				"0 = unlimited)" },
+			{ "cells-max-params", ba_option_kind::count,
+				nullptr, nullptr,
+				get_cells_max_params_option,
+				set_cells_max_params_option,
+				"cap the other free variables, and the named "
+				"endpoints, a qlt decision by cells ranges over "
+				"(default: TAU_QLT_CELLS_MAX_PARAMS or 2; "
 				"0 = unlimited)" },
 		}};
 	}

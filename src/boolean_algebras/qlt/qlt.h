@@ -78,6 +78,38 @@ inline size_t qlt_const_output_max() {
 	return env_limit_count("TAU_QLT_CONST_OUTPUT_MAX", 100);
 }
 
+/**
+ * @brief Cap on the formula instances one decision by cells evaluates (the
+ * quantifier elimination, the comparisons over named endpoints and the point
+ * solver); past it the decision is left open. Runtime parameter by policy
+ * (qlt's own `qlt-cells-budget` option). The sentinel -1 means "not set":
+ * `TAU_QLT_CELLS_BUDGET` is consulted, and 65536 applies when that is absent
+ * too. 0 = unlimited.
+ */
+inline long qlt_cells_budget_param = -1;
+
+/**
+ * @brief Cap on the other free variables, and on the named endpoints, a
+ * decision by cells ranges over; above it the decision is left open. Runtime
+ * parameter by policy (qlt's own `qlt-cells-max-params` option). The
+ * sentinel -1 means "not set": `TAU_QLT_CELLS_MAX_PARAMS` is consulted, and 2
+ * applies when that is absent too. 0 = unlimited.
+ */
+inline long qlt_cells_max_params_param = -1;
+
+/// Effective cell budget (0 = unlimited).
+inline size_t qlt_cells_budget() {
+	if (qlt_cells_budget_param >= 0) return (size_t) qlt_cells_budget_param;
+	return env_limit_count("TAU_QLT_CELLS_BUDGET", 1 << 16);
+}
+
+/// Effective cap on the parameters of a decision by cells (0 = unlimited).
+inline size_t qlt_cells_max_params() {
+	if (qlt_cells_max_params_param >= 0)
+		return (size_t) qlt_cells_max_params_param;
+	return env_limit_count("TAU_QLT_CELLS_MAX_PARAMS", 2);
+}
+
 /// Effective T3 atom cap: `qlt_t3_encoding_cap()` bounded by 30.
 inline int qlt_t3_encoding_cap_effective() {
 	const size_t hard = 30;

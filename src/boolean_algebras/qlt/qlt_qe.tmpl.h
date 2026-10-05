@@ -12,6 +12,8 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_QE_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_QE_TMPL_H__
 
+#include <limits>
+
 #include "boolean_algebras/qlt/qlt.h"
 #include "tau_tree.h"
 
@@ -338,11 +340,11 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 // quantifier exactly: `ex` is the disjunction over the cells, `all` the
 // conjunction.
 
-/** @brief Cap on the formula instances one cell decision evaluates. */
-inline constexpr size_t qlt_cells_budget = 1 << 16;
-
-/** @brief Cap on the free point variables a cell decision ranges over. */
-inline constexpr size_t qlt_cells_max_params = 2;
+// True when n parameters exceed the qlt-cells-max-params option.
+inline bool qlt_cells_too_many(size_t n) {
+	const size_t cap = qlt_cells_max_params();
+	return cap && n > cap;
+}
 
 namespace qlt_cells_detail {
 
@@ -628,7 +630,8 @@ public:
 
 private:
 	std::vector<qlt_rational> ends;
-	size_t budget = qlt_cells_budget;
+	size_t budget = qlt_cells_budget() ? qlt_cells_budget()
+		: std::numeric_limits<size_t>::max();
 
 	std::optional<qlt_rational> value_of(tref var) const {
 		for (auto it = env.rbegin(); it != env.rend(); ++it)
@@ -774,7 +777,7 @@ static tref qlt_point_meets(tref body) {
 
 // `ex var body` (`all var body` when universal) decided by cells, when it has
 // the same truth for every value of the other free variables of body and for
-// every position of its named endpoints, at most qlt_cells_max_params of each;
+// every position of its named endpoints, at most qlt-cells-max-params of each;
 // nullopt otherwise.
 template<NodeType node>
 static std::optional<bool> qlt_cells_qe(tref var, tref body, bool universal) {
@@ -782,8 +785,8 @@ static std::optional<bool> qlt_cells_qe(tref var, tref body, bool universal) {
 	if (!ends) return std::nullopt;
 	auto params = qlt_point_params<node>(var, body);
 	const auto names = qlt_point_eval<node>::names_of(body);
-	if (!params || params->size() > qlt_cells_max_params
-		|| names.size() > qlt_cells_max_params) return std::nullopt;
+	if (!params || qlt_cells_too_many(params->size())
+		|| qlt_cells_too_many(names.size())) return std::nullopt;
 	qlt_point_eval<node> ev(std::move(*ends));
 	std::optional<bool> verdict;
 	bool decided = true;
@@ -814,7 +817,7 @@ static tref qlt_cells_residual(tref var, tref body) {
 	auto ends = qlt_point_eval<node>::ends_of(body, true);
 	if (!ends) return nullptr;
 	const auto names = qlt_point_eval<node>::names_of(body);
-	if (names.size() > qlt_cells_max_params) return nullptr;
+	if (qlt_cells_too_many(names.size())) return nullptr;
 	auto params = qlt_point_params<node>(var, body);
 	if (!params || params->size() != 1) return nullptr;
 	const tref y = params->front();
@@ -875,7 +878,7 @@ static std::optional<bool> qlt_named_ground_truth(size_t op, tref lhs,
 	for (auto& n : eval::names_of(rhs)) names.push_back(std::move(n));
 	std::sort(names.begin(), names.end());
 	names.erase(std::unique(names.begin(), names.end()), names.end());
-	if (names.empty() || names.size() > qlt_cells_max_params)
+	if (names.empty() || qlt_cells_too_many(names.size()))
 		return std::nullopt;
 	auto l = eval::ends_of(lhs, true), r = eval::ends_of(rhs, true);
 	if (!l || !r) return std::nullopt;

@@ -442,3 +442,9 @@ add_repl_test(normalize_cmd-qlt_named_and_finite_kept
 add_repl_test(normalize_cmd-qlt_named_residual
 	"normalize ex x:qlt (x > y:qlt && x < {c}:qlt)" "%1[^%]*: y\\{ \\(-inf, c\\) \\}:qlt != 0")
 
+# The cell decisions keep their binder past qlt-cells-max-params parameters.
+add_repl_test(normalize_cmd-qlt_cells_max_params_zero_is_unlimited
+	"set qlt-cells-max-params 0. normalize ex x:qlt (x > y:qlt && {[0,1]}:qlt & x != 0)" "%[0-9]+[^%]*: y\\{ \\(-inf, 1\\) \\}:qlt != 0")
+add_repl_test(normalize_cmd-qlt_cells_budget_spent
+	"set qlt-cells-budget 1. normalize ex x:qlt ((({3}:qlt & x) != 0) && (({5}:qlt & x) != 0))" "%[0-9]+[^%]*: ex ")
+
