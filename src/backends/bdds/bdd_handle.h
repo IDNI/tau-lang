@@ -579,7 +579,7 @@ struct bdd_handle<Bool, o> {
 		TAU_TRY(auto z, get_one_zero());
 		for (const auto& kv : z)
 			m.emplace(kv.first,	((*this) & get(kv.second)) |
-						  (bit(true, kv.first) & ~*this));
+						  (bit(true, static_cast<uint_t>(kv.first)) & ~*this));
 		return r.with_assert_check_value(std::move(m));
 	}
 

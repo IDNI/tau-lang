@@ -1716,10 +1716,13 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
 	}
 
-	// Witness zero for Bool: walks the low branches, assigning false,
-	// until a node whose high child is F (assign true) or the F leaf
-	// pins x to false; the assignment in m is partial. x == T has no
-	// zero witness and is an error.
+	// Witness zero for Bool: walks a path from x to the F leaf,
+	// preferring the low branch (assign false) and taking the high
+	// branch (assign true) only when the low child is T. A reduced
+	// node has distinct children, so a child other than T always
+	// exists and every function other than T reaches F. The
+	// assignment in m is partial: the variables off the path are
+	// free. x == T has no zero witness and is an error.
 	static result<bool> get_one_zero(bdd_ref x, std::map<int_t, Bool>& m) {
 		result<bool> r;
 		if (x == T)
@@ -1728,15 +1731,11 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		m.clear();
 		while (!leaf(x)) {
 			const bdd_node_t& n = get(x);
-			if (n.h == F) {
-				m.emplace(n.v, true);
-				return r.with_assert_check_value(true);
-			}
-			m.emplace(n.v, false);
-			if ((x = n.l) == F) return r.with_assert_check_value(true);
+			const bool high = n.l == T;
+			m.emplace(static_cast<int_t>(n.v), high);
+			x = high ? n.h : n.l;
 		}
-		// Reached when x was F on entry (the empty assignment is its
-		// witness zero) or when the low walk ended at a leaf.
+		DBG(assert(x == F);)
 		return r.with_assert_check_value(true);
 	}
 
@@ -1744,7 +1743,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if (leaf(x)) return x;
 		const bdd_node_t& n = get(x);
 		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
-		if (auto it = m.find(n.v); it == m.end())
+		if (auto it = m.find(static_cast<int_t>(n.v)); it == m.end())
 			return ite(add(n.v, T, F), a, b);
 		else return ite(it->second, a, b);
 	}

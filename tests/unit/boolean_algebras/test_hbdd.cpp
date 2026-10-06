@@ -132,3 +132,63 @@ TEST_SUITE("BDD_Splitter") {
 		CHECK(((a1 & a2) & ~bad) != false);
 	}
 }
+
+namespace {
+
+using hb = bdd_handle<Bool>;
+
+// f with the constants of the partial assignment m substituted
+hbdd<Bool> under(const hbdd<Bool>& f, const std::map<int_t, Bool>& m) {
+	std::map<int_t, hbdd<Bool>> c;
+	for (const auto& [v, b] : m) c.emplace(v, b == true ? hb::htrue : hb::hfalse);
+	return f->compose(c);
+}
+
+// The function over variables 1..3 whose truth table is the bits of t
+hbdd<Bool> from_truth_table(unsigned t) {
+	hbdd<Bool> f = hb::hfalse;
+	for (unsigned row = 0; row < 8; ++row) {
+		if (((t >> row) & 1u) == 0) continue;
+		hbdd<Bool> c = hb::htrue;
+		for (uint_t v = 1; v <= 3; ++v)
+			c = c & hb::bit(((row >> (v - 1)) & 1u) != 0, v);
+		f = f | c;
+	}
+	return f;
+}
+
+} // namespace
+
+TEST_SUITE("get_one_zero") {
+	TEST_CASE("a node whose low child is one is left by its high branch") {
+		bdd_init<Bool>();
+		// v1 ? v2 : 1
+		auto f = (hb::bit(true, 1) & hb::bit(true, 2)) | hb::bit(false, 1);
+		auto z = f->get_one_zero();
+		REQUIRE(z.has_value());
+		CHECK(under(f, z.value()) == false);
+	}
+
+	TEST_CASE("every function over three variables but one has a zero witness") {
+		bdd_init<Bool>();
+		for (unsigned t = 0; t < 255; ++t) {
+			CAPTURE(t);
+			auto f = from_truth_table(t);
+			auto z = f->get_one_zero();
+			REQUIRE(z.has_value());
+			CHECK(under(f, z.value()) == false);
+		}
+		CHECK_FALSE(from_truth_table(255)->get_one_zero().has_value());
+	}
+
+	TEST_CASE("lgrs parametrizes only zeros") {
+		bdd_init<Bool>();
+		for (unsigned t = 0; t < 255; ++t) {
+			CAPTURE(t);
+			auto f = from_truth_table(t);
+			auto s = f->lgrs();
+			REQUIRE(s.has_value());
+			CHECK(f->compose(s.value()) == false);
+		}
+	}
+}
