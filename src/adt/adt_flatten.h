@@ -48,17 +48,21 @@ namespace idni::tau_lang {
  * @tparam node Tree node type satisfying `NodeType`.
  * @param spec Parsed spec tree (as produced by `tau::get` with
  * `infer_ba_types = false`).
- * @param ctx I/O context; unused in this pass (io stream ADT layouts arrive
- * in a later task) -- accepted so callers do not need to special-case it.
+ * @param ctx I/O context, may be null. When set, a tuple-typed io def
+ * replaces its root entry in `ctx->inputs`/`ctx->outputs` with one entry per
+ * flat member and records the layout in `ctx->adt_streams`; an io def
+ * redefined without a tuple type erases its stale `ctx->adt_streams` entry.
+ * When null, a tuple-typed io def is dropped without registration.
  * @param session_type_defs Optional REPL-session `type_def`s (declared on
  * earlier, separately parsed lines) to pre-register into the registry
  * before @p spec's own type_defs -- see `adt_registry::build`'s override
- * semantics. `nullptr` (the default) matches today's spec-only behavior.
- * @return The flattened tree as the report's value, or a report carrying an
- * error on any spec error (registry error, conflicting annotation,
+ * semantics. `nullptr` (the default) registers only @p spec's own type_defs.
+ * @return The flattened tree as the report's value (@p spec itself when no
+ * type is declared), or a report carrying an error on any spec error (registry error, conflicting annotation,
  * untyped/unknown member access, member access on a non-tuple, shape
- * mismatch, or a tuple-typed term used outside `=`/`!=`/a quantifier
- * binder).
+ * mismatch, a tuple-typed term used outside `=`/`!=`/a quantifier
+ * binder/a ref argument, an io def head with a member path, or an io stream
+ * file name holding a quote).
  */
 template <NodeType node>
 result<tref> adt_flatten(tref spec, io_context<node>* ctx = nullptr,

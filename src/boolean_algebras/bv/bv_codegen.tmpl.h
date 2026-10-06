@@ -43,7 +43,9 @@ inline std::string bv_witness_expr(const bv& value, size_t width) {
 
 // A single edge "var = constant" is the hello_world/always_one class: the
 // constant is the witness, extracted directly rather than solved for. The
-// constant may be the algebra's 0 or 1 of a `width`-bit type.
+// constant may be the algebra's 0 or 1 of a `width`-bit type. nullopt when
+// the first conjunct of @p conj is not a bf_eq whose one side has @p var as
+// its only free variable and whose other side is a constant.
 template <NodeType node>
 static std::optional<bv> bv_single_equality_constant(tref var, tref conj,
 	size_t width)
@@ -75,6 +77,7 @@ static std::optional<bv> bv_single_equality_constant(tref var, tref conj,
 // inconsistency between the oracle and the translation to cvc5, not a
 // legitimate "no witness" answer -- both are reported the same way (nullopt)
 // since the emitter's caller already turns either into a build-time error.
+// nullopt too when the width of @p var's type is unknown.
 template <NodeType node>
 static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	using tau = tree<node>;
@@ -96,7 +99,8 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	return bv_witness_expr<node>(std::get<bv>(tau::get(cst).get_ba_constant()), width);
 }
 
-// The codegen_constant_expr capability: @p cst is already a trimmed, known bitvector value, so this only extracts and spells it.
+// The codegen_constant_expr capability: spells the trimmed bitvector constant
+// @p cst; nullopt when @p cst is not a BA constant or its width is unknown.
 template <NodeType node>
 static std::optional<std::string> bv_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;

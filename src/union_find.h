@@ -77,9 +77,9 @@ struct union_find : public std::map<data_t, data_t, less_t> {
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_rank : public union_find<data_t, less_t> {
 private:
-	// TT2-12: must use less_t like the parent map -- with a coarser
-	// equivalence (e.g. subtree_less over trefs) the two maps would
-	// otherwise disagree on key identity, degrading ranks to 0.
+	// Must use less_t like the parent map -- with a coarser equivalence
+	// (e.g. subtree_less over trefs) the two maps would otherwise disagree
+	// on key identity, degrading ranks to 0.
 	std::map<data_t, size_t, less_t> rank; // rank for union by rank
 
 public:
@@ -124,7 +124,8 @@ struct union_find_by_less : public union_find<data_t, less_t> {
 	 * @brief Union the sets containing @p x and @p y, choosing the lesser root.
 	 * @param x First element.
 	 * @param y Second element.
-	 * @return Root of the merged set (the lesser of the two roots per `less_t`).
+	 * @return Root of the merged set (the lesser of the two roots per
+	 * `less_t`; @p y's root when neither is less).
 	 */
 	data_t merge(data_t x, data_t y) {
 		static const less_t comp;
@@ -166,8 +167,10 @@ struct scoped_less {
 /**
  * @brief Scope-aware union-find supporting nested scopes.
  *
- * Elements inserted via `insert` are visible in all enclosing scopes.
- * Elements inserted via `push` are visible only in the current scope.
+ * `insert` finds an element in the innermost active scope that holds it and
+ * otherwise registers it in the global scope, visible from every scope.
+ * `push` registers it in the most recently opened scope, which shadows any
+ * outer registration until that scope is closed.
  * @tparam data_t Element type.
  * @tparam less_t Comparator for choosing the root on merge.
  */
@@ -178,16 +181,19 @@ struct scoped_union_find {
 
 	/**
 	 * @brief Error payload declared for an unbalanced `close`; currently
-	 * never produced — `close()` always returns `std::nullopt` (see the
-	 * TODO there).
+	 * never produced — `close()` always returns `std::nullopt`.
 	 */
 	struct scope_error {
 		data_t element;
 	};
 
+	/// The disjoint sets over (scope, element) pairs.
 	union_find_by_less<std::pair<size_t, data_t>, scoped_less<data_t, less_t>> uf;
+	/// Id of the most recently opened scope; never decreases.
 	scope current = 0;
+	/// Ids of the active scopes, outermost first.
 	std::deque<size_t> scopes;
+	/// Id of the global scope.
 	scope global = 0;
 
 	/** @brief Construct with a single global scope active. */
@@ -204,13 +210,13 @@ struct scoped_union_find {
 	/**
 	 * @brief Close the current scope; closing the global scope is a
 	 * silent no-op.
-	 * @return Always `std::nullopt`; reporting a `scope_error` on an
-	 * unbalanced close is pending (see the TODO below).
+	 * @return Always `std::nullopt`; no `scope_error` is reported on an
+	 * unbalanced close.
 	 */
 	std::optional<scope_error> close() {
 		if (scopes.size() == 1) {
-			// TT2-14 verdict: the silent tolerance here is
-			// LOAD-BEARING, not a bug -- e.g. get_nso_rr on a lone
+			// The silent tolerance here is LOAD-BEARING, not a
+			// bug -- e.g. get_nso_rr on a lone
 			// rec_relation drives a resolver that closes at the
 			// global scope (an assert here SIGABRTs that path).
 			// Callers treat close() at global scope as a no-op;
@@ -239,7 +245,8 @@ struct scoped_union_find {
 	}
 
 	/**
-	 * @brief Insert @p data into the current (innermost) scope.
+	 * @brief Insert @p data into the most recently opened scope (`current`),
+	 * the innermost active one while no scope has been closed since.
 	 * @param data Element to push.
 	 * @return Scoped element for @p data.
 	 */
@@ -248,7 +255,10 @@ struct scoped_union_find {
 	}
 
 	/**
-	 * @brief Merge the sets containing @p d1 and @p d2.
+	 * @brief Merge the sets containing @p d1 and @p d2, each resolved as by
+	 * `insert`.
+	 * @param d1 First element.
+	 * @param d2 Second element.
 	 * @return Root of the merged set.
 	 */
 	element merge(const data_t& d1, const data_t& d2) {
@@ -258,9 +268,11 @@ struct scoped_union_find {
 	}
 
 	/**
-	 * @brief Return the scope level at which @p data was registered.
+	 * @brief Return the scope level at which @p data was registered,
+	 * registering it in the global scope when absent.
 	 * @param data Element to query.
-	 * @return Scope index (0 = global if not found in any scope).
+	 * @return Scope index of the innermost active scope holding @p data, or
+	 * the global scope.
 	 */
 	scope scope_of(const data_t& data) {
 		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)

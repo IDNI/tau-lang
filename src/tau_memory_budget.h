@@ -145,12 +145,14 @@ std::string tref_budget_message() {
  */
 template <NodeType node>
 struct budget_scope {
+	/// Opens the scope; the outermost one records the live node count.
 	budget_scope() {
 		if (depth()++) return;
 		tref_budget_last_before = tref_count<node>();
 		tref_budget_last_after = tref_budget_last_before;
 	}
 
+	/// Closes the scope; the outermost one records the live node count again.
 	~budget_scope() {
 		if (--depth() == 0) tref_budget_last_after = tref_count<node>();
 	}
@@ -215,6 +217,16 @@ bool take_bdd_node_table_exhausted() {
  * its caller cannot turn the failure into an answer either. A call that
  * starts with the flag already up, raised by work outside any boundary, is
  * refused, since that work may have left unknown values in the caches.
+ *
+ * A time budget (bounded_call.h) that ran out during the outermost call adds
+ * its message as a `code::solver_error` to the result and clears the tree
+ * caches; one left over from work outside any boundary only clears them.
+ *
+ * @tparam F A nullary callable returning `result<T>`.
+ * @param f The unit of work.
+ * @return What @p f returned, with an error added when a bdd node table
+ * filled or a time budget ran out during it; an error and no value when the
+ * call was refused.
  */
 template <NodeType node, typename F>
 std::invoke_result_t<F> with_budget(F&& f) {

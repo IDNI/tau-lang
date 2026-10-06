@@ -58,12 +58,14 @@ static std::optional<std::string> qlt_codegen_witness(tref var, tref conj) {
 		if (auto witness = qlt_pick_witness<node>(*interval); witness)
 			return qlt_witness_expr<node>(*witness);
 	// No determined interval, or none of its pieces yields a witness. The ABA
-	// oracle has already found the edge feasible, so emit a value rather than
-	// refusing: 1 is what this has always emitted here.
+	// oracle has already found the edge feasible, so emit the value 1 rather
+	// than refusing.
 	return qlt_witness_expr<node>(qlt_rational(1, 1));
 }
 
-// The codegen_constant_expr capability: @p cst is already trimmed to a closed, single-point qlt value, so this only extracts and spells its rational.
+// The codegen_constant_expr capability: spells the rational of @p cst when it
+// is a trimmed qlt constant holding one closed, finite point; nullopt
+// otherwise.
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;

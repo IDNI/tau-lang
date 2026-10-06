@@ -44,8 +44,8 @@ namespace idni::tau_lang {
 // been fixed by some other, non-binding annotation found in the same
 // scope -- see the "annotation propagates in scope" vs. "conflicting
 // annotations" tests for why these are different variables in the same
-// local map). Only a quantifier's own bound variable is ever marked
-// is_binder; every other entry (including the whole outermost/global scope,
+// local map). Only a quantifier's own bound variable or a rec_relation's
+// formal parameter is ever marked is_binder; every other entry (including the whole outermost/global scope,
 // which has no binder at all) stays false. Used by pass 2 to decide whether
 // a rewritten occurrence needs its own `typed` annotation: a bound
 // variable's flat members get it once, on the binder, and every other
@@ -70,7 +70,7 @@ tref adt_flatten_find_child(tref n, size_t nt) {
 
 // The identifying dict id of a variable's head (var_name/io_var/uconst),
 // ignoring an io_var's offset -- the key scope maps are keyed on, so that
-// e.g. `x` and `x.a` (and, once io is handled, `p[t]` and `p[t-1]`) share
+// e.g. `x` and `x.a` (and `p[t]` and `p[t-1]`) share
 // one scope entry.
 template <NodeType node>
 size_t adt_flatten_var_key(tref head) {
@@ -104,6 +104,9 @@ std::string adt_flatten_describe_var(tref var_node) {
 // path), used identically by generic-context rewriting, tuple-equality
 // classification, and quantifier-binder expansion.
 
+/// What one `variable` occurrence resolves to: not an ADT, an alias, a full
+/// path to a base member (k_full_leaf), or a whole tuple or tuple-valued
+/// prefix (k_partial, listing every flat member below it).
 template <NodeType node>
 struct adt_resolution {
 	enum kind_t { k_not_adt, k_alias, k_full_leaf, k_partial } kind = k_not_adt;
@@ -120,7 +123,7 @@ struct adt_resolution {
 	// whatever head/prefix reached it -- is what structurally IDENTIFIES a
 	// member, so two k_partial resolutions reached through different
 	// variables/prefixes can still be compared member-for-member (see
-	// adt_flatten_rewrite_equality's shape check, C1).
+	// adt_flatten_rewrite_equality's shape check).
 	struct member_ref { std::string name; tref base_type; std::vector<size_t> suffix; };
 	std::vector<member_ref> members; ///< valid iff kind == k_partial
 	tref head = nullptr;           ///< the occurrence's own head (io_var/var_name/
@@ -323,8 +326,7 @@ result<bool> adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 		// (input_def => io_var_name [member_path] [typed] ... stream, per
 		// parser/tau.tgf -- the grammar's own [member_path] on the DEF
 		// itself is always rejected before this point is ever reached, by
-		// adt_flatten's upfront adt_flatten_check_io_def_head scan, I4-alt
-		// final review) -- unlike every other ADT-typing source (a
+		// adt_flatten's upfront adt_flatten_check_io_def_head scan) -- unlike every other ADT-typing source (a
 		// quantifier binder, a ref formal), so it needs its own branch here
 		// rather than falling through to the `variable` case below. A
 		// tuple-typed io def (`p:Point := in console.`) is the io-grouping
@@ -477,7 +479,7 @@ result<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 // switch via `case tau::ref:`, for wff_ref/bf_ref call sites and for a
 // rec_relation body that is itself a bare ref). A ref_arg whose bf is a
 // plain variable or a full member path reaching a tuple type -- the only two
-// shapes design section 3 rule 4 allows to fill a tuple-typed slot -- splices
+// shapes allowed to fill a tuple-typed slot -- splices
 // into one ref_arg per flat member (both shapes already resolve to
 // adt_resolve_var's k_partial: an empty member_path lists every flat member,
 // a path landing on a nested tuple boundary lists that subtree's). Anything
@@ -485,10 +487,11 @@ result<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 // variable nested inside some other bf operation (`y'`, `y | z`, ...) already
 // errors there via rule 5's "used outside an equality or quantifier context"
 // (adt_flatten_rewrite_variable's k_partial branch) -- exactly the "any other
-// bf ... = error" design rule, with no extra code needed here. (NOTE: `y | y`
+// bf ... = error" rule, with no extra code needed here. (NOTE: `y | y`
 // -- same operand on both sides -- is not a usable example here: it folds to
 // bare `y` during parsing itself, before adt_flatten ever runs, per Boolean
-// idempotence; the "non-variable tuple arg" test below uses `y'` instead.)
+// idempotence; the "call with non-variable tuple arg fails" test in
+// tests/unit/test_adt_flatten.cpp uses `y'` instead.)
 //
 // @p head_style selects how a flat member is annotated: true (a
 // rec_relation's own formal declarations) always types every flat member,
@@ -536,15 +539,15 @@ result<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
 
 // Rewrites one `ref` node (`sym [offsets] ref_args [typed] [fallback]`) in
 // full: its ref_args (adt_flatten_rewrite_ref_args above); its own result
-// `typed` -- a tuple-typed result (`f(v):Point`) is always an error per
-// design section 5 (this used to silently pass through and crash downstream
-// inference instead of failing cleanly here); an alias-typed result is
+// `typed` -- a tuple-typed result (`f(v):Point`) is always an error; an
+// alias-typed result is
 // rewritten to the alias target, same as any other alias annotation; a
 // non-registry result type passes through untouched, same as everywhere
 // else; its `fallback` and any `offsets`, both recursed into generically (a
 // tuple-typed term surfacing there other than through a ref_arg slot already
 // errors via the same rule-5 path as everything else -- see
-// "fp_fallback with tuple-typed content fails" test). Used for both a
+// "fp_fallback with tuple-typed content fails" test in
+// tests/unit/test_adt_flatten.cpp). Used for both a
 // rec_relation's own head (@p head_style true, called directly from
 // adt_flatten_rewrite_rec_relation -- a rec_relation head is never reached
 // through the generic dispatch below) and an ordinary call site (false,
@@ -605,8 +608,8 @@ result<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& reg,
 }
 
 // A rec_relation (`f(args) := body`) is its own scope: its formal
-// parameters' annotations (a valid ADT-typing source per design section 3,
-// pass 1: "a ref formal") are visible to member-path resolution in its own
+// parameters' annotations (a valid ADT-typing source in pass 1, like a
+// quantifier binder) are visible to member-path resolution in its own
 // body only, isolated from whatever contains the definitions list (sibling
 // definitions, `main`) -- see adt_flatten_collect_local's matching stop
 // condition. Each formal found in the collected local scope is additionally
@@ -615,7 +618,7 @@ result<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& reg,
 // variable's flat members, the HEAD's own flattened formal always carries
 // its type (adt_flatten_rewrite_ref_args's head_style=true) while every BODY
 // occurrence of it resolves is_bound and stays bare, matching a quantified
-// variable's binder-vs-body split exactly (Task 6's ref-arg rule: see
+// variable's binder-vs-body split exactly (see
 // adt_flatten_rewrite_ref/adt_flatten_rewrite_ref_args above).
 template <NodeType node>
 result<tref> adt_flatten_rewrite_rec_relation(tref n,
@@ -728,7 +731,7 @@ result<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 		for (size_t i = 0; i < lc->members.size(); ++i) {
 			const auto& lm = lc->members[i];
 			const auto& rm = rc->members[i];
-			// Structural comparison per design section 3 rule 2: two
+			// Structural comparison: two
 			// same-arity tuple sides only actually match member-for-member
 			// when each pair also resolves to the SAME member path (its
 			// registry-path SUFFIX relative to whatever prefix reached it --
@@ -736,7 +739,7 @@ result<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 			// type at each position. Without this, two same-arity,
 			// same-base-type but differently NAMED tuples (or a same-arity
 			// tuple reached at a different nesting depth) would silently
-			// expand positionally instead of failing (C1).
+			// expand positionally instead of failing.
 			bool same_path = lm.suffix == rm.suffix;
 			bool same_type = is_same_ba_type<node>(lm.base_type, rm.base_type);
 			if (!same_path || !same_type) {
@@ -772,12 +775,12 @@ result<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 // Rewrite one `input_def`/`output_def` node (`io_var_name [member_path]
 // [typed] stream`, per parser/tau.tgf -- never wrapped in a `variable`
 // node; a member_path on the def itself never reaches here, rejected
-// earlier by adt_flatten's upfront scan, I4-alt final review). A
+// earlier by adt_flatten's upfront scan). A
 // non-registry `typed` (an ordinary base type) passes through
 // untouched, same as everywhere else. An alias-typed def (`i:byte := in
 // console.`) rewrites its `typed` to the alias target, same as any other
 // alias annotation (adt_flatten_rewrite_ref's own `typed` handling). A
-// tuple-typed def (`p:Point := in console.`) is design section 4's io
+// tuple-typed def (`p:Point := in console.`) is an io
 // grouping: `process_io_def` (tau_tree_from_parser.tmpl.h) already
 // registered the bare root under `ctx->inputs`/`outputs` during tree
 // construction, before the flattener ever runs -- that entry is REPLACED
@@ -808,13 +811,13 @@ result<tref> adt_flatten_rewrite_io_def(tref n,
 	size_t root_sid = tau::get(head).get_string_id();
 	// A redefinition of this SAME root name under a non-tuple annotation (or
 	// none at all) retires any STALE ctx->adt_streams entry a PRIOR
-	// tuple-typed declaration of the same root left behind (C2/minor #8).
+	// tuple-typed declaration of the same root left behind.
 	// Without this: (1) repl_evaluator::get_applied's own
 	// adt_streams-contains skip (repl_evaluator.tmpl.h) would keep treating
 	// this now-plain stream as an already-registered tuple forever, silently
 	// dropping every later normalize/sat/solve/run reference to it; (2)
-	// io_context::update_types' own adt_streams-contains skip (added for
-	// C2's phantom-type fix, io_context.tmpl.h) would likewise keep refusing
+	// io_context::update_types' own adt_streams-contains skip
+	// (io_context.tmpl.h) would likewise keep refusing
 	// to (re)type/register the redefined plain stream at all. Harmless when
 	// there was nothing to retire (map::erase on a missing key is a no-op).
 	auto retire_stale_adt_stream = [&] { if (ctx) ctx->adt_streams.erase(root_sid); };
@@ -966,7 +969,7 @@ result<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 	case tau::def_input_cmd: case tau::def_output_cmd: {
 		// REPL form of an io def. adt_flatten_rewrite_io_def's registration
 		// side effect (ctx->adt_streams plus the per-member ctx->inputs/
-		// outputs entries -- what lets Task 8's grouped reader/writer and
+		// outputs entries -- what lets the grouped reader/writer and
 		// continue_running's combined tuple-literal prompt find a tuple
 		// stream's members) must run here too, exactly like the
 		// definitions/spec_multiline case above. Unlike that case, though,
@@ -1019,21 +1022,18 @@ result<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 	return r.with_value(tau::get_typed(nt, new_kids, t.get_ba_type()));
 }
 
-// I4-alt (final review): an io stream def's own head may never carry a
-// member_path. parser/tau.tgf's grammar still allows one syntactically
-// (`input_def/output_def => io_var_name [member_path] [typed] ...` --
-// changing the grammar itself re-drifted unrelated nonterminal-id-derived
-// test orderings AND deterministically tripped a latent, pre-existing DBG
-// assertion in anti_prenex/hooks.tmpl.h on an unrelated test, so per the
-// final reviewer's sanctioned alternative the grammar stays as committed
-// and this is rejected here instead), but it is always meaningless:
+// An io stream def's own head may never carry a member_path; returns an
+// error report when it does. parser/tau.tgf's grammar still allows one
+// syntactically (`input_def/output_def => io_var_name [member_path] [typed]
+// ...` -- changing the grammar shifts nonterminal ids, which reorders
+// id-derived test output, so it is rejected here instead), but it is always
+// meaningless:
 // input_def/output_def are never wrapped in a `variable` node (see
 // adt_flatten_collect_local's own comment on this same shape), so nothing
 // downstream ever resolves a path against a registry for it, and
 // process_io_def (tau_tree_from_parser.tmpl.h) would silently register the
-// stream under the BARE head name regardless, discarding the path --
-// exactly the "p.a := in console." mis-registers under "p" silently bug
-// the finding called out.
+// stream under the BARE head name regardless, discarding the path
+// (`p.a := in console.` would silently register under `p`).
 template <NodeType node>
 result<bool> adt_flatten_check_io_def_head(tref n) {
 	using tau = tree<node>;
@@ -1049,17 +1049,17 @@ result<bool> adt_flatten_check_io_def_head(tref n) {
 		{{label::value, adt_flatten_describe_var<node>(n)}});
 }
 
-// A parsed io stream def whose file name contains a double quote is always a
+// Returns an error report when a parsed io stream def's file name contains a
+// double quote, which is always a
 // greedy-capture mis-parse, never legitimate input: `file_name` is
 // `printable+` (parser/tau.tgf), delimited by '"', so with TWO file(...)
 // stream defs on one source line the capture can span from the first def's
 // opening quote to the last def's closing one -- silently swallowing the
-// second def and registering the first under the whole garbage span (found
-// 2026-08-17; the REPL is unaffected, it splits commands at periods before
-// parsing; newline-separated defs are unaffected too, printable excludes
-// newline). The grammar itself stays as committed -- tightening file_name's
+// second def and registering the first under the whole garbage span (the
+// REPL is unaffected, it splits commands at periods before parsing;
+// newline-separated defs are unaffected too, printable excludes newline). The grammar itself stays as committed -- tightening file_name's
 // char class would add a synthetic char-class nonterminal and shift ids,
-// the exact landmine adt_flatten_check_io_def_head's comment below
+// the same constraint adt_flatten_check_io_def_head's comment above
 // documents -- so the mis-parse is turned into a hard error here instead,
 // same pattern as that head check.
 template <NodeType node>
@@ -1081,6 +1081,7 @@ result<bool> adt_flatten_check_io_def_file_name(tref n) {
 // -----------------------------------------------------------------------------
 // Top-level entry point.
 
+/** @internal @copydoc adt_flatten @endinternal */
 template <NodeType node>
 result<tref> adt_flatten(tref spec, io_context<node>* ctx,
 		const std::vector<htref>* session_type_defs) {

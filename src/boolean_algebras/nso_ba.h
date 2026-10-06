@@ -18,10 +18,14 @@
 namespace idni::tau_lang {
 
 /**
- * @brief Bitwise AND operator for tau.
+ * @brief Conjunction of two tau trees.
+ *
+ * Folds 0 and 1, combines two BA constants of one type with the constant's
+ * own `&`, builds `bf_and` for two `bf`s and `wff_and` for two `wff`s; a `bf`
+ * against an (in)equation is pushed into the normalized equation's left side.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return Result of bitwise AND operation.
+ * @return The conjunction; @p l for any other operand shape.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -29,10 +33,10 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l,
         const tree<node<BAs...>>& r);
 
 /**
- * @brief Bitwise OR operator for tau.
+ * @brief Disjunction of two tau trees, by the same cases as `operator&`.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return Result of bitwise OR operation.
+ * @return The disjunction; @p l for any other operand shape.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -40,19 +44,21 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l,
         const tree<node<BAs...>>& r);
 
 /**
- * @brief Bitwise NOT operator for tau.
+ * @brief Complement of a tau tree: swaps 0 and 1, complements a BA constant,
+ * builds `bf_neg` for a `bf` and `wff_neg` for a `wff`.
  * @param l Operand.
- * @return Result of bitwise NOT operation.
+ * @return The complement; @p l for any other operand shape.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& l);
 
 /**
- * @brief Bitwise XOR operator for tau.
+ * @brief Symmetric difference of two tau trees, by the same cases as
+ * `operator&` (0 is the identity).
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return Result of bitwise XOR operation.
+ * @return The exclusive or; @p l for any other operand shape.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -60,10 +66,10 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
 /**
- * @brief Addition operator for tau.
+ * @brief Boolean-ring addition, the same as `operator^`.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return Result of addition operation.
+ * @return `l ^ r`.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -71,48 +77,54 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
 /**
- * @brief Checks if the tau is zero.
+ * @brief Checks if the tau tree is zero: syntactically 0 or F, or a BA
+ * constant its algebra decides to be zero.
  * @param l Operand.
- * @return True if the tau is zero, false otherwise.
+ * @return True if zero; false otherwise, including when the algebra cannot
+ * decide a constant.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_zero(const tree<node<BAs...>>& l);
 
 /**
- * @brief Checks if the tau is one.
+ * @brief Checks if the tau tree is one: syntactically 1 or T, or a BA
+ * constant its algebra decides to be one.
  * @param l Operand.
- * @return True if the tau is one, false otherwise.
+ * @return True if one; false otherwise, including when the algebra cannot
+ * decide a constant.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_one(const tree<node<BAs...>>& l);
 
 /**
- * @brief Equality operator for tau.
+ * @brief Structural equality of two tau trees (`subtree_equals`), not
+ * semantic equivalence; typed and untyped constants differ.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return True if both tau are equal, false otherwise.
+ * @return True if both trees are structurally equal.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
- * @brief Inequality operator for tau.
+ * @brief Negation of the structural `operator==`.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return True if both tau are not equal, false otherwise.
+ * @return True if the trees are not structurally equal.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator!=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
- * @brief Three-way comparison operator for tau.
+ * @brief Structural three-way comparison (`subtree_less`), deterministic
+ * across runs; typed and untyped constants compare different.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return Result of the three-way comparison.
+ * @return `equivalent` for structurally equal trees, else `less` or `greater`.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -160,20 +172,20 @@ requires BAsPack<BAs...>
 bool operator>=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
- * @brief Equality operator for tau and bool.
+ * @brief Compares a tau tree with a Boolean value.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return True if tau is equal to the boolean value, false otherwise.
+ * @return `is_one(l)` when @p r is true, `is_zero(l)` otherwise.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& l, const bool& r);
 
 /**
- * @brief Equality operator for bool and tau.
+ * @brief Compares a Boolean value with a tau tree, as `r == l`.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return True if boolean value is equal to tau, false otherwise.
+ * @return `is_one(r)` when @p l is true, `is_zero(r)` otherwise.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>

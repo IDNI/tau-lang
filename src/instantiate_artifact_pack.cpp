@@ -11,8 +11,10 @@
 
 namespace idni::tau_lang {
 
+/// The configured pack's node type, the one every instantiation below is for.
 using artifact_node_t = tau_pack::node_t;
 
+// Each artifact_pack.def entry expands to an explicit instantiation.
 #define TAU_ARTIFACT_PACK_FN(ret, name, args) \
 	template ret name<artifact_node_t> args;
 #define TAU_ARTIFACT_PACK_CLASS(name) \

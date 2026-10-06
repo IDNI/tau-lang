@@ -72,6 +72,8 @@ inline std::string csv_join(const std::vector<std::string>& v) {
 // there is no verdict. Used only by `synthesize`.
 struct verdict_line { bool realizable; std::string body; };
 
+// The verdict of ltlsynt's output when it starts with a verdict word, with
+// the text after the first newline as body; nullopt otherwise.
 inline std::optional<verdict_line> parse_verdict_line(const std::string& out) {
 	auto body = [&] {
 		auto nl = out.find('\n');
@@ -105,6 +107,9 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 
 #elif defined(_WIN32) && !defined(__CYGWIN__)
 
+// @p arg quoted for a CreateProcess command line (the MSVC runtime's argv
+// rules: backslashes doubled only before a quote or the closing quote);
+// unchanged when it has no blank and no quote.
 inline std::string win_quote_arg(const std::string& arg) {
 	if (arg.find_first_of(" \t\n\v\"") == std::string::npos)
 		return arg;
@@ -128,7 +133,9 @@ inline std::string win_quote_arg(const std::string& arg) {
 // configure), then the Spot folder of a package. Never link Spot; only exec
 // ltlsynt/autfilt/ltlfilt. SearchPathA with a null base searches the current
 // directory before PATH, so the walk is explicit: an ltlsynt.exe dropped
-// beside tau must not be picked up.
+// beside tau must not be picked up. A @p name with a path separator is
+// taken as is. Writes the full path into @p exe (size @p exe_sz) and returns
+// true when found; false when not found or the path does not fit.
 inline bool win_find_exe(const std::string& name, char* exe, DWORD exe_sz) {
 	if (name.find_first_of("\\/") != std::string::npos) {
 		if (GetFileAttributesA(name.c_str()) == INVALID_FILE_ATTRIBUTES)

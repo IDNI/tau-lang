@@ -4,8 +4,9 @@
  *
  * Provides `bv_predicate_blasting` (the main entry point) and helpers that
  * decompose BV relational/arithmetic operations into quantifier-free Boolean
- * formulas over per-bit variables.  Unsupported operations cause a `nullptr`
- * return so the caller can fall back to the cvc5 path.
+ * formulas over per-bit variables. A helper answers `nullptr` for an
+ * operation it does not support; the entry point then leaves the whole
+ * formula unchanged so the caller can fall back to the cvc5 path.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
@@ -22,11 +23,10 @@
 // than depend on inclusion order elsewhere.
 #include "tau_diagnostics.h"
 #include "env_limits.h"
-// `preprocessing` and the preprocessing/solver placement parameters. They
-// belong here, and used to be spelled out here, but live in their own
-// dependency-free header so tests/test_init.h can apply environment
+// `preprocessing` and the preprocessing/solver placement parameters live in
+// their own dependency-free header so tests/test_init.h can apply environment
 // overrides without pulling the whole tau tree into every test binary's
-// main(). See there.
+// main().
 #include "heuristics/preprocess_placement.h"
 
 namespace idni::tau_lang {
@@ -37,11 +37,9 @@ namespace idni::tau_lang {
 // Exposed to the CLI/REPL as the `bv-blasting` option, declared by
 // bv_descriptor's options().
 //
-// Defaults to true so a caller who touches neither switch sees exactly the
-// behaviour bv had before this flag existed: blasting runs iff the master
-// `preprocessing` is on, unaffected by this per-BA flag. Flip it off to
-// disable bv's own blasting pass specifically, without touching any other
-// BA's preprocessing.
+// Defaults to true, so by default blasting runs iff the master
+// `preprocessing` is on. Flip it off to disable bv's own blasting pass
+// specifically, without touching any other BA's preprocessing.
 //
 // NOT thread-safe, like `preprocessing` above: the tau library assumes
 // single-threaded access. Do not set it concurrently from multiple threads.
@@ -104,7 +102,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  * @par Example
  * @code{.cpp}
  * // 3 + 5 = 8 for 4-bit bitvectors (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -186,7 +184,7 @@ result<tref> bvshr_by_one(tref base, tref shifted);
  * @par Example
  * @code{.cpp}
  * // 3 << 3 = 8 for 4-bit: only the lowest source bit still fits (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:239-241).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 3 }:bv[4] && x << { 3 }:bv[4] = y && "
  *     "y = { 8 }:bv[4]).").value().main->get();
@@ -210,7 +208,7 @@ result<tref> bvshl(tref base, tref count, tref shifted);
  * @par Example
  * @code{.cpp}
  * // 15 >> 4 = 0 for 4-bit: the whole value shifts out (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:297-299).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 15 }:bv[4] && x >> { 4 }:bv[4] = y && "
  *     "y = { 0 }:bv[4]).").value().main->get();
@@ -240,7 +238,7 @@ result<tref> bvshr(tref base, tref count, tref shifted);
  * @par Example
  * @code{.cpp}
  * // Zero-extending {3}:bv[2] to bv[4] gives {3}:bv[4], not {11}:bv[4] (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:779-789).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm_ok = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && (bv[4]) x = { 3 }:bv[4]).").value().main->get();
  * CHECK( tau::get(normalizer<node_t>(
@@ -274,7 +272,7 @@ result<tref> bvcast(tref src, tref result);
  * @par Example
  * @code{.cpp}
  * // x != x is never satisfiable (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * // TEST_CASE("bvneq: x != x is never satisfiable")).
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * tref pred = bvneq<node_t>(x, x).value_or(nullptr);
@@ -295,7 +293,7 @@ result<tref> bvneq(tref left, tref right);
  * @par Example
  * @code{.cpp}
  * // 2 < 3 for 2-bit bitvectors, differing only at the LSB (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:340-341).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -316,7 +314,7 @@ result<tref> bvlt(tref left, tref right);
  * @par Example
  * @code{.cpp}
  * // x > x is never satisfiable (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
@@ -338,7 +336,7 @@ result<tref> bvgt(tref left, tref right);
  * through `lteq_predicate` instead, which independently negates
  * `lt_predicate` rather than calling this function. `bvlteq` is a
  * standalone convenience entry point (see
- * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * `TEST_CASE("bvlteq delegates to bvgt")`).
  *
  * @par Example
@@ -422,7 +420,7 @@ result<tref> bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
  *
  * @note Standalone wrapper, never invoked by the WFF dispatcher (`!>=`
  * routes through `ngteq_predicate`, which independently calls
- * `lt_predicate`). See tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * `lt_predicate`). See src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * `TEST_CASE("bvngteq delegates to bvlt")`.
  *
  * @par Example
@@ -468,7 +466,7 @@ result<tref> bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
  *
  * @note Standalone wrapper, never invoked by the WFF dispatcher (`!>` routes
  * through `ngt_predicate`, which independently calls `gt_predicate`). See
- * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * `TEST_CASE("bvngt delegates to bvlteq")`.
  *
  * @par Example
@@ -494,12 +492,13 @@ result<tref> bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
  * @param addend Right operand
  * @param sum Result variable
  * @param aux Collects the fresh auxiliary variables
- * @return The resulting predicate term, or nullptr on error
+ * @return The resulting predicate term; no value with an error report when
+ * the operands' bitwidth cannot be read
  *
  * @par Example
  * @code{.cpp}
  * // 15 + 1 = 0 for 4-bit (overflow wraps mod 2^4) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:82-84).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 15 }:bv[4] && x + { 1 }:bv[4] = { 0 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -522,12 +521,13 @@ result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux);
  * @param subtrahend Right operand
  * @param difference Result variable
  * @param aux Collects the fresh auxiliary variables
- * @return The resulting predicate term, or nullptr on error
+ * @return The resulting predicate term; no value with an error report when
+ * the operands' bitwidth cannot be read
  *
  * @par Example
  * @code{.cpp}
  * // 0 - 1 = 15 for 4-bit (underflow wraps mod 2^4) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:116-118).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x - { 1 }:bv[4] = { 15 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -556,7 +556,7 @@ result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
  * @par Example
  * @code{.cpp}
  * // 3 * 6 = 2 for 4-bit (18 mod 16 = 2, overflow) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:151-152).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x * { 6 }:bv[4] = { 2 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -585,7 +585,7 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
  * @note Never invoked by the library itself: `atomic_blasting` dispatches
  * `/` and `%` to @ref bvdiv and @ref bvmod separately rather than fusing
  * them into a single `bved` call, so this has no WFF-level coverage. See
- * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * `TEST_CASE("bved: 10 / 3 gives quotient=3, remainder=1")`.
  *
  * @par Example
@@ -628,7 +628,7 @@ result<tref> bved(tref dividend, tref divisor, tref quotient, tref remainder,
  * @par Example
  * @code{.cpp}
  * // 10 / 3 = 3 (integer division) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:451-452).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 10 }:bv[4] && x / { 3 }:bv[4] = y && "
  *     "y = { 3 }:bv[4]).").value().main->get();
@@ -657,7 +657,7 @@ result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
  * @par Example
  * @code{.cpp}
  * // 10 % 3 = 1 (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:486-487).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 10 }:bv[4] && x % { 3 }:bv[4] = y && "
  *     "y = { 1 }:bv[4]).").value().main->get();
@@ -681,13 +681,13 @@ result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
  * @param left Left operand
  * @param right Right operand
  * @param result Result variable (fresh, of the operands' bv type)
- * @return The resulting predicate term, or nullptr if a bitwidth cannot be
- * determined
+ * @return The resulting predicate term; no value with an error report when
+ * the bitwidth of @p left or @p result cannot be read
  *
  * @par Example
  * @code{.cpp}
  * // min(3, 5) = 3 (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp,
  * // TEST_SUITE("bvmin")).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 3 }:bv[4]).")
@@ -708,8 +708,8 @@ result<tref> bvmin(tref left, tref right, tref result);
  * @param left Left operand
  * @param right Right operand
  * @param result Result variable (fresh, of the operands' bv type)
- * @return The resulting predicate term, or nullptr if a bitwidth cannot be
- * determined
+ * @return The resulting predicate term; no value with an error report when
+ * the bitwidth of @p left or @p result cannot be read
  */
 template<NodeType node>
 result<tref> bvmax(tref left, tref right, tref result);

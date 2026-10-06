@@ -31,23 +31,43 @@ struct tau_spec {
 	tau_spec();
 	/**
 	 * @brief Parse @p tau_spec_part and append it to the current specification.
-	 * @param tau_spec_part Source string for the next part.
-	 * @return `true` on success.
+	 *
+	 * Each line is one part. A part that ends early (unexpected end of
+	 * file) is kept pending and joined with the next one; a part that fails
+	 * on its own is retried joined to the previous part, as a continuation.
+	 * @param tau_spec_part Source string for the next part(s).
+	 * @return `true` when every line parsed or awaits more input; `false` on
+	 * the first syntax error, which is recorded in errors(), or when an
+	 * earlier error is still recorded.
 	 */
 	bool parse(const std::string& tau_spec_part);
-	/** @brief Return `true` if an EOF marker has been reached. */
+	/** @brief Return `true` while the last part ended early and more input is expected. */
 	bool is_eof() const;
 	/** @brief Return all parse errors collected so far. */
 	const std::vector<std::string>& errors() const;
 	/**
-	 * @brief Return the most recently built formula tree, or `nullptr`.
-	 * @return Latest parsed tree ref, with the parse report.
+	 * @brief Build the spec tree from every part parsed and every formula
+	 * added so far.
+	 *
+	 * Types are inferred against the global definitions, whose io context
+	 * and global scope this updates. The build follows the mode set by
+	 * keep_warm_ups() or keep_as_written(); by default construction hooks
+	 * run and quantifier ids are canonized.
+	 * @return The spec tree; an error when input is still pending (recorded
+	 * in errors() until a later parse() continues it), when a parse error is
+	 * recorded, when there is no main formula or several, or when
+	 * transformation or type inference fails.
 	 */
 	result<tref> get();
 	/**
-	 * @brief Append a pre-built formula @p expr to the specification.
-	 * @param expr Formula to add.
-	 * @return `true` on success.
+	 * @brief Append a pre-built tree @p expr to the specification.
+	 *
+	 * A `spec` contributes its main formula and definitions, a `wff` or `bf`
+	 * becomes the main formula, an io def or `rec_relation` a definition,
+	 * and a `type_def` replaces any earlier type of the same name.
+	 * @param expr Tree to add; may be null.
+	 * @return `false` when @p expr is null, of another node kind, or a second
+	 * main formula (recorded in errors()); `true` otherwise.
 	 */
 	bool add(tref expr);
 	/**
@@ -76,17 +96,22 @@ struct tau_spec {
 private:
 	/// @brief Build tree-get options from current parser state.
 	typename tau::get_options get_options() const;
-	/// @brief Check for EOF and record @p error_msg if reached.
+	/// @brief Record @p error_msg as the pending end-of-input message and
+	/// return `true` when it reports an unexpected end of file.
 	bool eof_check(const std::string& error_msg);
-	/// @brief Internal parse of @p input as @p part index.
+	/// @brief Parse @p input into `parsed_[part]`; returns whether it parsed
+	/// and, when not, the parser's error message.
 	std::pair<bool, std::string> parse_(
 		const std::string& input,
 		size_t part);
-	/// @brief Parse the already-loaded @p part index.
+	/// @brief Parse part @p part, joined to a pending one; `false` on a
+	/// recorded error.
 	bool parse_part(size_t part);
-	/// @brief Parse @p part together with the previous part for context.
+	/// @brief Retry @p part joined to the previous part, as its continuation;
+	/// `true` when that parses or ends early.
 	bool parse_with_prev_part(size_t part);
-	/// @brief Combine all parsed pieces into one formula tree.
+	/// @brief Combine all parsed parts into one `spec` parse tree; an error
+	/// (also recorded in errors()) for several main formulas or none.
 	result<tref> build_parse_tree();
 
 	std::string current_part_{};

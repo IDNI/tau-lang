@@ -1128,7 +1128,7 @@ static result<tref> keep_comparison_predicate(tref atomic) {
  * @code{.cpp}
  * // Dispatched for "=" atoms by wff_predicate_blasting (see bf_eq case);
  * // exercised e.g. by "x + { 5 }:bv[4] = { 8 }:bv[4]" (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -1150,7 +1150,7 @@ static result<tref> eq_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "!=" atoms; x != x is never satisfiable (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:546-547).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr("ex x x:bv[4] != x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
@@ -1172,7 +1172,7 @@ static result<tref> neq_predicate(tref atomic) {
  * @code{.cpp}
  * // Dispatched for "<" atoms, delegating to bvlt after atomic_blasting
  * // resolves any embedded arithmetic (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:316-317).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -1212,7 +1212,7 @@ static result<tref> lt_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for ">" atoms; x > x is never satisfiable (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
@@ -1251,7 +1251,7 @@ static result<tref> gt_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "<=" atoms: 2 <= 3 for 2-bit bitvectors (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:415-417).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x <= { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -1278,7 +1278,7 @@ static result<tref> lteq_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for ">=" atoms: all x, x >= x (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:389-391).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr("all x x:bv[4] >= x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
@@ -1304,7 +1304,7 @@ static result<tref> gteq_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "!<" atoms: 2 !< 2 is T (equal case) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:850-851).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !< { 2 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -1331,7 +1331,7 @@ static result<tref> nlt_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "!>" atoms: 2 !> 2 is T (equal case) (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp,
  * // TEST_SUITE("bvngt"), "bvngt: 2 !> 2 is T (equal case)").
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !> { 2 }:bv[4]).").value().main->get();
@@ -1359,7 +1359,7 @@ static result<tref> ngt_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "!<=" atoms: 3 !<= 1 is T (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:433-434).
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && x !<= { 1 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
@@ -1381,7 +1381,7 @@ static result<tref> nlteq_predicate(tref atomic) {
  * @par Example
  * @code{.cpp}
  * // Dispatched for "!>=" atoms: 0 !>= 1 is T (see
- * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting.cpp,
  * // TEST_SUITE("bvngteq"), "bvngteq: 0 !>= 1 is T").
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x !>= { 1 }:bv[4]).").value().main->get();
@@ -1394,25 +1394,6 @@ static result<tref> ngteq_predicate(tref atomic) {
 	return lt_predicate<node>(atomic);
 }
 
-/**
- * @brief Recursively blasts all bitvector formulas in a formula.
- *
- * Traverses the formula, replacing atomic bitvector predicates with their blasted forms.
- *
- * @tparam node Node type
- * @param term The formula to blast
- * @return The formula with predicates blasted, or nullptr on error
- *
- * @par Example
- * @code{.cpp}
- * // This is what bv_predicate_blasting (the public entry point) calls
- * // internally; see @ref bv_predicate_blasting for a worked example.
- * tref fm = get_nso_rr(
- *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
- * tref blasted = wff_predicate_blasting<node_t>(fm).value_or(nullptr);
- * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
- * @endcode
- */
 /**
  * @brief Does @p atomic contain a variable outside the bv family, or a
  * bv-typed variable with no explicit bitwidth?
@@ -1445,6 +1426,27 @@ static bool has_non_bv_operand(tref atomic) {
 	return bad;
 }
 
+/**
+ * @brief Recursively blasts all bitvector formulas in a formula.
+ *
+ * Traverses the formula, replacing atomic bitvector predicates with their blasted forms.
+ *
+ * @tparam node Node type
+ * @param term The formula to blast
+ * @return The formula with predicates blasted; @p term unchanged (still a
+ * value) when some atom cannot be blasted (all-or-nothing); no value with an
+ * error report on a genuine internal failure
+ *
+ * @par Example
+ * @code{.cpp}
+ * // This is what bv_predicate_blasting (the public entry point) calls
+ * // internally; see @ref bv_predicate_blasting for a worked example.
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = wff_predicate_blasting<node_t>(fm).value_or(nullptr);
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
+ * @endcode
+ */
 template<NodeType node>
 static result<tref> wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
@@ -1453,8 +1455,8 @@ static result<tref> wff_predicate_blasting(tref term) {
 	result<tref> r;
 
 	// All-or-nothing: bv reasoning still needs every bv atom, so ANY atom
-	// that cannot be blasted, decline or failure, stops the whole walk
-	// (same shape as HEAD). Traversal control only, set directly from each
+	// that cannot be blasted, decline or failure, stops the whole walk.
+	// Traversal control only, set directly from each
 	// atom's own outcome below -- never derived by reading r's report back.
 	bool unresolved = false;
 
@@ -1621,17 +1623,7 @@ static result<tref> wff_predicate_blasting(tref term) {
 	return r.with_value(changes.find(term) != changes.end() ? changes[term] : term);
 }
 
-/**
- * @brief Entry point for predicate blasting on bitvector formulas.
- *
- * Alias for wff_predicate_blasting.
- *
- * @tparam node Node type
- * @param term The formula to blast
- * @return The formula with predicates blasted, or @p term unchanged (still
- *         a value, all-or-nothing) when some atom could not be blasted;
- *         no value at all when a genuine internal failure occurred.
- */
+/** @internal @copydoc bv_predicate_blasting @endinternal */
 template<NodeType node>
 inline result<tref> bv_predicate_blasting(tref term) {
 	return wff_predicate_blasting<node>(term);

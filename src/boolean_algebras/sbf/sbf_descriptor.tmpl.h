@@ -20,17 +20,22 @@ namespace idni::tau_lang {
 template <NodeType node>
 static std::optional<std::string> sbf_codegen_constant_expr(tref cst);
 
+/// The descriptor of the BDD-backed simple Boolean formula algebra (`sbf`).
 template <typename... PackBAs>
 struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
 
+	/// The type name, `sbf`.
 	static constexpr const char* type_name = "sbf";
+	/// Priority for the pack's default type (lower wins).
 	static constexpr int default_type_priority = 1;
 
 	/** @brief The 64-bit BDD reference hash: std::hash keeps 32 bits on wasm32. */
 	static std::uint64_t hash_constant(const sbf_ba& x) { return x->hash(); }
+	/// sbf is atomless.
 	static constexpr bool atomless = true;
+	/// sbf is not a non-aba omega-categorical algebra.
 	static constexpr bool non_aba_omcat = false;
 
 	/** @brief sbf can carry a plain 0 or 1. */
@@ -43,34 +48,45 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 			.set_enabled_productions(guards);
 	}
 
+	/// Whether type tree @p type_tree is `:sbf`.
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
 			type_tree, type_name);
 	}
 
+	/// The type tree `:sbf`.
 	static tref type_tree() {
 		return ba_types_detail::make_syntactic_type_tree<node_t>(
 			type_name);
 	}
 
+	/// Whether type id @p ba_type_id names `sbf`; false for an invalid id.
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
 			ba_type_id, type_name);
 	}
 
 
+	/// Whether @p x is the BDD true; BDDs are canonical, so this is also
+	/// the semantic answer.
 	static bool is_syntactic_one(const sbf_ba& x) { return is_sbf_one(x); }
 
+	/// Whether @p x is the BDD false.
 	static bool is_syntactic_zero(const sbf_ba& x) { return is_sbf_zero(x); }
 
+	/// Whether @p x is one; always decided, never an error.
 	static result<bool> is_one(const sbf_ba& x) { return result<bool>{is_sbf_one(x)}; }
 
+	/// Whether @p x is zero; always decided, never an error.
 	static result<bool> is_zero(const sbf_ba& x) { return result<bool>{is_sbf_zero(x)}; }
 
+	/// Every sbf constant is closed.
 	static result<bool> is_closed(const sbf_ba&) { return result<bool>{true}; }
 
+	/// The spelling of the sbf one, `1`.
 	static std::string literal_one(tref) { return "1"; }
 
+	/// The spelling of the sbf zero, `0`.
 	static std::string literal_zero(tref) { return "0"; }
 
 	/** @brief The sbf constant holding @p value (0 or 1), wrapped as a bf constant. */
@@ -81,24 +97,30 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 			type_tree()));
 	}
 
+	/// @p x unchanged: a BDD is already in normal form.
 	static result<sbf_ba> normalize(const sbf_ba& x) {
 		return result<sbf_ba>{normalize_sbf(x)};
 	}
 
+	/// A splitter of @p x of kind @p st (sbf_splitter).
 	static result<sbf_ba> splitter(const sbf_ba& x, splitter_type st) {
 		return result<sbf_ba>{sbf_splitter(x, st)};
 	}
 
+	/// A bad splitter of one, wrapped as an sbf bf constant.
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(sbf_splitter_one()),
 			type_tree()));
 	}
 
+	/// @p sym unchanged: sbf has no symbol simplification.
 	static tref simplify_symbol(tref sym) { return simplify_sbf_symbol(sym); }
 
+	/// @p term unchanged: sbf has no term simplification.
 	static result<tref> simplify_term(tref term) { return result<tref>{simplify_sbf_term(term)}; }
 
+	/// Parse @p src as an sbf literal; the type tree argument is ignored.
 	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{

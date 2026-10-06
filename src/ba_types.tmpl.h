@@ -190,10 +190,8 @@ size_t ba_types<node>::id(tref ba_type) {
 }
 
 // A ba_type_id past the end of type_trees() means the id was corrupted
-// somewhere upstream; silently clamping it to 0 (untyped) in release --
-// while asserting in debug -- masked that corruption as a valid type,
-// which unify(size_t,size_t) would then happily merge with whatever the
-// other operand's type is. Fail loudly in both configurations instead.
+// somewhere upstream; it is an out-of-range error in every configuration,
+// never a clamp to 0 (untyped) that unify(size_t,size_t) would merge.
 template<NodeType node>
 result<tref> ba_types<node>::type_tree(size_t ba_type_id) {
 	result<tref> r;
@@ -613,8 +611,7 @@ bool is_buildable(size_t op, tref n, tref m) {
 			return pack_type_has_arith_ops<node>(unified)
 				|| is_untyped<node>(unified);
 		}
-		// BA2-15: bf_neg dropped from this switch -- it is unary and a
-		// two-operand buildability answer for it was meaningless.
+		// bf_neg is unary, so it has no two-operand buildability answer.
 		case tau::bf_or: case tau::bf_xor: case tau::bf_and: {
 			return true;
 		}

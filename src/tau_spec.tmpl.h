@@ -173,10 +173,9 @@ bool tau_spec<node>::add(tref expr) {
 		if (trefs defs = t | tau::definitions
 			|| tau::rec_relation || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
-		// TT2-4: the grammar allows io defs inside `definitions` too
-		// (definitions => (rec_relation | input_def | output_def)+);
-		// dropping them here silently lost the streams from the
-		// rebuilt spec tree (the top-level cases below accept them).
+		// The grammar allows io defs inside `definitions` too
+		// (definitions => (rec_relation | input_def | output_def)+), so
+		// they are kept like the top-level cases below.
 		if (trefs defs = t | tau::definitions
 			|| tau::input_def || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
@@ -362,9 +361,9 @@ result<tref> tau_spec<node>::build_parse_tree() {
 				if (!main_ && !main) { // first main found
 					main = c;
 				} else {
-					// TT2-5: when the first main came from
-					// add(), local `main` is null here --
-					// print main_ instead of dereferencing.
+					// When the first main came from add(),
+					// local `main` is null here -- print main_
+					// instead of dereferencing.
 					std::stringstream ss; ss
 						<< "Multiple main formulas: \""
 						<< (main ? ptree_to_str(main)
