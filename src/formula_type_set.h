@@ -17,14 +17,21 @@
 namespace idni::tau_lang {
 
 // ── formula_type_set ─────────────────────────────────────────────────────────
-// Lazily collects only the BA types actually referenced by a formula.
-// All enumeration loops should iterate over this set, not the full registry.
-
+/**
+ * @brief The set of BA type ids a formula references.
+ *
+ * All enumeration loops should iterate over this set, not the full registry.
+ * The untyped id 0 is never a member.
+ */
 template <NodeType node>
 struct formula_type_set {
 	using tau = tree<node>;
 
-	// Collect types from a formula's atoms
+	/**
+	 * @brief Collect the BA type of every typed node of @p fm.
+	 * @param fm Formula to scan; every node is visited.
+	 * @return The set of nonzero type ids found.
+	 */
 	static formula_type_set from_formula(tref fm) {
 		formula_type_set fts;
 		tau::get(fm).find_top([&](tref n) {
@@ -35,7 +42,11 @@ struct formula_type_set {
 		return fts;
 	}
 
-	// Collect types from a set of atoms
+	/**
+	 * @brief Collect the BA type of each atom, as `find_ba_type` gives it.
+	 * @param atoms Atoms paired with their names; the names are ignored.
+	 * @return The set of nonzero type ids found.
+	 */
 	static formula_type_set from_atoms(
 			const std::vector<std::pair<tref, std::string>>& atoms) {
 		formula_type_set fts;
@@ -47,12 +58,21 @@ struct formula_type_set {
 		return fts;
 	}
 
+	/// @brief The collected type ids, in ascending order.
 	const std::set<size_t>& type_ids() const { return type_ids_; }
+	/// @brief Number of distinct type ids.
 	size_t size() const { return type_ids_.size(); }
+	/// @brief true when at most one type id was collected (empty included).
 	bool single_type() const { return type_ids_.size() <= 1; }
+	/// @brief true when @p tid was collected.
 	bool contains(size_t tid) const { return type_ids_.contains(tid); }
 
-	// Check if any type in the set satisfies a predicate
+	/**
+	 * @brief Check if any type id in the set satisfies @p pred.
+	 * @tparam Pred Callable `bool(size_t)`.
+	 * @param pred Predicate over a type id.
+	 * @return true on the first id for which @p pred holds.
+	 */
 	template <typename Pred>
 	bool any_of(Pred&& pred) const {
 		for (size_t tid : type_ids_)
@@ -60,8 +80,9 @@ struct formula_type_set {
 		return false;
 	}
 
-	// Iterate
+	/// @brief Iterator to the first type id.
 	auto begin() const { return type_ids_.begin(); }
+	/// @brief Past-the-end iterator of the type ids.
 	auto end() const { return type_ids_.end(); }
 
 private:

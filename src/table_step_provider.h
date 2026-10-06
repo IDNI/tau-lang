@@ -20,38 +20,51 @@
 
 namespace idni::tau_lang {
 
-// Selects each step's solution by matching the input guard against a
-// baked codegen::strategy instead of re-solving. Flag outputs are read off
-// the matched edge; witness/data outputs use edge_witnesses' precomputed
-// value, or are solved per step from edge_witness_templates when the value
-// depends on the step's own inputs.
+/**
+ * @brief Selects each step's solution by matching the input guard against a
+ * baked codegen::strategy instead of re-solving.
+ *
+ * Flag outputs are read off the matched edge; witness/data outputs use
+ * edge_witnesses' precomputed value, or are solved per step from
+ * edge_witness_templates when the value depends on the step's own inputs.
+ * @tparam node Tree node type.
+ */
 template <NodeType node>
 struct table_step_provider : step_provider<node> {
-	// The Mealy view of a strategy of the data game (ltl_aba_solution::
-	// data_game): every atom is read at the step played, from step 0 on,
-	// `history` (a conjunction of atoms over the steps before 0) is solved
-	// for the values the strategy starts from, and a step reads only the
-	// inputs of the atoms its state's guards compare.
+	/// @brief The Mealy view of a strategy of the data game (ltl_aba_solution::
+	/// data_game): every atom is read at the step played, from step 0 on,
+	/// `history` (a conjunction of atoms over the steps before 0) is solved
+	/// for the values the strategy starts from, and a step reads only the
+	/// inputs of the atoms its state's guards compare.
 	struct from_start {
+		/// Conjuncts over the steps before 0, solved at the first step.
 		trefs history;
+		/// Past steps the strategy reads (reported by `lookback()`).
 		int_t lookback = 0;
 	};
 
-	// input_atoms: (name, atom template) per guard slot, evaluated each step.
-	// flag_outputs: one output variable name per flag-output guard slot.
-	// edge_witnesses[s][e]: precomputed (name, value) pairs for that edge.
-	// edge_witness_templates[s][e]: atom conjuncts solved per step when the
-	// output value depends on the step's own inputs.
-	// edge_witness_template_is_counter[s][e]: parallel to
-	// edge_witness_templates[s][e], true where that template atom is a
-	// hoisted positional atom's step-counter relativization -- produce()
-	// grounds it at the counter's own absolute step (time_point) instead of
-	// the lookback-shifted formula_time_point every other template atom
-	// uses. Empty (the default) means none are -- every atom grounds at
-	// formula_time_point as before.
-	// step_guard_ks: one threshold k per "__step_ge<k>" guard prop, matched
-	// like an extra input since its value (time_point >= k) is a function
-	// of the step, never a free choice.
+	/**
+	 * @brief Build the provider; every tree is held GC-rooted.
+	 * @param strat The baked strategy; play starts at its initial state.
+	 * @param input_atoms (name, atom template) per guard slot, evaluated
+	 *        each step.
+	 * @param flag_outputs One output variable name per flag-output guard slot.
+	 * @param edge_witnesses `[s][e]`: precomputed (name, value) pairs for
+	 *        that edge.
+	 * @param edge_witness_templates `[s][e]`: atom conjuncts solved per step
+	 *        when the output value depends on the step's own inputs.
+	 * @param edge_witness_template_is_counter `[s][e]`: parallel to
+	 *        edge_witness_templates[s][e], true where that template atom is
+	 *        a hoisted positional atom's step-counter relativization --
+	 *        produce() grounds it at the counter's own absolute step
+	 *        (time_point) instead of the lookback-shifted formula_time_point
+	 *        every other template atom uses. Empty (the default) means none
+	 *        are.
+	 * @param step_guard_ks One threshold k per "__step_ge<k>" guard prop,
+	 *        matched like an extra input since its value (time_point >= k)
+	 *        is a function of the step, never a free choice.
+	 * @param start Set for the from_start (data game) mode; empty otherwise.
+	 */
 	table_step_provider(
 		codegen::strategy strat,
 		std::vector<std::pair<std::string, tref>> input_atoms,
@@ -64,28 +77,62 @@ struct table_step_provider : step_provider<node> {
 		std::vector<int_t> step_guard_ks = {},
 		std::optional<from_start> start = std::nullopt);
 
+	/**
+	 * @brief Play one step of the strategy.
+	 *
+	 * Evaluates the guard atoms against @p memory (in the from_start mode
+	 * only those the current state's guards compare, at @p time_point, after
+	 * solving the values before step 0 once), takes the matching edge, fills
+	 * the flag outputs from its guard and the data outputs from its baked
+	 * witnesses or by solving its witness templates, and moves to the edge's
+	 * destination state.
+	 * @param step_spec Unused: the strategy replaces the spec.
+	 * @param memory Committed memory so far this step (inputs merged in).
+	 * @param time_point Current execution time point.
+	 * @param formula_time_point Time point the running formula is phrased at.
+	 * @return The step's solution; nullopt when no edge of the current state
+	 *         matches the inputs; an error when a guard atom is undecided or
+	 *         no witness satisfies the matched edge.
+	 */
 	result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		int_t time_point, int_t formula_time_point) override;
 
+	/**
+	 * @brief The inputs read at the current state.
+	 * @param vars The inputs of the step, one io_var each.
+	 * @return In the from_start mode, the members of @p vars whose stream an
+	 *         atom of the current state's guards or witness templates reads
+	 *         at the current step; nullopt otherwise.
+	 */
 	std::optional<trefs> read_set(const trefs& vars) const override;
+	/// @brief The current strategy state in the from_start mode, nullopt
+	/// otherwise.
 	std::optional<size_t> strategy_state() const override;
+	/// @brief The from_start lookback, 0 otherwise.
 	int_t lookback() const override;
+	/// @brief Return to the initial state and drop the values before step
+	/// 0, the values found so far and the fresh-element ledger.
 	void reset() override;
 
-	// Every atom this table strategy may consult this run: input guards
-	// (input_atoms_, evaluated unconditionally every step to route edges)
-	// plus every edge's witness-template atoms across every state. Callers
-	// building a table interpreter (emit_main's emitted code, make_table_
-	// provider's in-process callers) pass this to make_table_interpreter's
-	// live_probe_atoms parameter so step()'s input filter can tell, per
-	// step, which declared inputs the strategy actually needs -- the same
-	// substitute-and-simplify test appear_within_lookback runs against
-	// ubt_ctn for the general solve path. A superset across all states is
-	// fine: appear_within_lookback only ever grows its "appeared" set, so
-	// including an atom from a state not currently active can only keep an
-	// input requested longer than strictly necessary, never drop one that
-	// is actually needed.
+	/**
+	 * @brief Every atom this table strategy may consult this run.
+	 *
+	 * The input guards (input_atoms_, evaluated every step to route edges;
+	 * in the from_start mode only those the state's guards compare) plus
+	 * every edge's witness-template atoms across every state. Callers
+	 * building a table interpreter (emit_main's emitted code,
+	 * make_table_provider's in-process callers) pass this to
+	 * make_table_interpreter's live_probe_atoms parameter so step()'s input
+	 * filter can tell, per step, which declared inputs the strategy actually
+	 * needs -- the same substitute-and-simplify test appear_within_lookback
+	 * runs against ubt_ctn for the general solve path. A superset across
+	 * all states is fine: appear_within_lookback only ever grows its
+	 * "appeared" set, so including an atom from a state not currently active
+	 * can only keep an input requested longer than strictly necessary, never
+	 * drop one that is actually needed.
+	 * @return The atoms, input guards first; may repeat an atom.
+	 */
 	trefs live_probe_atoms() const;
 
 private:
@@ -127,12 +174,20 @@ private:
 	std::vector<htref> found_;
 };
 
-// Builds a table_step_provider from a solved LTL(ABA) strategy, the one
-// playable_table_solution(sol) returns: carrier-typed output atoms keep a
-// flag slot, data-typed ones become per-edge witness templates solved at
-// runtime. Returns {provider, {lookback, highest_initial_pos}}; the report
-// carries an error when playable_table_solution refuses the solution or a
-// flag atom is not over a single variable.
+/**
+ * @brief Build a table_step_provider from a solved LTL(ABA) strategy, the
+ * one playable_table_solution(sol) returns.
+ *
+ * Carrier-typed output atoms whose truth decides their variable keep a flag
+ * slot; data-typed ones, and carrier ones that do not decide their
+ * variable, become per-edge witness templates solved at runtime. A data
+ * game solution yields a provider in the from_start mode.
+ * @tparam node Tree node type.
+ * @param sol The solved strategy.
+ * @return {provider, {lookback, highest_initial_pos}}; an error when
+ *         playable_table_solution refuses the solution or a carrier-typed
+ *         flag atom is not over a single variable.
+ */
 template <NodeType node>
 result<std::pair<std::shared_ptr<table_step_provider<node>>,
 	std::pair<int, int>>>

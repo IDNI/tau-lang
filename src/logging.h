@@ -11,11 +11,11 @@
  */
 
 // Logging streams:
-//  LOG_ERROR   << "msg";         // "(Error) msg"
-//  LOG_WARNING << "msg";         // "(Warning) msg"
-//  LOG_INFO    << "msg";         // "msg"
-//  LOG_DEBUG   << "msg";         // "(debug) [channel] msg"
-//  LOG_TRACE   << "msg";         // "(trace) [channel] msg"
+//  LOG_ERROR   << "msg";         // "(Error) msg"   on std::cerr
+//  LOG_WARNING << "msg";         // "(Warning) msg" on std::cerr
+//  LOG_INFO    << "msg";         // "msg"           on std::cout
+//  LOG_DEBUG   << "msg";         // "(Debug) [channel] msg" on std::cout
+//  LOG_TRACE   << "msg";         // "(Trace) [channel] msg" on std::cout
 
 // Color printers for various data types
 //  LOG_BRIGHT(m)     // TAU_LOG_BRIGHT_COLOR << m << TC.CLEAR()
@@ -25,11 +25,11 @@
 //  LOG_BA_TYPE(tid)  // TAU_LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
 //  LOG_FM(fm)        // TAU_LOG_FM_COLOR << TAU_TO_STR(fm)             <<TC.CLEAR()
 //  LOG_FM_DUMP(fm)   // TAU_LOG_FM_COLOR << TAU_DUMP_TO_STR(fm)        <<TC.CLEAR()
-//  LOG_RR(nso_rr)    // TAU_LOG_FM_COLOR << to_str<node>(fm)           <<TC.CLEAR()
+//  LOG_RR(nso_rr)    // TAU_LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 
 // Logging current file and line:
-//   LOG_TRACE << LOG_LINE_PATH << "msg"; // (trace) [channel] /path/to/file.h:123 msg
-//   LOG_TRACE << LOG_LINE << "msg";      // (trace) [channel] file.h:123 msg
+//   LOG_TRACE << LOG_LINE_PATH << "msg"; // (Trace) [channel] /path/to/file.h:123 msg
+//   LOG_TRACE << LOG_LINE << "msg";      // (Trace) [channel] file.h:123 msg
 
 // TODO (LOW) maybe allow to set a list of enabled channels (addition to --severity trace or debug)
 // TODO (LOW) multiple channels for various warnings and allow user to filter them
@@ -70,10 +70,11 @@ namespace idni::tau_lang {
 //
 // #define TAU_LOG_LINES
 
-// Uncomment or use -D to enable LOG_DEBUG and LOG_TRACE messages in RELEASE.
-// This enables channel filtering by a following LOG_ENABLED_CHANNELS list
-// for non-DEBUG builds. This list is also used in DEBUG builds by default.
-// Otherwise the list of enabled channels is empty.
+// Uncomment or use -D to enable LOG_DEBUG and LOG_TRACE messages of named
+// channels in RELEASE. This enables channel filtering by a following
+// LOG_ENABLED_CHANNELS list for non-DEBUG builds. This list is also used in
+// DEBUG builds by default. Otherwise the list holds no channel, so only the
+// "global" channel's debug and trace messages pass.
 //
 // #define TAU_LOG_CHANNELS
 
@@ -85,6 +86,7 @@ namespace idni::tau_lang {
 // Comment or uncomment as desired.
 //
 #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
+/// @brief Channels whose debug and trace messages pass the filter.
 static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 
 
@@ -132,12 +134,14 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"testing",
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
+/// @brief No channel enabled: only "global" debug and trace messages pass.
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #endif // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
 // -----------------------------------------------------------------------------
 // Logging channels
 
-// default channel name
+/// @brief Channel of the LOG_DEBUG and LOG_TRACE messages that follow
+/// (default "global").
 #define LOG_CHANNEL_NAME "global"
 
 // to define a channel name, redefine the LOG_CHANNEL_NAME macro.
@@ -154,7 +158,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 
 // -----------------------------------------------------------------------------
 
-// Configure the value of a printed file (w or w/o paths) and line number printing in trace and debug messages
+/// @brief File (with or without path) and line prefix of trace and debug
+/// messages, per TAU_LOG_LINE_PATHS / TAU_LOG_LINES; empty by default.
 #ifdef TAU_LOG_LINE_PATHS
 #	define TAU_LOG_LINE_VALUE         << TAU_LOG_LINE_PATH << "\t"
 #else
@@ -165,19 +170,26 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #	endif
 #endif
 
-// Logging stream for error messages. Prepends message with "(Error) "
+/// @brief Logging stream for error messages, on std::cerr. Prepends
+/// message with "(Error) ".
 #define TAU_LOG_ERROR     BOOST_LOG_TRIVIAL(error)
+/// @brief Alias of `TAU_LOG_ERROR`.
 #define LOG_ERROR         TAU_LOG_ERROR
-// Logging stream for warning messages. Prepends message with "(Warning) "
+/// @brief Logging stream for warning messages, on std::cerr. Prepends
+/// message with "(Warning) ".
 #define TAU_LOG_WARNING   BOOST_LOG_TRIVIAL(warning)
+/// @brief Alias of `TAU_LOG_WARNING`.
 #define LOG_WARNING       TAU_LOG_WARNING
 
-// Logging stream for info messages. Doesn't prepend anything
+/// @brief Logging stream for info messages, on std::cout. Doesn't prepend
+/// anything.
 #define TAU_LOG_INFO      BOOST_LOG_TRIVIAL(info)
+/// @brief Alias of `TAU_LOG_INFO`.
 #define LOG_INFO          TAU_LOG_INFO
 
-// Logging stream for debug messages. Prepends message with "(debug) [channel] "
-// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+/// @brief Logging stream for debug messages. Prepends message with
+/// "(Debug) [channel] " padded to a common width; the locally defined
+/// LOG_CHANNEL_NAME has to be "global" or in LOG_ENABLED_CHANNELS.
 //
 // The severity pre-check makes a filtered-out site cost one branch:
 // without it, Boost's open_record runs its attribute-registry lookups on
@@ -190,151 +202,186 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 			  BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::debug) TAU_LOG_LINE_VALUE
+/// @brief Alias of `TAU_LOG_DEBUG`.
 #define LOG_DEBUG         TAU_LOG_DEBUG
-// Logging stream for trace messages. Prepends message with "(trace) [channel] "
-// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+/// @brief Logging stream for trace messages. Prepends message with
+/// "(Trace) [channel] " padded to a common width; the locally defined
+/// LOG_CHANNEL_NAME has to be "global" or in LOG_ENABLED_CHANNELS.
 #define TAU_LOG_TRACE     for (bool _tau_log_gate = logging::level() \
 					<= boost::log::trivial::trace; \
 				_tau_log_gate; _tau_log_gate = false) \
 			  BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::trace) TAU_LOG_LINE_VALUE
+/// @brief Alias of `TAU_LOG_TRACE`.
 #define LOG_TRACE         TAU_LOG_TRACE
 
 // Logging helper macros
 
-// LOG_TRACE << LOG_LINE_PATH << "message";
+/// @brief Streams "<path>:<line> "; use as `LOG_TRACE << LOG_LINE_PATH << "message";`.
 #define TAU_LOG_LINE_PATH        __FILE__      << ":" << __LINE__ << " "
+/// @brief Alias of `TAU_LOG_LINE_PATH`.
 #define LOG_LINE_PATH            TAU_LOG_LINE_PATH
-// LOG_TRACE << LOG_LINE << "message";
+/// @brief Streams "<file>:<line> "; use as `LOG_TRACE << LOG_LINE << "message";`.
 // cl.exe has no __FILE_NAME__, so it prints the full path instead.
 #if defined(_MSC_VER)
 #define TAU_LOG_LINE             __FILE__ << ":" << __LINE__ << " "
 #else
 #define TAU_LOG_LINE             __FILE_NAME__ << ":" << __LINE__ << " "
 #endif
+/// @brief Alias of `TAU_LOG_LINE`.
 #define LOG_LINE                 TAU_LOG_LINE
 
 // -----------------------------------------------------------------------------
 // Colors used in logging
 
-// used for LOG_BRIGHT and pretty printed formulas, specs
+/// @brief Color used for LOG_BRIGHT and pretty printed formulas, specs.
 #define TAU_LOG_BRIGHT_COLOR        TC(term::color::WHITE, \
 					term::color::BRIGHT)
+/// @brief Alias of `TAU_LOG_BRIGHT_COLOR`.
 #define LOG_BRIGHT_COLOR            TAU_LOG_BRIGHT_COLOR
 
-// color for Error messages (only the word "Error" is colored)
+/// @brief Color for Error messages (only the word "Error" is colored).
 #define TAU_LOG_ERROR_COLOR         TC(term::color::RED, \
 					term::color::BRIGHT)
+/// @brief Alias of `TAU_LOG_ERROR_COLOR`.
 #define LOG_ERROR_COLOR             TAU_LOG_ERROR_COLOR
 
-// color for Warning messages (only the "Warning" is colored)
+/// @brief Color for Warning messages (only the "Warning" is colored).
 #define TAU_LOG_WARNING_COLOR       TC(term::color::YELLOW, \
 					term::color::BRIGHT)
+/// @brief Alias of `TAU_LOG_WARNING_COLOR`.
 #define LOG_WARNING_COLOR           TAU_LOG_WARNING_COLOR
-// color for logging channel name
+/// @brief Color for logging channel name.
 #define TAU_LOG_CHANNEL_COLOR       TC(term::color::CYAN)
+/// @brief Alias of `TAU_LOG_CHANNEL_COLOR`.
 #define LOG_CHANNEL_COLOR           TAU_LOG_CHANNEL_COLOR
 
-// color for formulas and specs
+/// @brief Color for formulas and specs.
 #define TAU_LOG_FM_COLOR            TAU_LOG_BRIGHT_COLOR
+/// @brief Alias of `TAU_LOG_FM_COLOR`.
 #define LOG_FM_COLOR                TAU_LOG_FM_COLOR
 
-// color for nonterminal / node types
+/// @brief Color for nonterminal / node types.
 #define TAU_LOG_NT_COLOR            TC(term::color::GREEN)
+/// @brief Alias of `TAU_LOG_NT_COLOR`.
 #define LOG_NT_COLOR                TAU_LOG_NT_COLOR
 
-// color for constants and ba types
+/// @brief Color for constants and ba types.
 #define TAU_LOG_BA_COLOR            TC(term::color::CYAN)
+/// @brief Alias of `TAU_LOG_BA_COLOR`.
 #define LOG_BA_COLOR                TAU_LOG_BA_COLOR
 
-// color for rules
+/// @brief Color for rules.
 #define TAU_LOG_RULE_COLOR          TC(term::color::YELLOW)
+/// @brief Alias of `TAU_LOG_RULE_COLOR`.
 #define LOG_RULE_COLOR              TAU_LOG_RULE_COLOR
 
 // -----------------------------------------------------------------------------
 // Logging helper macros for various types to use appropriate colors
 // They have to be used with `ostream`, ie. after `<<`
 
-// LOG_BRIGHT_COLOR escapes in a stream for any element we want to make bright
+/// @brief LOG_BRIGHT_COLOR escapes in a stream for any element we want to make bright.
 #define TAU_LOG_BRIGHT(m)    TAU_LOG_BRIGHT_COLOR << m              <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_BRIGHT`.
 #define LOG_BRIGHT(m)        TAU_LOG_BRIGHT(m)
 
-// LOG_NT_COLOR escapes in a stream for `size_t` or `node::type`
-//                                               or `tau_parser::nonterminal`
+/// @brief LOG_NT_COLOR escapes in a stream for `size_t` or `node::type`
+///                                               or `tau_parser::nonterminal`.
 #define TAU_LOG_NT(nt)       TAU_LOG_NT_COLOR << node::name(nt)     <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_NT`.
 #define LOG_NT(nt)           TAU_LOG_NT(nt)
 
-// LOG_NT_COLOR escapes in a stream for `rr_sig` (recurrence relation signature)
+/// @brief LOG_NT_COLOR escapes in a stream for `rr_sig` (recurrence relation signature).
 #define TAU_LOG_RR_SIG(sig)  TAU_LOG_NT_COLOR << sig                <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_RR_SIG`.
 #define LOG_RR_SIG(sig)      TAU_LOG_RR_SIG(sig)
 
-// LOG_RULE_COLOR escapes in a stream for rewriter or recurrence relation def
-// requires type node alias to be defined
+/// @brief LOG_RULE_COLOR escapes in a stream for rewriter or recurrence
+/// relation def; requires type node alias to be defined.
 #define TAU_LOG_RULE(r)      TAU_LOG_RULE_COLOR << to_str<node>(r)  <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_RULE`.
 #define LOG_RULE(r)          TAU_LOG_RULE(r)
 
-// LOG_BA_COLOR escapes in a stream for `size_t` BA type id
+/// @brief LOG_BA_COLOR escapes in a stream for `size_t` BA type id; an
+/// unknown id prints "INVALID".
 // TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
 #define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR << [](size_t bid) { \
 		auto nm = ba_types<node>::name(bid); \
 		return nm.has_value() ? nm.value() : std::string("INVALID"); \
 	}(tid) <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_BA_TYPE`.
 #define LOG_BA_TYPE(tid)     TAU_LOG_BA_TYPE(tid)
 
-// LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id
+/// @brief LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id.
 #define TAU_LOG_BA_TYPE_DUMP(tid) TAU_LOG_BA_TYPE(tid) << "(" << tid << ")"
+/// @brief Alias of `TAU_LOG_BA_TYPE_DUMP`.
 #define LOG_BA_TYPE_DUMP(tid)     TAU_LOG_BA_TYPE_DUMP(tid)
 
-// LOG_BA_COLOR escapes in a stream (constants or other elements representing ba constants or ba types)
+/// @brief LOG_BA_COLOR escapes in a stream (constants or other elements representing ba constants or ba types).
 #define TAU_LOG_BA(c)        TAU_LOG_BA_COLOR << c                  <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_BA`.
 #define LOG_BA(c)            TAU_LOG_BA(c)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
+/// @brief LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print.
 #define TAU_LOG_FM(fm)       TAU_LOG_FM_COLOR << tree<node>::get(fm).to_str() \
 								    <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_FM`.
 #define LOG_FM(fm)           TAU_LOG_FM(fm)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
-//                      and then followed by nodes tree printed in a line
+/// @brief LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
+///                      and then followed by nodes tree printed in a line.
 #define TAU_LOG_FM_DUMP(fm)  TAU_LOG_FM_COLOR <<tree<node>::get(fm).to_str() \
 	<< TC.CLEAR() << " \t#\t" << tree<node>::get(fm).print_in_line_to_str()
+/// @brief Alias of `TAU_LOG_FM_DUMP`.
 #define LOG_FM_DUMP(fm)      TAU_LOG_FM_DUMP(fm)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htref` tree print
+/// @brief LOG_FM_COLOR escapes in a stream for `tref` or `htref` tree print.
 #define TAU_LOG_FM_TREE(fm)  TAU_LOG_FM_COLOR<<tree<node>::get(fm).tree_to_str() \
 								    <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_FM_TREE`.
 #define LOG_FM_TREE(fm)      TAU_LOG_FM_TREE(fm)
 
-// LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
+/// @brief LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation).
 #define TAU_LOG_RR(nso_rr)   TAU_LOG_FM_COLOR <<to_str<node>(nso_rr)<<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_RR`.
 #define LOG_RR(nso_rr)       TAU_LOG_RR(nso_rr)
 
-// LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
+/// @brief LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation), dumped.
 #define TAU_LOG_RR_DUMP(nso_rr)  TAU_LOG_FM_COLOR<<dump_to_str<node>(nso_rr) \
 								    <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_RR_DUMP`.
 #define LOG_RR_DUMP(nso_rr)      TAU_LOG_RR_DUMP(nso_rr)
 
-// LOG_SPLITTER adds a LOG_WARNING_COLOR escaped dash separater
+/// @brief LOG_SPLITTER adds a LOG_WARNING_COLOR escaped dash separator.
 #define TAU_LOG_SPLITTER     TAU_LOG_WARNING_COLOR<<"-------------------------"\
 	"----------------------------------------------------------"<<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_SPLITTER`.
 #define LOG_SPLITTER         TAU_LOG_SPLITTER
 
-// outputs tabs to pad up to the trace/debug messages beginning for new lines in log msgs
+/// @brief Outputs tabs to pad up to the trace/debug messages beginning for new lines in log msgs.
 #define TAU_LOG_PADDING      "\t\t\t\t"
+/// @brief Alias of `TAU_LOG_PADDING`.
 #define LOG_PADDING          TAU_LOG_PADDING
 
-// outputs padding + one tab indentation for indenting of new lines in log msgs
+/// @brief Outputs padding + one tab indentation for indenting of new lines in log msgs.
 #define TAU_LOG_INDENT       TAU_LOG_PADDING << "\t"
+/// @brief Alias of `TAU_LOG_INDENT`.
 #define LOG_INDENT           TAU_LOG_INDENT
+/// @brief Alias of `TAU_LOG_INDENT` (one level of indentation).
 #define TAU_LOG_INDENT1      TAU_LOG_INDENT
+/// @brief Alias of `TAU_LOG_INDENT`.
 #define LOG_INDENT1          TAU_LOG_INDENT
+/// @brief Padding + two tabs of indentation for new lines in log msgs.
 #define TAU_LOG_INDENT2      TAU_LOG_INDENT << "\t"
+/// @brief Alias of `TAU_LOG_INDENT2`.
 #define LOG_INDENT2          TAU_LOG_INDENT2
 
 // -----------------------------------------------------------------------------
 
+/// @brief Boost.Log keyword for the "Channel" attribute of a record.
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
+/// @brief Boost.Log keyword for the "Severity" attribute of a record.
 BOOST_LOG_ATTRIBUTE_KEYWORD(severity,     "Severity",
 			    boost::log::trivial::severity_level)
 
@@ -365,9 +412,12 @@ struct logging {
 	/**
 	 * @brief Apply severity @p level as the active filter for the Boost.Log core.
 	 * 
-	 * Sets a global severity level filter. Per-channel filtering is supported
-	 * only for trace and debug levels via the compile-time LOG_ENABLED_CHANNELS
-	 * list. For other severity levels, filtering is global only.
+	 * Sets a global severity level filter and records @p level for `level()`.
+	 * Per-channel filtering applies only while the threshold is trace or
+	 * debug: then a record of a named channel passes only when the channel is
+	 * in the compile-time LOG_ENABLED_CHANNELS list, while the "global"
+	 * channel and records with no channel always pass. Above debug,
+	 * filtering is by severity only.
 	 * 
 	 * @param level Minimum severity level to log (trace, debug, info, warning, error, fatal)
 	 */
@@ -388,16 +438,17 @@ struct logging {
 		});
 	}
 
-	// initialize logging
+	/// @brief true once the Boost.Log core has been configured.
 	inline static bool initialized = false;
 	/**
 	 * @brief One-time Boost.Log setup (subsequent constructions no-op).
 	 *
 	 * Adds the common attributes, applies the default info-level filter
-	 * (see set_filter) and installs a single console sink on std::cout
-	 * whose formatter prefixes records by severity: colored "(Error)" /
-	 * "(Warning)" tags, a "(Trace)"/"(Debug)" tag plus a padded
-	 * [channel] label, and no prefix for info.
+	 * (see set_filter) and installs two console sinks, std::cout for trace,
+	 * debug and info and std::cerr for warning and above, whose formatter
+	 * prefixes records by severity: colored "(Error)" / "(Warning)" tags, a
+	 * "(Trace)"/"(Debug)" tag plus a padded [channel] label, and no prefix
+	 * for info.
 	 */
 	logging() {
 		using namespace boost::log;
@@ -449,6 +500,8 @@ struct logging {
 			keywords::filter = severity >= trivial::warning);
  	}
 
+	/// @brief Severity-and-channel logger, thread-safe unless Boost.Log is
+	/// built without threads.
 #ifdef BOOST_LOG_NO_THREADS
 	using channel_logger_type =
 		boost::log::sources::severity_channel_logger<
@@ -459,13 +512,18 @@ struct logging {
 			boost::log::trivial::severity_level, std::string>;
 #endif // BOOST_LOG_NO_THREADS
 
-	/** @brief Return (creating if needed) the per-channel logger for @p channel_name. */
+	/**
+	 * @brief Return (creating if needed) the per-channel logger for @p channel_name.
+	 *
+	 * The loggers live in a function-local static map for the life of the
+	 * process; the returned reference stays valid.
+	 */
 	inline static channel_logger_type& get_channel_logger(
 						const std::string& channel_name)
 	{
 		using namespace boost::log;
 		static std::unordered_map<std::string, channel_logger_type> loggers;
-		// TT2-25: one lookup, not three (this runs on every DEBUG
+		// One lookup, not three (this runs on every DEBUG
 		// LOG_DEBUG/LOG_TRACE statement).
 		return loggers.try_emplace(channel_name,
 			channel_logger_type(
@@ -477,7 +535,7 @@ private:
 	inline static boost::log::trivial::severity_level set_level;
 };
 
-// static initialization of the logging system
+/// @brief Static instance whose construction configures the logging system.
 inline static logging initialize_logging;
 
 } // namespace idni::tau_lang

@@ -4,8 +4,8 @@
  * @file defs.h
  * @brief Core macros, compile-time helpers, and GIT version constants for Tau.
  *
- * Defines `hasb`/`hasbc`/`sortc` search/sort macros and the `TAU_PRINT*`
- * family of tree-printing macros. Also initializes logging and includes the
+ * Defines `hasb`/`hasbc`/`sortc` search/sort macros, `erase_at` and the
+ * `TAU_PRINT*` family of tree-printing macros. Also initializes logging and includes the
  * external parser's `defs.h`.
  */
 
@@ -50,15 +50,22 @@
 #endif
 
 // Macros to ease searching and sorting
-// Binary search of y in x
+/// @brief Binary search of @p y in the sorted range @p x.
 #define hasb(x, y) (std::binary_search(x.begin(), x.end(), y))
-// Binary search of y in x using comparator f
+/// @brief Binary search of @p y in @p x, sorted by comparator @p f.
 #define hasbc(x, y, f) (std::binary_search(x.begin(), x.end(), y, f))
-// Sorting of x using comparator f
+/// @brief Sort @p x in place with comparator @p f.
 #define sortc(x, f) (std::sort(x.begin(), x.end(), f))
 
-// Erase the element at @p index: a vector offset is signed, so the index
-// converts once here instead of at each call site.
+/**
+ * @brief Erase the element at @p index of @p v.
+ *
+ * A vector offset is signed, so the index converts once here instead of at
+ * each call site.
+ * @tparam V A sequence container with random-access iterators.
+ * @param v Container to erase from.
+ * @param index Position of the element; must be less than `v.size()`.
+ */
 template <typename V>
 void erase_at(V& v, size_t index) {
 	v.erase(v.begin() + static_cast<std::ptrdiff_t>(index));
@@ -72,23 +79,23 @@ void erase_at(V& v, size_t index) {
 // argument `ref` is a tree pointer reference `tref`,
 // or shared pointer handle `htref`
 
-// helper macro for pretty printing a tau tree tref into std::cout
+/// @brief Pretty print the tree @p ref into std::cout.
 #define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
-// helper macro for printing a tau tree tref into std::cout
+/// @brief Print the node structure of the tree @p ref into std::cout.
 #define TAU_PRINT_TREE(ref) (tree<node>::get(ref).print_tree(std::cout))
-// helper macro for dumping a tau tree tref into std::cout
+/// @brief Dump the tree @p ref (debug dump form) into std::cout.
 #define TAU_DUMP(ref) (tree<node>::get(ref).dump(std::cout))
-// helper macro for pretty printing a tau tree tref into to stream
+/// @brief Pretty print the tree @p ref into the stream @p to.
 #define TAU_PRINT_TO(ref, to) (tree<node>::get(ref).print(to))
-// helper macro for printing a tau tree tref into to stream
+/// @brief Print the node structure of the tree @p ref into the stream @p to.
 #define TAU_PRINT_TREE_TO(ref, to) (tree<node>::get(ref).print_tree(to))
-// helper macro for dumping a tau tree tref into to stream
+/// @brief Dump the tree @p ref (debug dump form) into the stream @p to.
 #define TAU_DUMP_TO(ref, to) (tree<node>::get(ref).dump(to))
-// helper macro for pretty printing a tau tree tref into a string
+/// @brief Pretty print the tree @p ref into a string.
 #define TAU_TO_STR(ref) (tree<node>::get(ref).to_str())
-// helper macro for rendering a tau tree tref's node structure as a string
+/// @brief Render the node structure of the tree @p ref as a string.
 #define TAU_TREE_TO_STR(ref) (tree<node>::get(ref).tree_to_str())
-// helper macro for dumping a tau tree tref (debug dump form) into a string
+/// @brief Dump the tree @p ref (debug dump form) into a string.
 #define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
 
 namespace idni::tau_lang {

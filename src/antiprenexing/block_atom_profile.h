@@ -45,17 +45,19 @@ struct block_atom_profile {
 	/// `distribute_block_over_atoms`, the law this guards, is Corollary 5.1
 	/// with J1 empty and holds only in an *atomless* Boolean algebra: for
 	/// `bv[1]`, `ex x (x != 0 && x' != 0)` is F while the distributed
-	/// `ex x (x != 0) && ex x (x' != 0)` is T. Its header names the
-	/// precondition and delegates it to the caller, but the caller only ever
-	/// established `!skip_content` -- i.e. atomlessness rode entirely on the
-	/// caller's choice of analysis, which is exactly what went wrong when
-	/// `blast_block` re-entered with a skip-nothing one. `atomic_ba_content`
-	/// checks it directly instead.
+	/// `ex x (x != 0) && ex x (x' != 0)` is T. `!skip_content` alone does not
+	/// establish atomlessness (an analysis that skips nothing passes it), so
+	/// the guard also requires `!atomic_ba_content`.
+	/// @return true when every atom is a negated equation and nothing is
+	///         skipped or atomic.
 	bool all_negated() const {
 		return !skip_content && !atomic_ba_content && others == 0
 			&& positives == 0 && negatives > 0;
 	}
 	/// Paper step 2b's guard.
+	/// @return true when every atom is an equation `f = 0` and nothing is
+	///         skipped; valid in any Boolean algebra, so atomicity is not
+	///         consulted.
 	bool all_positive() const {
 		return !skip_content && others == 0
 			&& negatives == 0 && positives > 0;

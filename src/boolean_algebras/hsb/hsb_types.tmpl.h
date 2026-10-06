@@ -6,11 +6,13 @@
 namespace idni::tau_lang {
 
 // Derived from the descriptor, which builds both from its own type_name.
+/** @internal @copydoc hsb_type @endinternal */
 template <NodeType node>
 tref hsb_type() {
 	return ba_descriptor<hsb, node>::type_tree();
 }
 
+/** @internal @copydoc hsb_type_id @endinternal */
 template <NodeType node>
 size_t hsb_type_id() {
 	static const size_t id = ba_types<node>::id(

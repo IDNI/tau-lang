@@ -6,8 +6,8 @@
  *
  * Declares the public interface: `fm_at_time_point`,
  * `get_uninterpreted_constants_constraints`, `transform_to_execution`,
- * `is_tau_formula_sat`, `is_tau_impl`, `are_tau_equivalent`, and
- * `simp_tau_unsat_valid`. Template implementations and internal helpers
+ * `is_tau_formula_sat`, `pin_written_warm_ups`, `is_tau_impl`,
+ * `are_tau_equivalent`, and `simp_tau_unsat_valid`. Template implementations and internal helpers
  * reside in `satisfiability.tmpl.h`.
  */
 
@@ -41,6 +41,9 @@ enum class sometimes_inputs : bool {
 
 /**
  * @brief Instantiate @p original_fm for IO variables at @p time_point.
+ *
+ * Every variable of @p io_vars is replaced at once by its instantiation;
+ * a variable already at a constant time point is kept.
  * @tparam node Tree node type.
  * @param original_fm Formula template to instantiate.
  * @param io_vars IO variable nodes to substitute.
@@ -66,10 +69,15 @@ result<tref> fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time
 /**
  * @brief Compute constraints for uninterpreted constants in an unbounded continuation.
  *
- * Assumes @p fm is an unbound continuation formula.
+ * Assumes @p fm is an unbound continuation formula. Instantiates @p fm at
+ * its lookback plus @p start_time, quantifies its IO variables in
+ * time-compatible order (inputs universally, outputs existentially),
+ * existentially quantifies every other free variable except the
+ * uninterpreted constants, and normalizes the result.
  * @tparam node Tree node type.
  * @param fm Unbounded continuation formula.
- * @param io_vars IO variable nodes (updated with any new variables).
+ * @param io_vars [in,out] IO variable nodes of @p fm on entry; consumed
+ * (left empty) on exit.
  * @param start_time Time step at which the continuation was started.
  * @return A result carrying the formula constraining uninterpreted
  * constants, or `T` if none exist. A failed result means the continuation
@@ -97,26 +105,38 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, in
 
 /**
  * @brief Transform a normalized Tau formula into execution form.
+ *
+ * Replaces the always part by its unbounded continuation and folds the
+ * `sometimes` clauses into eventual-variable flags whose raising is then
+ * searched. With two or more `sometimes` clauses each is first decided
+ * alone with the always part, and one refuted alone refutes @p fm. With
+ * `TAU_CACHE` the result is memoized per (formula, start time) and per
+ * @p inputs, and the memo is dropped when `verdict_budget_fingerprint`
+ * changes. Bounded by `max_fixpoint_steps` and `max_flag_search_steps`.
  * @tparam node Tree node type.
- * @param fm Normalized Tau formula.
+ * @param fm Normalized Tau formula; a single DNF clause.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
  * @param inputs How the input streams of a `sometimes` clause are read
  * (default: universally, as satisfiability defines them).
  * @return Formula ready for step-by-step execution (`F` when @p fm has no
- * satisfiable continuation), or `nullptr` when normalization fails on a
- * `bv_widening` width-cap violation (already logged by the widening pass).
+ * satisfiable continuation); an error when @p fm is null, still holds a
+ * function or predicate reference, nests a temporal operator inside an
+ * `always` or `sometimes` clause, or when a step cap, the time budget or a
+ * normalization stops the search before a verdict.
  *
  * @par Example
  * @code{.cpp}
  * // Unsatisfiable clause: o1 is always 0, yet must sometimes be both 0 and 1
- * // (see tests/integration/test_integration-satisfiability1.cpp:24-27)
+ * // (see the test case "equal_lookback_two_st" in
+ * // tests/integration/satisfiability/test_integration-satisfiability-bool.cpp)
  * tref fm = create_spec(
  *     "(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
  * CHECK(transform_to_execution<node_t>(fm).value() == tau::_F());
  *
  * // Satisfiable bitvector conditional: holds for every possible input
- * // (see tests/integration/test_integration-satisfiability3.cpp:38-40)
+ * // (see the REPL test realizable_cmd-bv-simple_conditional_case in
+ * // tests/repl/commands/test_repl-realizable_cmd.cmake)
  * tref fm2 = create_spec(
  *     "(always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }).");
  * CHECK(transform_to_execution<node_t>(fm2).value() != tau::_F());
@@ -130,8 +150,15 @@ result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
 
 /**
  * @brief Check whether a Tau formula is satisfiable.
+ *
+ * CTL* formulas are reduced to LTL first; full-LTL formulas (and Boolean
+ * combinations of models the safety pipeline cannot read) go to the
+ * LTL(ABA) realizability check; the rest is normalized and each DNF path is
+ * decided by `transform_to_execution`. With `TAU_CACHE` the verdict is
+ * memoized per (formula, start time) unless @p output is set, and the memo
+ * is dropped when `verdict_budget_fingerprint` changes.
  * @tparam node Tree node type.
- * @param fm Tau formula to test.
+ * @param fm Tau formula to test; must not be null.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
  * @return `true` if the formula is satisfiable: it can be executed
@@ -144,14 +171,16 @@ result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
  * @code{.cpp}
  * // Unsatisfiable: "always" forces o1 to be 0 at every time step, but the
  * // "sometimes" clause demands a time step where o1[t] = 1 while o1[t-1] = 0
- * // (see tests/integration/test_integration-satisfiability1.cpp:13-14)
+ * // (see the test case "equal_lookback_one_st" in
+ * // tests/integration/satisfiability/test_integration-satisfiability-bool.cpp)
  * tref fm_unsat = create_spec(
  *     "(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
  * CHECK(!is_tau_formula_sat<node_t>(fm_unsat).value());
  *
  * // Satisfiable: "always" pins o1 to the constant 1, and "sometimes" only
  * // constrains the unrelated stream o2
- * // (see tests/integration/test_integration-satisfiability1.cpp:17-18)
+ * // (see the test case "smaller_lookback_one_st" in
+ * // tests/integration/satisfiability/test_integration-satisfiability-bool.cpp)
  * tref fm_sat = create_spec(
  *     "(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
  * CHECK(is_tau_formula_sat<node_t>(fm_sat).value());
@@ -217,8 +246,9 @@ result<tref> pin_written_warm_ups(tref fm);
  * @param f2 Consequent formula.
  * @return `true` if every model of @p f1 satisfies @p f2, `false` as soon
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
- * disjunct is satisfiable and one of them is undecided, or when
- * normalization fails.
+ * disjunct is satisfiable and one of them is undecided, when normalization
+ * fails, or (`unsupported_operation`) when either formula holds a CTL*
+ * operator or the check holds full-LTL operators.
  *
  * @par Example
  * @code{.cpp}
@@ -247,8 +277,9 @@ result<bool> is_tau_impl(tref f1, tref f2);
  * @param f2 Second formula (closed).
  * @return `true` if @p f1 and @p f2 have identical models, `false` as soon
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
- * disjunct is satisfiable and one of them is undecided, or when
- * normalization fails.
+ * disjunct is satisfiable and one of them is undecided, when normalization
+ * fails, or (`unsupported_operation`) when the check holds CTL* or
+ * full-LTL operators.
  *
  * @par Example
  * @code{.cpp}
@@ -265,29 +296,42 @@ template <NodeType node>
 result<bool> are_tau_equivalent(tref f1, tref f2);
 
 // Support-component factoring (defined in boolean_algebras/tau/tau_ba.tmpl.h,
-// same translation unit): used by simp_tau_unsat_valid below to decide its
-// per-path satisfiability tests unit-wise where that is exact.
+// same translation unit): factored_tau_sat and factored_tau_valid let
+// simp_tau_unsat_valid below decide its validity and per-path
+// satisfiability tests unit-wise where that is exact.
+/// @brief Whether component factoring is on (the `ba_component_factoring`
+/// flag, or the TAU_BA_COMPONENT_FACTORING environment variable).
 inline bool ba_component_factoring_enabled();
+/// @brief Unit-wise satisfiability of @p fm: 1 sat, 0 unsat, -1 not
+/// applicable (the caller falls back to the monolithic check).
 template <typename node> static int factored_tau_sat(tref fm);
+/// @brief Unit-wise validity of @p fm: 1 valid, 0 not valid, -1 not
+/// applicable (the caller falls back to the monolithic check).
 template <typename node> static int factored_tau_valid(tref fm);
 
 /**
  * @brief Simplify @p fm by removing unsatisfiable or valid temporal sub-formulas.
+ *
+ * A valid @p fm becomes `T`. Otherwise @p fm is normalized and every DNF
+ * path that is not unsatisfiable is kept; the kept paths are deduplicated
+ * and absorbed by `simplify_dnf_clauses`. With component factoring on
+ * (`pack_ba_component_factoring_enabled`) and @p start_time `0`, validity
+ * and each path's satisfiability are decided unit-wise where that is exact.
+ * An undecided validity only skips that simplification.
  * @tparam node Tree node type.
- * @param fm Formula to simplify.
+ * @param fm Formula to simplify; must not be null.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return Simplified formula, or `nullptr` when normalization fails on a
- * `bv_widening` width-cap violation (already logged by the widening pass).
+ * @return Simplified formula (`F` when no path is satisfiable); an error
+ * when normalization fails or a path's satisfiability cannot be decided.
  *
  * @par Example
  * @code{.cpp}
  * // First disjunct is unsatisfiable (o2[t] cannot be both 0 and 1 at the
- * // same time step), second disjunct is satisfiable. Tracing the
- * // implementation: is_tau_impl<node>(T, fm).value_or(false) fails first (fm is not
- * // valid), so fm is normalized into DNF disjuncts and each disjunct whose
- * // transform_to_execution(...) is not F is kept; the unsatisfiable first
- * // disjunct is therefore dropped from the result.
+ * // same time step), second disjunct is satisfiable. fm is not valid, so it
+ * // is normalized into DNF paths and each path that is not unsatisfiable is
+ * // kept; the unsatisfiable first disjunct is therefore dropped from the
+ * // result.
  * tref fm = create_spec(
  *     "(always (o2[t] = 0 && o2[t] = 1)) || (always o1[t] = 1).");
  * tref result = simp_tau_unsat_valid<node_t>(fm).value();

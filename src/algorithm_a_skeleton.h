@@ -3,15 +3,16 @@
 // Algorithm A (D_i + R_ρ encoding) skeleton builder — paper's main optimization.
 //
 // The encoding:
-//   R_ρ  — ⌈log₂|T₁|⌉ output bits binary-encoding the T₁ type of the current output y
-//   D_i  — K output bits, one per data subformula (passed verbatim to φ*)
+//   R_ρ  — ⌈log₂|T₁|⌉ output bits (at least 1) binary-encoding the T₁ type of the
+//          current output y
+//   D_i  — K output bits d_0..d_{K-1}, one per data subformula (passed verbatim to φ*)
 //
 // Input:
 //   T1_size        |T₁| = 2k+1 (k = number of named constants)
 //   K              number of data subformulas
 //   feasible_set   (σ, ρ, A): σ=T₁ type of prev y (memory), ρ=T₁ type of curr y,
 //                  A=D-bitmask (bit i set ↔ D_i holds in this T₃ type)
-//   phi_star_ltl   LTL skeleton over D_0..D_{K-1} in Spot syntax; passed verbatim
+//   phi_star_ltl   LTL skeleton over d_0..d_{K-1} in Spot syntax; passed verbatim
 //
 // Output formula:
 //   (1) G(!r_encode(ρ))                                for ρ ∈ [T1_size, 2^n_rbits) — R-validity
@@ -19,7 +20,7 @@
 //   (3) G(r_encode(σ) → X(∧ !(r_encode(ρ) & d_pattern(A))))  per σ
 //   (4) (phi_star_ltl)
 //
-// outs: r_0..r_{n_rbits-1} then D_0..D_{K-1}
+// outs: r_0..r_{n_rbits-1} then d_0..d_{K-1}
 
 #ifndef __IDNI__TAU__ALGORITHM_A_SKELETON_H__
 #define __IDNI__TAU__ALGORITHM_A_SKELETON_H__
@@ -88,7 +89,8 @@ inline std::string neg_atom(int rho, int A, int K, int n_rbits) {
 }
 
 /// @brief Output of `build_algorithm_a_skeleton`: the formula, its output
-/// propositions and the encoding sizes.
+/// propositions (`r_0..r_{n_rbits-1}` then `d_0..d_{K-1}`) and the encoding
+/// sizes (`n_rbits` R-bits, `T1_size` = |T_1|, `K` data atoms).
 struct skeleton_bundle {
 	std::string formula;
 	std::vector<std::string> outs; // r_0..r_{n_rbits-1} then D_0..D_{K-1}
@@ -102,12 +104,15 @@ struct skeleton_bundle {
  * the file header.
  *
  * Emits the R-validity clauses (1), the unconditional (2) and per-sigma
- * conditional (3) infeasibility clauses in the compact form when the
- * feasible A-set is smaller than its complement, then phi* verbatim (4).
+ * conditional (3) infeasibility clauses, then phi* verbatim (4). For each
+ * rho (or (sigma, rho)) with no feasible A the R-encoding is forbidden
+ * outright; otherwise the clause lists the feasible D-patterns when they are
+ * no more than the infeasible ones, and the negated infeasible ones
+ * otherwise. The formula size is O(T1_size^2 * 2^K) in the worst case.
  * @param T1_size |T_1| = 2k+1.
- * @param K Number of data subformulas.
+ * @param K Number of data subformulas; the A-masks range over [0, 2^K).
  * @param feasible_set Feasible (sigma, rho, A) triples.
- * @param phi_star_ltl LTL skeleton over D_0..D_{K-1}; empty means "true".
+ * @param phi_star_ltl LTL skeleton over d_0..d_{K-1}; empty means "true".
  * @return The bundle {formula, outs, n_rbits, T1_size, K}.
  */
 inline skeleton_bundle build_algorithm_a_skeleton(

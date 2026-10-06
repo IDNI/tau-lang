@@ -8,18 +8,21 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc rule_apply_counts @endinternal */
 template <NodeType node>
 std::unordered_map<std::string, size_t>& rule_apply_counts() {
 	static std::unordered_map<std::string, size_t> m;
 	return m;
 }
 
+/** @internal @copydoc rule_hit_counts @endinternal */
 template <NodeType node>
 std::unordered_map<std::string, size_t>& rule_hit_counts() {
 	static std::unordered_map<std::string, size_t> m;
 	return m;
 }
 
+/** @internal @copydoc flush_rule_counts @endinternal */
 template <NodeType node>
 void flush_rule_counts(report& rep) {
 	auto& applies = rule_apply_counts<node>();
@@ -46,6 +49,7 @@ rewriter::rule alpha_shift_rule_body(const rewriter::rule& r, tref n) {
 	return { r.first, tau::geth(shifted) };
 }
 
+/** @internal @copydoc nso_rr_apply(const rewriter::rule&, const tref&) @endinternal */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
@@ -99,6 +103,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 		return nn;
 }
 
+/** @internal @copydoc nso_rr_apply(const rewriter::rules&, tref) @endinternal */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
@@ -144,22 +149,23 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 // offset-free reference to a recurrence defined with offsets, e.g. `g(y)`
 // for `g[n](x) := ...`), runs calculate_fixed_point on each, and records
 // the results in `changes` for the caller to substitute. Non-call nodes
-// are rebuilt with their children's recorded replacements. Applied by
-// calculate_all_fixed_points below over a spec's main formula.
+// are returned as they are. Applied by calculate_all_fixed_points below
+// over a spec's main formula.
 template <NodeType node>
 struct fixed_point_transformer {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	using type = typename node::type;
 
+	// Keeps a copy of @p defs and builds its fixpoint-call table.
 	fixed_point_transformer(const rr<node>& defs)
 		: defs(defs), fpcalls(find_fpcalls(defs)) {}
 
 	// Visitor step: when @p n is a wff- or bf-wrapped reference whose
 	// signature names a fixpoint call (see find_fpcalls), calculate the
 	// fixpoint in @p n's own world (wff or bf, from the wrapper) and
-	// memoize it in `changes`; otherwise rebuild @p n from its children's
-	// recorded replacements. Returns nullptr on an unsupported
+	// memoize it in `changes`; otherwise return @p n as is (the caller
+	// substitutes `changes` afterwards). Returns nullptr on an unsupported
 	// multi-index call or a failed fixpoint calculation, which aborts the
 	// traversal.
 	tref operator()(tref n) {
@@ -192,9 +198,8 @@ struct fixed_point_transformer {
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
-		// RR-6: `changes` is only ever keyed by the parent nodes, so
-		// the old contains(ref) propagation branch here was dead --
-		// the rebuild always returned the identical canonical node.
+		// `changes` is only ever keyed by the wrapping parent nodes, so a
+		// non-call reference needs no propagation.
 		return n;
 	}
 
@@ -247,24 +252,23 @@ struct fixed_point_transformer {
 		return fpcalls;
 	}
 
-	// returns ref to calculate fp by provided by fp call sig, or no value
+	// Returns the indexed signature the fixpoint call @p fp_sig calculates,
+	// or no value when @p fp_sig is not a fixpoint call.
 	std::optional<rr_sig> fpcall(const rr_sig& fp_sig) const {
 		if (auto it = fpcalls.find(fp_sig); it != fpcalls.end())
 			return { it->second };
 		return {};
 	}
 
+	// Calculated fixpoint per call node, for the caller to substitute.
 	subtree_map<node, tref> changes;
+	// The recurrence relation the calls are calculated against.
 	rr<node> defs;
+	// Offset-free call signature -> indexed definition signature.
 	std::unordered_map<rr_sig, rr_sig> fpcalls;
 };
 
-// Replaces every fixpoint call in @p nso_rr's main formula by its
-// calculated fixpoint (or fallback) value, leaving the rest of the
-// formula unchanged. Reports an error when the spec is invalid or any
-// fixpoint calculation fails (multi-index call, non-well-founded
-// definitions, exhausted enumeration budget, or rules that never apply to
-// the call).
+/** @internal @copydoc calculate_all_fixed_points @endinternal */
 template <NodeType node>
 result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 	result<tref> r;
@@ -287,15 +291,7 @@ result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 	return r.with_value(new_main);
 }
 
-// Turns @p nso_rr's definitions into applicable rewrite rules: variables
-// in offset positions and in reference arguments become captures, so a
-// rule head matches any call. In each rule's HEAD every variable
-// argument is converted while being collected; in its BODY only the
-// variables that appeared in the head are converted (a body variable of
-// its own is a value, not a pattern hole). The main formula only gets
-// its offset variables converted. IO stream variables are never touched
-// (they are concrete streams, not pattern holes). Types carried by the
-// converted arguments are preserved on the rebuilt nodes.
+/** @internal @copydoc transform_ref_args_to_captures @endinternal */
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;
@@ -376,8 +372,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	return ret;
 }
 
-// Applies the recurrence relations the formula comes with to the formula.
-// This is the rr-overload of nso_rr_apply, complementing the rule/rules overloads.
+/** @internal @copydoc nso_rr_apply(const rr<node>&) @endinternal */
 template <NodeType node>
 result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	result<tref> r;

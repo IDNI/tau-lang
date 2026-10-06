@@ -25,7 +25,7 @@ static bool ocltl_direct_decode_atom_shaped(tref atom) {
 
 // True when every atom on an edge's template list is direct-decode shaped --
 // the whole edge is then eligible for the atomless decode below instead of
-// the general solve_with_max_update path.
+// the general solution_with_max_update path.
 template <NodeType node>
 static bool ocltl_direct_decode_edge_eligible(const trefs& tmpls) {
 	for (tref atom : tmpls)
@@ -61,7 +61,8 @@ static bool ocltl_is_output_coord(tref v) {
 //
 // Returns nullopt if some atom doesn't reduce to <=1 free output
 // coordinate, or the system is unsatisfiable for this history; either way
-// produce() falls back to the general path.
+// produce() falls back to the general path. An error means grounding a
+// template or the atomless solver failed.
 //
 // `ledger` is this run's fresh_element_ledger, threaded into every solve so
 // its cross-step exclusion fast path can engage; each decided coordinate is
@@ -181,6 +182,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	return r.with_value(std::move(sol));
 }
 
+/** @internal @copydoc table_step_provider::table_step_provider @endinternal */
 template <NodeType node>
 table_step_provider<node>::table_step_provider(
 	codegen::strategy strat,
@@ -241,6 +243,7 @@ table_step_provider<node>::table_step_provider(
 	}
 }
 
+/** @internal @copydoc table_step_provider::live_probe_atoms @endinternal */
 template <NodeType node>
 trefs table_step_provider<node>::live_probe_atoms() const {
 	trefs atoms;
@@ -252,6 +255,7 @@ trefs table_step_provider<node>::live_probe_atoms() const {
 	return atoms;
 }
 
+/** @internal @copydoc table_step_provider::produce @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	const trefs&, const assignment<node>& memory,
@@ -442,6 +446,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	return r.with_assert_check_value(std::move(result));
 }
 
+/** @internal @copydoc table_step_provider::read_set @endinternal */
 template <NodeType node>
 std::optional<trefs> table_step_provider<node>::read_set(const trefs& vars)
 	const
@@ -474,17 +479,20 @@ std::optional<trefs> table_step_provider<node>::read_set(const trefs& vars)
 	return out;
 }
 
+/** @internal @copydoc table_step_provider::strategy_state @endinternal */
 template <NodeType node>
 std::optional<size_t> table_step_provider<node>::strategy_state() const {
 	if (!from_start_) return std::nullopt;
 	return state_;
 }
 
+/** @internal @copydoc table_step_provider::lookback @endinternal */
 template <NodeType node>
 int_t table_step_provider<node>::lookback() const {
 	return from_start_ ? lookback_ : 0;
 }
 
+/** @internal @copydoc table_step_provider::reset @endinternal */
 template <NodeType node>
 void table_step_provider<node>::reset() {
 	state_ = strat_.initial_state;
@@ -494,6 +502,7 @@ void table_step_provider<node>::reset() {
 	ledger_ = fresh_element_ledger{};
 }
 
+/** @internal @copydoc make_table_provider @endinternal */
 template <NodeType node>
 result<std::pair<std::shared_ptr<table_step_provider<node>>,
 	std::pair<int, int>>>

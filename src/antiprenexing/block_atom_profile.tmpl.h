@@ -10,6 +10,8 @@ namespace detail {
  * @tparam node Tree node type.
  * @param n Sub-formula to census.
  * @param p Accumulator, updated in place.
+ * @param guards_only Stop as soon as neither guard of @p p can hold; the
+ *        counts are then lower bounds (see `profile_block_atoms`).
  * @endinternal
  */
 template<NodeType node>
@@ -42,6 +44,7 @@ void profile_block_atoms_rec(tref n, block_atom_profile<node>& p,
 
 } // namespace detail
 
+/** @internal @copydoc profile_block_atoms @endinternal */
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
 	const eliminability<node>& el, bool guards_only)

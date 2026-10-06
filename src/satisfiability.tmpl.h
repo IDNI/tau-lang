@@ -21,22 +21,23 @@
 
 namespace idni::tau_lang {
 
+/// When set, `print_fixpoint_info` writes to std::cerr instead of `LOG_INFO`.
 inline static bool use_debug_output_in_sat = false;
 
 /// Cap on the fixpoint searches in `find_fixpoint_phi`/`find_fixpoint_chi`;
 /// 0 = unlimited. A runtime parameter by policy, never a header constant —
 /// set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
-/// `api::set_max_fixpoint_steps`. SO-1 caveat: these searches have no
-/// convergence guarantee, so an unlimited run on a non-converging spec does
-/// not terminate. The shipped default is therefore FINITE (500, the value the
-/// pre-parameter constant had): reaching it is an error without a verdict,
-/// where an unlimited run may hang `sat`/`run`/pointwise revision. Pass 0 to
-/// opt into unlimited. The CLI default in main.cpp must agree with this value.
-/// Environment fallback `TAU_MAX_FIXPOINT_STEPS`.
+/// `api::set_max_fixpoint_steps`. These searches have no convergence
+/// guarantee, so an unlimited run on a non-converging spec does not
+/// terminate. The shipped default is therefore FINITE (500): reaching it is
+/// an error without a verdict, where an unlimited run may hang
+/// `sat`/`run`/pointwise revision. Pass 0 to opt into unlimited. The CLI
+/// default in main.cpp must agree with this value. Environment fallback
+/// `TAU_MAX_FIXPOINT_STEPS`.
 inline env_limit<size_t> max_fixpoint_steps{ "TAU_MAX_FIXPOINT_STEPS", 500 };
 
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
-/// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps`, and
+/// boundary; 0 = unlimited. Same convergence caveat as `max_fixpoint_steps`, and
 /// reaching it is likewise an error without a verdict. Shipped default 500
 /// (finite, see above); set via `--max-flag-search-steps`, REPL `flagsteps`,
 /// or `api::set_max_flag_search_steps`.
@@ -47,12 +48,15 @@ inline env_limit<size_t> max_flag_search_steps{
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
- * caps above, the master preprocessing switch, the options the algebras of
- * the pack declare (`pack_ba_options_fingerprint`) and the LTL(ABA) knobs
- * (`ltl_verdict_budget_fingerprint`). The verdict memos in this file are
- * keyed on the formula only and drop their entries when it changes. (The
- * semantic PWR fallback lives in pointwise_revision.h, which includes this
- * header; it steers the revision, not these memos.)
+ * caps above, the master preprocessing switch, `max_constant_size`, the
+ * options the algebras of the pack declare (`pack_ba_options_fingerprint`)
+ * and the LTL(ABA) knobs (`ltl_verdict_budget_fingerprint`). The verdict
+ * memos in this file are keyed on the formula only and drop their entries
+ * when it changes. (The semantic PWR fallback lives in
+ * pointwise_revision.h, which includes this header; it steers the revision,
+ * not these memos.)
+ * @tparam node Tree node type.
+ * @return A hash of the current values; equal values give equal hashes.
  */
 template <NodeType node>
 size_t verdict_budget_fingerprint() {
@@ -124,8 +128,8 @@ int_t get_lookback_after_normalization(const trefs& io_vars) {
 	return max_lookback;
 }
 
-// Check if a formula has a temporary output stream
-// which are used for flag handling
+// True when @p fm holds an IO variable whose name starts with "_", the
+// temporary streams of the flag handling.
 template <NodeType node>
 bool has_temporary_io_var(tref fm) {
 	using tau = tree<node>;
@@ -273,8 +277,8 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<size_t> quantifiable_i_vars;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		// SO-10: fail loudly on an unclassified io_var, like the
-		// existential sibling does.
+		// Fail loudly on an unclassified io_var, like the existential
+		// sibling does.
 		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
 			|| tau::get(io_vars[i])[0].is_output_variable());)
 		// Skip output streams
@@ -302,19 +306,18 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 /**
  * @internal
  * @brief Evaluate a constant-time constraint (e.g. `t <= 3`) at a concrete
- * time point, returning the result as a Boolean-algebra constant.
+ * time point.
  * @tparam node Tree node type.
  * @param constraint Constraint node comparing `t` against a fixed numeral
- * (`ctn_eq`, `ctn_neq`, `ctn_lt`, `ctn_lteq`, `ctn_gt`, or `ctn_gteq`).
+ * (`ctn_eq`, `ctn_neq`, `ctn_lt`, `ctn_lteq`, `ctn_gt`, or `ctn_gteq`);
+ * must not be null.
  * @param time_point Concrete value substituted for `t`.
- * @return The Boolean-algebra constant `_1` if the constraint holds at
- * `time_point`, otherwise `_0`.
+ * @return `true` if the constraint holds at `time_point`.
  * @endinternal
  *
  * @par Example
- * For the constraint `t <= 3` and `time_point = 2`, `calculate_ctn`
- * evaluates `2 <= 3` and returns `_1` (true); for `time_point = 5` it
- * evaluates `5 <= 3` and returns `_0` (false).
+ * For the constraint `t <= 3`, `time_point = 2` evaluates `2 <= 3` and
+ * returns `true`; `time_point = 5` evaluates `5 <= 3` and returns `false`.
  */
 template <NodeType node>
 bool ctn_holds_at(tref constraint, int_t time_point) {
@@ -346,6 +349,8 @@ bool ctn_holds_at(tref constraint, int_t time_point) {
 	return false;
 }
 
+// `ctn_holds_at` as a constant of the pack's Boolean carrier type: `1` when
+// @p constraint holds at @p time_point, `0` otherwise.
 template <NodeType node>
 tref calculate_ctn(tref constraint, int_t time_point) {
 	const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
@@ -374,7 +379,12 @@ bool ctn_holds_from(tref constraint, int_t start) {
  * The `always` statements together form one clause and each `sometimes`
  * statement another; a clause is enforced from the deepest lookback it reads
  * (README.md, "Lookback initialization"), so a guard such as `[t = 0]` in a
- * clause reading `o1[t-1]` has no effect.
+ * clause reading `o1[t-1]` has no effect. A clause with no lookback is not
+ * checked.
+ * @tparam node Tree node type.
+ * @tparam R A result or report type with a `warning(msg, attrs)` member.
+ * @param fm Formula as written; may be null (nothing is checked).
+ * @param r Receives one warning per dead constraint, naming it.
  */
 template <NodeType node, typename R>
 void warn_dead_time_constraints(tref fm, R& r) {
@@ -461,6 +471,7 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	return false;
 }
 
+/** @internal @copydoc fm_at_time_point @endinternal */
 template <NodeType node>
 result<tref> fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) {
 	result<tref> r;
@@ -617,7 +628,7 @@ inline auto constant_io_comp = [](tref v1, tref v2) {
  * points.
  * @return `true` if the time-compatibly quantified formula is satisfiable
  * (short-circuiting to `true`/`false` immediately if `fm` is already `T`
- * or `F`).
+ * or `F`); an error when @p fm is null or a normalization fails.
  * @endinternal
  *
  * @par Example
@@ -625,12 +636,12 @@ inline auto constant_io_comp = [](tref v1, tref v2) {
  * conjoining successive `fm_at_time_point<node>(ubd_ctn, io_vars, t)`
  * instantiations and calls `is_run_satisfiable<node>(run)` after each step
  * to detect a contradiction as early as possible. For the always-part of
- * "smaller_lookback_one_st" from
- * tests/integration/test_integration-satisfiability1.cpp:17
+ * the test case "smaller_lookback_one_st" of
+ * tests/integration/satisfiability/test_integration-satisfiability-bool.cpp
  * (`o1[t] = o1[t-1] && o1[t-1] = 1`), the run instantiated at times 0 and
  * 1 (`o1[0] = 1 && (o1[1] = o1[0] && o1[0] = 1)`) is satisfiable, since an
  * output stream constantly equal to `1` exists; for the always-part of
- * "equal_lookback_one_st" (line 13, `o1[t-1] = 0`) combined with a run step
+ * "equal_lookback_one_st" (`o1[t-1] = 0`) combined with a run step
  * that additionally forces `o1[t] = 1`, no such assignment exists and
  * `is_run_satisfiable` returns `false`.
  */
@@ -752,7 +763,7 @@ result<bool> is_run_satisfiable_by_steps(const trefs& steps) {
 	return r.with_value(sat);
 }
 
-// Assumption is that the provided fm is an unbound continuation
+/** @internal @copydoc get_uninterpreted_constants_constraints @endinternal */
 template <NodeType node>
 result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
 	using tau = tree<node>;
@@ -835,16 +846,18 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, co
  * @param time_point Time step at which unrolling starts.
  * @return A result carrying the pair `(phi, steps)`: `phi` is the
  * formula at the fixpoint and `steps` is the number of steps taken to
- * reach it. A failed result means the step cap `max_fixpoint_steps` was
- * hit before a fixpoint was reached.
+ * reach it. When the time budget runs out first (`time_budget_exhausted`),
+ * the value is `(nullptr, steps)`. A failed result means the step cap
+ * `max_fixpoint_steps` was hit before a fixpoint was reached, or a step
+ * could not be built.
  * @endinternal
  *
  * @par Example
  * This is a deeper fixpoint-search helper operating on partially unrolled
  * AST state, so a literal spec-string round trip does not apply; the
  * following is illustrative rather than a runnable snippet. For the
- * always-part of "smaller_lookback_one_st" in
- * tests/integration/test_integration-satisfiability1.cpp:17
+ * always-part of the test case "smaller_lookback_one_st" in
+ * tests/integration/satisfiability/test_integration-satisfiability-bool.cpp
  * (`o1[t] = o1[t-1] && o1[t-1] = 1`), each unrolling step directly
  * determines `o1` at the new time point from the previous one with no
  * additional free choices, so the accumulated formula stabilizes (up to
@@ -870,22 +883,15 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	int_t lookback = get_max_shift<node>(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
-	// SO-1: this search has no convergence guarantee; the global
+	// This search has no convergence guarantee; the global
 	// max_fixpoint_steps (default 500, 0 = unlimited) caps the step count
 	// so a non-converging formula fails with an error instead of hanging
-	// forever. Real specs settle in a handful of steps (the flag_boundary
-	// tests in tests/integration/test_integration-solver.cpp reach single
-	// digits), so any generous bound leaves a wide margin.
+	// forever. Real specs settle in a handful of steps, so any generous
+	// bound leaves a wide margin.
 	//
-	// Checking the implication on the RAW iterates is deliberate. A
-	// variant that normalized each iterate once (normalize_non_temp per
-	// step) and ran is_nso_impl on the normal forms -- hoping the
-	// positive-polarity block eliminations would be cache hits and equal
-	// normal forms would shortcut the query -- measured ~10% SLOWER on
-	// bv[64]x14 interpreter stress (22.0-22.9s vs 19.0-21.1s wall over
-	// repeated runs, 2026-08-17): the extra per-step normalization of the
-	// accumulated telescope costs more than it saves, buying only a ~21%
-	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
+	// The implication is checked on the RAW iterates on purpose:
+	// normalizing the accumulated telescope at every step costs more wall
+	// time than it saves (it only lowers peak memory).
 	auto impl = [&](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
 		if (ir.has_value()) {
@@ -972,8 +978,8 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
  * @return A `result` carrying the pair `(chi, steps)`: `chi` is the
  * normalized fixpoint over constant-time variables anchored at
  * @p time_point, and `steps` is the number of steps taken. A failed
- * result means a normalization failed or the step cap
- * (`max_fixpoint_steps`) was hit before a fixpoint was reached.
+ * result means a normalization failed, the time budget ran out, or the
+ * step cap (`max_fixpoint_steps`) was hit before a fixpoint was reached.
  * @endinternal
  *
  * @par Example
@@ -1030,7 +1036,7 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	TAU_TRY(tref chi, step(chi_prev));
 	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(chi);
 
-	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
+	// Same unbounded-search concern as find_fixpoint_phi above, and
 	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
 	while (step_num < lookback || !(weakening ? impl(chi, chi_prev)
 						: impl(chi_prev, chi)))
@@ -1125,7 +1131,8 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
  * @brief Build the "current" flag stream occurrence for a flag
  * recurrence rule, anchored to the surrounding formula's lookback.
  *
- * Returns the SBF-typed output stream `name[var-(lookback-1)]` when
+ * Returns the output stream `name[var-(lookback-1)]`, typed with the
+ * pack's Boolean carrier type (`pack_bool_carrier_type`), when
  * `lookback >= 2`, and `name[var]` otherwise. Paired with
  * `build_prev_flag_on_lookback` this always yields two occurrences
  * exactly one step apart whose deeper member sits at
@@ -1155,7 +1162,8 @@ tref build_flag_on_lookback(tref var_name_node, const std::string& var,
  * @brief Build the previous-step companion of `build_flag_on_lookback`:
  * the flag stream occurrence one step before the "current" one.
  *
- * Returns the SBF-typed output stream `name[var-lookback]` when
+ * Returns the output stream `name[var-lookback]`, typed with the pack's
+ * Boolean carrier type, when
  * `lookback >= 2`, and `name[var-1]` otherwise — i.e. the occurrence at
  * the surrounding formula's lookback (at least 1).
  * @tparam node Tree node type.
@@ -1215,11 +1223,12 @@ size_t& ctn_flag_counter() {
  * previous time point the flag rule refers to.
  * @param start_time Time step at which the run begins (used to seed
  * initial conditions).
- * @param reset_ctn_id When `true`, resets the (function-local static)
- * flag-numbering counter back to `0` before processing @p fm.
+ * @param reset_ctn_id When `true`, resets the flag-numbering counter
+ * (`ctn_flag_counter`) back to `0` before processing @p fm.
  * @return A result carrying `fm` with each constraint replaced by
- * `_fK[t] != 0` for a fresh flag stream `_fK`, or `fm` unchanged if it
- * contains no constraints.
+ * `_fK[t] = 1` for a fresh flag stream `_fK` (time variable as in the
+ * constraint), or `fm` unchanged if it contains no constraints. A failed
+ * result means a flag's initial condition could not be instantiated.
  * @endinternal
  *
  * @par Example
@@ -1229,12 +1238,9 @@ size_t& ctn_flag_counter() {
  * occurring in a formula, `transform_ctn_to_streams` introduces a flag
  * stream `_f0[t]` such that `_f0[t] != 0` replaces the constraint,
  * together with `flag_rules` encoding "once `_f0` drops to `0` it stays
- * `0`" (or the dual, for `>`/`>=` constraints) and `flag_initials` fixing
- * `_f0[0..3] = 1` to match `t <= 3` holding at those initial time points.
- * This underlies the constant-time initial-condition handling exercised
- * by the "flag_boundary" tests in
- * tests/integration/test_integration-solver.cpp:841-878 (e.g. `o1[8] =
- * 1`).
+ * `0`" (or the dual, for `>`/`>=` constraints) and, with start time 0,
+ * `flag_initials` fixing `_f0[0..3] = 1` and `_f0[4] = 0` over the
+ * constraint's initial phase (`is_initial_ctn_phase`).
  */
 template <NodeType node>
 result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
@@ -1260,9 +1266,7 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 	flag_initials = tau::_T();
 	subtree_map<node, tref> changes;
 	// The flag counter is owned by the caller (see ctn_flag_counter) so that
-	// different parts of one formula can be transformed independently without
-	// the numbering being shared, unsynchronised, across every formula and
-	// node type -- which is what a function-local static gave.
+	// different parts of one formula can be transformed independently.
 	size_t& ctn_id = ctn_flag_counter<node>();
 	if (reset_ctn_id) ctn_id = 0;
 	for (tref ctn : tau::get(fm).select_top(is<node, tau::constraint>)) {
@@ -1341,14 +1345,14 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
  *
  * @par Example
  * `transform_to_execution` calls this on the always-part of a spec before
- * combining it with any `sometimes` clauses. For the always-part of
- * "smaller_lookback_one_st" in
- * tests/integration/test_integration-satisfiability1.cpp:17
+ * combining it with any `sometimes` clauses. For the always-part of the
+ * test case "smaller_lookback_one_st" in
+ * tests/integration/satisfiability/test_integration-satisfiability-bool.cpp
  * (`o1[t] = o1[t-1] && o1[t-1] = 1`), `always_to_unbounded_continuation`
  * conceptually determines that `o1` is forced to be constantly `1` from
  * time step 1 onward and returns a formula equivalent to that recurrence
- * (satisfiable). For the always-part of "equal_lookback_one_st" (line 13,
- * `o1[t-1] = 0`), it likewise returns a satisfiable continuation (`o1`
+ * (satisfiable). For the always-part of "equal_lookback_one_st"
+ * (`o1[t-1] = 0`), it likewise returns a satisfiable continuation (`o1`
  * constantly `0`); it is the combination with the conflicting `sometimes`
  * clause elsewhere in `transform_to_execution` that later makes the whole
  * spec unsatisfiable. This is illustrative rather than a literal
@@ -1459,7 +1463,9 @@ result<tref> always_to_unbounded_continuation(tref fm,
 	return r.with_value(result);
 }
 
-// Creates a guard using the names of the input streams in uninterpreted constants
+// Conjunction of `i = _<i>_<number>` over the input streams `i` of
+// @p io_vars, each `_<i>_<number>` an uninterpreted constant of the stream's
+// type named after it; `T` when @p io_vars holds no input stream.
 template <NodeType node>
 tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
@@ -1512,8 +1518,9 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  * @par Example
  * This is a deeper AST-to-AST transformation introducing generated flag
  * streams (`_e0`, `_e1`, ...), so the following is conceptual rather than
- * a literal `create_spec`/`CHECK` snippet. For "smaller_lookback_one_st"
- * in tests/integration/test_integration-satisfiability1.cpp:17
+ * a literal `create_spec`/`CHECK` snippet. For the test case
+ * "smaller_lookback_one_st" in
+ * tests/integration/satisfiability/test_integration-satisfiability-bool.cpp
  * (`(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0)`),
  * `transform_to_eventual_variables` introduces a flag stream `_e0[t]` and
  * folds the assumption "once `_e0` transitions from nonzero to zero,
@@ -1738,24 +1745,22 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback,
  * @return A `result<tref>` carrying `F` if the flag can never be raised
  * (the `sometimes` clause is unsatisfiable given the always-part), or a
  * formula describing a run in which the flag is raised, conjoined with
- * `original_aw`. A failed result means a normalization cap or a fixpoint-
- * or flag-search-step cap was hit before a verdict was reached.
+ * `original_aw`. A failed result means a normalization cap, the time
+ * budget, or a fixpoint- or flag-search-step cap stopped the search before
+ * a verdict was reached, or the always part holds a Boolean combination of
+ * models.
  * @endinternal
  *
  * @par Example
  * This operates on already fixpoint-transformed AST fragments, so the
  * following is conceptual rather than a literal `create_spec`/`CHECK`
- * snippet. For "smaller_lookback_one_st" in
- * tests/integration/test_integration-satisfiability1.cpp:17 (whose
+ * snippet. For the test case "smaller_lookback_one_st" in
+ * tests/integration/satisfiability/test_integration-satisfiability-bool.cpp (whose
  * `sometimes o2[t] = 0` was turned into a flag by
  * `transform_to_eventual_variables`), `to_unbounded_continuation` finds
  * that the flag can be raised within the initial segment (since `o2` is
  * unconstrained by the always-part), so it returns a satisfying run
- * immediately, without needing to fall back to `find_fixpoint_chi`. The
- * "flag_boundary" tests in
- * tests/integration/test_integration-solver.cpp:841-878 pin down the size
- * of that initial segment (`flag_boundary`) for specs designed to stress
- * it, for both the sat and unsat outcomes.
+ * immediately, without needing to fall back to `find_fixpoint_chi`.
  */
 template <NodeType node>
 result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
@@ -1980,6 +1985,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	}
 }
 
+/** @internal @copydoc transform_to_execution @endinternal */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time,
 	const bool output, const sometimes_inputs inputs)
@@ -2425,17 +2431,6 @@ result<tref> pin_written_warm_ups(tref fm) {
 	return r.with_value(res);
 }
 
-// This is the cross-revision satisfiability result cache. Any U/R/W/S/T
-// content routes a query through the full LTL(ABA) pipeline -- one ltlsynt
-// subprocess per call -- and the pointwise revision asks the same (formula,
-// start_time) query again on every later update. Memoise the verdict under
-// TAU_CACHE, keyed like `transform_to_execution`'s cache and invalidated by
-// the tree GC like every other create_cache table. The `output` flag only
-// adds logging/exports on top of the same verdict, so it is not part of the
-// key -- but an output=true call still runs the full computation for its
-// side effects (and stores the verdict for others). Never share a cvc5
-// solver or ltlsynt session across calls -- the result cache is the only
-// safe port.
 // fm with every input stream read as an output: satisfiable exactly when
 // some input sequence lets fm hold, i.e. when some trace satisfies it.
 // The stream is renamed as well as re-tagged: resolve_io_vars stamps every
@@ -2669,6 +2664,7 @@ trefs simplify_dnf_clauses(const trefs& clauses) {
 	return out;
 }
 
+/** @internal @copydoc is_tau_formula_sat @endinternal */
 template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	const bool output)
@@ -2684,6 +2680,18 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			"witnesses range over every input branch, which is "
 			"stricter than E; satisfiability could not be decided");
 	};
+	// This is the cross-revision satisfiability result cache. Any U/R/W/S/T
+	// content routes a query through the full LTL(ABA) pipeline -- one
+	// ltlsynt subprocess per call -- and the pointwise revision asks the
+	// same (formula, start_time) query again on every later update. Memoise
+	// the verdict under TAU_CACHE, keyed like `transform_to_execution`'s
+	// cache and invalidated by the tree GC like every other create_cache
+	// table. The `output` flag only adds logging/exports on top of the same
+	// verdict, so it is not part of the key -- but an output=true call
+	// still runs the full computation for its side effects (and stores the
+	// verdict for others). Never share a cvc5 solver or ltlsynt session
+	// across calls -- the result cache is the only safe port.
+	//
 	// the memos are keyed on the formula as given; fm is rewritten below
 	[[maybe_unused]] const tref key_fm = fm;
 #ifdef TAU_CACHE
@@ -2867,7 +2875,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	return r;
 }
 
-// Check for temporal formulas if f1 implies f2
+/** @internal @copydoc is_tau_impl @endinternal */
 template <NodeType node>
 result<bool> is_tau_impl(tref f1, tref f2) {
 	result<bool> r;
@@ -2930,7 +2938,7 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	return r.with_assert_check_value(true);
 }
 
-// The formulas need to be closed
+/** @internal @copydoc are_tau_equivalent @endinternal */
 template <NodeType node>
 result<bool> are_tau_equivalent(tref f1, tref f2) {
 	result<bool> r;
@@ -2997,6 +3005,7 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc simp_tau_unsat_valid @endinternal */
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	const bool output)
@@ -3010,9 +3019,6 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// Check if formula is valid. Validity distributes over conjunction, so
 	// where the formula is a conjunction of independent units the unit-wise
 	// verdict is exact and cheap; the monolithic check stays for the rest.
-	// (Measured on an accumulating run with a 137-clause `:tau` constant: the per-path
-	// transform below cost ~62 s per rejection while returning the formula
-	// unchanged; unit-wise it is milliseconds, with the same paths kept.)
 	// The unit-wise verdicts are taken at start time 0 (the only start time
 	// the caller uses); any other start time keeps the monolithic checks.
 	const bool factor = pack_ba_component_factoring_enabled<node>()
