@@ -317,10 +317,6 @@ result<size_t> pack_default_ba_type(size_t type_id);
 template <NodeType node>
 size_t find_ba_type (tref term);
 
-/** @brief Type tree of find_ba_type(@p term); the untyped type tree when no type is found, `nullptr` only for an invalid id. */
-template <NodeType node>
-tref find_ba_type_tree (tref term);
-
 /** @brief find_ba_type(term), falling back to the configured pack's default BA type when unresolved. */
 template <NodeType node>
 size_t find_ba_type_or_default (tref term);

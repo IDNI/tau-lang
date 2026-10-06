@@ -572,14 +572,6 @@ size_t find_ba_type (tref term) {
 }
 
 template <NodeType node>
-tref find_ba_type_tree (tref term) {
-	const size_t t = find_ba_type<node>(term);
-	auto tt = ba_types<node>::type_tree(t);
-	// TODO (HIGH) dropped error: type_tree's report -- find_ba_type_tree answers nullptr for a not-found id.
-	return tt.has_value() ? tt.value() : nullptr;
-}
-
-template <NodeType node>
 size_t find_ba_type_or_default (tref term) {
 	size_t type = find_ba_type<node>(term);
 	return type > 0 ? type : get_ba_type_id<node>(node::ba::default_type());
