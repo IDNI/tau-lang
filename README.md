@@ -1003,7 +1003,7 @@ its limit is needed:
 | `TAU_CACHE_BOUND` | 4096 (0 = unbounded) | `--cache-bound` / `cachebound` |
 | `TAU_BF_DEPENDENCE_MAX_NODES` | 65536 | `--bf-dependence-max-nodes` / `bfdependencemaxnodes` |
 | `TAU_GC_MIN_SIZE` | 256 | `--gc-min-size` / `gcminsize` |
-| `TAU_GC_GROWTH_FACTOR` | 1.5 (<= 0 disables gc) | `--gc-growth-factor` / `gcgrowth` |
+| `TAU_GC_GROWTH_FACTOR` | 1.5 (<= 0 disables the growth-triggered sweeps) | `--gc-growth-factor` / `gcgrowth` |
 | `TAU_TREF_BUDGET` | 0 (unlimited) | `--tref-budget` / `trefbudget` |
 | `TAU_TREF_BUDGET_SOFT` | 75 | `--tref-budget-soft` / `trefbudgetsoft` |
 
@@ -1028,7 +1028,9 @@ too). The nlang oracle reads `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`),
 only, never a verdict: `TAU_LEAN_DECIDE_CROSSCHECK` re-decides the lean
 constant tests through the full path and reports disagreements, and
 `TAU_PHI_DELTA_CROSSCHECK=1` shadows the ABA oracle with the closed-form
-Φ_Δ of the atomless algebra on matching shapes. `TAU_CODEGEN_RUN_SDK_LINK_TEST`
+Φ_Δ of the atomless algebra on matching shapes. `TAU_SPOT_BIN` names a directory searched for `ltlsynt`, `autfilt` and
+`ltlfilt` after `PATH` and before the Spot folder of an installed package.
+`TAU_CODEGEN_RUN_SDK_LINK_TEST`
 opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula
@@ -2991,7 +2993,7 @@ The general options are the following:
 | -l, --license      | show the license                                        |
 | -v, --version      | show the version of the executable                      |
 | -V, --charvar      | char-as-variable short form (enabled by default)        |
-| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (enabled by default) |
+| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (disabled by default) |
 | -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
 | -S, --severity     | severity level (trace/debug/info/error); default `info` |
 | -I, --indenting    | indent formulas in output                               |
@@ -3044,7 +3046,7 @@ non-negative number is an error):
 | -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default `TAU_MAX_PROBE_STEPS` or 10000; 0 = unlimited) |
 | -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (default `TAU_MAX_REWRITE_ROUNDS` or 0; 0 = unlimited) |
 | -G, --gc-min-size             | tree-node count floor before gc may trigger (default `TAU_GC_MIN_SIZE` or 256)       |
-| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default `TAU_GC_GROWTH_FACTOR` or 1.5; <= 0 disables gc) |
+| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default `TAU_GC_GROWTH_FACTOR` or 1.5; <= 0 disables the growth-triggered sweeps) |
 | -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default `TAU_TREF_BUDGET` or 0; 0 = unlimited) |
 | -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
 | -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default `TAU_LTL_MAX_CONSISTENCY_SUBSETS` or 4096; 0 = unlimited) |
@@ -3256,7 +3258,7 @@ REPL. It's on by default.
 
 * `B|preprocessing`: Can be on/off. Master switch for every BA-specific
 preprocessing pass, e.g. bv's own predicate blasting (see below) — off
-disables all of them regardless of their own setting. It's on by default.
+disables all of them regardless of their own setting. It's off by default.
 
 * `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
 tau-algebra constant tests: a constant whose clauses share no variables and
@@ -3287,7 +3289,7 @@ Besides the boolean options above, the REPL exposes every limit option as a
 numeric option. These take a count via `set <option> <n>` (so `enable`,
 `disable` and `toggle` do not apply); `0` means unlimited, except for the two
 gc knobs, which keep their tuned defaults (`gcgrowth` at or below `0` disables
-gc). Each mirrors the command line option shown alongside, and until it is set
+the growth-triggered sweeps). Each mirrors the command line option shown alongside, and until it is set
 reads the `TAU_*` environment variable of that option (see
 [Realizability algorithm](#realizability-algorithm) for the list); `get` shows the value
 in force:
@@ -3359,7 +3361,8 @@ type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`,
 * `gcgrowth|gcgrowthfactor`: gc growth-factor trigger; accepts decimals such
 as `1.5` (`--gc-growth-factor`, `TAU_GC_GROWTH_FACTOR`). 1.5 by default; a
 value at or below 0
-disables gc.
+disables the growth-triggered sweeps; a store past `trefbudgetsoft` still
+sweeps.
 
 * `trefbudget`: cap on the live interned tree nodes (`--tref-budget`). A
 command that starts with the store at or above the cap fails without running;
@@ -3377,7 +3380,7 @@ characters (`--spec-size-warn`, `TAU_SPEC_SIZE_WARN`). 0 (off) by default.
 specification part (`--max-revision-alts`, `TAU_MAX_REVISION_ALTS`).
 Unlimited by default.
 
-* `maxsubsets`: cap on the k-ary consistency subset checks per atom group in
+* `maxsubsets|maxconsistencysubsets`: cap on the k-ary consistency subset checks per atom group in
 LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default, or
 `TAU_LTL_MAX_CONSISTENCY_SUBSETS` when that is set; a fired cap is sound but
 may answer unrealizable.
