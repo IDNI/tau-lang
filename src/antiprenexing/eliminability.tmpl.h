@@ -5,12 +5,13 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc eliminability_comp @endinternal */
 template <NodeType node>
 bool eliminability_comp(tref l, tref r) {
 	return tree<node>::subtree_less(l, r);
 }
 
-/** @copydoc has_foreign_arith_constant */
+/** @internal @copydoc has_foreign_arith_constant @endinternal */
 template <NodeType node>
 bool has_foreign_arith_constant(tref form) {
 	using tau = tree<node>;
@@ -24,6 +25,7 @@ bool has_foreign_arith_constant(tref form) {
 	return tau::get(form).find_top(foreign) != nullptr;
 }
 
+/** @internal @copydoc eliminability::covers_atom @endinternal */
 template <NodeType node>
 bool eliminability<node>::covers_atom(tref n) const {
 	// Only an ATOM may stop the walk. A conjunct, a connective or a whole
@@ -50,6 +52,7 @@ bool eliminability<node>::covers_atom(tref n) const {
 	return any_arith;
 }
 
+/** @internal @copydoc eliminability::has_skip_content @endinternal */
 template <NodeType node>
 bool eliminability<node>::has_skip_content(tref f) const {
 	bool found = false;
@@ -67,6 +70,7 @@ bool eliminability<node>::has_skip_content(tref f) const {
 	return found;
 }
 
+/** @internal @copydoc eliminability::has_frozen @endinternal */
 template <NodeType node>
 bool eliminability<node>::has_frozen(tref f) const {
 	using tau = tree<node>;
@@ -94,13 +98,13 @@ namespace detail {
  *   - `arithmetic` -- the atom holds an arithmetic operator `atomic_blasting`
  *     cannot express (`bv_predicate_blasting.tmpl.h`: mul needs a constant
  *     factor, shl/shr/div/mod a constant second argument);
- *   - `blasteable` -- the atom holds a (supported) arithmetic operator;
+ *   - `blasteable` -- the atom holds arithmetic operators, all supported;
  *   - `eliminable` -- otherwise, INCLUDING an arith-typed atom (its type's
  *     owning BA declares `arith_ops`) holding no arithmetic at all.
  *
- * That last case is the 2026-08-14 user directive ("bv variables that appear
- * only in atoms that are purely BA are also eliminable" -- bv being, today,
- * the only in-tree algebra declaring `arith_ops`). A purely Boolean
+ * In that last case, bv being today the only in-tree algebra declaring
+ * `arith_ops`, a bv variable appearing only in purely Boolean atoms is
+ * eliminable. A purely Boolean
  * arith-typed atom -- `|`, `&`, `'`, constants, nothing else -- is decided by
  * the very Boole-expansion laws the elimination core implements, which hold
  * in ANY Boolean algebra, atomic or not (`f = 0` is solvable for `x` iff
@@ -124,13 +128,10 @@ namespace detail {
  * off the atom's VARIABLES.
  * @tparam node Tree node type.
  * @param m Atomic formula (`is_atomic_fm` must hold).
- * @param arith_is_solver_owned `analysis_context::arith_is_solver_owned`. Unused
- *        since the directive above: the two verdicts it used to scope are now
- *        decided without it (arithmetic is classified before it was ever read;
- *        a pure-BA atom is eliminable under both settings). Kept in the
- *        signature because it remains the analysis's contract with its context
- *        -- `process_quantifier_block` still demotes `blasteable` by it -- and
- *        Task 9 threads the full `analysis_context` through here.
+ * @param arith_is_solver_owned `analysis_context::arith_is_solver_owned`.
+ *        Unused: the verdict does not depend on it (the demotion of
+ *        `blasteable` by it happens in `antiprenexing.tmpl.h`).
+ * @return The seed verdict of @p m.
  * @endinternal
  */
 template <NodeType node>
@@ -186,6 +187,10 @@ elim_verdict atom_arith_verdict(tref m, bool arith_is_solver_owned) {
  * into (`visit_unique` returns false at them), matching the seeding traversal
  * that consumes the result.
  * @tparam node Tree node type.
+ * @param conj Conjunct to walk.
+ * @param arith_is_solver_owned Forwarded to `atom_arith_verdict`.
+ * @return The non-`eliminable` verdict of each atom of @p conj; a missing
+ * atom is `eliminable`.
  * @endinternal
  */
 template <NodeType node>
@@ -207,6 +212,7 @@ subtree_unordered_map<node, elim_verdict> collect_arith_verdicts(tref conj,
 
 } // namespace detail
 
+/** @internal @copydoc analyse_block @endinternal */
 template <NodeType node>
 block_eliminability<node> analyse_block(const trefs& block_vars,
 	const trefs& conjuncts, const analysis_context<node>& ctx)
@@ -415,17 +421,20 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	return res;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::open @endinternal */
 template<NodeType node>
 void scoped_verdict_resolver<node>::open() {
 	scoped.open();
 }
 
+/** @internal @copydoc scoped_verdict_resolver::close @endinternal */
 template<NodeType node>
 std::optional<typename scoped_verdict_resolver<node>::uf_t::scope_error>
 scoped_verdict_resolver<node>::close() {
 	return scoped.close();
 }
 
+/** @internal @copydoc scoped_verdict_resolver::insert @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::insert(tref n, elim_verdict k) {
@@ -434,6 +443,7 @@ scoped_verdict_resolver<node>::insert(tref n, elim_verdict k) {
 	return e;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::kind_of @endinternal */
 template<NodeType node>
 elim_verdict scoped_verdict_resolver<node>::kind_of(tref n) {
 	auto root = scoped.root(scoped.insert(n));
@@ -441,6 +451,7 @@ elim_verdict scoped_verdict_resolver<node>::kind_of(tref n) {
 	return kinds.emplace(root, elim_verdict::eliminable).first->second;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::assign @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::assign(tref n, elim_verdict k) {
@@ -452,6 +463,7 @@ scoped_verdict_resolver<node>::assign(tref n, elim_verdict k) {
 	return root;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::merge @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::merge(tref a, tref b) {
@@ -462,6 +474,7 @@ scoped_verdict_resolver<node>::merge(tref a, tref b) {
 	return new_root;
 }
 
+/** @internal @copydoc analyse_formula @endinternal */
 template <NodeType node>
 eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx) {
 	using tau = tree<node>;

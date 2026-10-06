@@ -15,17 +15,27 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Descriptor of the nlang Boolean algebra in the pack @p PackBAs.
+ * @tparam PackBAs The BAs of the configured pack.
+ */
 template <typename... PackBAs>
 struct ba_descriptor<nlang_ba, node<PackBAs...>> {
+	/// The node type of the pack.
 	using node_t = node<PackBAs...>;
+	/// The tree type of the pack.
 	using tau = tree<node_t>;
 
+	/// Type name used in annotations (`:nlang`).
 	static constexpr const char* type_name = "nlang";
+	/// Default-type priority; lower wins.
 	static constexpr int default_type_priority = 50;
 
 	/** @brief The 64-bit content hash: std::hash<nlang_ba> keeps 32 bits on wasm32. */
 	static std::uint64_t hash_constant(const nlang_ba& x) { return nlang_hash(x); }
+	/// nlang is atomless.
 	static constexpr bool atomless = true;
+	/// nlang is a Boolean algebra, not a non-aba omcat.
 	static constexpr bool non_aba_omcat = false;
 	// answers come from an LLM oracle, so comparing two constants can leave
 	// the process and need not be reproducible
@@ -44,6 +54,7 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	 */
 	static constexpr bool output_always_satisfiable_by_system = true;
 
+	/// @brief `true` if @p type_tree names the nlang type.
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
 			type_tree, type_name);
@@ -51,9 +62,11 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	/// @name nlang-declared CLI/REPL options
 	/// @{
+	/// @brief Current HTTP timeout of the oracle, in seconds (0 = no cap).
 	static size_t get_http_timeout_option() {
 		return (size_t) nlang_http_timeout_sec();
 	}
+	/// @brief Sets the HTTP timeout of the oracle to @p n seconds (0 = no cap).
 	static void set_http_timeout_option(size_t n) {
 		nlang_http_timeout_sec_param = (long) n;
 	}
@@ -76,51 +89,69 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 		}};
 	}
 
+	/// @brief The nlang type tree.
 	static tref type_tree() {
 		return ba_types_detail::make_syntactic_type_tree<node_t>(
 			type_name);
 	}
 
+	/// @brief `true` if @p ba_type_id is the nlang type id.
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
 			ba_type_id, type_name);
 	}
 
 
+	/// @brief `true` if @p x is the one constant (`is_nlang_one`).
 	static bool is_syntactic_one(const nlang_ba& x) { return is_nlang_one(x); }
 
+	/// @brief `true` if @p x is the zero constant (`is_nlang_zero`).
 	static bool is_syntactic_zero(const nlang_ba& x) { return is_nlang_zero(x); }
 
+	/// @brief Same test as `is_syntactic_one`; never an error.
 	static result<bool> is_one(const nlang_ba& x) { return result<bool>{is_nlang_one(x)}; }
 
+	/// @brief Same test as `is_syntactic_zero`; never an error.
 	static result<bool> is_zero(const nlang_ba& x) { return result<bool>{is_nlang_zero(x)}; }
 
+	/// @brief Every nlang constant is closed.
 	static result<bool> is_closed(const nlang_ba&) { return result<bool>{true}; }
 
+	/// @brief Source text of the one constant, "everything".
 	static std::string literal_one(tref) { return "everything"; }
 
+	/// @brief Source text of the zero constant, "nothing".
 	static std::string literal_zero(tref) { return "nothing"; }
 
+	/// @brief @p x normalized by `normalize_nlang`; never an error.
 	static result<nlang_ba> normalize(const nlang_ba& x) {
 		return result<nlang_ba>{normalize_nlang(x)};
 	}
 
+	/// @brief A splitter of @p x (`nlang_splitter`); never an error.
 	static result<nlang_ba> splitter(const nlang_ba& x, splitter_type st) {
 		return result<nlang_ba>{nlang_splitter(x, st)};
 	}
 
+	/// @brief The splitter of one, as a bf constant tree of the nlang type.
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(nlang_splitter_one()),
 			type_tree()));
 	}
 
+	/// @brief Returns @p sym: nlang has no symbol simplification.
 	static tref simplify_symbol(tref sym) {
 		return simplify_nlang_symbol(sym);
 	}
 
+	/// @brief Returns @p term: nlang has no term simplification.
 	static result<tref> simplify_term(tref term) { return result<tref>{simplify_nlang_term(term)}; }
 
+	/**
+	 * @brief Parses @p src as an nlang constant; the type tree is ignored.
+	 * @return The constant with the nlang type, or the parse error.
+	 */
 	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{

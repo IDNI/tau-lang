@@ -121,6 +121,8 @@ inline size_t max_cover_products() {
  * between two queries would otherwise return the first query's bounded
  * give-up as the second's answer. Each memo compares this fingerprint with
  * the one it was filled under and drops its entries when they differ.
+ * @param seed Initial hash value.
+ * @return @p seed mixed with every verdict-relevant limit.
  */
 inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	auto mix = [&seed](size_t v) {
@@ -181,12 +183,11 @@ bool realizability_has_game_operators(tref fm);
 /**
  * @brief Extract the data atoms of a formula and name them "p0", "p1", ...
  *
- * A "data atom" is a maximal subtree that contains no temporal operators
- * (wff_always, wff_sometimes, wff_until, wff_release, wff_weak_until) but does contain at least
- * one io_var.  Each distinct atom is assigned a fresh proposition name "p0","p1"...
+ * A "data atom" is an ABA comparison (`=`, `!=`, `<`, ...) that contains
+ * at least one io_var, whether or not it sits under a temporal operator.
+ * Each distinct atom is assigned a fresh proposition name "p0","p1"...
  *
- * Returns a vector of {tref, proposition_name} in discovery order.
- * The map from tref → name is built using structural equality (subtree_equals).
+ * Distinct atoms are told apart by structural equality (subtree_equals).
  * @tparam node Tree node type.
  * @param fm Formula to scan.
  * @return Pairs {atom, proposition name} in discovery order.
@@ -226,11 +227,13 @@ result<std::string> ltl_skeleton(tref fm,
  * LTL constraints (G, X, propositional) that ltlsynt handles natively.
  */
 struct past_temporal_tester {
+	/// Name of the fresh propositional state variable.
 	std::string state_var;
 	/// Informational only (LT-15): always false ((φ S ψ)(−1) = false);
 	/// the encoding hard-codes !state_var at t=0. Kept for the
 	/// explain/debug output.
 	bool        initial_value;
+	/// LTL constraint (Spot syntax) encoding the tester's transition.
 	std::string transition;
 	/// Informational only (LT-15): the negation is already inlined in the
 	/// expression returned by skeleton_str_with_testers; this flag merely
@@ -272,11 +275,10 @@ void append_tester_constraints(
 /**
  * @brief True iff every io_var appearing in the atom is an INPUT variable.
  *
- * Primarily reads the resolved direction bit (data 1=input / 2=output);
- * only unresolved io_vars fall back to the name prefix ('o' = output).
- * Note the resolver additionally classifies `this` as input and `u` as
- * output (see tau_tree_extractors.tmpl.h); the prefix fallback here does
- * not replicate that.
+ * Reads `io_var_direction`: the resolved direction bit (data 1=input /
+ * 2=output), and for an unresolved io_var its name (`i...` or `this` =
+ * input, `o...` or `u` = output). An atom with no output io_var, including
+ * one with no io_var at all, counts as pure input.
  * @tparam node Tree node type.
  * @param atom Data atom to classify.
  * @return `true` iff the atom mentions no output variable.
@@ -302,7 +304,8 @@ bool is_pure_input_atom(tref atom);
  * hoa_strategy_text is non-empty only when realizable == true.
  *
  * The result carries an error (code::solver_error) when the subprocess
- * produced no verdict, and when ltlsynt is not on PATH.
+ * produced no verdict, and when ltlsynt cannot be found (PATH, then
+ * `TAU_SPOT_BIN`, then the Spot folder of a package).
  * Every caller merges that error into its own result rather than reading it
  * as a definite UNREALIZABLE.
  * @param ltl_formula Propositional LTL formula in Spot syntax.
@@ -372,16 +375,18 @@ tref guard_to_aba(const std::string& guard_label,
  */
 template <NodeType node>
 struct ctl_star_reduction {
+    /// The reduced LTL formula.
     tref ltl_formula;                    // reduced LTL formula
+    /// Witness output variable names.
     std::vector<std::string> witnesses;  // witness output variable names
-    // BA type id per witness (index-aligned with `witnesses`): the pack's
-    // Boolean carrier (pack_bool_carrier_type), or the input's type for a
-    // direction output. The interpreter registers each witness as an
-    // internal output stream.
+    /// BA type id per witness (index-aligned with `witnesses`): the pack's
+    /// Boolean carrier (pack_bool_carrier_type), or the input's type for a
+    /// direction output. The interpreter registers each witness as an
+    /// internal output stream.
     std::vector<size_t> witness_types;
-    // false when an E witness was encoded without direction outputs while
-    // the formula has inputs (a past operator inside χ): the encoding is
-    // then stricter than E, so an unrealizable verdict is undecided.
+    /// false when an E witness was encoded without direction outputs while
+    /// the formula has inputs (a past operator inside χ): the encoding is
+    /// then stricter than E, so an unrealizable verdict is undecided.
     bool exact = true;
 };
 

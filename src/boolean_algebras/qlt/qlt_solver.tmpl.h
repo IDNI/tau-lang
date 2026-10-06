@@ -5,7 +5,7 @@
  * @brief qlt's solver for pure ordering systems, which the BA-level
  *        solve_inequality_system cannot handle.
  *
- * Included from qlt_descriptor.tmpl.h and nowhere else.
+ * Included from qlt_descriptor.tmpl.h and qlt_codegen.tmpl.h.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_SOLVER_TMPL_H__
@@ -63,8 +63,11 @@ std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
 // against every atom.
 namespace qlt_dlo_detail {
 
+// Strength of the order relation between two nodes; a larger value is
+// stronger, so the closure keeps the max.
 enum class rel : uint8_t { none = 0, le = 1, lt = 2 };
 
+// The greatest integer not above r (r.q > 0).
 inline qlt_rational floor_int(const qlt_rational& r) {
 	long long f = r.p >= 0 ? r.p / r.q : -((-r.p + r.q - 1) / r.q);
 	return qlt_rational(f, 1);
@@ -98,7 +101,9 @@ inline qlt_rational pick_between(const std::optional<qlt_rational>& lo,
 
 } // namespace qlt_dlo_detail
 
-// Solves a pure DLO ordering system jointly (see above), or declines.
+// Solves a pure DLO ordering system jointly (see above): a model mapping
+// each variable's bf node to a singleton qlt constant of options.type_id, or
+// nullopt when it declines.
 template <NodeType node>
 static std::optional<solution<node>> qlt_dlo_order_solve(
 	const inequality_system<node>& sys, const solver_options& options)

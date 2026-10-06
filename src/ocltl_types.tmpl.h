@@ -2,6 +2,7 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc ocltl_unit @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 BA ocltl_unit() {
@@ -12,6 +13,7 @@ BA ocltl_unit() {
 	return std::get<BA>(c->first);
 }
 
+/** @internal @copydoc ocltl_minterm @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 BA ocltl_minterm(const std::vector<BA>& a, size_t A) {
@@ -25,6 +27,7 @@ BA ocltl_minterm(const std::vector<BA>& a, size_t A) {
 	return *m;
 }
 
+/** @internal @copydoc ocltl_type_of @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<ocltl_type_mask> ocltl_type_of(const std::vector<BA>& a) {
@@ -40,6 +43,7 @@ result<ocltl_type_mask> ocltl_type_of(const std::vector<BA>& a) {
 	return r.with_value(z);
 }
 
+/** @internal @copydoc ocltl_witness @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter_type st) {
@@ -67,6 +71,7 @@ result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter
 	return r.with_value(*b);
 }
 
+/** @internal @copydoc ocltl_witness_wide @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,

@@ -5,16 +5,13 @@
  * @brief Per-block union-find analysis deciding which block variables may be
  * eliminated, and why the others may not.
  *
- * Replaces the conjunct-level guards `eliminate_block_over_clause`'s
- * `is_quant_removable_in_clause` and `treat_ex_quantified_clause`'s
- * `blocks_elimination` used to apply. Those were all-or-nothing per clause;
- * this is per *component*, so a reference freezes only the variables that
- * actually reach it.
+ * The analysis works per union-find *component*, not per clause, so a
+ * reference freezes only the variables that actually reach it.
  *
  * Unlike its `block_*` / `boole_*` siblings, which self-include their `.tmpl.h`,
  * this header does not: `normal_forms.h` includes `eliminability.tmpl.h` after
- * `normal_forms.tmpl.h`, because from Task 2 onward the definitions here are
- * consumed by `antiprenexing.tmpl.h`, which has that ordering requirement.
+ * `normal_forms.tmpl.h`, because the definitions here are consumed by
+ * `antiprenexing.tmpl.h`, which has that ordering requirement.
  */
 
 #ifndef __IDNI__TAU__ANTIPRENEXING_ELIMINABILITY_H__
@@ -34,8 +31,7 @@ namespace idni::tau_lang {
 /**
  * @brief Why a block variable may or may not be eliminated.
  *
- * The four meanings the single `skip` predicate used to conflate. The
- * distinction that matters most is `frozen` ("do not touch") versus
+ * The distinction that matters most is `frozen` ("do not touch") versus
  * `blasteable` ("this has a destination -- send it there"): honouring a
  * `frozen`-style skip on bitvector content would disable the very blasting the
  * pipeline relies on.
@@ -98,26 +94,38 @@ bool has_foreign_arith_constant(tref form);
  */
 template <NodeType node>
 struct analysis_context {
+	/// `false` when the formula holds a constant the arithmetic solver
+	/// cannot translate; see the struct comment.
 	bool arith_is_solver_owned = true;
 };
 
 /**
- * @brief Verdict-per-node analysis result; replaces the composed `skip`
- * predicates (spec item 2). `verdicts` holds every var and atom analysed;
- * `members` groups the same nodes by category (spec item 1's map of types to
- * sets of trefs). `arith_floor`, when set, makes any node whose type's owning
- * BA declares `arith_ops` (`pack_type_has_arith_ops`; bv is the only in-tree
- * algebra declaring it today) at least `blasteable` even if the analysis
- * never keyed it -- this reproduces the blanket bv-type-family skip exactly
- * (find_top(skip) may probe arbitrary subtree nodes, not only analysed
- * vars/atoms).
+ * @brief Verdict-per-node analysis result.
+ *
+ * `verdicts` holds every var and atom analysed; `members` groups the same
+ * nodes by verdict. `arith_floor`, when set, makes any node whose type's
+ * owning BA declares `arith_ops` (`pack_type_has_arith_ops`; bv is the only
+ * in-tree algebra declaring it today) at least `blasteable` even if the
+ * analysis never keyed it, since `find_top(skip)` may probe arbitrary subtree
+ * nodes, not only analysed vars/atoms.
+ * @tparam node Tree node type.
  */
 template <NodeType node>
 struct eliminability {
+	/// Explicit verdict of every analysed variable and atom.
 	subtree_unordered_map<node, elim_verdict> verdicts;
+	/// The nodes of `verdicts`, grouped by verdict.
 	std::map<elim_verdict, subtree_unordered_set<node>> members;
+	/// Floor unanalysed arith-typed nodes to `blasteable`.
 	bool arith_floor = false;
 
+	/**
+	 * @brief Verdict of @p n: its explicit entry if analysed, else
+	 * `blasteable` for an arith-typed node under `arith_floor`, else
+	 * `eliminable`.
+	 * @param n Node to query; null yields `eliminable`.
+	 * @return The verdict of @p n.
+	 */
 	elim_verdict verdict_of(tref n) const {
 		// A null tref has no verdict to look up, and hashing it
 		// (subtree_unordered_map's key hash) dereferences the node --
@@ -139,7 +147,7 @@ struct eliminability {
 			return elim_verdict::blasteable;
 		return elim_verdict::eliminable;
 	}
-	/// Drop-in equivalent of the old `skip(n)`.
+	/// @brief `true` unless @p n is `eliminable` (`verdict_of`).
 	bool skip(tref n) const {
 		return verdict_of(n) != elim_verdict::eliminable;
 	}
@@ -169,9 +177,10 @@ struct eliminability {
 	 * a rebuilt atom loses its entry and would silently fall back to the
 	 * floor.
 	 *
-	 * A no-op on `none()` (nothing is ever skipped) and on `arith_only()` (no
-	 * explicit verdicts exist, so no atom is ever covered) -- which is what
-	 * keeps blasting's re-entry behaving exactly as before.
+	 * Under `none()` nothing is ever skipped, and under `arith_only()` no
+	 * explicit verdicts exist, so no atom is ever covered.
+	 * @param f Subtree to scan.
+	 * @return `true` if some node of @p f outside a covered atom is skipped.
 	 */
 	bool has_skip_content(tref f) const;
 	/**
@@ -189,11 +198,14 @@ struct eliminability {
 	 * `arith_floor`, which only ever floors to `blasteable`. So there is no
 	 * floor to distinguish from an analysed atom's own terms, and a plain
 	 * `verdict_of(n) == frozen` hit test is exact.
+	 * @param f Subtree to scan.
+	 * @return `true` if some node of @p f has verdict `frozen`.
 	 */
 	bool has_frozen(tref f) const;
 	/// Everything-eliminable instance: skips nothing at all.
 	static eliminability none() { return {}; }
-	/// arith-type-only instance == the old bv-type-family default skip.
+	/// Instance with no explicit verdicts and `arith_floor` set: skips
+	/// exactly the arith-typed nodes.
 	static eliminability arith_only() { eliminability e; e.arith_floor = true; return e; }
 
 private:
@@ -229,10 +241,9 @@ struct block_eliminability : eliminability<node> {
 	 * A conservative signal, not an exhaustive scan: a reference pruned
 	 * under a kept binder (the traversal stops at the binder and never
 	 * looks inside it) and a `bf_ref` inside an atom's arguments are not
-	 * counted here -- parity with the guard this analysis replaces, which
-	 * did not distinguish them either.
+	 * counted here.
 	 *
-	 * The `bf_ref` half of that parity deserves a note: `analyse_block`'s
+	 * The `bf_ref` case deserves a note: `analyse_block`'s
 	 * `is_ref_fm` recognises only `wff_ref`, so `g(y) = 0` is classified an
 	 * ordinary eliminable atom. That is handled, not a gap:
 	 * `eliminate_block_over_clause` prunes vacuous binders so such a clause
@@ -243,7 +254,9 @@ struct block_eliminability : eliminability<node> {
 	 */
 	bool has_reference() const { return has_ref; }
 
+	/// Per block variable, the conjuncts in its union-find component.
 	subtree_unordered_map<node, trefs> components;
+	/// Backing flag of `has_reference`.
 	bool has_ref = false;
 };
 
@@ -255,6 +268,7 @@ struct block_eliminability : eliminability<node> {
  * `subtree_less` is. Declared as a free function template rather than a lambda
  * because `union_find_with_sets` stores its comparator **by reference**; a
  * temporary lambda would dangle.
+ * @return `true` if @p l orders before @p r under `subtree_less`.
  */
 template <NodeType node>
 bool eliminability_comp(tref l, tref r);
@@ -262,12 +276,9 @@ bool eliminability_comp(tref l, tref r);
 /**
  * @brief Scope-aware resolver over the `elim_verdict` join semilattice.
  *
- * Generalises the two two-element-lattice resolvers this replaced (a
- * reference-usage one and a bitvector-arithmetic-taint one, both deleted with
- * their modules in 2026-08-14): each tracked its own kind with a scope-tagged
- * union-find and a root->kind map; here the lattice is `elim_verdict`
- * (`join`, not `unify`) so a single resolver type serves both roles inside
- * `analyse_formula`.
+ * A scope-tagged union-find plus a root->kind map over the `elim_verdict`
+ * lattice (`join`, not `unify`); `analyse_formula` runs two instances, one
+ * for reference usage and one for arithmetic content.
  *
  * `insert` delegates to the underlying union-find's `push`
  * (current-scope-only, no search) -- the opposite of `type_scoped_resolver`'s
@@ -276,36 +287,53 @@ bool eliminability_comp(tref l, tref r);
  */
 template<NodeType node>
 struct scoped_verdict_resolver {
+	/// Underlying scoped union-find.
 	using uf_t = scoped_union_find<tref, idni::subtree_less<node>>;
+	/// A (scope, node) element of `uf_t`.
 	using element = typename uf_t::element;
+	/// A scope id of `uf_t`.
 	using scope = typename uf_t::scope;
 
 	/** @brief Open a new nested scope. */
 	void open();
-	/** @brief Close the innermost scope. */
+	/**
+	 * @brief Close the innermost scope.
+	 * @return The union-find's scope error, or nullopt on success.
+	 */
 	std::optional<typename uf_t::scope_error> close();
 	/**
 	 * @brief Declare @p n as new in the current (innermost) scope with initial kind @p k.
+	 * @param n Node to declare.
+	 * @param k Initial kind.
 	 * @return The scoped element for @p n.
 	 */
 	element insert(tref n, elim_verdict k);
 	/**
 	 * @brief Return the joined `elim_verdict` of @p n's root (unseen defaults to `eliminable`).
+	 *
+	 * Inserts @p n, and an `eliminable` kind for its root, when unseen.
 	 * @param n Node to query; searched across enclosing scopes, falling back to global.
+	 * @return The kind of @p n's root.
 	 */
 	elim_verdict kind_of(tref n);
 	/**
 	 * @brief Join @p k into @p n's root's kind.
+	 * @param n Node whose root is updated; inserted when unseen.
+	 * @param k Kind to join in.
 	 * @return @p n's root element.
 	 */
 	element assign(tref n, elim_verdict k);
 	/**
 	 * @brief Union the sets containing @p a and @p b, joining their kinds.
+	 * @param a First node.
+	 * @param b Second node.
 	 * @return The merged set's root element.
 	 */
 	element merge(tref a, tref b);
 
+	/// The scoped union-find.
 	uf_t scoped;
+	/// Kind of each root element.
 	std::map<element, elim_verdict, scoped_less<tref, idni::subtree_less<node>>> kinds;
 };
 
@@ -313,18 +341,17 @@ struct scoped_verdict_resolver {
  * @brief Analyse @p form as a whole, producing one verdict per variable and
  * atomic formula (and predicate reference) it contains.
  *
- * One `pre_order` traversal (the scope-opening shape both deleted collectors
- * used) drives TWO `scoped_verdict_resolver`s in lockstep, because the two
- * propagation domains must stay separate to preserve the precision of the
- * collectors this replaces:
- * - the *ref* resolver takes over the reference-usage collector: it seeds
+ * One `pre_order` traversal drives TWO `scoped_verdict_resolver`s in
+ * lockstep, because the two propagation domains must stay separate for
+ * precision:
+ * - the *ref* resolver seeds
  *   `frozen` at every `wff_ref` and unions each `wff_ref`/atom with ALL its
  *   free variables;
- * - the *arith* resolver takes over the bitvector-arithmetic-taint collector,
- *   generalised from its two-element lattice to `elim_verdict`: it seeds
- *   `blasteable` or `arithmetic` at atoms carrying content of a type whose
- *   owning BA declares `arith_ops` (`pack_type_has_arith_ops`) and unions
- *   each atom with only its arith-typed free variables.
+ * - the *arith* resolver seeds
+ *   `blasteable` or `arithmetic` at atoms holding an arithmetic operator
+ *   (`eliminable` otherwise) and unions each atom with only its free
+ *   variables whose type's owning BA declares `arith_ops`
+ *   (`pack_type_has_arith_ops`).
  *
  * Both resolvers open/close a scope at every quantifier and insert its bound
  * variable into both, so two unrelated binders of the same name never
@@ -338,6 +365,7 @@ struct scoped_verdict_resolver {
  * @tparam node Tree node type.
  * @param form Formula to analyse.
  * @param ctx Formula-wide inputs.
+ * @return The verdicts of the variables, atoms and references of @p form.
  */
 template <NodeType node>
 eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx);
@@ -356,8 +384,10 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
  * `frozen` is seeded at every unresolved reference, at every kept binder, and
  * -- fail closed -- at every wff-level shape this analysis does not otherwise
  * recognise, so an unhandled shape cannot silently leave its variables
- * `eliminable`. @p ctx.arith_is_solver_owned is consulted when seeding an
- * arith-typed atom: `blasteable` only applies while it holds.
+ * `eliminable`. An atom's seed comes from its arithmetic operators alone
+ * (`blasteable` or `arithmetic`), so an arith-typed atom with no arithmetic
+ * operator is seeded `eliminable`; @p ctx.arith_is_solver_owned does not
+ * change the seeds.
  *
  * Only a *bound* variable's own scope can constrain it -- it cannot occur
  * outside it -- so analysing the block body is not merely cheaper than
@@ -368,6 +398,8 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
  * @param block_vars Variables bound by the block.
  * @param conjuncts Top-level conjuncts of the block body.
  * @param ctx Formula-wide inputs.
+ * @return The verdicts and, per block variable, its component's conjuncts;
+ * empty when @p block_vars is empty.
  */
 template <NodeType node>
 block_eliminability<node> analyse_block(const trefs& block_vars,

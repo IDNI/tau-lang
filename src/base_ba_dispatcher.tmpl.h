@@ -9,7 +9,8 @@
 
 namespace idni::tau_lang {
 
-// Parse a plain Bool constant ("0"/"false"/"F" or "1"/"true"/"T").
+// Parse a plain Bool constant ("0"/"false"/"F" or "1"/"true"/"T"); a
+// parse_error for any other source.
 template <typename... BAs>
 requires BAsPack<BAs...>
 inline result<typename node<BAs...>::constant_with_type> parse_bool(
@@ -37,11 +38,12 @@ inline result<typename node<BAs...>::constant_with_type> parse_bool(
 
 namespace idni::tau_lang {
 
-// Generic, descriptor-driven definitions.  Every pack dispatches through these;
-// no hand-written per-pack specialization survives.
+// Generic, descriptor-driven definitions.  Every pack dispatches through these.
 
 namespace detail {
 
+// The type tree of the BA with the lowest default_type_priority, the first
+// in pack order on ties.
 template <typename... BAs>
 tref default_type_for_pack() {
 	using node_t = node<BAs...>;
@@ -60,6 +62,7 @@ tref default_type_for_pack() {
 
 } // namespace detail
 
+/** @internal @copydoc base_ba_dispatcher::is_syntactic_one @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool base_ba_dispatcher<BAs...>::is_syntactic_one(
@@ -71,6 +74,7 @@ bool base_ba_dispatcher<BAs...>::is_syntactic_one(
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::is_syntactic_zero @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool base_ba_dispatcher<BAs...>::is_syntactic_zero(
@@ -82,6 +86,7 @@ bool base_ba_dispatcher<BAs...>::is_syntactic_zero(
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::is_one @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem) {
@@ -90,6 +95,7 @@ result<bool> base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::is_zero @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& elem) {
@@ -98,6 +104,7 @@ result<bool> base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& ele
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::is_closed @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> base_ba_dispatcher<BAs...>::is_closed(const std::variant<BAs...>& elem) {
@@ -106,12 +113,14 @@ result<bool> base_ba_dispatcher<BAs...>::is_closed(const std::variant<BAs...>& e
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::types @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::vector<std::string> base_ba_dispatcher<BAs...>::types() {
 	return { ba_descriptor<BAs, node_t>::type_name... };
 }
 
+/** @internal @copydoc base_ba_dispatcher::type_names @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr std::array<std::string_view, sizeof...(BAs)>
@@ -119,6 +128,7 @@ base_ba_dispatcher<BAs...>::type_names() {
 	return { std::string_view(ba_descriptor<BAs, node_t>::type_name)... };
 }
 
+/** @internal @copydoc base_ba_dispatcher::types_joined_length @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 consteval std::size_t base_ba_dispatcher<BAs...>::types_joined_length() {
@@ -131,6 +141,7 @@ consteval std::size_t base_ba_dispatcher<BAs...>::types_joined_length() {
 	return total;
 }
 
+/** @internal @copydoc base_ba_dispatcher::types_joined @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr std::string_view base_ba_dispatcher<BAs...>::types_joined() {
@@ -148,12 +159,14 @@ constexpr std::string_view base_ba_dispatcher<BAs...>::types_joined() {
 	return std::string_view(chars.data(), chars.size());
 }
 
+/** @internal @copydoc base_ba_dispatcher::default_type @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::default_type() {
 	return detail::default_type_for_pack<BAs...>();
 }
 
+/** @internal @copydoc base_ba_dispatcher::one @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<std::string> base_ba_dispatcher<BAs...>::one(const tref type_tree) {
@@ -162,8 +175,7 @@ result<std::string> base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
 		: false) || ...);
 	// A type no BA owns -- the untyped type a bf_t carries, for one -- falls
-	// back to the pack's Boolean carrier asked about its *own* type, which is
-	// what the per-pack chains returned from their trailing clause: "1" from
+	// back to the pack's Boolean carrier asked about its *own* type: "1" from
 	// sbf, and equally "1" from bv[1]. Passing type_tree on instead would ask
 	// a width-dependent literal about a type carrying no width.
 	if constexpr (pack_can_host_bool<node_t>()) if (!out) {
@@ -179,6 +191,7 @@ result<std::string> base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 	return r.with_assert_check_value(*out);
 }
 
+/** @internal @copydoc base_ba_dispatcher::zero @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<std::string> base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
@@ -200,6 +213,7 @@ result<std::string> base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 	return r.with_assert_check_value(*out);
 }
 
+/** @internal @copydoc base_ba_dispatcher::splitter @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::splitter(
@@ -216,6 +230,7 @@ result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::splitter(
 	}, elem);
 }
 
+/** @internal @copydoc base_ba_dispatcher::splitter_one @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::splitter_one(tref type_tree) {
@@ -232,6 +247,7 @@ tref base_ba_dispatcher<BAs...>::splitter_one(tref type_tree) {
 	return out.value_or(nullptr);
 }
 
+/** @internal @copydoc base_ba_dispatcher::unpack_tau_ba @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::unpack_tau_ba(
@@ -264,6 +280,7 @@ struct pack_tau_ba_one {
 	}
 };
 
+/** @internal @copydoc base_ba_dispatcher::pack_tau_ba @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<std::variant<BAs...>> base_ba_dispatcher<BAs...>::pack_tau_ba(
@@ -272,6 +289,7 @@ std::optional<std::variant<BAs...>> base_ba_dispatcher<BAs...>::pack_tau_ba(
 	return pack_tau_ba_one<node_t, BAs...>::template go<BAs...>(t);
 }
 
+/** @internal @copydoc base_ba_dispatcher::normalize @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::normalize(
@@ -285,6 +303,7 @@ result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::normalize(
 	}, v);
 }
 
+/** @internal @copydoc base_ba_dispatcher::simplify_symbol @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::simplify_symbol(tref symbol) {
@@ -296,6 +315,7 @@ tref base_ba_dispatcher<BAs...>::simplify_symbol(tref symbol) {
 	return out;
 }
 
+/** @internal @copydoc base_ba_dispatcher::simplify_term @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tref> base_ba_dispatcher<BAs...>::simplify_term(tref term) {
@@ -308,6 +328,8 @@ result<tref> base_ba_dispatcher<BAs...>::simplify_term(tref term) {
 }
 
 // Constant parsing: the owning BA's descriptor parses its own constants.
+// get(src, type_tree) returns the owner's parse result, or a result with
+// neither value nor error when no BA of the pack owns type_tree.
 template <NodeType node>
 struct ba_constants_parse;
 
@@ -341,6 +363,7 @@ struct ba_constants_parse<node<BAs...>> {
 	}
 };
 
+/** @internal @copydoc ba_constants::get(const std::string&, tref, const std::string) @endinternal */
 template <NodeType node>
 result<typename node::constant_with_type> ba_constants<node>::get(
 	const std::string& constant_source, tref type_tree,

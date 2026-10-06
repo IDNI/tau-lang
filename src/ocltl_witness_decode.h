@@ -16,22 +16,33 @@
 
 namespace idni::tau_lang {
 
-// Sentinel `coord` value: the atom's other side is the algebra's own
-// constant (see `const_is_one`), not one of `a`'s coordinates.
+/// Sentinel `coord` value: the atom's other side is the algebra's own
+/// constant (see `const_is_one`), not one of `a`'s coordinates.
 inline constexpr size_t ocltl_target_none = static_cast<size_t>(-1);
 
-// One structured atom directly constraining the new coordinate b: either
-// "b == a[coord]" or "b == the algebra's unit/zero", each with the polarity
-// the edge's D-pattern requires (asserted == the atom must hold).
+/// One structured atom directly constraining the new coordinate b: either
+/// "b == a[coord]" or "b == the algebra's unit/zero", each with the polarity
+/// the edge's D-pattern requires (asserted == the atom must hold).
 struct ocltl_target_atom {
+	/// Index into `a`, or ocltl_target_none for a constant side.
 	size_t coord = ocltl_target_none;
+	/// The constant is the unit (true) or zero (false).
 	bool const_is_one = false; // meaningful only when coord == ocltl_target_none
+	/// `true` for "b == ...", `false` for "b != ...".
 	bool asserted = true;
 };
 
-// Builds the (k+1)-bit-wide Prop-4 target mask ocltl_witness_wide expects.
-// "b == value" atoms force full inclusion/exclusion of value's minterms;
-// "!=" atoms stay unconstrained, relying on the splitter to differ by default.
+/**
+ * @brief Builds the (k+1)-bit-wide Prop-4 target mask ocltl_witness_wide
+ * expects.
+ *
+ * "b == value" atoms force full inclusion/exclusion of value's minterms;
+ * "!=" atoms stay unconstrained, relying on the splitter to differ by default.
+ * Two asserted atoms that disagree on a minterm are a caller error.
+ * @param k Arity of the committed tuple.
+ * @param atoms Atoms constraining the new coordinate.
+ * @return A 2^(k+1)-length mask; a minterm no atom forces is left split.
+ */
 inline ocltl_type_mask_wide ocltl_build_target_mask(size_t k,
 	const std::vector<ocltl_target_atom>& atoms)
 {
@@ -52,9 +63,15 @@ inline ocltl_type_mask_wide ocltl_build_target_mask(size_t k,
 	return tau;
 }
 
-// Decodes the new coordinate b via Prop. 4 / ocltl_witness_wide from the
-// concrete, already-committed tuple `a` and the atoms that constrain b
-// directly.
+/**
+ * @brief Decodes the new coordinate b via Prop. 4 / ocltl_witness_wide from
+ * the concrete, already-committed tuple @p a and the atoms that constrain b
+ * directly.
+ * @param a The committed tuple.
+ * @param atoms Atoms constraining b (see ocltl_build_target_mask).
+ * @param st Splitter used where a minterm is left split.
+ * @return The value of b, or the error of a failed BA decision.
+ */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_decode_witness(const std::vector<BA>& a,

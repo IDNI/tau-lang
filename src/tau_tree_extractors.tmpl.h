@@ -13,6 +13,7 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // various extractors
 
+/** @internal @copydoc get_rr_sig @endinternal */
 template <NodeType node>
 rr_sig get_rr_sig(tref n) {
 	using tau = tree<node>;
@@ -42,17 +43,12 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			// EX-1: this used to be canonize<node>(n), but canonize
-			// expects the enclosing `variable` node -- it selects an
-			// io_var CHILD (tt(x) | tau::io_var | tau::var_name).
-			// Handed the io_var itself it matched nothing and returned
-			// its argument unchanged, offset subtree and all, so the
-			// key could never equal what add_input_console/
-			// add_output_console register
-			// (build_canonized_io_var == variable(io_var(var_name))).
-			// Both context lookups below were therefore dead, and
-			// classification always fell through to the name heuristic.
-			// Build the key the registrars' way instead.
+			// The key is built the registrars' way,
+			// variable(io_var(var_name)) without the offset, so it
+			// equals what add_input_console/add_output_console
+			// register. canonize<node>(n) does not fit here: it
+			// expects the enclosing `variable` node and returns a bare
+			// io_var unchanged, offset subtree and all.
 			tref var_name = get_var_name_node<node>(n);
 			tref var = var_name
 				? tau::get(tau::variable,
@@ -80,6 +76,7 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 	return resolved;
 }
 
+/** @internal @copydoc get_rec_relations(io_context<node>&, tref) @endinternal */
 template <NodeType node>
 rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	using tau = tree<node>;
@@ -105,33 +102,13 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	return x;
 }
 
+/** @internal @copydoc get_rec_relations(tref) @endinternal */
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
 	return get_rec_relations<node>(
 		*definitions<node>::instance().get_io_context(), rrs);
 }
 
-// TI-3: every case of one recurrence family (same symbol name, offset
-// arity, AND ref-arg arity -- the full rr_sig, matching how
-// is_functional_ref/the fixpoint-call machinery itself identifies a
-// family: get_rr_sig's own three fields, not just a name+arg_arity
-// subset of it. An indexed family `f[n]/f[0]` and an unrelated plain
-// function `f(x)` sharing the name and argument count are DIFFERENT
-// families -- name+arg_arity alone would conflate them, wrongly rejecting
-// the unrelated plain function as "a case of recurrence f" the moment an
-// indexed family of the same name/arity also exists.) must agree on the
-// effective BA types of its head arguments. Cases are entered as separate
-// statements and inferred independently, so a half-annotated family
-// type-checks per case but can never match one set of call arguments: the
-// indexed call silently fails to expand and the fixpoint enumeration
-// never reaches its base case (2026-09-01). Reject the family at assembly
-// time with a message that names both offending cases.
-//
-// Per-position state accumulated across every case of one family: the
-// effective BA type id pinned so far (0 = still a wildcard -- no case has
-// pinned this position, e.g. because every case's argument there is a
-// non-variable match pattern, such as a nested ref, with no variable type
-// to read), and the head that pinned it, for the error message.
 // Effective BA type id of each of @p r's OWN immediate arguments (ref >
 // ref_args > ref_arg, one level each way): a recursive descendant search
 // would also pick up ref_args belonging to a nested ref used AS one of the
@@ -165,6 +142,20 @@ std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	return types;
 }
 
+// TI-3: every case of one recurrence family (same symbol name, offset
+// arity, AND ref-arg arity -- the full rr_sig, as is_functional_ref and the
+// fixpoint-call machinery identify a family; an indexed family `f[n]/f[0]`
+// and an unrelated plain function `f(x)` sharing the name and argument
+// count are different families) must agree on the effective BA types of
+// its head arguments. Cases are entered as separate statements and
+// inferred independently, so a half-annotated family type-checks per case
+// but can never match one set of call arguments: the indexed call silently
+// fails to expand and the fixpoint enumeration never reaches its base
+// case. Rejecting the family here names both offending cases.
+//
+// A position no case pins (type 0, e.g. a nested-ref match pattern) is a
+// wildcard. Returns true, or a type_error naming the disagreeing case
+// heads.
 template <NodeType node>
 result<bool> validate_rr_case_types(const rr<node>& defs) {
 	result<bool> r;
@@ -223,8 +214,7 @@ result<bool> validate_rr_case_types(const rr<node>& defs) {
 // TI-4: a call whose argument types can never match its definition's
 // parameter types is a silent no-op at rule-application time -- the rule
 // simply never fires, so `pr2(u) := (u:sbf = 0)` followed by `pr2(z:tau)`
-// echoed the call back unexpanded, and the same shape under solve
-// surfaced as "Internal error in solver" (2026-09-02). Functions already
+// would echo the call back unexpanded. Functions already
 // error on this (their calls unify against the recorded signature type in
 // infer_ba_types); predicates have no recorded signature, so their calls
 // are checked here instead, where the definitions and every call site are
@@ -233,7 +223,8 @@ result<bool> validate_rr_case_types(const rr<node>& defs) {
 // untyped argument matches one -- verified against nso_rr_apply), so both
 // normalize to tau before comparing; every other pairing must be exact. A
 // reference matching no definition family is uninterpreted and stays
-// legal, as always.
+// legal. Returns true, or a type_error naming the first mismatching call
+// in the main formula or a rule body.
 template <NodeType node>
 result<bool> validate_rr_call_types(const rr<node>& defs) {
 	result<bool> r;
@@ -301,6 +292,10 @@ result<bool> validate_rr_call_types(const rr<node>& defs) {
 	return r.with_value(true);
 }
 
+// Besides the failures documented at the declaration, fails when the cases
+// of a recurrence family, or a call and its definition, disagree on their
+// argument types (validate_rr_case_types, validate_rr_call_types).
+/** @internal @copydoc get_nso_rr(io_context<node>&, tref) @endinternal */
 template <NodeType node>
 result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 	result<rr<node>> r;
@@ -360,6 +355,7 @@ result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 	return r.with_value(std::move(nso_rr));
 }
 
+/** @internal @copydoc get_nso_rr(tref) @endinternal */
 template <NodeType node>
 result<rr<node>> get_nso_rr(tref ref) {
 	return get_nso_rr<node>(
@@ -368,18 +364,17 @@ result<rr<node>> get_nso_rr(tref ref) {
 
 // -----------------------------------------------------------------------------
 
+/** @internal @copydoc get_leaves(tref, typename node::type, trefs&) @endinternal */
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	using tau = tree<node>;
 	if (!n) return;
 
-	// Explicit-stack pre-order walk along the and/or spine. The previous
-	// recursive flatten needed one frame per nesting level and, since a
-	// DNF's or-spine is a left-deep binary chain, its depth equalled the
-	// clause count and overflowed the 8 MB stack near ~24k clauses
-	// (GitHub #90). It also memoised the full leaf list at every spine
-	// node, which is quadratic in the clause count (30k clauses -> 4 GB).
-	// Leaves are appended left to right with multiplicity preserved (a
+	// Explicit-stack pre-order walk along the and/or spine: a DNF's
+	// or-spine is a left-deep binary chain, so a recursive flatten would
+	// need one frame per clause and overflow the stack on large inputs
+	// (GitHub #90), and memoising the leaf list at every spine node would
+	// be quadratic in the clause count. Leaves are appended left to right with multiplicity preserved (a
 	// shared or duplicated subtree is spliced in once per occurrence), so
 	// no memo is needed: the work is linear in the output size.
 	std::vector<tref> stack{n};
@@ -398,6 +393,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	}
 }
 
+/** @internal @copydoc get_leaves(tref, typename node::type) @endinternal */
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch) {
 	trefs leaves;
@@ -407,6 +403,7 @@ trefs get_leaves(tref n, typename node::type branch) {
 	return leaves;
 }
 
+/** @internal @copydoc get_dnf_wff_clauses @endinternal */
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n) {
 	using tau = tree<node>;
@@ -414,6 +411,7 @@ trefs get_dnf_wff_clauses(tref n) {
 	return get_leaves<node>(n, tau::wff_or);
 }
 
+/** @internal @copydoc get_dnf_bf_clauses @endinternal */
 template <NodeType node>
 trefs get_dnf_bf_clauses(tref n) {
 	using tau = tree<node>;
@@ -421,6 +419,7 @@ trefs get_dnf_bf_clauses(tref n) {
 	return get_leaves<node>(n, tau::bf_or);
 }
 
+/** @internal @copydoc get_cnf_wff_clauses @endinternal */
 template <NodeType node>
 trefs get_cnf_wff_clauses(tref n) {
 	using tau = tree<node>;
@@ -428,6 +427,7 @@ trefs get_cnf_wff_clauses(tref n) {
 	return get_leaves<node>(n, tau::wff_and);
 }
 
+/** @internal @copydoc get_cnf_bf_clauses @endinternal */
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n) {
 	using tau = tree<node>;
@@ -435,6 +435,10 @@ trefs get_cnf_bf_clauses(tref n) {
 	return get_leaves<node>(n, tau::bf_and);
 }
 
+// The path the current decisions select: every or-fork (bf_or/bf_xor for a
+// term, wff_or outside quantifiers for a formula) is replaced by the branch
+// its decision names; a fork met for the first time is pushed as "left".
+// nullptr past the end.
 template<NodeType node>
 tref expression_paths<node>::iterator::operator*() {
 	if (!_expr) return nullptr;
@@ -483,6 +487,10 @@ tref expression_paths<node>::iterator::operator*() {
 	return res;
 }
 
+// Advance to the next path: flip the deepest "left" decision to "right",
+// dropping the exhausted "right" ones below it; past the last path the
+// iterator becomes end(). Right after an apply() that kept the current
+// fork's other branch, it stays put instead.
 template<NodeType node>
 expression_paths<node>::iterator& expression_paths<node>::iterator::operator++() {
 	if (keep_path) {
@@ -497,6 +505,11 @@ expression_paths<node>::iterator& expression_paths<node>::iterator::operator++()
 	return *this;
 }
 
+// Apply f to the current path and erase that path from the expression.
+// Returns f's result, or nullptr when f leaves the path unchanged (the
+// expression is then kept as is) or the iterator is past the end. The
+// erased expression of a single-path expression is 0 (term) or F (formula).
+// undo_apply() restores the expression from before this call.
 template<NodeType node>
 tref expression_paths<node>::iterator::apply(const auto& f) {
 	if (!_expr) return nullptr;
@@ -599,21 +612,26 @@ bool expression_paths<node>::iterator::operator==(const iterator& other) const {
 	} else return false;
 }
 
+// Negation of operator==.
 template<NodeType node>
 bool expression_paths<node>::iterator::operator!=(const iterator& other) const {
 	return !(*this == other);
 }
 
+// An iterator at the first (leftmost) path of the expression.
 template<NodeType node>
 expression_paths<node>::iterator expression_paths<node>::begin() const {
 	return iterator(_expr);
 }
 
+// The past-the-end iterator (null expression).
 template<NodeType node>
 expression_paths<node>::iterator expression_paths<node>::end() const {
 	return iterator(nullptr);
 }
 
+// Applies path_transform to every path and returns the disjunction of the
+// unchanged remainder and every changed path's result.
 template<NodeType node>
 tref expression_paths<node>::apply(const auto& path_transform) {
 	iterator it = iterator(_expr);
@@ -632,6 +650,10 @@ tref expression_paths<node>::apply(const auto& path_transform) {
 	} else return tau::build_wff_or(res, tau::build_wff_or(changes));
 }
 
+// As apply(path_transform), stopping as soon as callback rejects the
+// result built so far; callback is first called with nullptr. Returns the
+// last result built (nullptr when callback rejects nullptr or the
+// expression is null).
 template<NodeType node>
 tref expression_paths<node>::apply(const auto& path_transform, const auto& callback) {
 	auto build_or = [*this](tref l, tref r) {
@@ -653,6 +675,10 @@ tref expression_paths<node>::apply(const auto& path_transform, const auto& callb
 	return res;
 }
 
+// Applies path_transform to one path at a time and returns the first
+// result callback accepts; a rejected change is undone. When no change is
+// accepted, returns the expression restored after the last rejected change
+// (nullptr when no path changed at all).
 template<NodeType node>
 tref expression_paths<node>::apply_only_if(const auto& path_transform,
 	const auto& callback) {
@@ -679,11 +705,13 @@ tref expression_paths<node>::apply_only_if(const auto& path_transform,
 
 // -----------------------------------------------------------------------------
 
+/** @internal @copydoc get_ba_type @endinternal */
 template <NodeType node>
 size_t get_ba_type(tref n) {
 	return tree<node>::get(n).get_ba_type();
 }
 
+/** @internal @copydoc get_var_name_node @endinternal */
 template <NodeType node>
 tref get_var_name_node(tref var) {
 	using tau = tree<node>;
@@ -715,6 +743,7 @@ tref get_var_name_node(tref var) {
 	return nullptr;
 }
 
+/** @internal @copydoc get_var_name @endinternal */
 template <NodeType node>
 const std::string& get_var_name(tref var) {
 	tref vn = get_var_name_node<node>(var);
@@ -722,6 +751,7 @@ const std::string& get_var_name(tref var) {
 	return tree<node>::get(vn).get_string();
 }
 
+/** @internal @copydoc get_var_name_sid @endinternal */
 template <NodeType node>
 size_t get_var_name_sid(tref var) {
 	tref vn = get_var_name_node<node>(var);
@@ -750,23 +780,27 @@ static tref io_var_node(tref v) {
 	return tau::get(v).is(tau::io_var) ? v : tau::get(v).child(0);
 }
 
+/** @internal @copydoc is_io_initial @endinternal */
 template <NodeType node>
 bool is_io_initial(tref io_var) {
 	return tree<node>::get(io_var_node<node>(io_var))[1][0].is_integer();
 }
 
+/** @internal @copydoc is_io_shift @endinternal */
 template <NodeType node>
 bool is_io_shift(tref io_var) {
 	using tau = tree<node>;
 	return tau::get(io_var_node<node>(io_var))[1][0].is(tau::shift);
 }
 
+/** @internal @copydoc get_io_time_point @endinternal */
 template <NodeType node>
 int_t get_io_time_point(tref io_var) {
 	using tau = tree<node>;
 	return tau::get(io_var_node<node>(io_var))[1][0].get_integer();
 }
 
+/** @internal @copydoc get_payload_int @endinternal */
 template <NodeType node>
 int_t get_payload_int(const tree<node>& n) {
 	const uint64_t payload = n.data();
@@ -775,12 +809,14 @@ int_t get_payload_int(const tree<node>& n) {
 	return static_cast<int_t>(payload);
 }
 
+/** @internal @copydoc get_io_shift @endinternal */
 template <NodeType node>
 int_t get_io_shift(tref io_var) {
 	return get_payload_int<node>(
 		tree<node>::get(io_var_node<node>(io_var))[1][0][1]);
 }
 
+/** @internal @copydoc get_io_var_shift @endinternal */
 template <NodeType node>
 int_t get_io_var_shift(tref io_var) {
 	// If there is a shift
@@ -788,6 +824,7 @@ int_t get_io_var_shift(tref io_var) {
 	return 0;
 }
 
+/** @internal @copydoc get_max_shift @endinternal */
 template <NodeType node>
 int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	int_t max_shift = 0;
@@ -799,6 +836,7 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	return max_shift;
 }
 
+/** @internal @copydoc get_max_initial @endinternal */
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars) {
 	int_t max_init = -1;
@@ -811,6 +849,7 @@ int_t get_max_initial(const trefs& io_vars) {
 	return max_init;
 }
 
+/** @internal @copydoc get_free_vars @endinternal */
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
@@ -1056,12 +1095,8 @@ trefs get_free_vars_appearance_order(tref expression) {
 	return free_vars;
 }
 
-// (TT2-10: get_free_bound_vars deleted -- zero callers, zero tests.)
-
-
 // A formula "has a temporal variable" if it contains ANY io_var (including
-// constant positions -- TT2-18: the old comment claimed variable/capture
-// positions only) or, when no io_var exists, a constraint flag.
+// constant positions) or, when no io_var exists, a constraint flag.
 template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;
@@ -1073,6 +1108,9 @@ bool has_temp_var(tref fm) {
 	else return true;
 }
 
+// Returns true, with a warning naming the constant, at the first converted
+// Tau-formula constant that is not closed; constants not converted yet
+// (BA constant id 0) are skipped. Fails when is_closed fails.
 template <NodeType node>
 result<bool> has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
@@ -1098,12 +1136,10 @@ result<bool> has_open_tau_fm_in_constant(tref fm) {
 	return r.with_assert_check_value(false);
 }
 
+// Always false: full LTL is supported, so every temporal quantifier may
+// nest freely inside any other (G(F p), F(G p), G((F p) && q), etc.).
 template<NodeType node>
 bool invalid_nesting_of_temp_quants(tref /*fm*/) {
-	// Full LTL is supported: every temporal quantifier may nest freely
-	// inside any other (G(F p), F(G p), G((F p) && q), etc.). The
-	// historical safety-fragment restriction that rejected such nesting
-	// no longer applies.
 	return false;
 }
 
@@ -1114,7 +1150,8 @@ bool invalid_nesting_of_temp_quants(tref /*fm*/) {
 // conditional) are not themselves atoms — descending past them is fine,
 // because their operands will be scoped by their own temporal quantifiers.
 // Only a non-glue subterm reached without first crossing a temporal
-// quantifier is a violation.
+// quantifier is a violation. Returns true, with an info naming that
+// subterm, on a violation; false when fm has no temporal quantifier.
 template<NodeType node>
 result<bool> missing_temp_quants(tref fm) {
 	result<bool> r;
@@ -1149,6 +1186,7 @@ result<bool> missing_temp_quants(tref fm) {
 	return r.with_value(false);
 }
 
+/** @internal @copydoc invalid_nesting_of_quants @endinternal */
 template<NodeType node>
 result<bool> invalid_nesting_of_quants(tref fm) {
 	result<bool> r;
@@ -1172,6 +1210,7 @@ result<bool> invalid_nesting_of_quants(tref fm) {
 	return r.with_value(false);
 }
 
+/** @internal @copydoc has_negative_offset @endinternal */
 template<NodeType node>
 result<bool> has_negative_offset(tref fm) {
 	using tau = tree<node>;
@@ -1224,6 +1263,7 @@ bool has_missplaced_fallback(tref fm) {
 	return tau::get(fm).find_top(missplaced_fallback) != nullptr;
 }
 
+/** @internal @copydoc has_semantic_error @endinternal */
 template<NodeType node>
 result<bool> has_semantic_error(tref fm) {
 	result<bool> r;
@@ -1242,7 +1282,9 @@ result<bool> has_semantic_error(tref fm) {
 // Rewrite G(A && G(B)) → G(A) && G(B).
 // The CFG parser produces G(A && G(B)) when the user writes G(A) && G(B)
 // because both are valid parses and the grammar's G rule comes before &&.
-// G(G(x)) = G(x) so the rewrite is semantically transparent.
+// G(G(x)) = G(x) so the rewrite is semantically transparent. Applied
+// recursively, but never inside an ABA comparison; returns fm itself when
+// nothing changes.
 template <NodeType node>
 tref unnest_nested_always(tref fm) {
 	using tau = tree<node>;
@@ -1334,6 +1376,7 @@ tref unnest_nested_always(tref fm) {
 
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
+/** @internal @copydoc get_temporally_quantified_formula @endinternal */
 template <NodeType node>
 tref get_temporally_quantified_formula(tref n) {
 	using tau = tree<node>;

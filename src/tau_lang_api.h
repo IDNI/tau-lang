@@ -2,7 +2,7 @@
 
 /**
  * @file tau_lang_api.h
- * @brief tau-lang LTL(ABA) stable public API surface -- Q40-API1.
+ * @brief tau-lang LTL(ABA) stable public API surface.
  *
  * This header documents and re-exports the three functions that form the
  * stable external interface for LTL(ABA) synthesis and execution.  All
@@ -21,13 +21,12 @@
  *   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
  *
  * Environment variables that affect synthesis:
- *   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no
- *                          heuristic: unset behaves as B, i.e. Algorithm B is
- *                          gated on and the default ABA-oracle path is used
- *                          when B does not apply.  Only A, B and D are
- *                          recognised; any other value (including "C" and
- *                          "auto") disables every gate, falls through to the
- *                          default path, and is reported with a warning.
+ *   TAU_LTL_ALG=A|B|D|auto Select the synthesis algorithm (case-insensitive;
+ *                          `--ltl-alg` / `set ltlalg` win over it).  Unset
+ *                          or `auto` selects the default routing: Algorithm
+ *                          B is gated on and the default ABA-oracle path is
+ *                          used when B does not apply.  Any other value is
+ *                          reported once with a warning and read as `auto`.
  *                          Pure-output qlt formulas take Algorithm A
  *                          unconditionally, whatever this is set to.
  *                          Note (LS-20): an EXPLICIT `B` is not a no-op
@@ -35,16 +34,17 @@
  *                          polarity-complete pairwise constraint pass in
  *                          normalization (unset only defaults the gate in
  *                          the builders).
- *   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
+ *   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60,
+ *                          0 = none, at most 86400)
  *   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
  *   `TAU_LTL_EXPORT_STRATEGY_FILE=<path>`  Write strategy HOA to file
  *   TAU_LTL_WITNESS=1       On UNREALIZABLE, print counterexample trace
  *   TAU_LTL_SIMPLIFICATION=bwoa|sat|bisim-sat|none  ltlsynt minimization
  *
  * The header declares nothing itself: `is_tau_formula_sat`, `get_nso_rr`
- * and `run` are declared in satisfiability.h, tau.h and interpreter.h
- * (all reached through the includes below) and described in the section
- * comments inside the namespace.
+ * and `run` are declared in satisfiability.h, tau_tree.tmpl.h and
+ * interpreter.h (all reached through the includes below) and described in
+ * the section comments inside the namespace.
  *
  * Version: 1.0 (2026-04-21)
  */
@@ -65,13 +65,17 @@ namespace idni::tau_lang {
 //
 // The top-level LTL realizability check.
 //
-//   tref fm  — a parsed and normalized formula tree (from get_nso_rr)
-//   Returns  — true iff fm is REALIZABLE
+//   tref fm          — a parsed and normalized formula tree (from get_nso_rr)
+//   int_t start_time — time point the check starts at (default 0)
+//   bool output      — print the verdict trace (default false)
+//   Returns          — result<bool>: true iff fm is REALIZABLE; an error
+//                      when no verdict could be obtained
 //
 // Usage:
-//   auto nso = get_nso_rr<node_t>(tau::get("G (o1[t] = 0)."));
+//   auto nso = get_nso_rr<node_t>(tau::get("G (o1[t] = 0).").value());
 //   if (nso.has_value()) {
-//       bool r = is_tau_formula_sat<node_t>(nso.value().main->get());
+//       auto r = is_tau_formula_sat<node_t>(nso.value().main->get());
+//       if (r.has_value() && r.value()) { /* realizable */ }
 //   }
 //
 // Declared in: satisfiability.h (included via tau.h)
@@ -79,25 +83,29 @@ namespace idni::tau_lang {
 
 // ── get_nso_rr ────────────────────────────────────────────────────────────────
 //
-// Parse a tau-lang formula string and return a normalized rr<node>.
+// Extract the recurrence relation system of a parsed spec.
 //
-//   tref expr — a formula string wrapped with tau::get(str)
-//   Returns   — result<rr<node>>, a failed report if parse fails
+//   tref expr — the parsed spec, tau::get(str).value() (tau::get returns
+//               a result<tref> carrying the parse report)
+//   Returns   — result<rr<node>>, a failed report if extraction fails
 //
 // Usage:
-//   auto result = get_nso_rr<node_t>(tau::get("F (o1[t] = 0)."));
-//   if (!result.has_value()) { /* parse error */ }
+//   auto parsed = tau::get("F (o1[t] = 0).");
+//   if (!parsed.has_value()) { /* parse error */ }
+//   auto result = get_nso_rr<node_t>(parsed.value());
 //
-// Declared in: tau.h
+// Declared in: tau_tree.tmpl.h (included via tau.h)
 // Note: call classify_parse_error(formula_str) on failure for a user hint.
 
 // ── run ──────────────────────────────────────────────────────────────────────
 //
 // Execute a realizable formula against an io_context for N steps.
 //
-//   tref fm         — a realizable formula (is_tau_formula_sat returned true)
-//   io_context& ctx — bound input/output streams
-//   size_t steps    — number of time steps to execute
+//   tref fm               — a realizable formula (is_tau_formula_sat returned true)
+//   const io_context& ctx — bound input/output streams
+//   size_t steps          — maximum number of time steps (default 0 = unlimited)
+//   Returns               — result<interpreter<node>>: the interpreter after
+//                           execution, or an error if initialization failed
 //
 // Usage:
 //   io_context<node_t> ctx;

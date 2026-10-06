@@ -2,6 +2,7 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc ocltl_decode_witness @endinternal */
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_decode_witness(const std::vector<BA>& a,

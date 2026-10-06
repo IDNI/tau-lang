@@ -94,13 +94,19 @@ inline std::string d_pattern(int A, int K) {
 /// @brief Output of `build_algorithm_b_skeleton`: the formula, its input
 /// and output propositions and the encoding sizes.
 struct b_skeleton_bundle {
+	/// The synthesis formula in Spot syntax.
 	std::string formula;
 	std::vector<std::string> outs;  // r_0..r_{n_rbits-1} then d_0..d_{K-1}
 	std::vector<std::string> ins;   // p_0..p_{n_pbits-1}
+	/// Number of R-bits, at least 1.
 	int n_rbits = 0;
+	/// Number of P-bits, 0 when T2_size <= 1.
 	int n_pbits = 0;
+	/// |T_1| as passed to the builder.
 	int T1_size = 0;
+	/// |T_2| as passed to the builder.
 	int T2_size = 0;
+	/// Number of data subformulas d_i.
 	int K       = 0;
 };
 
@@ -112,6 +118,8 @@ struct b_skeleton_bundle {
  *                 and D-bitmask of τ = A).
  * t2_pos_m[σ]:   pos_m field of T₂ type σ (needed for Ψ_I grouping).
  * phi_star_ltl:  LTL skeleton over d_0..d_{K-1} in Spot format.
+ * Complexity: one infeasibility guarantee per triple missing from
+ * feasible_set_b, so the formula grows with T2_size * T1_size * 2^K.
  * @param T1_size |T_1|.
  * @param T2_size |T_2|.
  * @param K Number of data subformulas.

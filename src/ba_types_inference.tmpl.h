@@ -19,17 +19,22 @@ namespace idni::tau_lang {
 // A ba_constant whose source text could not be parsed under the type id
 // that inference assigned to it.
 struct parse_error {
+	/// The ba_constant.
 	tref element;
+	/// The type it failed to parse under.
 	size_t type_id;
 };
 
 // A type that names a parameterized family but never acquires the
 // parameter: neither its own annotation, nor a cast's operand, supplies one.
 struct incomplete_type_error {
+	/// The node carrying the type.
 	tref element;
+	/// The parameterless family type.
 	size_t type_id;
 };
 
+// Node kind -> (canonized node -> type id); see get_typeable_type_ids_by_type.
 template<NodeType node>
 using typeables_type_id_map = std::map<size_t, subtree_map<node, size_t>>;
 
@@ -604,10 +609,6 @@ bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 	if (!types.contains(canonized)) return false;
 	return types.at(canonized) == untyped_type_id<node>();
 }
-
-// (BA2-4: update_ref deleted -- zero callers, and it returned an
-// inference_error from a tref function, a hard compile error on first
-// instantiation. Recover from git and fix the return type if needed.)
 
 // Rewraps a fixpoint reference whose fallback makes it a function:
 // retypes its constants, bf_t/bf_f and variables via update(), checks a
@@ -1198,7 +1199,8 @@ void inference_error_message(
 
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
-// If a variable or constant remains unassigned, it is assigned to tau.
+// If a variable or constant remains unassigned, it is assigned to tau when
+// options.use_defaults holds.
 // We assume that the types of the constants could also be propagated across
 // scopes (in the future we will restrict it to equations)
 // If conflicting type information is found, the function returns nullptr.
@@ -1233,7 +1235,7 @@ void inference_error_message(
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
 // | wff      | wff_ex            | wff_ex       | wff_ex       | resolve the quantified variables
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
-
+/** @internal @copydoc infer_ba_types @endinternal */
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
  		const subtree_map<node, size_t>* global_scope,
@@ -1271,8 +1273,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	return infer_ba_types<node>(n, available_function_symbols, resolver, options);
 }
 
-// This function version is introduced for debugging purposes as it allows
-// to inspect the resolver state after the type inference.
+// Worker of infer_ba_types over a caller-owned @p resolver, so the resolver
+// state can be inspected after the inference. @p available_function_symbols
+// maps <symbol id, offset arity, argument arity> to the type of a known
+// function definition and is extended with the definitions found in @p n.
+// Returns the same pair as the public overload.
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,

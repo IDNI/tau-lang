@@ -34,17 +34,21 @@ struct type_inference_options {
  * @brief Infer and propagate BA type ids for all nodes in the tree @p n.
  *
  * Traverses @p n, assigns type ids compatible with each node's constraints,
- * and propagates across scopes. Unassigned nodes receive the `tau` type.
- * Returns `nullptr` as the first element on type conflict.
+ * and propagates across scopes. Unassigned nodes receive the `tau` type
+ * when `options.use_defaults` holds. Errors are logged, not reported.
+ * Rewrite hooks (`tree::use_hooks`) are off during the call and restored
+ * afterwards.
  *
  * @tparam node Tree node type.
  * @param n Root formula node to type-check.
- * @param global_scope Optional map of globally known type bindings.
+ * @param global_scope Optional map of globally known type bindings; only its
+ *        io variables are used.
  * @param definition_heads Optional list of definition heads whose types
- *        are already fixed.
+ *        are already fixed; untyped heads (predicates) are ignored.
  * @param options Inference control flags.
- * @return Pair of (annotated tree root, node→type-id map), or
- *         `{nullptr, {}}` on conflict.
+ * @return Pair of (annotated tree root, canonized element→type-id map of the
+ *         global scope), or `{nullptr, {}}` on a type conflict, an
+ *         unparsable constant or a scope error.
  */
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
