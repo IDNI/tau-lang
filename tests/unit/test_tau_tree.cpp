@@ -224,6 +224,13 @@ TEST_SUITE("build_rr_ref") {
 		CHECK(tau::get(r).children_size() == 3); // sym, offsets, ref_args
 	}
 
+	TEST_CASE("string offset is a plain variable, as the offset grammar has it") {
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		tref n = tau::build_variable(std::string("n"), untyped_type_id<node_t>());
+		CHECK(tau::build_rr_ref(std::string("f"), std::string("n"), trefs{ x })
+			== tau::build_rr_ref(std::string("f"), trefs{ n }, trefs{ x }));
+	}
+
 	TEST_CASE("string sym_name, size_t offset, args builds an integer offset") {
 		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
 		tref r = tau::build_rr_ref(std::string("f"), size_t{ 2 }, trefs{ x });
