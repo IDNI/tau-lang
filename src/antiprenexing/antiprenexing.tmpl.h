@@ -68,7 +68,9 @@ struct blast_reentry_guard {
 /// Exhausting it costs precision, not soundness: the caller's
 /// resolve_quantifiers2 -> resolve_quantifiers -> complete_quantifier_elimination
 /// chain absorbs whatever is left unresolved.
-/// Runtime-tunable via `api::set_block_max_splits`; default unlimited. Like
+/// Runtime-tunable via `api::set_block_max_splits`, `--block-max-splits` or
+/// REPL `maxsplits`; default unlimited, and 0 means unlimited there and in
+/// the environment. Like
 /// `preprocessing` (heuristics/preprocess_placement.h), this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
 /// Environment fallback `TAU_BLOCK_MAX_SPLITS`.
@@ -78,8 +80,9 @@ inline env_limit<size_t> block_boole_max_splits{ "TAU_BLOCK_MAX_SPLITS",
 /// Maximum rounds `process_quantifier_blocks` may take before giving up.
 /// Unconditional: the termination argument at its use site is subtle enough
 /// that a regression must fail loudly rather than hang Release forever.
-/// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above;
-/// default unlimited. Environment fallback `TAU_BLOCK_MAX_ROUNDS`.
+/// Runtime-tunable via `api::set_block_max_rounds`, `--block-max-rounds` or
+/// REPL `maxrounds`, same caveats as above; default unlimited, and 0 means
+/// unlimited. Environment fallback `TAU_BLOCK_MAX_ROUNDS`.
 inline env_limit<size_t> block_max_rounds{ "TAU_BLOCK_MAX_ROUNDS",
 	std::numeric_limits<size_t>::max(), env_zero::unlimited };
 
@@ -89,8 +92,9 @@ inline env_limit<size_t> block_max_rounds{ "TAU_BLOCK_MAX_ROUNDS",
 /// re-wraps the quantifier verbatim -- the same escape hatch it takes for
 /// temporal and wff_ref scopes -- and logs a warning. The nomic ratchet
 /// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
-/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`; same caveats
-/// as block_max_rounds above; default unlimited. Environment fallback
+/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`,
+/// `--cqe-max-clauses` or REPL `maxclauses`; same caveats as
+/// block_max_rounds above; default unlimited, and 0 means unlimited. Environment fallback
 /// `TAU_CQE_MAX_CLAUSES`.
 inline env_limit<size_t> cqe_max_clauses{ "TAU_CQE_MAX_CLAUSES",
 	std::numeric_limits<size_t>::max(), env_zero::unlimited };

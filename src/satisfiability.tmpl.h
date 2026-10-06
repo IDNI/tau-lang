@@ -31,9 +31,8 @@ inline static bool use_debug_output_in_sat = false;
 /// guarantee, so an unlimited run on a non-converging spec does not
 /// terminate. The shipped default is therefore FINITE (500): reaching it is
 /// an error without a verdict, where an unlimited run may hang
-/// `sat`/`run`/pointwise revision. Pass 0 to opt into unlimited. The CLI
-/// default in main.cpp must agree with this value. Environment fallback
-/// `TAU_MAX_FIXPOINT_STEPS`.
+/// `sat`/`run`/pointwise revision. Pass 0 to opt into unlimited.
+/// Environment fallback `TAU_MAX_FIXPOINT_STEPS`.
 inline env_limit<size_t> max_fixpoint_steps{ "TAU_MAX_FIXPOINT_STEPS", 500 };
 
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag

@@ -180,7 +180,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 		CHECK( o1->get_values() == strings{ "1", "2", "3" } );
 	}
 
-	// Task 8 (bv-widening): prove the widened semantics through a live
+	// bv widening: prove the widened semantics through a live
 	// execution run, not just direct widen_bv_arithmetic/normalizer calls
 	// (Tasks 4-6). `min(i1[t] + i2[t], {200}:bv[8])` is the brief's
 	// saturating-add idiom: at step 0, i1=200/i2=100 overflows bv[8]
@@ -231,7 +231,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 		CHECK( o1->get_values() == strings{ "200", "30", "10", "0" } );
 	}
 
-	// Task 8 pwr probe: does an UPDATE rule containing bv arithmetic get
+	// pwr probe: does an UPDATE rule containing bv arithmetic get
 	// elaborated the same way a compile-time spec does? `i1` stays the
 	// tau-typed update-submission channel (the `u[t] = i1[t]` idiom used
 	// throughout this suite's "u[t] = i1[t]: ..." cases); the update text
@@ -245,7 +245,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	//
 	// The original spec leaves o1 UNCONSTRAINED (unlike "u[t] = i1[t]:
 	// spec_replace" above, which pins a baseline for o1 to replace).
-	// Confirmed by a trace-level investigation (see the Task 8 report):
+	// Confirmed by a trace-level investigation:
 	// pinning a conflicting baseline instead routes pointwise_revision
 	// through its documented "I1" last-resort-alternative path
 	// (interpreter.tmpl.h ~1806-1823) rather than the plain "append as a

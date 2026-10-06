@@ -1,13 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// BA-20: sbf_splitter and simplify_sbf_symbol (boolean_algebras/sbf_ba.h)
-// were untested at the unit level.
+// Unit tests of sbf_splitter and simplify_sbf_symbol
+// (boolean_algebras/sbf/sbf_ba.h).
 //
-// sbf_splitter_one is already exercised via tests/integration/test_integration-
-// solver.cpp, and sbf_splitter's middle/lower strategies already have direct
-// unit-level coverage added by a prior pass (SO-26) in
-// tests/integration/test_integration-splitter.cpp. This file adds the
-// missing pieces: sbf_splitter's upper (default) strategy, and the
+// sbf_splitter_one is exercised via the sbf plugin's
+// test_integration-solver-sbf.cpp, and sbf_splitter's middle/lower strategies have direct
+// unit-level coverage in
+// tests/integration/test_integration-splitter.cpp. This file covers the
+// rest: sbf_splitter's upper (default) strategy, and the
 // trivially-no-op simplify_sbf_symbol/simplify_sbf_term helpers.
 
 #include "test_init.h"

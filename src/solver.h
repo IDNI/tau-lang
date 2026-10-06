@@ -25,8 +25,8 @@ namespace idni::tau_lang {
 /// being squeezed per width and given a ground solution by `find_solution` /
 /// `find_minimal_solution`, whose Boole expansion is exponential in the
 /// variables (GitHub #121). `var = constant` conjuncts
-/// are read off before the count. SIZE_MAX = unlimited (0 through the
-/// setter); set via `api::set_lgrs_max_vars`, `--lgrs-max-vars` or the REPL
+/// are read off before the count. Default 8; SIZE_MAX = unlimited (0
+/// through the setter); set via `api::set_lgrs_max_vars`, `--lgrs-max-vars` or the REPL
 /// option `lgrsmaxvars`.
 /// Environment fallback `TAU_LGRS_MAX_VARS` (0 = unlimited there too).
 inline env_limit<size_t> lgrs_max_vars{ "TAU_LGRS_MAX_VARS", 8,

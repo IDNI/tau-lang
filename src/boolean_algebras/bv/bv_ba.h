@@ -103,14 +103,15 @@ inline bool bv_quantifier_free_decision_enabled() {
 
 /// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
 /// the nodes it may keep in use at once before it leaves the formula to
-/// cvc5; 0 leaves every formula to cvc5. The option `bv-bitblast-max-nodes`.
+/// cvc5; default 2^20; 0 leaves every formula to cvc5. The option
+/// `bv-bitblast-max-nodes`.
 /// Environment fallback `TAU_BV_BITBLAST_MAX_NODES`.
 inline env_limit<size_t> bv_bitblast_max_nodes{ "TAU_BV_BITBLAST_MAX_NODES",
 	size_t{1} << 20 };
 
 /// Widest bit-vector the BDD decision takes; a formula with a wider one goes
-/// to cvc5 (0 sends every formula there). A product of two wider values
-/// outgrows any useful budget. The option `bv-bitblast-max-width`,
+/// to cvc5. Default 16; 0 sends every formula there. A product of two wider
+/// values outgrows any useful budget. The option `bv-bitblast-max-width`,
 /// environment fallback `TAU_BV_BITBLAST_MAX_WIDTH`.
 inline env_limit<size_t> bv_bitblast_max_width{ "TAU_BV_BITBLAST_MAX_WIDTH",
 	16 };
@@ -118,8 +119,9 @@ inline env_limit<size_t> bv_bitblast_max_width{ "TAU_BV_BITBLAST_MAX_WIDTH",
 /// Wall-clock budget, in seconds, of one quantified cvc5 decision of
 /// `bv_formula_sat_status`: the query runs in a child process killed at the
 /// bound (bounded_call.h), and a query killed there has no answer, which
-/// makes the command asking it UNKNOWN. 0 runs every query in the process,
-/// unbounded. The option `bv-solve-timeout`.
+/// makes the command asking it UNKNOWN. Default 60; 0 runs every query in the
+/// process, unbounded. The option `bv-solve-timeout`, whose setter clears
+/// the caches of decided verdicts when the value changes.
 /// Environment fallback `TAU_BV_SOLVE_TIMEOUT`.
 inline env_limit<size_t> bv_solve_timeout{ "TAU_BV_SOLVE_TIMEOUT", 60 };
 

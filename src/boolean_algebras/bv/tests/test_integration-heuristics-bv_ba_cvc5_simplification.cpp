@@ -55,7 +55,7 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	}
 
 	TEST_CASE("nand of constants") {
-	// NOTE (AP1-10): since cte_neg folds constant complements at
+	// NOTE: since cte_neg folds constant complements at
 	// construction, a constant nand/nor may arrive here ALREADY folded
 	// to a single constant -- the pass being an identity then is
 	// correct, so assert the folded SHAPE rather than inequality.
@@ -78,7 +78,7 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	}
 
 	TEST_CASE("nor of constants") {
-		// See the nand case (AP1-10).
+		// See the nand case.
 		const char* sample = "{5}:bv[8] !| {3}:bv[8]";
 		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
@@ -102,7 +102,7 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
-		// See the nand case (AP1-10): may arrive pre-folded.
+		// See the nand case: may arrive pre-folded.
 		if (simplified) CHECK( tau::get(simplified)
 			.find_top(is_child<node_t, tau::ba_constant>) );
 	}
@@ -378,7 +378,7 @@ TEST_SUITE("ba bv cvc5 power of 2/variable simplification") {
 
 TEST_SUITE("cvc5 back-translation correctness") {
 
-	// Regression tests for HE-1 and HE-N1: the cvc5 -> tau back-translator
+	// Regression tests: the cvc5 -> tau back-translator
 	// (cvc5_tree_to_tau_tree) must produce a tau formula that is
 	// semantically equivalent to the original cvc5 term for every
 	// assignment of the free variable(s) involved, not just structurally

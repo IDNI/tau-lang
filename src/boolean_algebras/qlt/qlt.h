@@ -29,7 +29,7 @@ namespace idni::tau_lang {
 /**
  * @brief Cap on the data atoms the omcat (qlt) T3 encodings accept: the
  * A/B/D skeletons and the semantic PWR compute `1 << K` and enumerate 2^K
- * masks, so K is bounded here (LG-9/LS-11). Above the cap the default
+ * masks, so K is bounded here. Above the cap the default
  * ABA-oracle path decides instead. Runtime parameter by policy (qlt's own
  * `qlt-t3-cap` CLI/REPL option); clamped to 30 (a signed shift is
  * undefined at 31); 0 = unlimited within that bound.
@@ -426,7 +426,7 @@ tref simplify_qlt_term(tref t);
 /// Q, the lower half (by midpoint, or one unit wide toward an infinite
 /// side) otherwise; bottom for bottom.
 ///
-/// BA1-5 contract note: unlike sbf_splitter (which honors every
+/// Contract note: unlike sbf_splitter (which honors every
 /// splitter_type and always makes progress), this splitter ignores @p st
 /// and MAY RETURN @p x UNCHANGED when the element is atomic/degenerate
 /// (e.g. a singleton piece). Callers looping "split until proper subset"

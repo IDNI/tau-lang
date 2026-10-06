@@ -511,7 +511,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			messages::unknown_realizability_no_verdict);
 	};
 
-	// LT-5 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
+	// Backstop: a `wff_semantic_neg`, `A` or `E` that reaches
 	// here was not handled by reduce_ctl_star_to_ltl (direct callers such
 	// as preferences.h skip the reduction entirely). None has a
 	// propositional encoding -- the skeleton would flatten it to "1" --

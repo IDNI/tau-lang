@@ -39,32 +39,36 @@ inline bool bv_definitional_elimination = true;
 
 /// Cap on the clauses a conjunct mentioning the variable may be flattened
 /// into (`D || (A && B)` distributes to `(D || A), (D || B)`, exponential in
-/// the nesting); a conjunct beyond it stays a reader. SIZE_MAX = unlimited
-/// (0 through the option setter); the REPL/CLI option
+/// the nesting); a conjunct beyond it stays a reader. Default 16; SIZE_MAX
+/// = unlimited (0 through the option setter); the REPL/CLI option
 /// `bv-defelim-max-clauses`.
-/// Environment fallback `TAU_BV_DEFELIM_MAX_CLAUSES`.
+/// Environment fallback `TAU_BV_DEFELIM_MAX_CLAUSES` (0 = unlimited there
+/// too).
 inline env_limit<size_t> bv_defelim_max_clauses{ "TAU_BV_DEFELIM_MAX_CLAUSES",
 	16, env_zero::unlimited };
 
 /// Cap on the distinct atoms the propositional check of a guard set may
 /// brute-force over (2^atoms assignments); above it the set is not refuted
-/// and the definition is not used. Never more than 30 whatever the setting.
-/// The option `bv-defelim-max-atoms`.
+/// and the definition is not used. Default 18; never more than 30 whatever
+/// the setting, so 0 (stored as SIZE_MAX by the setter and the environment
+/// alike) means 30. The option `bv-defelim-max-atoms`.
 /// Environment fallback `TAU_BV_DEFELIM_MAX_ATOMS`.
 inline env_limit<size_t> bv_defelim_max_atoms{ "TAU_BV_DEFELIM_MAX_ATOMS",
 	18, env_zero::unlimited };
 
 /// Cap on the size of the clause subsets searched for a total definition
-/// (all subsets up to this size are tried). SIZE_MAX = unlimited (0 through
-/// the setter); the option `bv-defelim-max-subset`.
-/// Environment fallback `TAU_BV_DEFELIM_MAX_SUBSET`.
+/// (all subsets up to this size are tried). Default 4; SIZE_MAX = unlimited
+/// (0 through the setter); the option `bv-defelim-max-subset`.
+/// Environment fallback `TAU_BV_DEFELIM_MAX_SUBSET` (0 = unlimited there
+/// too).
 inline env_limit<size_t> bv_defelim_max_subset{ "TAU_BV_DEFELIM_MAX_SUBSET",
 	4, env_zero::unlimited };
 
 /// Cap on the elimination rounds per existential block (one variable is
-/// eliminated per round). SIZE_MAX = unlimited (0 through the setter); the
-/// option `bv-defelim-max-rounds`.
-/// Environment fallback `TAU_BV_DEFELIM_MAX_ROUNDS`.
+/// eliminated per round). Default 256; SIZE_MAX = unlimited (0 through the
+/// setter); the option `bv-defelim-max-rounds`.
+/// Environment fallback `TAU_BV_DEFELIM_MAX_ROUNDS` (0 = unlimited there
+/// too).
 inline env_limit<size_t> bv_defelim_max_rounds{ "TAU_BV_DEFELIM_MAX_ROUNDS",
 	256, env_zero::unlimited };
 

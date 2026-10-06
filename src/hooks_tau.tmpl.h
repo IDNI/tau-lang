@@ -762,7 +762,7 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 			tau::build_bf_lteq(arg1_fm(ch).get(),
 				arg2_fm(ch).get()),
 			tau::build_bf_lteq(arg2_fm(ch).get(),
-				arg3_fm(ch).get())), r); // AP1-9: thread r
+				arg3_fm(ch).get())), r);
 	}
 	return tau::get(tau::build_bf_interval(
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);

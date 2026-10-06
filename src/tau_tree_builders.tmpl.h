@@ -318,7 +318,7 @@ int_t find_biggest_quant_id(tref fm) {
 					id = std::max(id, static_cast<int_t>(std::stoll(name)));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1
 				}
 				return false;
 			}

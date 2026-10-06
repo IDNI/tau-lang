@@ -146,7 +146,8 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		idni::tau_lang::ba_decision_pins = n;
 	}
 
-	/// Read the cap on pinned decided rows, owned by tau_ba.h.
+	/// Read the effective cap on pinned decided rows, owned by tau_ba.h:
+	/// the option, else `TAU_BA_DECISION_PINS`, else 4096; 0 pins nothing.
 	static size_t ba_decision_pins() {
 		return idni::tau_lang::ba_decision_pins;
 	}

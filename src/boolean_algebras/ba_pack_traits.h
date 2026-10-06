@@ -456,6 +456,8 @@ void pack_set_ba_decision_pins(size_t n) {
  * @brief Read the cap on pinned decided rows, owned by tau_ba.h.
  *
  * Optional: a pack without tau pins nothing, so 0 is the answer.
+ * @return The cap of the last pack member declaring one (the option, else
+ * `TAU_BA_DECISION_PINS`, else 4096 for tau), or 0 when none declares it.
  */
 template <typename Node>
 size_t pack_ba_decision_pins() {

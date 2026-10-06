@@ -229,13 +229,13 @@ result<std::string> ltl_skeleton(tref fm,
 struct past_temporal_tester {
 	/// Name of the fresh propositional state variable.
 	std::string state_var;
-	/// Informational only (LT-15): always false ((φ S ψ)(−1) = false);
+	/// Informational only: always false ((φ S ψ)(−1) = false);
 	/// the encoding hard-codes !state_var at t=0. Kept for the
 	/// explain/debug output.
 	bool        initial_value;
 	/// LTL constraint (Spot syntax) encoding the tester's transition.
 	std::string transition;
-	/// Informational only (LT-15): the negation is already inlined in the
+	/// Informational only: the negation is already inlined in the
 	/// expression returned by skeleton_str_with_testers; this flag merely
 	/// annotates the explain/debug output for T-testers.
 	bool        negate_output;

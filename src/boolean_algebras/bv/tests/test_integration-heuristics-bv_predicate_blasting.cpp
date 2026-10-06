@@ -2597,10 +2597,10 @@ TEST_SUITE("blasted scopes stay off the solver path") {
 }
 
 //
-// HE-16: single atoms with more than one arithmetic operator. Every other
+// Single atoms with more than one arithmetic operator. Every other
 // suite in this file writes chains through named intermediate variables
-// (`x / 3 = q && x % 3 = r`), so the nested-operand path -- where HE-3's
-// `changes` lookup and HE-4's per-operation result type live -- was never
+// (`x / 3 = q && x % 3 = r`), so the nested-operand path -- where the
+// `changes` lookup and the per-operation result type live -- was never
 // exercised. The verdict alone is not enough: `blast_block` re-enters
 // blasting once per nesting level, so an incomplete first pass is masked.
 // Each case therefore also asserts that the *direct* blasting output holds
@@ -2731,7 +2731,7 @@ TEST_SUITE("chained arithmetic in a single atom") {
 }
 
 //
-// HE-4: arithmetic *inside* a cast operand. The fresh result variable for the
+// Arithmetic *inside* a cast operand. The fresh result variable for the
 // inner operation used to be built with the atomic's top-level BA type (the
 // cast's target width), so the inner constraint mixed two widths.
 //

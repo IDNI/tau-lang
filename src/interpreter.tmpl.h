@@ -145,9 +145,8 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 				"failed to find the input stream for the stream",
 				{{label::name, get_var_name<node>(var)}});
 		}
-		// AP2-7: query with the parameter, not the member -- the only
-		// caller passes time_point today, but a future lookback pre-read
-		// with time_step != time_point would read the wrong step.
+		// Query with the parameter, not the member: a lookback pre-read
+		// with time_step != time_point must read its own step.
 		auto maybe_line = it->second->get(stream_pos(time_step)); // get a value from input stream
 		if (!maybe_line.has_value()) {
 			DBG(LOG_TRACE << "read[result]: {}\n"
@@ -271,7 +270,7 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 		if (is_excluded_output(vn)) continue;
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
-			// AP2-15: excluded outputs (_e*/_f*) were already filtered
+			// Excluded outputs (_e*/_f*) were already filtered
 			// before the sort above. Other `_`-prefixed streams are
 			// still returned in step()'s assignment but have no
 			// registered output stream, so they are silently unwritten
@@ -335,7 +334,7 @@ result<bool> interpreter<node>::build_inputs(
 {
 	result<bool> r;
 	// Reverse index from a flattened tuple member's own (canonized) io var
-	// to the adt_stream_layout root it belongs to (ctx.adt_streams, Task 7),
+	// to the adt_stream_layout root it belongs to (ctx.adt_streams),
 	// so a member below is routed to its group instead of getting a private
 	// stream of its own. Rebuilt fresh each call -- cheap, a handful of
 	// layouts/components -- rather than cached, since ctx.adt_streams can
@@ -1011,9 +1010,9 @@ post_normalization:
 			}
 		}
 
-		// rebuild io streams according to the SELECTED clause -- AP2-5:
-		// collecting from the whole spec opened (and truncated) file
-		// outputs and prompted console inputs referenced only in
+		// rebuild io streams according to the SELECTED clause:
+		// collecting from the whole spec would open (and truncate) file
+		// outputs and prompt console inputs referenced only in
 		// rejected clauses. update() already collects per chosen spec.
 		subtree_map<node, size_t> output_streams;
 		if (auto collected = r.merge_take(
@@ -2798,7 +2797,7 @@ result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs&
 	// transforms, one per alternative. Middle alternatives that need the
 	// transform's machinery (sometimes clauses, uninterpreted constants)
 	// still take it.
-	// IN-M8: both shortcuts below skip get_executable_spec, and with it
+	// Both shortcuts below skip get_executable_spec, and with it
 	// its rejection of constant time positions below 0. Apply that check
 	// here so a lookback-shifted alternative cannot slip through as a
 	// continuation with an unresolvable negative position.
@@ -2951,7 +2950,7 @@ result<typename interpreter<node>::update_plan>
 	// The constant time positions in original_spec need to be replaced by
 	// present assignments from memory and already executed sometimes
 	// statements need to be removed. This working copy does not depend on
-	// the update clause, so compute it once for the whole clause loop (I6).
+	// the update clause, so compute it once for the whole clause loop.
 	auto memory_spec = original_spec;
 	for (auto& [alts, rep] : memory_spec) {
 		// update current spec part with memory
@@ -3007,7 +3006,7 @@ result<typename interpreter<node>::update_plan>
 			// (or uninterpreted constant) to revise: it is an
 			// input-only constraint, or the Mealy initial-output
 			// part make_interpreter adds (IN-N11); it never merges
-			// and never receives an update (PW-10h).
+			// and never receives an update.
 			if (!current_spec[i].second) continue;
 			for (size_t j = i+1; j < current_spec.size(); ++j) {
 				// If no output/uninterpreted constant present, skip
@@ -3527,8 +3526,8 @@ result<bool> interpreter<node>::update(tref update) {
 		if (!r.report().has_error()) r = false;
 		return r;
 	}
-	// I7: growth telemetry -- the only prior symptom of the revision
-	// doubling was the interpreter getting slower.
+	// Growth telemetry: a growing revision otherwise shows only as a
+	// slower interpreter.
 	LOG_INFO << "Updated specification (" << plan->spec_str.size()
 		<< " chars): " << plan->spec_str << "\n\n";
 	if (spec_size_warn_threshold
@@ -3649,7 +3648,7 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 			for (const htref& h : alts_in) {
 				TAU_TRY(tref rev, pointwise_revision_temporal<node>(
 					h->get(), update, start_time));
-				// IN-M6: nullptr (the revision could not be
+				// nullptr (the revision could not be
 				// built) and F (the alternative is gone) are
 				// different outcomes; say which.
 				if (!rev) {
@@ -3705,7 +3704,7 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 		fold_pwr_diag(true);
 		return r.with_assert_check_value(std::optional<htrefs>(to_htrefs(alts)));
 	}
-	// PW-R6: one satisfiability memo per factored revision — the clause,
+	// One satisfiability memo per factored revision — the clause,
 	// sometimes-conjunction and gate checks repeat identical hash-consed
 	// (formula, start_time) queries, each a subprocess on temporal
 	// content (see pointwise_revision.h for the delegated-path twin).
@@ -4204,7 +4203,7 @@ result<void> interpreter<node>::seed_aux_lookback_bits(
 	for (const auto& [name, bit] : bits) {
 		auto it = lookback_occ.find(name);
 		if (it == lookback_occ.end()) {
-			// IN-M4: a bit with no shift-(-1) occurrence in the
+			// A bit with no shift-(-1) occurrence in the
 			// executable spec cannot be seeded — its t = -1 value
 			// will be the interpreter's default rather than the
 			// strategy's initial state. Today the Mealy encoding
@@ -4615,7 +4614,7 @@ interpreter<node>::boundary_traces(int n, int max_length) const {
 	std::vector<std::vector<size_t>> all_paths;
 	std::vector<size_t> stack;
 	std::vector<bool> on_stack(aut.num_states, false);
-	// AP2-9: initial_state is untrusted elsewhere (make_interpreter range
+	// initial_state is untrusted elsewhere (make_interpreter range
 	// checks it); an out-of-range value would overrun on_stack.
 	if (aut.initial_state >= aut.num_states) return {};
 

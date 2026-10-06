@@ -314,9 +314,9 @@ TEST_SUITE("bv cast - quantifier operand - unambiguous") {
 	}
 }
 
-// TY-20: the content of a `{...}:bv[N]` ba_constant is parsed by a
-// dedicated sub-grammar (parser/bitvector.tgf -> bitvector_parser.generated.h,
-// used from bv_constant_from_parse_tree() in src/boolean_algebras/bv_ba.tmpl.h)
+// The content of a `{...}:bv[N]` ba_constant is parsed by a
+// dedicated sub-grammar (bv/parser/bitvector.tgf -> bitvector_parser.generated.h,
+// used from bv_constant_from_parse_tree() in src/boolean_algebras/bv/bv_ba.tmpl.h)
 // that accepts three literal forms: plain decimal digits (already covered by
 // every other test in this file), "#b" + binary digits, and "#x" + hex
 // digits. This is tau's own literal syntax (not borrowed from cvc5's

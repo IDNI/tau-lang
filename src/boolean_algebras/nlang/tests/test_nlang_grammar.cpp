@@ -386,7 +386,7 @@ TEST_CASE("nlang: dispatcher parse_nlang empty => no value") {
 
 } // TEST_SUITE
 
-// BA1-11: nlang_splitter had zero coverage. The bot and or_ branches are
+// nlang_splitter: the bot and or_ branches are
 // oracle-free; the atom branch needs the DeepSeek key and is skipped when
 // it is unset (the no-key deepseek_query returns "", giving an atom whose
 // text is empty -- not asserted here).

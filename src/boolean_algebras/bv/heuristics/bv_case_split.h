@@ -49,10 +49,11 @@ inline bool bv_case_split_enabled() {
 /// may be tested against for the case split to apply; above it the binder is
 /// left to the pipeline. The split builds one instance per cell (2k+1 for k
 /// order-tested constants, k+1 with equalities only), so this bounds the
-/// instance count. SIZE_MAX = unlimited (0 through the option setter); set
-/// via --bv-case-split-max-tests or the REPL option
+/// instance count. SIZE_MAX = unlimited (the default; 0 through the option
+/// setter); set via --bv-case-split-max-tests or the REPL option
 /// bv-case-split-max-tests.
-/// Environment fallback `TAU_BV_CASE_SPLIT_MAX_TESTS`.
+/// Environment fallback `TAU_BV_CASE_SPLIT_MAX_TESTS` (0 = unlimited there
+/// too).
 inline env_limit<size_t> bv_case_split_max_tests{
 	"TAU_BV_CASE_SPLIT_MAX_TESTS", std::numeric_limits<size_t>::max(),
 	env_zero::unlimited };

@@ -29,7 +29,7 @@
  *                          reported once with a warning and read as `auto`.
  *                          Pure-output qlt formulas take Algorithm A
  *                          unconditionally, whatever this is set to.
- *                          Note (LS-20): an EXPLICIT `B` is not a no-op
+ *                          Note: an EXPLICIT `B` is not a no-op
  *                          relative to unset -- it additionally enables the
  *                          polarity-complete pairwise constraint pass in
  *                          normalization (unset only defaults the gate in

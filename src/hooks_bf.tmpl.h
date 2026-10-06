@@ -407,7 +407,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("$X'' :=  $X.");)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
-	//RULE "{c}' := ~c" (AP1-10): constant negation folds like or/and/xor
+	//RULE "{c}' := ~c": constant negation folds like or/and/xor
 	// do, so the `{c} = 1 ::= T or F` wff rules see a folded constant.
 	//
 	// A tau-type constant is exempt: cte_neg normalizes through the

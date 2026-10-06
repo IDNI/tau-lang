@@ -3136,7 +3136,7 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 	assert(shift <= 0 && "build_carrier_eq_aux: shift must be <= 0 (past or current)");
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
 	// The Boolean carrier's type, spelled in full — a bare name without its
-	// parameter is rejected by the grammar. IN-M4: ONE width source — this
+	// parameter is rejected by the grammar. ONE width source — this
 	// is the same carrier type seed_aux_lookback_bits builds its seed
 	// values in, so the two never desynchronise.
 	TAU_TRY(std::string type_str, get_ba_type_name<node>(

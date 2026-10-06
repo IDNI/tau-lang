@@ -34,7 +34,7 @@ rr_sig get_rr_sig(tref n) {
  */
 template <NodeType node>
 tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
-	// Classification (TT2-21, public contract): a stream registered in
+	// Classification (public contract): a stream registered in
 	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
 	// first char 'i' or the name "this" -> input; first char 'o' or the
 	// name "u" -> output; anything else stays unresolved.
@@ -142,7 +142,7 @@ std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	return types;
 }
 
-// TI-3: every case of one recurrence family (same symbol name, offset
+// Every case of one recurrence family (same symbol name, offset
 // arity, AND ref-arg arity -- the full rr_sig, as is_functional_ref and the
 // fixpoint-call machinery identify a family; an indexed family `f[n]/f[0]`
 // and an unrelated plain function `f(x)` sharing the name and argument
@@ -211,7 +211,7 @@ result<bool> validate_rr_case_types(const rr<node>& defs) {
 	return r.with_value(true);
 }
 
-// TI-4: a call whose argument types can never match its definition's
+// A call whose argument types can never match its definition's
 // parameter types is a silent no-op at rule-application time -- the rule
 // simply never fires, so `pr2(u) := (u:sbf = 0)` followed by `pr2(z:tau)`
 // would echo the call back unexpanded. Functions already
@@ -1119,8 +1119,8 @@ result<bool> has_open_tau_fm_in_constant(tref fm) {
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
-		// Skip a ba_constant not converted to a constant yet -- aborting
-		// the whole scan here (TT2-6) let an open tau constant hide
+		// Skip a ba_constant not converted to a constant yet; aborting
+		// the whole scan here would let an open tau constant hide
 		// behind an earlier unparsed one.
 		if (tau::get(ba_const).get_ba_constant_id() == 0) continue;
 		TAU_TRY(auto is_closed_val,

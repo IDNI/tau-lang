@@ -244,7 +244,8 @@ concept ba_has_component_factoring = ba_has_descriptor_v<Node, BA>
 			-> std::convertible_to<bool>; };
 
 /// @brief @p BA caps the decided rows it keeps pinned:
-/// `set_ba_decision_pins(n)`.
+/// `set_ba_decision_pins(n)` sets the cap and `ba_decision_pins()` reads
+/// its effective value.
 template <typename Node, typename BA>
 concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t n) {

@@ -290,7 +290,7 @@ tref semantic_revise_atoms(tref alpha, tref beta) {
 }
 
 /**
- * @brief PW-R6: per-revision satisfiability memo.
+ * @brief Per-revision satisfiability memo.
  *
  * One revision asks is_tau_formula_sat for the same (formula, start_time)
  * several times: the trees are hash-consed, so Step 1's `spec ∧ update`,

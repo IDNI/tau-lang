@@ -93,7 +93,7 @@ void default_typing_message(tref var, tref env, const bool bv = false) {
 	LOG_DEBUG << message << tau::get(var) << type_info << " in " << tau::get(env) << "\n";
 }
 
-// BA2-20: canonize is the type-inference KEY builder -- it untypes,
+// canonize is the type-inference KEY builder -- it untypes,
 // unwraps a `bf` wrapper, and rewrites any io_var to
 // variable(io_var(var_name)) DROPPING the offset/shift. That last part is
 // load-bearing: it is what makes typed history entries of one stream match
@@ -436,7 +436,7 @@ std::variant<tref, inference_error, parse_error> update_arith_symbol(tref n,
 	if (pack_type_has_arith_ops<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
-	// BA2-16: expected = a type declaring arith_ops (report as
+	// expected = a type declaring arith_ops (report as
 	// untyped-expected slot per the error's rendering order: found first),
 	// found = t.
 	return inference_error{n, untyped_type_id<node>(), t};
@@ -566,7 +566,7 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 	using tau = tree<node>;
 
 	// If we have no type information for the element we do nothing.
-	// BA2-1: return n, not nullptr -- the caller stores the returned tref
+	// Return n, not nullptr -- the caller stores the returned tref
 	// verbatim when it differs from n, and a nullptr child in the rebuilt
 	// tree is dereferenced by any later traversal (update_tref returns n
 	// for exactly this case).
@@ -634,7 +634,7 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	// BA2-22: with use_defaults == false everything can legitimately stay
+	// With use_defaults == false everything can legitimately stay
 	// untyped here; handle it gracefully like update_functional_rr's
 	// `if (is_untyped) return updated;` instead of aborting debug builds.
 	if (is_untyped<node>(type)) return updated;
@@ -1084,10 +1084,8 @@ std::variant<tref, inference_error, parse_error> update(
 		if (is_atomic_fm<node>(n)) type_environment.push_back(n);
 		else if (n_t.is(tau::rec_relation)) type_environment.push_back(n);
 		else if (n_t.is(tau::ref)) type_environment.push_back(n);
-		// Case of single bf
-		// (BA2-17: an `else if (type_environment.empty() && ...)` push
-		// was deleted here -- the environment is seeded with {r} and
-		// pushes/pops are balanced, so it can never be empty.)
+		// A single bf needs no push of its own: the environment is seeded
+		// with {r} and pushes/pops are balanced, so it is never empty.
 		return true;
 	};
 	post_order<node>(r).search(f, update_type_env);

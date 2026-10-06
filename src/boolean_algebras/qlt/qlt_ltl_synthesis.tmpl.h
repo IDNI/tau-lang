@@ -126,7 +126,7 @@ static bool is_algorithm_a_applicable(
 {
 	using tau = tree<node>;
 	if (atoms.empty()) return false;
-	// LG-9: bound K -- the A/B/D encodings compute 1 << K (signed-shift
+	// Bound K -- the A/B/D encodings compute 1 << K (signed-shift
 	// UB at K >= 31) and enumerate 2^K masks (exponential strings well
 	// before that). The cap is qlt's runtime option `qlt-t3-cap`
 	// (qlt_t3_encoding_cap, qlt.h), shared with the semantic PWR.
@@ -674,7 +674,7 @@ solve_ltl_aba_algorithm_b(
 	int T1_size = 2 * (int)constants.size() + 1;
 
 	// D-bitmask per T₃ type: the one helper Algorithm A and the semantic
-	// PWR use (LS-12).
+	// PWR use.
 	TAU_TRY(auto type_A, qlt_type_A_bitmasks<node>(atoms, T3, constants));
 
 	// Build T₂ lookup: (pos_m, pos_x, rel_mx) → T₂ index.
@@ -827,7 +827,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 
 	// The choice comes from `--ltl-alg` / `set ltlalg` / TAU_LTL_ALG;
 	// ltl_algorithm_choice() (ltl_aba_limits.h) validates it and reports an
-	// unrecognised value once (LS-8), returning "" for the default routing.
+	// unrecognised value once, returning "" for the default routing.
 	const bool alg_b_mode = alg_choice.empty() || alg_choice == "B";
 	const bool alg_a_mode = alg_choice == "A";
 	if (is_algorithm_a_applicable<node>(sol.atoms)) {

@@ -392,7 +392,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	{
 		HOOK_LOGGING(applied("{c} = 1 ::= T or F");)
 		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(
-			arg1_fm(ch).get())), r); // AP1-9: thread r
+			arg1_fm(ch).get())), r);
 	}
 
 	// Rule {c} = {d} ::= {c} + {d} = 0
@@ -402,7 +402,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 			HOOK_LOGGING(applied("{c} = {d} ::= {c} + {d} = 0");)
 			return tau::get(tau::build_bf_eq_0(
 				build_bf_xor<node>(
-					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
+					arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 			}
 
 	// The owning BA may decide the equation
@@ -435,7 +435,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	if (arg1(ch).is(tau::bf_t) || arg1(ch).is(tau::bf_f)) {
 		HOOK_LOGGING(applied("1/0 = X ::= X = 1/0");)
 		return tau::get(tau::build_bf_eq(arg2_fm(ch).get(),
-			arg1_fm(ch).get()), r); // AP1-9
+			arg1_fm(ch).get()), r);
 	}
 
 	return tau::get_raw(v, ch, len, r);
@@ -496,7 +496,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 	{
 		HOOK_LOGGING(applied("{c} != 1 ::= T or F");)
 		return tau::get(tau::build_bf_neq_0(tau::build_bf_neg(
-			arg1_fm(ch).get())), r); // AP1-9
+			arg1_fm(ch).get())), r);
 	}
 
 	// Rule {c} != {d} ::= {c} + {d} != 0
@@ -506,7 +506,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 			HOOK_LOGGING(applied("{c} != {d} ::= {c} + {d} != 0");)
 			return tau::get(tau::build_bf_neq_0(
 				build_bf_xor<node>(
-					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
+					arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 		}
 
 	// The owning BA may decide the disequation
@@ -539,7 +539,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 	if (arg1(ch).is(tau::bf_t) || arg1(ch).is(tau::bf_f)) {
 		HOOK_LOGGING(applied("1/0 != X ::= X != 1/0");)
 		return tau::get(tau::build_bf_neq(arg2_fm(ch).get(),
-			arg1_fm(ch).get()), r); // AP1-9
+			arg1_fm(ch).get()), r);
 	}
 
 	return tau::get_raw(v, ch, len, r);

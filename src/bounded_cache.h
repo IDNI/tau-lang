@@ -81,7 +81,8 @@ inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
  *
  * Two bounding modes. Default construction uses the compile-time `Max`
  * template parameter. Constructing with a pointer to a runtime bound
- * switches to runtime mode: the pointee is read on every insert, so
+ * (or to an env_limit) switches to runtime mode: the pointee is read on
+ * every insert, so
  * a `set cachebound N` tightens or loosens a live cache. In both
  * modes a bound of 0 means unbounded; in runtime mode the FIFO
  * queue is maintained even while the bound is 0, so a later
@@ -111,7 +112,10 @@ struct bounded_cache {
 	/// pointer selects compile-time mode.
 	explicit bounded_cache(const std::size_t* runtime_bound)
 		: runtime_bound_(runtime_bound) {}
-	/// @brief Runtime mode over a limit with an environment fallback.
+	/// @brief Runtime mode over a limit with an environment fallback: the
+	/// limit's effective value (see env_limit) is read on every insert.
+	/// @param runtime_limit Limit to read; must outlive the cache. A null
+	/// pointer selects compile-time mode.
 	explicit bounded_cache(const env_limit<std::size_t>* runtime_limit)
 		: runtime_limit_(runtime_limit) {}
 

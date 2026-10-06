@@ -371,7 +371,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// o:bv[8] = min(x*y, {200}): needed W = 16 (mul: 8+8; min keeps
 		// max(16, 8) = 16). o is bare storage -- untouched; the RHS is
 		// elaborated at 16 and wrapped in one truncating (bv[8]) cast.
-		// Exact elaborated shape (Task 5/6 reviewers: pin against this):
+		// Exact elaborated shape (pinned):
 		//   o = (bv[8]) min((bv[16]) x * (bv[16]) y, {200})
 		// {200} is NOT printed with a "(bv[16])" cast prefix: it is a
 		// compile-time-constant operand, and the construction-time
@@ -524,7 +524,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// assignment shape's outer cast does -- re-running needed_width
 		// naively on an already-widened "x*y <= z" would see two
 		// already-(bv[16])-cast mul operands and recompute 16+16=32,
-		// inflating W without bound on every re-application. Task 6 calls
+		// inflating W without bound on every re-application. The pipeline calls
 		// this pass inside normalize_non_temp, which runs every step, so
 		// this MUST be a true no-op, not just "eventually settles" or
 		// "hits the cap". The is_side_saturated_at guard is what makes
@@ -781,7 +781,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// (ba_types_inference.tmpl.h's get_typeable_type_ids_by_type only
 		// ever looks at ref/variable/ba_constant/bf_t/bf_f) -- so it is
 		// left untyped post-inference, which that Debug check treats as a
-		// bug. Task 3's own needed_width "$X + y" test sidesteps the same
+		// bug. The needed_width "$X + y" test sidesteps the same
 		// check the same way (.infer_ba_types = false); with inference
 		// off, the check does not run at all, for anything.
 		//
@@ -1259,11 +1259,11 @@ TEST_SUITE("bv widening - whole formula pass") {
 }
 
 // ---------------------------------------------------------------------------
-// Task 6: pipeline integration + end-to-end cvc5 semantics.
+// Pipeline integration + end-to-end cvc5 semantics.
 //
 // Every case below turns `bv_widening` on BEFORE parsing, not merely
 // before calling widen_bv_arithmetic: term_add/term_sub/term_mul's
-// fit-gated constant folding (Task 2) checks the SAME global flag at
+// fit-gated constant folding checks the SAME global flag at
 // construction time, and deliberately leaves an overflowing constant
 // operation (e.g. `{16}*{16}` at bv[8]) symbolic -- unfolded -- exactly
 // when bv_widening is on, so that the tree still contains a genuine
@@ -1500,7 +1500,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 	// Post-review fix: a D4 cap violation (needed width W exceeds a
 	// capped bv_max_width) makes widen_bv_arithmetic return nullptr,
 	// which normalize_with_temp_simp/normalize_non_temp now propagate
-	// (Task 6's own gated snippet: `if (!fm) return nullptr;`). Before
+	// (`if (!fm) return nullptr;`). Before
 	// this round's fix, none of the many call sites of those two
 	// functions across solver.tmpl.h/satisfiability.tmpl.h/
 	// interpreter.tmpl.h/normalizer.tmpl.h checked for that nullptr
@@ -1550,7 +1550,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		CHECK(!maybe_i.has_value());
 	}
 
-	// Task 8 pwr-update repro: an interpreter update submitted through the
+	// pwr-update repro: an interpreter update submitted through the
 	// u stream widens to exactly the shape
 	// "always o1[t]:bv[8] = min(i2[t]:bv[8] * {3}:bv[8], {100}:bv[8])"
 	// (confirmed by a trace-level rerun: the printed u value carried the
@@ -1592,7 +1592,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 }
 
 // ---------------------------------------------------------------------------
-// Task 7: blasting backend support for widened bv atoms.
+// Blasting backend support for widened bv atoms.
 //
 // atomic_blasting (bv_predicate_blasting.tmpl.h) hoists a fresh auxiliary
 // variable for every bf_add/bf_sub/bf_shl/bf_shr/bf_mul/bf_div/bf_mod/
@@ -1617,7 +1617,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 // bf_min node inside it, so the hoisted intermediates' widths actually
 // matter to the final bit-level constraints.
 //
-// Literal-constant-only analogues of Task 6's own end-to-end samples (e.g.
+// Literal-constant-only analogues of the pipeline suite's end-to-end samples (e.g.
 // "o = min({16}*{16}, {200})") do NOT exercise this: with both operands
 // literal, the widened RHS folds away to a single constant before blasting
 // ever sees a bf_mul/bf_min node.
@@ -1750,9 +1750,9 @@ TEST_SUITE("bv widening - blasting backend (Task 7)") {
 }
 
 // ---------------------------------------------------------------------------
-// Task 9: pinned realizability/satisfiability truth-value flips through the
+// Pinned realizability/satisfiability truth-value flips through the
 // full `is_tau_formula_sat`/`api<node_t>::realizable` entry points, on vs.
-// off. Every earlier end-to-end flip (Task 6's suite above) goes through
+// off. Every earlier end-to-end flip (the pipeline suite above) goes through
 // `is_bv_formula_valid`/`is_bv_formula_sat` directly on an explicitly
 // `widen_bv_arithmetic`-called tree; these instead exercise the production
 // pipeline entry points a caller actually uses (`is_tau_formula_sat` calls
@@ -1763,7 +1763,7 @@ TEST_SUITE("bv widening - blasting backend (Task 7)") {
 //
 // `bv_widening` must be set BEFORE parsing, not just before normalizing:
 // the fit-gated constant folding in
-// `term_mul`/`term_add`/`term_sub` (Task 2) reads the same global flag at
+// `term_mul`/`term_add`/`term_sub` reads the same global flag at
 // construction time and leaves an overflowing constant operation symbolic
 // exactly when the flag is on -- so each side of a flip below re-parses the
 // SAME source string fresh under the flag state it is checking, rather than
@@ -1799,8 +1799,8 @@ TEST_SUITE("bv widening - realizability on/off") {
 			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")).value_or(false));
 
 		// Exact (bv_widening on, set BEFORE parsing so the fit-gate
-		// leaves 16*16 unfolded -- the "load-bearing" ordering Task 6's
-		// end-to-end suite established): W = needed_width(mul) = 16;
+		// leaves 16*16 unfolded -- the "load-bearing" ordering the pipeline
+		// suite established): W = needed_width(mul) = 16;
 		// 16*16 = 256 exactly (fits in 16 bits, no fit-gate trip once
 		// widen_bv_arithmetic re-extends both operands to bv[16] during
 		// normalization, at which point the mul re-folds to the plain

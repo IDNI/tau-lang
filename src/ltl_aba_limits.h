@@ -260,7 +260,7 @@ inline int ltl_timeout_sec() {
  * Precedence: @ref ltl_algorithm_param when non-empty, else the
  * `TAU_LTL_ALG` environment variable, else the default. Anything other
  * than A, B, D or auto (case-insensitive) is reported once and read as the
- * default (LS-8): a typo must not silently disable every gate.
+ * default: a typo must not silently disable every gate.
  * @return The upper-cased choice, or `""` for `auto`, unset or invalid.
  */
 inline std::string ltl_algorithm_choice() {

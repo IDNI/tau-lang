@@ -206,7 +206,7 @@ struct bdd_handle {
 		const bdd<B, o> &xx = x->get();
 		const bdd<B, o> &yy = get();
 		if (xx.leaf()) {
-			if (std::get<B>(xx) == true) return *this; // BA1-21: get(bdd_handle) has no overload
+			if (std::get<B>(xx) == true) return *this; // get(bdd_handle) has no overload
 			if (std::get<B>(xx) == false) return hfalse;
 			if (yy.leaf())
 				return	bdd_handle<B, o>::get(
@@ -229,7 +229,7 @@ struct bdd_handle {
 		const bdd<B, o> &yy = get();
 		if (xx.leaf()) {
 			if (std::get<B>(xx) == true) return htrue;
-			if (std::get<B>(xx) == false) return *this; // BA1-21: get(bdd_handle) has no overload
+			if (std::get<B>(xx) == false) return *this; // get(bdd_handle) has no overload
 			if (yy.leaf())
 				return	bdd_handle<B, o>::get(
 					std::get<B>(xx) | std::get<B>(yy));

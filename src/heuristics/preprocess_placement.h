@@ -60,7 +60,7 @@ namespace idni::tau_lang {
 //
 // | combo                         | W1  | W2         | W3      |
 // |--------------------------------|-----|------------|---------|
-// | DEFAULTS (on,leaf,apx,eager)   | 24s | 14s        | TIMEOUT |
+// | B leaf,apx                     | 24s | 14s        | TIMEOUT |
 // | A0 off,eager                   | 25s | 13s        | 0s PASS |
 // | A1 off,per_closed_block        | 24s | 12s        | 0s PASS |
 // | A2 off,per_formula              | 25s | 12s        | 0s PASS |

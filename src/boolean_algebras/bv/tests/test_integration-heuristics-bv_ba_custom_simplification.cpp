@@ -225,7 +225,7 @@ TEST_SUITE("ba bv custom simplification") {
 			"X:bv[64] * {2}:bv[64]");
 	}
 
-	// HE-2: `{1} / X` used to fold to `(0 / X) * {1}`, which is 0 for every X
+	// `{1} / X` used to fold to `(0 / X) * {1}`, which is 0 for every X
 	// while the source is 1 whenever X = 1.
 	TEST_CASE("1 / X") {
 		check_unchanged("{1}:bv[64] / X:bv[64]");
@@ -246,7 +246,7 @@ TEST_SUITE("ba bv custom simplification") {
 			"0:bv[64] - X:bv[64] + 1:bv[64]");
 	}
 
-	// HE-2: the whole chain contains divisions, so nothing may be regrouped.
+	// The whole chain contains divisions, so nothing may be regrouped.
 	TEST_CASE("1 / X / 2") {
 		check_unchanged("{1}:bv[64] / X:bv[64] / {2}:bv[64]");
 	}
@@ -280,12 +280,12 @@ TEST_SUITE("ba bv custom simplification") {
 	}
 }
 
-// HE-1/HE-2/HE-12: blocks that mix `+ - * /` with a non-block operator, a
+// Blocks that mix `+ - * /` with a non-block operator, a
 // cast, or a division. Every case below was silently mis-folded (or crashed
 // in release) while the suite above asserted only `simplified != nullptr`.
 TEST_SUITE("bv custom simplification: unsound folds") {
 
-	// HE-2: cancelling a term that appears on both sides of a division is
+	// Cancelling a term that appears on both sides of a division is
 	// only valid in a group; Z/2^n under `*` is not one.
 	TEST_CASE("X / X is not folded") {
 		check_unchanged("x:bv[8] / x:bv[8]");
@@ -296,33 +296,33 @@ TEST_SUITE("bv custom simplification: unsound folds") {
 		check_unchanged("x:bv[8] * y:bv[8] / y:bv[8]");
 	}
 
-	// HE-1(a): the `&` operand's frames used to survive on the block stack,
+	// The `&` operand's frames used to survive on the block stack,
 	// so the additive block folded `y + z` and deleted `x & y` entirely.
 	TEST_CASE("(x & y) + z keeps the conjunction") {
 		check_unchanged("(x:bv[8] & y:bv[8]) + z:bv[8]");
 	}
 
-	// HE-1(c): this shape popped the wrong frame and then called
+	// This shape popped the wrong frame and then called
 	// apply_block_operation on a one-frame stack, reading past the end of an
 	// empty vector.
 	TEST_CASE("((a + b) & c) + d does not corrupt the block stack") {
 		check_unchanged("((a:bv[8] + b:bv[8]) & c:bv[8]) + d:bv[8]");
 	}
 
-	// HE-1(b): round 2 of the fixpoint loop used to assign the right-hand
+	// Round 2 of the fixpoint loop used to assign the right-hand
 	// constant to the left-hand block, yielding `{5} & {5}`.
 	TEST_CASE("(a + {1}) & ({2} + {3}) keeps both operands") {
 		// the parser's hooks already fold {2}+{3} into {5}
 		check_unchanged("(a:bv[8] + {1}:bv[8]) & {5}:bv[8]");
 	}
 
-	// HE-12: a cast terminates the block; folding {9} and {1} together across
+	// A cast terminates the block; folding {9} and {1} together across
 	// the width change loses the truncation/zero-extension.
 	TEST_CASE("a cast terminates the additive block") {
 		check_unchanged("(bv[8]) (x:bv[4] + {9}:bv[4]) + {1}:bv[8]");
 	}
 
-	// BA1-31: the bv hook must not fold `0 / X` for a non-constant X either.
+	// The bv hook must not fold `0 / X` for a non-constant X either.
 	TEST_CASE("{0} / X is not folded to zero") {
 		check_unchanged("{0}:bv[8] / x:bv[8]");
 	}

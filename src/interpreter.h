@@ -108,14 +108,15 @@ struct interpreter {
 	friend struct api<node>;
 
 	/**
-	 * @brief Runtime size guard for updated specifications (I7).
+	 * @brief Runtime size guard for updated specifications.
 	 *
 	 * When nonzero, update() logs a WARNING whenever the stored
 	 * specification exceeds this many printed characters. 0 disables the
-	 * check. Set from the `--spec-size-warn` CLI option; a runtime
-	 * parameter by policy, never a header constant.
+	 * check (the default). Set via `--spec-size-warn`, REPL
+	 * `specsizewarn` or `api::set_spec_size_warn`; a runtime parameter by
+	 * policy, never a header constant. Environment fallback
+	 * `TAU_SPEC_SIZE_WARN`.
 	 */
-	/// Environment fallback `TAU_SPEC_SIZE_WARN`.
 	static inline env_limit<size_t> spec_size_warn_threshold{
 		"TAU_SPEC_SIZE_WARN", 0 };
 
@@ -129,11 +130,11 @@ struct interpreter {
 	 * `max_revision_alts - 1` (the strongest accumulated behavior) and
 	 * the last one (the newest update clause, the part's universally
 	 * executable anchor) are kept and the middle preference tiers are
-	 * dropped with a WARNING. 0 disables the cap. Set from the
-	 * `--max-revision-alts` CLI option; a runtime parameter by policy,
-	 * never a header constant.
+	 * dropped with a WARNING. 0 disables the cap (the default). Set via
+	 * `--max-revision-alts`, REPL `revisionalts` or
+	 * `api::set_max_revision_alts`; a runtime parameter by policy, never a
+	 * header constant. Environment fallback `TAU_MAX_REVISION_ALTS`.
 	 */
-	/// Environment fallback `TAU_MAX_REVISION_ALTS`.
 	static inline env_limit<size_t> max_revision_alts{
 		"TAU_MAX_REVISION_ALTS", 0 };
 
@@ -164,12 +165,15 @@ struct interpreter {
 	 * the tuned 256 / 1.5), public like the two limits above so the REPL
 	 * `get` printers can read them back: set via
 	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
-	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
+	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`. A floor of 0
+	 * leaves the growth factor as the only trigger. Environment fallbacks
+	 * `TAU_GC_MIN_SIZE` and `TAU_GC_GROWTH_FACTOR`. A store past its soft
+	 * tref budget sweeps regardless of both.
 	 */
-	/// Environment fallbacks `TAU_GC_MIN_SIZE` and `TAU_GC_GROWTH_FACTOR`.
 	static inline env_limit<size_t> gc_min_size{ "TAU_GC_MIN_SIZE", 256 };
 	/// Growth of bintree<node>::M() since the last sweep that triggers the
-	/// next one; <= 0 disables the sweeps (see gc_min_size).
+	/// next one (default 1.5); <= 0 disables the growth-triggered sweeps
+	/// (see gc_min_size). Environment fallback `TAU_GC_GROWTH_FACTOR`.
 	static inline env_limit<double> gc_growth_factor{
 		"TAU_GC_GROWTH_FACTOR", 1.5 };
 
@@ -373,7 +377,7 @@ struct interpreter {
 	/// commit, without changing the interpreter.
 	///
 	/// Runs the same plan_update() as update(), so can_extend(psi) is true
-	/// exactly when update(psi) would commit (PW-N9 / IN-M7). The one side
+	/// exactly when update(psi) would commit (IN-M7). The one side
 	/// effect both share is that unknown console streams named by @p psi get
 	/// registered in the io_context during stream collection. Non-const
 	/// because the dry run copies the output_partition union-find.

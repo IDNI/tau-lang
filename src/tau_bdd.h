@@ -31,9 +31,9 @@ namespace idni::tau_lang {
 template <NodeType node>
 struct tau_bdd_node {
 	tref v = nullptr;     ///< Variable (Tau tree reference).
-	bool inv_v : 1 = false; ///< Invert the variable polarity.
-	bool inv_h : 1 = false; ///< Invert the high child.
-	bool inv_l : 1 = false; ///< Invert the low child.
+	bool inv_v : 1 = false; ///< The two children are stored swapped.
+	bool inv_h : 1 = false; ///< Invert the edge to the stored high child.
+	bool inv_l : 1 = false; ///< Invert the edge to the stored low child.
 
 	/** @brief Construct a node for @p _v with every flag clear. */
 	explicit tau_bdd_node(tref _v) : v(_v) {}

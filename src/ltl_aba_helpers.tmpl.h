@@ -536,7 +536,7 @@ static result<std::string> skeleton_str_with_testers(
 	if (t.is(tau::wff)) return skeleton_wff_with_testers<node>(n, atoms, testers, c);
 	result<std::string> r;
 	auto prop = find_prop<node>(n, atoms);
-	return r.with_value(prop.empty() ? "1" : prop); // LT-11
+	return r.with_value(prop.empty() ? "1" : prop); // not a data atom: true
 }
 
 template <NodeType node>
@@ -548,7 +548,7 @@ static result<std::string> skeleton_wff_with_testers(
 	using tau = tree<node>;
 	result<std::string> r;
 	const auto& t = tau::get(n);
-	if (!t.has_child()) { return r.with_value("1"); } // LT-11
+	if (!t.has_child()) { return r.with_value("1"); } // a terminal node: true
 	auto nt = t[0].value.nt;
 	const auto& inner = t[0];
 
@@ -691,12 +691,8 @@ static result<std::string> skeleton_wff_with_testers(
 	case tau::wff_A:
 	case tau::wff_E:
 	case tau::wff_semantic_neg:
-		// IN-R3: LT-5's fail-loudly guard landed only in skeleton_str,
-		// but every live call site (solve_ltl_aba, ltl_explain) builds
-		// the skeleton through THIS function, so A/E/- that survived the
-		// CTL* reduction still fell into the default case and became the
-		// propositional constant "1" (`ltl A (F o1 = 1)` printed
-		// "skeleton: 1" REALIZABLE). Same refusal as skeleton_str.
+		// A, E or - that survived the CTL* reduction has no propositional
+		// encoding; refuse instead of reading it as the constant "1".
 		return r.with_error(code::solver_error,
 		    "CTL* node (A / E / semantic negation) survived the CTL* "
 		    "reduction and reached the propositional skeleton; it has no "

@@ -59,8 +59,9 @@ namespace idni::tau_lang {
 /// NOT thread-safe (single-threaded library assumption, as bv_blasting).
 inline bool bv_widening = false;
 
-/// Cap on the computed width W (inclusive); exceeding it is an elaboration
-/// error. 0 passed to the setter leaves the current cap unchanged.
+/// Cap on the computed width W (inclusive), default 1024; exceeding it is an
+/// elaboration error. The option `bv-max-width`; 0 passed to the setter
+/// leaves the current cap unchanged.
 /// Environment fallback `TAU_BV_MAX_WIDTH`, where 0 keeps the default too.
 inline env_limit<size_t> bv_max_width{ "TAU_BV_MAX_WIDTH", 1024,
 	env_zero::keep_default };

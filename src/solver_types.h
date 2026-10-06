@@ -27,11 +27,11 @@ namespace idni::tau_lang {
 /// its complement, so the region grows with each step of a run, and each
 /// shrink decides the Tau constants it holds. Past the budget the ledger
 /// stops tracking the region and values come from the general solver.
-/// 0 = unlimited; set via `api::set_max_constant_size`,
+/// Default 2000; 0 = unlimited; set via `api::set_max_constant_size`,
 /// `--max-constant-size` or the REPL option `maxconstantsize`. Declared here
 /// rather than in solver.h: the verdict fingerprint of satisfiability.tmpl.h
 /// reads it, and that header cannot include solver.h.
-/// Environment fallback `TAU_MAX_CONSTANT_SIZE`.
+/// Environment fallback `TAU_MAX_CONSTANT_SIZE` (0 = unlimited there too).
 inline env_limit<size_t> max_constant_size{ "TAU_MAX_CONSTANT_SIZE", 2000 };
 
 /**

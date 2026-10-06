@@ -576,7 +576,7 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 }
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "normal_forms" // NF-14: "to_snf" was a stale channel name
+#define LOG_CHANNEL_NAME "normal_forms"
 
 
 /** @internal @copydoc anf @endinternal */

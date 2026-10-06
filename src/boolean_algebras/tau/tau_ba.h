@@ -44,7 +44,8 @@ inline bool ba_component_factoring = true;
 /// and the per-component factoring) keep their key tree pinned across the
 /// interpreter's per-step sweep, oldest released first. Rows whose key tree
 /// nothing else holds were dropped at every sweep and their constant
-/// re-decided at the next step (GitHub #92). 0 disables the pinning; set via
+/// re-decided at the next step (GitHub #92). Default 4096; 0 disables the
+/// pinning; set via
 /// api<node>::set_ba_decision_pins, --ba-decision-pins, or the REPL option
 /// decisionpins.
 /// Environment fallback `TAU_BA_DECISION_PINS`.

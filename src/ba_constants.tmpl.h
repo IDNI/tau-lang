@@ -90,7 +90,7 @@ void ba_constants<node>::cleanup() {
 	C().clear();
 	T().clear();
 	index_().clear();
-	poisoned = true; // BA2-5: any later get() must fail loudly, see header
+	poisoned = true; // any later get() must fail loudly, see header
 }
 
 } // namespace idni::tau_lang

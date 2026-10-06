@@ -65,6 +65,9 @@ inline size_t env_limit_count(const char* var, size_t dflt) {
  * The real-valued sibling of @ref env_limit_count: an absent variable is the
  * default, and a value that is not a finite decimal number keeps the default
  * and says so once per variable and thread. The sign is the limit's to read.
+ * @param var Name of the environment variable; must not be null.
+ * @param dflt Value returned when @p var is unset or invalid.
+ * @return The parsed value, or @p dflt.
  */
 inline double env_limit_real(const char* var, double dflt) {
 	const char* v = std::getenv(var);
@@ -82,9 +85,10 @@ inline double env_limit_real(const char* var, double dflt) {
 	return d;
 }
 
-/// What a limit's environment variable set to 0 means: 0 itself, the
-/// largest value (a budget whose loops read that as unlimited), or the
-/// default (a limit whose setter ignores 0).
+/// What a limit's environment variable set to 0 means: 0 itself
+/// (`value`), the largest value (`unlimited`: a budget whose loops read
+/// that as unlimited), or the default (`keep_default`: a limit whose setter
+/// ignores 0).
 enum class env_zero { value, unlimited, keep_default };
 
 /**
@@ -102,10 +106,16 @@ enum class env_zero { value, unlimited, keep_default };
  *
  * A variable set to 0 reads as its setter reads 0, chosen by @p zero (see
  * @ref env_zero).
+ * @tparam T The limit's value type: an integer count, or a floating-point
+ * number read with @ref env_limit_real.
  */
 template <typename T>
 class env_limit {
 public:
+	/// @param var Environment variable read when no option is set; must
+	/// outlive the limit (a string literal).
+	/// @param dflt Value when neither the option nor the variable is given.
+	/// @param zero What the variable set to 0 reads as.
 	constexpr env_limit(const char* var, T dflt,
 		env_zero zero = env_zero::value)
 		: var_(var), dflt_(dflt), zero_(zero) {}

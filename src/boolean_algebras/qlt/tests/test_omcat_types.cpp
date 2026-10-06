@@ -74,7 +74,7 @@ TEST_SUITE("omcat type enumeration") {
 		CHECK(cmp(w, rational(5, 1)) > 0);
 	}
 
-	// AL-R2: `cmp` was widened to 128-bit (BA2-24) because long long
+	// AL-R2: `cmp` was widened to 128-bit because long long
 	// cross-products overflow for parse-reachable magnitudes, but
 	// `realize()` kept multiplying the same p/q pairs in 64 bits.  Two
 	// constants with denominators around 3.04e9 make the old midpoint

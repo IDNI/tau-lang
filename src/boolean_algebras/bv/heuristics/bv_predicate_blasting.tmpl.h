@@ -444,7 +444,7 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	};
 	auto f = [&](tref n) {
 		if (is<node, tau::variable>(n)) {
-			// HE-18: a user variable literally named e.g.
+			// A user variable literally named e.g.
 			// 9999999999 must not throw out of the blasting pass;
 			// skip anything that does not fit.
 			if (const auto& name = get_var_name<node>(n);
@@ -1516,7 +1516,7 @@ static result<tref> wff_predicate_blasting(tref term) {
 		// their own ba_wff_hooks specialization. Only dispatch to the bv
 		// blasters when at least one operand actually carries a bv BA-type.
 		auto is_bv_operands = [&]() {
-			// HE-10: the ordering blasters read the bitwidth from the
+			// The ordering blasters read the bitwidth from the
 			// LEFT operand, so the left one must actually carry the
 			// bv type -- an OR-gate admitted left-untyped/right-bv
 			// atoms. Declining such a half-typed atom to rebuild_default

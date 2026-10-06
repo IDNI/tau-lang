@@ -60,8 +60,8 @@ __extension__ typedef __int128 omcat_int128_;
  * @return -1, 0 or +1 as `a` is less than, equal to or greater than `b`.
  */
 inline int cmp(const rational& a, const rational& b) {
-	// a.p/a.q  vs  b.p/b.q :  cross-multiply. BA2-24: widened to 128-bit
-	// -- long long products overflow for parse-reachable magnitudes and
+	// a.p/a.q  vs  b.p/b.q :  cross-multiply in 128 bits:
+	// long long products overflow for parse-reachable magnitudes and
 	// silently corrupt T1/T2/T3 orderings.
 	omcat_int128_ lhs = (omcat_int128_) a.p * b.q,
 		rhs = (omcat_int128_) b.p * a.q;
@@ -108,14 +108,14 @@ struct qlt_type1 {
 	bool greater_than(int j) const {
 		const int hp = pos >> 1;
 		// interval (c_{i-1}, c_i): x > c_j iff i-1 >= j, equivalently i > j.
-		return hp > j; // BA2-14: both ternary branches were identical
+		return hp > j;
 	}
 
 	/**
 	 * @brief A concrete rational witness of this type.
 	 *
 	 * AL-R2: all arithmetic in 128 bits, reduced by gcd before narrowing
-	 * (the BA2-24 rationale for `cmp` applies here verbatim: long long
+	 * (the rationale for `cmp` applies here verbatim: long long
 	 * products of parse-reachable p/q pairs overflow, and a corrupted
 	 * witness mis-orders T2/T3 enumeration).  The interior witness is the
 	 * MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for

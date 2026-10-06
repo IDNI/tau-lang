@@ -406,7 +406,7 @@ int_t get_max_var_name_b_id(tref fm) {
 						std::stoll(name.substr(1))));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1
 				}
 			}
 		}

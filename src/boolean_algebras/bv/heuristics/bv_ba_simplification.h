@@ -76,7 +76,7 @@ result<tref> bv_ba_custom_simplification(tref term);
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
-template <NodeType node> // HE-11: matches the definition
+template <NodeType node>
 result<tref> bv_ba_cvc5_simplification(tref term);
 
 } // namespace idni::tau_lang
