@@ -47,6 +47,7 @@ struct ba_descriptor;
 template <typename BA, typename Node>
 struct ba_term_hooks {};
 
+/// @brief Per-BA formula hook extensions; see ba_term_hooks.
 template <typename BA, typename Node>
 struct ba_wff_hooks {};
 
@@ -104,12 +105,15 @@ enum class ba_option_kind { flag, count };
  * The getter and setter are the only access path to the value.
  */
 struct ba_option {
+	/// bare option name, without the family prefix
 	const char* name;
+	/// selects the getter/setter pair in use
 	ba_option_kind kind;
 	bool   (*get_flag)()        = nullptr; ///< set iff kind == flag
 	void   (*set_flag)(bool)    = nullptr; ///< set iff kind == flag
 	size_t (*get_count)()       = nullptr; ///< set iff kind == count
 	void   (*set_count)(size_t) = nullptr; ///< set iff kind == count
+	/// one-line help text
 	const char* help            = "";
 };
 
@@ -126,87 +130,112 @@ constexpr bool ba_has_options_v = requires {
 	{ ba_descriptor<BA, Node>::options().end() };
 };
 
-/**
- * @brief One concept per optional capability, all `<Node, BA>`.
+/*
+ * One concept per optional capability, all `<Node, BA>`.
  *
  * A fold, a consumer and the conformance test ask the same name, so a
  * capability's spelling lives in exactly one place. A member-function
  * capability is present when the call is well-formed with the argument
  * types core passes; a flag capability is read through its `_v` variable,
  * so a declared `false` is honoured rather than taken as "present".
+ * docs/adding_base_bas.md lists each member with its resolution rule.
  */
+/// @brief @p BA decides a whole formula of its types with its own `solve(f)`.
 template <typename Node, typename BA>
 concept ba_has_solve = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) { ba_descriptor<BA, Node>::solve(f); };
 
+/// @brief @p BA tells whether it can decide a formula: `can_solve(f)`.
 template <typename Node, typename BA>
 concept ba_has_can_solve = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::can_solve(f) }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA gives a definite satisfiability answer, nullopt when unknown:
+/// `sat_status(f)`.
 template <typename Node, typename BA>
 concept ba_has_sat_status = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::sat_status(f) }
 			-> std::convertible_to<std::optional<bool>>; };
 
+/// @brief @p BA rewrites a formula before solving: `preprocess(f)`, an error
+/// naming why it failed.
 template <typename Node, typename BA>
 concept ba_has_preprocess = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::preprocess(f) }
 			-> std::same_as<result<tref>>; };
 
+/// @brief @p BA eliminates its quantified variables tested only against
+/// constants by a finite case split: `case_split_quantifiers(f)`.
 template <typename Node, typename BA>
 concept ba_has_case_split_quantifiers = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::case_split_quantifiers(f) }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA substitutes its existential variables a total definition
+/// determines: `eliminate_definitional_existentials(f)`.
 template <typename Node, typename BA>
 concept ba_has_eliminate_definitional_existentials = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::eliminate_definitional_existentials(f) }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA elaborates its arithmetic atoms to an overflow-free width:
+/// `widen_arithmetic(f)`, an error naming why it failed.
 template <typename Node, typename BA>
 concept ba_has_widen_arithmetic = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::widen_arithmetic(f) }
 			-> std::same_as<result<tref>>; };
 
+/// @brief @p BA reports whether its widening is on: `widening_state()`.
 template <typename Node, typename BA>
 concept ba_has_widening_state = ba_has_descriptor_v<Node, BA>
 	&& requires() {
 		{ ba_descriptor<BA, Node>::widening_state() }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA has a switch for its preprocessing pass: `set_preprocessing(b)`.
 template <typename Node, typename BA>
 concept ba_has_set_preprocessing = ba_has_descriptor_v<Node, BA>
 	&& requires(bool b) { ba_descriptor<BA, Node>::set_preprocessing(b); };
 
+/// @brief @p BA tells whether its pass can still make progress on a formula:
+/// `formula_is_preprocessable(f)`.
 template <typename Node, typename BA>
 concept ba_has_formula_is_preprocessable = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::formula_is_preprocessable(f) }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA tells whether its pass left a shape that closing would make
+/// expensive: `has_preprocessing_residue(f)`.
 template <typename Node, typename BA>
 concept ba_has_preprocessing_residue = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::has_preprocessing_residue(f) }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA tells whether a term with an arithmetic operator can be
+/// blasted: `term_is_blasteable(t)`.
 template <typename Node, typename BA>
 concept ba_has_term_is_blasteable = ba_has_descriptor_v<Node, BA>
 	&& requires(tref t) {
 		{ ba_descriptor<BA, Node>::term_is_blasteable(t) }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA keeps its grammar in step with core's var/charvar mode:
+/// `set_charvar(b)`.
 template <typename Node, typename BA>
 concept ba_has_set_charvar = ba_has_descriptor_v<Node, BA>
 	&& requires(bool b) { ba_descriptor<BA, Node>::set_charvar(b); };
 
+/// @brief @p BA has its own component-factoring switch:
+/// `set_ba_component_factoring(b)` and `ba_component_factoring_enabled()`.
 template <typename Node, typename BA>
 concept ba_has_component_factoring = ba_has_descriptor_v<Node, BA>
 	&& requires(bool b) {
@@ -214,6 +243,8 @@ concept ba_has_component_factoring = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::ba_component_factoring_enabled() }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA caps the decided rows it keeps pinned:
+/// `set_ba_decision_pins(n)`.
 template <typename Node, typename BA>
 concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t n) {
@@ -221,22 +252,26 @@ concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::ba_decision_pins() }
 			-> std::convertible_to<size_t>; };
 
+/// @brief @p BA gives the default zero of its type @p t when it is not `bf_f`:
+/// `zero_constant(t)`.
 template <typename Node, typename BA>
 concept ba_has_zero_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t) {
 		{ ba_descriptor<BA, Node>::zero_constant(t) }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA builds a constant of type @p t holding the integer @p v:
+/// `value_constant(t, v)`.
 template <typename Node, typename BA>
 concept ba_has_value_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, size_t v) {
 		{ ba_descriptor<BA, Node>::value_constant(t, v) }
 			-> std::convertible_to<tref>; };
 
-// The type's values are the integers 0 .. 2^n - 1 (n = modular_width, 0 for
-// a type that is not), read with unsigned modular semantics: the Boolean
-// operators bitwise, + - * modulo 2^n, / % unsigned, shifts logical, the
-// comparisons unsigned. modular_value reads the integer a constant holds.
+/// The type's values are the integers 0 .. 2^n - 1 (n = modular_width, 0 for
+/// a type that is not), read with unsigned modular semantics: the Boolean
+/// operators bitwise, + - * modulo 2^n, / % unsigned, shifts logical, the
+/// comparisons unsigned. modular_value reads the integer a constant holds.
 template <typename Node, typename BA>
 concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, tref c) {
@@ -245,31 +280,31 @@ concept ba_has_modular_bits = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::modular_value(t, c) }
 			-> std::convertible_to<std::optional<uint64_t>>; };
 
-// decide_closed decides a closed formula over the type whatever its
-// quantifier prefix, with no quantifier eliminated first: true when it
-// holds, false when not, nullopt when undecided (the formula untranslatable,
-// the decision out of budget).
+/// decide_closed decides a closed formula over the type whatever its
+/// quantifier prefix, with no quantifier eliminated first: true when it
+/// holds, false when not, nullopt when undecided (the formula untranslatable,
+/// the decision out of budget).
 template <typename Node, typename BA>
 concept ba_has_closed_decision = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::decide_closed(f) }
 			-> std::convertible_to<std::optional<bool>>; };
 
-// decide_ground decides a formula without variables, streams or temporal
-// operators whose constants are all of the type, which normalization leaves
-// standing when the type cannot decide its comparisons one at a time: true
-// when it holds, false when not, nullopt when undecided.
+/// decide_ground decides a formula without variables, streams or temporal
+/// operators whose constants are all of the type, which normalization leaves
+/// standing when the type cannot decide its comparisons one at a time: true
+/// when it holds, false when not, nullopt when undecided.
 template <typename Node, typename BA>
 concept ba_has_ground_decision = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::decide_ground(f) }
 			-> std::convertible_to<std::optional<bool>>; };
 
-// The type's values, read by = and the order comparisons, form a dense
-// linear order without endpoints; dense_order_compare orders two constants
-// (-1, 0, 1), nullopt when either is not a point of the order, and
-// dense_order_between gives a point above `lo` and below `hi` (either
-// nullptr for no bound), nullptr when a bound is not a point.
+/// The type's values, read by = and the order comparisons, form a dense
+/// linear order without endpoints; dense_order_compare orders two constants
+/// (-1, 0, 1), nullopt when either is not a point of the order, and
+/// dense_order_between gives a point above `lo` and below `hi` (either
+/// nullptr for no bound), nullptr when a bound is not a point.
 template <typename Node, typename BA>
 concept ba_has_dense_order = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, tref a, tref b) {
@@ -278,44 +313,57 @@ concept ba_has_dense_order = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::dense_order_between(t, a, b) }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA names which of its types carries a plain 0/1 when that is
+/// not its `type_tree()`: `bool_carrier_type()`.
 template <typename Node, typename BA>
 concept ba_has_bool_carrier_type = ba_has_descriptor_v<Node, BA>
 	&& requires {
 		{ ba_descriptor<BA, Node>::bool_carrier_type() }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA decides a quantifier over its own theory for every value of
+/// the other variables, nullopt when that depends on them:
+/// `omcat_qe(var, body)`.
 template <typename Node, typename BA>
 concept ba_has_omcat_qe = ba_has_descriptor_v<Node, BA>
 	&& requires(tref v, tref b) {
 		{ ba_descriptor<BA, Node>::omcat_qe(v, b) }
 			-> std::convertible_to<std::optional<bool>>; };
 
-// A quantifier-free formula equivalent to `ex var. body` over the other
-// variables, or nullptr when the theory cannot eliminate var that way.
+/// A quantifier-free formula equivalent to `ex var. body` over the other
+/// variables, or nullptr when the theory cannot eliminate var that way.
 template <typename Node, typename BA>
 concept ba_has_omcat_qe_residual = ba_has_descriptor_v<Node, BA>
 	&& requires(tref v, tref b) {
 		{ ba_descriptor<BA, Node>::omcat_qe_residual(v, b) }
 			-> std::convertible_to<tref>; };
 
+/// @brief @p BA revises a clause through its winning region:
+/// `semantic_pwr_optimal(clause, update)`.
 template <typename Node, typename BA>
 concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
 	&& requires(tref c, tref u) {
 		{ ba_descriptor<BA, Node>::semantic_pwr_optimal(c, u) }
 			-> std::same_as<result<tref>>; };
 
+/// @brief @p BA spells a witness of a variable in generated C++, nullopt when
+/// it cannot: `codegen_witness(var, conj)`.
 template <typename Node, typename BA>
 concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>
 	&& requires(tref v, tref c) {
 		{ ba_descriptor<BA, Node>::codegen_witness(v, c) }
 			-> std::convertible_to<std::optional<std::string>>; };
 
+/// @brief @p BA spells a constant in generated C++, nullopt when it cannot:
+/// `codegen_constant_expr(c)`.
 template <typename Node, typename BA>
 concept ba_has_codegen_constant_expr = ba_has_descriptor_v<Node, BA>
 	&& requires(tref c) {
 		{ ba_descriptor<BA, Node>::codegen_constant_expr(c) }
 			-> std::convertible_to<std::optional<std::string>>; };
 
+/// @brief @p BA tells whether a partly typed literal is truncated rather
+/// than malformed, so the REPL keeps reading: `literal_incomplete(src)`.
 template <typename Node, typename BA>
 concept ba_has_literal_incomplete = ba_has_descriptor_v<Node, BA>
 	&& requires(const std::string& s) {
@@ -340,6 +388,8 @@ concept ba_has_exact_constant = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::exact_constant(x) }
 			-> std::convertible_to<bool>; };
 
+/// @brief @p BA renders a constant for Tau when its own `operator<<` does not:
+/// `print_constant(os, x)`; probed at the point of use.
 template <typename Node, typename BA>
 concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(std::ostream& os, const BA& x) {
@@ -363,6 +413,8 @@ concept ba_has_constant_size = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::constant_size(x) }
 			-> std::convertible_to<size_t>; };
 
+/// @brief @p BA's family is parameterised (`bv[8]`): `type_param(t)`,
+/// `type_id_for(p)` and `type_tree_for(p)`, all three or none.
 template <typename Node, typename BA>
 concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>
 	&& requires(unsigned short p, tref t) {
@@ -373,13 +425,14 @@ concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::type_param(t) }
 			-> std::convertible_to<std::optional<unsigned short>>; };
 
-/**
- * @brief The flag capabilities, read as values: `false` when absent.
+/*
+ * The flag capabilities, read as values: `false` when absent.
  *
  * Variables rather than `requires` written inline at the point of use:
  * gcc 13.3 ICEs (cp/pt.cc:1747) on a requires-expression nested in a fold's
  * per-element lambda, and a name is what the conformance test enumerates.
  */
+/// @brief The grammar's arithmetic term operators apply to @p BA's type.
 template <typename Node, typename BA>
 constexpr bool ba_arith_ops_v = [] {
 	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
@@ -388,6 +441,7 @@ constexpr bool ba_arith_ops_v = [] {
 	else return false;
 }();
 
+/// @brief One of @p BA's types can hold a plain 0/1 (a Boolean carrier).
 template <typename Node, typename BA>
 constexpr bool ba_can_host_bool_v = [] {
 	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
@@ -397,6 +451,8 @@ constexpr bool ba_can_host_bool_v = [] {
 	else return false;
 }();
 
+/// @brief Deciding a question over @p BA leaves the process, so
+/// comparison-based conformance checks skip it.
 template <typename Node, typename BA>
 constexpr bool ba_uses_oracle_v = [] {
 	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
@@ -406,6 +462,8 @@ constexpr bool ba_uses_oracle_v = [] {
 	else return false;
 }();
 
+/// @brief A system can always meet an output constraint of @p BA's type by
+/// choosing its output (`output_always_satisfiable_by_system`).
 template <typename Node, typename BA>
 constexpr bool ba_output_always_satisfiable_v = [] {
 	if constexpr (ba_has_descriptor_v<Node, BA> && requires {

@@ -4,7 +4,8 @@
 //
 // Implements a hybrid semantic-syntactic algorithm:
 //   - Semantic per-step formula ((∃o. α∧β) → α) ∧ β at atomic leaves
-//   - REAL checks at temporal operator nodes for commitment-side selection
+//   - REAL checks (is_tau_formula_sat) at temporal operator nodes for
+//     commitment-side selection
 //   - And-distribution into invariant slots for clause-level granularity
 //   - Semantic optimal mode fallback: winning-region
 //     revision via Algorithm D when fast mode drops a clause
@@ -118,14 +119,11 @@ bool is_atom_leaf(tref fm) {
  * @brief True iff @p fm is a non-temporal formula: an atom or any Boolean
  * combination of atoms with no temporal operator anywhere inside.
  *
- * PW-N2: a non-temporal formula -- an atom or any Boolean combination of
- * atoms with no temporal operator anywhere inside. The semantic per-step
- * revision (semantic_revise_atoms) is defined for these as a whole: its
- * ∃o.(α∧β) → α construction only needs α and β to be step formulas, not
- * atoms. Without this, `revise()` sent a conjunction such as
- * `(i1 = 1 -> o1 = 1) && o2 = 0` against an atom update into the
- * operator-mismatch case and dropped the spec side entirely, so the
- * second of two conflicting updates forgot the first's revision.
+ * PW-N2: the semantic per-step revision (semantic_revise_atoms) is defined
+ * for these as a whole: its ∃o.(α∧β) → α construction only needs α and β
+ * to be step formulas, not atoms. revise() relies on this so that a
+ * conjunction such as `(i1 = 1 -> o1 = 1) && o2 = 0` against an atom
+ * update is revised rather than dropped as an operator mismatch.
  * @tparam node Tree node type.
  * @param fm Formula to inspect; a null tref yields `false`.
  * @return `true` iff no temporal operator occurs in @p fm.
@@ -270,8 +268,8 @@ trefs select_output_vars(tref fm) {
  * The existential quantifies the current-time output variables of alpha&&beta
  * (see `select_output_vars`).
  * @tparam node Tree node type.
- * @param alpha Spec side.
- * @param beta Update side.
+ * @param alpha Spec side, a non-temporal formula.
+ * @param beta Update side, a non-temporal formula.
  * @return The revised step formula.
  */
 
@@ -300,8 +298,9 @@ tref semantic_revise_atoms(tref alpha, tref beta) {
  * early-exit conjunction are one identical tref — and each repeat is a
  * fresh ltlsynt subprocess on temporal content. The memo answers repeats
  * within one revision in every build; the cross-revision TAU_CACHE memo
- * inside is_tau_formula_sat itself only exists where TAU_CACHE is on
- * (Release), so this one is load-bearing in Debug. Keyed by tref identity
+ * inside is_tau_formula_sat itself only exists where TAU_CACHE is on (not
+ * in Debug or Coverage builds), so this one is load-bearing there. Keyed
+ * by tref identity
  * (hash-consing makes that structural identity); transient, so no
  * GC integration is needed.
  */
@@ -354,9 +353,10 @@ result<bool> pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo)
  * @param phi Spec subtree.
  * @param psi Aligned update subtree.
  * @param psi_f Full update formula.
- * @param start_time Start time for the realizability checks.
+ * @param start_time Start time for the satisfiability checks.
  * @param memo Optional per-revision memo (see `pwr_sat_memo`).
- * @return The revised subtree, with the realizability queries' reports.
+ * @return The revised subtree, with the satisfiability queries' reports;
+ * an error when one of those checks fails.
  */
 
 template <NodeType node>
@@ -589,14 +589,17 @@ tref and_distribute(tref fm) {
  * Steps 0-5 of the pointwise revision algorithm.
  *
  * Both inputs must already be normalized (the interpreter does this before
- * calling); the result is the verified assembly, or `update` alone when the
- * assembly is not realizable.
+ * calling). A T side returns the other; a satisfiable `spec && update` is
+ * returned as is; otherwise the result is the verified assembly of the
+ * revised clauses and `update`, or `update` alone when the assembly is not
+ * satisfiable. Reads pwr_semantic_fallback.
  * @tparam node Tree node type.
  * @param spec Current (normalized) specification.
  * @param update Normalized update formula.
- * @param start_time Start time for the realizability checks.
+ * @param start_time Start time for the satisfiability checks.
  * @return The revised specification, with the satisfiability queries'
- * reports (they carry the ltlsynt call count).
+ * reports (they carry the ltlsynt call count); an error when a check or
+ * the semantic fallback fails.
  */
 
 template <NodeType node>
@@ -698,7 +701,7 @@ result<tref> pointwise_revision_temporal(
 
 	// Step 5: Assemble and verify
 	// assembly = (∧ revised_clauses) ∧ update
-	// LS-14: an optimal-mode clause is θ = update ∧ G(Win), so `update`
+	// An optimal-mode clause is θ = update ∧ G(Win), so `update`
 	// appears twice in the assembly for those. Harmless (idempotent
 	// conjunct) and kept: fast-revised clauses do need the update here,
 	// and semantic_pwr_optimal's θ-carries-update contract is load-bearing

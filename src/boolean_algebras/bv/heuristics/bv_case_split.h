@@ -34,6 +34,8 @@ namespace idni::tau_lang {
 /// other value enables; the variable overrides the flag in both directions).
 inline bool bv_case_split = true;
 
+/// Whether the case split runs: TAU_BV_CASE_SPLIT when set and non-empty
+/// (read once per process), else `bv_case_split`.
 inline bool bv_case_split_enabled() {
 	static const std::optional<bool> env = []() -> std::optional<bool> {
 		const char* v = std::getenv("TAU_BV_CASE_SPLIT");
@@ -96,6 +98,17 @@ inline env_limit<size_t> bv_case_split_max_tests{
 // the same variable), or a variable of a foreign type, leaves the quantifier
 // to the existing pipeline untouched. A cell exists for every tested
 // constant, so the domain is never exhausted and no width limit is needed.
+/**
+ * @brief Replaces every eligible quantifier of a bitvector variable in
+ * @p formula by its finite case split, as described above.
+ *
+ * Does not consult bv_case_split_enabled(); the caller does. A quantifier
+ * tested against more than bv_case_split_max_tests distinct constants, or
+ * whose variable width cannot be read, is left untouched.
+ * @param formula The formula to rewrite.
+ * @return The rewritten formula; @p formula itself when no quantifier
+ * qualifies.
+ */
 template <NodeType node>
 tref bv_case_split_quantifiers(tref formula);
 

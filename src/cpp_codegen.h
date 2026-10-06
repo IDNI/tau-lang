@@ -55,6 +55,7 @@ enum class field_kind { flag, witness, witness_template };
 struct field_desc {
 	std::string prop;      // the HOA/atom proposition name this field answers to
 	std::string cpp_name;  // sanitized C++ identifier
+	/// how the field's value is produced
 	field_kind kind = field_kind::flag;
 };
 
@@ -69,8 +70,11 @@ struct field_desc {
  * if absent from `witness_ctors` on this edge.
  */
 struct edge_desc {
+	/// One literal per slot: 1 true, -1 false, 0 either.
 	std::vector<std::int8_t> guard;
+	/// destination state
 	size_t dst = 0;
+	/// (output prop, C++ expression of type tref) per witness output.
 	std::vector<std::pair<std::string, std::string>> witness_ctors;
 	// Props of this edge's atoms whose value must be solved at runtime
 	// (their trees are program_desc::atoms entries); consumed by the
@@ -89,7 +93,9 @@ struct edge_desc {
 /// self-contained C++ expression of type tref rebuilding it, never
 /// re-parsed from text.
 struct atom_desc {
+	/// the atom's proposition name
 	std::string prop;
+	/// C++ expression of type tref
 	std::string ground_expr;
 };
 
@@ -103,10 +109,13 @@ struct atom_desc {
  * process's static initialization registered first.
  */
 struct ba_type_entry {
+	/// How the artifact rebuilds the type: a reserved core builder, a pack
+	/// family (with its parameter), or a bare syntactic type tree.
 	enum class recipe { reserved, family, syntactic };
 	recipe kind = recipe::family;
 	std::string name; // reserved builder / pack family / syntactic type name
 	std::optional<unsigned short> param; // family instances only (bv[8])
+	/// the id the type had at emission
 	size_t id = 0;
 };
 
@@ -118,8 +127,11 @@ struct ba_type_entry {
  * keeps the console default.
  */
 struct stream_desc {
+	/// Where the stream reads or writes.
 	enum class binding { console, file };
+	/// the stream variable's name
 	std::string name;
+	/// the stream's ba-type id
 	size_t ba_type = 0;
 	binding bind = binding::console;
 	std::string filename; // set iff bind == binding::file
@@ -131,9 +143,11 @@ struct stream_desc {
  * solved LTL(ABA) strategy.
  */
 struct program_desc {
+	/// identifier of the generated class
 	std::string class_name;
 	size_t num_states = 0;
 	size_t initial_state = 0;
+	/// The fields of the inputs and outputs structs; flag outputs first.
 	std::vector<field_desc> inputs, outputs;
 	std::vector<std::vector<edge_desc>> edges;  // edges[state] = outgoing
 	bool revisable = false;    // strategy table runtime-replaceable (PWR revise())
@@ -178,8 +192,9 @@ struct program_desc {
  * Returns `sol` itself when it is a Mealy view of the data game, or when it
  * has no step guard below its deepest lookback and each of its claims can
  * always be met. The report carries an error when the data game then gives
- * no Mealy view (it does not decide the skeleton, the machine exceeds its
- * bounds, or the solution came from a route without a game skeleton); `run`
+ * no Mealy view (it does not decide the skeleton, finds it unrealizable,
+ * the machine exceeds its bounds, or the solution came from a route without
+ * a game skeleton), and when a solver call fails; `run`
  * executes such a spec by solving each step.
  * @tparam node Tree node type.
  * @param sol Solved LTL(ABA) strategy.
@@ -208,7 +223,7 @@ result<ltl_aba_solution<node>> playable_table_solution(
  * spec's bindings) -- each stream's console/file binding and filename are
  * read from it by variable name, the same lookup the interpreter itself
  * does (interpreter.tmpl.h's rebuild_inputs/rebuild_outputs). Null keeps
- * every stream console-bound, as before.
+ * every stream console-bound.
  * @tparam node Tree node type.
  * @param sol Solved LTL(ABA) strategy.
  * @param class_name Identifier of the generated class.
@@ -227,7 +242,9 @@ result<program_desc> build_program_desc(
  * @brief Convenience: same as `build_program_desc`, but for the
  * purely-propositional case (no data atoms).
  *
- * Every field is a flag, so this never fails and needs no NodeType.
+ * Every field is a flag, so this never fails and needs no NodeType. An AP
+ * of @p aut named by neither list becomes an extra flag output, and an edge
+ * whose guard does not parse is omitted.
  * @param aut Strategy automaton.
  * @param input_props Environment-controlled proposition names.
  * @param output_props System-controlled proposition names.
@@ -249,12 +266,13 @@ program_desc build_program_desc_prop(
  * `d.needs_tau_link` is false the emitted text is self-contained (the
  * codegen::edge/strategy/strategy_step shape is inlined, not #included, so
  * the artifact has no path dependency on this tree at compile time). Covers
- * the PWR-capable (d.revisable) shape too -- program_desc replaced the old
- * per-purpose emitters
- * (emit_cpp_program_pwr, emit_strategy_initializer) with one data-driven
- * walk.
+ * the PWR-capable (d.revisable) shape too.
  * @param d Program description to emit.
  * @param out Stream receiving the generated source.
+ * @return true once the class is written; an unsupported_operation error,
+ * with nothing written, when `d` is a data-game Mealy view that reads
+ * steps before 0 (a lookback or a history) or has a witness_template
+ * output, which only the interpreter's table step provider can drive.
  */
 result<bool> emit_program(const program_desc& d, std::ostream& out);
 

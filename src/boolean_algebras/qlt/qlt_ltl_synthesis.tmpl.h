@@ -48,6 +48,8 @@
 
 namespace idni::tau_lang {
 
+// Core helpers this file uses, declared in ltl_aba.h and
+// tau_tree_extractors.tmpl.h and completed at instantiation.
 result<std::pair<bool, std::string>> call_ltlsynt(const std::string& formula,
 	const std::vector<std::string>& input_props,
 	const std::vector<std::string>& output_props);
@@ -68,11 +70,11 @@ bool is_pure_input_atom(tref atom);
 template <NodeType node>
 tref resolve_io_vars(const io_context<node>& ctx, tref fm);
 
-// LT-8 / LA-N1: used by the Algorithm D fast path to un-vacuate the ABA
-// oracle over the automaton's own d_i-named atoms (ltl_aba_normalization.tmpl.h).
+// Used by the Algorithm D fast path to un-vacuate the ABA oracle over the
+// automaton's own d_i-named atoms (ltl_aba_normalization.tmpl.h).
 // Declared without the real definition's default arguments to avoid a
 // "redefinition of default argument" diagnostic; the one call site here
-// passes all four arguments explicitly.
+// passes every argument explicitly.
 template <NodeType node>
 static result<void> add_consistency_constraints(
 	const std::vector<std::pair<tref, std::string>>& atoms,
@@ -101,6 +103,8 @@ inline atom_verdict verdict_from_bool(bool b) {
 // Role of an io_var in the (m=memory, x=input, y=output) T_3 triple.
 enum class t3_var_role { M, X, Y };
 
+// The T_3 role of an io_var by name and shift: o[t] is Y, i[t] is X, o[t-1]
+// is M; nullopt for any other variable.
 template <NodeType node>
 static std::optional<t3_var_role> t3_role_of(tref io_var) {
 	const std::string& nm = get_var_name<node>(io_var);
@@ -112,8 +116,10 @@ static std::optional<t3_var_role> t3_role_of(tref io_var) {
 	return std::nullopt;
 }
 
-// True iff all atoms are qlt-typed, have lookback ≤ 1, and each comparison
-// side has at most one io_var (no compound expressions like o1 & i1).
+// True iff there is at least one atom, no more than the T3-encoding cap
+// (qlt-t3-cap; warns when exceeded), all are qlt-typed, have lookback ≤ 1,
+// and each comparison side has at most one io_var (no compound expressions
+// like o1 & i1).
 template <NodeType node>
 static bool is_algorithm_a_applicable(
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -190,7 +196,8 @@ static atom_verdict qlt_atom_at_points(tref atom, size_t op,
 }
 
 // The atom's verdict in T3, or `undecided` when it is not a comparison this
-// path can evaluate.
+// path can evaluate. @p constants are the formula's qlt constants, the cut
+// points of T3.
 template <NodeType node>
 static result<atom_verdict> qlt_atom_holds_in_type3(
 	tref atom,
@@ -265,9 +272,8 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 
 // ── Algorithm A/B soundness guards (shared with semantic_pwr_optimal) ────────
 //
-// Both guards below gate the T_3 symbolic encoding.  They were inline in
-// `solve_ltl_aba` and `semantic_pwr_optimal` ran the SAME encoding without
-// either of them (LS-2), so they are factored out here and called from both.
+// Both guards below gate the T_3 symbolic encoding, here and in the
+// semantic PWR, which runs the same encoding (LS-2).
 
 // Algorithm A's T_3 encoding only handles atoms whose truth value is decidable
 // from a T_3 type plus the formula's named rational constants.  Atoms
@@ -277,6 +283,8 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 // in the symbolic encoding.  Without this guard ltlsynt happily synthesises a
 // strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
 // for direct contradictions like `F(o1={top}) && G(o1!={top})`.
+// Returns whether every atom is decided by at least one T_3 type (false when
+// there is no T_3 type); an error when the constants cannot be collected.
 template <NodeType node>
 static result<bool> alg_a_can_classify(
     tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
@@ -304,6 +312,7 @@ static result<bool> alg_a_can_classify(
 // fine: t3_role_of merges i_k → X but those flow through Algorithm B's P_σ
 // encoding, which is distinguisher-friendly; the conflation is harmful only on
 // the OUTPUT side.
+// Returns the number of distinct output streams the atoms' sides name.
 template <NodeType node>
 static size_t count_distinct_output_vars(
     const std::vector<std::pair<tref, std::string>>& atoms)
@@ -412,9 +421,10 @@ static result<atom_verdict> eval_pure_output_atom_at(
 // ltlsynt call for formulas with trivially-satisfiable U/W/R right-sides.
 template <NodeType node>
 // LA-10: on success, returns the WINNING assignment (output stream name →
-// T1 position of its constant value) instead of a bare true — the caller
-// materialises it as `always(⋀ o_k = c_k)` so the strategy survives into
-// execution and codegen instead of being discarded.
+// T1 position of its constant value); the caller materialises it as
+// `always(⋀ o_k = c_k)` so the strategy survives into execution and codegen.
+// nullopt when no combination is proven (an ltlfilt failure only demotes
+// that candidate) or the formula has no output stream.
 static result<std::optional<std::map<std::string, int>>> constant_output_realizable(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -525,7 +535,7 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 	return r.with_value(std::nullopt);
 }
 
-// Shared between solve_ltl_aba_algorithm_a and qlt_semantic_pwr_optimal
+// Shared by Algorithms A, B and D and the semantic PWR
 // (qlt_semantic_pwr.tmpl.h).
 //
 // Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
@@ -573,6 +583,9 @@ static inline std::string rename_skeleton_props_to_d(std::string phi_star,
 	return phi_star;
 }
 
+// Algorithm A (see the section comment above) on @p fm and its data atoms:
+// declined when the constants admit no T_3 type, unrealizable when ltlsynt
+// says so, else solved with the d_i atoms as output props.
 template <NodeType node>
 static result<propositional_synthesis<node>>
 solve_ltl_aba_algorithm_a(
@@ -639,7 +652,9 @@ solve_ltl_aba_algorithm_a(
 // Algorithm B: P_σ binary encoding — adds ⌈log₂|T₂|⌉ input propositions for
 // the T₂ = (pos_m, pos_x, rel_mx) type.  Needed for SOUNDNESS when the formula
 // contains input-variable atoms (the system observes x's type via P-bits and can
-// then pick the correct output type ρ).
+// then pick the correct output type ρ). Declined when the constants admit no
+// T_2 or T_3 type; a solved strategy is over the bookkeeping bits, so it is
+// not executable.
 template <NodeType node>
 static result<propositional_synthesis<node>>
 solve_ltl_aba_algorithm_b(
@@ -659,7 +674,7 @@ solve_ltl_aba_algorithm_b(
 	int T1_size = 2 * (int)constants.size() + 1;
 
 	// D-bitmask per T₃ type: the one helper Algorithm A and the semantic
-	// PWR use (LS-12); B kept an inline copy until 2026-09-17.
+	// PWR use (LS-12).
 	TAU_TRY(auto type_A, qlt_type_A_bitmasks<node>(atoms, T3, constants));
 
 	// Build T₂ lookup: (pos_m, pos_x, rel_mx) → T₂ index.
@@ -684,7 +699,7 @@ solve_ltl_aba_algorithm_b(
 	std::vector<int> t2_pos_m(T2.size());
 	for (size_t s = 0; s < t2_pos_m.size(); ++s) t2_pos_m[s] = T2[s].pos_m;
 
-	// Build phi* skeleton and rename p_i → d_i (LT-16: shared helper).
+	// Build phi* skeleton and rename p_i → d_i.
 	TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, atoms));
 	std::string phi_star = rename_skeleton_props_to_d(
 		std::move(phi_star_skel), K);
@@ -714,6 +729,12 @@ solve_ltl_aba_algorithm_b(
  * Declining and proving unrealizable are different answers: the first lets core
  * fall through to the ABA oracle, the second is final. Algorithms A, B and D all
  * produce both, so the result carries the distinction rather than collapsing it.
+ * The algorithm follows ltl_algorithm_choice() (`--ltl-alg`, TAU_LTL_ALG);
+ * D falls through to the default routing when it does not apply.
+ * @param fm The LTL(ABA) formula.
+ * @param atoms Its data atoms with their proposition names.
+ * @return Solved, unrealizable or declined; an error when a constant
+ * collection, a skeleton, ltlsynt or the HOA parse fails.
  */
 template <NodeType node>
 static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
@@ -748,7 +769,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		TAU_TRY(auto type_A,
 			qlt_type_A_bitmasks<node>(sol.atoms, T3, constants));
 
-		// Build φ*(D_i) (LT-16: shared rename helper).
+		// Build φ*(D_i).
 		TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, sol.atoms));
 		std::string phi_star = rename_skeleton_props_to_d(
 			std::move(phi_star_skel), K);

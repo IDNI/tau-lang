@@ -79,9 +79,8 @@ inline std::string guard_to_cpp(const std::string& g) {
 	return out;
 }
 
-// Determine which AP indices are outputs (found only inside guards, never
-// free, and marked as such by the caller via output_props membership).
-// Returns a map: ap_index → "o_NAME" or "i_NAME".
+// Label every AP by direction: "i_NAME" for an AP in input_props, "o_NAME"
+// for any other (output_props is not read). Returns one label per AP index.
 inline std::vector<std::string> label_aps(
     const std::vector<std::string>& aps,
     const std::vector<std::string>& input_props,
@@ -104,13 +103,9 @@ inline constexpr size_t no_ap_index = SIZE_MAX;
 
 // Parse an HOA guard label into its DNF cubes.
 //
-// LG-4: every emitter used to tokenise the label by top-level '&' and then
-// read each conjunct with `for (char c : idx_str) if (isdigit(c)) idx =
-// idx*10+(c-'0')`.  That loop SKIPS '|', '(' and ')' rather than rejecting
-// them, so `0|1` came out as the single literal (1, true) — wrong AP, and the
-// other disjunct silently gone — while `(0|1)` failed the leading isdigit test
-// and was dropped entirely, widening the guard to `true`.  Spot prints
-// strategy edge labels as sums of products, so both shapes are normal.
+// LG-4: Spot prints strategy edge labels as sums of products, so a label
+// may carry '|' and parentheses; reading it conjunct by conjunct would pick
+// a wrong AP or widen the guard to `true`.
 //
 // The expansion is delegated to the one guard parser that implements the full
 // grammar (`alg_d::hoa_guard::to_dnf`, the same module whose evaluator the
@@ -147,8 +142,7 @@ inline std::string double_to_cpp(double v) {
 
 // The atom-metadata a data-atom emitter groups witnesses by: which io_var
 // (if any) this atom is single-variable over, and whether that var's owner
-// contributes a flag or a witness. Replaces the old AtomKind/AtomMeta pair,
-// which conflated ownership with direction (see classify_output_field).
+// contributes a flag or a witness (see classify_output_field).
 struct atom_field_info {
 	field_kind kind = field_kind::flag;
 	std::string var_name;      // the io_var's base name, when single-variable
@@ -158,7 +152,8 @@ struct atom_field_info {
 	std::vector<std::pair<std::string, tref>> template_vars;
 };
 
-// Classify an OUTPUT atom's field kind purely from what owns @p io_var_ref's
+// Whether a carrier-typed output atom is a flag, and if so whether its guard
+// slot is the complement of its prop (true) or the prop itself (false).
 // A flag output's guard slot is written into the variable as-is
 // (table_step_provider, emit_program), so a carrier-typed output atom is a
 // flag only when its prop's truth decides the variable's value: `var = 1`
@@ -193,6 +188,7 @@ std::optional<bool> carrier_flag_negated(tref atom_ref, tref io_var_ref) {
 	return std::nullopt;
 }
 
+// Classify an OUTPUT atom's field kind purely from what owns @p io_var_ref's
 // type: flag when it's the pack's resolved bool carrier and the atom is
 // flag-shaped, witness otherwise. A spec reaching codegen has already passed
 // type inference, so ba_type 0 (no type at all, distinct from the real
@@ -342,7 +338,8 @@ atom_field_info classify_atom_field(
 // id, so each numeric type id baked anywhere in the desc resolves to the
 // same type in the artifact -- static initialization registers types before
 // main in both processes, in an order neither controls, and only a full
-// replay-with-assert makes the numbering portable.
+// replay-with-assert makes the numbering portable. An unsupported_operation
+// error names a type none of the three recipes rebuilds.
 template <NodeType node>
 result<std::vector<ba_type_entry>> snapshot_ba_type_registry() {
 	using namespace ba_types_detail;
@@ -387,8 +384,10 @@ result<std::vector<ba_type_entry>> snapshot_ba_type_registry() {
 }
 
 // Reconstruct one ABA-comparison operand (a ground BA constant, a bare bf_t/
-// bf_f literal, or a plain variable reference) as a self-contained C++
-// expression of type tref. A bare literal (e.g. the `1` in `o1[t] = 1`) never
+// bf_f literal, a plain variable reference, or a bf complement or binary bf
+// operator over such operands) as a self-contained C++ expression of type
+// tref; an unsupported_operation (or missing_type_information) error for
+// any other shape or a constant its owner cannot spell. A bare literal (e.g. the `1` in `o1[t] = 1`) never
 // becomes a ba_constant node -- type inference only ever retypes it in place
 // -- so it carries the atom's real BA type once inference has run; when it
 // is still 0 (untyped), fall back to `sibling_type`, the other operand's type.
@@ -511,6 +510,8 @@ result<std::string> build_atom_term_expr(tref term, size_t sibling_type = 0) {
 }
 
 // Reconstruct a relative-time ABA-comparison atom (sol.atoms[i].first) as a self-contained C++ expression of type tref.
+// An unsupported_operation error for an interval or unknown comparison, or
+// an operand build_atom_term_expr refuses.
 template <NodeType node>
 result<std::string> build_atom_ground_expr(tref atom_ref) {
 	using tau = tree<node>;
@@ -646,6 +647,7 @@ inline size_t num_flag_outputs(const program_desc& d) {
 
 } // namespace codegen_detail
 
+/** @internal @copydoc build_program_desc_prop @endinternal */
 inline program_desc build_program_desc_prop(
     const hoa_automaton& aut,
     const std::vector<std::string>& input_props,
@@ -708,6 +710,7 @@ inline program_desc build_program_desc_prop(
 	return d;
 }
 
+/** @internal @copydoc playable_table_solution @endinternal */
 template <NodeType node>
 result<ltl_aba_solution<node>> playable_table_solution(
 	const ltl_aba_solution<node>& sol)
@@ -758,6 +761,7 @@ result<ltl_aba_solution<node>> playable_table_solution(
 		{ { label::value, claim } });
 }
 
+/** @internal @copydoc build_program_desc @endinternal */
 template <NodeType node>
 result<program_desc> build_program_desc(
     const ltl_aba_solution<node>& given,
@@ -1120,6 +1124,7 @@ inline void emit_atoms_appendix(const program_desc& d, std::ostream& out) {
 	out << "\t\treturn " << d.atoms.size() << ";\n\t}\n\n";
 }
 
+/** @internal @copydoc emit_program @endinternal */
 inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 {
 	using namespace codegen_detail;

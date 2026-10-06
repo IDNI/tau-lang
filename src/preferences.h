@@ -26,8 +26,8 @@
 #include <string>
 #include <vector>
 
-// AP2-13: the file logs; when included standalone (after tau.h's
-// trailing undefs) the channel macro is gone -- restore it locally.
+// The file logs; when included standalone (after tau.h's trailing undefs)
+// the channel macro is gone -- restore it locally.
 #ifndef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "preferences"
 #endif
@@ -43,24 +43,25 @@ struct preference_entry {
 
 /// @brief Ordered list of preferences; earlier entries win over later ones.
 struct preference_order {
+	/// highest priority first
 	std::vector<preference_entry> entries;
 };
 
 /**
  * @brief Strengthen `spec` with tie-breaker clauses derived from `po`.
  *
- * Returns the new spec (or `spec` unchanged if `po.entries` is empty / all
- * preferences are unrealisable on top of the running spec).
- *
- * Preferences are conjuncted in declaration order; each is gated on
- * realisability of the spec-so-far ∧ this-preference. Failing preferences
- * are silently dropped (logged at DEBUG level).  A preference whose clause
- * fails to parse, or whose realizability check comes back undecided, is
- * dropped the same way.
+ * Each entry becomes the clause `G(var[t] = value)`. Preferences are
+ * conjuncted in declaration order; each is gated on realisability of the
+ * spec-so-far ∧ this-preference (a CTL* spec is reduced to LTL first).
+ * Failing preferences are silently dropped (logged at DEBUG level). A
+ * preference whose clause fails to parse, whose type conflicts with the
+ * spec, or whose realizability check comes back undecided, is dropped the
+ * same way. Runs one realizability check per entry.
  * @tparam node Tree node type.
  * @param spec Specification to strengthen.
  * @param po Preferences in priority order.
- * @return The strengthened specification.
+ * @return The strengthened specification, with types inferred over the
+ * whole conjunction; @p spec unchanged when no preference is kept.
  */
 template <NodeType node>
 tref apply_preferences(tref spec, const preference_order& po) {
@@ -78,8 +79,7 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		tref pref_clause = pref_res.has_value() ? pref_res.value() : nullptr;
 		if (pref_clause == nullptr) {
 			// Parse failed (typo in var name, value-type mismatch, etc.).
-			// Skip; do not corrupt the spec. (AP2-13: the header
-			// promised this logging; it was silent.)
+			// Skip; do not corrupt the spec.
 			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 				<< entry.var_name << "' -- clause failed to parse: "
 				<< pref_str;

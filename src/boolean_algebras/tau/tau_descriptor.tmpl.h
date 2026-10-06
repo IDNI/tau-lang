@@ -17,6 +17,14 @@ namespace idni::tau_lang {
 template <typename... BAs>
 struct is_tau_ba<tau_ba<BAs...>> : std::true_type {};
 
+/**
+ * @brief Descriptor of the tau wrapper algebra over base algebras
+ * @p BaseBAs, seen from the pack node `node<PackBAs...>`.
+ *
+ * Mandatory surface of ba_descriptor_complete plus the optional
+ * hash_constant, constant_size and the component-factoring and
+ * decision-pin switches.
+ */
 template <typename... BaseBAs, typename... PackBAs>
 struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -31,31 +39,35 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 
+	/// True iff @p type_tree is the tau type.
 	static bool matches_type(tref type_tree) {
 		return is_tau_type<node_t>(type_tree);
 	}
 
+	/// The tau type tree.
 	static tref type_tree() { return tau_type<node_t>(); }
 
+	/// True iff @p ba_type_id is the id of the tau type.
 	static bool owns_type(size_t ba_type_id) {
 		return is_tau_type<node_t>(ba_type_id);
 	}
 
 
-	// Undecidable falls to false here (never a witness of validity), the
-	// same fallback is_one() itself uses on its own decision failure.
+	// Runs the full validity decision of is_one(); an undecided or failed
+	// decision falls to false here (never a witness of validity).
 	static bool is_syntactic_one(const ba_t& x) {
 		// TODO (HIGH) dropped error: is_one's decision report -- is_syntactic_one returns bool, which cannot carry it.
 		return x.is_one().value_or(false);
 	}
 
-	// Undecidable falls to true here (never a witness of non-zeroness),
-	// mirroring is_zero()'s own fallback on decision failure.
+	// Runs the full satisfiability decision of is_zero(); an undecided or
+	// failed decision falls to true here.
 	static bool is_syntactic_zero(const ba_t& x) {
 		// TODO (HIGH) dropped error: is_zero's decision report -- is_syntactic_zero returns bool, which cannot carry it.
 		return x.is_zero().value_or(true);
 	}
 
+	/// Whether @p x is valid; an error when the decision fails.
 	static result<bool> is_one(const ba_t& x) { return x.is_one(); }
 
 	// the nodes of the embedded spec: its main and its rules
@@ -68,14 +80,19 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		return n;
 	}
 
+	/// Whether @p x is unsatisfiable; an error when the decision fails.
 	static result<bool> is_zero(const ba_t& x) { return x.is_zero(); }
 
+	/// Whether the spec embedded in @p x is closed (is_tau_closed).
 	static result<bool> is_closed(const ba_t& x) { return is_tau_closed<BaseBAs...>(x); }
 
+	/// The literal of the tau one, `T`.
 	static std::string literal_one(tref) { return "T"; }
 
+	/// The literal of the tau zero, `F`.
 	static std::string literal_zero(tref) { return "F"; }
 
+	/// The normal form of @p x (normalize_tau), or the normalizer's error.
 	static result<ba_t> normalize(const ba_t& x) { return normalize_tau(x); }
 
 	// tau_splitter's documented precondition is a normalized formula;
@@ -93,20 +110,26 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		return r.with_value(ba_t(s));
 	}
 
+	/// The bf constant holding tau_splitter_one, the splitter of one.
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(tau_splitter_one<BaseBAs...>()),
 			tau_type<node_t>()));
 	}
 
+	/// The main formula of the spec @p x embeds; @p x must have a main.
 	static tref unpack(const ba_t& x) { return x.nso_rr.main->get(); }
 
+	/// The constant embedding the formula @p t; never nullopt.
 	static std::optional<ba_t> pack(tref t) { return ba_t{t}; }
 
+	/// @p sym unchanged: tau has no symbol simplification.
 	static tref simplify_symbol(tref sym) { return sym; }
 
+	/// @p term unchanged: tau has no term simplification.
 	static result<tref> simplify_term(tref term) { return result<tref>{term}; }
 
+	/// Parses @p src as a tau spec (parse_tau); the type tree is unused.
 	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{

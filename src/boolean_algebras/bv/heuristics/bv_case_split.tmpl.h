@@ -4,7 +4,9 @@ namespace idni::tau_lang {
 
 namespace bv_case_split_detail {
 
-// Base-2 digits of the bitvector constant in `c`, left-padded to `width`.
+// Base-2 digits of the bitvector constant in `c`, left-padded to `width`;
+// nullopt when it is not a concrete value or is wider than `width`. `c` must
+// hold a `bv`.
 template <NodeType node>
 std::optional<std::string> bits_of(tref c, size_t width) {
 	auto cte = std::get<bv>(tree<node>::get(c).get_ba_constant());

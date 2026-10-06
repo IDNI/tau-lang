@@ -32,11 +32,15 @@ namespace idni::tau_lang {
 // With a deadline (stop_at), the table counts as full from the moment it
 // passes, `late` says so, and no collection clears it.
 struct data_bdd {
+	// A node id, an index into `nodes`.
 	using id = uint32_t;
+	// The ids of the false and true leaves.
 	static constexpr id F = 0, T = 1;
+	// The variable of a leaf, and the op of an empty memo slot.
 	static constexpr uint32_t leaf = UINT32_MAX;
 	// the variable of a freed node
 	static constexpr uint32_t freed = UINT32_MAX - 1;
+	// A decision node: `var` ? hi : lo.
 	struct nd { uint32_t var; id lo, hi; };
 	// An operation's arguments and result; `op` is `leaf` in an empty slot.
 	struct memo_entry { uint32_t op; id a, b, r; };
@@ -59,7 +63,9 @@ struct data_bdd {
 		return (size_t)h;
 	}
 
+	// Every node by id, freed ones included (their var is `freed`).
 	std::vector<nd> nodes{ { leaf, F, F }, { leaf, T, T } };
+	// The ids freed by collect(), reused by mk() first.
 	std::vector<id> free_ids;
 	// The hash-consing table and the memo, open addressing with linear
 	// probing over a power of two of slots; a unique slot holds a node id,
@@ -68,6 +74,7 @@ struct data_bdd {
 	std::vector<id> unique_slots;
 	std::vector<memo_entry> memo_slots;
 	size_t unique_count = 0, memo_count = 0;
+	// The node budget and the memo budget (0 for no bound).
 	size_t max_nodes, max_memo;
 	memo_policy on_max_memo;
 	// mk() makes no node past this many live ones: max_nodes, or less
@@ -82,9 +89,12 @@ struct data_bdd {
 	// wants_collect() once this many nodes are live; never before the
 	// table first fills, so that a table that never does costs nothing
 	size_t next_collect = SIZE_MAX;
+	// How many collect() and clear_memo() calls ran.
 	size_t collections = 0;
 	size_t memo_clears = 0;
 
+	// A table of at most `cap` live nodes and a memo of at most `memo_cap`
+	// entries (0 for no bound), handled by `on_memo_cap` once it is reached.
 	explicit data_bdd(size_t cap, size_t memo_cap = 0,
 		memo_policy on_memo_cap = memo_policy::give_up)
 		: unique_slots(1024, F), memo_slots(1024, { leaf, 0, 0, 0 }),
@@ -95,6 +105,7 @@ struct data_bdd {
 	size_t size() const { return nodes.size() - free_ids.size(); }
 	// The nodes that can still be made.
 	size_t room() const { return max_nodes - std::min(size(), max_nodes); }
+	// The memo entries and the hash-consed nodes held.
 	size_t memo_size() const { return memo_count; }
 	size_t unique_size() const { return unique_count; }
 
@@ -110,6 +121,7 @@ struct data_bdd {
 
 	// Lets at most `n` more nodes be live until grow_freely().
 	void grow_at_most(size_t n) { limit = std::min(max_nodes, size() + n); }
+	// Lifts the bound of grow_at_most() back to `max_nodes`.
 	void grow_freely() { limit = max_nodes; }
 
 	// The slot of node (v, lo, hi) in the unique table, or the empty slot
@@ -123,6 +135,8 @@ struct data_bdd {
 		}
 		return i;
 	}
+	// Rehashes every live node into a unique table of `slots` slots, a
+	// power of two.
 	void rebuild_unique(size_t slots) {
 		unique_slots.assign(slots, F);
 		for (id n = 2; n < nodes.size(); ++n)
@@ -130,6 +144,7 @@ struct data_bdd {
 				unique_slots[unique_slot(x.var, x.lo, x.hi)] = n;
 	}
 
+	// The memo slot of (op, a, b), or the empty slot where it goes.
 	size_t memo_slot(uint32_t op, id a, id b) const {
 		const size_t mask = memo_slots.size() - 1;
 		size_t i = hash(op, a, b) & mask;
@@ -139,10 +154,15 @@ struct data_bdd {
 		}
 		return i;
 	}
+	// The remembered result of (op, a, b), or nullptr; the pointer is
+	// valid until the memo next changes.
 	const id* recall(uint32_t op, id a, id b) const {
 		const memo_entry& e = memo_slots[memo_slot(op, a, b)];
 		return e.op == leaf ? nullptr : &e.r;
 	}
+	// Records r as the result of (op, a, b), growing the memo as needed;
+	// may set `full` (memo budget under give_up, or the deadline) or clear
+	// the memo (memo budget under clear).
 	void remember(uint32_t op, id a, id b, id r) {
 		memo_entry& e = memo_slots[memo_slot(op, a, b)];
 		if (e.op == leaf) ++memo_count;
@@ -161,7 +181,8 @@ struct data_bdd {
 		memo_count = 0;
 		++memo_clears;
 	}
-	// Keeps the entries whose arguments and result `keep`.
+	// Rehashes the memo into `slots` slots, a power of two, keeping the
+	// entries whose arguments and result `keep`.
 	template <typename Keep>
 	void rebuild_memo(size_t slots, Keep&& keep) {
 		std::vector<memo_entry> old(slots, { leaf, 0, 0, 0 });
@@ -174,6 +195,9 @@ struct data_bdd {
 			}
 	}
 
+	// The unique node `v` ? hi : lo (lo itself when lo == hi). Past the
+	// node limit or the deadline it sets `full` and returns F. The
+	// children must have variables after `v`.
 	id mk(uint32_t v, id lo, id hi) {
 		if (lo == hi) return lo;
 		const size_t i = unique_slot(v, lo, hi);
@@ -193,10 +217,12 @@ struct data_bdd {
 			rebuild_unique(unique_slots.size() * 2);
 		return n;
 	}
+	// The literal of variable `v`, positive or negated.
 	id var(uint32_t v, bool pos = true) {
 		return pos ? mk(v, F, T) : mk(v, T, F);
 	}
-	// op 0 conjunction, 1 disjunction, 3 exclusive or
+	// op 0 conjunction, 1 disjunction, 3 exclusive or (2 is neg()'s memo
+	// key); memoized, F once `full`
 	id apply(uint32_t op, id a, id b) {
 		if (op == 0) {
 			if (a == F || b == F) return F;
@@ -224,11 +250,13 @@ struct data_bdd {
 		if (!full) remember(op, a, b, r);
 		return r;
 	}
+	// The Boolean connectives over apply(); each is F once `full`.
 	id conj(id a, id b) { return apply(0, a, b); }
 	id disj(id a, id b) { return apply(1, a, b); }
 	id exor(id a, id b) { return apply(3, a, b); }
 	id iff(id a, id b) { return neg(exor(a, b)); }
 	id ite(id c, id a, id b) { return disj(conj(c, a), conj(neg(c), b)); }
+	// The complement of `a`; memoized, F once `full`.
 	id neg(id a) {
 		if (a <= T) return a == T ? F : T;
 		if (full) return F;
@@ -238,7 +266,8 @@ struct data_bdd {
 		if (!full) remember(2, a, F, r);
 		return r;
 	}
-	// Quantifies the variables flagged in `qs`.
+	// Quantifies the variables flagged in `qs`, existentially when
+	// `exists`, else universally.
 	id quantify(id a, const std::vector<bool>& qs, bool exists) {
 		std::unordered_map<id, id> seen;
 		std::function<id(id)> go = [&](id n) -> id {
@@ -354,6 +383,7 @@ struct data_bdd {
 // first, with unsigned modular semantics.
 namespace bit_circuits {
 
+// A bit vector, least significant bit first.
 using bits = std::vector<data_bdd::id>;
 
 // x + y + carry, modulo 2^n.
@@ -385,6 +415,7 @@ inline data_bdd::id less(data_bdd& bdd, const bits& x, const bits& y) {
 	return lt;
 }
 
+// x == y, bit by bit.
 inline data_bdd::id same(data_bdd& bdd, const bits& x, const bits& y) {
 	data_bdd::id r = data_bdd::T;
 	for (size_t i = 0; i < x.size(); ++i)

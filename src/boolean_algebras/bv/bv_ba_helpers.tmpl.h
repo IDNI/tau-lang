@@ -10,11 +10,6 @@
 
 namespace idni::tau_lang {
 
-// (BA1-15: is_zero_bv_constant, build_bv_zero, is_bv_lsb_one, bv_shr_by_one
-// and bv_shl_by_one were deleted -- zero callers, and two carried latent
-// defects (width-1-only zero compare; width+1 string into mkBitVector).
-// Recover from git if needed.)
-
 using namespace cvc5;
 using namespace idni;
 
@@ -39,7 +34,8 @@ bool is_bv_constant(tref t) {
 
 
 // Bit width of the BA type of node `t`. No DBG precondition; reports when
-// the type is not in the bv family or carries no explicit bitwidth.
+// the type is not in the bv family, carries no explicit bitwidth or has a
+// width outside 1 .. 65535.
 template<NodeType node>
 result<size_t> get_bv_type_bitwidth(tref t) {
 	auto type = tree<node>::get(t).get_ba_type();
@@ -52,8 +48,10 @@ result<size_t> get_bv_type_bitwidth(tref t) {
 }
 
 // Numeric (unsigned) value of the bitvector constant in `t`, parsed from
-// its base-2 string. Precondition: `t` is a BA constant holding a `bv`.
-// Returns an empty optional if the term is not a concrete bitvector value.
+// its base-2 string. `t` must be a BA constant; a type_error when it does
+// not hold a `bv`. An empty optional if the term is not a concrete
+// bitvector value; an invalid_argument error when the value does not fit
+// 64 bits.
 template<NodeType node>
 result<std::optional<uint64_t>> get_bv_constant_value(tref t) {
 	result<std::optional<uint64_t>> r;

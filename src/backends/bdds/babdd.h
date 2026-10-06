@@ -23,8 +23,11 @@
 
 namespace idni::tau_lang {
 
+/// Signed BDD literal / variable index type.
 typedef int32_t int_t;
+/// Unsigned BDD variable index type.
 typedef uint32_t uint_t;
+/// Shorthand for a shared pointer.
 template<typename T> using sp = std::shared_ptr<T>;
 
 /**
@@ -43,9 +46,11 @@ inline bool bdd_node_table_exhausted = false;
 
 // A BDD literal is a signed variable id: positive = the variable, negative
 // = its complement. These two convert across that boundary once.
+/// @brief The variable of literal @p lit (its absolute value).
 inline uint_t lit_var(int_t lit) {
 	return static_cast<uint_t>(lit > 0 ? lit : -lit);
 }
+/// @brief The literal of variable @p v, negated when @p neg is true.
 inline int_t signed_lit(uint_t v, bool neg) {
 	return neg ? -static_cast<int_t>(v) : static_cast<int_t>(v);
 }
@@ -67,11 +72,16 @@ inline std::uint64_t fpairing(std::uint64_t x, std::uint64_t y) {
  * - use of input inverters
  * - use of output inverters
  * - use of variable shifters
+ * - use of the descending variable order
  */
 enum bdd_params {
+	/// input inverters (child swap in the reference)
 	INV_IN = (1u << 0),
+	/// output inverters (complement in the reference)
 	INV_OUT = (1u << 1),
+	/// variable shifters (variable-free skeletons)
 	VARSHIFT = (1u << 2),
+	/// descending variable order
 	INV_ORDER = (1u << 3)
 };
 
@@ -88,6 +98,9 @@ public:
 	const uint8_t idW;
 	const uint8_t shiftW;
 
+	/// @brief Options with id width @p idWidth and shift width
+	/// @p shiftWidth (ignored, set to 0, without VARSHIFT); the widths
+	/// must sum to at most 62.
 	constexpr static bdd_options
 	create(const auto idWidth, const auto shiftWidth) {
 		if constexpr (params & VARSHIFT) {
@@ -99,21 +112,27 @@ public:
 		}
 	}
 
+	/// @brief Default options: 18-bit ids and 12-bit shifts with
+	/// VARSHIFT, 30-bit ids otherwise.
 	constexpr static bdd_options create() {
 		if constexpr (params & VARSHIFT)
 			return bdd_options(18, 12);
 		else return bdd_options(30, 0);
 	}
 
+	/// True iff variable shifters are enabled.
 	constexpr bool has_varshift() const {
 		return params & static_cast<uint8_t>(VARSHIFT);
 	}
+	/// True iff input inverters are enabled.
 	constexpr bool has_inv_in() const {
 		return params & static_cast<uint8_t>(INV_IN);
 	}
+	/// True iff output inverters are enabled.
 	constexpr bool has_inv_out() const {
 		return params & static_cast<uint8_t>(INV_OUT);
 	}
+	/// True iff the variable order is descending.
 	constexpr bool has_inv_order() const {
 		return params & static_cast<uint8_t>(INV_ORDER);
 	}
@@ -189,6 +208,7 @@ struct bdd_reference {
 		       id == x.id;
 	}
 
+	/// Lexicographic order on (in, out, shift, id).
 	auto operator<=>(const bdd_reference x) const {
 		if (in != x.in) return (int)in <=> (int)x.in;
 		if (out != x.out) return (int)out <=> (int)x.out;
@@ -246,6 +266,7 @@ struct bdd_reference {
 		return bdd_reference(x.in, x.out, s - x.shift + 1, x.id);
 	}
 
+	/// 64-bit hash of every field of @p x, identical on every platform.
 	static std::uint64_t hash(const bdd_reference x) {
 		std::uint64_t seed = 0;
 		hash_combine(seed, x.id + x.in);
@@ -288,20 +309,24 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 		return in == x.in && out == x.out && id == x.id;
 	}
 
+	/// Lexicographic order on (in, out, id).
 	auto operator<=>(const bdd_reference x) const {
 		if (in != x.in) return (int)in <=> (int)x.in;
 		if (out != x.out) return (int)out <=> (int)x.out;
 		return (long long)id <=> (long long)x.id;
 	}
 
+	// Toggle the input inverter (denotes the child-swapped node)
 	static bdd_reference flip_in(const bdd_reference x) {
 		return bdd_reference(x.in == 1 ? 0 : 1, x.out, x.id);
 	}
 
+	// Toggle the output inverter (denotes the complement function)
 	static bdd_reference flip_out(const bdd_reference x) {
 		return bdd_reference(x.in, x.out == 1 ? 0 : 1, x.id);
 	}
 
+	/// 64-bit hash of every field of @p x, identical on every platform.
 	static std::uint64_t hash(const bdd_reference x) {
 		return (std::uint64_t{x.id} + x.in) ^ x.out;
 	}
@@ -321,6 +346,7 @@ struct bdd_node {
 	uint_t v;
 	R h, l;
 	std::uint64_t hash;
+	/// Structural equality; the hash is compared first as a fast reject.
 	bool operator==(const auto& x) const {
 		return hash == x.hash && v == x.v && h == x.h && l == x.l;
 	}
@@ -335,6 +361,7 @@ struct node_skeleton {
 		h(h), l(l), hash(hash_upair(R::hash(h), R::hash(l))) {}
 	R h, l;
 	std::uint64_t hash;
+	/// Structural equality; the hash is compared first as a fast reject.
 	bool operator==(const auto& x) const {
 		return hash == x.hash && h == x.h && l == x.l;
 	}
@@ -424,7 +451,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		bool leaf() const { return holds_alternative<B>(*this); }
 	};
 
+	/// Decision node (v ? h : l); not interned, see add().
 	bdd(uint_t v, bdd_ref h, bdd_ref l) : base(bdd_node_t(v, h, l)) {}
+	/// Value holding @p n, a bdd_node_t or a constant of B.
 	explicit bdd(const auto& n) : base(n) {}
 	//bdd(const B& b) : base(b) {}
 
@@ -552,6 +581,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		}
 	}
 
+	// Store result r under the key check_cache looks up for the same
+	// operands, rebased the same way; no write while the node table is
+	// exhausted.
 	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
 		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
@@ -609,13 +641,15 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if(x.id > y.id) swap(x,y);
 	}
 
-	// Fast check if output inverters are enabled
+	// True iff y is x with the output inverter toggled, i.e. its
+	// complement; always false without output inverters
 	static bool negation_of(bdd_ref x, bdd_ref y) {
 		if constexpr (o.has_inv_out()) {
 			return bdd_ref::flip_out(x) == y;
 		} else return false;
 	}
 
+	// Intern the decoded node n, see add(v, h, l)
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
 
 	// idW-bit ids address at most 2^idW entries; the node that does not
@@ -742,7 +776,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	static bdd_node_t get_node(bdd_ref x) { return std::get<bdd_node_t>(get(x)); }
 
 	// The literal of variable |v|: positive v gives the function "v",
-	// negative v its complement
+	// negative v its complement; registers |v| in var_dict
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
 		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
@@ -1024,7 +1058,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return r;
 	}
 
-	// treat x as a *disjoint* union of elements of s
+	// treat x as a *disjoint* union of elements of s: every clause whose
+	// constant meets e is split into its parts with each element of s
+	// and with the remainder p of one outside s
 	static bdd_ref split(bdd_ref x, const B& e, const std::set<B>& s) {
 		std::set<std::pair<B, std::vector<int_t>>> r;
 		B p = get_one<B>();
@@ -1070,7 +1106,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return add(n.v, n.h, F);
 	}
 
-	// Find highest variable name in bdd
+	// Highest variable index in x; 0 for a leaf
 	static uint_t highest_var(bdd_ref x) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) return 0;
@@ -1078,7 +1114,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return max(n.v, max(highest_var(n.h), highest_var(n.l)));
 	}
 
-	// Find a variable not present in x
+	// Conjoin x with the positive literal of a variable not present in
+	// x (one past its highest, or past its top variable with INV_ORDER;
+	// variable 1 for a leaf)
 	static bdd_ref split_clause(bdd_ref x) {
 		if constexpr (!o.has_inv_order()) {
 			// First variable is smallest; the new variable's index is non-negative.
@@ -1548,6 +1586,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return memo_and_many(v, bdd::add(m, h, l));
 	}
 
+	// Record r as the conjunction of v (no write while the node table is
+	// exhausted) and return r
 	static bdd_ref memo_and_many(const std::vector<bdd_ref>& v, bdd_ref r) {
 		if (!bdd_node_table_exhausted) and_many_memo.emplace(v, r);
 		return r;
@@ -1695,8 +1735,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			m.emplace(n.v, false);
 			if ((x = n.l) == F) return r.with_assert_check_value(true);
 		}
-		// x == F here (the loop never runs): the empty assignment is its
-		// witness zero.
+		// Reached when x was F on entry (the empty assignment is its
+		// witness zero) or when the low walk ended at a leaf.
 		return r.with_assert_check_value(true);
 	}
 
@@ -1745,9 +1785,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			if ((x.first & e) == false) r.insert(x);
 			else {
 				r.emplace(x.first & p, x.second);
-				// BA1-22: iterate the split set s, not the
-				// clause's variable list (every int_t converted
-				// to Bool(true), a no-op AND).
+				// Iterate the split set s, not the clause's
+				// variable list.
 				for (const Bool& y : s)
 					r.emplace(x.first & y, x.second);
 			}
@@ -1783,14 +1822,16 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return add(n.v, n.h, F);
 	}
 
-	// Find highest variable in bdd
+	// Highest variable index in x; 0 for a leaf
 	static uint_t highest_var(bdd_ref x) {
 		if (leaf(x)) return 0;
 		const bdd& n = get(x);
 		return std::max(n.v, std::max(highest_var(n.h), highest_var(n.l)));
 	}
 
-	// Find a variable not present in x
+	// Conjoin x with the positive literal of a variable not present in
+	// x (one past its highest, or past its top variable with INV_ORDER;
+	// variable 1 for a leaf)
 	static bdd_ref split_clause(bdd_ref x) {
 		if constexpr (!o.has_inv_order()) {
 			// First variable is smallest; the new variable's index is non-negative.

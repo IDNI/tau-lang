@@ -31,10 +31,9 @@ typename ba_constants<node>::pool_index& ba_constants<node>::index_() {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
-	// BA2-5: after cleanup() the C/T pools are out of sync by design
-	// (atexit ordering); interning then would alias fresh constants
-	// with stale trees. Poisoning is a programming error, not a reportable
-	// input failure, so it is caught by the debug assert only.
+	// After cleanup() interning would pool into a freshly reset pool.
+	// Poisoning is a programming error, not a reportable input failure,
+	// so it is caught by the debug assert only.
 	DBG(assert(!poisoned && "ba_constants::get called after cleanup()");)
 	// No tracing here: this runs for every constant the bv evaluation
 	// hooks fold during a step, and the pool lookup is index-backed.
@@ -85,11 +84,9 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	// Both pools live behind leaked function-local statics (see C()/T()
-	// above) so neither ever runs a static destructor at exit -- no
-	// atexit ordering hazard with the BDD/cvc5 backends remains, so all
-	// three pools are simply cleared together here to keep their indices
-	// aligned.
+	// All three pools live behind leaked function-local statics (see
+	// C()/T()/index_() above), so none runs a static destructor at exit;
+	// they are cleared together here to keep their indices aligned.
 	C().clear();
 	T().clear();
 	index_().clear();
