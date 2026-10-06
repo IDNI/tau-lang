@@ -26,6 +26,13 @@ using idni::tau_lang::qint_rational;
 static constexpr double POS_INF =  std::numeric_limits<double>::infinity();
 static constexpr double NEG_INF = -std::numeric_limits<double>::infinity();
 
+// The fraction num/den; the test expects it to fit.
+static qint_rational fr(long long num, long long den) {
+	auto r = qint_rational::fraction(num, den);
+	REQUIRE(r);
+	return *r;
+}
+
 // The exact endpoint of a double. Every finite value used here is dyadic, so
 // doubling reaches an integer.
 static qint_rational R(double d) {
@@ -33,7 +40,7 @@ static qint_rational R(double d) {
 		? qint_rational::pos_inf() : qint_rational::neg_inf();
 	long long den = 1;
 	while (std::abs(d - std::trunc(d)) > 0.0) d *= 2, den *= 2;
-	return qint_rational(static_cast<long long>(d), den);
+	return fr(static_cast<long long>(d), den);
 }
 
 // Construct a single-interval qint [lo, hi)
@@ -880,15 +887,15 @@ TEST_CASE("a fraction and its decimal rounding stay distinct") {
 }
 
 TEST_CASE("decimals, exponents and fractions parse exactly") {
-	CHECK(ep("0.25") == qint_rational(1, 4));
-	CHECK(ep(".5") == qint_rational(1, 2));
+	CHECK(ep("0.25") == fr(1, 4));
+	CHECK(ep(".5") == fr(1, 2));
 	CHECK(ep("5.") == qint_rational(5));
-	CHECK(ep("-1.5") == qint_rational(-3, 2));
-	CHECK(ep("2e-3") == qint_rational(1, 500));
+	CHECK(ep("-1.5") == fr(-3, 2));
+	CHECK(ep("2e-3") == fr(1, 500));
 	CHECK(ep("1.25E+2") == qint_rational(125));
-	CHECK(ep("2/4") == qint_rational(1, 2));
-	CHECK(ep("1/-3") == qint_rational(-1, 3));
-	CHECK(ep("0.5/3") == qint_rational(1, 6));
+	CHECK(ep("2/4") == fr(1, 2));
+	CHECK(ep("1/-3") == fr(-1, 3));
+	CHECK(ep("0.5/3") == fr(1, 6));
 	CHECK(ep("-inf").is_neg_inf());
 	CHECK(ep("+inf").is_pos_inf());
 }
@@ -905,17 +912,29 @@ TEST_CASE("a value that does not fit exactly is rejected, not rounded") {
 TEST_CASE("endpoints print as integers, terminating decimals or p/q") {
 	using idni::tau_lang::qint_detail::endpoint_to_string;
 	CHECK(endpoint_to_string(qint_rational(3)) == "3");
-	CHECK(endpoint_to_string(qint_rational(-1, 4)) == "-0.25");
-	CHECK(endpoint_to_string(qint_rational(1, 500)) == "0.002");
-	CHECK(endpoint_to_string(qint_rational(1, 3)) == "1/3");
-	CHECK(endpoint_to_string(qint_rational(-5, 6)) == "-5/6");
+	CHECK(endpoint_to_string(fr(-1, 4)) == "-0.25");
+	CHECK(endpoint_to_string(fr(1, 500)) == "0.002");
+	CHECK(endpoint_to_string(fr(1, 3)) == "1/3");
+	CHECK(endpoint_to_string(fr(-5, 6)) == "-5/6");
 	CHECK(qi(qint_rational(0), ep("1/3")).to_string() == "[0, 1/3)");
+}
+
+TEST_CASE("a fraction with a zero denominator or out of range is rejected") {
+	constexpr long long min = std::numeric_limits<long long>::min();
+	constexpr long long max = std::numeric_limits<long long>::max();
+	CHECK_FALSE(qint_rational::fraction(1, 0));
+	CHECK_FALSE(qint_rational::fraction(0, 0));
+	CHECK_FALSE(qint_rational::fraction(min, -1));
+	CHECK_FALSE(qint_rational::fraction(1, min));
+	CHECK(qint_rational::fraction(min, 1) == qint_rational(min));
+	CHECK(qint_rational::fraction(max, -1) == qint_rational(-max));
+	CHECK(qint_rational::fraction(6, -4) == fr(-3, 2));
 }
 
 TEST_CASE("the midpoint split is exact") {
 	auto s = qint_splitter(qi(qint_rational(0), ep("1/3")),
 		splitter_type::upper);
-	CHECK(s == qi(qint_rational(0), qint_rational(1, 6)));
+	CHECK(s == qi(qint_rational(0), fr(1, 6)));
 }
 
 } // TEST_SUITE qint — exact endpoints

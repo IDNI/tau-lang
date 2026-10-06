@@ -56,10 +56,11 @@ struct qint_rational {
 	/**
 	 * @brief The rational @p num / @p den, reduced to lowest terms.
 	 *
-	 * @p den must not be 0; use pos_inf() / neg_inf() for the infinities.
-	 * When @p den is 0 or the reduced value does not fit, the value is 0.
+	 * Use pos_inf() / neg_inf() for the infinities.
+	 * @return nullopt when @p den is 0 or the reduced value does not fit a
+	 *         64-bit numerator and denominator.
 	 */
-	qint_rational(long long num, long long den);
+	static std::optional<qint_rational> fraction(long long num, long long den);
 
 	/// @brief The endpoint +inf.
 	static qint_rational pos_inf() { qint_rational r; r.p = 1; r.q = 0; return r; }

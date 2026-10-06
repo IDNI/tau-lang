@@ -67,9 +67,10 @@ std::optional<qint_rational> midpoint(const qint_rational& a,
 
 } // namespace
 
-qint_rational::qint_rational(long long num, long long den) {
-	auto r = make_rational(num, den);
-	if (r) *this = *r;
+std::optional<qint_rational> qint_rational::fraction(long long num,
+	long long den)
+{
+	return make_rational(num, den);
 }
 
 std::strong_ordering qint_rational::operator<=>(
@@ -336,7 +337,7 @@ qint qint_splitter(const qint& x, splitter_type /*st*/) {
 }
 
 qint qint_splitter_one() {
-	return qint{{ {qint_rational(0), qint_rational(1, 2)} }};
+	return qint{{ {qint_rational(0), *make_rational(1, 2)} }};
 }
 
 // =============================================================================
