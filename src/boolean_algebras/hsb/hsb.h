@@ -301,7 +301,8 @@ struct hsb {
 	/// @brief Negation of operator==(bool).
 	bool operator!=(bool b) const;
 
-	/// @brief Structural ordering via `to_string()` output.
+	/// @brief Orders by `to_string()` output, then structurally (node kind,
+	/// halfspace values, children) for distinct elements that print alike.
 	bool operator<(const hsb& o) const;
 	/// @brief Three-way form of operator<; equal only for the same root.
 	std::strong_ordering operator<=>(const hsb& o) const;

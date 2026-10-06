@@ -184,6 +184,24 @@ TEST_SUITE("hsb — basic construction") {
 		CHECK(is_hsb_zero(h) == false);
 	}
 
+	// Two distinct halfspaces whose biases agree to six digits print alike,
+	// so the order cannot rest on the printed text alone.
+	TEST_CASE("distinct elements that print alike are strictly ordered") {
+		auto a = make_hs({1.0}, 0.1234567);
+		auto b = make_hs({1.0}, 0.1234568);
+		REQUIRE(a != b);
+		REQUIRE(a.to_string() == b.to_string());
+		CHECK((a < b) != (b < a));
+		CHECK((a <=> b) != std::strong_ordering::equal);
+		CHECK(std::is_lt(a <=> b) == std::is_gt(b <=> a));
+		CHECK((a < b) == std::is_lt(a <=> b));
+		auto ca = a | make_hs({0.0, 1.0}, 1.0);
+		auto cb = b | make_hs({0.0, 1.0}, 1.0);
+		REQUIRE(ca.to_string() == cb.to_string());
+		CHECK((ca < cb) != (cb < ca));
+		CHECK((ca < cb) == (a < b));
+	}
+
 } // TEST_SUITE basic construction
 
 TEST_SUITE("hsb — halfspace pool") {

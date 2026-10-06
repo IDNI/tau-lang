@@ -338,16 +338,50 @@ inline bool hsb::operator==(bool b) const {
 }
 inline bool hsb::operator!=(bool b) const { return !(*this == b); }
 
+namespace hsb_detail {
+// A total order on interned trees that agrees with tref equality: the node
+// kind, then the halfspace values, then the children from left to right.
+// The pool interns halfspaces by hsb_halfspace::operator<, so two leaves
+// with different pool indices are never equivalent under it.
+inline std::strong_ordering tree_order(tref a, tref b) {
+	if (a == b) return std::strong_ordering::equal;
+	if (!a || !b)
+		return a ? std::strong_ordering::greater
+			: std::strong_ordering::less;
+	const auto& ta = hsb_tree::get(a);
+	const auto& tb = hsb_tree::get(b);
+	if (ta.value.nt != tb.value.nt)
+		return static_cast<size_t>(ta.value.nt)
+			<=> static_cast<size_t>(tb.value.nt);
+	switch (static_cast<hsb::kind>(ta.value.nt)) {
+	case hsb::kind::halfspace: {
+		const auto& ha = hsb_halfspace_pool::get(ta.value.data);
+		const auto& hb = hsb_halfspace_pool::get(tb.value.data);
+		if (ha < hb) return std::strong_ordering::less;
+		if (hb < ha) return std::strong_ordering::greater;
+		return ta.value.data <=> tb.value.data;
+	}
+	case hsb::kind::not_:
+		return tree_order(ta.first(), tb.first());
+	case hsb::kind::and_:
+	case hsb::kind::or_:
+		if (auto c = tree_order(ta.first(), tb.first()); c != 0) return c;
+		return tree_order(ta.second(), tb.second());
+	default:
+		return std::strong_ordering::equal;
+	}
+}
+} // namespace hsb_detail
+
 inline bool hsb::operator<(const hsb& o) const {
-	if (*this == o) return false;
-	return to_string() < o.to_string();
+	return std::is_lt(*this <=> o);
 }
 
 inline std::strong_ordering hsb::operator<=>(const hsb& o) const {
 	if (*this == o) return std::strong_ordering::equal;
-	return to_string() < o.to_string()
-		? std::strong_ordering::less
-		: std::strong_ordering::greater;
+	// Distinct elements can print alike (doubles print at six digits).
+	if (auto c = to_string() <=> o.to_string(); c != 0) return c;
+	return hsb_detail::tree_order(root_ref(), o.root_ref());
 }
 
 // ── Serialization ─────────────────────────────────────────────────────────────
