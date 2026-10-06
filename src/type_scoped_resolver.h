@@ -216,9 +216,8 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 		size_t inferred_type);
 
 /**
- * @brief Unify @p inferred_type with every type listed in @p types, in
- * order, then open a new scope registering each listed node with the type
- * unified up to and including that node.
+ * @brief Unify @p inferred_type with every type listed in @p types, then
+ * open a new scope registering every listed node with the unified type.
  *
  * The caller closes the scope. Nothing is opened on a conflict.
  * @tparam node Tree node type.
@@ -252,8 +251,8 @@ std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver
  * Touches no resolver.
  * @tparam node Tree node type.
  * @return Unified type id (@p default_type when @p types is empty), or
- *         `inference_error` on conflict, whose `expected` is the listed type
- *         and `found` the type unified so far.
+ *         `inference_error` on conflict, whose `expected` is the type
+ *         unified so far and `found` the listed type.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);

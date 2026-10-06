@@ -260,6 +260,22 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		CHECK(r.type_id_of(a) == bool_tid);
 	}
 
+	TEST_CASE("free open_same_type (initializer_list variant): every node gets the fully unified type") {
+		type_scoped_resolver<node_t> r;
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
+		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
+		size_t untyped_tid = untyped_type_id<node_t>();
+		// a comes first, still untyped; b's type is only met afterwards
+		auto result = open_same_type<node_t>(r, {
+			subtree_map<node_t, size_t>{ { a, untyped_tid } },
+			subtree_map<node_t, size_t>{ { b, bool_tid } } }, untyped_tid);
+		REQUIRE(!std::holds_alternative<inference_error>(result));
+		CHECK(std::get<size_t>(result) == bool_tid);
+		CHECK(r.type_id_of(a) == bool_tid);
+		CHECK(r.type_id_of(b) == bool_tid);
+	}
+
 	TEST_CASE("free merge (initializer_list variant): merges nodes, ignoring the map's type values") {
 		type_scoped_resolver<node_t> r;
 		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
@@ -339,6 +355,9 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		auto result = unify<node_t>(types, untyped_type_id<node_t>());
 		REQUIRE(std::holds_alternative<inference_error>(result));
 		CHECK(std::get<inference_error>(result).element == b);
+		// expected: the type unified so far (a's); found: b's own type
+		CHECK(std::get<inference_error>(result).expected == bool_tid);
+		CHECK(std::get<inference_error>(result).found == sbf_tid);
 	}
 
 	// unify()'s "nat never unifies" contract (see TY-1): the nat type is

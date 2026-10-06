@@ -254,9 +254,8 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
 		size_t default_type) {
-	subtree_map<node, size_t> scoped;
+	subtree_set<node> keys;
 	size_t inferred_type = default_type;
-	//auto inferred_type = untyped_type_id<node>();
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
@@ -264,10 +263,11 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 			if (!unified.has_value())
 				return inference_error{t, inferred_type, type};
 			else inferred_type = unified.value();
-			// Store the type inferred so far, not default_type.
-			scoped[t] = inferred_type;
+			keys.insert(t);
 		}
 	}
+	subtree_map<node, size_t> scoped;
+	for (auto t : keys) scoped[t] = inferred_type;
 	resolver.open(scoped);
 	return inferred_type;
 }
@@ -298,7 +298,7 @@ std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<n
 			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (auto unified = unify<node>(unified_type, type); unified.has_value()) {
 				unified_type = unified.value();
-			} else return inference_error{ typeable, type, unified_type}; // conflicting or invalid type id
+			} else return inference_error{ typeable, unified_type, type }; // conflicting or invalid type id
 		}
 	}
 	return unified_type;
