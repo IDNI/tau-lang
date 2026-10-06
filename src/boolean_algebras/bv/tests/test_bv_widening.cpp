@@ -224,10 +224,8 @@ TEST_SUITE("bv widening - needed_width") {
 		CHECK(needed_width<node_t>(src, 64, m).value() == 64);
 		CHECK(m == 64);
 	}
-	TEST_CASE("shift amount too large for stoull falls back to no growth") {
-		// 2^70 as a bv[128] literal: getBitVectorValue(10) yields a
-		// decimal string std::stoull throws out_of_range on; the catch
-		// folds it into the same "no known growth" answer.
+	TEST_CASE("shift amount too large for size_t falls back to no growth") {
+		// 2^70 as a bv[128] literal reads as no known growth.
 		size_t m;
 		CHECK(widths_typed(
 			"x:bv[128] << { 1180591620717411303424 }:bv[128]", 128, m)

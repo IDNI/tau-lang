@@ -4,7 +4,7 @@
 #include "bv_widening.h"               // Only for IDE resolution, not really needed.
 
 #include <algorithm>
-#include <stdexcept>
+#include <charconv>
 #include <string>
 
 namespace idni::tau_lang {
@@ -16,11 +16,8 @@ namespace idni::tau_lang {
  *
  * A variable shift amount executes at the left operand's width and may
  * wrap (see the `bf_shl` rule in bv_widening.h), so it reads as `0`
- * growth. A shift amount too large to fit `unsigned long
- * long` (an exceedingly wide bitvector literal) is treated the same way:
- * `std::stoull` throwing is caught and folded into the same "no known
- * growth" fallback as a non-constant amount, rather than propagating an
- * uncaught exception out of needed_width.
+ * growth. A shift amount too large to fit `size_t` (an exceedingly wide
+ * bitvector literal) is treated the same way.
  *
  * A constant amount does not always survive as a `ba_constant`: the
  * all-ones value of a bv type is canonicalized to the *top element*
@@ -48,7 +45,7 @@ namespace idni::tau_lang {
  * @param op The `bf_shl` operator node (the child of its `bf` wrapper).
  * @return The literal amount, or `0` for a variable amount, an untyped
  * constant, or an amount too large to be represented (`w >= 64` top
- * element, or a literal `std::stoull` cannot parse). Returns no value when
+ * element, or a literal past `size_t`). Returns no value when
  * a typed bv amount's bitwidth cannot be looked up.
  * @endinternal
  */
@@ -69,7 +66,7 @@ result<size_t> bf_shl_shift_amount(const tree<node>& op) {
 		// 2^w - 1 is not representable in size_t for w >= 64 (and the
 		// resulting width would be astronomically past any usable
 		// bv_max_width anyway): fall into the same "no known growth"
-		// fallback the unparseably-large `std::stoull` case uses, rather
+		// fallback an amount past `size_t` takes, rather
 		// than wrapping around to a small -- silently under-widening --
 		// amount.
 		if (w >= sizeof(size_t) * 8) return r.with_value(0);
@@ -78,12 +75,14 @@ result<size_t> bf_shl_shift_amount(const tree<node>& op) {
 
 	if (amount.is_ba_constant() && typed_bv) {
 		const auto c = amount.get_ba_constant();
-		try {
-			return r.with_value(static_cast<size_t>(
-				std::stoull(std::get<bv>(c).getBitVectorValue(10))));
-		} catch (const std::exception&) {
-			return r.with_value(0); // too large (or malformed) to parse: no known growth
-		}
+		const bv* value = std::get_if<bv>(&c);
+		if (!value || !value->isBitVectorValue()) return r.with_value(0);
+		const std::string digits = value->getBitVectorValue(10);
+		size_t shift = 0;
+		const auto [_, ec] = std::from_chars(digits.data(),
+			digits.data() + digits.size(), shift);
+		// too large for size_t: no known growth
+		return r.with_value(ec == std::errc{} ? shift : 0);
 	}
 	return r.with_value(0);
 }
