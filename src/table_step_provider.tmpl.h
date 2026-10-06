@@ -597,7 +597,6 @@ make_table_provider(const ltl_aba_solution<node>& given)
 				trefs tmpls;
 				std::vector<bool> is_counter;
 				for (auto& [ap_idx, positive] : cube) {
-					if (!positive) continue;
 					if (ap_idx >= sol.aut.aps.size())
 						continue;
 					const auto& prop = sol.aut.aps[ap_idx];

@@ -261,6 +261,41 @@ TEST_SUITE("table_step_provider") {
 		// The echo itself: the emitted value is each step's own input.
 		CHECK(table_vals == i1_vals);
 	}
+
+	// The strategy's edge carries the output atom negated: the witness
+	// must make it false, so each output differs from the step's input.
+	TEST_CASE("negated data output: the witness keeps the atom false"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		size_t bv4_tid = bv_type_id<node_t>(4);
+		strings i1_vals = {"0", "3", "0", "15", "0"};
+		std::string spec = "G(!(o1[t]:bv[4] = i1[t]:bv[4])).";
+
+		io_context<node_t> ctx;
+		ctx.add_input("i1", bv4_tid, std::make_shared<vector_input_stream>(i1_vals));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv4_tid, o1);
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
+		auto table = make_table_provider<node_t>(*sol);
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
+		REQUIRE(provider != nullptr);
+
+		auto table_vals = run_table_o1(provider, ctx, o1, 5,
+			bounds.first, bounds.second);
+		REQUIRE(table_vals.size() == i1_vals.size());
+		for (size_t k = 0; k < i1_vals.size(); ++k) {
+			CAPTURE(k);
+			CHECK(table_vals[k] != i1_vals[k]);
+		}
+	}
 #endif
 
 	// Lookback shifts memory reads through the solve path's own catch-up
