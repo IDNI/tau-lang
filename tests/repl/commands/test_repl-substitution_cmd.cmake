@@ -209,11 +209,12 @@ add_repl_test(substitution_cmd_no_match_wrong_type
 
 # An input that cannot be type-inferred at all (bitvector arithmetic without
 # width annotations) is matched as parsed, so unannotated patterns substitute
-# in it instead of silently missing on inferred-vs-raw type ids
+# in it instead of silently missing on inferred-vs-raw type ids. Type
+# inference still reports why it failed, so NO_FAIL_REGEX.
 add_repl_test(substitution_cmd_untyped_arith
-	"s a + b = c [a / d]" ": d\\+b = c")
+	"s a + b = c [a / d]" ": d\\+b = c" NO_FAIL_REGEX)
 add_repl_test(substitution_cmd_untyped_arith_multi
-	"s a + b = c [a / d, b / e]" ": d\\+e = c")
+	"s a + b = c [a / d, b / e]" ": d\\+e = c" NO_FAIL_REGEX)
 
 # Multiple bracket groups (sequential composition)
 #

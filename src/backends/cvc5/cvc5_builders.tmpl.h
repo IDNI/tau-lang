@@ -170,10 +170,42 @@ inline Term make_bitvector_extract(const Term& t, size_t hi, size_t lo) {
 	return cvc5_term_manager.mkTerm(op, {t});
 }
 
-// Constants of width `size`; string forms are parsed in `base` and the
-// value must fit in `size` bits (cvc5 rejects it otherwise).
+inline bool bitvector_literal_fits(const size_t size, const std::string& str,
+		const size_t base) {
+	if (size == 0 || size > UINT32_MAX || str.empty()) return false;
+	if (base != 2 && base != 10 && base != 16) return false;
+	std::vector<uint8_t> digits;
+	for (char c : str) {
+		uint8_t d;
+		if (c >= '0' && c <= '9') d = static_cast<uint8_t>(c - '0');
+		else if (c >= 'a' && c <= 'f') d = static_cast<uint8_t>(c - 'a' + 10);
+		else if (c >= 'A' && c <= 'F') d = static_cast<uint8_t>(c - 'A' + 10);
+		else return false;
+		if (d >= base) return false;
+		if (!digits.empty() || d != 0) digits.push_back(d);
+	}
+	// Count the bits of the value by halving its digit string.
+	size_t bits = 0;
+	while (!digits.empty()) {
+		if (++bits > size) return false;
+		std::vector<uint8_t> half;
+		size_t rem = 0;
+		for (uint8_t d : digits) {
+			size_t cur = rem * base + d;
+			auto q = static_cast<uint8_t>(cur / 2);
+			rem = cur % 2;
+			if (!half.empty() || q != 0) half.push_back(q);
+		}
+		digits = std::move(half);
+	}
+	return true;
+}
+
+// cvc5 throws on a string that does not fit: callers check
+// bitvector_literal_fits first.
 inline cvc5::Term make_bitvector_cte(const size_t size,
 		const std::string& str, const size_t base) {
+	DBG(assert(bitvector_literal_fits(size, str, base));)
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), str, static_cast<uint32_t>(base));
 }
 
@@ -191,8 +223,10 @@ inline cvc5::Term make_bitvector_value(const size_t size, const uint64_t value) 
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value);
 }
 
-// `base` defaults to 2 at the declaration in cvc5.h.
+// `base` defaults to 2 at the declaration in cvc5.h. cvc5 throws on a
+// string that does not fit, see make_bitvector_cte.
 inline cvc5::Term make_bitvector_value(const size_t size, const std::string& value, const size_t base) {
+	DBG(assert(bitvector_literal_fits(size, value, base));)
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value, static_cast<uint32_t>(base));
 }
 

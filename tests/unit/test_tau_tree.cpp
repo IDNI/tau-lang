@@ -993,6 +993,16 @@ TEST_SUITE("rr_dict (RR-12)") {
 	}
 }
 
+// An unknown string id would trip the assert of a DEBUG build.
+#ifndef DEBUG
+TEST_SUITE("dict") {
+
+	TEST_CASE("an unknown string id reads as the empty string, without a throw") {
+		CHECK( dict(size_t(-1)).empty() );
+	}
+}
+#endif // DEBUG
+
 // ── get_free_vars: per-subtree cache keeps scope handling intact ─────────────
 //
 // get_free_vars memoizes the free-variable sets of spine subtrees (binders,

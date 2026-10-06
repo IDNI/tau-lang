@@ -168,6 +168,11 @@ add_repl_test(normalize_cmd-cast_of_tau_stream_rejected
 	"n (bv[8]) i1[t]:tau = o1[t]:bv[8]" "Incompatible type information" NO_FAIL_REGEX)
 add_repl_test(normalize_cmd-cast_result_meets_sbf_rejected
 	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information" NO_FAIL_REGEX)
+
+# An arithmetic operator over a type without arithmetic operations is
+# rejected by type inference, and the rejection names the type.
+add_repl_test(normalize_cmd-arith_on_type_without_arith_ops_rejected
+	"n x:sbf + y:sbf = 0" "The type :sbf has no arithmetic operations" NO_FAIL_REGEX)
 add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 	"n (bv[8]) x:bv[4] = y" "y")
 

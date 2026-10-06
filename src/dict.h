@@ -39,13 +39,13 @@ inline size_t dict(const std::string& s) {
  * @param id Id previously returned by `dict(string)`.
  * @return Reference to the corresponding string; it stays valid only until
  * the next registration of a new string.
- * @pre @p id is a registered id; an unknown id throws `std::out_of_range`.
+ * @pre @p id is a registered id; an unknown id asserts in a DEBUG build and
+ * reads as the empty string otherwise.
  */
 inline const std::string& dict(size_t id) {
 	DBG(assert(id < S().size());)
-	// .at: a corrupted or stale id throws instead of reading out of bounds
-	// in Release.
-	return S().at(id);
+	// A corrupted or stale id must neither throw nor read out of bounds.
+	return id < S().size() ? S()[id] : S()[0];
 }
 
 } // namespace idni::tau_lang

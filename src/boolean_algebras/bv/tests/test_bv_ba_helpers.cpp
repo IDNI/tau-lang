@@ -230,6 +230,41 @@ TEST_SUITE("bv solver budgets and declines") {
 	}
 }
 
+// A bitvector literal reaches cvc5 only once it is known to fit: cvc5 throws
+// on one that does not, and the library raises no exception.
+TEST_SUITE("bitvector_literal_fits") {
+
+	TEST_CASE("values at the edge of the width") {
+		CHECK( bitvector_literal_fits(8, "255", 10) );
+		CHECK( !bitvector_literal_fits(8, "256", 10) );
+		CHECK( bitvector_literal_fits(8, "11111111", 2) );
+		CHECK( !bitvector_literal_fits(8, "111111111", 2) );
+		CHECK( bitvector_literal_fits(8, "000000000011", 2) );
+		CHECK( bitvector_literal_fits(8, "ff", 16) );
+		CHECK( bitvector_literal_fits(8, "00FF", 16) );
+		CHECK( !bitvector_literal_fits(8, "100", 16) );
+		CHECK( bitvector_literal_fits(1, "0", 10) );
+		CHECK( bitvector_literal_fits(1, "1", 10) );
+		CHECK( !bitvector_literal_fits(1, "2", 10) );
+		CHECK( bitvector_literal_fits(64, "18446744073709551615", 10) );
+		CHECK( !bitvector_literal_fits(64, "18446744073709551616", 10) );
+	}
+
+	TEST_CASE("malformed input and widths cvc5 rejects") {
+		CHECK( !bitvector_literal_fits(0, "0", 10) );
+		CHECK( !bitvector_literal_fits(8, "", 10) );
+		CHECK( !bitvector_literal_fits(8, "12", 2) );
+		CHECK( !bitvector_literal_fits(8, "1a", 10) );
+		CHECK( !bitvector_literal_fits(8, "-1", 10) );
+		CHECK( !bitvector_literal_fits(8, "1", 8) );
+	}
+
+	TEST_CASE("a constant that does not fit its type is a parse error") {
+		CHECK( parse("{ 256 }:bv[8] = x") == nullptr );
+		CHECK( parse("{ 255 }:bv[8] = x") != nullptr );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

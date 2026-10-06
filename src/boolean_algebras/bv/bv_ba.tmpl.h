@@ -46,14 +46,12 @@ result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 	DBG(assert(base > 0 );)
 	TAU_TRY(size_t bv_size, get_bv_size<node<BAs...>>(type_tree));
 	auto str = t | tt::terminals;
-	try {
-		return r.with_value(make_bitvector_cte(bv_size, str, base));
-	} catch (const cvc5::CVC5ApiException& e) {
-		std::ostringstream oss;
-		oss << "Error creating bitvector constant from string '"
-			<< str << "': " << e.what();
-		return r.with_error(code::parse_error, oss.str(), {{label::width, bv_size}});
-	}
+	if (!bitvector_literal_fits(bv_size, str, base))
+		return r.with_error(code::parse_error,
+			"Error creating bitvector constant from string '" + str
+				+ "': the value does not fit in the width",
+			{{label::width, bv_size}});
+	return r.with_value(make_bitvector_cte(bv_size, str, base));
 }
 
 template<typename...BAs>
