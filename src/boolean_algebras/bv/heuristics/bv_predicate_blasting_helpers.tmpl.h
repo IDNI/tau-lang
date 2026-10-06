@@ -8,7 +8,6 @@
 
 namespace idni::tau_lang {
 
-// Custom factory methods for creating rules and rr's.
 /**
  * @brief Creates a rewriter rule from a head and body term.
  * @tparam node Node type
@@ -24,10 +23,10 @@ inline static rewriter::rule make_rule(tref head, tref body) {
 }
 
 /**
- * @brief Creates a recurrence relation (rr) from rules and a main term.
+ * @brief Creates a recurrence relation (rr) from rules and a main formula.
  * @tparam node Node type
- * @param rules The set of rules
- * @param main The main term
+ * @param rules The rules, each defining one recurrence relation
+ * @param main The main formula, usually a call of a rule's head
  * @return The constructed recurrence relation
  */
 template<NodeType node>

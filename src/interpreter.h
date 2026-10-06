@@ -49,8 +49,9 @@ struct step_provider {
 	 * @param memory Committed memory so far this step (inputs already merged in).
 	 * @param time_point Current execution time point.
 	 * @param formula_time_point Time point the running formula is phrased at.
-	 * @return The solution, or `std::nullopt` if no part of @p step_spec
-	 * is solvable; the report carries the probes tried along the way.
+	 * @return The solution, or `std::nullopt` when the step has none (for
+	 * the default provider: some part of @p step_spec has no solvable
+	 * path); the report carries the probes tried along the way.
 	 */
 	virtual result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
@@ -167,6 +168,8 @@ struct interpreter {
 	 */
 	/// Environment fallbacks `TAU_GC_MIN_SIZE` and `TAU_GC_GROWTH_FACTOR`.
 	static inline env_limit<size_t> gc_min_size{ "TAU_GC_MIN_SIZE", 256 };
+	/// Growth of bintree<node>::M() since the last sweep that triggers the
+	/// next one; <= 0 disables the sweeps (see gc_min_size).
 	static inline env_limit<double> gc_growth_factor{
 		"TAU_GC_GROWTH_FACTOR", 1.5 };
 
@@ -185,12 +188,18 @@ struct interpreter {
 		assignment<node>& memory, const io_context<node>& ctx);
 
 	/**
-	 * @brief Build an interpreter from a normalized Tau specification.
-	 * @param spec Normalized Tau formula.
+	 * @brief Build an interpreter from a Tau specification.
+	 *
+	 * Classifies the io vars against @p ctx, reduces CTL* operators,
+	 * normalizes the spec (or, for game operators, synthesizes a strategy
+	 * and encodes it as a safety formula), partitions it by output streams
+	 * and opens its streams.
+	 * @param spec Tau formula as parsed; must not be null.
 	 * @param ctx I/O context.
-	 * @return Initialized interpreter, or an error result if the spec is
-	 * unsatisfiable or fails to normalize (a `bv_widening` width-cap
-	 * violation, already logged by the widening pass).
+	 * @return Initialized interpreter, or an error when @p spec is null, its
+	 * CTL* reduction fails, it does not normalize, it is unsat or
+	 * unrealizable, its realizability cannot be decided, or a stream cannot
+	 * be typed or opened.
 	 */
 	static result<interpreter> make_interpreter(tref spec,
 		const io_context<node>& ctx);
@@ -201,7 +210,8 @@ struct interpreter {
 	 * Bypasses `make_interpreter`'s normalizer/safety-encoding/partitioning
 	 * pipeline: constructs directly with empty spec-side state and takes
 	 * @p lookback / @p highest_initial_pos as given (they would otherwise be
-	 * derived from `ubt_ctn`, which is empty here). No caller yet.
+	 * derived from `ubt_ctn`, which is empty here). The C++ program
+	 * `tau compile` emits runs its strategy through this.
 	 * @param ctx I/O context; also the source of the input/output streams.
 	 * @param provider Solution source `step()` will consult each step.
 	 * @param lookback Baked lookback (max relative shift across the table's atoms).
@@ -221,18 +231,27 @@ struct interpreter {
 		int_t lookback, int_t highest_initial_pos = 0,
 		const trefs& live_probe_atoms = {});
 
+	/// The outputs of a step, and whether the step read an input (the
+	/// caller then continues without prompting).
 	using step_result = std::pair<std::optional<assignment<node>>, bool>;
 
 	/**
-	 * @brief Execute one time step without providing explicit input values.
-	 * @return Pair (output assignment if successful, whether execution should continue).
+	 * @brief Execute one time step, reading its inputs from the input streams.
+	 *
+	 * Only the inputs the step provider or the spec's lookback needs are read.
+	 * @return As step(const assignment<node>&); an `invalid_state` error when
+	 * an input stream has ended or a value could not be read or parsed.
 	 */
 	result<step_result> step();
 
 	/**
 	 * @brief Execute one time step with the given input @p values.
-	 * @param values Input variable assignments for this step.
-	 * @return Pair (output assignment if successful, whether execution should continue).
+	 * @param values Input variable assignments for this step; stored in
+	 *        `memory`.
+	 * @return The step's outputs (always present on success) and whether
+	 * @p values was non-empty; an `unsat` error when a spec part or the step
+	 * provider finds no solution. Advances the time point on success and
+	 * may run the tree-node gc (see gc_min_size).
 	 *
 	 * Lifetime of the returned map (IN-M1): its nodes are owned by the
 	 * tree store and kept alive by the interpreter until the SECOND
@@ -250,7 +269,8 @@ struct interpreter {
 	 * @param update Normalized update formula.
 	 * @return The verdict: true iff the update was accepted and committed;
 	 *         false leaves the interpreter exactly as it was (spec,
-	 *         streams, memory). The report carries the rejection reason.
+	 *         streams, memory). The report carries the rejection reason;
+	 *         no value means an internal invariant broke.
 	 */
 	result<bool> update(tref update);
 
@@ -278,181 +298,181 @@ struct interpreter {
 	 *   and no input was needed this step).
 	 * @param idle_hook Optional callback invoked with true when the loop
 	 *   starts waiting on stdin and with false when the wait ends.
-	 * @return false if a step's output failed to write (error already
-	 *   logged); true otherwise, including a clean user/input-driven stop.
-	 *   The report carries any pointwise-revision rejection reasons seen
-	 *   along the way.
+	 * @param steps Number of steps to run; 0 runs until input ends or the
+	 *   user quits.
+	 * @return true on a clean stop, including a user- or input-driven one;
+	 *   no value, with the error in the report, when a step fails for a
+	 *   reason other than awaiting input, an output fails to write, or an
+	 *   update breaks an invariant. The report also carries any
+	 *   pointwise-revision rejection reasons seen along the way.
 	 */
 	result<bool> run_loop(const size_t steps = 0, bool quit_on_idle = false,
 		const std::function<void(bool)>& idle_hook = {});
 
-	// ── Inspection / introspection (added for tau-neuro runtime) ─────────
+	// ── Inspection / introspection ───────────────────────────────────────
 
-	// Return the current running spec as a tau-syntax string. Reflects
-	// whatever the interpreter holds in `original_spec` after any PWR
-	// updates that have been applied — this is the "this[t]" view.
-	//
-	// IN-M2: a part with several revision alternatives is executed by
-	// step() as its FIRST solvable alternative, not as their disjunction.
-	// Once a step has run, this reports the alternatives that step chose;
-	// before the first step (or after an update, until the next step) it
-	// reports the disjunction, which over-approximates.
+	/// @brief The current running spec as a tau-syntax string.
+	///
+	/// Reflects whatever the interpreter holds in `original_spec` after any
+	/// pointwise-revision updates -- the "this[t]" view.
+	///
+	/// IN-M2: a part with several revision alternatives is executed by
+	/// step() as its FIRST solvable alternative, not as their disjunction.
+	/// Once a step has run, this reports the alternatives that step chose;
+	/// before the first step (or after an update, until the next step) it
+	/// reports the disjunction, which over-approximates.
 	std::string current_spec() const;
 
-	// True once a pointwise-revision update has been committed after the
-	// Mealy strategy in `cached_solution` was synthesised (IN-N3): the
-	// automaton then no longer describes the running spec, and the
-	// strategy introspection below (visualise_mealy_dot, determinise,
-	// boundary_traces) reports nothing rather than a stale machine.
+	/// @brief True once a pointwise-revision update has been committed after
+	/// the Mealy strategy in `cached_solution` was synthesised (IN-N3).
+	///
+	/// The automaton then no longer describes the running spec, and the
+	/// strategy introspection below (visualise_mealy_dot, determinise,
+	/// boundary_traces) reports nothing rather than a stale machine.
 	bool strategy_stale() const { return cached_solution_stale_; }
 
-	// Reset the interpreter back to time t=0. Clears `memory`,
-	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
-	// the inner-S auxiliary anchors (see seed_since_aux_bits). The spec
-	// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
-	// preserved — only the execution snapshot is reset. Returns the
-	// re-seeding result.
+	/// @brief Reset the interpreter back to time t=0.
+	///
+	/// Clears `memory`, `time_point`, `formula_time_point` and the step
+	/// state, resets the step provider, recomputes lookback and re-seeds the
+	/// inner-S auxiliary anchors (see seed_since_aux_bits). The spec
+	/// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
+	/// preserved -- only the execution snapshot is reset.
+	/// @return The re-seeding result.
 	result<void> reset();
 
-	// LA-N3: pre-populate `memory` with bv-0 for every INNER (off-spine)
-	// S/T auxiliary `o__ltl_s<k>__` in `since_aux_anchor_`, at
-	// t = formula_time_point - 1 — the strong-past anchor S(-1) = false
-	// (equivalently T(-1) = true) that the compile-away pass cannot state
-	// in the formula without a cross-BA-type or negative-time shape (both
-	// revert-pinned; see compile_since_trigger_rec). Without it the first
-	// enforced step's `φ ∧ prev` arm lets the strategy claim a Since
-	// through phantom memory. Called by make_interpreter and by reset();
-	// no-op when the list is empty or lookback is 0.
+	/// @brief Pre-populate `memory` with the strong-past anchors of the inner
+	/// Since/Trigger auxiliaries (LA-N3).
+	///
+	/// Sets the Boolean carrier's false (pack_bool_carrier_type) for every
+	/// INNER (off-spine) S/T auxiliary `o__ltl_s<k>__`
+	/// in `since_aux_anchor_`, at t = formula_time_point - 1 -- the anchor
+	/// S(-1) = false (equivalently T(-1) = true) that the compile-away pass
+	/// cannot state in the formula without a cross-BA-type or negative-time
+	/// shape (see compile_since_trigger_rec). Without it the first enforced
+	/// step's `φ ∧ prev` arm lets the strategy claim a Since through phantom
+	/// memory. Called by make_interpreter and by reset(); no-op when the
+	/// list is empty or lookback is 0.
+	/// @return An error when an anchor's io var cannot be built.
 	result<void> seed_since_aux_bits();
 
-	// Opaque identifier for the current Mealy state (or interpreter
-	// snapshot if the spec has no Mealy strategy). Two states with the
-	// same identifier are guaranteed equivalent for value-function lookup
-	// and audit-log purposes.
-	//
-	// When `cached_solution` is present and the spec was multi-state
-	// encoded, this returns the unique index `i` such that the auxiliary
-	// one-hot bit `o__ltl_ms<i>__` is set in `memory` at the most-recently
-	// committed time step. For single-state Mealy or pure-safety specs
-	// (no auxiliary bits), this returns 0.
+	/// @brief Opaque identifier for the current Mealy state (or interpreter
+	/// snapshot if the spec has no Mealy strategy).
+	///
+	/// Two states with the same identifier are equivalent for value-function
+	/// lookup and audit-log purposes. A step provider that plays a strategy
+	/// reports its own state. Otherwise, when `cached_solution` holds a
+	/// multi-state strategy, this is the index `i` whose one-hot bit
+	/// `o__ltl_ms<i>__` is set in `memory` at the last committed step (the
+	/// automaton's initial state before the first step or when no bit is
+	/// set). For single-state Mealy or pure-safety specs it is 0.
+	/// @return The state; an error when a bit's value cannot be decided.
 	result<size_t> current_state() const;
 
-	// Per-revision realisability pre-check: would PWR-merging `psi` with
-	// the current spec keep the result realisable?
-	//
-	// Implementation: dry-run the same merge that `update(psi)` performs
-	// (per-clause `pointwise_revision` followed by `get_executable_spec`
-	// non-null gate), but don't mutate any state. Returns true iff the
-	// resulting merged spec would be executable.
-	//
-	// Uses the same PWR pipeline as update(): syntactic fast mode with
-	// the semantic-optimal fallback (LS-7: both wired at HEAD).
-	//
-	// Non-const because the dry-run needs to copy the output_partition
-	// union-find structure, which lacks a usable copy constructor;
-	// implementation defers to the same machinery as `update()` --
-	// literally: both call plan_update(), so can_extend(psi)'s verdict is
-	// true exactly when update(psi) would commit (PW-N9 / IN-M7). The one
-	// side effect both share is that unknown console streams named by
-	// psi get registered in the io_context during stream collection.
+	/// @brief Whether pointwise-revising the running spec by @p psi would
+	/// commit, without changing the interpreter.
+	///
+	/// Runs the same plan_update() as update(), so can_extend(psi) is true
+	/// exactly when update(psi) would commit (PW-N9 / IN-M7). The one side
+	/// effect both share is that unknown console streams named by @p psi get
+	/// registered in the io_context during stream collection. Non-const
+	/// because the dry run copies the output_partition union-find.
+	/// @param psi Normalized update formula; null is trivially accepted.
+	/// @return The verdict; the report carries the rejection reason, and
+	/// no value means an internal invariant broke.
 	result<bool> can_extend(tref psi);
 
-	// Enumerate output assignments admissible at the current step without
-	// advancing time. Implements
-	// "K_t = M_Φ.admissible_outputs(q_t)" via blocking-clause solver
-	// enumeration above `solve()`:
-	//   1. solve(step_spec) → assignment s_1; record.
-	//   2. block_1 = ∨_i ((s_1[var_i] ⊕ var_i) ≠ 0); conjunct.
-	//   3. solve(step_spec ∧ block_1) → s_2; record.
-	//   4. ... loop until UNSAT or max_results.
-	//
-	// For Mealy-synthesised specs, the strategy is already encoded into
-	// `step_spec` via `o__ltl_ms<i>__` aux bits (encode_mealy_as_safety),
-	// so a single uniform path covers both safety and Mealy cases.
-	//
-	// Caller: tau-neuro's per-token loop calls this ONCE per token to get
-	// the admissibility set, then constrained-argmax over it. The returned
-	// assignments are over OUTPUT stream variables; auxiliary state bits
-	// (`o__ltl_ms*`, `o__ltl_s*`) are filtered via `is_excluded_output`.
-	//
-	// IN-M2: for a part with several revision alternatives the constraint
-	// is the FIRST alternative that is solvable under the current memory
-	// -- the one step() would execute -- not the disjunction of all of
-	// them (which admitted outputs step() never emits).
-	//
-	// Non-const because lazy initialization of step_spec via
-	// `calculate_initial_spec()` may be required.
-	//
-	// The report carries every solve() call's diagnostics across the
-	// enumeration; an error means the solver failed, not that the
-	// admissibility set is exhausted -- the caller can tell those apart.
+	/// @brief Enumerate output assignments admissible at the current step
+	/// without advancing time.
+	///
+	/// Blocking-clause enumeration over `solve()`:
+	///   1. solve(step_spec) → assignment s_1; record.
+	///   2. block_1 = ∨_i ((s_1[var_i] ⊕ var_i) ≠ 0); conjunct.
+	///   3. solve(step_spec ∧ block_1) → s_2; record.
+	///   4. ... loop until UNSAT or max_results.
+	///
+	/// For Mealy-synthesised specs, the strategy is already encoded into
+	/// `step_spec` via `o__ltl_ms<i>__` aux bits (encode_mealy_as_safety),
+	/// so a single uniform path covers both safety and Mealy cases. The
+	/// returned assignments drop the outputs `is_excluded_output` names
+	/// (auxiliary state bits and internal outputs).
+	///
+	/// IN-M2: for a part with several revision alternatives the constraint
+	/// is the FIRST alternative that is solvable under the current memory
+	/// -- the one step() would execute -- not the disjunction of all of
+	/// them (which admitted outputs step() never emits).
+	///
+	/// Non-const because it may compute step_spec lazily
+	/// (`calculate_initial_spec()`).
+	/// @param max_results Maximum number of assignments to return.
+	/// @return The admissible assignments. The report carries every solve()
+	/// call's diagnostics; an error means the solver failed, not that the
+	/// admissibility set is exhausted.
 	result<std::vector<assignment<node>>>
 	admissible_outputs(size_t max_results = 1024);
 
-	// Read-only observability of an accumulator.
-	//
-	// Accumulators are bounded-type spec-language state variables (Bool,
-	// Int[l..h], Real([l,h], q), Phase, Set[T,M], List[T,M,ttl], Enum).
-	// Their update function f_a runs INSIDE the synthesised Mealy,
-	// expressed in the spec language's primitives; Python's role is
-	// read-only observability.
-	//
-	// Implementation: look up `name` (or `acc_<name>`) in `memory` at the
-	// most-recent committed time step, format the BA-element value via
-	// `serialize_constant`. The value is the serialised string, or empty
-	// if no accumulator with this name is found; the report carries any
-	// entry that matched the name but did not serialise.
+	/// @brief Read-only observability of an accumulator: a spec output
+	/// stream holding state the strategy updates.
+	///
+	/// Looks up `name` (then `acc_<name>`) in `memory` at the most recent
+	/// committed time step and formats its value via `serialize_constant`.
+	/// @param name Name of the output stream, with or without `acc_`.
+	/// @return The serialised value, or empty if no entry of that name is
+	/// found; an error when entries match but none serialises.
 	result<std::string> accumulator_state(const std::string& name) const;
 
-	// Whether the data game's strategy chooses this run's outputs. Its
-	// Mealy view, when it has one, is then `cached_solution`.
+	/// @brief Whether the data game's strategy chooses this run's outputs.
+	/// Its Mealy view, when it has one, is then `cached_solution`.
 	bool plays_data_game() const;
 
-	/// @brief Return `true` if @p var is excluded from output.
+	/// @brief Return `true` if @p var is an internal output a host never
+	/// sees: an auxiliary LTL state bit, a CTL* witness, a clause warm-up or
+	/// an `_e`/`_f` output. Input variables are never excluded.
 	static bool is_excluded_output(tref var);
 
 	// ── Mealy-strategy introspection (cached_solution-dependent) ─────────
 	//
 	// All four methods below return meaningful results only when the spec
-	// needed Mealy synthesis (general LTL with future operators). For
-	// pure-safety / pure-past-LTL specs, they return empty / no-op
-	// equivalents that document the absence of a strategy.
+	// needed Mealy synthesis (general LTL with future operators) and the
+	// strategy is not stale (strategy_stale). Otherwise they return empty /
+	// no-op equivalents that document the absence of a strategy.
 
-	// Emit the cached Mealy strategy as a Graphviz DOT graph. Useful for
-	// an operator audit of Approach A3.
-	// Returns "" when no Mealy was synthesised.
+	/// @brief The cached Mealy strategy as a Graphviz DOT graph, for an
+	/// operator audit; "" when no current strategy was synthesised.
 	std::string visualise_mealy_dot() const;
 
-	// Return the cached deterministic Mealy strategy automaton produced by
-	// ltlsynt at synthesis time (Approach A3). The HOA is already
-	// deterministic-strategy by construction. Returns an empty automaton
-	// (num_states == 0) when no Mealy was synthesised.
+	/// @brief The cached deterministic Mealy strategy automaton produced by
+	/// ltlsynt at synthesis time (already deterministic by construction).
+	/// @return The automaton, or an empty one (num_states == 0) when no
+	/// current strategy was synthesised.
 	hoa_automaton determinise() const;
 
-	// Extract up to `n` "boundary" traces — simple paths from the initial
-	// Mealy state, sorted by length (longest first). This approximates
-	// "extremal behaviour" (longest delay before eventually fires,
-	// minimum sequence between until antecedent and consequent) by
-	// returning the longest distinct paths through the strategy graph.
-	//
-	// Each trace is a sequence of state indices (length ≥ 1, starting
-	// at initial_state). Returns empty when no Mealy was synthesised.
+	/// @brief Extract up to @p n "boundary" traces: simple paths from the
+	/// initial Mealy state, longest first.
+	///
+	/// This approximates "extremal behaviour" (longest delay before
+	/// eventually fires, minimum sequence between until antecedent and
+	/// consequent) by returning the longest distinct paths through the
+	/// strategy graph. Every prefix of a path is a path too; ties are
+	/// ordered lexicographically by state.
+	/// @param n Maximum number of traces; <= 0 returns none.
+	/// @param max_length Maximum number of states per trace; <= 0 returns none.
+	/// @return Sequences of state indices (length ≥ 1, starting at
+	/// initial_state); empty when no current strategy was synthesised.
 	std::vector<std::vector<size_t>>
 	boundary_traces(int n, int max_length = 100) const;
 
-	// Cryptographic-approval commit for Approach A3 (operator-approved
-	// committed Mealy). Records the operator's approval hash on the
-	// interpreter; subsequent PWR / re-synthesis paths can check
-	// `committed_approval_hash` and refuse / fork as policy dictates.
-	//
-	// Caller is responsible for the approval hash's structure: SHA-256 of
-	// `(timestamp, operator_id, NL_spec, formula_with_atoms,
-	// boundary_trace_set, approach_choice, prev_hash)`. This method only
-	// persists the string.
+	/// @brief Record an operator's approval hash of the committed Mealy
+	/// strategy in `committed_approval_hash`.
+	///
+	/// Policy checks can read it and refuse or fork a later revision or
+	/// re-synthesis. The caller owns the hash's structure; this method only
+	/// stores the string.
+	/// @param approval_hash The approval hash to store.
 	void commit_realiser(const std::string& approval_hash);
 
-	// The committed approval hash (empty if no commit_realiser call has
-	// occurred). Public so downstream policy checks can read it.
+	/// The committed approval hash (empty if no commit_realiser call has
+	/// occurred). Public so downstream policy checks can read it.
 	std::string committed_approval_hash;
 
 	/**
@@ -481,40 +501,47 @@ struct interpreter {
 	/// multi-state Mealy initial-output part pushed by make_interpreter
 	/// has a representative-less entry in `original_spec` too (IN-N11).
 	std::vector<htrefs> ubt_ctn;
-	// Table mode only: atoms (input guards + witness templates) a table
-	// strategy may consult, seeded by make_table_interpreter and consulted
-	// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves
-	// empty on purpose -- see make_table_interpreter's doc comment). Kept
-	// separate from ubt_ctn so it never reaches calculate_initial_spec /
-	// get_ubt_ctn_at, whose QE machinery table mode is built to bypass.
+	/// Table mode only: atoms (input guards + witness templates) a table
+	/// strategy may consult, seeded by make_table_interpreter and consulted
+	/// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves
+	/// empty on purpose -- see make_table_interpreter's doc comment). Kept
+	/// separate from ubt_ctn so it never reaches calculate_initial_spec /
+	/// get_ubt_ctn_at, whose QE machinery table mode is built to bypass.
 	htrefs live_probe_atoms;
 	/// Partition of spec: per part the ordered alternative formulas with a
 	/// representative for its set of output streams.
 	std::vector<std::pair<htrefs, htref>> original_spec;
+	/// Committed stream values (inputs read and outputs chosen), keyed by
+	/// io var at a time point; pruned to what a future step can read.
 	assignment<node> memory;
+	/// The next step to execute.
 	int_t time_point = 0;
+	/// The input streams, per io var.
 	input_streams<node>     inputs;
+	/// The output streams, per io var.
 	output_streams<node>    outputs;
+	/// The I/O context the streams and the stream types come from.
 	io_context<node> ctx;
 
-	// Cached LTL synthesis solution from `ltl_to_safety_formula_full` if the
-	// spec needed Mealy synthesis (general LTL with future operators). Empty
-	// for pure-safety / pure-past-LTL specs that bypass `solve_ltl_aba`.
-	//
-	// When present, downstream code can:
-	//   - read sol.aut to introspect the Mealy strategy (states, edges),
-	//   - correlate the runtime Mealy state with the auxiliary one-hot bits
-	//     `o__ltl_ms<i>__` in `memory` (per `encode_mealy_as_safety`),
-	//   - emit DOT visualisations, extract boundary traces, etc. — without
-	//     re-running synthesis.
+	/// Cached LTL synthesis solution from `ltl_to_safety_formula_full` if the
+	/// spec needed Mealy synthesis (general LTL with future operators). Empty
+	/// for pure-safety / pure-past-LTL specs that bypass `solve_ltl_aba`.
+	///
+	/// When present, downstream code can:
+	///   - read sol.aut to introspect the Mealy strategy (states, edges),
+	///   - correlate the runtime Mealy state with the auxiliary one-hot bits
+	///     `o__ltl_ms<i>__` in `memory` (per `encode_mealy_as_safety`),
+	///   - emit DOT visualisations, extract boundary traces, etc. — without
+	///     re-running synthesis.
 	std::optional<ltl_aba_solution<node>> cached_solution;
+	/// Backs strategy_stale().
 	bool cached_solution_stale_ = false;
 
-	// LA-N3: auxiliary output names (`o__ltl_s<k>__`) of the inner /
-	// off-spine S operators from the pure-past compile-away, whose t=0
-	// anchor is not expressible in the safety formula itself. Set by
-	// make_interpreter from ltl_to_safety_formula_full's third result;
-	// consumed by seed_since_aux_bits() (make_interpreter and reset()).
+	/// LA-N3: auxiliary output names (`o__ltl_s<k>__`) of the inner /
+	/// off-spine S operators from the pure-past compile-away, whose t=0
+	/// anchor is not expressible in the safety formula itself. Set by
+	/// make_interpreter from ltl_to_safety_formula_full's third result;
+	/// consumed by seed_since_aux_bits() (make_interpreter and reset()).
 	std::vector<std::string> since_aux_anchor_;
 
 private:
@@ -531,20 +558,27 @@ private:
 	subtree_map<node, size_t> input_stream_sources;
 	subtree_map<node, size_t> output_stream_sources;
 
+	/// Order of the output streams in output_partition.
 	static bool stream_comp(tref s1, tref s2) {
 		return tau::subtree_less(s1, s2);
 	};
+	/// Groups the output streams that share a spec part.
 	union_find_with_sets<decltype(stream_comp), node> output_partition;
 	/// Per spec part, the alternatives' continuations at the current step.
 	std::vector<trefs> step_spec;
+	/// True once step_spec no longer changes with the time point.
 	bool final_system = false;
 	/// Time point step_spec was last (re)computed for; -1 means stale.
 	int_t step_spec_time_point_ = -1;
+	/// Time point the running formula is phrased at (time_point + lookback).
 	int_t formula_time_point = 0;
+	/// Highest fixed position (o[3]) the spec reads.
 	int_t highest_initial_pos = 0;
+	/// Largest backward shift (o[t-k]) the spec reads.
 	int_t lookback = 0;
 	/// Inputs the spec names at a fixed time position, by name and time.
 	std::set<std::pair<std::string, int_t>> fixed_inputs_;
+	/// Last step whose "Execution step" line was logged; -1 for none.
 	int_t announced_step_ = -1;
 
 	// Freshness ledger for step()'s warm-up direct-decode fallback;
@@ -553,6 +587,7 @@ private:
 
 	/// Solution source step() consults; set by make_interpreter/make_table_interpreter.
 	std::shared_ptr<step_provider<node>> provider_;
+	/// bintree<node>::M() after the last gc sweep.
 	size_t m_at_last_gc = 0;
 	/// The output map returned by the previous step(); pinned through the
 	/// next sweep so a host may still read it while feeding the next step
@@ -566,11 +601,12 @@ private:
 	/// sweep (collect_live_refs cannot see locals).
 	void maybe_gc(const assignment<node>* pin = nullptr);
 
-	/// Shared memory pre-population for auxiliary bv state bits (the Mealy
+	/// Shared memory pre-population for auxiliary state bits (the Mealy
 	/// one-hot bits and the LA-N3 inner-S anchors): for each (name → bit)
 	/// entry whose `name[t-1]` lookback occurs in `ubt_ctn`, emplace
-	/// memory[name[t = formula_time_point - 1]] := bv-{bit}. No-op when
-	/// `formula_time_point` is 0 (no lookback, nothing to seed).
+	/// memory[name[t = formula_time_point - 1]] := the Boolean carrier's
+	/// true (bit 1) or false (bit 0). No-op when `formula_time_point` is 0
+	/// (no lookback, nothing to seed) or @p bits is empty.
 	result<void> seed_aux_lookback_bits(const std::map<std::string, int>& bits);
 
 	/// @brief Everything update() needs to commit, computed without
@@ -625,6 +661,8 @@ private:
 
 	/// @brief Thin wrapper over the free solution_with_max_update,
 	/// supplying this interpreter's own time_point.
+	/// @param spec The formula to solve.
+	/// @return As the free solution_with_max_update.
 	result<assignment<node>> solution_with_max_update(tref spec);
 
 	/// @brief The running spec as step() executes it: per part its chosen
@@ -716,7 +754,8 @@ private:
 	/// spec was calculated.
 	result<bool> calculate_initial_spec();
 
-	/// @brief Build the input variable assignments required for step @p t.
+	/// @brief The input variables step @p t reads, and whether a tau-typed
+	/// `this` input stream is registered.
 	std::pair<trefs, bool> build_inputs_for_step(const int_t t);
 
 	/** @brief Return `true` if a tau-typed `this` input stream is registered. */
@@ -728,7 +767,8 @@ private:
 	result<tref> update_to_time_point(tref f, const int_t t);
 
 
-	/// @brief Return `true` if all memory accesses in @p io_vars are valid.
+	/// @brief Return `true` if every io var of @p io_vars at a fixed time
+	/// point below the current one has a value in `memory`.
 	bool is_memory_access_valid(const auto& io_vars) const;
 
 	/// @brief Compute and store the lookback and highest initial position.
@@ -739,7 +779,14 @@ private:
 	///        that was just completed, before it was advanced.
 	void prune_memory(int_t completed_time_point);
 
-	/// @brief Find an executable specification clause from DNF.
+	/// @brief The executable form (unbounded continuation) of a spec clause.
+	/// Solves the clause's uninterpreted constants and substitutes their
+	/// model into both the clause and the result.
+	/// @param clause The clause; rewritten in place with that model.
+	/// @param start_time Time point the clause starts at.
+	/// @return The executable formula; an error when @p clause is null,
+	/// reduces to false, reads a negative fixed position, or its
+	/// uninterpreted constants have no model.
 	static result<tref> get_executable_spec(tref& clause, const int_t start_time = 0);
 
 	/// @brief Recompute the executable continuations of a part's ordered
@@ -765,7 +812,10 @@ private:
 	result<std::optional<htrefs>> pointwise_revision(const htrefs& alts,
 		tref update, const int_t start_time, bool check_goals = true);
 
-	/// @brief Return those variables in @p vars that appear within the lookback.
+	/// @brief Return those variables in @p vars that still occur, after
+	/// substituting `memory` and simplifying, in a continuation at some time
+	/// point from the current one to `lookback` steps ahead (or in
+	/// live_probe_atoms in table mode). Computes step_spec if needed.
 	result<trefs> appear_within_lookback(const trefs& vars);
 
 	/// @brief Re-fold the per-clause `always` wrappers of one partition
@@ -800,7 +850,7 @@ private:
 	/// changed without diffing it.
 	size_t spec_revision() const { return spec_revision_; }
 
-	/// @brief Dump interpreter state to @p os.
+	/// @brief Dump interpreter state (spec, step spec, memory) to @p os.
 	std::ostream& dump(std::ostream& os) const;
 	/// @brief Dump interpreter state to a string.
 	std::string dump_to_str() const;
@@ -813,8 +863,9 @@ private:
 /**
  * @brief Unpack a typed Tau constant node to its value tree.
  * @tparam node Tree node type.
- * @param constant Typed constant node.
- * @return The inner value tree.
+ * @param constant Typed constant node, possibly wrapped.
+ * @return The formula the tau constant holds; nullptr when @p constant is
+ * not a BA constant.
  */
 template <NodeType node>
 tref unpack_tau_constant(tref constant);
@@ -826,7 +877,8 @@ tref unpack_tau_constant(tref constant);
  *
  * @tparam node Tree node type.
  * @param fm Formula to check.
- * @return `true` if a disallowed free variable (or undeclared stream) exists.
+ * @return `true` if a disallowed free variable (or undeclared stream) exists;
+ * the report names each one in an info message.
  */
 template <NodeType node>
 result<bool> has_free_vars(tref fm);
@@ -840,11 +892,23 @@ result<bool> has_free_vars(tref fm);
  * `interpreter::step` and other members use the memoized member of the
  * same name instead.
  * @tparam node Tree node type.
+ * @param f Formula whose io vars are relative to the time variable.
+ * @param t Time point to phrase @p f at.
+ * @return @p f at @p t; an error when an io var cannot be shifted.
  */
 template <NodeType node>
 result<tref> update_to_time_point(tref f, const int_t t);
 
-// Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point. A normalization failure yields false, not an error; the report carries why.
+/**
+ * @brief Ground @p atom_ref at @p formula_time_point against @p memory and
+ * return its truth.
+ *
+ * update_to_time_point, then rewriter::replace with @p memory, then
+ * normalize_non_temp: a step_provider's guard-evaluation counterpart to
+ * update_to_time_point.
+ * @return Whether the grounded atom normalizes to T; an error when it does
+ * not normalize, so "unknown" is never read as false.
+ */
 template <NodeType node>
 result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 	int_t formula_time_point);
@@ -855,6 +919,9 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
  * Free function: the only interpreter state it reads is the current
  * @p time_point, passed explicitly so a `step_provider` can call it too.
  * @tparam node Tree node type.
+ * @param spec The formula to solve.
+ * @param time_point The step whose update stream `u` is maximized.
+ * @return A solution of @p spec; an `unsat` error when it has none.
  */
 template <NodeType node>
 result<assignment<node>> solution_with_max_update(tref spec, int_t time_point);
@@ -862,13 +929,15 @@ result<assignment<node>> solution_with_max_update(tref spec, int_t time_point);
 /**
  * @brief Run a Tau specification for at most @p steps time steps.
  *
- * Builds an interpreter, then calls `step()` repeatedly until the spec is
- * exhausted, an error occurs, or @p steps steps have been executed.
+ * Clears the global definitions<node>, builds an interpreter with
+ * make_interpreter, then drives it with run_loop(@p steps).
  * @tparam node Tree node type.
- * @param form Normalized Tau formula.
+ * @param form Tau formula, as make_interpreter takes it.
  * @param ctx I/O context for stream I/O.
- * @param steps Maximum number of steps (0 = unlimited).
- * @return Interpreter after execution, or an error result if initialization failed.
+ * @param steps Maximum number of steps (0 = until input ends or the user
+ *        quits).
+ * @return Interpreter after execution, or an error if initialization or a
+ * step failed.
  */
 template <NodeType node>
 result<interpreter<node>> run(tref form,

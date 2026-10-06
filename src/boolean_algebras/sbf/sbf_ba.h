@@ -30,7 +30,10 @@ template <NodeType node> size_t sbf_type_id();
 using sbf_ba = hbdd<Bool>;
 
 /**
- * @brief global static bdd variable cache
+ * @brief Cache of the BDD of each sbf variable, keyed by its `var_dict` id.
+ *
+ * Filled by the sbf parser; a variable whose BDD was built on an exhausted
+ * node table is not cached.
  */
 inline static std::map<int_t, sbf_ba> var_cache{};
 
@@ -50,7 +53,16 @@ inline sbf_ba sbf_splitter_one() { return bdd_handle<Bool>::htrue->splitter(spli
 /** @brief Normalise an SBF element (identity — BDDs are already canonical). */
 inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 
-/** @brief Parse @p src as an SBF constant; the result reports why on failure. */
+/**
+ * @brief Parse @p src as an SBF constant.
+ *
+ * Results are cached per source string, except one built on an exhausted BDD
+ * node table. Initializes the BDD library if needed.
+ * @param src Source text of the constant; a text without an sbf expression
+ * yields the BDD `false`.
+ * @return The constant with the sbf type, or a `parse_error` (or an internal
+ * error for an unknown operator) in the report.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
@@ -62,7 +74,7 @@ inline bool is_sbf_zero(const sbf_ba& x) { return x->is_zero(); }
 
 } // namespace idni::tau_lang
 
-// Hash for hbdd as specialization of std::hash
+/// Hash of an sbf constant: the hash of its BDD handle.
 template<>
 struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
 	size_t operator()(const idni::tau_lang::hbdd<idni::tau_lang::Bool>& h)

@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // ω-categorical type enumeration for Algorithm D (direct parity-game
-// construction).  Standalone header with NO dependency on qlt.h — the
+// construction), the qlt LTL synthesis and the qlt semantic revision.  Standalone header with NO dependency on qlt.h — the
 // full qlt.h include chain pulls in hooks.tmpl.h which requires the
 // template-parameter context that only a full tau-lang TU sets up.  We
 // instead use plain std::pair<long long, long long> rationals here; the
@@ -14,6 +14,8 @@
 //   - enumerate_qlt_T1(constants)                  returns 2|Σ|+1 1-types.
 //   - qlt_type1::realize()                          concrete rational witness.
 //   - qlt_type_of(value, sorted_consts)            type of a value.
+//   - qlt_type2 / enumerate_qlt_T2(constants)      2-types (m, x).
+//   - qlt_type3 / enumerate_qlt_T3(constants)      3-types (m, x, y).
 
 #ifndef __IDNI__TAU__OMCAT_TYPES_H__
 #define __IDNI__TAU__OMCAT_TYPES_H__
@@ -36,6 +38,7 @@ namespace idni::tau_lang::omcat {
  * The constructor normalises the sign so that `q` is non-negative.
  */
 struct rational {
+	/// Numerator p and denominator q; q is never negative.
 	long long p = 0, q = 1;
 	rational() = default;
 	rational(long long p_, long long q_) : p(p_), q(q_) {
@@ -77,7 +80,9 @@ inline int cmp(const rational& a, const rational& b) {
  * Total: 2k+1 types.
  */
 struct qlt_type1 {
+	/// Encoded position, in 0..2k.
 	int pos = 0;
+	/// The named constants, sorted and deduplicated.
 	std::vector<rational> constants;
 
 	/// @brief True iff the type is a point x = c_i (odd position).
@@ -91,14 +96,15 @@ struct qlt_type1 {
 
 	/// @brief True iff every x of this type satisfies x < c_j.
 	/// Interval pos=2i spans (c_{i-1}, c_i) (with c_{-1}=-∞, c_k=+∞).
-	/// Point pos=2i+1 is x = c_i.  Ordering against the named constant c_j:
+	/// Point pos=2i+1 is x = c_i.
+	/// @param j index of the named constant, 0 <= j < k.
 	bool less_than(int j) const {
 		const int hp = pos >> 1;
 		return is_point() ? hp < j : hp <= j;
 	}
-	/// @brief True iff this type is the point x = c_j.
+	/// @brief True iff this type is the point x = c_j (@p j a constant index).
 	bool equal_to(int j) const { return is_point() && (pos >> 1) == j; }
-	/// @brief True iff every x of this type satisfies x > c_j.
+	/// @brief True iff every x of this type satisfies x > c_j (@p j a constant index).
 	bool greater_than(int j) const {
 		const int hp = pos >> 1;
 		// interval (c_{i-1}, c_i): x > c_j iff i-1 >= j, equivalently i > j.
@@ -114,6 +120,7 @@ struct qlt_type1 {
 	 * witness mis-orders T2/T3 enumeration).  The interior witness is the
 	 * MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for
 	 * positive denominators and never needs a product at all.
+	 * @pre pos lies in 0..2k.
 	 * @return The constant itself for a point type; c_0 - 1, c_{k-1} + 1
 	 * or the mediant of the two bounding constants for an interval, and 0
 	 * when there are no constants at all.
@@ -216,9 +223,13 @@ enum class relation : uint8_t { LT = 0, EQ = 1, GT = 2 };
  * (memory, input) at a single time step.
  */
 struct qlt_type2 {
+	/// 1-type position of m.
 	int pos_m = 0;
+	/// 1-type position of x.
 	int pos_x = 0;
+	/// Order of m against x.
 	relation rel = relation::LT;
+	/// The named constants, sorted and deduplicated.
 	std::vector<rational> constants;
 
 	/// @brief Restriction onto the m-component: just the 1-type of m.
@@ -243,8 +254,8 @@ struct qlt_type2 {
  * Not every (pos_m, pos_x, rel) is admissible: if m's 1-type and x's
  * 1-type already fix their relative order (e.g., m = c_0 and x = c_1 with
  * c_0 < c_1 implies rel must be LT), we emit only the consistent triples.
- * @param constants Named constants.
- * @return The admissible 2-types.
+ * @param constants Named constants (any order, duplicates allowed).
+ * @return The admissible 2-types, ordered by (pos_m, pos_x, rel).
  */
 inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
@@ -320,8 +331,11 @@ inline bool rel3_consistent(relation r_mx, relation r_xy, relation r_my) {
 
 /// @brief 3-type of (memory m, input x, output y) over (Q, <, Sigma).
 struct qlt_type3 {
+	/// 1-type positions of m, x and y.
 	int pos_m = 0, pos_x = 0, pos_y = 0;
+	/// Pairwise order of m, x and y.
 	relation rel_mx = relation::LT, rel_my = relation::LT, rel_xy = relation::LT;
+	/// The named constants, sorted and deduplicated.
 	std::vector<rational> constants;
 
 	/// @brief The 1-type of m.
@@ -336,7 +350,8 @@ struct qlt_type3 {
  * @brief Enumerate all 3-types for (Q, <) with the given named constants.
  *
  * Filters the T_1^3 product by forced-relation consistency and transitivity.
- * @param constants Named constants.
+ * The count grows cubically in the number of constants.
+ * @param constants Named constants (any order, duplicates allowed).
  * @return The admissible 3-types.
  */
 inline std::vector<qlt_type3> enumerate_qlt_T3(const std::vector<rational>& constants) {

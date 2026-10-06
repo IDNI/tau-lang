@@ -43,6 +43,13 @@ struct hoa_automaton {
 // already be visible wherever this header is included -- tau_diagnostics.h
 // is safe to include ahead of this file (it reaches nothing beyond the
 // standard library itself), unlike normalizer.h.
+/**
+ * @brief Parse the HOA text of a strategy automaton printed by Spot.
+ * @param hoa_text the HOA output of `ltlsynt` or `autfilt`
+ * @return the automaton, or a `parse_error` in the report when the text is
+ * not a HOA automaton or its state count is malformed or above
+ * `ltl_hoa_max_states()` (0 means unlimited).
+ */
 result<hoa_automaton> parse_hoa(const std::string& hoa_text);
 
 /** @brief Defined in ltl_aba_normalization.tmpl.h; incomplete is enough here. */

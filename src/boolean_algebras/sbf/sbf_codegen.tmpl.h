@@ -46,6 +46,7 @@ inline std::string sbf_literal_expr(const std::string& name, bool negated) {
 // disjunction. Clause and literal order are sorted by variable name (never by
 // the numeric BDD ids this process happened to assign), so the same logical
 // constant always emits the same text regardless of parse/interning order.
+// Errors when a literal's variable id has no name in var_dict.
 template <NodeType node>
 inline result<std::string> sbf_value_expr(const sbf_ba& v) {
 	result<std::string> r;
@@ -86,7 +87,8 @@ inline result<std::string> sbf_value_expr(const sbf_ba& v) {
 
 // A self-contained C++ expression of type tref: an IIFE that rebuilds the
 // exact sbf BDD via sbf_value_expr and registers it through the BA's own
-// constant pool, mirroring qlt_witness_expr / bv_witness_expr.
+// constant pool, mirroring qlt_witness_expr / bv_witness_expr. Carries the
+// error of sbf_value_expr.
 template <NodeType node>
 inline result<std::string> sbf_constant_expr(const sbf_ba& v) {
 	result<std::string> r;
@@ -108,7 +110,8 @@ inline result<std::string> sbf_constant_expr(const sbf_ba& v) {
 }
 
 // The codegen_constant_expr capability: @p cst is already a trimmed, known
-// sbf BDD value, so this only extracts and spells it.
+// sbf BDD value, so this only extracts and spells it. Returns nullopt when
+// @p cst is not a BA constant or its expression cannot be built.
 template <NodeType node>
 static std::optional<std::string> sbf_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;

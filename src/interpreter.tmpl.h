@@ -31,7 +31,7 @@ inline size_t stream_pos(int_t t) {
 	return static_cast<size_t>(t);
 }
 
-// `adt_tuple_reader`/`adt_tuple_writer` (io_context.h, Task 7) take sole
+// `adt_tuple_reader`/`adt_tuple_writer` (io_context.h) take sole
 // ownership of their physical stream through a `unique_ptr` constructor
 // parameter, because they hold onto it for the whole group's lifetime and
 // nothing else may reach the same object through a second handle. Two of
@@ -78,6 +78,7 @@ struct adt_shared_physical_output_stream : serialized_constant_output_stream {
 	}
 };
 
+/** @internal @copydoc find_repl_pending_input @endinternal */
 template <NodeType node>
 std::shared_ptr<repl_pending_input_stream> find_repl_pending_input(
 	const std::shared_ptr<serialized_constant_input_stream>& stream)
@@ -100,6 +101,7 @@ std::shared_ptr<repl_pending_input_stream> find_repl_pending_input(
 	return nullptr;
 }
 
+/** @internal @copydoc interpreter::read @endinternal */
 template <NodeType node>
 result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read(
 	const trefs& in_vars, int_t time_step)
@@ -204,6 +206,7 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 	return r.with_assert_check_value(read_result{ value, false });
 }
 
+/** @internal @copydoc interpreter::write @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	result<bool> r;
@@ -292,6 +295,7 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc interpreter::rebuild_inputs @endinternal */
 template<NodeType node>
 result<bool> interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
@@ -320,6 +324,7 @@ result<bool> interpreter<node>::rebuild_inputs(
 	return r.with_value(true);
 }
 
+/** @internal @copydoc interpreter::build_inputs @endinternal */
 template<NodeType node>
 result<bool> interpreter<node>::build_inputs(
 	const subtree_map<node, size_t>& current_inputs,
@@ -482,6 +487,7 @@ result<bool> interpreter<node>::build_inputs(
 	return r.with_value(true);
 }
 
+/** @internal @copydoc interpreter::rebuild_outputs @endinternal */
 template<NodeType node>
 result<bool> interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
@@ -510,6 +516,7 @@ result<bool> interpreter<node>::rebuild_outputs(
 	return r.with_value(true);
 }
 
+/** @internal @copydoc interpreter::build_outputs @endinternal */
 template<NodeType node>
 result<bool> interpreter<node>::build_outputs(
 	const subtree_map<node, size_t>& current_outputs,
@@ -644,6 +651,7 @@ result<bool> interpreter<node>::build_outputs(
 // interpreter
 
 
+/** @internal @copydoc interpreter::interpreter @endinternal */
 template <NodeType node>
 interpreter<node>::interpreter(
 	std::vector<htrefs>& ubt_ctn, auto& original_spec, auto& output_partition,
@@ -676,6 +684,7 @@ static bool reads_fixed_step_in_temporal_part(tref fm) {
 	return false;
 }
 
+/** @internal @copydoc interpreter::make_interpreter @endinternal */
 template <NodeType node>
 result<interpreter<node>>
 	interpreter<node>::make_interpreter(tref spec,
@@ -1048,6 +1057,7 @@ post_normalization:
 	return r.with_assert_check_error(code::unsat, "Tau specification is unsat");
 }
 
+/** @internal @copydoc interpreter::make_table_interpreter @endinternal */
 template <NodeType node>
 result<interpreter<node>>
 	interpreter<node>::make_table_interpreter(
@@ -1092,6 +1102,7 @@ result<interpreter<node>>
 	return r.with_value(std::move(i));
 }
 
+/** @internal @copydoc interpreter::create_spec_partition @endinternal */
 template <NodeType node>
 std::vector<std::pair<htref, htref>>
 interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
@@ -1158,10 +1169,6 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 	return partition;
 }
 
-// The semantic formula of a partitioned spec under I1: the conjunction over
-// parts of the disjunction of each part's ordered alternatives. Only used
-// for the packed `this` stream, telemetry and semantic checks -- never
-// stored, so the alternatives themselves keep growing additively.
 // Disjunction of a part's ordered alternatives -- the part's semantic formula.
 template <NodeType node>
 static tref part_alts_fm(const htrefs& alts) {
@@ -1172,6 +1179,10 @@ static tref part_alts_fm(const htrefs& alts) {
 	return tau::build_wff_or(fms);
 }
 
+// The semantic formula of a partitioned spec under I1: the conjunction over
+// parts of the disjunction of each part's ordered alternatives. Only used
+// for the packed `this` stream, telemetry and semantic checks -- never
+// stored, so the alternatives themselves keep growing additively.
 template <NodeType node>
 static tref combined_spec_fm(
 	const std::vector<std::pair<htrefs, htref>>& parts)
@@ -1194,12 +1205,14 @@ tref interpreter<node>::spec_partition_fm(
 	return unsqueeze_always(combined_spec_fm<node>(parts));
 }
 
+/** @internal @copydoc interpreter::current_spec_fm @endinternal */
 template <NodeType node>
 tref interpreter<node>::current_spec_fm() const {
 	return spec_partition_fm(original_spec);
 }
 
-// LTL state-variable names: Mealy "o__ltl_ms<i>__", S-operator "o__ltl_s<i>__".
+// True for an LTL state-variable name: Mealy "o__ltl_ms<i>__", S-operator
+// "o__ltl_s<i>__" or step-counter "o__ltl_ctr...".
 template <NodeType node>
 static bool is_ltl_state_var_name(const std::string& name) {
 	return (name.size() > 9 && name.compare(0, 9, "o__ltl_ms") == 0)
@@ -1238,6 +1251,11 @@ static bool mentions_ltl_state_var(tref part) {
  * top-level `o = c` holds in every solution, so the result is equivalent
  * and its solutions, extended by @p propagated (bf(o) -> bf(c)), are exactly
  * the original ones. Returns @p part_at_t unchanged when the switch is off.
+ * @param part_at_t Step formula, phrased at the step's time point.
+ * @param propagated Out: receives each substituted bf(o) -> bf(c).
+ * @return The propagated formula (a round that does not normalize stops the
+ * rounds, demoted in the report); an error when a constant does not
+ * normalize or the simplification fails.
  */
 template <NodeType node>
 result<tref> propagate_step_definitions(tref part_at_t,
@@ -1646,6 +1664,7 @@ result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
  */
 template <NodeType node>
 struct data_game_step_provider : step_provider<node> {
+	// The strategy played.
 	std::shared_ptr<data_game_strategy<node>> strategy;
 	// The spec the strategy was solved for, its fixed steps absolute; a
 	// revision revises it.
@@ -1654,6 +1673,7 @@ struct data_game_step_provider : step_provider<node> {
 	// the game from the step it is made at.
 	int_t offset = 0;
 
+	// Plays `s`, solved for `fm` from the absolute step `start`.
 	explicit data_game_step_provider(
 		std::shared_ptr<data_game_strategy<node>> s, tref fm = nullptr,
 		int_t start = 0)
@@ -1785,14 +1805,15 @@ struct data_game_step_provider : step_provider<node> {
 	}
 };
 
+/** @internal @copydoc interpreter::plays_data_game @endinternal */
 template <NodeType node>
 bool interpreter<node>::plays_data_game() const {
 	return std::dynamic_pointer_cast<data_game_step_provider<node>>(
 		provider_) != nullptr;
 }
 
-// Prototype (minterm_solving_rework, "Lever B"): canonicalize a step's
-// committed witness value once, at commit time, so later steps' lookback
+// Canonicalize a step's committed witness value once, at commit time
+// (normalize_ba), so later steps' lookback
 // references decide/normalize a smaller equivalent tau constant instead of
 // one that grows a little more with every step it passes through. Only
 // tau-typed ba_constant values are touched -- everything else, and a tau
@@ -1893,6 +1914,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_missing(
 	return r.with_value(std::move(sol));
 }
 
+/** @internal @copydoc interpreter::step(const assignment<node>&) @endinternal */
 template <NodeType node>
 result<typename interpreter<node>::step_result>
 interpreter<node>::step(const assignment<node>& values)
@@ -2223,6 +2245,7 @@ interpreter<node>::step(const assignment<node>& values)
 	return r.with_assert_check_value(step_result{ global, auto_continue });
 }
 
+/** @internal @copydoc interpreter::step() @endinternal */
 template <NodeType node>
 result<typename interpreter<node>::step_result>
 interpreter<node>::step()
@@ -2276,6 +2299,7 @@ interpreter<node>::step()
 	return r;
 }
 
+/** @internal @copydoc interpreter::prune_memory @endinternal */
 template <NodeType node>
 void interpreter<node>::prune_memory(int_t completed_time_point) {
 	// Once calculate_initial_spec() reaches final_system, step_spec is
@@ -2321,6 +2345,7 @@ void interpreter<node>::prune_memory(int_t completed_time_point) {
 	});
 }
 
+/** @internal @copydoc interpreter::collect_live_refs @endinternal */
 template <NodeType node>
 void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const {
 	// ubt_ctn, original_spec, and ctx.{types,inputs,outputs} hold htrefs
@@ -2344,6 +2369,7 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 	output_partition.collect_live_refs(keep);
 }
 
+/** @internal @copydoc interpreter::maybe_gc @endinternal */
 template <NodeType node>
 void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	const size_t m_pre = tau::m_size();
@@ -2421,6 +2447,7 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		<< " step=" << time_point;
 }
 
+/** @internal @copydoc interpreter::get_ubt_ctn_at @endinternal */
 template <NodeType node>
 result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	result<std::vector<trefs>> r;
@@ -2501,6 +2528,7 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	return r.with_assert_check_value(std::move(upd_ubt_ctn));
 }
 
+/** @internal @copydoc interpreter::calculate_initial_spec @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::calculate_initial_spec() {
 	result<bool> r;
@@ -2543,6 +2571,7 @@ result<bool> interpreter<node>::calculate_initial_spec() {
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc interpreter::has_this_input_stream @endinternal */
 template <NodeType node>
 bool interpreter<node>::has_this_input_stream() const {
 	for (const auto& [var, _] : inputs)
@@ -2553,6 +2582,7 @@ bool interpreter<node>::has_this_input_stream() const {
 	return false;
 }
 
+/** @internal @copydoc interpreter::build_inputs_for_step @endinternal */
 template <NodeType node>
 std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 	const int_t t)
@@ -2580,6 +2610,7 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 	return { step_inputs, has_this_stream };
 }
 
+/** @internal @copydoc interpreter::update_to_time_point @endinternal */
 template <NodeType node>
 result<tref> interpreter<node>::update_to_time_point(
 	tref f, const int_t t) {
@@ -2617,6 +2648,7 @@ result<tref> update_to_time_point(tref f, const int_t t) {
 	return r.with_value(updated);
 }
 
+/** @internal @copydoc evaluate_atom @endinternal */
 template <NodeType node>
 result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 	int_t formula_time_point)
@@ -2639,6 +2671,7 @@ result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 	return r.with_assert_check_value(is_t);
 }
 
+/** @internal @copydoc interpreter::is_memory_access_valid @endinternal */
 template <NodeType node>
 bool interpreter<node>::is_memory_access_valid(const auto& io_vars) const
 {
@@ -2653,6 +2686,7 @@ bool interpreter<node>::is_memory_access_valid(const auto& io_vars) const
 	return true;
 }
 
+/** @internal @copydoc interpreter::compute_lookback_and_initial @endinternal */
 template <NodeType node>
 void interpreter<node>::compute_lookback_and_initial() {
 	trefs io_vars;
@@ -2675,6 +2709,7 @@ void interpreter<node>::compute_lookback_and_initial() {
 				get_io_time_point<node>(v));
 }
 
+/** @internal @copydoc interpreter::get_executable_spec @endinternal */
 template <NodeType node>
 result<tref> interpreter<node>::get_executable_spec(
 	tref& clause, const int_t start_time)
@@ -2742,6 +2777,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	return r.with_assert_check_value(executable);
 }
 
+/** @internal @copydoc interpreter::compute_part_continuations @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 	const int_t start_time)
@@ -2877,6 +2913,7 @@ static bool pwr_contains_arith_content(tref f) {
 	}) != nullptr;
 }
 
+/** @internal @copydoc interpreter::plan_update @endinternal */
 template <NodeType node>
 result<typename interpreter<node>::update_plan>
 	interpreter<node>::plan_update(tref update)
@@ -3234,6 +3271,7 @@ result<typename interpreter<node>::update_plan>
 	return r;
 }
 
+/** @internal @copydoc interpreter::plan_data_game_update @endinternal */
 template <NodeType node>
 result<typename interpreter<node>::update_plan>
 	interpreter<node>::plan_data_game_update(tref update)
@@ -3476,6 +3514,7 @@ result<typename interpreter<node>::update_plan>
 	return r;
 }
 
+/** @internal @copydoc interpreter::update @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
@@ -3529,6 +3568,7 @@ result<bool> interpreter<node>::update(tref update) {
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc interpreter::can_extend @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::can_extend(tref psi) {
 	// Dry-run update(): plan_update leaves the interpreter unchanged by
@@ -3544,6 +3584,7 @@ result<bool> interpreter<node>::can_extend(tref psi) {
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc interpreter::pointwise_revision @endinternal */
 template <NodeType node>
 result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 	const htrefs& alts_in, tref update, const int_t start_time,
@@ -3928,6 +3969,7 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 	return r.with_assert_check_value(std::nullopt);
 }
 
+/** @internal @copydoc interpreter::finalize_alternatives @endinternal */
 template <NodeType node>
 result<htrefs> interpreter<node>::finalize_alternatives(const trefs& alts) {
 	result<htrefs> r;
@@ -3964,6 +4006,7 @@ result<htrefs> interpreter<node>::finalize_alternatives(const trefs& alts) {
 
 // ── current_spec ──────────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::current_spec @endinternal */
 template <NodeType node>
 std::string interpreter<node>::current_spec() const {
 	// The running spec is the conjunction of all spec partition entries,
@@ -3978,6 +4021,7 @@ std::string interpreter<node>::current_spec() const {
 	return TAU_TO_STR(combined);
 }
 
+/** @internal @copydoc interpreter::first_solvable_alternative @endinternal */
 template <NodeType node>
 result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 	size_t part)
@@ -4040,6 +4084,7 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 		"current memory");
 }
 
+/** @internal @copydoc interpreter::executed_spec_fm @endinternal */
 template <NodeType node>
 result<tref> interpreter<node>::executed_spec_fm(bool use_memory) {
 	result<tref> r;
@@ -4091,6 +4136,7 @@ tref interpreter<node>::chosen_spec_fm() const {
 
 // ── reset ─────────────────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::reset @endinternal */
 template <NodeType node>
 result<void> interpreter<node>::reset() {
 	// Clear the execution snapshot; preserve spec / streams / cached_solution.
@@ -4117,6 +4163,7 @@ result<void> interpreter<node>::reset() {
 	return seed_since_aux_bits();
 }
 
+/** @internal @copydoc interpreter::seed_aux_lookback_bits @endinternal */
 template <NodeType node>
 result<void> interpreter<node>::seed_aux_lookback_bits(
 	const std::map<std::string, int>& bits)
@@ -4186,6 +4233,7 @@ result<void> interpreter<node>::seed_aux_lookback_bits(
 	return r.with_assert_check_value();
 }
 
+/** @internal @copydoc interpreter::seed_since_aux_bits @endinternal */
 template <NodeType node>
 result<void> interpreter<node>::seed_since_aux_bits() {
 	// LA-N3: every inner (off-spine) S auxiliary is anchored to 0 at the
@@ -4200,6 +4248,7 @@ result<void> interpreter<node>::seed_since_aux_bits() {
 
 // ── current_state ─────────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::current_state @endinternal */
 template <NodeType node>
 result<size_t> interpreter<node>::current_state() const {
 	result<size_t> r;
@@ -4272,6 +4321,7 @@ result<size_t> interpreter<node>::current_state() const {
 
 // ── admissible_outputs ────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::admissible_outputs @endinternal */
 template <NodeType node>
 result<std::vector<assignment<node>>>
 interpreter<node>::admissible_outputs(size_t max_results)
@@ -4418,6 +4468,7 @@ interpreter<node>::admissible_outputs(size_t max_results)
 
 // ── accumulator_state ─────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::accumulator_state @endinternal */
 template <NodeType node>
 result<std::string> interpreter<node>::accumulator_state(const std::string& name) const
 {
@@ -4481,6 +4532,7 @@ result<std::string> interpreter<node>::accumulator_state(const std::string& name
 
 // ── visualise_mealy_dot ───────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::visualise_mealy_dot @endinternal */
 template <NodeType node>
 std::string interpreter<node>::visualise_mealy_dot() const {
 	if (!cached_solution.has_value() || cached_solution_stale_) return "";
@@ -4532,6 +4584,7 @@ std::string interpreter<node>::visualise_mealy_dot() const {
 
 // ── determinise ───────────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::determinise @endinternal */
 template <NodeType node>
 hoa_automaton interpreter<node>::determinise() const {
 	if (!cached_solution.has_value() || cached_solution_stale_)
@@ -4541,6 +4594,7 @@ hoa_automaton interpreter<node>::determinise() const {
 
 // ── boundary_traces ───────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::boundary_traces @endinternal */
 template <NodeType node>
 std::vector<std::vector<size_t>>
 interpreter<node>::boundary_traces(int n, int max_length) const {
@@ -4602,13 +4656,15 @@ interpreter<node>::boundary_traces(int n, int max_length) const {
 
 // ── commit_realiser ───────────────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::commit_realiser @endinternal */
 template <NodeType node>
 void interpreter<node>::commit_realiser(const std::string& approval_hash) {
 	committed_approval_hash = approval_hash;
 }
 
-// ── can_extend ────────────────────────────────────────────────────────────────
+// ── solution_with_max_update ──────────────────────────────────────────────────
 
+/** @internal @copydoc interpreter::solution_with_max_update @endinternal */
 template <NodeType node>
 result<assignment<node>> interpreter<node>::solution_with_max_update(
 	tref spec)
@@ -4619,6 +4675,7 @@ result<assignment<node>> interpreter<node>::solution_with_max_update(
 	return ::idni::tau_lang::solution_with_max_update<node>(spec, time_point);
 }
 
+/** @internal @copydoc solution_with_max_update(tref, int_t) @endinternal */
 template <NodeType node>
 result<assignment<node>> solution_with_max_update(tref spec, int_t time_point)
 {
@@ -4692,6 +4749,7 @@ result<assignment<node>> solution_with_max_update(tref spec, int_t time_point)
 	return r;
 }
 
+/** @internal @copydoc interpreter::is_excluded_output @endinternal */
 template <NodeType node>
 bool interpreter<node>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
@@ -4713,6 +4771,7 @@ bool interpreter<node>::is_excluded_output(tref var) {
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }
 
+/** @internal @copydoc interpreter::appear_within_lookback @endinternal */
 template <NodeType node>
 result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 	result<trefs> r;
@@ -4779,6 +4838,7 @@ result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 	return r.with_value(appeared);
 }
 
+/** @internal @copydoc interpreter::unsqueeze_always @endinternal */
 template <NodeType node>
 tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 	// Squeeze always statements again
@@ -4808,6 +4868,7 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 		tau::build_wff_and(clauses));
 }
 
+/** @internal @copydoc unpack_tau_constant @endinternal */
 template <NodeType node>
 tref unpack_tau_constant(tref constant) {
 	using tau = tree<node>;
@@ -4857,7 +4918,7 @@ void warn_if_update_dropped(interpreter<node>& i,
 	}
 }
 
-// returns true if there is a free variable in formula fm
+/** @internal @copydoc has_free_vars @endinternal */
 template <NodeType node>
 result<bool> has_free_vars(tref fm) {
 	result<bool> r;
@@ -4883,6 +4944,7 @@ result<bool> has_free_vars(tref fm) {
 	return r.with_value(found);
 }
 
+/** @internal @copydoc run @endinternal */
 template <NodeType node>
 result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	const size_t steps)
@@ -4906,6 +4968,7 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	return r.with_assert_check_value(std::move(intrprtr));
 }
 
+/** @internal @copydoc interpreter::run_loop @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 	const std::function<void(bool)>& idle_hook)
@@ -5001,6 +5064,7 @@ result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 	return r.with_assert_check_value(true);
 }
 
+/** @internal @copydoc interpreter::collect_input_streams(tref, subtree_map<node, size_t>&) @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::collect_input_streams(tref dnf,
 	subtree_map<node, size_t>& current_inputs)
@@ -5039,6 +5103,7 @@ result<bool> interpreter<node>::collect_input_streams(tref dnf,
 	return r.with_value(true);
 }
 
+/** @internal @copydoc interpreter::collect_input_streams(tref) @endinternal */
 template<NodeType node>
 result<subtree_map<node, size_t>>
 	interpreter<node>::collect_input_streams(tref dnf) {
@@ -5050,6 +5115,7 @@ result<subtree_map<node, size_t>>
 	return r.with_value(std::move(current_inputs));
 }
 
+/** @internal @copydoc interpreter::collect_output_streams(tref, subtree_map<node, size_t>&) @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::collect_output_streams(tref dnf,
 	subtree_map<node, size_t>& current_outputs)
@@ -5100,6 +5166,7 @@ result<bool> interpreter<node>::collect_output_streams(tref dnf,
 	return r.with_value(true);
 }
 
+/** @internal @copydoc interpreter::collect_output_streams(tref) @endinternal */
 template<NodeType node>
 result<subtree_map<node, size_t>>
 	interpreter<node>::collect_output_streams(tref dnf) {
@@ -5111,6 +5178,7 @@ result<subtree_map<node, size_t>>
 	return r.with_value(std::move(current_outputs));
 }
 
+/** @internal @copydoc interpreter::dump @endinternal */
 template <NodeType node>
 std::ostream& interpreter<node>::dump(std::ostream& os) const {
 	os << "\n" << TC.GREEN() << "=== Interpreter ===" << TC.CLEAR() << "\n";
@@ -5140,6 +5208,7 @@ std::ostream& interpreter<node>::dump(std::ostream& os) const {
 	return os << "\n";
 }
 
+/** @internal @copydoc interpreter::dump_to_str @endinternal */
 template <NodeType node>
 std::string interpreter<node>::dump_to_str() const {
 	std::stringstream ss;

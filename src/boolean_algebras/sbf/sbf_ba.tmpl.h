@@ -11,7 +11,9 @@ namespace idni::tau_lang {
 
 using namespace idni;
 
-// evaluates a parsed bdd terminal node recursively
+// Returns the BDD of the sbf expression whose wrapper node is t (its only child
+// is the operator or leaf); an error for an unrecognized binary operator.
+// Caches each variable in var_cache.
 inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
 	using type = sbf_parser::nonterminal;
@@ -78,6 +80,7 @@ inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	}
 }
 
+/** @internal @copydoc parse_sbf @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<BAs...>::constant_with_type> parse_sbf(

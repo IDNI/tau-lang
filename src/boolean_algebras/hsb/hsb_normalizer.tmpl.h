@@ -15,7 +15,8 @@ namespace idni::tau_lang {
 
 namespace detail {
 
-/// Clone the formula tree, normalizing every halfspace leaf (post_order).
+/// Returns @p root with every halfspace leaf replaced by its normalize()d form
+/// (highest-indexed coefficient ±1); unchanged leaves keep their node.
 inline tref normalize_all_leaves(tref root) {
 	auto f = [](tref n) -> tref {
 		auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
@@ -36,7 +37,8 @@ struct boundary {
 	bool upper = true;      ///< true = upper bound (h.w[i]>0), false = lower bound
 };
 
-/// Build the boundary for halfspace @p h at variable @p i (|h.w[i]| must equal 1).
+/// Build the boundary for halfspace @p h at variable @p i, solving h for x[i].
+/// @pre h is normalized with |h.w[i]| = 1 and no non-zero coefficient above i.
 inline boundary make_boundary(const hsb_halfspace& h, size_t i) {
 	boundary bd;
 	bd.bw.assign(i, 0.0);
@@ -76,7 +78,9 @@ inline bool boundary_eq(const boundary& a, const boundary& b_) {
 	return hsb_detail::feq(a.bb, b_.bb);
 }
 
-/// Build the linear_constraint encoding an interval bound on x[i].
+/// Build the linear_constraint encoding a bound of x[i] by @p bd in @p dim
+/// dimensions: x[i] <= B when @p upper, else the strict x[i] > B. The flag
+/// @p upper overrides bd.upper.
 inline linear_constraint make_interval_constraint(
 	const boundary& bd, size_t i, size_t dim, bool upper)
 {
@@ -95,7 +99,9 @@ inline linear_constraint make_interval_constraint(
 	return lc;
 }
 
-/// Reconstruct an hsb value from a list of clauses (each = conjunction of linear_constraints).
+/// Reconstruct an hsb value from a list of clauses (each = conjunction of
+/// linear_constraints), padding each weight vector to @p dim. No clause gives
+/// bottom; an empty clause gives top.
 inline hsb reconstruct_hsb(
 	const std::vector<std::vector<linear_constraint>>& clauses, size_t dim)
 {
@@ -115,7 +121,14 @@ inline hsb reconstruct_hsb(
 	return result;
 }
 
-/// Core recursive canonical decomposition over the DNF.
+/// Core recursive canonical decomposition over the DNF of normalized halfspaces.
+/// Slices x[var_idx] into the intervals between its sorted boundaries, keeps
+/// the conjuncts each interval satisfies, and recurses on var_idx - 1.
+/// @param dnf disjunction of conjunctions of normalized halfspaces
+/// @param var_idx index of the variable to slice; below 0 the path is complete
+/// @param dim number of dimensions
+/// @param path in/out: the interval constraints chosen so far; restored on return
+/// @param out receives each LRA-feasible complete path as one clause
 inline void decompose(
 	const std::vector<std::vector<hsb_halfspace>>& dnf,
 	int var_idx,
@@ -223,6 +236,10 @@ inline void decompose(
 /**
  * @brief Canonical decomposition of @p x into a unique disjunction of
  *        disjoint convex polyhedra (lex-half-open intervals, d dimensions).
+ * @param x the value to normalize
+ * @return bottom or top when @p x is empty or full, @p x itself when it
+ * mentions no variable, else the reconstructed decomposition. Each cell is
+ * checked for feasibility through the LRA solver.
  */
 inline hsb normalize_hsb(const hsb& x) {
 	auto k = x.root_kind();
