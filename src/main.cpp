@@ -46,15 +46,7 @@ using tau_api = api<node_t>;
 /// of the configured pack is added as `--<family>-<option>`.
 /// @return The options, keyed by long name.
 cli::options tau_options() {
-	cli::options opts;
-	opts["help"] = cli::option("help", 'h', false)
-		.set_description("detailed information about options");
-	opts["version"] = cli::option("version", 'v', false)
-		.set_description("show the current Tau executable version");
-	opts["license"] = cli::option("license", 'l', false)
-		.set_description("show license for Tau");
-	opts["charvar"] = cli::option("charvar", 'V', true)
-		.set_description("charvar (enabled by default)");
+	cli::options opts = tau_cli_options(cli_option_set::full);
 	// The default is the library's `preprocessing` global: a value of the
 	// CLI's own would override the library for every plain `tau` run.
 	opts["preprocessing"] = cli::option("preprocessing", 'B', preprocessing)
@@ -68,31 +60,6 @@ cli::options tau_options() {
 			"support component (")
 			+ (ba_component_factoring ? "enabled" : "disabled")
 			+ " by default)");
-	opts["severity"] = cli::option("severity", 'S', "info")
-		.set_description("severity level (trace/debug/info/error)");
-	opts["indenting"] = cli::option("indenting", 'I', false)
-		.set_description("indenting of formulas");
-	opts["highlighting"] = cli::option("highlighting", 'H', false)
-		.set_description("syntax highlighting");
-	opts["benchmarks"] = cli::option("benchmarks", 'b', true)
-		.set_description("print benchmarks (enabled by default)");
-	opts["json"] = cli::option("json", 'J', false)
-		.set_description("output in JSON format");
-	opts["quit"] = cli::option("quit", 'q', false)
-		.set_description("quit when no input");
-	// REPL specific options
-	opts["evaluate"] = cli::option("evaluate", 'e', "")
-		.set_description("REPL command to evaluate");
-	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
-		.set_description("use legacy terminal REPL instead of FTXUI");
-	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status (enabled by default)");
-	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors (enabled by default)");
-	DBG(opts["debug"] = cli::option("debug", 'd', true)
-		.set_description("debug mode");)
-	opts["experimental"] = cli::option("experimental", 'x', false)
-		.set_description("enables transitioning features");
 	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "")
 		.set_description("warn when an updated specification exceeds "
 			"this many characters (default: TAU_SPEC_SIZE_WARN or 0; "

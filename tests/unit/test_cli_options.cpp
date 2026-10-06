@@ -1,11 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // cli_options.h is the shared option table the tau CLI and a compiled
-// artifact's own main both build on (main.cpp's tau_options() now delegates
-// to tau_cli_options(cli_option_set::full); tau_compile.tmpl.h's emit_main()
-// emits a call to tau_cli_options(cli_option_set::artifact)). Plain
-// (non-template) functions in namespace idni::tau_lang, so no NodeType/BA
-// setup is needed here, just the header itself.
+// artifact's own main both build on: main.cpp's tau_options() starts from
+// tau_cli_options(cli_option_set::full) and adds the BA preprocessing flags
+// and the runtime limits; tau_compile.tmpl.h's emit_main() emits a call to
+// tau_cli_options(cli_option_set::artifact). Plain (non-template) functions
+// in namespace idni::tau_lang, so no NodeType/BA setup is needed here, just
+// the header itself.
 
 #include "test_init.h"
 #include "cli_options.h"
@@ -48,6 +49,27 @@ TEST_SUITE("cli_options") {
 			CHECK(full.at(name).is_string() == opt.is_string());
 		}
 		CHECK(full.size() > art.size());
+	}
+
+	TEST_CASE("full table leaves main.cpp's own flags and letters free") {
+		auto full = tau_cli_options(cli_option_set::full);
+		// main.cpp adds these, with 'B' and 'K', after the full table.
+		for (const char* n : { "blasting", "preprocessing",
+				"ba-component-factoring" })
+			CHECK_MESSAGE(!has(full, n), n << " should not be in the full table");
+		for (auto& [name, opt] : full) {
+			CAPTURE(name);
+			CHECK(opt.short_name() != 'B');
+			CHECK(opt.short_name() != 'K');
+		}
+		for (const char* n : { "charvar", "indenting", "highlighting",
+				"evaluate", "legacy-repl", "status", "color",
+				"experimental" })
+			CHECK_MESSAGE(has(full, n), n << " missing from the full table");
+		CHECK(full.at("status").description()
+			== "display status (enabled by default)");
+		CHECK(full.at("color").description()
+			== "use colors (enabled by default)");
 	}
 
 	TEST_CASE("severity string maps: trace/debug/error match, anything else is info") {

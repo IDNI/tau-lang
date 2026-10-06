@@ -7,7 +7,8 @@
  * The main that `tau gen` emits (tau_compile.tmpl.h) builds its options with
  * @ref tau_cli_options and the artifact subset, so its `--help` and its
  * unknown-flag error come from the same idni::cli code as the tau CLI's. The
- * tau executable builds its own, larger table in main.cpp (`tau_options()`).
+ * tau executable's table (`tau_options()` in main.cpp) starts from the full
+ * set and adds the BA preprocessing flags and the runtime limits.
  */
 
 #ifndef __IDNI__TAU__CLI_OPTIONS_H__
@@ -21,8 +22,9 @@
 namespace idni::tau_lang {
 
 /// Which option table @ref tau_cli_options builds: `full`, the general and
-/// REPL flags (no runtime limit), or `artifact`, the run-time-meaningful
-/// subset a compiled artifact's own main parses.
+/// REPL flags of the tau executable (main.cpp adds `--preprocessing`,
+/// `--ba-component-factoring` and the runtime limits), or `artifact`, the
+/// run-time-meaningful subset a compiled artifact's own main parses.
 enum class cli_option_set { full, artifact };
 
 /**
@@ -53,8 +55,6 @@ inline idni::cli::options tau_cli_options(cli_option_set set = cli_option_set::f
 	if (set == cli_option_set::artifact) return opts;
 	opts["charvar"] = idni::cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
-	opts["blasting"] = idni::cli::option("blasting", 'B', true)
-		.set_description("blasting (enabled by default)");
 	opts["indenting"] = idni::cli::option("indenting", 'I', false)
 		.set_description("indenting of formulas");
 	opts["highlighting"] = idni::cli::option("highlighting", 'H', false)
@@ -65,9 +65,9 @@ inline idni::cli::options tau_cli_options(cli_option_set set = cli_option_set::f
 	opts["legacy-repl"] = idni::cli::option("legacy-repl", 'X', false)
 		.set_description("use legacy terminal REPL instead of FTXUI");
 	opts["status"] = idni::cli::option("status", 's', true)
-		.set_description("display status");
+		.set_description("display status (enabled by default)");
 	opts["color"] = idni::cli::option("color", 'c', true)
-		.set_description("use colors");
+		.set_description("use colors (enabled by default)");
 	DBG(opts["debug"] = idni::cli::option("debug", 'd', true)
 		.set_description("debug mode");)
 	opts["experimental"] = idni::cli::option("experimental", 'x', false)
