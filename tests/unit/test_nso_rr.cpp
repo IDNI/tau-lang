@@ -142,11 +142,6 @@ TEST_SUITE("definition expansion skips absent heads (#135)") {
 TEST_SUITE("rule counting") {
 
 	TEST_CASE("normalizer: rule_counting gates count nodes in the report") {
-		// nso_rr_apply(rule, tref) caches on (rule, formula) identity, so
-		// each case below needs a formula never rewritten anywhere else in
-		// this binary -- otherwise a cache hit skips the counting code
-		// entirely and the assertion below is testing a stale cache, not
-		// the counting logic.
 		auto with_flag = get_nso_rr(
 			"q[m](y) := !q[m-1](y)."
 			"q[0](y) := F."
@@ -168,6 +163,35 @@ TEST_SUITE("rule counting") {
 		CHECK( !report_has_code(uncounted.report(), code::info_count) );
 	}
 
+	// The second expansion of the same formula is answered from the
+	// caches, and must count the same applications and hits as the first.
+	TEST_CASE("an expansion answered from the cache counts the same") {
+		auto spec = get_nso_rr(
+			"c16a(x) := c16b(x)."
+			"c16b(x) := x = 0."
+			"c16a(y).");
+		REQUIRE( spec.has_value() );
+		using counts_t = std::unordered_map<std::string, size_t>;
+		auto count_expansion = [&]() -> std::pair<counts_t, counts_t> {
+			rule_apply_counts<node_t>().clear();
+			rule_hit_counts<node_t>().clear();
+			rule_counting = true;
+			auto applied = nso_rr_apply<node_t>(spec.value());
+			rule_counting = false;
+			CHECK( applied.has_value() );
+			std::pair<counts_t, counts_t> counts{
+				rule_apply_counts<node_t>(), rule_hit_counts<node_t>() };
+			rule_apply_counts<node_t>().clear();
+			rule_hit_counts<node_t>().clear();
+			return counts;
+		};
+		auto first = count_expansion();
+		auto second = count_expansion();
+		CHECK( !first.first.empty() );
+		CHECK( !first.second.empty() );
+		CHECK( second.first == first.first );
+		CHECK( second.second == first.second );
+	}
 }
 
 // GitHub #80: std::hash<rr<node>> used to hash the htref handles' addresses

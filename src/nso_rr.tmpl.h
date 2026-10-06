@@ -55,6 +55,11 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
 		return tree<node>::get(n).is(node::type::capture);
 	};
+	auto count_rule_application = [&r, &n](tref nn) {
+		auto name = to_str<node>(r);
+		++rule_apply_counts<node>()[name];
+		if (n != nn) ++rule_hit_counts<node>()[name];
+	};
 
 #ifdef TAU_CACHE
 	// apply_rule below rebuilds nodes via ordinary construction, which runs
@@ -64,8 +69,10 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	using cache_t = std::map<std::tuple<rewriter::rule, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	const bool widening = pack_widening_active<node>();
-	if (auto it = cache.find({r, n, widening}); it != cache.end())
+	if (auto it = cache.find({r, n, widening}); it != cache.end()) {
+		if (rule_counting) count_rule_application(it->second);
 		return it->second;
+	}
 #endif // TAU_CACHE
 
 	// A definition body carries bound-variable ids numbered per formula
@@ -78,11 +85,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	const rewriter::rule ar = alpha_shift_rule_body<node>(r, n);
 	auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							ar, n, is_capture);
-		if (rule_counting) {
-			auto name = to_str<node>(r);
-			++rule_apply_counts<node>()[name];
-			if (n != nn) ++rule_hit_counts<node>()[name];
-		}
+	if (rule_counting) count_rule_application(nn);
 #ifdef DEBUG
 	LOG_TRACE << "--------------------------------";
 	LOG_TRACE << "rule:       " << LOG_RULE(r);
@@ -97,10 +100,10 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // DEBUG
 
 #ifdef TAU_CACHE
-		cache[{r, n, widening}] = nn;
+	cache[{r, n, widening}] = nn;
 #endif // TAU_CACHE
 
-		return nn;
+	return nn;
 }
 
 /** @internal @copydoc nso_rr_apply(const rewriter::rules&, tref) @endinternal */
@@ -112,8 +115,11 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	using cache_t = std::map<std::tuple<rewriter::rules, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	const bool widening = pack_widening_active<node>();
-	if (auto it = cache.find({rs, n, widening}); it != cache.end())
-		return it->second;
+	// A hit here would skip every rule application below; while rules
+	// are counted, the applications run and hit their own cache instead.
+	if (!rule_counting)
+		if (auto it = cache.find({rs, n, widening}); it != cache.end())
+			return it->second;
 #endif // TAU_CACHE
 
 	if (rs.empty()) return n;
