@@ -215,7 +215,7 @@ cli::options tau_options() {
 			"oracle examines per check (default: "
 			"TAU_LTL_WINDOW_MAX_PATHS or 4096; 0 = unlimited)");
 	opts["ltl-closed-regions-timeout"] =
-		cli::option("ltl-closed-regions-timeout", 'K', "")
+		cli::option("ltl-closed-regions-timeout", '\0', "")
 		.set_description("cap in seconds the data game's attempt on regions "
 			"that keep their quantifiers, all its questions together, "
 			"each at most a quarter of it (default: "

@@ -3060,7 +3060,7 @@ non-negative number is an error):
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
-| -K, --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
+|     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
 |     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default `TAU_LTL_DATA_GAME_MAX_NODES` or 8388608; 0 = unlimited) |
 |     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default `TAU_LTL_DATA_GAME_MAX_MEMO` or 33554432; 0 = unlimited) |
 |     --ltl-data-game-max-combinations | cap the value combinations the data game tabulates for one comparison its circuits do not encode (default `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` or 4096; 0 = unlimited) |
