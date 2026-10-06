@@ -289,6 +289,12 @@ TEST_SUITE("hsb_splitter — unsimplified trees") {
 		REQUIRE(dnf.size() == 1);
 		REQUIRE(dnf[0].size() == 1);
 		CHECK(dnf[0][0] == (~make_hs({1.0}, -5.0)).root_ref());
+		// A null node is bottom: it adds no clause and keeps those
+		// already collected.
+		hd::to_dnf(nullptr, dnf);
+		REQUIRE(dnf.size() == 1);
+		CHECK(dnf[0][0] == (~make_hs({1.0}, -5.0)).root_ref());
+		dnf.clear();
 		hd::to_dnf(nullptr, dnf);
 		CHECK(dnf.empty());
 	}

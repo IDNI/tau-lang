@@ -144,10 +144,10 @@ inline tref push_neg(tref n);
 
 /// Append the DNF of @p n to @p dnf (each clause a conjunction of halfspace
 /// nodes; an empty clause is true, no clause is false). A not_ node is
-/// expanded through @ref push_neg; a null @p n clears @p dnf entirely. The
-/// clause count can grow exponentially.
+/// expanded through @ref push_neg; a null @p n is bottom and adds nothing.
+/// The clause count can grow exponentially.
 inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
-	if (!n) { dnf.clear(); return; }
+	if (!n) return;
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
 	switch (k) {
 	case hsb::kind::bot:
