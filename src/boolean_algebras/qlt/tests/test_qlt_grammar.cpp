@@ -471,6 +471,23 @@ TEST_CASE("qlt: reject bare -inf as singleton") {
 	CHECK_FALSE(result.has_value());
 }
 
+// A literal that parses but has no value carries the reason as an error.
+TEST_CASE("qlt: an invalid literal is an error of qlt_eval_parse_tree") {
+	for (std::string src : { "[1, 0)", "(3, 3)", "+inf", "1/0",
+		"[0, 1] | [1, 0)", "[0, 1/0]" })
+	{
+		CAPTURE(src);
+		auto parsed = qlt_parser::instance().parse(src.c_str(), src.size());
+		REQUIRE(parsed.found);
+		auto t = qlt_parser::tree::traverser(parsed.get_shaped_tree2())
+			| qlt_parser::qlt;
+		REQUIRE(t.has_value());
+		auto r = qlt_eval_parse_tree(t);
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+	}
+}
+
 TEST_CASE("qlt: reject malformed interval (missing closing bracket)") {
 	auto result = qlt_parser_instance::instance().parse("[0, 1", 5);
 	CHECK_FALSE(result.found);

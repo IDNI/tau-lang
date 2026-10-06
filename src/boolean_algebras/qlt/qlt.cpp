@@ -594,9 +594,10 @@ qlt qlt::normalise(std::vector<qlt_piece> ps) {
 
 // --- parsing helpers ---
 
-std::optional<qlt> qlt_eval_interval(
+result<qlt> qlt_eval_interval(
 	const qlt_parser::tree::traverser& interval_node)
 {
+	result<qlt> r;
 	using tt = qlt_parser::tree::traverser;
 	using type = qlt_parser::nonterminal;
 
@@ -618,20 +619,26 @@ std::optional<qlt> qlt_eval_interval(
 		}
 	}
 
-	if (endpoints.size() < 2 || !found_bracket) return std::nullopt;
+	if (endpoints.size() < 2 || !found_bracket)
+		return r.with_error(code::parse_error,
+			"qlt interval needs a bracket and two endpoints");
 
 	qlt_rational lo_r, hi_r;
-	if (!qlt_rational::parse(endpoints[0], lo_r)) return std::nullopt;
-	if (!qlt_rational::parse(endpoints[1], hi_r)) return std::nullopt;
+	for (size_t i = 0; i < 2; ++i)
+		if (!qlt_rational::parse(endpoints[i], i ? hi_r : lo_r))
+			return r.with_error(code::parse_error,
+				"Not a rational or a name in a qlt interval",
+				{{label::value, endpoints[i]}});
 
-	if (!lo_r.is_sym() && !hi_r.is_sym()) {
-		if (hi_r < lo_r) return std::nullopt;
-		if (lo_r == hi_r &&
-		    !(lo_b == qlt_bound::CLOSED && hi_b == qlt_bound::CLOSED))
-			return std::nullopt;
-	}
+	if (!lo_r.is_sym() && !hi_r.is_sym()
+		&& (hi_r < lo_r || (lo_r == hi_r && !(lo_b == qlt_bound::CLOSED
+			&& hi_b == qlt_bound::CLOSED))))
+		return r.with_error(code::parse_error,
+			"Empty qlt interval",
+			{{label::value, endpoints[0] + ", " + endpoints[1]}});
 
-	return qlt{{ { qlt_endpoint{lo_r, lo_b}, qlt_endpoint{hi_r, hi_b} } }};
+	return r.with_value(qlt{{ { qlt_endpoint{lo_r, lo_b},
+		qlt_endpoint{hi_r, hi_b} } }});
 }
 
 result<qlt> qlt_eval_parse_tree(
@@ -653,11 +660,18 @@ result<qlt> qlt_eval_parse_tree(
 
 	case type::qlt_singleton: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return r;
+		if (children.empty())
+			return r.with_error(code::parse_error, "Empty qlt singleton");
 		auto s = children[0] | tt::terminals;
 		qlt_rational val;
-		if (!qlt_rational::parse(s, val)) return r;
-		if (val.is_pos_inf() || val.is_neg_inf()) return r;
+		if (!qlt_rational::parse(s, val))
+			return r.with_error(code::parse_error,
+				"Not a rational or a name as a qlt singleton",
+				{{label::value, s}});
+		if (val.is_pos_inf() || val.is_neg_inf())
+			return r.with_error(code::parse_error,
+				"An infinity is not a qlt singleton",
+				{{label::value, s}});
 		return r.with_value(qlt{{ {
 			qlt_endpoint{val, qlt_bound::CLOSED},
 			qlt_endpoint{val, qlt_bound::CLOSED}
@@ -666,23 +680,22 @@ result<qlt> qlt_eval_parse_tree(
 
 	case type::qlt_interval: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return r;
-		auto interval = qlt_eval_interval(children[0]);
-		if (!interval) return r;
-		return r.with_value(*interval);
+		if (children.empty())
+			return r.with_error(code::parse_error, "Empty qlt interval");
+		return qlt_eval_interval(children[0]);
 	}
 
 	case type::qlt_union: {
 		// qlt_union children = [interval, qlt] (after __E_qlt_0 inlining)
 		auto children = (n | tt::children)();
-		if (children.size() < 2) return r;
+		if (children.size() < 2)
+			return r.with_error(code::parse_error,
+				"qlt union needs two operands");
 
-		auto left = qlt_eval_interval(children[0]);
-		if (!left) return r;
-
+		TAU_TRY(auto left, qlt_eval_interval(children[0]));
 		TAU_TRY(auto right, qlt_eval_parse_tree(children[1]));
 
-		return r.with_value(*left | right);
+		return r.with_value(left | right);
 	}
 
 	default:

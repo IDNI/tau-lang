@@ -399,14 +399,14 @@ bool qlt_pieces_unordered(const qlt& q);
 std::ostream& operator<<(std::ostream& os, const qlt& q);
 
 // --- parsing helpers (called from templates in qlt.tmpl.h) ---
-/// The single-piece value of an `interval` parse node, or `nullopt` when it
+/// The single-piece value of an `interval` parse node; a parse error when it
 /// lacks a bracket or two endpoints, an endpoint does not parse, or the
 /// (non-symbolic) interval is empty.
-std::optional<qlt> qlt_eval_interval(
+result<qlt> qlt_eval_interval(
 	const qlt_parser::tree::traverser& interval_node);
 /// The value of a `qlt` parse node: top, bot, a singleton, an interval or a
-/// union. No value, without an error, when a singleton or an interval does
-/// not evaluate; an internal error for an unknown node.
+/// union. A parse error when a singleton or an interval does not evaluate;
+/// an internal error for an unknown node.
 result<qlt> qlt_eval_parse_tree(
 	const qlt_parser::tree::traverser& t);
 
