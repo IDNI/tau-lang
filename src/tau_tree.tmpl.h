@@ -44,8 +44,9 @@ rewriter::rules get_rec_relations(tref r);
  * bodies against @p ctx. A bare `bf`/`ref` becomes a rule-free main taken
  * verbatim; a single `rec_relation` yields rules with a null main.
  * @return a failed report when @p ref is null, no main formula is found,
- * or an I/O variable remains unclassified after resolve_io_vars (neither a
- * declared stream nor named like one).
+ * an I/O variable remains unclassified after resolve_io_vars (neither a
+ * declared stream nor named like one), or validate_rr_case_types or
+ * validate_rr_call_types rejects the rules.
  */
 template <NodeType node>
 result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
@@ -137,7 +138,9 @@ struct expression_paths {
 		/// current state
 		iterator& operator++();
 		/// Apply the function f to current path and return the result
-		/// while erasing the path from _expr
+		/// while erasing the path from _expr; nullptr, with nothing
+		/// erased, when f leaves the path unchanged or the expression is
+		/// null.
 		/// NOTE that this changes the result of operator*()
 		tref apply(const auto& f);
 		/// Restore the expression saved by the last apply().

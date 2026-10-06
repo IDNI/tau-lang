@@ -231,7 +231,11 @@ struct node {
 	/** @brief Inequality. */
 	constexpr auto     operator!= (const node& that) const;
 
-	/** @brief Return the pre-computed hash value for this node. */
+	/**
+	 * @brief Compute this node's content hash (the value that initializes
+	 * `hash`): nt, the type name, ext, and the pooled string or constant
+	 * content rather than the pool index.
+	 */
 	uint64_t hashit() const;
 };
 
@@ -1193,7 +1197,7 @@ bool is_var_or_capture(tref n);
 template <NodeType node>
 inline std::function<bool(tref)> is_var_or_capture();
 
-/** @brief Return `true` if @p n is any quantifier (logical or functional). */
+/** @brief Return `true` if @p n is a logical quantifier (`all` or `ex`); see `is_functional_quantifier`. */
 template <NodeType node>
 bool is_quantifier(tref n);
 
