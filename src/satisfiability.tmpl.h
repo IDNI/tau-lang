@@ -1897,9 +1897,8 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	auto [chi_inf, steps] = *chi_fp;
 	TAU_TRY(tref chi_norm, normalize_non_temp<node>(chi_inf));
 	chi_inf = chi_norm;
-	// A cap violation surfaces as nullptr; propagate it rather than
-	// dereferencing it below.
-	if (!chi_inf) return r.with_value(nullptr);
+	if (!chi_inf) return r.with_error(code::internal_error,
+		messages::non_temp_normalization_produced_no_formula);
 
 	// LOG_TRACE << "Fixpoint chi after normalize: " << chi_inf;
 	if (tau::get(chi_inf).equals_F()) {
