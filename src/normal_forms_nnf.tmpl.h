@@ -173,7 +173,6 @@ tref push_negation_in(tref fm) {
 template <NodeType node, bool is_wff>
 result<tref> to_dnf(tref fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<tref> r;
 	LOG_TRACE << "to_dnf: " << LOG_FM(fm);
 	auto layer_to_dnf = [&](tref n) -> tref {
@@ -183,8 +182,14 @@ result<tref> to_dnf(tref fm) {
 				auto conj = conjunct_dnfs_to_dnf<node>(
 					t[0].first(), t[0].second());
 				// Perform simplification
-				if (tau::get(conj) != tau::get(n)) return tt(conj)
-					| wff_reduce_dnf<node>() | tt::ref;
+				if (tau::get(conj) != tau::get(n)) {
+					auto red = reduce<node>(conj);
+					if (!red.has_value()) {
+						r.merge(std::move(red));
+						return nullptr;
+					}
+					return red.value();
+				}
 				else return n;
 			}
 		}
@@ -267,7 +272,6 @@ result<tref> temporal_layer_to_dnf(tref fm) {
 template <NodeType node, bool is_wff>
 result<tref> to_cnf(tref fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<tref> r;
 	auto layer_to_cnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
@@ -276,8 +280,14 @@ result<tref> to_cnf(tref fm) {
 				auto dis = disjunct_cnfs_to_cnf<node>(
 					t[0].first(), t[0].second());
 				// Perform simplification
-				if (tau::get(dis) != tau::get(n)) return tt(dis)
-					| wff_reduce_cnf<node>() | tt::ref;
+				if (tau::get(dis) != tau::get(n)) {
+					auto red = reduce<node, true>(dis);
+					if (!red.has_value()) {
+						r.merge(std::move(red));
+						return nullptr;
+					}
+					return red.value();
+				}
 				else return n;
 			}
 		}

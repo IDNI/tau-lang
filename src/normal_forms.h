@@ -342,80 +342,15 @@ typename tree<node>::traverser operator|(
 	const bf_reduce_canonical<node>& r);
 
 /**
- * @brief Functor that reduces a wff to DNF.
- *
- * Wraps `reduce<node, false>` so it can be used in the traversal pipeline.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-struct wff_reduce_dnf {
-	/// @brief Reduce `fm`, assumed in DNF, with `reduce<node, false>`.
-	///
-	/// @return The reduced formula, or `nullptr` if `reduce` failed (its
-	/// report is dropped).
-	///
-	/// @par Example
-	/// @code{.cpp}
-	/// // Thin wrapper over reduce<node, false>: a contradiction reduces to F
-	/// tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
-	/// tref res = tt(fm) | wff_reduce_dnf<node_t>() | tt::ref;
-	/// CHECK( tau::get(res).equals_F() );
-	/// @endcode
-	tref operator() (tref fm) const;
-};
-
-/**
- * @brief Functor that reduces a wff to CNF.
- *
- * Wraps `reduce<node, true>` so it can be used in the traversal pipeline.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-struct wff_reduce_cnf {
-	/// @brief Reduce `fm`, assumed in CNF, with `reduce<node, true>`.
-	///
-	/// @return The reduced formula, or `nullptr` if `reduce` failed (its
-	/// report is dropped).
-	///
-	/// @par Example
-	/// @code{.cpp}
-	/// // Thin wrapper over reduce<node, true>: a tautology reduces to T
-	/// tref fm = get_nso_rr("x = 0 || x != 0.").value().main->get();
-	/// tref res = tt(fm) | wff_reduce_cnf<node_t>() | tt::ref;
-	/// CHECK( tau::get(res).equals_T() );
-	/// @endcode
-	tref operator() (tref fm) const;
-};
-
-/**
- * @brief Pipe operator: apply `wff_reduce_dnf` to a tree traverser.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& fm,
-	const wff_reduce_dnf<node>& r);
-
-/**
- * @brief Pipe operator: apply `wff_reduce_cnf` to a tree traverser.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& fm,
-	const wff_reduce_cnf<node>& r);
-
-/**
  * @brief Convert a formula to Disjunctive Normal Form (DNF).
  *
  * Pushes negations in (and, for bf, expands XOR), then distributes
- * conjunctions over disjunctions while interleaving reductions via
- * `wff_reduce_dnf` (or `reduce` for bf). For wff it does not descend into
- * the scopes `visit_wff` skips.
+ * conjunctions over disjunctions while interleaving `reduce`. For wff it
+ * does not descend into the scopes `visit_wff` skips.
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
- * @return Equivalent formula in DNF, or the error of a bf `reduce`.
+ * @return Equivalent formula in DNF, or the error of a `reduce`.
  *
  * @par Example
  * @code{.cpp}
@@ -434,11 +369,11 @@ result<tref> to_dnf(tref fm);
  *
  * Pushes negations in (and, for bf, expands XOR into its conjunctive shape),
  * then distributes disjunctions over conjunctions while interleaving
- * reductions via `wff_reduce_cnf` (or `reduce<node, true>` for bf).
+ * reductions via `reduce<node, true>`.
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
- * @return Equivalent formula in CNF, or the error of a bf `reduce`.
+ * @return Equivalent formula in CNF, or the error of a `reduce`.
  *
  * @par Example
  * @code{.cpp}

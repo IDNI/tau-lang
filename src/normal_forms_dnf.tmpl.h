@@ -767,40 +767,6 @@ int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	return i;
 }
 
-/** @internal @copydoc wff_reduce_dnf::operator() @endinternal */
-template <NodeType node>
-tref wff_reduce_dnf<node>::operator() (tref fm) const {
-	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
-	// is fixed to tref by the operator| pipeline.
-	auto r = reduce<node>(fm);
-	return r.has_value() ? r.value() : nullptr;
-}
-
-/** @internal @copydoc wff_reduce_cnf::operator() @endinternal */
-template <NodeType node>
-tref wff_reduce_cnf<node>::operator() (tref fm) const {
-	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
-	// is fixed to tref by the operator| pipeline.
-	auto r = reduce<node, true>(fm);
-	return r.has_value() ? r.value() : nullptr;
-}
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& fm,
-	const wff_reduce_dnf<node>& r)
-{
-	return typename tree<node>::traverser(r(fm.value()));
-}
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& fm,
-	const wff_reduce_cnf<node>& r)
-{
-	return typename tree<node>::traverser(r(fm.value()));
-}
-
 // The DNF of `d1 && d2` (or `d1 & d2` for bf) for two DNFs of the same kind,
 // by distributing every clause of d1 over every clause of d2.
 template <NodeType node>
