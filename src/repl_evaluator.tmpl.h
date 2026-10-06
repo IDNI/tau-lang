@@ -394,6 +394,13 @@ void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::print_warnings(const report& rep) const {
+	if (!opt.print_benchmarks) rep.print(idni::diagnostics::sinks{
+		.error = {}, .warning = &err, .info = {} });
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	// grammar: "onf" __ variable __ onf_cmd_arg -- n[1] is the variable
 	// itself (must not go through get_any/apply_all_defs, which expect a
@@ -801,6 +808,11 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			return;
 		}
 
+		// Shown before the run starts: the setup report itself prints
+		// only with the benchmarks, once the run ends.
+		gi.report().print(idni::diagnostics::sinks{
+			.error = {}, .warning = &err, .info = {} });
+		setup_rep.append(std::move(gi.report()));
 		// A new formula replaces any stored session.
 		running = std::make_unique<run_session>(std::move(gi).value());
 		running->rep.append(std::move(setup_rep));
@@ -1233,6 +1245,7 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 		auto res = tau_api::valid(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
+		print_warnings(res.report());
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1248,6 +1261,7 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 		auto res = tau_api::sat(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
+		print_warnings(res.report());
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1263,6 +1277,7 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 		auto res = tau_api::unsat(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
+		print_warnings(res.report());
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1276,6 +1291,7 @@ tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
+		print_warnings(res.report());
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1289,6 +1305,7 @@ tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
+		print_warnings(res.report());
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;

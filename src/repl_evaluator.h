@@ -401,6 +401,9 @@ private:
 	void print_benchmarks(const result<T>& res) const;
 	/// @brief Print @p rep, if benchmarking is on.
 	void print_benchmarks(const report& rep) const;
+	/// The warnings of a command that succeeded, which the benchmark tree
+	/// carries only while benchmarks are printed.
+	void print_warnings(const report& rep) const;
 
 	/// @brief Structural equality of @p a and @p b ignoring type
 	/// annotations and resolved BA type ids.

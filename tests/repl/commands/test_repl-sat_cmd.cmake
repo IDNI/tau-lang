@@ -227,3 +227,22 @@ endif()
 # A ground qlt formula over named endpoints that holds wherever they lie.
 add_repl_test(sat_cmd-qlt_named_ground_tautology
 	"sat {c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt" "%1[^%]*: T")
+
+# A time constraint that never holds once its clause applies is reported: the
+# clause reads o1[t-1], so it starts at step 1 and [t = 0] has no effect
+# (GitHub #204). One that still holds there, or whose negation does, is not.
+add_repl_test(sat_cmd-dead_time_constraint_warns
+	"sat always ([t = 0] -> o1[t] = 1) && ([t >= 1] -> o1[t] = o1[t-1])"
+	"never holds.*\\[t = 0\\].*%1[^%]*: T")
+add_repl_test(sat_cmd-dead_time_constraint_lt
+	"sat always ([t < 2] -> o1[t] = 1) && o1[t] = o1[t-2]"
+	"never holds.*\\[t < 2\\]")
+add_repl_test(sat_cmd-live_time_constraint_quiet
+	"sat always ([t < 3] -> o1[t] = 1) && o1[t] = o1[t-2]"
+	"%1[^%]*: T" FAIL_REGEX "never holds")
+add_repl_test(sat_cmd-time_constraint_at_lookback_quiet
+	"sat always ([t >= 2] -> o1[t] = o1[t-2])"
+	"%1[^%]*: T" FAIL_REGEX "never holds")
+add_repl_test(sat_cmd-time_constraint_without_lookback_quiet
+	"sat always ([t = 0] -> o1[t] = 1) && ([t = 1] -> o1[t] = 1)"
+	"%1[^%]*: T" FAIL_REGEX "never holds")

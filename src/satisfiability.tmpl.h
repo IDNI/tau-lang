@@ -313,7 +313,7 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
  * evaluates `5 <= 3` and returns `_0` (false).
  */
 template <NodeType node>
-tref calculate_ctn(tref constraint, int_t time_point) {
+bool ctn_holds_at(tref constraint, int_t time_point) {
 	DBG(assert(constraint != nullptr);)
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -321,34 +321,86 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	tt t = ctn();
 	int_t condition;
 	bool is_left;
-	auto to_ba = [](const bool c) {
-		const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
-		return c ? tau::_1(type) : tau::_0(type);
-	};
-
 	if (ctn[0][0].is(tau::num))
 		is_left = true,  condition = get_payload_int<node>(ctn[0][0]);
 	else    is_left = false, condition = get_payload_int<node>(ctn[0][1]);
 
-	if (t | tau::ctn_neq) return to_ba(condition != time_point);
-	if (t | tau::ctn_eq)  return to_ba(condition == time_point);
+	if (t | tau::ctn_neq) return condition != time_point;
+	if (t | tau::ctn_eq)  return condition == time_point;
 	if (t | tau::ctn_gteq)
-		return is_left  ? to_ba(condition >= time_point)
-				: to_ba(time_point >= condition);
+		return is_left ? condition >= time_point : time_point >= condition;
 	if (t | tau::ctn_gt)
-		return is_left  ? to_ba(condition > time_point)
-				: to_ba(time_point > condition);
+		return is_left ? condition > time_point : time_point > condition;
 	if (t | tau::ctn_lteq)
-		return is_left  ? to_ba(condition <= time_point)
-				: to_ba(time_point <= condition);
+		return is_left ? condition <= time_point : time_point <= condition;
 	if (t | tau::ctn_lt)
-		return is_left  ? to_ba(condition < time_point)
-				: to_ba(time_point < condition);
+		return is_left ? condition < time_point : time_point < condition;
 	// The above is exhaustive for the possible children of a constraint;
 	// the grammar admits only these kinds, so an unrecognized one is a
-	// shape error caught in debug. Return _0 to keep the caller total.
+	// shape error caught in debug. Return false to keep the caller total.
 	DBG(assert(false && "Unrecognized constraint kind");)
-	return to_ba(false);
+	return false;
+}
+
+template <NodeType node>
+tref calculate_ctn(tref constraint, int_t time_point) {
+	const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	return ctn_holds_at<node>(constraint, time_point)
+		? tree<node>::_1(type) : tree<node>::_0(type);
+}
+
+// True when the constant-time constraint holds at some time point from
+// @p start on. Each kind is constant past its numeral, so the start, the
+// numeral and the point after both decide it.
+template <NodeType node>
+bool ctn_holds_from(tref constraint, int_t start) {
+	const auto& ctn = tree<node>::get(constraint);
+	const int_t c = ctn[0][0].is(tree<node>::num)
+		? get_payload_int<node>(ctn[0][0])
+		: get_payload_int<node>(ctn[0][1]);
+	return ctn_holds_at<node>(constraint, start)
+		|| (c >= start && ctn_holds_at<node>(constraint, c))
+		|| ctn_holds_at<node>(constraint, std::max(start, c) + 1);
+}
+
+/**
+ * @brief Warn on each constant-time constraint of @p fm, as written, that never
+ * holds once its clause applies.
+ *
+ * The `always` statements together form one clause and each `sometimes`
+ * statement another; a clause is enforced from the deepest lookback it reads
+ * (README.md, "Lookback initialization"), so a guard such as `[t = 0]` in a
+ * clause reading `o1[t-1]` has no effect.
+ */
+template <NodeType node, typename R>
+void warn_dead_time_constraints(tref fm, R& r) {
+	using tau = tree<node>;
+	if (!fm) return;
+	auto check = [&](const trefs& parts) {
+		trefs io_vars;
+		for (tref p : parts)
+			for (tref v : tau::get(p).select_top(
+				is_child<node, tau::io_var>)) io_vars.push_back(v);
+		const int_t start = get_max_shift<node>(io_vars);
+		if (start == 0) return;
+		for (tref p : parts)
+			for (tref ctn : tau::get(p).select_top(
+				is<node, tau::constraint>))
+				if (!ctn_holds_from<node>(ctn, start))
+					r.warning("this time constraint never "
+						"holds: its clause reads "
+						+ std::to_string(start) + " steps "
+						"back, so it applies from step "
+						+ std::to_string(start) + " on, and "
+						"the constraint has no effect; a "
+						"fixed position such as o1[0] "
+						"constrains an earlier step",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(ctn))}});
+	};
+	check(tau::get(fm).select_top(is_child<node, tau::wff_always>));
+	for (tref st : tau::get(fm).select_top(
+		is_child<node, tau::wff_sometimes>)) check({ st });
 }
 
 /**

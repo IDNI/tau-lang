@@ -681,3 +681,11 @@ add_repl_test(stop_cmd-stops_stored_run
 	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). stop. run"
 	"run stopped.*no run to continue")
 add_repl_test(run_cmd-nothing_to_continue "run" "no run to continue")
+
+# run reports a dead time constraint before it starts (GitHub #204).
+add_repl_test(run_cmd-dead_time_constraint_warns
+	"o1:sbf := out console. run 3 steps always ([t = 0] -> o1[t] = 1) && ([t >= 1] -> o1[t] = o1[t-1])."
+	"never holds.*\\[t = 0\\].*o1\\[0\\] :=")
+add_repl_test(run_cmd-fixed_positions_quiet
+	"o1:sbf := out console. run 3 steps always (o1[0] = 1) && ([t >= 1] -> o1[t] = o1[t-1])."
+	"o1\\[0\\] := 1.*o1\\[1\\] := 1.*o1\\[2\\] := 1" FAIL_REGEX "never holds")

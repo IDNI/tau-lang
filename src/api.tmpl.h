@@ -1310,29 +1310,32 @@ result<bool> api<node>::realizable(tref fm) {
 		// error, not an UNREALIZABLE answer; is_ltl_aba_realizable propagates
 		// it through r below, same as any other error.
 		TAU_TRY(tref target, realizability_target_of(fm));
+		// The verdict joins the report the prefix left in r.
+		auto adopt = [&r](result<bool>&& verdict) -> result<bool> {
+			auto v = r.merge_take(std::move(verdict));
+			if (!v) return std::move(r);
+			return r.with_assert_check_value(*v);
+		};
 		if (has_ctl_star_operators<node>(fm)) {
-			r = is_ctl_star_realizable<node>(target, 0, true);
+			return adopt(is_ctl_star_realizable<node>(target, 0, true));
 		} else if (realizability_has_game_operators<node>(fm)) {
 			// is_tau_formula_sat now answers satisfiability only,
 			// where an unrealizable full-LTL formula is undecided
 			// rather than false; realizable() needs the real
 			// verdict, so ask the realizability procedure directly
 			// instead of going through it.
-			r = is_ltl_aba_realizable<node>(target, 0, true);
+			return adopt(is_ltl_aba_realizable<node>(target, 0, true));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
 			// unsat(fm) => unrealizable(fm): reject without running
 			// synthesis. An undecided sat (error) is not a decided
 			// false, so it falls through to the real check below.
-			r = false;
-		} else {
-			// realizable() needs the real verdict, and only
-			// is_ltl_aba_realizable can report a fragment it has no
-			// game construction for.
-			r = is_ltl_aba_realizable<node>(target, 0, true);
+			return adopt(std::move(s));
 		}
-		DBG(assert(r.is_well_formed());)
-		return r;
+		// realizable() needs the real verdict, and only
+		// is_ltl_aba_realizable can report a fragment it has no game
+		// construction for.
+		return adopt(is_ltl_aba_realizable<node>(target, 0, true));
 	});
 }
 
@@ -1369,7 +1372,8 @@ result<bool> api<node>::sat(tref fm) {
 		if (!fm || !is_formula(fm)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
-		return sat_prepared(fm);
+		TAU_TRY(bool v, sat_prepared(fm));
+		return r.with_assert_check_value(v);
 	});
 }
 
@@ -1718,6 +1722,9 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// place -- corrupting later, unrelated calls -- on every one of the
 		// early-return failure paths below.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		// Before pin_main rebuilds the spec, whose hooks rewrite the time
+		// constraints the user wrote.
+		warn_dead_time_constraints<node>(spec, r);
 		TAU_TRY(spec, pin_main(spec));
 		spec = tau::reget(spec);
 		TAU_TRY(auto nso_rr, get_nso_rr(spec));
@@ -1763,6 +1770,14 @@ result<interpreter<node>> api<node>::get_interpreter(
 		// See the tref overload above: remaps are assigned into the global
 		// io_context only once every validation step has succeeded.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		// The time constraints as written: a parsed spec is built once
+		// without hooks for it, whose report the build below repeats.
+		tref written = spec.main();
+		if (!written) {
+			spec.keep_as_written();
+			if (auto w = spec.get(); w.has_value()) written = w.value();
+		}
+		warn_dead_time_constraints<node>(written, r);
 		spec.keep_warm_ups();
 		TAU_TRY(auto nso_rr, spec.get_nso_rr());
 		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
@@ -1939,6 +1954,7 @@ result<tref> api<node>::simplify_keeping_warm_ups(tref expr, bool negate) {
 	return with_budget<node>([&] {
 		result<tref> r;
 		TAU_TRY(tref inferred, simplify_as_written(expr));
+		warn_dead_time_constraints<node>(inferred, r);
 		TAU_TRY(tref pinned, pin_main(inferred, negate));
 		tref e = canonize_quantifier_ids<node>(tau::reget(pinned));
 		if (!e) r.error(code::internal_error, "Simplification failed");

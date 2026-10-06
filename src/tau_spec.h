@@ -69,6 +69,9 @@ struct tau_spec {
 	 * decides. The procedures that decide it fold it themselves.
 	 */
 	void keep_as_written() { mode_ = build_mode::as_written; }
+	/// @brief The main formula as it was added, or `nullptr` until a
+	/// parsed spec is built.
+	tref main() const { return main_; }
 
 private:
 	/// @brief Build tree-get options from current parser state.

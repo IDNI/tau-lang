@@ -398,6 +398,10 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 		return finish(1);
 	}
 	auto& i = gi.value();
+	// Its warnings come before the run; the report prints only with the
+	// benchmarks, once the run ends.
+	gi.report().print(idni::diagnostics::sinks{
+		.error = {}, .warning = &std::cerr, .info = {} });
 	rep.append(std::move(gi).report());
 	bool quit_on_idle = opts["quit"].get<bool>();
 	auto run_ok = tau_api::run(i, quit_on_idle);

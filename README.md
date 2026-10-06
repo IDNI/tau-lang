@@ -1073,6 +1073,14 @@ guards, such as the one a top-level `since` reads at step 0, belongs to
 a step before step 0, played like any other step: the environment picks
 its inputs and the system its outputs.
 
+A time constraint therefore has no effect before its clause starts:
+in `always ([t = 0] -> o1[t] = i1[t]) && ([t >= 1] -> o1[t] = o1[t-1])` the
+clause starts at step 1, so `[t = 0]` never holds and `o1[0]` is free.
+`sat`, `realizable`, `valid` and `run` warn about such a constraint ("this
+time constraint never holds"). A fixed position constrains the warm-up
+steps instead: `always (o1[0] = i1[0]) && ([t >= 1] -> o1[t] = o1[t-1])`
+copies the first input into every step.
+
 ### Known LTL limitations
 
 - **Spec terminator**: in specification files and in programs passed to the
