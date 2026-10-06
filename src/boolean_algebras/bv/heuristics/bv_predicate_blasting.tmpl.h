@@ -776,7 +776,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	// below), reused here as a cheap stand-in for `x`'s true node count.
 	auto over_budget_after_fold = [&](typename tbdd::ref x, size_t estimate) {
 		if (batches_since_rescan + 1 >= RESCAN_EVERY_BATCHES ||
-			estimate >= size_t(node_budget * RESCAN_HEADROOM_FRACTION))
+			estimate >= size_t(static_cast<double>(node_budget)
+				* RESCAN_HEADROOM_FRACTION))
 			return rescan(x) > node_budget;
 		running_nodes = estimate;
 		++batches_since_rescan;

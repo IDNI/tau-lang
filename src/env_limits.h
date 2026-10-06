@@ -144,7 +144,11 @@ private:
 			if constexpr (std::is_floating_point_v<T>)
 				v = (T) env_limit_real(var_, dflt_);
 			else v = (T) env_limit_count(var_, dflt_);
-			if (v != T{} || zero_ == env_zero::value) env_ = v;
+			bool zero;
+			if constexpr (std::is_floating_point_v<T>)
+				zero = !(v < T{}) && !(v > T{});
+			else zero = v == T{};
+			if (!zero || zero_ == env_zero::value) env_ = v;
 			else env_ = zero_ == env_zero::unlimited
 				? std::numeric_limits<T>::max() : dflt_;
 		});
