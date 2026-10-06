@@ -43,8 +43,10 @@ private:
 	 * @param v Node descriptor.
 	 * @param ch Array of child tree-refs (length @p len).
 	 * @param len Number of children.
-	 * @param r The default result node (returned unchanged if no reduction applies).
-	 * @return Reduced or canonical node, or @p r.
+	 * @param r The default result node, passed to `tree::get_raw` when no
+	 * reduction applies.
+	 * @return Reduced or canonical node, the raw node when no reduction
+	 * applies, or nullptr when the node is ill-formed (a negative shift).
 	 */
 	tref operator()(const node& v, const tref* ch, size_t len, tref r);
 
@@ -75,21 +77,29 @@ private:
 	static inline const tree<node>& quantified_formula(const tref* ch);
 
 	// hooks
-	/// @brief Construct the typed BF constant `0` for BA type @p ba_type.
+	/// @brief Build the `bf` constant `0` typed @p ba_type, reusing @p r as the
+	/// default result.
 	static tref _0_typed(size_t ba_type, tref r);
-	/// @brief Construct the typed BF constant `1` for BA type @p ba_type.
+	/// @brief Build the `bf` constant `1` typed @p ba_type, reusing @p r as the
+	/// default result.
 	static tref _1_typed(size_t ba_type, tref r);
-	/// @brief Hook for `bf` nodes: reduce to `0` if possible.
+	/// @brief Return `0` typed by the operands of the binary term in @p ch (the
+	/// one concrete type if only one side has it); the raw node if they clash.
 	static tref _0(const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf` nodes: reduce to `1` if possible.
+	/// @brief Return `1` typed by the operands of the binary term in @p ch (the
+	/// one concrete type if only one side has it); the raw node if they clash.
 	static tref _1(const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff` nodes: reduce to `F` (false) if possible.
+	/// @brief Return `F`, unless the two operands in @p ch carry distinct
+	/// concrete BA types, in which case the raw node.
 	static tref _F(const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff` nodes: reduce to `T` (true) if possible.
+	/// @brief Return `T`, unless the two operands in @p ch carry distinct
+	/// concrete BA types, in which case the raw node.
 	static tref _T(const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Negate a continuous (ctn) sub-formula.
+	/// @brief Negate the time constraint @p n (`[t op k]`) by flipping its
+	/// comparison; any other shape is wrapped in a `wff_neg`.
 	static tref ctn_neg(const tree<node>& n);
-	/// @brief Hook for `bf` term nodes.
+	/// @brief Hook for `bf` term nodes: dispatch on the operator child, else
+	/// let the pack simplify a typed symbol.
 	static tref term           (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `bf_or` (term disjunction) nodes.
 	static tref term_or        (const node& v, const tref* ch, size_t len, tref r);
@@ -99,17 +109,23 @@ private:
 	static tref term_neg       (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `bf_xor` (term exclusive-or) nodes.
 	static tref term_xor       (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_cast` (type-cast) nodes.
+	/// @brief Hook for `bf_cast` (type-cast) nodes: the BA owning the target
+	/// type folds the cast when it can.
 	static tref term_cast      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for constant `bf` nodes.
+	/// @brief Hook for `ba_constant` terms: fold a typed syntactic zero or one
+	/// to the typed `0` / `1`.
 	static tref cte            (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for constant-disjunction nodes.
+	/// @brief Fold the disjunction of two constants into one normalized
+	/// constant; keep the raw node when the owner reports it inexact.
 	static tref cte_or         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for constant-conjunction nodes.
+	/// @brief Fold the conjunction of two constants into one normalized
+	/// constant; keep the raw node when the owner reports it inexact.
 	static tref cte_and        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for constant-negation nodes.
+	/// @brief Fold the complement of a constant into one normalized constant;
+	/// keep the raw node when the owner reports it inexact.
 	static tref cte_neg        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for constant-xor nodes.
+	/// @brief Fold the exclusive-or of two constants into one normalized
+	/// constant; keep the raw node when the owner reports it inexact.
 	static tref cte_xor        (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff` (well-formed formula) nodes.
 	static tref wff            (const node& v, const tref* ch, size_t len, tref r);
@@ -121,15 +137,18 @@ private:
 	static tref wff_neg        (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_xor` exclusive-or nodes.
 	static tref wff_xor        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_ctn` (continuous) nodes.
+	/// @brief Hook for time `constraint` nodes: rewrite `=` into `<=` and `>=`,
+	/// `!=` into `<` or `>`.
 	static tref wff_ctn        (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `bf_eq` equality nodes.
 	static tref wff_eq         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_eq` equality nodes with a constant RHS.
+	/// @brief Decide `{c} = 0` for a typed constant `c`; an inexact constant is
+	/// left to its owner's hook, or kept raw.
 	static tref wff_eq_cte     (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `bf_neq` disequality nodes.
 	static tref wff_neq        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_neq` disequality nodes with a constant RHS.
+	/// @brief Decide `{c} != 0` for a typed constant `c`; an inexact constant
+	/// is left to its owner's hook, or kept raw.
 	static tref wff_neq_cte    (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_sometimes` (existential-temporal) nodes.
 	static tref wff_sometimes  (const node& v, const tref* ch, size_t len, tref r);
@@ -151,25 +170,28 @@ private:
 	static tref wff_rimply     (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_equiv` (equivalence) nodes.
 	static tref wff_equiv      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_lt` (less-than BV comparison) nodes.
+	/// @brief Hook for `bf_lt` (less-than) nodes.
 	static tref wff_lt         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_nlt` (not-less-than) nodes.
+	/// @brief Hook for `bf_nlt` (not-less-than) nodes.
 	static tref wff_nlt        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_lteq` (less-than-or-equal) nodes.
+	/// @brief Hook for `bf_lteq` (less-than-or-equal) nodes.
 	static tref wff_lteq       (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_nlteq` (not-less-than-or-equal) nodes.
+	/// @brief Hook for `bf_nlteq` (not-less-than-or-equal) nodes.
 	static tref wff_nlteq      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_gt` (greater-than) nodes.
+	/// @brief Hook for `bf_gt` (greater-than) nodes.
 	static tref wff_gt         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_ngt` (not-greater-than) nodes.
+	/// @brief Hook for `bf_ngt` (not-greater-than) nodes.
 	static tref wff_ngt        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_gteq` (greater-than-or-equal) nodes.
+	/// @brief Hook for `bf_gteq` (greater-than-or-equal) nodes.
 	static tref wff_gteq       (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_ngteq` (not-greater-than-or-equal) nodes.
+	/// @brief Hook for `bf_ngteq` (not-greater-than-or-equal) nodes.
 	static tref wff_ngteq      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for bitvector interval constraint nodes.
+	/// @brief Hook for `bf_interval` nodes: a type with arithmetic operations
+	/// splits `a <= x <= b` into two `<=` atoms.
 	static tref wff_interval   (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for time-shift nodes.
+	/// @brief Hook for `shift` nodes: fold a numeric `n - k` into the integer
+	/// it denotes; keep a variable or capture `t - k` raw.
+	/// @return nullptr when `k > n` (a negative time point).
 	static tref shift          (const node& v, const tref* ch, size_t len, tref r);
 };
 

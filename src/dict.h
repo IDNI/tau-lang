@@ -37,12 +37,14 @@ inline size_t dict(const std::string& s) {
 /**
  * @brief Return the string registered under integer @p id.
  * @param id Id previously returned by `dict(string)`.
- * @return Reference to the corresponding string.
+ * @return Reference to the corresponding string; it stays valid only until
+ * the next registration of a new string.
+ * @pre @p id is a registered id; an unknown id throws `std::out_of_range`.
  */
 inline const std::string& dict(size_t id) {
 	DBG(assert(id < S().size());)
-	// .at: a corrupted/stale sid throws loudly instead of silent
-	// out-of-bounds UB in Release (TT2-22).
+	// .at: a corrupted or stale id throws instead of reading out of bounds
+	// in Release.
 	return S().at(id);
 }
 

@@ -128,6 +128,7 @@ static tref parse_guard_expr(
 	return result;
 }
 
+/** @internal @copydoc guard_to_aba @endinternal */
 template <NodeType node>
 tref guard_to_aba(
     const std::string& guard_label,
@@ -160,6 +161,8 @@ tref guard_to_aba(
 // forces a minterm to zero, contradicting the independent all-false type).
 // Wired SHADOW-ONLY: the solver's answer stays authoritative; this only
 // measures the agreement rate via ocltl_swap_stats/ocltl_swap_crosscheck.
+// Agreement counters of the shadow crosscheck; the eligibility and agreement
+// counts move only while the crosscheck is enabled.
 struct ocltl_swap_counters {
 	std::atomic<size_t> total_calls{0}; // aba_existential_feasible's compute() ran (always counted, cheap)
 	std::atomic<size_t> eligible{0};    // fm matched match_ocltl_swap_shape (crosscheck-gated)
@@ -168,6 +171,7 @@ struct ocltl_swap_counters {
 	std::atomic<size_t> disagree{0};    // closed form != solver, among eligible
 };
 
+// The process-wide counters of the shadow crosscheck.
 inline ocltl_swap_counters& ocltl_swap_stats() {
 	static ocltl_swap_counters c;
 	return c;
@@ -352,6 +356,10 @@ static bool qlt_order_conj_unsat(tref fm) {
 	return false;
 }
 
+// Tri-state existential satisfiability of fm, all of its variables existential:
+// true / false when decided, nullopt when the solver could not decide. A
+// decided answer is cached (under TAU_CACHE) until the verdict budgets or the
+// pack's options change.
 template <NodeType node>
 static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	using tau = tree<node>;
@@ -467,6 +475,7 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 			return v;
 		}
 		// an undecided check decides nothing: a later, larger budget may
+		// decide it
 		report cand = std::move(sat).report();
 		cand.demote_errors_to_warnings();
 		r.append(std::move(cand));
@@ -483,6 +492,8 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	return r.with_value(result);
 }
 
+// aba_existential_feasibility, reading undecided as feasible and setting
+// ltl_verdict_incomplete.
 template <NodeType node>
 static result<bool> aba_existential_feasible(tref fm) {
 	result<bool> r;
@@ -492,6 +503,8 @@ static result<bool> aba_existential_feasible(tref fm) {
 	return r.with_value(true);
 }
 
+// aba_existential_feasibility, reading undecided as infeasible and setting
+// ltl_verdict_incomplete.
 template <NodeType node>
 static result<bool> aba_existential_proven_feasible(tref fm) {
 	result<bool> r;
@@ -560,6 +573,7 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 			return v;
 		}
 		// an undecided check decides nothing: a later, larger budget may
+		// decide it
 		report cand = std::move(sr).report();
 		cand.demote_errors_to_warnings();
 		r.append(std::move(cand));
@@ -575,6 +589,8 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	return r.with_value(result);
 }
 
+// aba_synthesis_feasibility, reading undecided as feasible and setting
+// ltl_verdict_incomplete.
 template <NodeType node>
 static result<bool> aba_synthesis_feasible(tref fm) {
 	result<bool> r;
@@ -591,8 +607,9 @@ static result<bool> aba_synthesis_feasible(tref fm) {
 //
 //   - Pure-input formulas → EXISTENTIAL: pure-input constraints are env
 //     assumptions, not system obligations; ∃i captures env freedom.
-//   - Non-aba omcat output-only formulas → EXISTENTIAL: no input to be
-//     adversarial about.
+//   - Non-aba omcat output-only formulas, and output-only formulas of an
+//     algebra whose outputs are always satisfiable → EXISTENTIAL: no input
+//     to be adversarial about.
 //   - Input-bearing or non-omcat formulas → aba_synthesis_feasible: env
 //     picks inputs adversarially; system needs ∀i.∃o guarantees.
 //
@@ -656,6 +673,8 @@ static void collect_guard_and(tref fm, trefs& out) {
 template <NodeType node>
 struct guard_lit { tref lit; tref atom; bool pure_input; };
 
+// One live product of a guard: its literals, the pure-input ones among them,
+// and whether the whole product is (provably) feasible.
 template <NodeType node>
 struct guard_product {
 	std::vector<guard_lit<node>> lits;
@@ -860,6 +879,10 @@ guard_infeasible_products(const std::string& guard_label,
 	return r.with_value(std::move(out));
 }
 
+// The ABA oracle for one strategy edge: true when every input class the
+// label `guard_label` admits is covered by a feasible product (see the rule
+// below); a dead label or one whose products are all input-dead is vacuously
+// feasible.
 template <NodeType node>
 static result<bool> guard_is_aba_feasible(
     const std::string& guard_label,
@@ -1422,6 +1445,10 @@ static result<void> extend_consistency_positive_k_ary_mus(
 	return r;
 }
 
+// Appends to `skeleton` (and `out_constraints`) a G(!(...)) forbid for each
+// minimal infeasible positive subset of `group` of size >= 3 that no shorter
+// positive forbid already in `out_constraints` subsumes; the MUS enumeration
+// for groups up to 22 atoms, the exhaustive walk above that.
 template <NodeType node>
 static result<void> extend_consistency_positive_k_ary(
     const std::vector<std::pair<tref, std::string>>& group,
@@ -1440,7 +1467,7 @@ static result<void> extend_consistency_positive_k_ary(
 	if (out_constraints) {
 		// Only a positive forbid "G(!(name1 && name2 && ...))" subsumes:
 		// an implication or a forbid with a negated atom rules out other
-		// combinations. Names are matched whole (LT-9: `p1` is not in
+		// combinations. Names are matched whole (`p1` is not in
 		// `p10`).
 		std::map<std::string, int> index_of;
 		for (int i = 0; i < n; ++i)
@@ -1603,6 +1630,11 @@ static result<void> add_shift_chain_constraints(
 	return r;
 }
 
+// Appends the ABA consistency constraints described above for `atoms` to
+// `skeleton`, recording each in `out_constraints` when given.
+// `polarity_complete` also checks the mixed-polarity combinations of the
+// same-type system pairs, as Algorithm B always does. Input-only infeasibilities, seeded with `seed_input_assumptions`,
+// become an assumption the whole skeleton is wrapped under.
 template <NodeType node>
 static result<void> add_consistency_constraints(
     const std::vector<std::pair<tref, std::string>>& atoms,
@@ -1645,8 +1677,8 @@ static result<void> add_consistency_constraints(
 				bool is_mixed = atom_has_any_input<node>(atoms[i].first);
 				bool pure_out_lookback = atom_has_lookback<node>(atoms[i].first)
 				    && !is_mixed;
-				// LT-18: this block is only entered when the atom
-				// is NOT pure-input, so pass false directly.
+				// This block is only entered when the atom is NOT
+				// pure-input, so pass false directly.
 				bool feasible = pure_out_lookback;
 				if (!feasible) {
 					auto fr = aba_feasible_dispatch<node>(
@@ -1711,7 +1743,7 @@ static result<void> add_consistency_constraints(
 	// Uses existential feasibility (∃m,x,y. combo) — same standard as the
 	// oracle — so we emit exactly the constraints the oracle would later reject.
 	// Gated on the synthesis algorithm choice being B (`--ltl-alg B` /
-	// `set ltlalg B` / TAU_LTL_ALG=B); default behaviour is unchanged.
+	// `set ltlalg B` / TAU_LTL_ALG=B) or on `polarity_complete`.
 	//
 	// Pure-input pairs are ALWAYS checked, with the infeasible combinations
 	// added as environment assumptions: over a finite algebra such as
@@ -2264,10 +2296,9 @@ static void add_input_twins(
 // ltl_to_safety_formula_full: atom extraction, classification, skeleton + ABA
 // consistency constraints, ltlsynt call, HOA parse.
 //
-// Returns {atoms, input_props, output_props, automaton} on success,
-// std::nullopt when propositionally unrealizable.
-// The caller must perform the ABA oracle check if desired.
-
+// Its result, declared in ltl_aba.h: the atoms, the input and output props
+// and the strategy automaton, with what the later passes need. The caller
+// must perform the ABA oracle check if desired.
 template <NodeType node>
 struct ltl_aba_solution {
 	std::vector<std::pair<tref, std::string>> atoms;
@@ -2469,6 +2500,8 @@ static tref reindex_to_window_frame(tref fm, int_t shift_add) {
 	return rewriter::replace<node>(fm, reindex);
 }
 
+// The blocking clauses window_infeasible_paths found, and whether it stopped
+// at its path cap.
 struct window_oracle_result {
 	std::vector<std::string> blocking_clauses;
 	bool path_cap_reached = false;
@@ -2643,6 +2676,8 @@ struct data_quantifier {
 	// Reports of the checks that answer through a value; a caller merges it.
 	report rep;
 
+	// Whether v's type provably has only the values 0 and 1, cached per
+	// type.
 	bool is_two_element(tref v) {
 		size_t tid = find_ba_type<node>(v);
 		auto it = two_element.find(tid);
@@ -2663,6 +2698,8 @@ struct data_quantifier {
 		return two;
 	}
 
+	// `ex v fm` or `all v fm`, as a disjunction or conjunction over the two
+	// values when v's type is two-element.
 	tref quantify(tref v, tref fm, bool exists) {
 		if (!is_two_element(v))
 			return exists ? tau::build_wff_ex(v, fm, false)
@@ -2678,6 +2715,8 @@ struct data_quantifier {
 			: tau::build_wff_and(lo, hi);
 	}
 
+	// fm with its quantifiers eliminated by the normalizer; nullptr when
+	// that fails or leaves a quantifier standing.
 	tref eliminate(tref fm) {
 		auto n = normalize_non_temp<node>(fm);
 		if (!n.has_value() || !n.value()
@@ -2772,6 +2811,7 @@ struct data_quantifier {
 // quantifiers. The strategy wins when the steps before step 0, each played
 // like any other step (reached_before_start), can reach R_init.
 
+// The answer of strategy_wins_on_data.
 enum class strategy_data_verdict { wins, loses, undecided };
 
 // `rounds` receives the number of fixpoint rounds run; max_rounds 0 is
@@ -3079,8 +3119,9 @@ static result<std::optional<tref>> first_unforced_claim(
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
 //
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:
-//   G(o__ltl_s{k}__[t]:bv = {1}  ↔  (ψ[t]  ∨  (φ[t]  ∧  o__ltl_s{k}__[t-1]:bv = {1})))
-// and replace wff_since(φ,ψ) with the atom  o__ltl_s{k}__[t]:bv = {1}.
+//   G(o__ltl_s{k}__[t]:C = {1}  ↔  (ψ[t]  ∨  (φ[t]  ∧  o__ltl_s{k}__[t-1]:C = {1})))
+// and replace wff_since(φ,ψ) with the atom  o__ltl_s{k}__[t]:C = {1}, where C
+// is the pack's Boolean carrier type (pack_bool_carrier_type).
 //
 // φ T ψ  ("φ Trigger ψ") = ¬(¬φ S ¬ψ): rewrite and apply S.
 //
@@ -3114,7 +3155,8 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 		*definitions<node>::instance().get_io_context(), fm));
 }
 
-// Recursively rewrite all wff_since / wff_trigger nodes.
+// Recursively rewrite all wff_since / wff_trigger nodes; returns fm with each
+// replaced by its auxiliary atom.
 // Uses `counter` for fresh auxiliary names.
 // `safety_invs` collects G(curr && rhs) for the outermost S, and
 // G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form

@@ -13,7 +13,7 @@
 // THE TWO OPPOSITE PRECONDITIONS -- read this before "simplifying" either
 // normalisation call below into a single shared one. They genuinely conflict.
 //
-// `squeeze_positives` (normal_forms_transformations.tmpl.h:382-385) DBG-asserts
+// `squeeze_positives` (normal_forms_nnf.tmpl.h) DBG-asserts
 // its input holds no `wff_neg(bf_eq)`, and it selects with
 // `select_top(is<bf_eq>)`. `select_top` descends THROUGH a `wff_neg`, so the
 // equation inside a `!(g = 0)` is folded into the *positive* squeeze, while the
@@ -29,7 +29,7 @@
 // that spelling.
 //
 // Neither spelling can be made global. `squeeze_positives` has a second caller
-// outside anti-prenexing at `interpreter.tmpl.h:1156`, so its precondition is
+// outside anti-prenexing in `interpreter.tmpl.h`, so its precondition is
 // not ours to change; and the rest of this pipeline canonicalises on the
 // `!(= 0)` spelling. Each precondition is therefore established locally, at its
 // own point of use. Both calls are no-ops on input already in the right form.
@@ -75,12 +75,9 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 
 	// ---- Lift the conjuncts no block variable touches --------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`. A conjunct free of every
-	// block variable is not in the block's scope in any meaningful sense, and
-	// carrying it into the squeeze would distribute the block over a term it
-	// does not occur in. `push_ex_block_into_clause` used to only DBG-assert
-	// this could not happen; doing the lift makes the assumption true instead
-	// of assumed.
+	// A conjunct free of every block variable is not in the block's scope,
+	// and carrying it into the squeeze would distribute the block over a term
+	// it does not occur in.
 	tref indep = _T<node>();
 	trefs conjs;
 	for (tref c : get_cnf_wff_clauses<node>(clause)) {
@@ -100,25 +97,16 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// from `_0<node>(clause_type)`, so a heterogeneous input silently
 	// produces a wrongly-typed term.
 	//
-	// Scanned AFTER the lift, and over `conjs` rather than the whole clause,
-	// which is what makes this usable at all. A mixed `:tau` / `:bv[N]` spec
-	// -- every `run` over mixed streams -- reaches here with a clause whose
-	// conjuncts are individually homogeneous but collectively are not, and
-	// the block's own variables only ever occur in conjuncts of the block's
-	// type. Scanning the whole clause declined all of those: measured
-	// 2026-08-04, that is what left the `all i2[1]:bv[8] (...)` block
-	// standing in `test_integration-interpreter`'s "nested conditionals over
-	// mixed tau/bv streams stay sat" (issue #70) once the legacy fallback
-	// stopped rescuing it, making the step system unsolvable and the run
-	// report "Tau specification is unexpectedly unsat".
+	// Scanned AFTER the lift, and over `conjs` rather than the whole clause:
+	// a mixed `:tau` / `:bv[N]` spec -- every `run` over mixed streams --
+	// reaches here with a clause whose conjuncts are individually homogeneous
+	// but collectively are not, and the block's own variables only ever occur
+	// in conjuncts of the block's type. Scanning the whole clause would keep
+	// those blocks and can leave the step system of such a run unsolvable.
 	//
-	// A runtime guard, deliberately with no DBG assert beside it. It used to
-	// carry one, on the reading that a heterogeneous clause meant the
-	// quantifiers had been pushed in wrongly upstream. The same experiment
-	// disproved that: `test_integration-splitter` reaches this line
-	// legitimately and Release, which only had the guard, passed 26/26.
-	// Mixing BA types is a shape this algorithm meets; declining is the
-	// answer, not dying.
+	// A runtime guard, deliberately with no DBG assert beside it: a
+	// heterogeneous clause is a legitimate input (`test_integration-splitter`
+	// reaches this line), and declining is the answer, not dying.
 	size_t clause_type = 0;
 	bool types_homogeneous = true;
 	auto note_type = [&](size_t t) {
@@ -261,10 +249,10 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// assumption.
 	// REVIEW (MEDIUM): this `!= eliminable` gate routes every blasteable
 	// variable into `kept_set` (and so into the re-wrapped part below)
-	// before it can reach the solver/blast loop at :317-362, making that
-	// loop unreachable through this path (empirically confirmed
-	// 2026-08-18; pinned in tests/unit/test_leaf_clause.cpp -- the pins
-	// must flip if this gate narrows).
+	// before it can reach the solver/blast loop below, making that loop
+	// unreachable through this path (pinned in
+	// tests/unit/test_leaf_clause.cpp -- the pins must flip if this gate
+	// narrows).
 	subtree_unordered_set<node> kept_set, reserved;
 	for (tref v : block)
 		if (elim.verdict_of(v) != elim_verdict::eliminable)
@@ -275,11 +263,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	for (tref v : block)
 		if (kept_set.contains(v))
 			for (tref c : elim.conjuncts_of(v)) reserved.insert(c);
-	// An unrecognised conjunct shape freezes its own component rather than
-	// the whole clause. This replaces `push_ex_block_into_clause`'s
-	// `is_quant_removable_in_clause` flag: that flag re-wrapped the entire
-	// block around the entire clause on the first `bf_lt` it met, which is
-	// the all-or-nothing behaviour this module exists to remove.
+	// An unrecognised conjunct shape (a `bf_lt`, say) freezes its own
+	// component rather than the whole clause.
 	for (tref c : conjs)
 		if (!is_squeezable_conjunct<node>(c)) reserved.insert(c);
 	// `contains` (syntactic subtree occurrence), not `get_free_vars`: it is
@@ -363,22 +348,15 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 
 	// ---- A substitution witness, per live variable -----------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`: `ex x (x = t && phi(x))`
-	// becomes `phi(t)`. Cheaper and more precise than the squeeze, so it is
-	// tried first; a variable it settles leaves `live` and never reaches the
-	// BDD. Re-checked against the *current* `scoped` each time, since an
-	// earlier substitution can create the witness for a later variable.
+	// `ex x (x = t && phi(x))` becomes `phi(t)`. Cheaper and more precise
+	// than the squeeze, so it is tried first; a variable it settles leaves
+	// `live` and never reaches the BDD. Re-checked against the *current*
+	// `scoped` each time, since an earlier substitution can create the
+	// witness for a later variable.
 	//
-	// History, because this loop was once removed as "unsound": with the
-	// legacy fallback off it made the issue #70 step formula normalise to F.
-	// The fault was NOT here -- it was the γ1 cofactor branch of
-	// `anti_prenex_block` dropping `¬atm` from its F-branch (see the fix
-	// comment there), and this loop merely fed the core the reduced shapes
-	// that reached γ1. With that fixed, the loop is back, and with it the
-	// completeness it provides: without it, blocks it would discharge
-	// survive and multiply across driver rounds
-	// (`test_integration-interpreter` diverges, satisfiability2 is ~13x
-	// slower).
+	// Do not drop this loop: without it, blocks it would discharge survive
+	// and multiply across the rounds of the block driver
+	// (`test_integration-interpreter` diverges).
 	trefs still_live;
 	for (size_t i = 0; i < live.size(); ++i) {
 		if (tau::get(scoped).equals_T()
@@ -408,16 +386,16 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 
 	// ---- Bitvector content: the solver, then blasting --------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`, and scoped by the analysis
-	// rather than by a bare type test: `blasteable` is exactly "bv-typed
+	// Scoped by the analysis rather than by a bare type test: `blasteable`
+	// is exactly "bv-typed
 	// and cvc5 can be expected to translate this formula", which is the
 	// question this branch needs answered. Gating on the verdict rather than
 	// on `pack_type_has_arith_ops` alone is what keeps a formula carrying a foreign
 	// BA constant out of a solver that cannot represent it.
 	//
-	// Currently unreachable through the block driver, which diverts a
-	// skip-matched block to `blast_block` before a clause ever gets here; it
-	// becomes live when the legacy path is rewired through this module.
+	// Unreachable through the block driver, which diverts a skip-matched
+	// block to `blast_block` before a clause ever gets here, and through the
+	// `kept_set` gate above.
 	for (tref v : still_live) {
 		if (elim.verdict_of(v) != elim_verdict::blasteable) continue;
 		if (!pack_type_has_arith_ops<node>(tau::get(v).get_ba_type())) continue;
@@ -452,12 +430,11 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// to generic Boole decomposition would build BDD leaves backed by
 		// solver terms -- orders of magnitude costlier per node than
 		// atomless ones.
-		// (AN-3 note: this blast-then-re-enter hop carries no depth
-		// accounting of its own; the cycle it opens runs through the
-		// block driver, whose blast_block/per_block hops are bounded by
-		// max_blast_reentry_depth, and the branch is documented
-		// unreachable through the driver today. If it goes live with a
-		// re-entry that bypasses those bounded hops, add the guard here.)
+		// This blast-then-re-enter hop carries no depth accounting of its
+		// own; the cycle it opens runs through the block driver, whose
+		// blast_block/per_block hops are bounded by
+		// max_blast_reentry_depth. If this branch goes live with a
+		// re-entry that bypasses those bounded hops, add the guard here.
 		if (preprocessing && preprocess_placement == preprocess_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
 			TAU_TRY(tref pre_val, pack_preprocess<node>(ex_fm));

@@ -59,6 +59,15 @@ template <NodeType node>
 static std::optional<int> qlt_singleton_cmp(
 	const tree<node>& c1, const tree<node>& c2);
 
+/**
+ * @brief The qlt descriptor: the dense linear order of the rationals, whose
+ * constants are finite unions of intervals and whose variables denote points.
+ *
+ * Core reaches its quantifier elimination, ground decision, inequality solver,
+ * propositional LTL synthesis and semantic revision through the optional
+ * members below.
+ * @tparam PackBAs The BAs of the configured pack.
+ */
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -74,6 +83,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = true;
 
+	/// @brief `true` when @p type_tree names `qlt`.
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
 			type_tree, type_name);
@@ -148,11 +158,13 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		}};
 	}
 
+	/// @brief The type tree of `qlt`.
 	static tref type_tree() {
 		return ba_types_detail::make_syntactic_type_tree<node_t>(
 			type_name);
 	}
 
+	/// @brief `true` when @p ba_type_id is the id of `qlt`.
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
 			ba_type_id, type_name);
@@ -168,38 +180,58 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return !x.inexact && !qlt_pieces_unordered(x);
 	}
 
+	/// @brief `true` when @p x is held as the single piece covering Q; a
+	/// value covering Q in several pieces of unknown order is not recognised.
 	static bool is_syntactic_one(const qlt& x) { return is_qlt_one(x); }
 
+	/// @brief `true` when @p x has no piece.
 	static bool is_syntactic_zero(const qlt& x) { return is_qlt_zero(x); }
 
+	/// @brief Same structural test as `is_syntactic_one`; never fails.
 	static result<bool> is_one(const qlt& x) { return result<bool>{is_qlt_one(x)}; }
 
+	/// @brief Same test as `is_syntactic_zero`; never fails.
 	static result<bool> is_zero(const qlt& x) { return result<bool>{is_qlt_zero(x)}; }
 
+	/// @brief Always `true`: a qlt constant is closed.
 	static result<bool> is_closed(const qlt&) { return result<bool>{true}; }
 
+	/// @brief The literal `top`.
 	static std::string literal_one(tref) { return "top"; }
 
+	/// @brief The literal `bot`.
 	static std::string literal_zero(tref) { return "bot"; }
 
+	/// @brief Return @p x: a qlt is normalised at construction.
 	static result<qlt> normalize(const qlt& x) {
 		return result<qlt>{normalize_qlt(x)};
 	}
 
+	/// @brief A part of the first piece of @p x (the piece itself when its
+	/// midpoint is degenerate); @p st is ignored.
 	static result<qlt> splitter(const qlt& x, splitter_type st) {
 		return result<qlt>{qlt_splitter(x, st)};
 	}
 
+	/// @brief The `bf` constant `(0, 1)`, a nonempty proper part of `top`.
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(qlt_splitter_one()),
 			type_tree()));
 	}
 
+	/// @brief Return @p sym unchanged: qlt has no symbol simplification.
 	static tref simplify_symbol(tref sym) { return simplify_qlt_symbol(sym); }
 
+	/// @brief Return @p term unchanged: qlt has no term simplification.
 	static result<tref> simplify_term(tref term) { return result<tref>{simplify_qlt_term(term)}; }
 
+	/**
+	 * @brief Parse the qlt literal @p src.
+	 * @param src The literal text; the type annotation is ignored.
+	 * @return The constant typed `qlt`, or an error naming why @p src is not
+	 * one.
+	 */
 	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
@@ -219,7 +251,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief The singleton `{0}`, wrapped as a bf constant.
+	 * @brief The singleton `{0}` typed @p ba_type, wrapped as a bf constant.
 	 *
 	 * A dense linear order has no bottom element, so qlt's default is the
 	 * finite rational 0 rather than bf_f.
@@ -238,6 +270,9 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 * @brief The order of two qlt singleton constants. `0` and `1` are the
 	 * order's sentinels below and above every point, not points, so they
 	 * compare as nothing here.
+	 * @return Negative, zero or positive as @p a is below, at or above @p b;
+	 * nullopt when either is not a qlt constant or the order is not
+	 * determined.
 	 */
 	static std::optional<int> dense_order_compare(size_t, tref a, tref b) {
 		auto operand = [](tref c) -> const tau& {
@@ -253,6 +288,11 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/**
 	 * @brief The rational halfway between @p lo and @p hi, one above
 	 * @p lo or below @p hi when only one is given, 0 when neither is.
+	 * @param ba_type Type id the returned constant carries.
+	 * @param lo Lower singleton constant, or nullptr.
+	 * @param hi Upper singleton constant, or nullptr.
+	 * @return The singleton as a bf constant; nullptr when a given bound is
+	 * not a finite closed singleton.
 	 */
 	static tref dense_order_between(size_t ba_type, tref lo, tref hi) {
 		auto point = [](tref c) -> std::optional<qlt_rational> {
@@ -327,12 +367,14 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return qlt_cells_residual<node_t>(var, body);
 	}
 
-	/** @brief A rational witness for @p var, spelled for generated C++. */
+	/** @brief A rational witness for @p var satisfying @p conj, spelled for
+	 * generated C++; `1` when the elimination determines no interval. */
 	static std::optional<std::string> codegen_witness(tref var, tref conj) {
 		return qlt_codegen_witness<node_t>(var, conj);
 	}
 
-	/** @brief @p cst's own rational, spelled for generated C++. */
+	/** @brief @p cst's own rational, spelled for generated C++; nullopt when
+	 * @p cst is not a finite point. */
 	static std::optional<std::string> codegen_constant_expr(tref cst) {
 		return qlt_codegen_constant_expr<node_t>(cst);
 	}
@@ -348,7 +390,8 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 	{ return qlt_try_propositional_synthesis<node_t>(fm, atoms); }
 
-	/** @brief Revise @p clause by the winning region of its product game. */
+	/** @brief Revise @p clause by @p update through the winning region of
+	 * their product game. */
 	static result<tref> semantic_pwr_optimal(tref clause, tref update) {
 		return qlt_semantic_pwr_optimal<node_t>(clause, update);
 	}

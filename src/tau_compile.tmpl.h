@@ -138,6 +138,9 @@ inline result<bool> write_artifact_presets(const std::string& out_dir,
 // the failing stage; its exit code is the verdict. The check that out_exe
 // exists only catches a script that reported success without copying. The
 // script output goes to compile.log there, and a failure reports its end.
+// `native` selects the running tau's own build over a platform preset;
+// `target_sdk`, when not empty, is the SDK the configure resolves from.
+// Returns out_exe.
 inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	const std::string& artifact_dir, const std::string& out_exe,
 	const std::string& cxx, const std::string& preset,
@@ -229,8 +232,8 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	return r.with_value(std::move(out_exe));
 }
 
-// The includes, the embedded spec and the option handling every artifact
-// main starts with, up to tau_init.
+// Writes to f the includes, the embedded spec of d and the option handling
+// every artifact main starts with, up to tau_init.
 inline void emit_main_head(const program_desc& d, std::ostream& f) {
 	f <<
 		"// Auto-generated driver for a tau-compiled spec.\n"
@@ -288,7 +291,8 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 		;
 }
 
-// The end of every artifact main: prints the run's report and leaves.
+// Writes to f the end of every artifact main: prints the run's report and
+// leaves.
 inline void emit_main_tail(std::ostream& f) {
 	f <<
 		"\trun_r.report().print(cerr);\n"
@@ -465,8 +469,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 	emit_main_tail(f);
 }
 
-// The main of a spec `run` executes by solving as it goes: the artifact
-// executes the embedded spec with the same interpreter.
+// Writes to f the main of a spec `run` executes by solving as it goes: the
+// artifact executes the embedded spec with the same interpreter.
 inline void emit_solving_main(const program_desc& d, std::ostream& f) {
 	emit_main_head(d, f);
 	f <<
@@ -530,9 +534,10 @@ inline std::string sdk_package_suffix(const std::string& platform) {
 }
 
 // Maps a `--preset` name to the platform it builds in, from the table compiled
-// into tau (cmake/tau_bas.cmake). A platform name is its own platform, so the
-// bare `--preset release-w64` the docs allow needs no map entry. An unknown
-// name fails here, before any SDK is touched, and names the platforms.
+// into tau (cmake/tau_artifact_template.h.in). A platform name is its own
+// platform, so the bare `--preset release-w64` the docs allow needs no map
+// entry. An unknown name fails here, before any SDK is touched, and names the
+// platforms.
 inline result<std::string> preset_platform(const std::string& preset) {
 	result<std::string> r;
 	for (const auto& e : tau_preset_platform_map)
@@ -567,6 +572,7 @@ inline std::string platform_sdk_dir(const std::string& platform) {
 
 } // namespace compile_detail
 
+/** @internal @copydoc resolve_sdk_dir @endinternal */
 inline result<std::string> resolve_sdk_dir(const std::string& platform) {
 	result<std::string> r;
 #if defined(__EMSCRIPTEN__)
@@ -668,9 +674,9 @@ inline result<std::string> resolve_sdk_dir(const std::string& platform) {
 #endif
 }
 
-// Parse, synthesize and emit the artifact. Split from compile_spec so `tau
-// gen` stops before the build and `tau compile` continues into the SDK's
-// cmake script.
+// Split from compile_spec so `tau gen` stops before the build and
+// `tau compile` continues into the SDK's cmake script.
+/** @internal @copydoc gen_spec @endinternal */
 template <NodeType Node>
 result<codegen_result> gen_spec(
 	const std::string& spec_src,
@@ -854,6 +860,7 @@ result<codegen_result> gen_spec(
 	return r.with_assert_check_value(std::move(res));
 }
 
+/** @internal @copydoc compile_spec @endinternal */
 template <NodeType Node>
 result<codegen_result> compile_spec(
 	const std::string& spec_src,

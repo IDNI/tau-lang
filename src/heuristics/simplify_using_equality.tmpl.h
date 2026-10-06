@@ -13,31 +13,7 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula);
 
 // ── Internal helpers ────────────────────────────────────────────────────────
 
-/**
- * @internal
- * @brief Strict term ordering used to pick canonical union-find representatives.
- *
- * Order: `0` < `1` < `ba_constant` < uninterpreted constant < input stream
- * variable < output stream variable < plain variable < everything else (by
- * `subtree_less`).
- * @tparam node Tree node type.
- * @param l Left term.
- * @param r Right term.
- * @return `true` if @p l strictly precedes @p r in this order.
- *
- * @par Example
- * @code{.cpp}
- * // 0 precedes any variable (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:20-26).
- * tref atm    = get_nso_rr("x = 0.").value().main->get();
- * tref x_t    = tau::get(atm)[0].first();
- * tref zero_t = tau::get(atm)[0].second();
- * CHECK( simplify_using_equality_term_comp<node_t>(zero_t, x_t) == true );
- * CHECK( simplify_using_equality_term_comp<node_t>(x_t, zero_t) == false );
- * @endcode
- * @endinternal
- */
-// Number of nodes of a term, memoised (terms are interned).
+// Number of nodes of term @p n, memoised in a tree cache (terms are interned).
 template <NodeType node>
 size_t simplify_using_equality_term_size(tref n) {
 	using tau = tree<node>;
@@ -50,6 +26,30 @@ size_t simplify_using_equality_term_size(tref n) {
 	return cache.emplace(n, size).first->second;
 }
 
+/// @internal
+/// @brief Strict term ordering used to pick canonical union-find representatives.
+///
+/// Order: `0` < `1` < `ba_constant` < uninterpreted constant < input stream
+/// variable < output stream variable < plain variable < everything else.
+/// Ties inside a class are broken by `subtree_less`; compound terms are
+/// ordered by node count first, so a representative never contains another
+/// member of its class.
+/// @tparam node Tree node type.
+/// @param l Left term.
+/// @param r Right term.
+/// @return `true` if @p l strictly precedes @p r in this order.
+///
+/// @par Example
+/// @code{.cpp}
+/// // 0 precedes any variable (see the "0 < variable" case of
+/// // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
+/// tref atm    = get_nso_rr("x = 0.").value().main->get();
+/// tref x_t    = tau::get(atm)[0].first();
+/// tref zero_t = tau::get(atm)[0].second();
+/// CHECK( simplify_using_equality_term_comp<node_t>(zero_t, x_t) == true );
+/// CHECK( simplify_using_equality_term_comp<node_t>(x_t, zero_t) == false );
+/// @endcode
+/// @endinternal
 // TODO: For variables, make lower time step < higher time step
 template <NodeType node>
 bool simplify_using_equality_term_comp(tref l, tref r) {
@@ -114,14 +114,17 @@ bool simplify_using_equality_term_comp(tref l, tref r) {
  * @internal
  * @brief Stable-sorts @p conjs in place so equality conjuncts come before
  * non-equality ones, and among equalities, equational assignments
- * (`variable = ...`) come before non-assignment equalities.
+ * (`variable = ...`) come before non-assignment equalities; the assignments
+ * are then ordered so that one defining `x` precedes every assignment that
+ * reads `x` (a dependency cycle keeps its input order).
  * @tparam node Tree node type.
  * @param conjs Conjuncts to sort in place.
  *
  * @par Example
  * @code{.cpp}
- * // "x != 0 && y = 0": the equality moves to the front (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:78-85).
+ * // "x != 0 && y = 0": the equality moves to the front (see the
+ * // "equality precedes inequality" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * tref fm = get_nso_rr("x != 0 && y = 0.").value().main->get();
  * trefs conjs = get_cnf_wff_clauses<node_t>(fm);
  * simplify_using_equality_sort_atms<node_t>(conjs);
@@ -217,8 +220,9 @@ void simplify_using_equality_sort_atms(auto& conjs) {
  *
  * @par Example
  * @code{.cpp}
- * // "0 = x" is reoriented to "x = 0" (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:144-151).
+ * // "0 = x" is reoriented to "x = 0" (see the "reversed equality 0 = x is
+ * // reoriented to x = 0" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * tref orig   = get_nso_rr("x = 0.").value().main->get();
  * tref x_t    = tau::get(orig)[0].first();
  * tref zero_t = tau::get(orig)[0].second();
@@ -272,13 +276,15 @@ struct simplify_using_equality_cached_consequences {
  * @tparam node Tree node type.
  * @param uf Union-find to register the equality (and consequences) in.
  * @param eq The equality atom to add (`T`/`F` are accepted as trivial cases).
- * @return `false` if a syntactic contradiction is detected (e.g. `lhs` and
- * `!lhs` become connected, or `0` and `1` become connected); `true` otherwise.
+ * @return `false` if @p eq is `F` or a syntactic contradiction is detected
+ * (`lhs` and `!lhs` become connected, or `0` and `1` do); `true` otherwise.
+ * The derived terms are cached per (lhs, rhs) pair in a tree cache.
  *
  * @par Example
  * @code{.cpp}
- * // x = 0 then x = 1 is a contradiction (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:202-210).
+ * // x = 0 then x = 1 is a contradiction (see the case of that name in the
+ * // simplify_using_equality_add_raw_equality suite of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -328,7 +334,8 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
 /**
  * @internal
  * @brief Registers @p eq in @p uf, decomposing `f = 0` via DNF first so each
- * disjunct of `f` gets connected to `0` individually.
+ * disjunct of `f` gets connected to `0` individually; any other equality is
+ * registered as is.
  * @tparam node Tree node type.
  * @param uf Union-find to register the equality (and derived facts) in.
  * @param eq The equality atom to add.
@@ -338,7 +345,8 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
  * @par Example
  * @code{.cpp}
  * // "x|y = 0" decomposes: x and y are each individually connected to 0
- * // (see tests/integration/test_integration-heuristics-simplify_using_equality.cpp:248-260).
+ * // (see the "x|y = 0 decomposes" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -368,8 +376,8 @@ bool simplify_using_equality_add_equality(auto& uf, tref eq) {
  * @internal
  * @brief Rewrites sub-terms of @p eq with their union-find canonical
  * representatives from @p uf, leaving @p eq unchanged where no rewrite
- * applies. Preserves sub-terms whose variables are all input-stream
- * variables.
+ * applies. A sub-term whose variables are all input-stream variables is kept
+ * as is.
  * @tparam node Tree node type.
  * @param uf Union-find holding previously-registered equalities.
  * @param eq Equation to rewrite.
@@ -378,8 +386,9 @@ bool simplify_using_equality_add_equality(auto& uf, tref eq) {
  *
  * @par Example
  * @code{.cpp}
- * // x = 0 is known; simplifying "x = y" replaces x by 0 (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:296-304).
+ * // x = 0 is known; simplifying "x = y" replaces x by 0 (see the "term
+ * // known equal to 0 is replaced" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -433,6 +442,7 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 
+/** @internal @copydoc simplify_using_equality @endinternal */
 template <NodeType node>
 result<tref> simplify_using_equality(tref fm) {
 	using tau = tree<node>;

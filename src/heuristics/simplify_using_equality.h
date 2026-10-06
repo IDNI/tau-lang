@@ -26,18 +26,21 @@ namespace idni::tau_lang {
  *
  * @tparam node Tree node type.
  * @param fm Formula to simplify.
+ * Sub-formulas under a quantifier, a temporal quantifier, or an implication,
+ * equivalence, xor or conditional are not entered.
+ *
  * @return Simplified formula; `T`/`F` when a branch is trivially true/false.
+ * An `internal_error` when the union-find scopes do not balance.
  *
  * @par Example
  * @code{.cpp}
- * // "xy|zx = 0 && xy = 0": xy=0 registers x~0 (or y~0), which simplifies
- * // the reoriented "xy|zx=0" clause (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:323-333).
+ * // "xy|zx = 0 && xy = 0": registering xy = 0 lets the other clause absorb
+ * // it (see case "1" of the simplify_using_equality suite in
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * tref fm = get_nso_rr("xy|zx = 0 && xy = 0.").value().main->get();
  * auto res = simplify_using_equality<node_t>(fm);
- * // tau::get(res.value()).to_str() matches one of "yx|xz = 0", "xy|xz = 0",
- * // "yx|zx = 0", "xy|zx = 0" (term-ordering / xz-vs-zx are not canonical
- * // across builds; see matches_to_str_to_any_of in the cited test)
+ * // res.value() matches "yx|zx = 0" up to and/or operand order
+ * // (matches_wff_mod_and_or_any_of)
  * @endcode
  */
 template <NodeType node>

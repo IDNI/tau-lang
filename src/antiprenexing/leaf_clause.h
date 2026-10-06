@@ -4,15 +4,12 @@
  * @file leaf_clause.h
  * @brief Eliminating a quantifier block over a single dependent clause.
  *
- * Merges what `push_ex_block_into_clause` and `treat_ex_quantified_clause`
- * used to do separately: lift the conjuncts no block variable touches,
- * partition the rest by eliminability component, try a substitution witness
+ * Lifts the conjuncts no block variable touches, hands a non-ABA
+ * omega-categorical block to its owner's elimination, partitions the rest by
+ * eliminability component, tries a substitution witness
  * per live variable, hand bitvector content to the solver or to blasting, and
  * otherwise squeeze the positive equations into a single term and drop the
  * binder.
- *
- * Split out of `antiprenexing.tmpl.h` because that file's block core is
- * already large; merging the clause logic into it would make both unreadable.
  *
  * Like the rest of `src/antiprenexing/`, this header does NOT include its own
  * `.tmpl.h` -- see the comment at `normal_forms.h`'s include block for why the
@@ -31,8 +28,7 @@
 
 namespace idni::tau_lang {
 
-// Forward declaration, same reason and same shape as the one in
-// heuristics/bv_predicate_blasting.h: the blast-and-re-enter branch of
+// Forward declaration: the blast-and-re-enter branch of
 // eliminate_block_over_clause calls back into the block driver, whose
 // definition lands later in normal_forms.h's include order. No default
 // argument here -- a default cannot be redeclared, and that call site always
@@ -55,9 +51,12 @@ result<tref> anti_prenex(tref formula, const eliminability<node>& el);
  * @param clause Clause to eliminate over.
  * @param block Block variables, outermost first.
  * @param elim Verdicts for @p block against @p clause's conjuncts.
- * @param order BDD variable order for the block.
+ * @param order Unused; the squeezes build their own BDD orders.
  * @return Clause with the eliminable part of the block removed and the frozen
- * part re-wrapped around only its own conjuncts.
+ * part re-wrapped around only its own conjuncts (`F` when the clause is
+ * unsatisfiable for every value of the block). Dependent conjuncts of mixed BA
+ * types keep the whole block and add a warning to the report; an error comes
+ * only from the normal form or preprocessing steps it runs.
  */
 template <NodeType node>
 result<tref> eliminate_block_over_clause(tref clause, const trefs& block,

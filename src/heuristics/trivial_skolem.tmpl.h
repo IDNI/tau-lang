@@ -36,6 +36,8 @@
 //     side containing `v` until the base form `v = witness` is obtained.
 //  5) The witness is accepted only if it does not mention any variable from
 //     `vars` (so it is independent from eliminated existentials in this pass).
+//     A variable of a non-ABA omega-categorical type is always kept: its
+//     owner's elimination decides it.
 //  6) Every accepted atom is replaced by `T` in one pass and the formula is
 //     rebuilt (`tree<node>::reget`) so the normal simplification hooks fold
 //     away the resulting `T && x`/`T || x` redundancies; `v` is removed from
@@ -83,9 +85,9 @@ namespace idni::tau_lang {
  *
  * @par Example
  * @code{.cpp}
- * // "a1 ^ c = d": xor is invertible, isolating a1 as "d ^ c"
- * // (see tests/integration/test_integration-heuristics-trivial_skolem.cpp:88-93,
- * // exercised through trivial_skolem_ex).
+ * // "a1 ^ c = d": xor is invertible, isolating a1 as "d ^ c" (see the
+ * // "xor is invertible (left operand)" case of
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp, exercised through trivial_skolem_ex).
  * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
  * tref phi = get_nso_rr("a1 ^ c = d.").value().main->get();
  * tref side  = tau::get(phi)[0].first();
@@ -152,8 +154,9 @@ bool trivial_skolem_invert_term(tref side, tref other, tref var, tref& result) {
  * @code{.cpp}
  * // "a1 = a2 && c = 0": a1 = a2 isolates a1 with witness "a2", but a2 is
  * // itself one of the variables being eliminated, so the witness is
- * // rejected (see
- * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:72-79).
+ * // rejected (see the "witness referencing another target variable is
+ * // rejected, both kept" case of
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp).
  * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
  * auto a2 = build_variable<node_t>("a2", tau_type_id<node_t>());
  * tref clause = get_nso_rr("a1 = a2.").value().main->get();
@@ -186,15 +189,15 @@ bool trivial_skolem_invertible_clause(tref clause, tref var,
  * @internal
  * @brief Predicate marking the non-monotone-position boundaries this pass
  * must not descend past: negation, wff-level xor/implication-family
- * connectives, and any (including temporal) quantifier.
+ * connectives, and any (including temporal or functional) quantifier.
  *
  * Atomic formulas under negation, wff-level xor, or implication-style
  * connectives are not in a monotone position (see file overview). We also
- * stop at nested (possibly temporal) quantifiers because those atoms are
- * out of scope for this pass. We intentionally do *not* stop at `wff_or`:
- * once a defining atom is proven equivalent to `T`, replacing it by `T`
- * remains sound under disjunction, and doing so lets the simplifier remove
- * the now-trivial branch.
+ * stop at nested (possibly temporal or functional) quantifiers because those
+ * atoms are out of scope for this pass. We intentionally do *not* stop at
+ * `wff_or`: once a defining atom is proven equivalent to `T`, replacing it by
+ * `T` remains sound under disjunction, and doing so lets the simplifier
+ * remove the now-trivial branch.
  * @tparam node Tree node type.
  * @param n Node to test.
  * @return `true` if @p n is one of these boundary node types.
@@ -202,8 +205,8 @@ bool trivial_skolem_invertible_clause(tref clause, tref var,
  * @par Example
  * @code{.cpp}
  * // An atom under negation is out of scope (negation is one of the
- * // boundaries; compare the negation-elimination cases at
- * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:263-278).
+ * // boundaries; compare the "atom under negation ..." cases of
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp).
  * tref neg = get_nso_rr("!(a1 = c).").value().main->get();
  * tref inner = tau::get(neg)[0].get();
  * // tau::get(inner).to_str() == "!a1 = c" (the wff_neg node itself)
@@ -243,8 +246,9 @@ bool trivial_skolem_atom_boundary(tref n) {
  * @par Example
  * @code{.cpp}
  * // a1 occurs in two separate clauses -> count is 2, so trivial_skolem_ex
- * // keeps it quantified rather than eliminating it (see
- * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:56-62).
+ * // keeps it quantified rather than eliminating it (see the "variable
+ * // occurring in two clauses is kept, both clauses preserved" case of
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp).
  * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
  * tref phi = get_nso_rr("a1 = c && a1 = d.").value().main->get();
  * CHECK( trivial_skolem_count_occurrences<node_t>(phi, a1) == 2 );
@@ -265,6 +269,7 @@ size_t trivial_skolem_count_occurrences(tref fm, tref var) {
 	return count(fm);
 }
 
+/** @internal @copydoc trivial_skolem_ex @endinternal */
 template <NodeType node>
 tref trivial_skolem_ex(const trefs& vars, tref phi) {
 	using tau = tree<node>;
