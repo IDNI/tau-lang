@@ -29,19 +29,30 @@ namespace idni::tau_lang {
 template <NodeType node>
 static std::optional<std::string> bv_codegen_witness(tref var, tref conj);
 
+/// C++ spelling of a bv constant; defined in bv_codegen.tmpl.h.
 template <NodeType node>
 static std::optional<std::string> bv_codegen_constant_expr(tref cst);
 
+/**
+ * @brief The descriptor of bv in any pack that holds it: the mandatory
+ * ba_descriptor surface plus bv's optional capabilities.
+ * @tparam PackBAs The BAs of the pack.
+ */
 template <typename... PackBAs>
 struct ba_descriptor<bv, node<PackBAs...>> {
+	/// The node type of the pack.
 	using node_t = node<PackBAs...>;
+	/// The tree over that node type.
 	using tau = tree<node_t>;
 
+	/// The family name of the type, matched by `bv` and every `bv[n]`.
 	static constexpr const char* type_name = "bv";
+	/// Priority for the pack's default type (lower wins).
 	static constexpr int default_type_priority = 50;
 
 	/** @brief bv is an atomic Boolean algebra, and not ω-categorical. */
 	static constexpr bool atomless = false;
+	/// bv is not a non-ABA ω-categorical type.
 	static constexpr bool non_aba_omcat = false;
 
 	/** @brief bv supports the grammar's arithmetic term operators. */
@@ -49,6 +60,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	/** @brief A bitvector holds a plain 0 or 1; one bit is enough for it. */
 	static constexpr bool can_host_bool = true;
+	/// The type core builds a plain 0/1 in when bv carries it: `bv[1]`.
 	static tref bool_carrier_type() { return bv_type<node_t>(1); }
 
 	/** @brief Render a value in decimal; cvc5's own operator<< does not. */
@@ -63,12 +75,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 */
 	static std::uint64_t hash_constant(const bv& x) { return hash_bv_constant(x); }
 
+	/// Whether @p type_tree is `bv` or some `bv[n]`.
 	static bool matches_type(tref type_tree) {
 		return is_bv_type_family<node_t>(type_tree);
 	}
 
+	/// The default bv type, `bv[default_bv_size]`.
 	static tref type_tree() { return bv_type<node_t>(default_bv_size); }
 
+	/// Whether the type id @p ba_type_id is of the bv family; false for an
+	/// unknown id.
 	static bool owns_type(size_t ba_type_id) {
 		return is_bv_type_family<node_t>(ba_type_id);
 	}
@@ -90,33 +106,43 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return static_cast<unsigned short>(width);
 	}
 
+	/// The type id of `bv[bitwidth]`, registering the type if needed.
 	static size_t type_id_for(unsigned short bitwidth) {
 		return bv_type_id<node_t>(bitwidth);
 	}
 
+	/// The type tree of `bv[bitwidth]`.
 	static tref type_tree_for(unsigned short bitwidth) {
 		return bv_type<node_t>(bitwidth);
 	}
 
+	/// Whether @p x is literally the all-ones bitvector.
 	static bool is_syntactic_one(const bv& x) {
 		return is_bv_syntactic_one(x);
 	}
 
+	/// Whether @p x is literally the all-zeros bitvector.
 	static bool is_syntactic_zero(const bv& x) {
 		return is_bv_syntactic_zero(x);
 	}
 
+	/// Whether @p x is the top element; decided syntactically, never fails.
 	static result<bool> is_one(const bv& x) {
 		return result<bool>{is_bv_syntactic_one(x)};
 	}
 
+	/// Whether @p x is the bottom element; decided syntactically, never fails.
 	static result<bool> is_zero(const bv& x) {
 		return result<bool>{is_bv_syntactic_zero(x)};
 	}
 
+	/// Every bv constant is closed.
 	static result<bool> is_closed(const bv&) { return result<bool>{true}; }
 
-	/** @brief Width-dependent: the all-ones bitvector of this type's width. */
+	/**
+	 * @brief Width-dependent: the all-ones bitvector of this type's width,
+	 * in decimal; empty when @p type_tree carries no width.
+	 */
 	static std::string literal_one(tref type_tree) {
 		auto width = get_bv_size<node_t>(type_tree);
 		// TODO (HIGH) dropped error: get_bv_size's report -- ba_descriptor_complete fixes this member to std::string.
@@ -124,6 +150,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return make_bitvector_top_elem(width.value()).getBitVectorValue(10);
 	}
 
+	/// The all-zeros bitvector of @p type_tree's width, in decimal; empty
+	/// when the type carries no width.
 	static std::string literal_zero(tref type_tree) {
 		auto width = get_bv_size<node_t>(type_tree);
 		// TODO (HIGH) dropped error: get_bv_size's report -- ba_descriptor_complete fixes this member to std::string.
@@ -131,14 +159,18 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return make_bitvector_bottom_elem(width.value()).getBitVectorValue(10);
 	}
 
+	/// @p x simplified by cvc5; never fails.
 	static result<bv> normalize(const bv& x) {
 		return result<bv>{normalize_bv(x)};
 	}
 
+	/// The simplified form of the bv operator node @p sym.
 	static tref simplify_symbol(tref sym) {
 		return simplify_bv_symbol<node_t>(sym);
 	}
 
+	/// The simplified form of the bv term @p term; an error is carried in
+	/// the report.
 	static result<tref> simplify_term(tref term) {
 		return simplify_bv_term<node_t>(term);
 	}
@@ -154,7 +186,11 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	// code asks the pack for one rather than naming solve_bv/is_bv_formula_sat.
 	// `auto` return keeps the solution type out of the generic fold.
 
-	/** @brief Solve @p form with bv's own solver. */
+	/**
+	 * @brief Solve @p form with bv's own solver.
+	 * @return A satisfying assignment, or nullopt when there is none, or
+	 *         when widening (if on) fails.
+	 */
 	// Exact arithmetic must see the widened atoms before cvc5 does. solve()
 	// stays a plain tref consumer (its own contract, unlike widen_arithmetic
 	// itself, is not result-carrying), so a widening failure collapses here.
@@ -261,7 +297,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	/// @name bv-declared CLI/REPL options
 	/// Backing getters/setters for @ref options; plain free functions so
-	/// they decay to the function pointers `ba_option` holds.
+	/// they decay to the function pointers `ba_option` holds. A `*-max-*`
+	/// cap setter of case split or definitional elimination stores SIZE_MAX
+	/// (unlimited) for 0; blastdepth, bitblast-max-nodes and solve-timeout
+	/// store 0 as given; max-width ignores 0.
 	/// @{
 	static bool get_blasting_option() { return bv_blasting; }
 	static void set_blasting_option(bool enabled) { bv_blasting = enabled; }

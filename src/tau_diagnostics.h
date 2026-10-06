@@ -10,20 +10,28 @@
 
 namespace idni::tau_lang {
 
+/// Short alias of the parser's diagnostics namespace.
 namespace diag = ::idni::diagnostics;
 
+/// A value of type @p T or an error, with the report that explains it.
 template <typename T>
 using result = diag::result<T>;
 
+/// Structured diagnostics: nodes tagged with a code, with attrs and timed scopes.
 using report = diag::report;
+/// The tag of a report node; its top two bits encode the severity.
 using code = diag::code;
+/// A labelled value attached to a report node.
 using attr = diag::attr;
+/// The attr labels shared with the parser.
 using label = idni::parser_strings::label;
+/// The output slot of one severity band (a stream or a callable).
 using diag_sink = diag::sink;
+/// One sink per severity band (error, warning, info).
 using diag_sinks = diag::sinks;
 
-// Static message strings, mirroring idni::parser_strings::messages. Use
-// these instead of repeating the same literal across error sites.
+/// @brief Static message strings, mirroring idni::parser_strings::messages.
+/// Use these instead of repeating the same literal across error sites.
 struct messages {
 	using sv = std::string_view;
 	static constexpr sv failed_to_parse_spec
@@ -96,20 +104,29 @@ struct messages {
 		= "the Boolean-algebra type id is invalid";
 };
 
-// Gates per-rule application/hit accounting in nso_rr_apply(rule, tref);
-// off by default since it costs a map lookup per rewrite. Set alongside the
-// REPL/CLI "benchmarks" option so a benchmark run also gets rule counts.
+/// @brief Gates per-rule application/hit accounting in nso_rr_apply(rule, tref),
+/// which the normalizer flushes into its report; off by default since it costs
+/// a map lookup per rewrite. The CLI sets it from its "benchmarks" option, so a
+/// benchmark run (file spec or REPL) also gets rule counts.
 inline bool rule_counting = false;
 
-// True when the report carries a node tagged @p c.
+/// @brief Whether @p rep carries a node tagged @p c.
+/// @param rep The report to search.
+/// @param c The code to look for.
+/// @return True when some node of @p rep has tag @p c.
 inline bool report_has_code(const report& rep, code c) {
 	for (const auto& n : rep.nodes()) if (n.tag == c) return true;
 	return false;
 }
 
-// @p n's value for attr @p lbl, or nullopt when @p n does not carry it.
-// The one place that indexes a node's attrs by label; every other lookup
-// below is built on this.
+/// @brief The raw value of attr @p lbl on node @p n.
+/// The one place that indexes a node's attrs by label; every other lookup
+/// below is built on this.
+/// @param rep The report owning @p n and its attrs.
+/// @param n A node of @p rep.
+/// @param lbl The attr label.
+/// @return The stored value (an interned key for a text label), or nullopt
+///         when @p n does not carry @p lbl.
 inline std::optional<int64_t> node_attr_value(const report& rep,
 	const diag::node& n, idni::int_t lbl)
 {
@@ -120,9 +137,14 @@ inline std::optional<int64_t> node_attr_value(const report& rep,
 	return std::nullopt;
 }
 
-// node_attr_value's result decoded as interned text. A text label --
-// name, value, type_name, path, expected -- stores an interned key.
-// is_text_label decides which, never the sign of the value.
+/// @brief node_attr_value's result decoded as interned text.
+/// A text label -- name, value, type_name, path, expected -- stores an
+/// interned key; is_text_label decides which, never the sign of the value.
+/// The caller must pass a text label: the value is decoded unconditionally.
+/// @param rep The report owning @p n and its string table.
+/// @param n A node of @p rep.
+/// @param lbl A text attr label.
+/// @return The text, or nullopt when @p n does not carry @p lbl.
 inline std::optional<std::string> node_attr_text(const report& rep,
 	const diag::node& n, idni::int_t lbl)
 {
@@ -131,8 +153,10 @@ inline std::optional<std::string> node_attr_text(const report& rep,
 	return std::string(rep.str(static_cast<idni::int_t>(*v)));
 }
 
-// The value of the first attr tagged @p lbl found anywhere in @p rep, or
-// nullopt.
+/// @brief The value of the first attr tagged @p lbl found anywhere in @p rep.
+/// @param rep The report to search, in node order.
+/// @param lbl The attr label.
+/// @return The raw value, or nullopt when no node carries @p lbl.
 inline std::optional<int64_t> report_attr_value(const report& rep,
 	idni::int_t lbl)
 {
@@ -141,20 +165,30 @@ inline std::optional<int64_t> report_attr_value(const report& rep,
 	return std::nullopt;
 }
 
-// True when some node in @p rep carries an attr tagged @p lbl.
+/// @brief Whether some node in @p rep carries an attr tagged @p lbl.
+/// @param rep The report to search.
+/// @param lbl The attr label.
+/// @return True when the attr is found.
 inline bool report_has_attr(const report& rep, idni::int_t lbl) {
 	return report_attr_value(rep, lbl).has_value();
 }
 
-// True when a step stopped because it needs input. invalid_state is reserved
-// for exactly that: a completed step never carries it.
+/// @brief Whether a step stopped because it needs input.
+/// code::invalid_state is reserved for exactly that: a completed step never
+/// carries it.
+/// @param rep The step's report.
+/// @return True when @p rep carries a code::invalid_state node.
 inline bool step_awaiting_input(const report& rep) {
 	return report_has_code(rep, code::invalid_state);
 }
 
-// Collapses newlines and caps the length of value text quoted in a
-// diagnostic message, so a whole spec pasted as an input value does not
-// flood the report.
+/// @brief Collapses newlines and caps the length of value text quoted in a
+/// diagnostic message, so a whole spec pasted as an input value does not
+/// flood the report.
+/// @param v The text to quote.
+/// @param max_len Characters kept before the "..." suffix is appended.
+/// @return @p v with each CR/LF replaced by a space, cut to @p max_len
+///         characters plus "..." when longer.
 inline std::string truncate_for_message(std::string_view v,
 	size_t max_len = 120)
 {
@@ -167,7 +201,9 @@ inline std::string truncate_for_message(std::string_view v,
 
 } // namespace idni::tau_lang
 
+/// Token-pastes @p a and @p b without expanding them first.
 #define TAU_TRY_CONCAT_INNER(a, b) a##b
+/// Token-pastes @p a and @p b after expanding them (used with __LINE__).
 #define TAU_TRY_CONCAT(a, b) TAU_TRY_CONCAT_INNER(a, b)
 
 /// Sequential try-step for a function that owns a local `result<T> r;`.

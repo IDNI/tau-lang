@@ -47,34 +47,39 @@ namespace idni::tau_lang::alg_d {
 
 /// @brief Synthesis parity game parsed from `ltlsynt --print-game-hoa`.
 struct synth_game {
+	/// Number of states.
 	size_t num_states = 0;
+	/// Initial state.
 	size_t init = 0;
-	// player[q]: 0 = env (uncontrollable), 1 = sys (controller)
+	/// player[q]: 0 = env (uncontrollable), 1 = sys (controller)
 	std::vector<int> player;
-	// state_color[q]: color for state-based acceptance (-1 if none)
+	/// state_color[q]: color for state-based acceptance (-1 if none)
 	std::vector<int> state_color;
-	// trans[q]: list of (guard_string, next_state, edge_color)
-	// edge_color = -1 if no acceptance mark on this transition
+	/// trans[q]: list of (guard_string, next_state, edge_color)
+	/// edge_color = -1 if no acceptance mark on this transition
 	std::vector<std::vector<std::tuple<std::string,size_t,int>>> trans;
+	/// Atomic proposition names, by AP index.
 	std::vector<std::string> aps;
+	/// controllable[i]: AP i is a system output.
 	std::vector<bool> controllable;
 	// Acceptance info
 	int  n_colors  = 0;    // number of acceptance sets
 	bool trans_acc = false; // true = transition-based acceptance
-	// Parity priority for each state (computed from color + acceptance type)
-	// Even priority = good for env (player 0); odd = good for sys (player 1).
-	// For trivial (all): priority 1 everywhere.
-	// For Büchi  Inf(0): color 0 → priority 1 elsewhere priority 0.
-	// For general parity: priority = color.
+	/// Parity priority for each state (computed from color + acceptance type)
+	/// Even priority = good for env (player 0); odd = good for sys (player 1).
+	/// For trivial (all): priority 1 everywhere.
+	/// For Büchi  Inf(0): color 0 → priority 1 elsewhere priority 0.
+	/// For co-Büchi Fin(0): color 0 → priority 2 elsewhere priority 1.
+	/// For parity: the color, normalized to the max-odd convention.
 	std::vector<int> state_priority;
-	// Edge priorities: edge_priority[q][j] = priority of j-th trans from q
+	/// Edge priorities: edge_priority[q][j] = priority of j-th trans from q
 	std::vector<std::vector<int>> edge_priority;
-	// The acceptance is one of all, Buchi, co-Buchi or parity, and whether
-	// a run that sees no colour infinitely often is accepted.
+	/// The acceptance is one of all, Buchi, co-Buchi or parity.
 	bool acc_known = false;
+	/// A run that sees no colour infinitely often is accepted.
 	bool acc_accepts_uncolored = false;
-	// Some state or edge carries more than one colour; the priorities
-	// above read the first one only.
+	/// Some state or edge carries more than one colour; the priorities
+	/// above read the first one only.
 	bool multi_colored = false;
 };
 
@@ -142,7 +147,8 @@ static inline void skip_ws(const std::string& s, size_t& i) {
 }
 
 /// @brief Evaluate a disjunction (E|E) of the guard grammar from position
-/// @p i.
+/// @p i, advancing it; bit `k` of @p bitmask is AP `k`, and an AP index
+/// outside [0, @p n_aps) reads false.
 static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps);
 
 /// @brief Evaluate one atom (t, f, N, !E or (E)) of the guard grammar.
@@ -253,9 +259,12 @@ struct parser {
 	explicit parser(const std::string& str, size_t cap)
 		: s(str), max_cubes(cap ? cap : SIZE_MAX) {}
 
+	/// The DNF of `true`: one empty cube.
 	static std::vector<cube> dnf_true()  { return { cube{} }; }
+	/// The DNF of `false`: no cube.
 	static std::vector<cube> dnf_false() { return {}; }
 
+	/// The DNF of `a & b`; sets `failed` past the cube cap.
 	std::vector<cube> conj(const std::vector<cube>& a, const std::vector<cube>& b) {
 		std::vector<cube> r;
 		for (const auto& ca : a)
@@ -268,6 +277,7 @@ struct parser {
 		return r;
 	}
 
+	/// The DNF of `a | b`; sets `failed` past the cube cap.
 	std::vector<cube> disj(std::vector<cube> a, const std::vector<cube>& b) {
 		for (const auto& cb : b) {
 			if (a.size() >= max_cubes) { failed = true; return {}; }
@@ -276,7 +286,7 @@ struct parser {
 		return a;
 	}
 
-	// ¬(c1 ∨ … ∨ cn) = ∧_i (∨_l ¬l)
+	/// The DNF of `!a`: ¬(c1 ∨ … ∨ cn) = ∧_i (∨_l ¬l).
 	std::vector<cube> negate(const std::vector<cube>& a) {
 		std::vector<cube> r = dnf_true();
 		for (const auto& c : a) {
@@ -289,6 +299,7 @@ struct parser {
 		return r;
 	}
 
+	/// Parse t, f, an AP index, !E or (E); sets `failed` on bad input.
 	std::vector<cube> parse_atom() {
 		skip_ws(s, i);
 		if (i >= s.size()) { failed = true; return {}; }
@@ -319,6 +330,7 @@ struct parser {
 		return {};
 	}
 
+	/// Parse a conjunction E&E.
 	std::vector<cube> parse_and() {
 		auto v = parse_atom();
 		while (!failed) {
@@ -330,6 +342,7 @@ struct parser {
 		return v;
 	}
 
+	/// Parse a disjunction E|E.
 	std::vector<cube> parse_or() {
 		auto v = parse_and();
 		while (!failed) {
@@ -767,7 +780,8 @@ result<synth_game> call_ltlsynt_game(
 // For each sys state (q, rho): sys picks D_pattern AND rho'.
 //   Transition is valid iff T3_feasible(pos_m=rho, pos_y=rho', D_pattern).
 //   New state: (q', rho') where q' = game_next(q, D_pattern).
-// For each env state (q, rho): env has unconditional transitions (output-only).
+// For each env state (q, rho): env keeps an edge only when its guard admits
+//   a D-pattern feasible from rho (the same T3 filter as sys edges).
 //   New state: (q', rho) [rho unchanged].
 //
 // For trans-based acceptance: insert intermediate "color" state per edge.
@@ -776,10 +790,14 @@ result<synth_game> call_ltlsynt_game(
 /// @brief Product of the synthesis game with the T_1 memory types (state
 /// index q * T1_size + rho, plus edge stubs for transition acceptance).
 struct product_game {
+	/// Number of product states, edge stubs included.
 	size_t n_states = 0;
+	/// The initial product state, (G.init, init_rho).
 	size_t init = 0;
+	/// player[s]: 0 = env, 1 = sys.
 	std::vector<int> player;
 	std::vector<int> priority;      // state-based (after intermediate conversion)
+	/// succs[s]: the successors of state s.
 	std::vector<std::vector<size_t>> succs;
 };
 
@@ -862,8 +880,8 @@ inline std::vector<std::pair<size_t,int>> sys_choices(const synth_game& G, int K
 // `o[t-1] ⋈ …` there is evaluated against the constant 0.  Fixing ρ₀ to the
 // same type makes the Algorithm-D verdict and the execution agree.
 //
-// The two rejected alternatives, for the record: ∃ρ₀ ("the system chooses
-// its initial memory") is unsound — ρ is not a free bookkeeping state like
+// Neither alternative is right: ∃ρ₀ ("the system chooses its initial
+// memory") is unsound — ρ is not a free bookkeeping state like
 // a Mealy initial state but the type of an actual prior output, so choosing
 // it asserts a phantom value (starkest for a point type {c_j}) that no
 // first move can implement, and the interpreter then fails at its first
@@ -901,15 +919,18 @@ inline int initial_memory(const std::vector<omcat::rational>& sorted_constants) 
  * filtered by the same feasibility (sec. 14); edge stubs carry transition-based
  * priorities.  The initial product state is (G.init, init_rho); an
  * out-of-range @p init_rho is a caller bug (asserted; left as-is in Release,
- * which downstream reads as UNREALIZABLE).
+ * which downstream reads as UNREALIZABLE). A game whose acceptance is not
+ * all, Buchi, co-Buchi or parity, or that carries several colours on one
+ * state or edge, gives an empty product game (no state is won).
  * @param G Synthesis game.
  * @param T1_size |T_1|.
  * @param T3 Enumerated 3-types.
  * @param type_A D-bitmask per T3 type.
  * @param K Number of D propositions.
  * @param init_rho Initial memory, from `initial_memory()`.
- * @return The product game, or an error result when the game has more
- * atomic propositions than the assignment enumeration supports.
+ * @return The product game (empty for an unsupported acceptance), or an
+ * error result when the game has more atomic propositions than the
+ * assignment enumeration supports.
  */
 inline result<product_game> build_product_game(
 	const synth_game& G,
@@ -1030,7 +1051,7 @@ inline result<product_game> build_product_game(
 					int ep = G.edge_priority[q][j];
 					if (ep < 0) continue; // no edge color, skip
 					const auto& [guard, next_q, edge_col] = G.trans[q][j];
-					// LG-11: env stubs are independent of the
+					// Env stubs are independent of the
 					// assignment -- create them once from any
 					// satisfying assignment instead of
 					// re-testing the key 2^n_aps times.
@@ -1065,7 +1086,7 @@ inline result<product_game> build_product_game(
 							}
 						}
 					}
-					// (env handled above, LG-11)
+					// (env handled above)
 				}
 			}
 		}
@@ -1399,10 +1420,11 @@ inline std::set<size_t> zielonka_win_player1(const product_game& pg) {
  * @brief Decide realizability via Algorithm D: synthesis game, product with
  * T_1, Zielonka from the one initial state.
  *
- * PRECONDITION (LG-30): output-only qlt atoms. Nothing below guards this --
+ * PRECONDITION: output-only qlt atoms. Nothing below guards this --
  * input atoms would silently produce garbage (the env branch never models
  * input choice). Callers must check atom_has_any_input first, as both
- * current callers (solve_ltl_aba, semantic_pwr_optimal) do.
+ * current callers (qlt_try_propositional_synthesis and, through
+ * solve_algorithm_d_full, qlt_semantic_pwr_optimal) do.
  * Returns REALIZABLE/UNREALIZABLE via Algorithm D, or an error result when
  * the ltlsynt subprocess gave no verdict -- that case is undecided, not
  * UNREALIZABLE, and the caller must not read it as one.
@@ -1455,10 +1477,14 @@ inline result<bool> solve_algorithm_d(
 /// @brief Extended Algorithm D result: verdict plus the winning region and
 /// the games it was computed on (consumed by semantic PWR).
 struct alg_d_result {
+	/// Player 1 wins from the initial product state.
 	bool realizable = false;
 	std::set<size_t> winning_region; // W1 state indices in product game
+	/// The product game the region is computed on.
 	struct product_game product_game;
+	/// The synthesis game from ltlsynt.
 	struct synth_game synth_game;
+	/// |T_1|, as passed in.
 	size_t T1_size = 0;
 	int K = 0;                        // number of D propositions
 	// The FIXED initial memory type (LG-12 convention (F), equal to the
@@ -1472,7 +1498,7 @@ struct alg_d_result {
  * @brief Same as `solve_algorithm_d`, but returns the winning region and
  * the games for semantic PWR.
  *
- * PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
+ * PRECONDITION: output-only qlt atoms; see solve_algorithm_d above.
  * An error result means the ltlsynt subprocess gave no verdict (undecided,
  * not unrealizable); see solve_algorithm_d above.
  * @param phi_star propositional LTL with D_0,...,D_{K-1} as output

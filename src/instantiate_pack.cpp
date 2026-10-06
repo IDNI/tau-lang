@@ -4,9 +4,9 @@
 // test binary and by the production CLI binary, and -- through
 // pack_core.def -- by an emitted `tau compile` artifact's main.cpp too.
 //
-// The dominant node pack is the configured one, tau_pack::node_t (also
-// bas_pack in tests/test_tau_helpers.h, used by 40+ unit tests AND by
-// src/main.cpp).
+// The dominant node pack is the configured one, tau_pack::node_t (the
+// node over bas_pack of tests/test_tau_helpers.h, used by most unit tests,
+// and the node_t of src/main.cpp).
 //
 // Without explicit instantiations, every consumer TU re-instantiates
 // the heaviest pipeline templates (is_ltl_aba_realizable,
@@ -16,7 +16,7 @@
 //
 // With the matching `extern template` declarations in
 // src/extern_template_test_pack.h (force-included into every test
-// TU by tests/CMakeLists.txt's `add()`) and src/artifact_pack_extern.h
+// TU by tests/CMakeLists.txt's `_tau_add_test_target()`) and src/artifact_pack_extern.h
 // (included by an emitted artifact's main.cpp), the linker resolves
 // these symbols against libTAU.a's pre-instantiated copy.
 //

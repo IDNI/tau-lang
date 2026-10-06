@@ -5,6 +5,7 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc bv_type @endinternal */
 template<NodeType node>
 tref bv_type(size_t bitwidth) {
 	using tau = tree<node>;
@@ -18,11 +19,13 @@ tref bv_type(size_t bitwidth) {
 	return tau::get(tau::typed, type);
 }
 
+/** @internal @copydoc bv_type_id @endinternal */
 template<NodeType node>
 size_t bv_type_id(size_t bitwidth) {
 	return ba_types<node>::id(bv_type<node>(bitwidth));
 }
 
+/** @internal @copydoc is_bv_type_family(tref) @endinternal */
 template<NodeType node>
 bool is_bv_type_family(tref t) {
 	using tau = tree<node>;
@@ -38,6 +41,7 @@ bool is_bv_type_family(tref t) {
 	return result;
 }
 
+/** @internal @copydoc is_bv_type_family(size_t) @endinternal */
 template<NodeType node>
 bool is_bv_type_family(size_t ba_type_id) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
@@ -46,12 +50,14 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(t.value());
 }
 
+/** @internal @copydoc is_tref_bv_type_family @endinternal */
 template<NodeType node>
 bool is_tref_bv_type_family(tref t) {
 	using tau = tree<node>;
 	return is_bv_type_family<node>(tau::get(t).get_ba_type());
 }
 
+/** @internal @copydoc get_bv_width(tref) @endinternal */
 template <NodeType node>
 result<size_t> get_bv_width(tref t) {
 	using tau = tree<node>;
@@ -75,6 +81,7 @@ result<size_t> get_bv_width(tref t) {
 	return result<size_t>{static_cast<size_t>(width)};
 }
 
+/** @internal @copydoc get_bv_width(size_t) @endinternal */
 template <NodeType node>
 result<size_t> get_bv_width(size_t ba_type_id) {
 	result<size_t> r;

@@ -1,11 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// hooks_tau.tmpl.h - Tau-specific hooks: temporal, quantifier, equiv, comparison ops
-// Split from hooks.tmpl.h for readability.
+// hooks_tau.tmpl.h - Tau-specific hooks: temporal and path operators,
+// conditional, implication, equivalence, order comparisons, interval, shift.
 
 namespace idni::tau_lang {
 
 
+/** @internal @copydoc get_hook::wff_sometimes @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_sometimes", v, ch, len, r);)
@@ -22,6 +23,7 @@ tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tr
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_always @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_always", v, ch, len, r);)
@@ -38,6 +40,7 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_binary_temporal @endinternal */
 // Constant-operand laws that need no other temporal operator on the result.
 template <NodeType node>
 tref get_hook<node>::wff_binary_temporal(const node& v, const tref* ch,
@@ -70,6 +73,7 @@ tref get_hook<node>::wff_binary_temporal(const node& v, const tref* ch,
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_A @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_A(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_A", v, ch, len, r);)
@@ -84,6 +88,7 @@ tref get_hook<node>::wff_A(const node& v, const tref* ch, size_t len, tref r) {
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_E @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_E(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_E", v, ch, len, r);)
@@ -98,6 +103,7 @@ tref get_hook<node>::wff_E(const node& v, const tref* ch, size_t len, tref r) {
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_semantic_neg @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_semantic_neg(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_semantic_neg", v, ch, len, r);)
@@ -112,6 +118,7 @@ tref get_hook<node>::wff_semantic_neg(const node& v, const tref* ch, size_t len,
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_conditional @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_conditional(
 		[[maybe_unused]] const node& v,
@@ -138,6 +145,7 @@ tref get_hook<node>::wff_conditional(
 			arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::wff_imply @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
 	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
@@ -171,6 +179,7 @@ tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_imply(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::wff_rimply @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_rimply([[maybe_unused]] const node& v, const tref* ch,
 	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
@@ -204,6 +213,7 @@ tref get_hook<node>::wff_rimply([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_imply(arg2_fm(ch).get(), arg1_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::wff_equiv @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
@@ -249,6 +259,7 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_equiv(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::wff_lt @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)
@@ -305,6 +316,7 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 		build_bf_neq<node>(arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 }
 
+/** @internal @copydoc get_hook::wff_nlt @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlt", v, ch, len, r);)
@@ -378,6 +390,7 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 		build_bf_eq<node>(arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 }
 
+/** @internal @copydoc get_hook::wff_lteq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lteq", v, ch, len, r);)
@@ -453,6 +466,7 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 		build_bf_neg<node>(arg2_fm(ch).get()))), r);
 }
 
+/** @internal @copydoc get_hook::wff_nlteq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlteq", v, ch, len, r);)
@@ -509,6 +523,7 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 		build_bf_neg<node>(arg2_fm(ch).get()))), r);
 }
 
+/** @internal @copydoc get_hook::wff_gt @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gt", v, ch, len, r);)
@@ -564,6 +579,7 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 		build_bf_neq<node>(arg2_fm(ch).get(), arg1_fm(ch).get())), r);
 }
 
+/** @internal @copydoc get_hook::wff_ngt @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngt", v, ch, len, r);)
@@ -619,6 +635,7 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 		build_bf_eq<node>(arg2_fm(ch).get(), arg1_fm(ch).get())), r);
 }
 
+/** @internal @copydoc get_hook::wff_gteq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gteq", v, ch, len, r);)
@@ -675,6 +692,7 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 				build_bf_neg<node>(arg1_fm(ch).get()))), r);
 }
 
+/** @internal @copydoc get_hook::wff_ngteq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngteq", v, ch, len, r);)
@@ -731,6 +749,7 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 				build_bf_neg<node>(arg1_fm(ch).get()))), r);
 }
 
+/** @internal @copydoc get_hook::wff_interval @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch,
 	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
@@ -749,6 +768,9 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::shift @endinternal */
+// Folds `n - k` over constants to the integer n - k; keeps a variable or
+// capture offset raw, and returns nullptr when n < k.
 template <NodeType node>
 tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("shift", v, ch, len, r);)

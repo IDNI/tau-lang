@@ -180,8 +180,8 @@ inline env_limit<size_t> compile_max_table_edges{
 inline constexpr int ltl_max_game_aps = 30;
 
 /**
- * @brief Wall-clock cap, in seconds, on each external `ltlsynt` /
- * `ltl2tgba` call; 0 disables the watchdog.
+ * @brief Wall-clock cap, in seconds, on each external Spot call
+ * (`ltlsynt`, and the `ltlfilt` tautology check); 0 disables the watchdog.
  *
  * Runtime parameter by policy (`--ltl-timeout`, REPL `set ltltimeout`,
  * `api::set_ltl_timeout_sec`). The sentinel -1 means "not set", in which
@@ -226,7 +226,8 @@ inline size_t ltl_qe_max_vars_param = 0;
  * `TAU_LTL_TIMEOUT_SEC` environment variable, else 60. Garbage in the
  * variable keeps the default instead of `atoi`'s 0 silently removing the
  * cap (LS-9); out-of-range values clamp to @ref ltl_timeout_sec_max with a
- * warning (SY-R5).
+ * warning (SY-R5). A parameter above the maximum clamps silently.
+ * @return The timeout in seconds, in [0, @ref ltl_timeout_sec_max].
  */
 inline int ltl_timeout_sec() {
 	if (ltl_timeout_sec_param >= 0)
@@ -260,6 +261,7 @@ inline int ltl_timeout_sec() {
  * `TAU_LTL_ALG` environment variable, else the default. Anything other
  * than A, B, D or auto (case-insensitive) is reported once and read as the
  * default (LS-8): a typo must not silently disable every gate.
+ * @return The upper-cased choice, or `""` for `auto`, unset or invalid.
  */
 inline std::string ltl_algorithm_choice() {
 	std::string v = ltl_algorithm_param;
@@ -283,7 +285,9 @@ inline std::string ltl_algorithm_choice() {
  *
  * Precedence: @ref ltl_qe_max_vars_param when non-zero, else the
  * `TAU_LTL_OMCAT_QE_MAX_VARS` environment variable (validated with
- * `strtol`; garbage keeps the default), else 2.
+ * `strtol`; garbage or a non-positive value keeps the default with a
+ * warning), else 2.
+ * @return The cap, always >= 1.
  */
 inline size_t ltl_qe_max_vars() {
 	if (ltl_qe_max_vars_param > 0) return ltl_qe_max_vars_param;
@@ -425,8 +429,9 @@ inline size_t ltl_max_observations() {
  * @brief Set when a cap of the synthesis pipeline gave up on a check whose
  * skipped part could make an UNREALIZABLE verdict wrong.
  *
- * Per thread; is_ltl_aba_realizable clears it on entry and reports an
- * UNREALIZABLE result as undecided when it is set.
+ * Per thread; is_ltl_aba_realizable clears it before its game pipeline
+ * (restoring the caller's flag on exit) and reports an UNREALIZABLE result
+ * as undecided when it is set.
  */
 inline thread_local bool ltl_verdict_incomplete = false;
 

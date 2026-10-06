@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // ltl_aba_helpers.tmpl.h - Helpers, formula analysis, skeleton, io classification
-// Split from ltl_aba.tmpl.h for readability.
 
 namespace idni::tau_lang {
 
@@ -96,6 +95,7 @@ static bool always_body_nests(tref body) {
 
 // ── sat_has_ltl_operators / realizability_has_game_operators ──────────────────
 
+/** @internal @copydoc sat_has_ltl_operators @endinternal */
 // True if the formula has an operator the safety pipeline cannot decide
 // satisfiability for.
 template <NodeType node>
@@ -129,6 +129,7 @@ bool sat_has_ltl_operators(tref fm) {
 	return result;
 }
 
+/** @internal @copydoc realizability_has_game_operators @endinternal */
 // True if the formula has an operator whose realizability needs the game.
 template <NodeType node>
 bool realizability_has_game_operators(tref fm) {
@@ -192,6 +193,8 @@ static void collect_atoms(
 		collect_atoms<node>(op.child(i), atoms, inside_temporal);
 }
 
+/** @internal @copydoc extract_data_atoms @endinternal */
+// Every ABA comparison over an io_var, under a temporal operator or not.
 template <NodeType node>
 std::vector<std::pair<tref, std::string>> extract_data_atoms(tref fm) {
 	std::vector<std::pair<tref, std::string>> atoms;
@@ -414,18 +417,26 @@ struct skel_ctx {
 	bool pos = true;
 	bool univ = true;
 	bool temporal = false;
+	/// The context under a negation: polarity flipped, mode kept.
 	skel_ctx neg() const { return { !pos, univ, temporal }; }
+	/// The context of a temporal operator's operand whose mode at positive
+	/// polarity is @p operand_univ; marks it as under a temporal operator.
 	skel_ctx scope(bool operand_univ) const {
 		return { pos, pos ? operand_univ : !operand_univ, true };
 	}
 };
 
+// The skeleton of `n` in context `c`: a wff goes to
+// skeleton_wff_with_testers; any other node is its atom's proposition, or
+// "1" when it is no data atom. Testers for S/T are appended to `testers`.
 template <NodeType node>
 static result<std::string> skeleton_str_with_testers(
     tref n,
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::vector<past_temporal_tester>& testers, skel_ctx c = {});
 
+// The tester-free skeleton of `n`; an error when `n` needs a past tester or
+// a step guard, which only ltl_skeleton_with_testers' callers drive.
 template <NodeType node>
 static result<std::string> skeleton_str(
     tref n,
@@ -450,6 +461,7 @@ static result<std::string> skeleton_str(
 	return r.with_value(std::move(s));
 }
 
+/** @internal @copydoc ltl_skeleton @endinternal */
 template <NodeType node>
 result<std::string> ltl_skeleton(
     tref fm,
@@ -723,6 +735,7 @@ static result<std::string> skeleton_wff_with_testers(
 	}
 }
 
+/** @internal @copydoc ltl_skeleton_with_testers @endinternal */
 // Build the LTL skeleton with temporal testers for past operators.
 // Returns the skeleton string and the list of testers. The caller must:
 //   1. Append the tester constraints to the skeleton
@@ -764,8 +777,8 @@ ltl_skeleton_with_testers(
 	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));
 }
 
-// Append temporal tester DFA constraints to a skeleton string.
-// For each tester:  && !state_var && G(X(state_var) <-> transition)
+/** @internal @copydoc append_tester_constraints @endinternal */
+// For each tester appends ` & !state_var & G(X(state_var) <-> transition)`.
 inline void append_tester_constraints(
     std::string& skeleton,
     const std::vector<past_temporal_tester>& testers)
@@ -780,6 +793,8 @@ inline void append_tester_constraints(
 
 // ── input / output classification ─────────────────────────────────────────────
 
+/** @internal @copydoc is_pure_input_atom @endinternal */
+// No io_var of `atom` classifies as an output under io_var_direction.
 template <NodeType node>
 bool is_pure_input_atom(tref atom) {
 	using tau = tree<node>;
@@ -799,6 +814,7 @@ bool is_pure_input_atom(tref atom) {
 	return result;
 }
 
+/** @internal @copydoc atom_has_any_input @endinternal */
 // True if the formula contains any io_var that is an input variable.
 // Symmetric to is_pure_input_atom (which checks for absence of output vars).
 template <NodeType node>
