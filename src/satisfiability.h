@@ -303,11 +303,13 @@ result<bool> are_tau_equivalent(tref f1, tref f2);
 /// flag, or the TAU_BA_COMPONENT_FACTORING environment variable).
 inline bool ba_component_factoring_enabled();
 /// @brief Unit-wise satisfiability of @p fm: 1 sat, 0 unsat, -1 not
-/// applicable (the caller falls back to the monolithic check).
-template <typename node> static int factored_tau_sat(tref fm);
+/// applicable (the caller falls back to the monolithic check); no value when
+/// the decision of a group failed.
+template <typename node> static result<int> factored_tau_sat(tref fm);
 /// @brief Unit-wise validity of @p fm: 1 valid, 0 not valid, -1 not
-/// applicable (the caller falls back to the monolithic check).
-template <typename node> static int factored_tau_valid(tref fm);
+/// applicable (the caller falls back to the monolithic check); no value when
+/// the decision of a unit failed.
+template <typename node> static result<int> factored_tau_valid(tref fm);
 
 /**
  * @brief Simplify @p fm by removing unsatisfiable or valid temporal sub-formulas.

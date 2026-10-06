@@ -359,12 +359,14 @@ static bool refers_to_absolute_time(tref unit) {
  * @endinternal
  */
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
-// 1 = sat. A failed decision of a group counts as unsat.
+// 1 = sat. A group whose decision fails gives no value and its report; the
+// failure is not cached.
 template <typename node>
-static int factored_tau_sat(tref fm) {
+static result<int> factored_tau_sat(tref fm) {
 	using tau = tree<node>;
+	result<int> r;
 	trefs units;
-	if (factored_tau_units<node>(fm, units) < 0) return -1;
+	if (factored_tau_units<node>(fm, units) < 0) return r.with_value(-1);
 	// one pass over the body of a unit finds an embedded constant and a
 	// reference to absolute time
 	for (tref u : units)
@@ -372,12 +374,12 @@ static int factored_tau_sat(tref fm) {
 			|| tau::get(tau::trim2(u)).find_top([](tref t) {
 				return tree<node>::get(t).is_ba_constant()
 					|| at_absolute_time<node>(t); }))
-			return -1;
+			return r.with_value(-1);
 	std::vector<std::vector<std::string>> supp(units.size());
 	for (size_t i = 0; i < units.size(); ++i)
 		for (tref v : tau::get(units[i]).get_free_vars()) {
 			const std::string& nm = get_var_name<node>(v);
-			if (nm.empty()) return -1;
+			if (nm.empty()) return r.with_value(-1);
 			supp[i].push_back(nm);
 		}
 	std::vector<std::vector<std::string>> cn;
@@ -412,7 +414,7 @@ static int factored_tau_sat(tref fm) {
 			erase_at(cc, c);
 		}
 	}
-	if (cc.size() < 2) return -1;
+	if (cc.size() < 2) return r.with_value(-1);
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	bool all_sat = true;
@@ -426,23 +428,24 @@ static int factored_tau_sat(tref fm) {
 		}
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
-		auto sat = is_tau_formula_sat<node>(f);
-		bool sres = sat.has_value() && sat.value();
+		auto sat = r.merge_take(is_tau_formula_sat<node>(f));
+		if (!sat) return r;
 		pin_decided_key<node>(f);
-		cache.insert_or_assign(f, sres);
-		all_sat = sres;
+		cache.insert_or_assign(f, *sat);
+		all_sat = *sat;
 	}
-	return all_sat ? 1 : 0;
+	return r.with_value(all_sat ? 1 : 0);
 }
 
 // Unit-wise validity (distributes over conjunction unconditionally);
-// -1 = not applicable, 0 = not valid, 1 = valid. A failed decision of a unit
-// counts as not valid.
+// -1 = not applicable, 0 = not valid, 1 = valid. A unit whose decision fails
+// gives no value and its report; the failure is not cached.
 template <typename node>
-static int factored_tau_valid(tref fm) {
+static result<int> factored_tau_valid(tref fm) {
 	using tau = tree<node>;
+	result<int> r;
 	trefs units;
-	if (factored_tau_units<node>(fm, units) < 0) return -1;
+	if (factored_tau_units<node>(fm, units) < 0) return r.with_value(-1);
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	bool all = true;
@@ -455,14 +458,15 @@ static int factored_tau_valid(tref fm) {
 		// ends the loop, and the units after it are not read: it does
 		// not refer to absolute time, so it is not valid from any step,
 		// and neither is the conjunction.
-		if (refers_to_absolute_time<node>(units[i])) return -1;
-		auto imp = is_tau_impl<node>(tau::_T(), units[i]);
-		bool vres = imp.has_value() && imp.value();
+		if (refers_to_absolute_time<node>(units[i]))
+			return r.with_value(-1);
+		auto imp = r.merge_take(is_tau_impl<node>(tau::_T(), units[i]));
+		if (!imp) return r;
 		pin_decided_key<node>(units[i]);
-		cache.insert_or_assign(units[i], vres);
-		all = vres;
+		cache.insert_or_assign(units[i], *imp);
+		all = *imp;
 	}
-	return all ? 1 : 0;
+	return r.with_value(all ? 1 : 0);
 }
 
 template <typename... BAs>
@@ -472,12 +476,17 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
 		[](tref normalized) -> result<bool> {
-			if (ba_component_factoring_enabled())
-				if (int r = factored_tau_sat<node>(normalized);
-						r >= 0)
-					return result<bool>{r == 0};
-			return is_tau_formula_sat<node>(normalized)
-				.transform([](bool sat) { return !sat; });
+			result<bool> r;
+			if (ba_component_factoring_enabled()) {
+				auto f = r.merge_take(
+					factored_tau_sat<node>(normalized));
+				if (!f) return r;
+				if (*f >= 0) return r.with_value(*f == 0);
+			}
+			auto sat = r.merge_take(
+				is_tau_formula_sat<node>(normalized));
+			if (!sat) return r;
+			return r.with_value(!*sat);
 		});
 }
 
@@ -488,11 +497,17 @@ result<bool> tau_ba<BAs...>::is_one() const {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
 		[](tref normalized) -> result<bool> {
-			if (ba_component_factoring_enabled())
-				if (int r = factored_tau_valid<node>(normalized);
-						r >= 0)
-					return result<bool>{r == 1};
-			return is_tau_impl<node>(tau::_T(), normalized);
+			result<bool> r;
+			if (ba_component_factoring_enabled()) {
+				auto f = r.merge_take(
+					factored_tau_valid<node>(normalized));
+				if (!f) return r;
+				if (*f >= 0) return r.with_value(*f == 1);
+			}
+			auto valid = r.merge_take(
+				is_tau_impl<node>(tau::_T(), normalized));
+			if (!valid) return r;
+			return r.with_value(*valid);
 		});
 }
 

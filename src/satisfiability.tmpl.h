@@ -3022,7 +3022,24 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// the caller uses); any other start time keeps the monolithic checks.
 	const bool factor = pack_ba_component_factoring_enabled<node>()
 		&& start_time == 0;
-	int fv = factor ? factored_tau_valid<node>(fm) : -1;
+	int fv = -1;
+	if (factor) {
+		auto fvr = factored_tau_valid<node>(fm);
+		if (fvr.has_value()) {
+			fv = fvr.value();
+			r.merge(std::move(fvr));
+		} else {
+			// the monolithic check below decides instead: a rejected
+			// candidate
+			auto sc = r.open("rejected candidate");
+			r.info("the unit-wise validity of the formula could not "
+				"be decided", {{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
+			report cand = std::move(fvr).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
+	}
 	if (fv == 1) {
 		return r.with_assert_check_value(tau::_T());
 	}
@@ -3054,10 +3071,19 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		// the report of the first clause that could not be decided
 		std::optional<result<tref>> failed;
 		auto keep_sat = [&](tref clause) {
-			int fs = factor ? factored_tau_sat<node>(clause) : -1;
-			if (fs >= 0) {
-				if (fs == 1) clauses.push_back(clause);
-				return true;
+			if (factor) {
+				auto fs = factored_tau_sat<node>(clause);
+				if (!fs.has_value()) {
+					failed.emplace(result<tref>{});
+					failed->merge(std::move(fs));
+					return false;
+				}
+				const int v = fs.value();
+				r.merge(std::move(fs));
+				if (v >= 0) {
+					if (v == 1) clauses.push_back(clause);
+					return true;
+				}
 			}
 			auto val = transform_to_execution<node>(clause,
 				start_time, output);

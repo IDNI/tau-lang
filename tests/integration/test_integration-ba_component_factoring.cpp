@@ -71,4 +71,26 @@ TEST_SUITE("tau ba component factoring") {
 			CHECK(api_sat(DISJOINT_SAT) == r1);
 		}
 	}
+
+	// Both groups need a fixpoint search to decide satisfiability, which
+	// finds the time budget spent: the decision fails, and is_zero must say
+	// so rather than answer that the constant is zero.
+	TEST_CASE("a group decision that fails is an error, not unsat") {
+		using tau_t = tau_ba<TAU_PACK_BASE_BAS>;
+		tref fm = create_spec("(always o1[t]:sbf = o1[t-2]:sbf)"
+			" && (always o2[t]:sbf = o2[t-2]:sbf).");
+		REQUIRE( fm != nullptr );
+		for (bool on : { false, true }) {
+			CAPTURE( on );
+			factoring_config factoring(on);
+			time_budget_handled scope;
+			note_time_budget_exhausted("test budget");
+			auto zero = tau_t(fm).is_zero();
+			CHECK( !zero.has_value() );
+			// the validity is decided without the fixpoint search
+			auto one = tau_t(fm).is_one();
+			REQUIRE( one.has_value() );
+			CHECK( !one.value() );
+		}
+	}
 }
