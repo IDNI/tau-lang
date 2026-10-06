@@ -377,7 +377,9 @@ struct interpreter {
 	/// commit, without changing the interpreter.
 	///
 	/// Runs the same plan_update() as update(), so can_extend(psi) is true
-	/// exactly when update(psi) would commit (IN-M7). The one side
+	/// exactly when update(psi) would commit (IN-M7); plan_update() itself
+	/// routes a run of the data game's strategy to plan_data_game_update(),
+	/// for both. The one side
 	/// effect both share is that unknown console streams named by @p psi get
 	/// registered in the io_context during stream collection. Non-const
 	/// because the dry run copies the output_partition union-find.
