@@ -763,8 +763,9 @@ result<codegen_result> gen_spec(
 		if (run.cached_solution)
 			for (const auto& es : run.cached_solution->aut.edges)
 				edges += es.size();
+		const size_t max_edges = compile_max_table_edges.get();
 		if (run.plays_data_game() && run.cached_solution && !revises
-			&& edges <= compile_max_table_edges.get())
+			&& max_edges > 0 && edges <= max_edges)
 				sol = run.cached_solution;
 		else solves_each_step = true;
 	}
