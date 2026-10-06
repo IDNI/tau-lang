@@ -1226,6 +1226,26 @@ TEST_CASE("splitter of symbolic singleton [c,c] is non-empty and contained") {
 	CHECK((s | a) == a);
 }
 
+// A named endpoint ranges over all of Q, so no specific rational is known to
+// lie on its side: the only part of the piece known to be inside is the piece.
+TEST_CASE("splitter of a piece with a named endpoint returns the piece") {
+	const auto c = qlt_rational::make_sym("c");
+	const auto neg = qlt_rational::make_neg_inf();
+	const auto pos = qlt_rational::make_pos_inf();
+	for (const auto& a : {
+		make_interval(neg, qlt_bound::OPEN, c, qlt_bound::OPEN),
+		make_interval(c, qlt_bound::CLOSED, pos, qlt_bound::OPEN),
+		make_interval(c, qlt_bound::OPEN, pos, qlt_bound::OPEN),
+		make_interval(qlt_rational(-5, 1), qlt_bound::OPEN,
+			c, qlt_bound::OPEN),
+		make_interval(c, qlt_bound::OPEN,
+			qlt_rational(5, 1), qlt_bound::OPEN) })
+	{
+		CAPTURE(a.to_string());
+		CHECK(qlt_splitter(a, splitter_type::upper) == a);
+	}
+}
+
 TEST_CASE("splitter of (0,+inf) is non-empty and sub-element") {
 	auto a = open_pos_inf(0);
 	auto s = qlt_splitter(a, splitter_type::upper);

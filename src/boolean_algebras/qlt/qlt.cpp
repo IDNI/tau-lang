@@ -710,9 +710,11 @@ qlt qlt_splitter(const qlt& x, splitter_type /*st*/) {
 	if (x.is_empty()) return qlt::bottom();
 	const auto& p = x.pieces[0];
 
-	// Finite endpoints: take left half of first piece
 	auto lo_val = p.lo.val;
 	auto hi_val = p.hi.val;
+	// A named endpoint ranges over all of Q, so no rational is known to lie
+	// on its inner side: the piece is the only part known to be inside x.
+	if (lo_val.is_sym() || hi_val.is_sym()) return qlt{{ p }};
 
 	if (lo_val.is_neg_inf() && hi_val.is_pos_inf()) {
 		// Full piece — return (-1, 0)
