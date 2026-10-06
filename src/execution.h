@@ -167,14 +167,6 @@ template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const step_t& l);
 
-/**
- * @brief Return a copy of @p s with a step of library @p l appended.
- * @tparam step_t Unused and not deducible: a call must name it explicitly.
- */
-template <NodeType node, typename step_t>
-steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const rewriter::library& l);
-
 /** @brief Return a copy of @p s with a step of library @p l appended. */
 template <NodeType node>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,

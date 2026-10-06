@@ -71,12 +71,10 @@ static bool ocltl_is_output_coord(tref v) {
 template <NodeType node>
 static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	const trefs& tmpls, const assignment<node>& memory,
-	int_t time_point, int_t formula_time_point,
-	fresh_element_ledger& ledger)
+	int_t time_point, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
 	result<std::optional<solution<node>>> r;
-	(void)formula_time_point; // kept for call-site symmetry with produce()
 
 	trefs grounded;
 	grounded.reserve(tmpls.size());
@@ -381,7 +379,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		}
 		else if (eligible) {
 			TAU_TRY(ws, ocltl_direct_decode_edge<node>(tmpls, memory,
-				time_point, formula_time_point, ledger_));
+				time_point, ledger_));
 		}
 		if (!ws) {
 			// Ineligible edge, or (defensively) an eligible one whose direct

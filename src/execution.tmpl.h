@@ -137,15 +137,6 @@ steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	return ns;
 }
 
-template <NodeType node, typename step_t>
-steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const rewriter::library& l)
-{
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
-
 template <NodeType node>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const rewriter::library& l)

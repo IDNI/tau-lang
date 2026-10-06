@@ -629,7 +629,7 @@ TEST_SUITE("table_step_provider") {
 		};
 		assignment<node_t> memory;
 		fresh_element_ledger ledger;
-		auto sol_r = ocltl_direct_decode_edge<node_t>(tmpls, memory, 0, 0,
+		auto sol_r = ocltl_direct_decode_edge<node_t>(tmpls, memory, 0,
 			ledger);
 		REQUIRE(sol_r.has_value());
 		auto sol = sol_r.value();
@@ -651,7 +651,7 @@ TEST_SUITE("table_step_provider") {
 		assignment<node_t> memory;
 		fresh_element_ledger ledger;
 		auto sol1_r = ocltl_direct_decode_edge<node_t>(
-			tmpls1, memory, 0, 0, ledger);
+			tmpls1, memory, 0, ledger);
 		REQUIRE(sol1_r.has_value());
 		auto sol1 = sol1_r.value();
 		REQUIRE(sol1.has_value());
@@ -664,7 +664,7 @@ TEST_SUITE("table_step_provider") {
 			parse_tmpl_atom("o1[t]:tau != o1[t-1]:tau."),
 		};
 		auto sol2_r = ocltl_direct_decode_edge<node_t>(
-			tmpls2, memory2, 1, 1, ledger);
+			tmpls2, memory2, 1, ledger);
 		REQUIRE(sol2_r.has_value());
 		auto sol2 = sol2_r.value();
 		REQUIRE(sol2.has_value());
@@ -688,10 +688,10 @@ TEST_SUITE("table_step_provider") {
 		one[build_out_var_at_n<node_t>("o1", 0, tau_type_id<node_t>())]
 			= build_bf_t_type<node_t>(tau_type_id<node_t>());
 		auto zero_r = ocltl_direct_decode_edge<node_t>(
-			tmpls, zero, 1, 1, ledger);
+			tmpls, zero, 1, ledger);
 		REQUIRE(zero_r.has_value());
 		CHECK_FALSE(zero_r.value().has_value());
-		auto sol = ocltl_direct_decode_edge<node_t>(tmpls, one, 1, 1, ledger);
+		auto sol = ocltl_direct_decode_edge<node_t>(tmpls, one, 1, ledger);
 		REQUIRE(sol.has_value());
 		REQUIRE(sol.value().has_value());
 		for (tref tmpl : tmpls) CHECK(atom_holds(tmpl, one, *sol.value(), 1));

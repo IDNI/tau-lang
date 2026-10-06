@@ -29,19 +29,7 @@ enum MemorySlotPre {
 	push_negation_in_m,      ///< Cache slot for push_negation_in traversals.
 	to_dnf_m,                ///< Cache slot for to_dnf traversals.
 	to_cnf_m,                ///< Cache slot for to_cnf traversals.
-	eliminate_quantifiers_m, ///< Cache slot for quantifier elimination traversals.
-	anti_prenex_step_m,      ///< Cache slot for anti-prenex step traversals.
 	synt_path_simp_m         ///< Cache slot for syntactic path simplification traversals.
-};
-
-/**
- * @brief Memory slot identifiers for post-order traversal caching.
- *
- * These slots are used as template parameters to `post_order::apply_unique`
- * to select a specific static cache.
- */
-enum MemorySlotPost {
-	anti_prenex_m ///< Cache slot for anti-prenex post-order traversals.
 };
 
 /**
