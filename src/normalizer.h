@@ -209,7 +209,7 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
  *
  * What is actually checked: nested `wff_always` only — any formula
  * containing `wff_sometimes` or another full-LTL / CTL* operator
- * (U/R/W/A/E/semantic_neg) anywhere is exempted by the outer scan and
+ * (U/R/W/S/T/A/E/semantic_neg) anywhere is exempted by the outer scan and
  * returns `true` unconditionally (those manage their own temporal scope),
  * so e.g. `(sometimes a) && (sometimes b)` passes the predicate. Otherwise a
  * formula passes when it is a single top-level `always` with no temporal

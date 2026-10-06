@@ -500,6 +500,23 @@ TEST_SUITE("HasNoBooleanCombsOfModels") {
 		tref fm = tau::build_wff_always(tau::build_wff_always(inner));
 		CHECK( !has_no_boolean_combs_of_models<node_t>(fm).value() );
 	}
+
+	// S and T are decided by the LTL(ABA) pipeline like U, so they exempt
+	// the formula as U does.
+	TEST_CASE("past operators exempt the formula like until") {
+		const char* models = "(always o1[t] = 0) || (always o2[t] = 0)";
+		for (const char* op : { "until", "since", "trigger" }) {
+			CAPTURE( op );
+			std::string spec = std::string("(") + models
+				+ ") && ((o3[t] = 0) " + op + " (o4[t] = 0)).";
+			auto parsed = get_nso_rr(spec.c_str());
+			REQUIRE( parsed.has_value() );
+			auto res = has_no_boolean_combs_of_models<node_t>(
+				parsed.value().main->get());
+			REQUIRE( res.has_value() );
+			CHECK( res.value() );
+		}
+	}
 }
 
 // NF-4: are_nso_equivalent and is_nso_impl had zero direct unit tests; only

@@ -738,9 +738,9 @@ tref get_ref(tref n) {
 }
 
 // LTL formulas (containing wff_sometimes / wff_until / wff_release /
-// wff_weak_until / wff_A / wff_E / wff_semantic_neg) are handled by the
-// LTL(ABA) pipeline and bypass the safety pipeline entirely, so they are
-// exempt from this check.
+// wff_weak_until / wff_since / wff_trigger / wff_A / wff_E /
+// wff_semantic_neg) are handled by the LTL(ABA) pipeline and bypass the
+// safety pipeline entirely, so they are exempt from this check.
 /** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
 template <NodeType node>
 result<bool> has_no_boolean_combs_of_models(tref n) {
@@ -756,6 +756,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 		auto nt = t[0].value.nt;
 		return nt == tau::wff_sometimes || nt == tau::wff_until
 		    || nt == tau::wff_release || nt == tau::wff_weak_until
+		    || nt == tau::wff_since || nt == tau::wff_trigger
 		    || nt == tau::wff_A || nt == tau::wff_E
 		    || nt == tau::wff_semantic_neg;
 	};
