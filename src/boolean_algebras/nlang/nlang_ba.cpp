@@ -45,6 +45,7 @@ static void warn_llm_http_status(long status) {
 		"  requires an explicit model, set TAU_LLM_MODEL.\n", status);
 }
 
+// TAU_LLM_ENDPOINT, else the OpenAI base URL.
 static std::string llm_endpoint() {
 	const char* ep = std::getenv("TAU_LLM_ENDPOINT");
 	if (ep && *ep) return ep;
@@ -59,6 +60,7 @@ static std::string llm_model() {
 
 // --- cURL helpers ---
 
+// curl write callback: appends the received bytes to *out.
 static size_t nlang_curl_write_cb(char* ptr, size_t size, size_t nmemb,
 	std::string* out)
 {
@@ -70,6 +72,7 @@ static size_t nlang_curl_write_cb(char* ptr, size_t size, size_t nmemb,
 // Keys repeat heavily in the fixpoint loop; caching converts O(N) calls to O(1).
 namespace {
 
+// Oracle answers per question, guarded by mtx.
 struct nlang_cache {
 	std::unordered_map<std::string, bool> is_empty_cache;
 	std::unordered_map<std::string, bool> is_universal_cache;
@@ -86,6 +89,7 @@ struct nlang_cache {
 	std::mutex mtx;
 };
 
+// The process-wide cache.
 nlang_cache& get_cache() {
 	static nlang_cache cache;
 	return cache;
@@ -295,11 +299,9 @@ std::string llm_query(const std::string& prompt) {
 	return extract_content(response);
 }
 
-// BA1-10: parse a YES/NO oracle reply by word, not by first y/n letter --
-// char scanning made "Answer: YES" hit the 'n' of "Answer" in one polarity
-// order and "cannot say" read as NO in the other. Tokenize on non-alpha and
-// accept only a standalone yes/no word; anything else is a conservative
-// false. One helper, one polarity, all three call sites.
+// The first standalone yes/no word of an oracle reply, case-insensitive
+// (words split on non-letters, so "Answer: YES" is yes and "cannot" is not
+// no); false when there is none.
 static bool parse_yes_no(const std::string& ans) {
 	std::string word;
 	auto flush = [&]() -> std::optional<bool> {

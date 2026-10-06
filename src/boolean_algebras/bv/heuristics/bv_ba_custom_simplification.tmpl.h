@@ -268,7 +268,7 @@ result<tref> build_simplification(const trefs& arguments, const trefs& inverses,
 
 	TAU_TRY(tref vars, combine_diff<node>(operation, type, args_vars, invs_vars));
 	TAU_TRY(tref ctes, combine_diff<node>(operation, type, args_ctes, invs_ctes));
-	// bare, like every other return here: see the note above `_0_trimmed`.
+	// bare, like every other return here: see the notes above.
 	if (!vars && !ctes) return r.with_value(_0_trimmed<node>(type));
 	if (!vars) return r.with_value(ctes);
 	if (!ctes) return r.with_value(vars);
@@ -300,11 +300,12 @@ result<std::pair<trefs, trefs>> collect_block_operand(tref n, size_t operation, 
  * @param n Bare (already `trim`med) subtree to process.
  * @param changes Rewrite map from block-top node to folded replacement,
  * accumulated across the whole recursion.
+ * @return true, or an error on a null subtree or a malformed block.
  *
  * @par Example
  * @code{.cpp}
  * // {1}:bv[8] + X:bv[8] + {2}:bv[8]: one additive block, folds to X + {3}
- * // (see tests/integration/test_integration-heuristics-bv_ba_custom_simplification.cpp).
+ * // (see src/boolean_algebras/bv/tests/test_integration-heuristics-bv_ba_custom_simplification.cpp).
  * auto pbf = parse_bf();
  * tref src = tau::get("{1}:bv[8] + X:bv[8] + {2}:bv[8]", pbf);
  * auto changes = simplify_blocks<node_t>(src);
@@ -445,15 +446,13 @@ result<subtree_map<node, tref>> simplify_blocks(const tref& n) {
 	return r.with_value(std::move(changes));
 }
 
+/** @internal @copydoc bv_ba_custom_simplification @endinternal */
 template<NodeType node>
 result<tref> bv_ba_custom_simplification(const tref term) {
-	// Loop simplify_blocks to a fixpoint. Previously current was inserted
-	// into visited every iteration right before the loop condition
-	// checked for it, so the condition was always false and the loop ran
-	// exactly once, discarding any further simplification. Guard against
-	// a longer oscillating cycle (as done in repeat_all, see RR-2) with a
-	// visited set, and against an ever-growing rewrite with the global
-	// max_simplify_rounds (0 = unlimited).
+	// Loop simplify_blocks to a fixpoint. A visited set stops an
+	// oscillating cycle, and the global max_simplify_rounds (0 = unlimited)
+	// an ever-growing rewrite; hitting the cap is a warning that keeps the
+	// partial simplification as the value.
 	tref current = term;
 	std::unordered_set<tref> visited{current};
 	size_t round = 0;

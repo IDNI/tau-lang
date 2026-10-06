@@ -8,6 +8,7 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+/** @internal @copydoc cvc5_tree_to_tau_tree @endinternal */
 template<NodeType node>
 tref cvc5_tree_to_tau_tree(bv n,
 	const std::map<std::string, tref>& var_map) {
@@ -64,11 +65,8 @@ tref cvc5_tree_to_tau_tree(bv n,
 			return (var_list != nullptr && body != nullptr) ? build_wff_all<node>(var_list, body) : nullptr; // Unable to transform to tau (returning null)
 		}
 		case Kind::VARIABLE_LIST: {
-			// HE-8: a multi-variable binder list cannot be expressed
-			// as a single tau variable node -- translating only n[0]
-			// silently dropped every bound variable after the first.
-			// Refuse multi-variable lists instead (the caller treats
-			// nullptr as "unable to transform").
+			// A multi-variable binder list has no single tau variable
+			// node to stand for it, so it declines (nullptr).
 			if (n.getNumChildren() != 1) return nullptr;
 			auto var_list = rec(n[0]);
 			return var_list != nullptr ? tau::trim(var_list) : nullptr; // Unable to transform to tau (returning null)
@@ -245,6 +243,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 #undef rec
 }
 
+/** @internal @copydoc bv_ba_cvc5_simplification @endinternal */
 template<NodeType node>
 result<tref> bv_ba_cvc5_simplification(tref term) {
 	using tau = tree<node>;

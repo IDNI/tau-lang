@@ -17,20 +17,19 @@
  * - solution<node>: Alias for subtree_map<node, tref>, representing a solution mapping.
  *
  * Helper Methods:
- * - get_bv_size: Returns the bit-width of a bit-vector term.
+ * - get_bv_size: Returns the bit-width of a bit-vector type.
  * - config_cvc5_solver: Configures a cvc5::Solver for bit-vector logic and model production.
  *
  * Advanced Methods:
- * - bv_eval_node: Evaluates a (bv) tau tree to a bit-vector formula.
- * - is_bv_formula_sat: Checks satisfiability of a bit-vector formula.
- * - is_bv_formula_valid: Checks validity of a bit-vector formula.
- * - is_bv_formula_unsat: Checks unsatisfiability of a bit-vector formula.
+ * - bv_eval_node: Translates a (bv) tau tree to a cvc5 term.
+ * - bv_formula_sat_status: Decides satisfiability, keeping unknown apart.
+ * - is_bv_formula_sat / is_bv_formula_unsat / is_bv_formula_valid: bool
+ *   collapses of bv_formula_sat_status (see each for how unknown answers).
  * - solve_bv: Attempts to solve a bit-vector formula, returning an optional solution.
- * - splitter: Dummy method included for completeness (variant ba). In the case
- * of atomless BAs, it computes the splitter of a given BA element.
  * - parse_bv: Parses a string into a bit-vector constant with type information.
  *
- * @note Implementation details are provided in "bv_ba.tmpl.h".
+ * @note Definitions live in bv_ba.tmpl.h, bv_types.tmpl.h,
+ * bv_ba_solver.tmpl.h and bv_ba_hooks.tmpl.h.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
@@ -54,24 +53,25 @@
 namespace idni::tau_lang {
 
 using bv = cvc5::Term;
+/// A cvc5 sort.
 using sort = cvc5::Sort;
+/// A list of bv terms.
 using bvs = std::vector<bv>;
+/// The cvc5 solver.
 using solver = cvc5::Solver;
+/// The cvc5 term manager.
 using term_manager = cvc5::TermManager;
 
+/// A satisfying assignment: each free variable (as a `bf` node) to its value.
 template<NodeType node>
 using solution = subtree_map<node, tref>;
 
 /**
- * @brief Returns the bit-vector size associated with the given tref.
+ * @brief Returns the bit width of a bitvector type tree; same as get_bv_width.
  *
- * This function template retrieves the size (in bits) of the bit-vector
- * represented by the provided tref object, depending on the specified NodeType.
- *
- * @tparam node The type of node for which the bit-vector size is queried.
- * @param b The tref object representing the bit-vector.
- * @return The size of the bit-vector in bits, or a report naming why it
- * could not be determined.
+ * @param t A bitvector type tree (`typed > type > subtype > num`).
+ * @return The width in bits, or an error when the type has no explicit
+ * width or the width is outside 1..65535.
  */
 template<NodeType node>
 result<size_t> get_bv_size(const tref t);
@@ -88,6 +88,11 @@ result<size_t> get_bv_size(const tref t);
 /// TAU_BV_QF_DECISION (a value of "0" disables).
 inline bool bv_quantifier_free_decision = false;
 
+/**
+ * @brief Whether the quantifier-free decision of `bv_formula_sat_status` is on.
+ * @return `bv_quantifier_free_decision`, or true when TAU_BV_QF_DECISION is
+ * set to a non-empty value other than "0" (read once per process).
+ */
 inline bool bv_quantifier_free_decision_enabled() {
 	static const bool env = [] {
 		const char* v = std::getenv("TAU_BV_QF_DECISION");
@@ -126,6 +131,8 @@ inline env_limit<size_t> bv_solve_timeout{ "TAU_BV_SOLVE_TIMEOUT", 60 };
  * and proofs are never read by the callers of `bv_formula_sat_status`, and
  * every instance performs exactly one checkSat, so incrementality is off as
  * well. Only reachable through `bv_quantifier_free_decision`.
+ *
+ * @param solver A fresh solver, before its logic is set.
  */
 inline void config_cvc5_solver_quantifier_free(cvc5::Solver& solver) {
 	solver.setOption("incremental", "false");
@@ -272,6 +279,14 @@ using bv_eval_memo = subtree_unordered_map<node, std::unordered_map<size_t, bv>>
  * keyed by (tref, ctx). @p ctx identifies the enclosing wff_all/wff_ex
  * instance (0 at top level, else a fresh value from @p ctx_counter minted
  * per quantifier entry) so memo entries don't leak across quantifier scopes.
+ *
+ * @param form Node to translate.
+ * @param vars Bound variable terms, as in the overload above.
+ * @param free_vars Free variable terms; a new free variable is added.
+ * @param memo Translation cache shared by one top-level call.
+ * @param ctx_counter Last context id handed out; incremented per binder.
+ * @param ctx Context id of the enclosing binder instance.
+ * @return As the overload above.
  */
 template <NodeType node>
 result<bv> bv_eval_node(const typename tree<node>::traverser& form,
@@ -290,7 +305,19 @@ template <NodeType node>
 result<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars);
 
-/** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */
+/**
+ * @brief Convert a cvc5 term back into a Tau tree.
+ *
+ * Handles the Boolean connectives, quantifiers over one variable, the
+ * unsigned comparisons, the bitvector operations of the bv BA, zero-extend,
+ * extract and concat (as casts and shifts), negation (as `~x + 1`) and the
+ * min/max ITE shapes make_bitvector_min/max build.
+ *
+ * @param n The cvc5 term.
+ * @param var_map cvc5 variable name (without `|` quotes) to the Tau variable
+ * it stands for; a variable not in it becomes a new bf variable of that name.
+ * @return The Tau tree, or nullptr when some subterm has no Tau counterpart.
+ */
 template <NodeType node>
 tref cvc5_tree_to_tau_tree (bv n,
 	const std::map<std::string, tref>& var_map = {});
@@ -312,6 +339,9 @@ enum class bv_sat_status { sat, unsat, unknown };
  * failure the same as unsat; callers that would otherwise assert a formula
  * is definitely false based on "not sat" should use this instead and treat
  * unknown/nullopt as "cannot decide", not as unsat.
+ *
+ * Obeys `bv_quantifier_free_decision`, `bv_bitblast_max_nodes` and
+ * `bv_solve_timeout`; a query killed at the timeout answers unknown.
  *
  * @param form The bit-vector formula to be checked for satisfiability.
  * @return The tri-state result, or nullopt if translation to cvc5 failed.
@@ -401,14 +431,16 @@ bool has_foreign_ba_constant(tref form);
  * bitvector arithmetic natively, but `eliminate_arithmetic_and_quantifiers` runs
  * `resolve_quantifiers` three times and is itself re-entered from the
  * interpreter's fixpoint loops, so a later pass can meet a scope an earlier one
- * already blasted. Only its *open*-scope branch screens on this, because only
- * that branch synthesises the universal block which -- wrapped around the
- * auxiliary quantifiers blasting introduced -- gives cvc5's
- * counterexample-guided instantiation the alternation it does not terminate on.
- * See that branch for the measurements and the reproducing spec.
+ * already blasted. Both of its solver branches screen on this, through
+ * the descriptor's `has_preprocessing_residue`: the open-scope branch because
+ * the universal block it synthesises around the auxiliary quantifiers
+ * blasting introduced gives cvc5's counterexample-guided instantiation the
+ * alternation it does not terminate on, and the closed-scope branch because
+ * the scope may already carry such an alternation from a prior pass. See the
+ * open-scope branch for the measurements and the reproducing spec.
  *
  * A hand-written `x & { 1 }:bv[N]` matches too. That costs nothing beyond the
- * solver shortcut for that one open scope -- blasting, the same fallback taken
+ * solver shortcut for that one scope -- blasting, the same fallback taken
  * for any scope the solver cannot own, still applies, and by the caller's own
  * reasoning blasting "neither closes a formula nor makes this check succeed
  * later", so no scope that cvc5 would have decided is lost.
@@ -420,30 +452,33 @@ template <NodeType node>
 bool has_blasting_residue(tref form);
 
 /**
- * @brief Checks whether a given bit-vector formula is valid.
+ * @brief Checks whether a given bit-vector formula is valid, as
+ * `is_bv_formula_unsat` of its negation.
  *
- * This function analyzes the provided formula and determines if it is valid
- * according to the semantics of bit-vector boolean algebra.
+ * Not a definite answer: when cvc5 answers unknown for the negation, or the
+ * negation cannot be translated, this returns true as well. A caller that
+ * must not take an undecided formula as valid uses `bv_formula_sat_status`
+ * on the negation instead.
  *
  * @param form The formula to be checked for validity.
- * @return true if the formula is valid, false otherwise.
+ * @return true if the negation of @p form is not definitely satisfiable.
  */
 template <NodeType node>
 bool is_bv_formula_valid(tref form);
 
 /**
- * @brief Checks whether a given bit-vector formula is unsatisfiable.
+ * @brief Checks whether a given bit-vector formula is unsatisfiable, as
+ * `!is_bv_formula_sat`.
  *
- * This function analyzes the provided formula and determines if there is no possible assignment
- * to its variables that would make the formula evaluate to true.
+ * Not a definite answer: a cvc5 unknown (a timeout included) and a
+ * translation failure also return true. A caller that would conclude the
+ * formula is false from it uses `bv_formula_sat_status` instead.
  *
  * @param form The bit-vector formula to be checked for unsatisfiability.
- * @return true if the formula is unsatisfiable; false otherwise.
+ * @return true if @p form is not definitely satisfiable.
  */
 template <NodeType node>
 bool is_bv_formula_unsat(tref form);
-
-// (BA1-16: never-defined solve_bv(tref, cvc5::Solver&) declaration removed.)
 
 /**
  * @brief Solves a boolean algebra problem over bit-vectors.
@@ -451,9 +486,11 @@ bool is_bv_formula_unsat(tref form);
  * Given a term reference representing a formula, attempts to find a solution
  * that satisfies the formula within the context of bit-vector boolean algebras.
  *
+ * Runs one cvc5 query with models on a fresh solver, with no time bound.
+ *
  * @param form The term reference representing the formula to solve.
- * @return An optional solution containing a mapping from nodes to values if a solution exists,
- *         or std::nullopt if no solution is found.
+ * @return The value of every free variable when cvc5 answers sat; nullopt
+ * when it answers unsat or unknown, or when @p form cannot be translated.
  */
 template <NodeType node>
 std::optional<solution<node>> solve_bv(tref form);
@@ -464,14 +501,21 @@ std::optional<solution<node>> solve_bv(tref form);
  * This function attempts to find a solution to the given Boolean formula
  * represented by the parameter `form`, which is expressed in terms of bit-vectors.
  *
- * @param form The Boolean formula to solve, represented as a collection of term references.
- * @return An optional solution containing a mapping of nodes if a solution exists;
- *         std::nullopt otherwise.
+ * @param form The literals of the formula, solved as their conjunction.
+ * @return As solve_bv(tref) on that conjunction.
  */
 template <NodeType node>
 std::optional<solution<node>> solve_bv(const trefs& form);
 
-/** @brief Extract a BV constant from a parse-tree node @p parse_tree with type @p type_tree. */
+/**
+ * @brief Build a bv constant from a bitvector-grammar parse tree.
+ * @param parse_tree The parse tree of a decimal, binary or hexadecimal
+ * literal; may be null.
+ * @param type_tree The bitvector type giving the width.
+ * @return The constant; no value and no error when @p parse_tree is null or
+ * not a literal; an error when the width is missing or cvc5 rejects the
+ * literal (for example a value wider than the type).
+ */
 template<typename...BAs>
 requires BAsPack<BAs...>
 result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
@@ -479,16 +523,14 @@ result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
 /**
  * @brief Parses a bit-vector constant from a string representation.
  *
- * This function attempts to parse the given string `src` as a bit-vector constant,
- * interpreting it according to the specified `size` (number of bits) and `base` (numerical base).
- * If parsing is successful, it returns an optional containing the parsed constant with its type;
- * otherwise, it returns an empty optional.
+ * The base comes from the literal itself (bitvector grammar: decimal,
+ * `#b`/`#x`); a leading `0b`/`0x` is accepted as `#b`/`#x`. The width
+ * comes from @p type_tree.
  *
- * @tparam BAs... Variadic template parameters representing Boolean Algebra types.
+ * @tparam BAs The Boolean algebras of the node pack.
  * @param src The string representation of the bit-vector constant to parse.
- * @param type_tree The type of the bit-vector.
- * @param base The numerical base to use for parsing (e.g., 2 for binary, 10 for decimal, 16 for hexadecimal). Defaults to 10.
- * @return The parsed bit-vector constant with type, or a report naming why parsing failed.
+ * @param type_tree The bitvector type of the constant.
+ * @return The constant with @p type_tree, or a parse error.
  */
 template<typename...BAs>
 requires BAsPack<BAs...>
@@ -497,9 +539,6 @@ result<typename node<BAs...>::constant_with_type> parse_bv(const std::string& sr
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
-// (BA1-16: four never-defined declarations removed: solve_bv(tref,Solver&),
-// canonize_associative_commutative_symbol, is_associative_and_commutative,
-// get_inv_sym.)
 
 /** @brief Normalise a BV term via cvc5's simplifier.
  *
@@ -511,15 +550,12 @@ result<typename node<BAs...>::constant_with_type> parse_bv(const std::string& sr
  * operation through here. simplify() adds no assertions, so solver reuse
  * is state-safe, and it is deterministic for a fixed option set (options
  * are fixed before the first query, see cvc5_options.h), so the cache is
- * sound. The solver is deliberately leaked: a static Solver object could
- * destruct after the global cvc5_term_manager it references (see at_exit
- * in main.cpp for the cleanup-order minefield).
+ * sound (the cache exists only with TAU_CACHE). The solver is deliberately
+ * leaked: do not make it an owned static object, which could be destroyed
+ * after the global cvc5_term_manager it references and crashes at exit.
  *
- * NOTE (BA1-17): an earlier attempt at a plain static Solver here (owned,
- * not leaked) SIGSEGVed Release LTL execution mid-run (test_ltl_correctness
- * LT2-EXEC-03, test_ltl_qlt_bv); the deliberate leak above avoids the
- * destruction-order interaction. Do not convert it back to an owned
- * static object. */
+ * @param fm A bv term.
+ * @return The simplified term, equivalent to @p fm. */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 #ifdef TAU_CACHE
 	static std::unordered_map<cvc5::Term, cvc5::Term> cache;
@@ -563,13 +599,14 @@ inline bool is_bv_syntactic_one(const cvc5::Term& fm) {
 // only to unqualified lookup inside idni::tau_lang would not be found there.
 namespace cvc5 {
 
-/** @brief Return `true` if BV term @p lhs equals @p rhs (one/zero). */
+/** @brief `true` if BV term @p lhs simplifies to all ones (@p rhs true) or
+ *  to all zeros (@p rhs false). */
 inline bool operator==(const Term& lhs, const bool& rhs);
-/** @brief Return `true` if @p lhs (bool) equals BV term @p rhs. */
+/** @brief Same as `rhs == lhs`. */
 inline bool operator==(const bool& lhs, const Term& rhs);
-/** @brief Return `true` if BV term @p lhs is not equal to @p rhs. */
+/** @brief Negation of `lhs == rhs`. */
 inline bool operator!=(const Term& lhs, const bool& rhs);
-/** @brief Return `true` if @p lhs (bool) is not equal to BV term @p rhs. */
+/** @brief Negation of `rhs == lhs`. */
 inline bool operator!=(const bool& lhs, const Term& rhs);
 
 } // namespace cvc5
@@ -586,9 +623,10 @@ template <NodeType node> bool is_bv_type_family(tref t);
 template <NodeType node> bool is_bv_type_family(size_t ba_type_id);
 /** @brief Return `true` if node @p t carries a bitvector type. */
 template <NodeType node> bool is_tref_bv_type_family(tref t);
-/** @brief Checked bitwidth lookup: a type without an explicit bitwidth is a report. */
+/** @brief Checked bitwidth lookup: a type without an explicit bitwidth, or
+ *  a width outside 1..65535, is an error. */
 template <NodeType node> result<size_t> get_bv_width(tref t);
-/** @brief Checked bitwidth lookup by type id. */
+/** @brief Checked bitwidth lookup by type id; an unknown id is an error too. */
 template <NodeType node> result<size_t> get_bv_width(size_t ba_type_id);
 
 // Bitvector specific symbol simplification
@@ -597,7 +635,8 @@ template <NodeType node> result<size_t> get_bv_width(size_t ba_type_id);
 // they decline the fold -- leaving the node symbolic -- whenever the exact
 // result would not fit, so the later widening pass can compute it at a wider
 // width instead of wrapping it here. div, mod and shr cannot overflow and
-// always fold.
+// always fold. Each returns the folded node, @p symbol unchanged when there
+// is nothing to fold, or nullptr when a constant's width cannot be read.
 /** @brief Simplify an `add` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_add(tref symbol);
 /** @brief Simplify a `sub` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
@@ -621,7 +660,10 @@ template<NodeType node> tref term_nand(tref symbol);
 /** @brief Cast the constant in `cast` node @p symbol to @p target_type_id. */
 template<NodeType node> tref term_cast(tref symbol, size_t target_type_id);
 
-// Constant comparison folds; nullptr when an operand is not a bv constant.
+// Constant comparison folds (unsigned). @p ch is the children array of the
+// `wff` being interned, @p r its right sibling, kept on the result. Each
+// returns T or F, or nullptr when the operands are not bv constants of the
+// same type.
 /** @brief Fold `<` over the constants in @p ch. */
 template<NodeType node> tref wff_bv_lt(const tref* ch, tref r);
 /** @brief Fold `!<` over the constants in @p ch. */
@@ -643,16 +685,16 @@ template<NodeType node> tref term_min(tref symbol);
 /** @brief Simplify a `max` bitvector symbol node @p symbol (unsigned). */
 template<NodeType node> tref term_max(tref symbol);
 
-/** @brief Apply all BV symbol-level simplifications to @p symbol. */
+/** @brief Dispatch @p symbol to the term_* fold of its operator; @p symbol
+ *  unchanged for any other operator. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);
 
-/** @brief Apply all BV term-level simplifications to @p term; the result
- *  reports why on a round-cap failure. */
+/** @brief Simplify the bv term @p term with bv_ba_cvc5_simplification, or
+ *  with bv_ba_custom_simplification when that declines.
+ *  @return The simplified term, with a warning when the custom pass hit
+ *  `max_simplify_rounds`; an error when either pass fails. */
 template<NodeType node> result<tref> simplify_bv_term(tref term);
 
-// (BA1-16: three never-defined declarations removed here:
-// canonize_associative_commutative_symbol, is_associative_and_commutative,
-// get_inv_sym.)
 
 
 // -----------------------------------------------------------------------------

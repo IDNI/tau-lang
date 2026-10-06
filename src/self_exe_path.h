@@ -22,8 +22,14 @@
 
 namespace idni::tau_lang {
 
-// The path of the running executable. The platform self-path call, not
-// argv[0], so a PATH lookup or a symlink still names the real binary.
+/**
+ * @brief The path of the running executable.
+ *
+ * Uses the platform self-path call, not argv[0], so a PATH lookup still
+ * names the binary (on Linux, /proc/self/exe also resolves symlinks; the
+ * macOS call may return a path through one).
+ * @return The path, or "" when the call fails and always under Emscripten.
+ */
 inline std::string self_exe_path() {
 #if defined(__EMSCRIPTEN__)
 	return {};

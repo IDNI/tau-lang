@@ -1,16 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// normal_forms_helpers.tmpl.h - Basic NF utilities, squeeze/unsqueeze, ONF
-// Split from normal_forms.tmpl.h for readability.
+// normal_forms_helpers.tmpl.h - Basic NF utilities: comparison-atom
+// normalization, NNF, BA-constant normalization, ONF.
 
 namespace idni::tau_lang {
-
-// (NF-7: the six squeeze/unsqueeze wff helpers were deleted -- zero
-// callers anywhere. Recover from git if the squeeze pipeline returns.)
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
+// Rewrite every `!(a = b)` in @p fm to `a != b`.
 template <NodeType node>
 tref not_equal_to_unequal(tref fm) {
 	using tau = tree<node>;
@@ -31,36 +29,19 @@ tref not_equal_to_unequal(tref fm) {
 	return result;
 }
 
-// This looks redundant at first glance: non-bv `wff_lt/nlt/lteq/nlteq/
-// gt/ngt/gteq/ngteq` nodes are already decomposed into and/or/eq form by
-// the construction-time hooks (hooks.tmpl.h), and bv-typed occurrences of
-// `bf_neq/gt/gteq/nlt/ngt/nlteq/ngteq` are handled directly by predicate
-// blasting and cvc5 (bv_predicate_blasting.tmpl.h, bv_ba_solver.tmpl.h) --
-// so it's tempting to drop this pass and rely on those. Both attempts
-// regressed the test suite, empirically:
-//  - Removing the pass entirely crashes an assertion in
-//    eliminate_block_over_clause (`!find_top(is<bf_neq>)`) and aborts most
-//    of the satisfiability/solver/splitter/interpreter/api tests: several
-//    downstream matchers (this one, trivial_skolem_ex's bf_eq-only
-//    matcher, the is_atomic filters gating Boole decomposition) hard-
-//    assume only bf_eq/bf_lt/bf_lteq atoms ever reach them.
-//  - Narrowing it to just the bf_neq case (leaving nlteq/nlt/gteq/gt/
-//    ngteq/ngt untouched) stops the crashes but still regresses Release:
-//    test_integration-satisfiability2/4 time out (fragmenting the atom
-//    space hurts pivot selection/memoization in the Boole-decomposition
-//    pipeline enough to blow up what's normally fast), test_integration-
-//    wff_normalization prints "Failed to translate the formula to cvc5:
-//    [t > 3]" (a non-bv atom left unresolved by the generic pipeline
-//    falls through to the cvc5 fallback and cvc5 rejects it), and
-//    test_integration-heuristics-syntactic_path_simplification fails on
-//    formulas containing only `=`/`!=` (to_nnf produces these ordering
-//    node shapes internally even from pure equality negation, so a
-//    neq-only fix doesn't cover it).
-// In short: the hooks and blasting/cvc5 handle *their* construction
-// paths, but this pass also normalizes comparison atoms produced
-// internally by the generic, bv-agnostic quantifier-elimination/NNF
-// machinery (anti_prenex*, onf_wff, to_nnf) -- which is why it can't be
-// removed or narrowed without a broader rewrite of those consumers.
+// Rewrite every comparison atom of @p fm into `=`, `<` and `<=` atoms and
+// negations: `!=` becomes `!(=)`; where the order on the operands is total,
+// `!<=`, `!<`, `>=`, `>`, `!>=`, `!>` become a (negated) `<` with the
+// operands swapped as needed; otherwise only swaps and explicit negations
+// apply. Cached per formula under TAU_CACHE.
+//
+// It looks redundant with the construction-time hooks (hooks.tmpl.h) and
+// with bv predicate blasting and cvc5, but downstream matchers
+// (eliminate_block_over_clause, trivial_skolem_ex, the is_atomic filters of
+// Boole decomposition) assume only bf_eq/bf_lt/bf_lteq atoms reach them,
+// and the generic quantifier-elimination/NNF machinery (anti_prenex*,
+// onf_wff, to_nnf) produces the other shapes internally. Do not remove or
+// narrow it without rewriting those consumers.
 template<NodeType node>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
@@ -70,7 +51,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
 	// this stores the value untrimmed: apply_unique preserves the input
 	// root's right sibling in its result. That is deliberate parity with
-	// the core traversal slot memo (tree.h ~1055), which already stores
+	// the core traversal slot memo (the parser's tree.h), which already stores
 	// sibling-carrying rebuilt nodes under sibling-insensitive keys; every
 	// consumer here compares content, not siblings, so an untrimmed value
 	// is safe. (Same note applies to to_nnf's cache below.)
@@ -245,6 +226,8 @@ result<tref> fold_modular_value_cover(tref fm) {
 	return syntactic_formula_simplification<node>(result);
 }
 
+// Rewrite every `>`, `>=`, `!>`, `!>=` atom of @p fm to `<`, `<=`, `!<`,
+// `!<=` with the operands swapped.
 template<NodeType node>
 tref gt_gteq_to_lt_lteq(tref fm) {
 	using tau = tree<node>;
@@ -276,13 +259,14 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 
 
 
+/** @internal @copydoc to_nnf @endinternal */
 template <NodeType node>
 tref to_nnf(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	// Untrimmed value cache; see normalize_atomic_formula_operators above
-	// for why (sibling-hygiene parity with the tree.h ~1055 traversal memo).
+	// for why (sibling-hygiene parity with the core traversal memo).
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
@@ -295,6 +279,8 @@ tref to_nnf(tref fm) {
 #endif // TAU_CACHE
 }
 
+// An equation `(a xor b) = 0` back to `a = b` (and `!= 0` to `a != b`);
+// any other @p eq unchanged.
 template<NodeType node>
 tref denorm_equation(tref eq) {
 	using tau = tree<node>;
@@ -313,7 +299,9 @@ tref denorm_equation(tref eq) {
 
 // -----------------------------------------------------------------------------
 
-// This function traverses a term fm and normalizes all Boolean algebra constants
+// Normalize every BA constant of the term @p fm (a `bf`, DBG-asserted): push
+// negations in (into constants too), then pass each constant through its
+// algebra's normalize. Returns the term, or the error of a failed normalize.
 template <NodeType node>
 result<tref> normalize_ba(tref fm) {
 	using tau = tree<node>;
@@ -363,7 +351,8 @@ result<tref> normalize_ba(tref fm) {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
-// return the inner quantifier or the top wff if the formula is not quantified
+// The variable and body of the innermost quantifier (ex, all, sometimes,
+// always) of @p n; an empty traverser and @p n itself when there is none.
 template <NodeType node>
 std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n) {
 	using tau = tree<node>;
@@ -383,6 +372,7 @@ std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n)
 	return { tt{}, n };
 }
 
+/** @internal @copydoc onf_wff::onf_wff @endinternal */
 template <NodeType node>
 onf_wff<node>::onf_wff(tref _var) {
 	using tau = tree<node>;
@@ -391,6 +381,7 @@ onf_wff<node>::onf_wff(tref _var) {
 	else var = _var;
 }
 
+/** @internal @copydoc onf_wff::operator()(tref) const @endinternal */
 template <NodeType node>
 tref onf_wff<node>::operator()(tref n) const {
 	using tau = tree<node>;
@@ -485,6 +476,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	return rewriter::replace<node>(n, changes);
 }
 
+/** @internal @copydoc operator|(const typename tree<node>::traverser&, const onf_wff_t<node>&) @endinternal */
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const onf_wff_t<node>& r)
@@ -492,6 +484,7 @@ typename tree<node>::traverser operator|(
 	return tt(r(t.value()));
 }
 
+/** @internal @copydoc onf @endinternal */
 template <NodeType node>
 result<tref> onf(tref n, tref var) {
 	using tau = tree<node>;

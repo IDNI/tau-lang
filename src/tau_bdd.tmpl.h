@@ -163,7 +163,8 @@ template<NodeType node>
 void tau_term_bdd<node>::sync_order_cache(const order& o) {
 	// Lazily register prune_caches() as a bintree<node>::gc_callback,
 	// exactly once. sync_order_cache() is the single choke point every
-	// public entry point (bdd_and, bdd_and_many, bdd_ite) calls before
+	// public entry point (bdd_and, bdd_and_many, bdd_ite, bdd_ex,
+	// bdd_quant) calls before
 	// touching a memo table, so this is guaranteed to run before any
 	// ex_memo/quant_memo entry exists; the function-local static's
 	// initialisation is thread-safe. An inline static data member of
@@ -345,15 +346,7 @@ bool tau_term_bdd<node>::leaf(ref l) {
 	return tl.l == nullptr && tl.r == nullptr;
 }
 
-/**
- * @internal
- * @brief Creates a BDD from a given Tau term
- * @param f The Tau term to build the BDD from
- * @param o The ordering of tau terms
- * @param o_bound The current highest ordering id
- * @return A reference to the BDD corresponding to f
- * @endinternal
- */
+/** @internal @copydoc tau_term_bdd::build_bdd(tref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 	std::unordered_map<tref, ref> memo;
@@ -409,7 +402,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd_step(tref f, const order& 
 		}
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID.
-			// TT1-29 invariant: U's keys are TYPED bf nodes; this
+			// Invariant: U's keys are TYPED bf nodes; this
 			// plain get(bf, ...) key only matches because the
 			// construction hook propagates the child's ba_type up.
 			// If build_bdd ever runs inside a hooks-off scope
@@ -446,7 +439,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 	if (x == T) return add(y);
 	if (x == F) return F;
 #ifdef TAU_CACHE
-	// TT1-12: canonicalize like the (ref, ref) variant, so entries from
+	// Canonicalize like the (ref, ref) variant, so entries from
 	// either variant hit the same memo slot.
 	ref yr = add(y);
 	{ ref xc = x, yc = yr; make_canonical(xc, yc);
@@ -902,8 +895,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 	if (v.size() == 1) return v[0];
 
 #ifdef TAU_CACHE
-	// TT1-14: local, not function-static -- the static scratch was a
-	// reentrancy trap for one saved allocation.
+	// Local, not function-static, so the recursion stays reentrant.
 	refs v1;
 	do {
 		if (v1=v, am_simplify(v, memo), v.size()==1) return v[0];
@@ -1191,7 +1183,7 @@ template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged, bdd_fv_cache_t& cache) {
 	using tau = tree<node>;
-	// TT1-6: BDD nodes are hash-consed and heavily shared; an unguarded
+	// BDD nodes are hash-consed and heavily shared; an unguarded
 	// recursion revisits a node once per path (worst-case exponential).
 	// Iterate with a visited set instead.
 	std::vector<tref> stack{ bdd_tref };
@@ -1218,7 +1210,7 @@ template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged) {
 	using tau = tree<node>;
-	// TT1-6: see the TAU_CACHE variant -- visited set prevents the
+	// See the TAU_CACHE variant -- visited set prevents the
 	// exponential revisits of shared sub-DAGs.
 	std::vector<tref> stack{ bdd_tref };
 	std::unordered_set<tref> visited;

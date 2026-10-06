@@ -22,9 +22,9 @@ namespace idni::tau_lang {
 /**
  * @brief BDD node keyed by a Tau tree reference with per-edge inversion flags.
  *
- * Stores the variable (@p v) and three output-inverter bits: one for the
- * node itself (`inv_v`) and one each for the high (`inv_h`) and low (`inv_l`)
- * child edges.
+ * Stores the variable (`v`, or the Tau term of a leaf) and three bits:
+ * `inv_v` says the two children are stored swapped, and `inv_h` / `inv_l`
+ * invert the edge to the stored high / low child.
  *
  * @tparam node Tree node type.
  */
@@ -35,7 +35,7 @@ struct tau_bdd_node {
 	bool inv_h : 1 = false; ///< Invert the high child.
 	bool inv_l : 1 = false; ///< Invert the low child.
 
-	/** @brief Construct a non-inverted leaf node for @p _v. */
+	/** @brief Construct a node for @p _v with every flag clear. */
 	explicit tau_bdd_node(tref _v) : v(_v) {}
 	/** @brief Construct with all inversion flags explicit. */
 	tau_bdd_node(tref _v, bool _inv_v, bool _inv_h, bool _inv_l)
@@ -45,7 +45,7 @@ struct tau_bdd_node {
 	bool operator==(const tau_bdd_node& other) const;
 	/** @brief Inequality comparison. */
 	bool operator!=(const tau_bdd_node& other) const;
-	/** @brief Ordering (for use in maps/sets). */
+	/** @brief Ordering (for use in maps/sets): by variable, then flags. */
 	bool operator<(const tau_bdd_node& other) const;
 };
 
@@ -62,7 +62,7 @@ struct tau_bdd_ref {
 	tref b = nullptr; ///< BDD node reference.
 	bool inv = false; ///< Output-inversion flag.
 
-	/** @brief Default-construct a null reference. */
+	/** @brief Default-construct a null reference (no BDD). */
 	tau_bdd_ref() {}
 	/** @brief Construct from node @p _b with inversion @p _inv. */
 	tau_bdd_ref(tref _b, bool _inv) : b(_b), inv(_inv) {}
@@ -120,10 +120,15 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	using subs_t  = std::vector<std::pair<tref, ref>>;        ///< @brief Substitution list.
 
 #ifdef TAU_CACHE
+	/// (x, y) -> x AND y.
 	using cache_and_t      = std::unordered_map<std::array<ref, 2>, ref>;
+	/// Conjuncts -> their AND.
 	using cache_and_many_t = std::unordered_map<refs, ref>;
+	/// Variables -> (x -> ex x).
 	using cache_ex_t       = std::map<trefs, std::unordered_map<ref, ref>>;
+	/// Prefix -> (x -> quantified x).
 	using cache_quant_t    = std::map<quants, std::unordered_map<ref, ref>>;
+	/// (f, g, h) -> ite.
 	using cache_ite_t      = std::unordered_map<std::array<ref, 3>, ref>;
 
 	static cache_and_t      and_memo;       ///< @brief Memoisation table for AND.
@@ -153,36 +158,44 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	// The memo tables are keyed by BDD refs alone, not by order, so a
 	// cached entry is only valid under the order it was computed with.
-	// bdd_and, bdd_and_many and bdd_ite call sync_order_cache() first,
-	// which clears all five tables when @p o differs from last_order.
+	// bdd_and, bdd_and_many, bdd_ite, bdd_ex and bdd_quant call
+	// sync_order_cache() first, which clears all five tables when the order
+	// differs from last_order.
 	static order last_order;      ///< @brief Order the memo caches were last populated under.
 	static bool  has_last_order;  ///< @brief Whether `last_order` holds a valid previous order.
 
-	/** @brief Clear all memoisation caches if @p o differs from the order last seen at a public entry point. */
+	/** @brief Clear all memoisation caches if @p o differs from the order last
+	 *  seen at a public entry point. The first call also registers
+	 *  prune_caches as a tree gc callback and clear_caches as a reset hook. */
 	static void sync_order_cache(const order& o);
 #endif
 
-	/** @brief Canonicalise the pair @p x, @p y so @p x ≤ @p y. */
+	/** @brief Canonicalise the pair @p x, @p y so @p x ≤ @p y (ref order). */
 	static void make_canonical(ref& x, ref& y);
-	/** @brief Return `true` if variable @p x has lower rank than @p y under @p o. */
+	/** @brief Return `true` if variable @p x has lower rank than @p y under
+	 *  @p o; `false` when either is not in @p o. */
 	static bool less_then(tref x, tref y, const order& o);
 
-	/** @brief Canonically insert a non-leaf BDD node into the universe. */
+	/** @brief Canonically insert the decision node (@p v, @p h, @p l) into the
+	 *  universe; @p h itself when @p h == @p l. */
 	static ref add(tref v, ref h, ref l);
-	/** @brief Canonically insert a leaf BDD node into the universe. */
+	/** @brief Canonically insert the leaf for Tau term @p leaf: T for `1`, F
+	 *  for `0`, an inverted leaf for a negation, else a plain leaf. */
 	static ref add(tref leaf);
 	/** @brief Retrieve the BDD node for reference @p x. */
 	static tau_term_bdd get_node(ref x);
-	/** @brief Return the variable of reference @p x. */
+	/** @brief Return the variable of reference @p x; for a leaf, its Tau term
+	 *  (negated when @p x is inverted). */
 	static tref get_var(ref x);
 	/** @brief Return the high child of reference @p x. */
 	static ref get_high(ref x);
 	/** @brief Return the low child of reference @p x. */
 	static ref get_low(ref x);
-	/** @brief Return `true` if @p l is a leaf reference. */
+	/** @brief Return `true` if @p l is T, F or a leaf (a node without children). */
 	static bool leaf(ref l);
 
-	/** @brief Build a BDD for Tau formula @p f using variable order @p o. */
+	/** @brief Build a BDD for Tau term @p f using variable order @p o: the
+	 *  subterms in @p o are decision variables, any other atom a leaf. */
 	static ref build_bdd(tref f, const order& o);
 	/**
 	 * @brief build_bdd with @p memo holding the BDD of every subterm already
@@ -194,7 +207,8 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief Build a single-bit BDD for variable @p v. */
 	static ref from_bit(tref v);
 
-	/** @brief AND of @p x and a leaf (Tau formula) @p y. */
+	/** @brief AND of @p x with the Tau term @p y, conjoined into every leaf of
+	 *  @p x (@p y is not a decision variable). */
 	static ref bdd_and(ref x, tref y);
 	/** @brief AND of two BDD references @p x and @p y under order @p o. */
 	static ref bdd_and(ref x, ref y, const order& o);
@@ -207,9 +221,12 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 *  @p v is taken by value: the implementation sorts it, and callers
 	 *  (including tau_term_bdd_handle::bdd_ex) hold it by const reference. */
 	static ref bdd_ex(ref x, trefs v, const order& o);
-	/** @brief Universally quantify variables @p v from @p x under @p o. */
+	/** @brief Universally quantify variables @p v from @p x under @p o, as
+	 *  `!ex v !x`. */
 	static ref bdd_all(ref x, trefs v, const order& o);
-	/** @brief Apply a sequence of mixed quantifiers @p v to @p x under @p o. */
+	/** @brief Apply a sequence of mixed quantifiers @p v to @p x under @p o.
+	 *  @p v lists the prefix outermost first; its variables must be in
+	 *  strictly decreasing rank under @p o (DBG-asserted). */
 	static ref bdd_quant(ref x, const quants& v, const order& o);
 
 	/** @brief AND of all references in @p v under @p o. */
@@ -225,7 +242,8 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief Apply multiple simultaneous variable substitutions @p subs. */
 	static ref bdd_compose(ref x, subs_t subs, const order& o);
 
-	/** @brief Convert BDD reference @p x to a Tau term of type @p term_type. */
+	/** @brief Convert BDD reference @p x to a Tau term of type @p term_type,
+	 *  as nested `v & high | v' & low`. */
 	static tref to_tau_term(ref x, size_t term_type);
 
 private:
@@ -273,10 +291,10 @@ private:
 	 */
 	static void am_sort(refs& b);
 	/**
-	 * @brief Rewrite @p v using one @p memo hit: if some memoised
-	 * argument set is a subset of @p v, replace that subset by its
-	 * memoised result ({F} collapses the list). Returns true iff @p v
-	 * changed; callers iterate it to a fixpoint.
+	 * @brief am_sort @p v, then rewrite it using one @p memo hit: if some
+	 * memoised argument set is a subset of @p v, replace that subset by its
+	 * memoised result ({F} collapses the list). Returns true iff such a hit
+	 * was applied; callers iterate until @p v stops changing.
 	 */
 	static bool am_simplify(refs& v, const std::unordered_map<refs, ref>& memo);
 	/**
@@ -290,14 +308,21 @@ private:
 	// Memoised recursive workers, independent of TAU_CACHE: the public
 	// entry points thread through a static map when TAU_CACHE is on, or
 	// a fresh local one otherwise.
+	/// Worker of bdd_and(ref, ref, const order&).
 	static ref bdd_and(ref x, ref y, const order& o,
 		std::unordered_map<std::array<ref, 2>, ref>& memo);
+	/// Worker of bdd_ite(ref, ref, ref, const order&).
 	static ref bdd_ite(ref f, ref g, ref h, const order& o,
 		std::unordered_map<std::array<ref, 3>, ref>& memo);
+	/// Worker of bdd_ex: quantifies @p v (sorted by rank) from index @p i on.
 	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o, auto& memo);
+	/// Worker of bdd_quant: applies @p v (innermost first) from index @p i on.
 	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o, auto& memo);
+	/// Worker of bdd_compose(ref, tref, ref, const order&).
 	static ref bdd_compose_impl(ref x, tref xi, ref g, const order& o,
 		std::unordered_map<ref, ref>& memo);
+	/// Worker of bdd_compose(ref, subs_t, const order&): @p subs sorted by
+	/// rank, applied from index @p i on.
 	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
 		const order& o, std::unordered_map<ref, ref>& memo);
 	// Memoised worker for to_tau_term(ref, size_t): shared BDD nodes are
@@ -349,7 +374,8 @@ struct tau_term_bdd_handle {
 	 * in @p U (see the handle overload -- no deduplication). */
 	static tref convert_to_tau_node(tref term, const order& o);
 	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node,
-	 * or nullopt if @p tau_node has no entry in @p U. */
+	 * or nullopt if @p tau_node has no entry in @p U (DBG-asserted not to
+	 * happen). */
 	static std::optional<term_handle> convert_to_handle(tref tau_node);
 	/** @brief Convert this handle to a Tau term of type @p term_type. */
 	tref to_tau_term(size_t term_type) const;
@@ -378,13 +404,19 @@ struct tau_term_bdd_handle {
 	/** @brief Apply simultaneous substitutions @p subs under @p o. */
 	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const;
 
-	/** @brief Substitute @p var with @p with in formula @p formula under @p o. */
+	/** @brief Substitute @p var with @p with in the BDD nodes of @p formula.
+	 *
+	 * Each `bf` node of @p formula registered in @p U is replaced by a new
+	 * BDD node (convert_to_tau_node) of its BDD composed with @p with for
+	 * @p var under @p o; the subtree of a replaced node is not visited. */
 	static tref substitute(tref formula, tref var, term_handle with, const order& o);
 
 	/** @brief Return the underlying BDD reference. */
 	ref get() const;
 
-	/** @brief Return the free Tau variables referenced by BDD node @p bdd_tref. */
+	/** @brief Return the free Tau variables of every decision variable and
+	 *  leaf of the BDD rooted at @p bdd_tref (empty for null); cached per
+	 *  root, so the reference stays valid. */
 	static const trefs& get_free_tau_vars(tref bdd_tref);
 
 	/** @brief Equality comparison. */
@@ -396,6 +428,7 @@ struct tau_term_bdd_handle {
 	bool inv = false; ///< @brief Output inverter flag.
 
 private:
+	/// BDD root -> interned free variables.
 	using bdd_fv_cache_t = std::unordered_map<tref, free_vars_ref>;
 #ifdef TAU_CACHE
 	/**
@@ -416,6 +449,7 @@ private:
 #endif
 };
 
+/// Short name of tau_term_bdd_handle.
 template<NodeType node>
 using term_handle = tau_term_bdd_handle<node>;
 

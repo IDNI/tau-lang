@@ -125,8 +125,8 @@ result<tref> simplify_bv_term(tref term) {
 	// stays a failure: falling back here could silently turn a real bug
 	// into custom_simplification's answer instead of reporting it.
 	if (r.has_error()) return r;
-	// bv_ba_custom_simplification never declines to nullptr, only fails
-	// outright, carrying the round-cap report; propagate it rather than
+	// bv_ba_custom_simplification always yields a value unless it fails
+	// (its round cap is only a warning); propagate a failure rather than
 	// falling back to term silently.
 	auto custom = r.merge_take(bv_ba_custom_simplification<node>(term));
 	if (!custom) return r;

@@ -30,14 +30,20 @@ namespace idni::tau_lang {
  */
 struct serialized_constant_input_stream {
 	virtual ~serialized_constant_input_stream() = default;
-	/** @brief Produce a fresh, rewound copy of this stream. */
+	/** @brief Produce a fresh copy of this stream, for a rebuilt
+	 *  interpreter (whether it rewinds depends on the stream). */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() = 0;
-	/** @brief Read the next value, or return `std::nullopt` at end-of-stream. */
+	/**
+	 * @brief Read the next value.
+	 * @return The value; an empty string when there is no more input (or no
+	 * value yet), which the interpreter takes as the quiet end of the run;
+	 * `std::nullopt` on a read failure, which it reports as an error.
+	 */
 	virtual std::optional<std::string> get() = 0;
 	/**
 	 * @brief Read the value for @p time_point (default: delegates to `get()`).
 	 * @param time_point Simulation step number.
-	 * @return Value at @p time_point, or `std::nullopt`.
+	 * @return As `get()`.
 	 */
 	virtual std::optional<std::string> get(size_t /*time_point*/) {
 		// DBG(LOG_TRACE << "serialized_constant_input_stream::get(time_point: " << time_point << ")";)
@@ -53,7 +59,8 @@ struct serialized_constant_input_stream {
  */
 struct serialized_constant_output_stream {
 	virtual ~serialized_constant_output_stream() = default;
-	/** @brief Produce a fresh, empty copy of this stream. */
+	/** @brief Produce a fresh copy of this stream, for a rebuilt
+	 *  interpreter (whether it starts empty depends on the stream). */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() = 0;
 	/**
 	 * @brief Write @p value to the stream.
@@ -94,7 +101,7 @@ struct console_input_stream : public serialized_constant_input_stream {
 	virtual ~console_input_stream() = default;
 	/** @brief Rebuild by returning a new `console_input_stream`. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Read one line from stdin. */
+	/** @brief Read one line from stdin; "" at end of input, never nullopt. */
 	virtual std::optional<std::string> get() override;
 };
 
@@ -105,7 +112,7 @@ struct console_output_stream : public serialized_constant_output_stream {
 	virtual ~console_output_stream() = default;
 	/** @brief Rebuild by returning a new `console_output_stream`. */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
-	/** @brief Write @p value to stdout. */
+	/** @brief Write @p value and a newline to stdout; always true. */
 	virtual bool put(const std::string& value) override;
 };
 
@@ -113,13 +120,15 @@ struct console_output_stream : public serialized_constant_output_stream {
  * @brief Input stream that prompts the user before reading from stdin.
  */
 struct console_prompt_input_stream : public console_input_stream {
-	/** @brief Construct with variable @p name used as the prompt label. */
+	/** @brief Construct with variable @p name used as the prompt label;
+	 *  widens the label column shared by every prompt stream. */
 	console_prompt_input_stream(const std::string& name);
 	virtual ~console_prompt_input_stream() = default;
 	/** @brief Rebuild by returning a new `console_prompt_input_stream`. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	using console_input_stream::get;
-	/** @brief Prompt with the step number @p time_point, then read. */
+	/** @brief Print `name[time_point] := `, then read a line; an empty read
+	 *  also ends the prompt line. */
 	virtual std::optional<std::string> get(size_t time_point) override;
 private:
 	std::string name;
@@ -132,13 +141,15 @@ private:
  * the awaiting stream and prompts for a value (no exceptions, for WASM). The
  * prompt label and type handling are the REPL's concern, not the stream's. */
 struct repl_pending_input_stream : public serialized_constant_input_stream {
+	/// An empty stream with no value set.
 	repl_pending_input_stream() = default;
 	virtual ~repl_pending_input_stream() = default;
 	/** @brief Rebuild by returning a new `repl_pending_input_stream`. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Sequential variant of `get(time_point)`: same contract. */
+	/** @brief Same as `get(0)`. */
 	virtual std::optional<std::string> get() override;
-	/** @brief Return the set value, or "" after flagging `awaiting()`. */
+	/** @brief Return the set value (consuming it), the value already handed
+	 *  out for this same @p time_point, or "" after flagging `awaiting()`. */
 	virtual std::optional<std::string> get(size_t time_point) override;
 	/** @brief Set the value the REPL just read from the user. */
 	void set(const std::string& value);
@@ -160,13 +171,14 @@ private:
  * @brief Output stream that labels each write with the variable name.
  */
 struct console_prompt_output_stream : public console_output_stream {
-	/** @brief Construct with variable @p name used as the output label. */
+	/** @brief Construct with variable @p name used as the output label;
+	 *  widens the label column shared by every prompt stream. */
 	console_prompt_output_stream(const std::string& name);
 	virtual ~console_prompt_output_stream() = default;
 	/** @brief Rebuild by returning a new `console_prompt_output_stream`. */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	using console_output_stream::put;
-	/** @brief Write @p value labelled with @p time_point. */
+	/** @brief Write `name[time_point] := value` and a newline. */
 	virtual bool put(const std::string& value, size_t time_point) override;
 private:
 	std::string name;
@@ -188,9 +200,11 @@ struct file_input_stream : public serialized_constant_input_stream {
 	static result<std::shared_ptr<file_input_stream>> make(
 		const std::string& filename);
 	virtual ~file_input_stream();
-	/** @brief Rebuild by reopening the file from the beginning. */
+	/** @brief Rebuild by reopening the file from the beginning; a failed
+	 *  reopen is not reported. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Read the next line from the file. */
+	/** @brief Read the next line from the file; `std::nullopt` at end of
+	 *  file and when the file never opened. */
 	virtual std::optional<std::string> get() override;
 protected:
 	const std::string filename;
@@ -227,9 +241,11 @@ struct file_output_stream : public serialized_constant_output_stream {
 	static result<std::shared_ptr<file_output_stream>> make(
 		const std::string& filename);
 	virtual ~file_output_stream();
-	/** @brief Rebuild by reopening the file. */
+	/** @brief Rebuild by reopening (and so truncating) the file; a failed
+	 *  reopen is not reported. */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
-	/** @brief Write @p value followed by a newline to the file. */
+	/** @brief Write @p value followed by a newline to the file.
+	 *  @return false when the file is not open or the write fails. */
 	virtual bool put(const std::string& value) override;
 protected:
 	const std::string filename;
@@ -258,12 +274,12 @@ struct vector_input_stream : public serialized_constant_input_stream {
 		std::shared_ptr<size_t> current);
 	virtual ~vector_input_stream() = default;
 	/** @brief Rebuild SHARING values and cursor -- the copy CONTINUES
-	 * where this stream left off (AP2-12: it does not rewind, despite the
-	 * base contract; tests pin this sharing behavior). */
+	 * where this stream left off; it does not rewind. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Return the next value, or `std::nullopt` when exhausted. */
+	/** @brief Return the next value, or "" when exhausted (never nullopt). */
 	virtual std::optional<std::string> get() override;
-	/** @brief Append @p value to the backing store. */
+	/** @brief Append @p value to the backing store, visible to every stream
+	 *  sharing it. */
 	virtual void put(const std::string& value);
 protected:
 	std::shared_ptr<std::vector<std::string>> values;
@@ -281,16 +297,16 @@ struct vector_output_stream : public serialized_constant_output_stream {
 	/** @brief Construct sharing @p values as the backing store. */
 	vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values);
 	virtual ~vector_output_stream() = default;
-	/** @brief Rebuild SHARING the backing values (not empty, unlike the
-	 * base contract) with the read cursor reset (AP2-12). */
+	/** @brief Rebuild SHARING the backing values (not empty) with a fresh
+	 * read cursor at 0. */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
-	/** @brief Append @p value to the backing store. */
+	/** @brief Append @p value to the backing store; always true. */
 	virtual bool put(const std::string& value) override;
 	/** @brief Return the next stored value, or `std::nullopt` when exhausted. */
 	virtual std::optional<std::string> get();
 	/** @brief Return a copy of all stored values. */
 	std::vector<std::string> get_values() const;
-	/** @brief Clear the backing store. */
+	/** @brief Clear the backing store and reset the read cursor. */
 	virtual void clear();
 protected:
 	std::shared_ptr<std::vector<std::string>> values;
@@ -369,36 +385,47 @@ struct io_context {
 
 	/**
 	 * @brief Return the BA type id of IO variable @p var.
-	 * @param var IO variable node.
-	 * @return BA type identifier.
+	 * @param var IO variable node; canonized before the lookup.
+	 * @return BA type identifier, or 0 when @p var has no recorded type.
 	 */
 	size_t type_of(tref var) const;
 	/**
 	 * @brief Update the BA types of IO variables from @p global_scope.
+	 *
+	 * Records each io variable's type; one not yet registered as an input or
+	 * output becomes a console stream by its name: `this` or `i...` an
+	 * input, `u` or `o...` an output. A bare root of a tuple-typed stream
+	 * (in `adt_streams`) is skipped.
 	 * @param global_scope Map of variable → type id from type inference.
-	 * @return The report of an undefined stream name, or nothing on success.
+	 * @return The report of an undefined stream name (any other name), or
+	 * nothing on success.
 	 */
 	result<void> update_types(const subtree_map<node, size_t>& global_scope);
 
-	/** @brief Register a prompting console input stream for @p name with @p type_id. */
+	// The add_* members record the io variable @p name with type @p type_id
+	// and its stream; an entry already present for the variable is kept
+	// (emplace). Each returns the canonized io variable.
+
+	/** @brief Register @p name as a console input (stream id 0). */
 	tref add_input_console(const std::string& name, size_t type_id);
-	/** @brief Register a prompting console output stream for @p name with @p type_id. */
+	/** @brief Register @p name as a console output (stream id 0). */
 	tref add_output_console(const std::string& name, size_t type_id);
-	/** @brief Register a file input stream reading from @p filename for @p name with @p type_id. */
+	/** @brief Register @p name as an input read from @p filename (opened by the interpreter). */
 	tref add_input_file(const std::string& name, size_t type_id, const std::string& filename);
-	/** @brief Register a file output stream writing to @p filename for @p name with @p type_id. */
+	/** @brief Register @p name as an output written to @p filename (opened by the interpreter). */
 	tref add_output_file(const std::string& name, size_t type_id, const std::string& filename);
-	/** @brief Register an arbitrary input @p stream for @p name with @p type_id. */
+	/** @brief Register @p name as a console input, remapped to @p stream in `input_remaps`. */
 	tref add_input(const std::string& name, size_t type_id, std::shared_ptr<serialized_constant_input_stream> stream);
-	/** @brief Register an arbitrary output @p stream for @p name with @p type_id. */
+	/** @brief Register @p name as a console output, remapped to @p stream in `output_remaps`. */
 	tref add_output(const std::string& name, size_t type_id, std::shared_ptr<serialized_constant_output_stream> stream);
-	/** @brief Remove all registered streams and types. */
+	/** @brief Remove all registered streams, types, remaps and tuple layouts
+	 *  (`console_input_factory` is kept). */
 	void clear();
 };
 
 /**
  * @brief Pretty-print the I/O context @p ctx to @p os.
- * @tparam node Tree node type.
+ * @return @p os.
  */
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx);
@@ -430,6 +457,7 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx);
  * flat member path.
  */
 struct adt_shape_node {
+	/// A member's own position (no nested members).
 	bool is_leaf = false;
 	std::map<size_t, adt_shape_node> children; ///< Keyed by member name dict id.
 };
@@ -460,20 +488,16 @@ struct adt_tuple_reader {
 	 * @brief Return the raw leaf string at @p path for @p time_point.
 	 * @param time_point Simulation step number.
 	 * @param path Member path (dict ids, outer -> inner) to read.
-	 * @return The leaf string; an empty string (`""`, `has_value()`) if the
-	 * PHYSICAL stream's own read for @p time_point was itself empty -- no
-	 * value yet (a non-blocking console stream, e.g. the REPL's
-	 * `repl_pending_input_stream`, flags itself "awaiting" and returns `""`
-	 * instead of blocking) or genuinely no more input (an exhausted
-	 * `vector_input_stream`/`file_input_stream` signals end-of-input the
-	 * same way) -- mirroring exactly what a plain (non-tuple) stream
-	 * already does for `interpreter::read()`'s own `line.empty()` quiet
-	 * path (`interpreter.tmpl.h`), so a tuple stream's "no value yet"/EOF
-	 * is handled identically to a plain stream's, not logged as an error;
-	 * or `std::nullopt` (after `LOG_ERROR`) on an actual physical read
-	 * failure, a wire-format parse failure, or a missing/duplicate/unknown
-	 * key or leaf/object shape mismatch against the layout -- those keep
-	 * hard-error + memoized-failure semantics, unchanged.
+	 * @return The leaf string; an empty string if the PHYSICAL stream's own
+	 * read for @p time_point was itself empty -- no value yet (the REPL's
+	 * `repl_pending_input_stream` flags itself "awaiting" and returns `""`
+	 * instead of blocking) or no more input (a console or an exhausted
+	 * `vector_input_stream`) -- so `interpreter::read()` takes the same
+	 * quiet path as for a plain stream; or `std::nullopt` (after
+	 * `LOG_ERROR`) on a physical read failure, a wire-format parse failure,
+	 * or a missing/duplicate/unknown key or leaf/object shape mismatch
+	 * against the layout, memoized for this time point until the physical
+	 * stream returns a different line.
 	 */
 	std::optional<std::string> leaf(size_t time_point,
 		const std::vector<size_t>& path);
@@ -497,6 +521,7 @@ private:
 	/// something), or `failed` (a physical read/parse/validation error,
 	/// already `LOG_ERROR`'d and memoized against `memo_raw_line`).
 	enum class read_status { ok, empty, failed };
+	/// Read, parse and validate the line for @p time_point, memoizing it.
 	read_status read_time_point(size_t time_point);
 
 	std::shared_ptr<serialized_constant_input_stream> physical;
@@ -530,7 +555,8 @@ struct adt_member_input_stream : public serialized_constant_input_stream {
 	std::shared_ptr<adt_tuple_reader<node>> reader; ///< Shared with sibling members.
 	std::vector<size_t> path;                        ///< This member's own path.
 	virtual ~adt_member_input_stream() = default;
-	/** @brief Rebuild by returning a new adapter sharing the same reader/path. */
+	/** @brief Rebuild by returning a new adapter sharing the same reader/path
+	 *  (its sequential time point restarts at 0). */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	/** @brief Route to `reader->leaf(time_point, path)`. */
 	virtual std::optional<std::string> get(size_t time_point) override;
@@ -561,6 +587,8 @@ struct adt_tuple_writer {
 	 * Once every layout component for @p time_point has been collected,
 	 * formats the nested tuple literal (members in layout order, nesting
 	 * rebuilt from their paths) and `put()`s it to the physical stream.
+	 * A second write to the same @p path for @p time_point drops the whole
+	 * pending record of that time point.
 	 * @return The report of a duplicate write or a failed physical `put()`,
 	 * or nothing on success.
 	 */
@@ -598,9 +626,11 @@ struct adt_member_output_stream : public serialized_constant_output_stream {
 	std::shared_ptr<adt_tuple_writer<node>> writer; ///< Shared with sibling members.
 	std::vector<size_t> path;                        ///< This member's own path.
 	virtual ~adt_member_output_stream() = default;
-	/** @brief Rebuild by returning a new adapter sharing the same writer/path. */
+	/** @brief Rebuild by returning a new adapter sharing the same writer/path
+	 *  (its sequential time point restarts at 0). */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
-	/** @brief Route to `writer->collect(time_point, path, value)`. */
+	/** @brief Route to `writer->collect(time_point, path, value)`; false when
+	 *  it reports an error (the report itself is dropped). */
 	virtual bool put(const std::string& value, size_t time_point) override;
 	/** @brief Sequential variant: writes at an internally tracked, self-advancing time point. */
 	virtual bool put(const std::string& value) override;
@@ -629,7 +659,7 @@ const adt_stream_layout<node>* find_adt_stream_for_member(
  * @brief A wire-format-shaped hint for @p layout, with placeholder (empty)
  * leaf values -- e.g. `{ a: "", b: "" }` -- for prompting a tuple-typed
  * stream's whole literal at once (one physical stream, one wire literal per
- * time point; see the design note above `adt_shape_node`).
+ * time point; see the section comment above `adt_shape_node`).
  */
 template <NodeType node>
 std::string adt_wire_hint(const adt_stream_layout<node>& layout);
