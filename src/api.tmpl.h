@@ -2141,7 +2141,8 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 		auto infer_result = infer_ba_types<node>(expr,
 			defs.get_global_scope(),
 			defs.get_definition_heads(),
-			{ .use_defaults = use_defaults });
+			{ .use_defaults = use_defaults,
+				.diagnostics = &r.report() });
 		tref inferred = canonize_quantifier_ids<node>(infer_result.first);
 		if (!inferred) {
 			DBG(LOG_TRACE << "inferred is nullptr";)

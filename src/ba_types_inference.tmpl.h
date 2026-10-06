@@ -2152,11 +2152,15 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		// update_arith_symbol, on a type that declares no arith_ops.
 		if (auto err = std::get_if<inference_error>(&updated)) {
 			auto found_nm = ba_types<node>::name(err->found);
-			// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
-			LOG_ERROR << "The type "
-				<< (found_nm.has_value() ? found_nm.value() : std::string("INVALID"))
-				<< " has no arithmetic operations, in "
-				<< tau::get(err->element) << ".\n";
+			// TODO (HIGH) dropped error: name's report -- the message falls back to INVALID.
+			const std::string msg = "The type "
+				+ (found_nm.has_value() ? found_nm.value() : std::string("INVALID"))
+				+ " has no arithmetic operations";
+			if (options.diagnostics)
+				options.diagnostics->error(code::type_error, msg,
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(err->element))}});
+			else LOG_ERROR << msg << ", in " << tau::get(err->element) << ".\n";
 		} else inference_error_message<node>(std::get<parse_error>(updated));
 		return tau::use_hooks = using_hooks,
 			std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };

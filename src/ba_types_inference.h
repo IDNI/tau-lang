@@ -28,6 +28,9 @@ namespace idni::tau_lang {
  */
 struct type_inference_options {
 	bool use_defaults = true; ///< Assign unresolved nodes to the `tau` type if `true`.
+	/// Receives the error of an arithmetic operator over a type without
+	/// arithmetic operations; the error is logged when null.
+	report* diagnostics = nullptr;
 };
 
 /**
@@ -35,7 +38,8 @@ struct type_inference_options {
  *
  * Traverses @p n, assigns type ids compatible with each node's constraints,
  * and propagates across scopes. Unassigned nodes receive the `tau` type
- * when `options.use_defaults` holds. Errors are logged, not reported.
+ * when `options.use_defaults` holds. Errors are logged, not reported, but
+ * for the one `options.diagnostics` receives.
  * Rewrite hooks (`tree::use_hooks`) are off during the call and restored
  * afterwards.
  *

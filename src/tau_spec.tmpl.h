@@ -104,7 +104,8 @@ result<tref> tau_spec<node>::get() {
 	auto& defs = definitions<node>::instance();
 	auto result = infer_ba_types<node>(spec,
 		defs.get_global_scope(),
-		defs.get_definition_heads());
+		defs.get_definition_heads(),
+		{ .diagnostics = &r.report() });
 	spec = result.first;
 	if (!spec) {
 		errors_.push_back("type inference failed");

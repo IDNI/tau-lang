@@ -503,16 +503,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// flat as match/replace successors in `pairs`, applied in a single
 	// pass over `in`, so no pair's replacement is ever re-matched by
 	// another pair of the same group
-	auto step = [&](tref in, const trefs& pairs) -> tref {
+	auto substitute_step = [&](tref in, bool in_typed, const trefs& pairs) -> tref {
 		DBG(assert(pairs.size() >= 2 && pairs.size() % 2 == 0);)
-		// infer_for_match hides inference failures, but whether the
-		// input actually inferred is needed below: only then can a
-		// failing result inference be attributed to the substitution
-		auto in_inferred_r = tau_api::infer(in);
-		tref in_inferred = in_inferred_r.has_value()
-			? in_inferred_r.value() : nullptr;
-		bool in_typed = in_inferred != nullptr;
-		if (in_typed) in = in_inferred;
 		// structurally keyed so a re-parsed duplicate pattern is caught
 		subtree_map<node, tref> changes;
 		for (size_t i = 0; i + 1 < pairs.size(); i += 2) {
@@ -623,6 +615,31 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 			// subst, n, sat, ...) see resolved types
 			r = inferred_r.value();
 		}
+		return r;
+	};
+	auto step = [&](tref in, const trefs& pairs) -> tref {
+		// infer_for_match hides inference failures, but whether the
+		// input actually inferred is needed: only then can a failing
+		// result inference be attributed to the substitution
+		auto in_inferred_r = tau_api::infer(in);
+		if (in_inferred_r.has_value() && in_inferred_r.value())
+			return substitute_step(in_inferred_r.value(), true, pairs);
+		// The input is substituted as parsed. When that succeeds, the
+		// failed inference is a rejected candidate, kept as warnings;
+		// when it fails too, the inference failure stays an error.
+		tref r = substitute_step(in, false, pairs);
+		report rep;
+		if (r) {
+			auto sc = rep.open("rejected candidate");
+			rep.info("the input could not be type-inferred and was "
+				"substituted as parsed",
+				{{label::value, truncate_for_message(tau::get(in).to_str())}});
+			report cand = std::move(in_inferred_r).report();
+			cand.demote_errors_to_warnings();
+			rep.append(std::move(cand));
+		} else rep = std::move(in_inferred_r).report();
+		if (r) print_benchmarks(rep), print_warnings(rep);
+		else rep.print(err);
 		return r;
 	};
 

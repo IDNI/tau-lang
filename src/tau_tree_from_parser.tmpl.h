@@ -350,7 +350,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		if (options.infer_ba_types) {
 			auto inferred = infer_ba_types<node>(transformed,
 				options.global_scope, options.definition_heads,
-				{ .use_defaults = options.use_default_types });
+				{ .use_defaults = options.use_default_types,
+					.diagnostics = &r.report() });
 			transformed = inferred.first;
 			// If type inference failed
 			if (!transformed) {
