@@ -160,6 +160,38 @@ TEST_SUITE("Execution: revision stream continuity") {
 		CHECK( u2.find("o2") != std::string::npos );
 	}
 
+	// The end of an input file is the end of the run, the same quiet stop
+	// the console and vector streams give: the step waits for input and
+	// reports no read failure.
+	TEST_CASE("the end of an input file ends the run without an io error") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		{
+			std::ofstream f(in_file);
+			f << "T.\n";
+		}
+		tref spec = create_spec("o1[t] = i1[t].");
+		io_context<node_t> ctx;
+		ctx.add_input_file("i1", tau_type_id<node_t>(), in_file);
+		ctx.add_output("o1", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		auto maybe_i = interpreter<node_t>::make_interpreter(spec, ctx);
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		auto step1 = i.step();
+		REQUIRE( step1.has_value() );
+		auto step2 = i.step();
+		const bool has_value = step2.has_value();
+		const bool awaiting = step_awaiting_input(step2.report());
+		const bool io_error = report_has_code(step2.report(), code::io_error);
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
+		CHECK( !has_value );
+		CHECK( awaiting );
+		CHECK( !io_error );
+	}
+
 	// The tuple streams of an ADT group share one physical stream; an
 	// accepted revision rebuilds the stream maps, and that physical stream
 	// (with its position) must carry over, both for a file declared in the

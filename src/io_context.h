@@ -195,7 +195,7 @@ struct file_input_stream : public serialized_constant_input_stream {
 	 * @brief Open @p filename for reading, or return the failure.
 	 *
 	 * The constructor keeps a failed open on the stream, where `get()`
-	 * reports end-of-stream; this factory reports it instead.
+	 * reports a read failure; this factory reports it instead.
 	 */
 	static result<std::shared_ptr<file_input_stream>> make(
 		const std::string& filename);
@@ -203,8 +203,9 @@ struct file_input_stream : public serialized_constant_input_stream {
 	/** @brief Rebuild by reopening the file from the beginning; a failed
 	 *  reopen is not reported. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Read the next line from the file; `std::nullopt` at end of
-	 *  file and when the file never opened. */
+	/** @brief Read the next line from the file; "" at end of file, the
+	 *  quiet end of the run; `std::nullopt` when the file never opened or
+	 *  a read fails. */
 	virtual std::optional<std::string> get() override;
 protected:
 	const std::string filename;

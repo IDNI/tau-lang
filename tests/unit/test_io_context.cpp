@@ -278,7 +278,9 @@ TEST_SUITE("file streams") {
 		CHECK(in->get() == std::optional<std::string>("line two"));
 	}
 
-	TEST_CASE("reading past the end yields nullopt (AP2-6)") {
+	// The end of a file is the quiet end of the run, as for the console
+	// and vector streams: an empty string, not the read-failure nullopt.
+	TEST_CASE("reading past the end yields an empty string") {
 		temp_path tf("eof");
 		{
 			auto out_r = file_output_stream::make(tf.str());
@@ -288,10 +290,20 @@ TEST_SUITE("file streams") {
 		auto in_r = file_input_stream::make(tf.str());
 		REQUIRE(in_r.has_value());
 		CHECK(in_r.value()->get() == std::optional<std::string>("only"));
-		// AP2-6: EOF is nullopt per the base-class contract -- the old
-		// empty-string-forever behavior made EOF indistinguishable
-		// from a blank line.
-		CHECK(!in_r.value()->get().has_value());
+		CHECK(in_r.value()->get() == std::optional<std::string>(""));
+		CHECK(in_r.value()->get() == std::optional<std::string>(""));
+	}
+
+	// A stream whose file never opened is a read failure on every get(),
+	// never a run of empty lines.
+	TEST_CASE("a file that never opened yields nullopt") {
+		const std::string missing = (suite_scratch_dir()
+			/ "tau_test_io_context_never_opened.in").string();
+		std::error_code ec;
+		std::filesystem::remove(missing, ec);
+		file_input_stream in(missing);
+		CHECK(!in.get().has_value());
+		CHECK(!in.get().has_value());
 	}
 
 	// The failure branch of the file_output_stream constructor: a path whose

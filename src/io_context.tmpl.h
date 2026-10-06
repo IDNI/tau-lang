@@ -169,7 +169,7 @@ inline bool console_prompt_output_stream::put(const std::string& value,
 inline file_input_stream::file_input_stream(const std::string& filename)
 	: serialized_constant_input_stream(), filename(filename)
 {
-	// A failed open stays on the stream: get() reports end-of-stream.
+	// A failed open stays on the stream: get() reports a read failure.
 	// make() turns that state into a report.
 	file.open(filename);
 }
@@ -201,12 +201,12 @@ inline std::shared_ptr<serialized_constant_input_stream>
 
 inline std::optional<std::string> file_input_stream::get() {
 	std::string line;
-	// nullopt at end of file and for a file that never opened, so neither
-	// reads as a blank line.
 	if (!std::getline(file, line)) {
+		// A file that never opened also reads as end of file to getline.
+		if (!file.is_open() || file.bad()) return std::nullopt;
 		DBG(LOG_TRACE << "file_input_stream(\"" << filename
 			<< "\"): get() = EOF";)
-		return std::nullopt;
+		return std::string{};
 	}
 	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
 	return line;
