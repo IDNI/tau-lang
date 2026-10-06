@@ -77,6 +77,45 @@ void tau_lang_mealy_free(int64_t handle);
 // free every tree node nothing holds. Returns the number of nodes freed.
 int64_t tau_lang_reset(void);
 
+// ---------------------------------------------------------------------------
+// Runtime limits and BA-declared options
+// ---------------------------------------------------------------------------
+
+// A numeric runtime limit, named as the C++ api setter and getter without
+// their set_/get_ prefix (max_fixpoint_steps, ltl_hoa_max_states, ...);
+// tau_lang_limit_names() lists them. The value read back is the one in
+// force: the one set, else the limit's TAU_* environment variable, else its
+// default; 0 means unlimited where the setter reads it so.
+// Returns 0, or -1 when no limit has that name.
+int tau_lang_set_limit(const char* name, uint64_t value);
+// Writes the value in force to *value and returns 0, or returns -1 when no
+// limit has that name.
+int tau_lang_get_limit(const char* name, uint64_t* value);
+// JSON array of the limit names. Valid until the next call.
+const char* tau_lang_limit_names(void);
+
+// The limits that are not a count.
+void tau_lang_set_gc_growth_factor(double factor);
+double tau_lang_get_gc_growth_factor(void);
+// A negative value falls back to TAU_LTL_TIMEOUT_SEC or 60.
+void tau_lang_set_ltl_timeout_sec(int64_t seconds);
+int64_t tau_lang_get_ltl_timeout_sec(void);
+// "A", "B", "D" or "auto"; "" falls back to TAU_LTL_ALG.
+void tau_lang_set_ltl_algorithm(const char* algorithm);
+// Valid until the next call.
+const char* tau_lang_get_ltl_algorithm(void);
+
+// An option an algebra of the build declares about itself, named
+// <family>-<option> (bv-defelim-max-atoms, qlt-cells-budget): a flag takes
+// 0 or 1, a count its number. Each writes the value now in force to *value
+// and returns 0, or returns -1 when no algebra declares the name
+// (tau_lang_last_error() says why). An unlimited cap may read as 2^64 - 1.
+int tau_lang_set_ba_option(const char* name, uint64_t value,
+	uint64_t* now);
+int tau_lang_get_ba_option(const char* name, uint64_t* value);
+// JSON array of the BA-declared option names. Valid until the next call.
+const char* tau_lang_ba_option_names(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

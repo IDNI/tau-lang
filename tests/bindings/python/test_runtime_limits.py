@@ -21,6 +21,10 @@ COUNT_SETTERS = (
 	"set_ltl_max_refinement_rounds", "set_ltl_window_max_paths",
 	"set_ltl_closed_regions_timeout", "set_ba_decision_pins",
 	"set_ltl_data_game_max_nodes", "set_ltl_data_game_max_memo",
+	"set_ltl_data_game_max_combinations", "set_ltl_max_observations",
+	"set_ltl_mealy_max_states", "set_ltl_mealy_max_edges",
+	"set_compile_max_table_edges", "set_bf_dependence_max_nodes",
+	"set_max_blast_reentry_depth",
 )
 
 # The shipped default of each count setter, restored after the round trip.
@@ -36,7 +40,15 @@ COUNT_DEFAULTS = {
 	"set_ltl_closed_regions_timeout": 20,
 	"set_ltl_data_game_max_nodes": 8388608,
 	"set_ltl_data_game_max_memo": 33554432,
+	"set_ltl_data_game_max_combinations": 4096,
+	"set_ltl_max_observations": 8, "set_ltl_mealy_max_states": 4096,
+	"set_ltl_mealy_max_edges": 65536, "set_compile_max_table_edges": 400,
+	"set_bf_dependence_max_nodes": 65536,
 }
+
+# What a getter reads after its setter took the restore value, where that
+# differs: the QE cap's 0 falls back to its default 2.
+READ_BACK = { "set_ltl_qe_max_vars": 2 }
 
 FLAG_SETTERS = {
 	"set_preprocessing": True, "set_ba_component_factoring": True,
@@ -53,17 +65,26 @@ def verdict(r):
 def test_every_setter_takes_a_value():
 	for name in COUNT_SETTERS:
 		setter = getattr(tau, name)
+		getter = getattr(tau, "get_" + name[4:])
 		assert setter(7) is None, name
-		setter(COUNT_DEFAULTS.get(name, 0))
+		assert getter() == 7, name
+		restore = COUNT_DEFAULTS.get(name, 0)
+		setter(restore)
+		assert getter() == READ_BACK.get(name, restore), name
 	for name, default in FLAG_SETTERS.items():
 		getattr(tau, name)(not default)
 		getattr(tau, name)(default)
 	tau.set_gc_growth_factor(2.0)
+	assert tau.get_gc_growth_factor() == 2.0
 	tau.set_gc_growth_factor(1.5)
 	tau.set_ltl_timeout_sec(30)
+	assert tau.get_ltl_timeout_sec() == 30
 	tau.set_ltl_timeout_sec(-1)
+	assert tau.get_ltl_timeout_sec() == 60
 	tau.set_ltl_algorithm("B")
+	assert tau.get_ltl_algorithm() == "B"
 	tau.set_ltl_algorithm("")
+	assert tau.get_ltl_algorithm() == "auto"
 	assert verdict(tau.sat(SPEC)) is True
 
 def test_tref_budget_refuses_a_call():

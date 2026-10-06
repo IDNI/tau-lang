@@ -6,13 +6,13 @@
 // the options an algebra declares about itself read back what was set.
 // The names are the camelCase form of the Python binding's.
 //
-// The api has no getter for the core budgets, so a budget is observed
-// through what it changes: the tree-node budget refuses a call, and the
-// fixpoint-step cap makes a query that needs more steps give up instead of
-// answering. The give-up workload is the one of the REPL test
-// test_repl-limit_effect-fixpointsteps_giveup. The constant size budget is
-// the exception: getMaxConstantSize reads it back, and its give-up workload
-// is the one of test_repl-run_cmd-value_past_constant_size_budget.
+// Every count setter has a getter that reads back the value in force, and a
+// budget is also observed through what it changes: the tree-node budget
+// refuses a call, and the fixpoint-step cap makes a query that needs more
+// steps give up instead of answering. The give-up workload is the one of the
+// REPL test test_repl-limit_effect-fixpointsteps_giveup; the constant size
+// budget's is the one of
+// test_repl-run_cmd-value_past_constant_size_budget.
 //
 // Needs no native binary.
 
@@ -42,8 +42,13 @@ const COUNT_SETTERS = {
 	setMaxRevisionAlts: 0, setMaxConsistencySubsets: 4096,
 	setCacheBound: 4096, setMaxCoverProducts: 256, setMaxConstantSize: 2000,
 	setLtlQeMaxVars: 0,
-	setLtlMaxRefinementRounds: 64, setBaDecisionPins: 4096,
+	setLtlMaxRefinementRounds: 64, setBfDependenceMaxNodes: 65536,
+	setBaDecisionPins: 4096,
 };
+
+// What each getter reads after its setter took the restore value: the same
+// value, except the QE cap, whose 0 falls back to its default 2.
+const READ_BACK = { setLtlQeMaxVars: 2 };
 
 // The flag setters and their default.
 const FLAG_SETTERS = {
@@ -51,11 +56,16 @@ const FLAG_SETTERS = {
 	setPwrSemanticFallback: false, setStepDefinitionalPropagation: true,
 };
 
-// The Python binding's setters of the ltlsynt route. This build has no
-// process model, so ltlsynt never runs and these are not bound.
+// The Python binding's setters of the ltlsynt route, and of the data game
+// played on ltlsynt's game. This build has no process model, so ltlsynt
+// never runs and these are not bound.
 const NOT_BOUND = [
 	'setLtlTimeoutSec', 'setLtlAlgorithm', 'setLtlHoaMaxStates',
 	'setLtlGuardMaxCubes', 'setLtlWindowMaxPaths',
+	'setLtlClosedRegionsTimeout', 'setLtlDataGameMaxNodes',
+	'setLtlDataGameMaxMemo', 'setLtlDataGameMaxCombinations',
+	'setLtlMaxObservations', 'setLtlMealyMaxStates', 'setLtlMealyMaxEdges',
+	'setCompileMaxTableEdges',
 ];
 
 function verdictsIntact(tau, label) {
@@ -65,9 +75,14 @@ function verdictsIntact(tau, label) {
 
 function runEverySetter(tau) {
 	for (const [name, restore] of Object.entries(COUNT_SETTERS)) {
+		const getter = 'get' + name.slice(3);
 		check(typeof tau[name] === 'function', `${name} is bound`);
+		check(typeof tau[getter] === 'function', `${getter} is bound`);
 		check(tau[name](7) === undefined, `${name}(7) accepted`);
+		check(tau[getter]() === 7, `${getter}() reads 7`);
 		tau[name](restore);
+		const back = READ_BACK[name] ?? restore;
+		check(tau[getter]() === back, `${getter}() reads ${back} again`);
 	}
 	verdictsIntact(tau, 'every count setter');
 	for (const [name, dflt] of Object.entries(FLAG_SETTERS)) {
@@ -77,10 +92,14 @@ function runEverySetter(tau) {
 		tau[name](dflt);
 	}
 	tau.setGcGrowthFactor(2.0);
+	check(tau.getGcGrowthFactor() === 2.0, 'getGcGrowthFactor() reads 2');
 	tau.setGcGrowthFactor(1.5);
 	verdictsIntact(tau, 'every flag setter and setGcGrowthFactor');
-	for (const name of NOT_BOUND)
+	for (const name of NOT_BOUND) {
 		check(tau[name] === undefined, `${name} is not bound (no ltlsynt)`);
+		check(tau['get' + name.slice(3)] === undefined,
+			`get${name.slice(3)} is not bound (no ltlsynt)`);
+	}
 }
 
 function runTrefBudget(tau) {

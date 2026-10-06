@@ -15,6 +15,7 @@
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/stl/bind_map.h>
 
+#include <deque>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -274,6 +275,41 @@ NB_MODULE(tau, m) {
 			"Operation memo entries of the BDD of a data game over "
 			"codes (--ltl-data-game-max-memo); a full memo is "
 			"emptied. 0 = unlimited." },
+		{ "set_ltl_data_game_max_combinations",
+			&tau_api::set_ltl_data_game_max_combinations,
+			"Value combinations the data game tabulates for one "
+			"comparison its circuits do not encode "
+			"(--ltl-data-game-max-combinations); default 4096, "
+			"0 = unlimited." },
+		{ "set_ltl_max_observations",
+			&tau_api::set_ltl_max_observations,
+			"Observation props whose impossible joint values the "
+			"synthesis skeleton assumes away "
+			"(--ltl-max-observations); default 8, at most 30, "
+			"0 = 30." },
+		{ "set_ltl_mealy_max_states",
+			&tau_api::set_ltl_mealy_max_states,
+			"States of the Mealy view a data-game strategy is played "
+			"through (--ltl-mealy-max-states); default 4096, "
+			"0 = no view." },
+		{ "set_ltl_mealy_max_edges",
+			&tau_api::set_ltl_mealy_max_edges,
+			"Edges of the Mealy view a data-game strategy is played "
+			"through (--ltl-mealy-max-edges); default 65536, "
+			"0 = no view." },
+		{ "set_compile_max_table_edges",
+			&tau_api::set_compile_max_table_edges,
+			"Edges of a Mealy view gen/compile carries as a table "
+			"(--compile-max-table-edges); default 400, 0 = none." },
+		{ "set_bf_dependence_max_nodes",
+			&tau_api::set_bf_dependence_max_nodes,
+			"BDD nodes built to tell whether a Boolean function "
+			"depends on a variable (--bf-dependence-max-nodes); "
+			"default 65536, 0 = unlimited." },
+		{ "set_max_blast_reentry_depth",
+			&tau_api::set_max_blast_reentry_depth,
+			"Blast-block re-entry nesting in anti-prenexing "
+			"(--bv-blastdepth); 0 = unlimited." },
 		{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
 			"Decided tau-algebra rows whose key tree is kept alive "
 			"across the step sweep (--ba-decision-pins); default "
@@ -281,6 +317,21 @@ NB_MODULE(tau, m) {
 	};
 	for (const count_setter& s : count_setters)
 		m.def(s.name, s.set, "n"_a, s.doc);
+	// One getter per count setter, reading back the value in force: the
+	// one set, else the TAU_* environment fallback, else the default.
+	static std::deque<std::string> getter_names;
+	for (const auto& l : tau_api::count_limits()) {
+		getter_names.push_back(std::string("get_") + l.name);
+		m.def(getter_names.back().c_str(), l.get,
+			"The value in force of the limit the setter of the same "
+			"name sets; 0 = unlimited where the setter reads it so.");
+	}
+	m.def("get_gc_growth_factor", &tau_api::get_gc_growth_factor,
+		"The gc growth factor in force.");
+	m.def("get_ltl_timeout_sec", &tau_api::get_ltl_timeout_sec,
+		"The ltlsynt watchdog in seconds in force; 0 = off.");
+	m.def("get_ltl_algorithm", &tau_api::get_ltl_algorithm,
+		"The omcat synthesis algorithm in force: A, B, D or auto.");
 
 	struct flag_setter {
 		const char* name;

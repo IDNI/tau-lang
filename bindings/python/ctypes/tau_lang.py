@@ -33,7 +33,7 @@ import enum
 import json
 import os
 import platform
-from ctypes import c_char_p, c_int, c_int64
+from ctypes import c_char_p, c_double, c_int, c_int64, c_uint64
 from typing import Optional
 
 
@@ -139,6 +139,32 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_mealy_free.restype = None
     _LIB.tau_lang_reset.argtypes = []
     _LIB.tau_lang_reset.restype = c_int64
+    # Runtime limits and BA-declared options
+    _LIB.tau_lang_set_limit.argtypes = [c_char_p, c_uint64]
+    _LIB.tau_lang_set_limit.restype = c_int
+    _LIB.tau_lang_get_limit.argtypes = [c_char_p, ctypes.POINTER(c_uint64)]
+    _LIB.tau_lang_get_limit.restype = c_int
+    _LIB.tau_lang_limit_names.argtypes = []
+    _LIB.tau_lang_limit_names.restype = c_char_p
+    _LIB.tau_lang_set_gc_growth_factor.argtypes = [c_double]
+    _LIB.tau_lang_set_gc_growth_factor.restype = None
+    _LIB.tau_lang_get_gc_growth_factor.argtypes = []
+    _LIB.tau_lang_get_gc_growth_factor.restype = c_double
+    _LIB.tau_lang_set_ltl_timeout_sec.argtypes = [c_int64]
+    _LIB.tau_lang_set_ltl_timeout_sec.restype = None
+    _LIB.tau_lang_get_ltl_timeout_sec.argtypes = []
+    _LIB.tau_lang_get_ltl_timeout_sec.restype = c_int64
+    _LIB.tau_lang_set_ltl_algorithm.argtypes = [c_char_p]
+    _LIB.tau_lang_set_ltl_algorithm.restype = None
+    _LIB.tau_lang_get_ltl_algorithm.argtypes = []
+    _LIB.tau_lang_get_ltl_algorithm.restype = c_char_p
+    _LIB.tau_lang_set_ba_option.argtypes = [
+        c_char_p, c_uint64, ctypes.POINTER(c_uint64)]
+    _LIB.tau_lang_set_ba_option.restype = c_int
+    _LIB.tau_lang_get_ba_option.argtypes = [c_char_p, ctypes.POINTER(c_uint64)]
+    _LIB.tau_lang_get_ba_option.restype = c_int
+    _LIB.tau_lang_ba_option_names.argtypes = []
+    _LIB.tau_lang_ba_option_names.restype = c_char_p
     return _LIB
 
 
@@ -268,3 +294,97 @@ def reset() -> int:
     """
     lib = _load()
     return lib.tau_lang_reset()
+
+
+# ---------------------------------------------------------------------------
+# Runtime limits and BA-declared options
+# ---------------------------------------------------------------------------
+#
+# Every numeric limit of the C++ api is reachable by name, and as
+# set_<name>(n) / get_<name>() like the nanobind module: set_max_fixpoint_steps,
+# get_ltl_hoa_max_states, ... A limit reads back the value in force: the one
+# set, else its TAU_* environment variable, else its default.
+
+
+def limit_names() -> list:
+    """Names of the numeric runtime limits, as set_<name> / get_<name>."""
+    return json.loads(_load().tau_lang_limit_names().decode("utf-8"))
+
+
+def set_limit(name: str, value: int) -> None:
+    """Set the numeric runtime limit ``name``; 0 = unlimited for a cap."""
+    if value < 0:
+        raise ValueError(f"{name}: a limit is a non-negative number")
+    if _load().tau_lang_set_limit(name.encode("utf-8"), value) != 0:
+        raise KeyError(last_error())
+
+
+def get_limit(name: str) -> int:
+    """The value in force of the numeric runtime limit ``name``."""
+    v = c_uint64()
+    if _load().tau_lang_get_limit(name.encode("utf-8"), ctypes.byref(v)) != 0:
+        raise KeyError(last_error())
+    return v.value
+
+
+def set_gc_growth_factor(factor: float) -> None:
+    """Growth factor of the gc trigger; <= 0 disables gc."""
+    _load().tau_lang_set_gc_growth_factor(factor)
+
+
+def get_gc_growth_factor() -> float:
+    return _load().tau_lang_get_gc_growth_factor()
+
+
+def set_ltl_timeout_sec(seconds: int) -> None:
+    """ltlsynt watchdog; 0 = off, negative = TAU_LTL_TIMEOUT_SEC or 60."""
+    _load().tau_lang_set_ltl_timeout_sec(seconds)
+
+
+def get_ltl_timeout_sec() -> int:
+    return _load().tau_lang_get_ltl_timeout_sec()
+
+
+def set_ltl_algorithm(algorithm: str) -> None:
+    """A, B, D or auto; "" falls back to TAU_LTL_ALG."""
+    _load().tau_lang_set_ltl_algorithm(algorithm.encode("utf-8"))
+
+
+def get_ltl_algorithm() -> str:
+    return _load().tau_lang_get_ltl_algorithm().decode("utf-8")
+
+
+def ba_option_names() -> list:
+    """Names of the options the algebras of this build declare."""
+    return json.loads(_load().tau_lang_ba_option_names().decode("utf-8"))
+
+
+def set_ba_option(name: str, value: int) -> int:
+    """Set a BA-declared option; returns the value now in force."""
+    if value < 0:
+        raise ValueError(f"{name}: an option value is a non-negative number")
+    v = c_uint64()
+    if _load().tau_lang_set_ba_option(
+            name.encode("utf-8"), value, ctypes.byref(v)) != 0:
+        raise KeyError(last_error())
+    return v.value
+
+
+def get_ba_option(name: str) -> int:
+    """The value of a BA-declared option (a flag reads 0 or 1)."""
+    v = c_uint64()
+    if _load().tau_lang_get_ba_option(
+            name.encode("utf-8"), ctypes.byref(v)) != 0:
+        raise KeyError(last_error())
+    return v.value
+
+
+def __getattr__(attr: str):
+    # set_<limit> / get_<limit> for every name limit_names() lists
+    for prefix in ("set_", "get_"):
+        if attr.startswith(prefix) and attr[4:] in limit_names():
+            name = attr[4:]
+            if prefix == "set_":
+                return lambda n: set_limit(name, n)
+            return lambda: get_limit(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")

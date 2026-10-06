@@ -13,6 +13,7 @@
 #include <boost/log/core.hpp>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <memory>
 #include <atomic>
@@ -164,7 +165,8 @@ std::optional<rr<node_t>> nso_rr_as_written(const char* formula) {
 	std::optional<rr<node_t>> nso;
 	{
 		use_hooks_guard<node_t> hooks_off(false);
-		nso = get_nso_rr<node_t>(tau::get(formula).value_or(nullptr));
+		auto r = get_nso_rr<node_t>(tau::get(formula).value_or(nullptr));
+		if (r.has_value()) nso = std::move(r.value());
 	}
 	if (!nso || !nso->main || !nso->main->get()) return nso;
 	auto pinned = tau_api::pin_main(nso->main->get());
@@ -315,7 +317,7 @@ extern "C" const char* tau_lang_mealy_step(int64_t handle,
 		// Build the inputs map expected by api::step
 		std::map<stream_at, std::string> inputs;
 		for (const auto& [name, value] : input_map) {
-			inputs[{name, interp.time_point}] = value;
+			inputs[{name, static_cast<size_t>(interp.time_point)}] = value;
 		}
 
 		// Execute one step — always use with-inputs overload
@@ -438,4 +440,118 @@ extern "C" int64_t tau_lang_reset(void) {
 	// api::reset cannot see.
 	g_interpreters.clear();
 	return static_cast<int64_t>(tau_api::reset());
+}
+
+namespace {
+
+const tau_api::count_limit* find_limit(const char* name) {
+	if (!name) return nullptr;
+	for (const auto& l : tau_api::count_limits())
+		if (std::string_view(l.name) == name) return &l;
+	return nullptr;
+}
+
+std::string g_names_result;
+std::string g_algorithm_result;
+
+// Writes the value of a BA-option result and returns 0, or keeps the reason
+// and returns -1.
+template <typename R>
+int ba_option_value(const R& r, uint64_t* out) {
+	if (r.has_value()) {
+		if (out) *out = static_cast<uint64_t>(r.value());
+		return 0;
+	}
+	std::ostringstream oss;
+	oss << r.report();
+	g_last_error = oss.str();
+	return -1;
+}
+
+} // namespace
+
+extern "C" int tau_lang_set_limit(const char* name, uint64_t value) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	const auto* l = find_limit(name);
+	if (!l) {
+		g_last_error = std::string("no runtime limit named ")
+			+ (name ? name : "(null)");
+		return -1;
+	}
+	l->set(static_cast<size_t>(value));
+	return 0;
+}
+
+extern "C" int tau_lang_get_limit(const char* name, uint64_t* value) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	const auto* l = find_limit(name);
+	if (!l) {
+		g_last_error = std::string("no runtime limit named ")
+			+ (name ? name : "(null)");
+		return -1;
+	}
+	if (value) *value = static_cast<uint64_t>(l->get());
+	return 0;
+}
+
+extern "C" const char* tau_lang_limit_names(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	std::vector<std::string> names;
+	for (const auto& l : tau_api::count_limits()) names.emplace_back(l.name);
+	g_names_result = build_json_array(names);
+	return g_names_result.c_str();
+}
+
+extern "C" void tau_lang_set_gc_growth_factor(double factor) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	tau_api::set_gc_growth_factor(factor);
+}
+
+extern "C" double tau_lang_get_gc_growth_factor(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	return tau_api::get_gc_growth_factor();
+}
+
+extern "C" void tau_lang_set_ltl_timeout_sec(int64_t seconds) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	tau_api::set_ltl_timeout_sec(static_cast<long>(seconds));
+}
+
+extern "C" int64_t tau_lang_get_ltl_timeout_sec(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	return static_cast<int64_t>(tau_api::get_ltl_timeout_sec());
+}
+
+extern "C" void tau_lang_set_ltl_algorithm(const char* algorithm) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	tau_api::set_ltl_algorithm(algorithm ? algorithm : "");
+}
+
+extern "C" const char* tau_lang_get_ltl_algorithm(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_algorithm_result = tau_api::get_ltl_algorithm();
+	return g_algorithm_result.c_str();
+}
+
+extern "C" int tau_lang_set_ba_option(const char* name, uint64_t value,
+	uint64_t* now)
+{
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	return ba_option_value(tau_api::set_ba_option(name ? name : "",
+		static_cast<size_t>(value)), now);
+}
+
+extern "C" int tau_lang_get_ba_option(const char* name, uint64_t* value) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	return ba_option_value(tau_api::get_ba_option(name ? name : ""), value);
+}
+
+extern "C" const char* tau_lang_ba_option_names(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_names_result = build_json_array(tau_api::ba_option_names());
+	return g_names_result.c_str();
 }
