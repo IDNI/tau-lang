@@ -1,7 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// hooks_bf.tmpl.h - BF hooks: helpers, primitives, term ops, CTE
-// Split from hooks.tmpl.h for readability.
+// hooks_bf.tmpl.h - BF hooks: helpers, primitives, term ops, CTE.
+// Definitions of the `get_hook` members declared in hooks.h that rewrite
+// terms (`bf` nodes) and fold constants.
 
 namespace idni::tau_lang {
 
@@ -10,9 +11,12 @@ namespace hooks_detail {
 /**
  * @brief Cast @p symbol to @p ba_type through the BA owning that type.
  *
- * Returns nullptr when no BA owns the type or none defines the hook, so the
- * caller keeps the symbol it already built. An owner that declines the cast
- * returns @p symbol itself, which is the same answer.
+ * @param symbol The raw `bf` node built for the cast.
+ * @param ba_type Target BA type id.
+ * @return The owner's cast result; nullptr when no BA owns the type or none
+ * defines the hook, so the caller keeps the symbol it already built. An
+ * owner that declines the cast returns @p symbol itself, which is the same
+ * answer.
  */
 template <typename node_t>
 tref try_term_cast(tref symbol, size_t ba_type) {
@@ -150,6 +154,9 @@ tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
 	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
 }
 
+// Typed 0 of the arguments' type: their common type, or the one typed side
+// when the other is untyped (0). Two distinct concrete types keep the raw
+// node.
 template <NodeType node>
 tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_0", v, ch, len, r);)
@@ -161,6 +168,7 @@ tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
 	return tau::get_raw(v, ch, len, r);
 }
 
+// Typed 1 of the arguments' type; same type resolution as `_0`.
 template <NodeType node>
 tref get_hook<node>::_1(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_1", v, ch, len, r);)
@@ -176,7 +184,7 @@ template <NodeType node>
 tref get_hook<node>::_F(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_F", v, ch, len, r);)
 	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// Fold unless both sides carry distinct concrete BA types (AP1-21).
+	// Fold unless both sides carry distinct concrete BA types.
 	if (!(type_l != type_r && type_l > 0 && type_r > 0))
 		return tau::get(tau::_F(), r);
 	return tau::get_raw(v, ch, len, r);
@@ -186,7 +194,7 @@ template <NodeType node>
 tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_T", v, ch, len, r);)
 	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// Fold unless both sides carry distinct concrete BA types (AP1-21).
+	// Fold unless both sides carry distinct concrete BA types.
 	if (!(type_l != type_r && type_l > 0 && type_r > 0))
 		return tau::get(tau::_T(), r);
 	return tau::get_raw(v, ch, len, r);
@@ -399,9 +407,8 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("$X'' :=  $X.");)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
-	//RULE "{c}' := ~c" (AP1-10: cte_neg had zero callers, so the
-	// `{c} = 1 ::= T or F` wff rules actually produced an unfolded
-	// `{c}' = 0` -- constant negation now folds like or/and/xor do)
+	//RULE "{c}' := ~c" (AP1-10): constant negation folds like or/and/xor
+	// do, so the `{c} = 1 ::= T or F` wff rules see a folded constant.
 	//
 	// A tau-type constant is exempt: cte_neg normalizes through the
 	// wrapped spec's full solve pass, while a `{...}:tau` constant holds
@@ -493,7 +500,8 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 	return tau::get_raw(v, ch, len, r);
 }
 
-// Simplify a cast of a constant: (T) constant -> constant of type T
+// Simplify a cast of a constant: (T) constant -> constant of type T, through
+// the BA owning T; an untyped target or a declined cast keeps the raw node.
 template <NodeType node>
 tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("term_cast", v, ch, len, r);)
@@ -515,7 +523,8 @@ tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r
 	return symbol;
 }
 
-// Simplify constants being syntactically true or false
+// Replace a typed constant that is syntactically zero or one by the typed
+// `bf_f` / `bf_t`; any other node is built raw.
 template <NodeType node>
 tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	HOOK_LOGGING(log("cte", v, ch, len, right);)
@@ -552,6 +561,8 @@ static bool folds_exactly(const auto& c) {
 	}, c);
 }
 
+// Fold `{l} | {r}` to one normalized constant of the typed side's type;
+// an inexact result keeps the raw node.
 template <NodeType node>
 tref get_hook<node>::cte_or(const node& v, const tref* ch, size_t len,
 	tref right)
@@ -571,6 +582,7 @@ tref get_hook<node>::cte_or(const node& v, const tref* ch, size_t len,
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
+// Fold `{l} & {r}`; same contract as `cte_or`.
 template <NodeType node>
 tref get_hook<node>::cte_and(const node& v, const tref* ch, size_t len,
 	tref right)
@@ -590,6 +602,7 @@ tref get_hook<node>::cte_and(const node& v, const tref* ch, size_t len,
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
+// Fold `{l} ^ {r}`; same contract as `cte_or`.
 template <NodeType node>
 tref get_hook<node>::cte_xor(const node& v, const tref* ch, size_t len,
 	tref right)
@@ -609,6 +622,8 @@ tref get_hook<node>::cte_xor(const node& v, const tref* ch, size_t len,
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
+// Fold `{l}'` to one normalized constant of l's type; an inexact result
+// keeps the raw node.
 template <NodeType node>
 tref get_hook<node>::cte_neg(const node& v, const tref* ch, size_t len,
 	tref right)

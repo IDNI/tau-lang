@@ -99,11 +99,14 @@ struct adt_registry {
 	 * order, followed by @p spec's own `type_def`s, in declaration order. A
 	 * `type_def` for a name already collected -- whether the earlier one came
 	 * from @p session_type_defs or from @p spec itself -- always replaces it,
-	 * after `LOG_WARNING` names the type: whether two declarations for one
-	 * name land in the same parse or in two separate ones is an artifact of
-	 * how the caller fed text in, not a distinction in what the user meant,
-	 * so both are handled through the one path.
+	 * after a warning in the returned report names the type: whether two
+	 * declarations for one name land in the same parse or in two separate
+	 * ones is an artifact of how the caller fed text in, not a distinction in
+	 * what the user meant, so both are handled through the one path.
 	 *
+	 * @param spec Parsed tree whose `type_def` nodes are collected.
+	 * @param session_type_defs Earlier `type_def` trees, collected first; may
+	 * be null.
 	 * @return The built registry as the report's value, or a report carrying
 	 * an error on: a duplicate member (including one introduced via
 	 * inheritance), a cycle (through members, aliases, or parents), a type
@@ -161,9 +164,13 @@ private:
 	 * once here so `adt_registry::members` can keep returning a reference.
 	 */
 	struct resolved_type {
+		/// `true` for a tuple, `false` for a base-type alias.
 		bool is_tuple = false;
+		/// Aliased base type tree; null for a tuple.
 		tref alias_target = nullptr;
+		/// Tuple members one nesting level deep.
 		std::vector<adt_level_member<node>> level_members{};
+		/// Tuple members walked to their flat leaf list.
 		std::vector<adt_member<node>> members{};
 	};
 

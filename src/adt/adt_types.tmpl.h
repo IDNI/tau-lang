@@ -31,6 +31,7 @@ namespace idni::tau_lang {
 // build (`bv_type`, `sbf_type`, ...), so either can be handed directly to
 // `get_ba_type_id` -- no separate extraction step is needed.
 
+/** @internal @copydoc adt_registry::build @endinternal */
 template <NodeType node>
 result<adt_registry<node>> adt_registry<node>::build(tref spec,
 	const std::vector<htref>* session_type_defs) {
@@ -227,38 +228,45 @@ result<adt_registry<node>> adt_registry<node>::build(tref spec,
 	return r.with_value(std::move(reg));
 }
 
+/** @internal @copydoc adt_registry::defines @endinternal */
 template <NodeType node>
 bool adt_registry<node>::defines(size_t name_sid) const {
 	return resolved_.contains(name_sid);
 }
 
+/** @internal @copydoc adt_registry::is_tuple @endinternal */
 template <NodeType node>
 bool adt_registry<node>::is_tuple(size_t name_sid) const {
 	auto it = resolved_.find(name_sid);
 	return it != resolved_.end() && it->second.is_tuple;
 }
 
+/** @internal @copydoc adt_registry::is_alias @endinternal */
 template <NodeType node>
 bool adt_registry<node>::is_alias(size_t name_sid) const {
 	auto it = resolved_.find(name_sid);
 	return it != resolved_.end() && !it->second.is_tuple;
 }
 
+/** @internal @copydoc adt_registry::alias_target @endinternal */
 template <NodeType node>
 tref adt_registry<node>::alias_target(size_t name_sid) const {
 	return resolved_.at(name_sid).alias_target;
 }
 
+/** @internal @copydoc adt_registry::members @endinternal */
 template <NodeType node>
 const std::vector<adt_member<node>>& adt_registry<node>::members(size_t name_sid) const {
 	return resolved_.at(name_sid).members;
 }
 
+/** @internal @copydoc adt_registry::empty @endinternal */
 template <NodeType node>
 bool adt_registry<node>::empty() const {
 	return resolved_.empty();
 }
 
+/** @internal @copydoc adt_registry::declares_locally @endinternal */
 template <NodeType node>
 bool adt_registry<node>::declares_locally() const {
 	return declares_locally_;

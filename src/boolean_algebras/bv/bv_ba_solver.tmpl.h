@@ -20,6 +20,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			       subtree_map<node, bv>& free_vars, bv_eval_memo<node>& memo,
 			       size_t& ctx_counter, size_t ctx);
 
+// Entry overload: translate with a fresh memo and no binder active.
 template <NodeType node>
 result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
 			       subtree_map<node, bv>& free_vars) {
@@ -52,7 +53,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 
 	// Carries only a genuine internal failure (see combine1's default
 	// branch below); an ordinary untranslatable-node decline stays a
-	// value-less, error-less result, same as std::nullopt did before.
+	// value-less, error-less result.
 	result<bv> r;
 
 	// Walked with the library's pre_order visit, which is iterative: a
@@ -355,6 +356,7 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 	return r.with_value(vals.front().value());
 }
 
+// Tree-reference overload: wraps @p form in a traverser.
 template<NodeType node>
 result<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars) {
@@ -390,6 +392,7 @@ result<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  *
  * @tparam node Node type
  * @param form The formula to check
+ * @param reason Out: why the formula was rejected (`ok` if it was not).
  * @return true if the formula is within the translator's reach: all
  * variables/constants are (explicitly sized) bitvectors and at least one
  * bv-typed variable/constant was seen
@@ -490,14 +493,14 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 	return solvable && has_bv;
 }
 
-/** @copydoc is_bv_solvable_formula(tref,bv_unsolvable_reason&) */
+/** @internal @copydoc is_bv_solvable_formula(tref) @endinternal */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form) {
 	bv_unsolvable_reason reason;
 	return is_bv_solvable_formula<node>(form, reason);
 }
 
-/** @copydoc has_foreign_ba_constant */
+/** @internal @copydoc has_foreign_ba_constant @endinternal */
 template <NodeType node>
 bool has_foreign_ba_constant(tref form) {
 	using tau = tree<node>;
@@ -512,7 +515,7 @@ bool has_foreign_ba_constant(tref form) {
 	return tau::get(form).find_top(foreign) != nullptr;
 }
 
-/** @copydoc has_blasting_residue */
+/** @internal @copydoc has_blasting_residue @endinternal */
 template <NodeType node>
 bool has_blasting_residue(tref form) {
 	using tau = tree<node>;
@@ -573,6 +576,8 @@ bool has_alternating_quantifiers(tref form) {
  * child costs a fork and a copy of every page the solver writes, which the
  * many small quantified questions of tests/benchmark/fixtures/satisfiability
  * would pay several times over.
+ * @param t Translated cvc5 term of the question.
+ * @return `true` iff @p t is both quantified and nonlinear.
  */
 inline bool bv_needs_bound(const cvc5::Term& t) {
 	std::unordered_set<uint64_t> seen;
@@ -599,6 +604,8 @@ inline bool bv_needs_bound(const cvc5::Term& t) {
 	return quantified && nonlinear;
 }
 
+/// The UNKNOWN message recorded when a bitvector question passes its
+/// `bv_solve_timeout` budget.
 inline std::string bv_solve_timeout_message() {
 	return "UNKNOWN: a bitvector question passed its time budget "
 		"(bv-solve-timeout, " + std::to_string(bv_solve_timeout)
@@ -622,7 +629,13 @@ inline std::chrono::steady_clock::time_point bv_question_deadline() {
  *
  * A child that passes the deadline, or ends without answering, gives
  * unknown, sets @p ran_out and notes the budget for the boundary of the unit
- * of work.
+ * of work (`note_time_budget_exhausted`).
+ * @param solver Solver holding the asserted question.
+ * @param bounded Whether to run the check in a child process.
+ * @param deadline When the child is killed; `time_point::max()` runs the
+ * check in-process even when @p bounded.
+ * @param ran_out Out: set to `true` when the budget ran out; never cleared.
+ * @return The verdict; unknown when cvc5 gave up or the budget ran out.
  */
 inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
 	std::chrono::steady_clock::time_point deadline, bool& ran_out)
@@ -653,6 +666,7 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
 	return bv_sat_status::unknown;
 }
 
+/** @internal @copydoc bv_formula_sat_status @endinternal */
 template <NodeType node>
 std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
@@ -773,13 +787,13 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 		}
 	}
 	// A fresh solver per query is deliberate, do NOT share one like
-	// normalize_bv's (B12): cvc5 forbids a second checkSat without
+	// normalize_bv's: cvc5 forbids a second checkSat without
 	// incremental mode ("cannot make multiple queries unless incremental
-	// solving is enabled" -- resetAssertions does not lift this), and a
-	// pair of long-lived incremental solvers measured strictly worse on
-	// bv[64]x14 stress: 19.4s -> 30.0s wall and 227MB -> 1.1GB peak RSS
-	// (2026-08-17). The engine construction cost per query is the price of
-	// the non-incremental option set, which is the larger win.
+	// solving is enabled" -- resetAssertions does not lift this), and
+	// long-lived incremental solvers measured strictly slower and several
+	// times larger on bv[64] stress. The engine construction cost per
+	// query is the price of the non-incremental option set, which is the
+	// larger win.
 	cvc5::Solver solver(cvc5_term_manager);
 	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
 	// quantifiers too, not just the innermost one; without that it does not
@@ -787,10 +801,9 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// cvc5 resolves its quantifier-module defaults at that point.
 	// See config_cvc5_solver_alternating_quantifiers for the measurements.
 	// Genuine alternation, not merely "both kinds occur somewhere": a
-	// quantifier of one kind must sit *below* one of the other kind. Testing
-	// find_top(wff_all) && find_top(wff_ex) also matched non-alternating
-	// shapes such as `(ex x P(x)) && (all y Q(y))`, which then paid the
-	// strategy change's cost (up to ~1.8x on quantified division, see
+	// quantifier of one kind must sit *below* one of the other kind.
+	// Non-alternating shapes such as `(ex x P(x)) && (all y Q(y))` would
+	// pay the strategy change's cost (see
 	// config_cvc5_solver_alternating_quantifiers) for no benefit.
 	if (has_alternating_quantifiers<node>(form))
 		config_cvc5_solver_alternating_quantifiers(solver);
@@ -834,6 +847,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	return memo(result);
 }
 
+/** @internal @copydoc is_bv_formula_sat @endinternal */
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
 	// Collapses unknown and translation failure into false, same as unsat.
@@ -843,17 +857,22 @@ bool is_bv_formula_sat(tref form) {
 	return bv_formula_sat_status<node>(form) == bv_sat_status::sat;
 }
 
+// The negation of is_bv_formula_sat: an unknown verdict or a translation
+// failure also answers `true` here.
 template <NodeType node>
 bool is_bv_formula_unsat(tref form) {
 	return !is_bv_formula_sat<node>(form);
 }
 
+// `is_bv_formula_unsat` of the negation, so it inherits that function's
+// answer on an unknown verdict or a translation failure.
 template <NodeType node>
 bool is_bv_formula_valid(tref form) {
 	using tau = tree<node>;
 	return is_bv_formula_unsat<node>(tau::build_wff_neg(form));
 }
 
+/** @internal @copydoc solve_bv(tref) @endinternal */
 template <NodeType node>
 std::optional<solution<node>> solve_bv(const tref form) {
 	using tau = tree<node>;
@@ -901,6 +920,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	return {};
 }
 
+/** @internal @copydoc solve_bv(const trefs&) @endinternal */
 template<NodeType node>
 std::optional<solution<node>> solve_bv(const trefs& lits) {
 	using tau = tree<node>;

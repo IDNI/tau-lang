@@ -25,7 +25,7 @@ namespace idni::tau_lang {
 struct Bool {
 	/** @brief Default-construct as `false` (zero). */
 	Bool();
-	/** @brief Construct from raw `bool`. */
+	/** @brief Construct from raw `bool` @p b (`true` is one). */
 	Bool(bool b);
 
 	/** @brief Return the zero element (static singleton). */
@@ -33,13 +33,13 @@ struct Bool {
 	/** @brief Return the one element (static singleton). */
 	static const Bool& one();
 
-	/** @brief Bitwise AND. */
+	/** @brief Bitwise AND with @p x. */
 	Bool operator&(const Bool& x) const;
-	/** @brief Bitwise OR. */
+	/** @brief Bitwise OR with @p x. */
 	Bool operator|(const Bool& x) const;
-	/** @brief Bitwise XOR. */
+	/** @brief Bitwise XOR with @p x. */
 	Bool operator^(const Bool& x) const;
-	/** @brief Addition (synonym for XOR in GF(2)). */
+	/** @brief Addition of @p x (synonym for XOR in GF(2)). */
 	Bool operator+(const Bool& x) const;
 	/** @brief Bitwise complement. */
 	Bool operator~() const;
@@ -52,7 +52,7 @@ struct Bool {
 	 * suppresses the one `<=>` would otherwise generate.
 	 */
 	bool operator==(const Bool& x) const = default;
-	/** @brief Compare against a plain truth value, as core does. */
+	/** @brief Return `true` if this element's value equals @p x. */
 	bool operator==(bool x) const { return b == x; }
 
 	/** @brief Return `true` if this element is zero. */
@@ -63,14 +63,24 @@ struct Bool {
 	bool b; ///< Underlying boolean value.
 };
 
-/** @brief Normalise a `Bool` (identity — already normalised). */
+/**
+ * @brief Normalise a `Bool` (identity — already normalised).
+ * @param b Element to normalise.
+ * @return @p b unchanged.
+ */
 Bool normalize_bool(const Bool& b);
 
-/** @brief Stream-print a `Bool` as `0` or `1`. */
+/**
+ * @brief Stream-print a `Bool` as `0` or `1`.
+ * @param os Output stream.
+ * @param b Element to print.
+ * @return @p os.
+ */
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 
 } // namespace idni::tau_lang
 
+/** @brief Hash of a `Bool`: 1 for one, 0 for zero. */
 template<>
 struct std::hash<idni::tau_lang::Bool> {
 	size_t operator()(const idni::tau_lang::Bool& b) const noexcept {

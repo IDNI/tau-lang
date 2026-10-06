@@ -31,7 +31,7 @@ struct product_ba: std::tuple<BAS...> {
 
 	/** @brief Default-construct all components. */
 	product_ba(): std::tuple<BAS...>() {}
-	/** @brief Construct with one value per BA type. */
+	/** @brief Construct from @p bas, one value per BA type, in pack order. */
 	product_ba(BAS... bas): std::tuple<BAS...>(bas...) {}
 
 	/** @brief Three-way comparison (defaulted, compares tuple members lexicographically). */
@@ -45,7 +45,7 @@ struct product_ba: std::tuple<BAS...> {
 		return result;
 	}
 
-	/** @brief Component-wise bitwise AND. */
+	/** @brief Component-wise bitwise AND with @p that. */
 	product_ba<BAS...> operator&(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __and = [](auto a, auto b, auto& c ) { return c = (a&b); };
@@ -53,7 +53,7 @@ struct product_ba: std::tuple<BAS...> {
 		return result;
 	}
 
-	/** @brief Component-wise bitwise OR. */
+	/** @brief Component-wise bitwise OR with @p that. */
 	product_ba<BAS...> operator|(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __or = [](auto a, auto b, auto& c ) { return c = (a|b); };
@@ -61,7 +61,7 @@ struct product_ba: std::tuple<BAS...> {
 		return result;
 	}
 
-	/** @brief Component-wise bitwise XOR. */
+	/** @brief Component-wise bitwise XOR with @p that. */
 	product_ba<BAS...> operator^(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __xor = [](auto a, auto b, auto& c ) { return c = (a^b); };

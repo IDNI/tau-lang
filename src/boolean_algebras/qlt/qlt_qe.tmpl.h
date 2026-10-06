@@ -348,10 +348,12 @@ inline bool qlt_cells_too_many(size_t n) {
 
 namespace qlt_cells_detail {
 
+// The greatest integer not above the finite rational r.
 inline qlt_rational floor_of(const qlt_rational& r) {
 	return qlt_rational(r.p >= 0 ? r.p / r.q : -((-r.p + r.q - 1) / r.q), 1);
 }
 
+// The least integer not below the finite rational r.
 inline qlt_rational ceil_of(const qlt_rational& r) {
 	const qlt_rational f = floor_of(r);
 	return f == r ? f : f + qlt_rational(1, 1);
@@ -374,6 +376,7 @@ inline qlt_rational between(const std::optional<qlt_rational>& lo,
 	return lo->midpoint(*hi);
 }
 
+// One cell: an endpoint, an open gap or a ray, with a representative point.
 struct cell {
 	qlt_piece piece;
 	qlt_rational point; // a point of piece
@@ -409,6 +412,7 @@ inline bool simpler(const qlt_rational& a, const qlt_rational& b) {
 	return a.p > b.p;
 }
 
+// The qlt constant {v}.
 inline qlt point_set(const qlt_rational& v) {
 	return qlt{ { { { v, qlt_bound::CLOSED }, { v, qlt_bound::CLOSED } } } };
 }
@@ -487,15 +491,20 @@ public:
 			&& ba_descriptor<qlt, node>::owns_type(t.get_ba_type());
 	}
 
+	/// @brief Evaluate over the finite endpoints @p ends (sorted, without
+	/// repeats), with a budget of `qlt_cells_budget()` cell visits (0 =
+	/// unbounded).
 	explicit qlt_point_eval(std::vector<qlt_rational> ends)
 		: ends(std::move(ends)) {}
 
-	/// False once the budget is spent, which makes every answer nullopt.
+	/// False once the budget is spent, which makes every answer nullopt;
+	/// otherwise spends one unit.
 	bool spend() {
 		if (!budget) return false;
 		--budget;
 		return true;
 	}
+	/// True once the budget is spent: a verdict reached since is not one.
 	bool exhausted() const { return !budget; }
 
 	/// The cells cut by the endpoints and by the values in @ref env.
@@ -508,6 +517,8 @@ public:
 		return qlt_cells_detail::cells_of(pts);
 	}
 
+	/// The truth of @p fm under @ref env and @ref named; nullopt when a
+	/// part of it is not read (see the class comment) or the budget ran out.
 	std::optional<bool> holds(tref fm) {
 		const auto& t = tau::get(fm);
 		if (t.equals_T()) return true;
@@ -591,14 +602,13 @@ public:
 	}
 
 	/**
-	 * @brief Calls @p f once per joint position of @p vars over the
-	 * endpoints, with a point of it in @ref env; stops when @p f returns
-	 * false.
-	 */
-	/**
 	 * @brief Calls @p f once per joint position of the named endpoints
 	 * @p names over the endpoints, with a value of each in @ref named;
 	 * stops when @p f returns false.
+	 * @param names The names to place.
+	 * @param i Index of the first name not yet placed (0 from a caller).
+	 * @param f Callback returning whether to continue.
+	 * @return False when @p f stopped the walk or the budget ran out.
 	 */
 	template <typename F>
 	bool each_naming(const std::vector<std::string>& names, size_t i,
@@ -615,6 +625,15 @@ public:
 		return true;
 	}
 
+	/**
+	 * @brief Calls @p f once per joint position of @p vars over the
+	 * endpoints, with a point of it in @ref env; stops when @p f returns
+	 * false.
+	 * @param vars The qlt variables to place.
+	 * @param i Index of the first variable not yet placed (0 from a caller).
+	 * @param f Callback returning whether to continue.
+	 * @return False when @p f stopped the walk or the budget ran out.
+	 */
 	template <typename F>
 	bool each_position(const trefs& vars, size_t i, F&& f) {
 		if (i == vars.size()) return f();
@@ -633,12 +652,15 @@ private:
 	size_t budget = qlt_cells_budget() ? qlt_cells_budget()
 		: std::numeric_limits<size_t>::max();
 
+	// The innermost value bound to var in env, nullopt when unbound.
 	std::optional<qlt_rational> value_of(tref var) const {
 		for (auto it = env.rbegin(); it != env.rend(); ++it)
 			if (tau::subtree_equals(it->first, var)) return it->second;
 		return std::nullopt;
 	}
 
+	// e itself, or the value of the named endpoint it names; nullopt for
+	// a name without a value.
 	std::optional<qlt_rational> value_of(const qlt_rational& e) const {
 		if (!e.is_sym()) return e;
 		for (const auto& [name, v] : named) if (name == e.sym) return v;
@@ -662,6 +684,8 @@ private:
 		return r;
 	}
 
+	// The qlt set a term denotes under env and named; nullopt for a
+	// shape not read or an inexact result.
 	std::optional<qlt> term(tref n) const {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;

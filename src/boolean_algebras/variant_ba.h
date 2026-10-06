@@ -26,13 +26,15 @@ namespace idni::tau_lang {
 /// Typing gives both operands of every in-tree call one type, so reaching
 /// this is a broken invariant; a default value would be a silent wrong
 /// constant.
+/// @param op Spelling of the operator, printed before aborting.
 [[noreturn]] inline void variant_ba_mismatch(const char* op) {
 	std::cerr << "variant operator" << op
 		<< ": mismatched alternatives\n";
 	std::abort();
 }
 
-/// @brief Component-wise bitwise AND on matching-alternative variants.
+/// @brief AND of the active alternatives of @p l and @p r.
+/// @pre @p l and @p r hold the same alternative; otherwise the process aborts.
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> operator&(const std::variant<BAs...>& l,
@@ -46,7 +48,8 @@ std::variant<BAs...> operator&(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-/// @brief Component-wise bitwise OR on matching-alternative variants.
+/// @brief OR of the active alternatives of @p l and @p r.
+/// @pre @p l and @p r hold the same alternative; otherwise the process aborts.
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> operator|(const std::variant<BAs...>& l,
@@ -60,7 +63,8 @@ std::variant<BAs...> operator|(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-/// @brief Component-wise bitwise XOR on matching-alternative variants.
+/// @brief XOR of the active alternatives of @p l and @p r.
+/// @pre @p l and @p r hold the same alternative; otherwise the process aborts.
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> operator^(const std::variant<BAs...>& l,
@@ -74,7 +78,8 @@ std::variant<BAs...> operator^(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-/// @brief Addition (synonym for XOR) on matching-alternative variants.
+/// @brief Addition (synonym for XOR) of @p l and @p r.
+/// @pre @p l and @p r hold the same alternative; otherwise the process aborts.
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> operator+(const std::variant<BAs...>& l,
@@ -83,7 +88,7 @@ std::variant<BAs...> operator+(const std::variant<BAs...>& l,
 	return l ^ r;
 }
 
-/// @brief Component-wise bitwise NOT.
+/// @brief Complement of the active alternative of @p l.
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> operator~(const std::variant<BAs...>& l) {
@@ -93,7 +98,7 @@ std::variant<BAs...> operator~(const std::variant<BAs...>& l) {
 	}), l);
 }
 
-/// @brief Equality between a variant BA element and a raw `bool`.
+/// @brief Compare the active alternative of @p l with the truth value @p r.
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const std::variant<BAs...>& l, const bool& r) {
@@ -104,21 +109,21 @@ bool operator==(const std::variant<BAs...>& l, const bool& r) {
 		), l);
 }
 
-/// @brief Equality between a raw `bool` and a variant BA element.
+/// @brief Compare the truth value @p l with the active alternative of @p r.
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const bool& l, const std::variant<BAs...>& r) {
 	return r == l;
 }
 
-/// @brief Inequality between a variant BA element and a raw `bool`.
+/// @brief Negation of `l == r` for a variant @p l and a truth value @p r.
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator!=(const std::variant<BAs...>& l, const bool& r) {
 	return !(l == r);
 }
 
-/// @brief Inequality between a raw `bool` and a variant BA element.
+/// @brief Negation of `l == r` for a truth value @p l and a variant @p r.
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator!=(const bool& l, const std::variant<BAs...>& r) {

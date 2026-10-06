@@ -157,7 +157,7 @@ inline bool ocltl_phi_delta_direct(const ocltl_phi_delta_dims& dims,
 
 namespace ocltl_phi_delta_detail {
 
-// The live node count of phi_delta's own BDD instantiation.
+// Return the size of the node table of phi_delta's own BDD instantiation.
 inline size_t node_table_size() {
 	return bdd<Bool, ocltl_phi_delta_bdd_options>::V.size();
 }

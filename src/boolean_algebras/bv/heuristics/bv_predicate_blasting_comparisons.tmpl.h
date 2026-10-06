@@ -59,7 +59,8 @@ static tref make_bvlt_call_from_index(tref left, tref right, size_t index) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The set of rules for less-than
+ * @return The set of rules for less-than, memoized per bitwidth in a
+ *         function-local static map.
  *
  * @par Example
  * @code{.cpp}
@@ -126,7 +127,8 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
+ * @return The constructed rule, memoized per bitwidth; an error from
+ *         applying the recurrence is carried in the report.
  *
  * @par Example
  * @code{.cpp}
@@ -172,6 +174,7 @@ static result<rewriter::rule> bvlt_rule(size_t bitwidth) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvlt @endinternal */
 template<NodeType node>
 result<tref> bvlt(tref left, tref right) {
 	result<tref> r;
@@ -234,7 +237,8 @@ static tref make_bvgt_call_from_index(tref left, tref right, int_t index) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The set of rules for greater-than
+ * @return The set of rules for greater-than, memoized per bitwidth in a
+ *         function-local static map.
  *
  * @par Example
  * @code{.cpp}
@@ -300,7 +304,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
+ * @return The constructed rule, memoized per bitwidth; an error from
+ *         applying the recurrence is carried in the report.
  *
  * @par Example
  * @code{.cpp}
@@ -346,6 +351,7 @@ static result<rewriter::rule> bvgt_rule(size_t bitwidth) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvgt @endinternal */
 template<NodeType node>
 result<tref> bvgt(tref left, tref right) {
 	result<tref> r;
@@ -410,7 +416,8 @@ static tref make_bvneq_call_from_index(tref left, tref right, size_t index) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The set of rules for not-equal
+ * @return The set of rules for not-equal, memoized per bitwidth in a
+ *         function-local static map.
  *
  * @par Example
  * @code{.cpp}
@@ -484,7 +491,8 @@ static rewriter::rules bvneq_rules(size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
+ * @return The constructed rule, memoized per bitwidth; an error from
+ *         applying the recurrence is carried in the report.
  *
  * @par Example
  * @code{.cpp}
@@ -528,6 +536,7 @@ static result<rewriter::rule> bvneq_rule(size_t bitwidth) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvneq @endinternal */
 template<NodeType node>
 result<tref> bvneq(tref left, tref right) {
 	result<tref> r;

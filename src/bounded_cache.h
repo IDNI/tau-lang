@@ -2,69 +2,56 @@
 
 // bounded_cache — std::map with a configurable max-size bound.
 //
-// STATUS (TT2-13): adopted for the string-keyed synthesis cache in
-// `call_ltlsynt_game` (runtime-bound mode, bound = `cache_bound` below).
-// The create_cache adoption described below has not happened yet for the
-// tref-keyed caches; the unbounded-growth issue it targets remains open at
-// the normal_forms/satisfiability cache sites (their keys at least get GC
-// pruning, which the string-keyed caches never did).
+// Used for the string-keyed synthesis cache of `call_ltlsynt_game`
+// (ltl_aba_synthesis.tmpl.h), in runtime-bound mode with the bound
+// `cache_bound` below. The tref-keyed caches made with `create_cache`
+// (e.g. in src/normal_forms.tmpl.h and src/satisfiability.tmpl.h) still
+// use a plain `std::map`, unbounded apart from the tree GC pruning their
+// stale keys and values.
 //
-// Drop-in replacement for `std::map<K, V, Cmp>` at every call site
-// where the existing tau-ltl convention is:
+// It can replace `std::map<K, V, Cmp>` at a site following the
+// convention:
 //
 //     using cache_t = std::map<K, V, Cmp>;
 //     static cache_t& cache = tree<node>::template create_cache<cache_t>();
 //
-// (See src/normal_forms.tmpl.h, src/satisfiability.tmpl.h, and the
-// 17+ other create_cache call sites for the existing pattern.)
-//
 // Why this exists
 // ---------------
-// Every existing cache in tau-ltl is unbounded.  The parser tree
-// library's GC pass prunes entries whose tref keys/values were
-// collected, but in a long-running process (the planned LTL server,
-// the web demo, batch synthesis pipelines) the entries that survive
-// every GC accumulate without limit.  Memory grows with the corpus
-// of distinct formulas seen, with no upper bound.
+// The parser tree library's GC pass prunes entries whose tref keys or
+// values were collected, but in a long-running process the entries that
+// survive every GC accumulate without limit, and a string-keyed cache gets
+// no pruning at all. Memory grows with the number of distinct formulas
+// seen.
 //
 // `bounded_cache<K, V, Cmp, Max>` adds a hard upper bound: when an
-// insert would push size past `Max`, the oldest entry (by FIFO insert
+// insert would push size past the bound, the oldest entry (by FIFO insert
 // order) is evicted first.  The eviction queue is kept as a
-// `std::list<iterator>` so amortised O(1) insert + O(1) eviction.
+// `std::list<iterator>`, so insert and eviction are amortised O(1).
 //
-// FIFO is intentionally chosen over true LRU:
-//   - Cheaper bookkeeping (no per-find list-splice).
-//   - Indistinguishable from LRU on the workloads tau-ltl actually
-//     hits, where hot formulas keep being re-emitted by the
-//     synthesis pipeline (so insertion order ~= access recency for
-//     the hot set).
-//   - Trivially exposes a knob to upgrade to LRU later: replace the
-//     queue with an intrusive list and splice on `find` hits.
+// FIFO rather than LRU: the bookkeeping is cheaper (no list splice on
+// every `find` hit), and on the synthesis workloads hot formulas keep
+// being re-inserted, so insertion order approximates access recency for
+// the hot set. Splicing the queue on `find` hits would turn it into LRU.
 //
 // Conformance
 // -----------
-// Provides the subset of `std::map` actually used by every
-// create_cache call site in tau-ltl:
+// Provides the subset of `std::map` the cache sites use:
 //   - operator[],   find,    contains
-//   - emplace, insert (the 2-arg overloads)
+//   - emplace, insert (the copy and move overloads)
 //   - begin / end  (returning the underlying map iterators)
 //   - size,    empty,   clear,    erase
 //
 // Iterator validity matches std::map's exactly EXCEPT that `emplace`
-// / `insert` / `operator[]` may invalidate the iterator returned by
-// the prior `begin()` if the eviction was triggered.  The existing
-// tau-ltl call sites never hold iterators across mutating
-// operations, so this is safe by inspection.
+// / `insert` / `operator[]` erase the evicted entries, invalidating any
+// iterator to them (including one obtained from `begin()`). Do not hold
+// an iterator across a mutating call.
 //
 // GC integration
 // --------------
 // The parser's `bintree<T>::create_cache<cache_t>()` registers a
-// gc_callback that walks the underlying map's `(key, value)` entries
-// looking for stale `tref`s.  bounded_cache is iterable (begin/end
-// over the map) and supports erase() — both behaviours are what the
-// gc_callback uses, so the pruning code in
-// the parser's tree template needs zero changes
-// to interoperate.
+// gc_callback that walks the cache's `(key, value)` entries looking for
+// stale `tref`s and erases them. bounded_cache is iterable (begin/end
+// over the map) and supports erase(), which is all that callback needs.
 
 #ifndef __IDNI__TAU__BOUNDED_CACHE_H__
 #define __IDNI__TAU__BOUNDED_CACHE_H__
@@ -81,12 +68,10 @@ namespace idni::tau_lang {
  * @brief The runtime bound consulted by the string-keyed synthesis caches
  * (0 = unbounded).
  *
- * LG-27: the runtime bound consulted by the string-keyed synthesis caches
- * (see `call_ltlsynt_game`). A cache constructed with `&cache_bound` reads
- * the current value on every insert, so `--cache-bound` / REPL `set
- * cachebound` / `api::set_cache_bound` take effect immediately. Runtime
- * parameter by policy; 0 = unbounded. Environment fallback
- * `TAU_CACHE_BOUND`.
+ * Read by the cache of `call_ltlsynt_game`. A cache constructed with
+ * `&cache_bound` reads the current value on every insert, so
+ * `--cache-bound` / REPL `set cachebound` / `api::set_cache_bound` take
+ * effect immediately. Default 4096; environment fallback `TAU_CACHE_BOUND`.
  */
 inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
 
@@ -94,9 +79,8 @@ inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
  * @brief std::map with a configurable max-size bound and FIFO eviction
  * (see the file header for the rationale and the std::map subset offered).
  *
- * TT2-13: two bounding modes. The compile-time `Max` template
- * parameter is the original mode (kept for the existing unit tests
- * and benchmark). Constructing with a pointer to a runtime bound
+ * Two bounding modes. Default construction uses the compile-time `Max`
+ * template parameter. Constructing with a pointer to a runtime bound
  * switches to runtime mode: the pointee is read on every insert, so
  * a `set cachebound N` tightens or loosens a live cache. In both
  * modes a bound of 0 means unbounded; in runtime mode the FIFO
@@ -123,6 +107,8 @@ struct bounded_cache {
 	bounded_cache() = default;
 	/// @brief Runtime mode: the bound is read from @p runtime_bound on
 	/// every insert (see the class comment).
+	/// @param runtime_bound Bound to read; must outlive the cache. A null
+	/// pointer selects compile-time mode.
 	explicit bounded_cache(const std::size_t* runtime_bound)
 		: runtime_bound_(runtime_bound) {}
 	/// @brief Runtime mode over a limit with an environment fallback.
@@ -172,7 +158,9 @@ struct bounded_cache {
 		return ins->second;
 	}
 
-	/// @brief Same return shape as std::map::emplace: {iterator, bool}.
+	/// @brief Construct an entry from @p args, as std::map::emplace; a new
+	/// entry may evict the oldest one.
+	/// @return {iterator to the entry, `true` if it was inserted}.
 	template <typename... Args>
 	std::pair<iterator, bool> emplace(Args&&... args) {
 		auto r = map_.emplace(std::forward<Args>(args)...);
@@ -180,14 +168,16 @@ struct bounded_cache {
 		return r;
 	}
 
-	/// @brief Insert a copy of @p v, as std::map::insert.
+	/// @brief Insert a copy of @p v, as std::map::insert; a new entry may
+	/// evict the oldest one.
 	std::pair<iterator, bool> insert(const value_type& v) {
 		auto r = map_.insert(v);
 		if (r.second) on_insert(r.first);
 		return r;
 	}
 
-	/// @brief Insert @p v by move, as std::map::insert.
+	/// @brief Insert @p v by move, as std::map::insert; a new entry may
+	/// evict the oldest one.
 	std::pair<iterator, bool> insert(value_type&& v) {
 		auto r = map_.insert(std::move(v));
 		if (r.second) on_insert(r.first);
@@ -195,7 +185,7 @@ struct bounded_cache {
 	}
 
 	/// @brief Erase the entry for @p k; returns the number erased (0 or 1).
-	/// O(n) scan of order_ deque; acceptable for current cache sizes.
+	/// O(n) scan of the FIFO queue when tracked.
 	std::size_t erase(const K& k) {
 		auto it = map_.find(k);
 		if (it == map_.end()) return 0;
@@ -210,6 +200,7 @@ struct bounded_cache {
 	}
 
 	/// @brief Erase the entry at @p it and return the following iterator.
+	/// O(n) scan of the FIFO queue when tracked.
 	iterator erase(iterator it) {
 		if (tracked()) {
 			for (auto qit = order_.begin(); qit != order_.end(); ++qit) {
@@ -225,7 +216,7 @@ struct bounded_cache {
 		if (tracked()) order_.clear();
 	}
 
-	// --- introspection (used by the benchmark) ---------------------
+	// --- introspection (used by tests/unit/test_bounded_cache.cpp) --
 
 	/// @brief Number of entries evicted so far.
 	std::size_t evictions() const noexcept { return evictions_; }
@@ -237,6 +228,8 @@ private:
 	bool tracked() const noexcept { return Max != 0 || runtime_bound_
 		|| runtime_limit_; }
 
+	// Enqueue the new entry @p it and evict the oldest entries while the
+	// size exceeds a non-zero bound.
 	void on_insert(iterator it) {
 		if (!tracked()) return; // unbounded, compile-time mode
 		order_.push_back(it);
