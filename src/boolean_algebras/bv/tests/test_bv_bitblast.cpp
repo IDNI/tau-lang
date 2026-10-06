@@ -248,4 +248,41 @@ TEST_SUITE("bounded bitvector decision") {
 		CHECK( take_time_budget_exhausted().empty() );
 		bv_bitblast_max_nodes = nodes;
 	}
+
+	TEST_CASE("solving a question past its budget gives no solution") {
+		if (!bounded_calls_available()) return;
+		const size_t timeout = bv_solve_timeout;
+		bv_solve_timeout = 1;
+		take_time_budget_exhausted();
+		tref hard = tau::get("all x:bv[16] ex y:bv[16] "
+			"all z:bv[16] ex u:bv[16] (y * x != z * u && z - u < z + y "
+			"&& x * z != y * u + {3}:bv[16])", wff_opts).value_or(nullptr);
+		REQUIRE( hard );
+		const auto start = std::chrono::steady_clock::now();
+		CHECK( !solve_bv<node_t>(hard).has_value() );
+		CHECK( std::chrono::steady_clock::now() - start
+			< std::chrono::seconds(30) );
+		CHECK( take_time_budget_exhausted().find("bv-solve-timeout, 1 s")
+			!= std::string::npos );
+		// once a budget ran out, nothing more is solved
+		note_time_budget_exhausted("earlier");
+		tref easy = tau::get("x:bv[8] = {3}:bv[8]", wff_opts)
+			.value_or(nullptr);
+		REQUIRE( easy );
+		CHECK( !solve_bv<node_t>(easy).has_value() );
+		take_time_budget_exhausted();
+		CHECK( solve_bv<node_t>(easy).has_value() );
+		bv_solve_timeout = timeout;
+	}
+
+	TEST_CASE("a bounded question decided sat is solved for its model") {
+		take_time_budget_exhausted();
+		tref f = tau::get("ex y:bv[8] z:bv[8] * y = {6}:bv[8]",
+			wff_opts).value_or(nullptr);
+		REQUIRE( f );
+		auto s = solve_bv<node_t>(f);
+		REQUIRE( s.has_value() );
+		CHECK( s->size() == 1 );
+		CHECK( take_time_budget_exhausted().empty() );
+	}
 }

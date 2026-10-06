@@ -117,7 +117,7 @@ inline env_limit<size_t> bv_bitblast_max_width{ "TAU_BV_BITBLAST_MAX_WIDTH",
 	16 };
 
 /// Wall-clock budget, in seconds, of one quantified cvc5 decision of
-/// `bv_formula_sat_status`: the query runs in a child process killed at the
+/// `bv_formula_sat_status` or `solve_bv`: the query runs in a child process killed at the
 /// bound (bounded_call.h), and a query killed there has no answer, which
 /// makes the command asking it UNKNOWN. Default 60; 0 runs every query in the
 /// process, unbounded. The option `bv-solve-timeout`, whose setter clears
@@ -488,11 +488,16 @@ bool is_bv_formula_unsat(tref form);
  * Given a term reference representing a formula, attempts to find a solution
  * that satisfies the formula within the context of bit-vector boolean algebras.
  *
- * Runs one cvc5 query with models on a fresh solver, with no time bound.
+ * Runs one cvc5 query with models on a fresh solver. A question
+ * `bv_formula_sat_status` would bound by `bv_solve_timeout` is first decided
+ * in a child process under that budget, and solved for its model only when
+ * the child answers sat. Once a time budget of the unit of work ran out
+ * (`time_budget_exhausted`), nothing is solved.
  *
  * @param form The term reference representing the formula to solve.
  * @return The value of every free variable when cvc5 answers sat; nullopt
- * when it answers unsat or unknown, or when @p form cannot be translated.
+ * when it answers unsat or unknown, when the budget runs out, or when
+ * @p form cannot be translated.
  */
 template <NodeType node>
 std::optional<solution<node>> solve_bv(tref form);

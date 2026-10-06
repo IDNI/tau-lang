@@ -873,10 +873,17 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	// Once a budget ran out, the unit of work asking has no answer to give.
+	if (!time_budget_exhausted().empty()) return std::nullopt;
+
 	subtree_map<node, bv> vars, free_vars;
 	// Fresh solver per query, same rationale as bv_formula_sat_status above:
 	// checkSat() is not safe to replay on a shared/reset solver instance.
+	// The same quantifier strategy as the decision below, so a question
+	// decided there within its budget is solved here in about that time.
+	const bool alternating = has_alternating_quantifiers<node>(form);
 	cvc5::Solver solver(cvc5_term_manager);
+	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
@@ -887,6 +894,30 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		return std::nullopt;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+
+	// A question bv_formula_sat_status would bound is first decided in a
+	// child process under the same budget, since a model cannot cross the
+	// process boundary; only a satisfiable one is then solved here for its
+	// model.
+	if (const auto deadline = bv_question_deadline();
+		deadline != std::chrono::steady_clock::time_point::max()
+		&& (shared_deadline().has_value()
+			|| bv_needs_bound(expr.value())))
+	{
+		cvc5::Solver decider(cvc5_term_manager);
+		if (alternating)
+			config_cvc5_solver_alternating_quantifiers(decider);
+		config_cvc5_solver(decider, true);
+		decider.assertFormula(expr.value());
+		bool ran_out = false;
+		if (bv_check_sat(decider, true, deadline, ran_out)
+			!= bv_sat_status::sat)
+		{
+			LOG_DEBUG << "Bitvector system is not decided sat within "
+				"its budget.";
+			return {};
+		}
+	}
 
 	solver.assertFormula(expr.value());
 	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
