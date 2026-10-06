@@ -1040,7 +1040,9 @@ struct api {
 	static result<htref> anti_prenex(htref fm);
 
 	/// Eliminate quantifiers by applying anti-prenex followed by
-	/// quantifier resolution. All definitions are applied first.
+	/// quantifier resolution. All definitions are applied first and the
+	/// result simplified: simplifying first types the calls, and a typed
+	/// call no longer matches an untyped definition head.
 	static result<std::string> eliminate_quantifiers(const std::string& fm);
 	/// @copydoc eliminate_quantifiers(const std::string&)
 	static result<tref> eliminate_quantifiers(tref fm);

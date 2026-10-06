@@ -572,6 +572,31 @@ TEST_SUITE("Tau API - tref - procedures") {
 		REQUIRE(e_r.has_value());
 		CHECK(!tau_api::contains(e_r.value(), tau::wff_ex));
 	}
+	// The definitions are applied before the formula is simplified, so a
+	// call is expanded and its quantifier eliminated; the htref overload
+	// answers as the tref one.
+	TEST_CASE_FIXTURE(api_fixture, "eliminate_quantifiers: htref answers as tref") {
+		REQUIRE(tau_api::get_definition("l6_eq_p(x) := x = 0 || x' = 0")
+			.has_value());
+		for (const char* src : { "ex y (l6_eq_p(y) && y = x)",
+				"all y (l6_eq_p(y) || x = y)" })
+		{
+			CAPTURE(src);
+			auto fm_r = tau_api::get_formula(src);
+			REQUIRE(fm_r.has_value());
+			auto t_r = tau_api::eliminate_quantifiers(fm_r.value());
+			REQUIRE(t_r.has_value());
+			CHECK(tau_api::to_str(t_r.value()).find("l6_eq_p")
+				== std::string::npos);
+			CHECK(!tau_api::contains(t_r.value(), tau::wff_ex));
+			CHECK(!tau_api::contains(t_r.value(), tau::wff_all));
+			auto h_r = tau_api::eliminate_quantifiers(
+				tau::geth(fm_r.value()));
+			REQUIRE(h_r.has_value());
+			CHECK(tau_api::to_str(h_r.value()) ==
+				tau_api::to_str(t_r.value()));
+		}
+	}
 	TEST_CASE_FIXTURE(api_fixture, "realizable") {
 		// realizable/unrealizable require a plain formula (is_formula()
 		// gates on a wff node), not a full multi-clause spec.

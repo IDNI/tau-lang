@@ -1454,8 +1454,8 @@ result<tref> api<node>::eliminate_quantifiers(tref fm) {
 		if (!tau::get(fm).is(tau::wff)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
-		TAU_TRY(auto simplified, simplify(fm));
-		TAU_TRY(auto applied, apply_all_defs(simplified));
+		TAU_TRY(auto expanded, apply_all_defs(fm));
+		TAU_TRY(auto applied, simplify(expanded));
 		applied = eliminate_functional_quantifiers<node>(applied);
 		TAU_TRY(auto prenexed, tau_lang::anti_prenex<node>(applied));
 		TAU_TRY(auto e, resolve_quantifiers<node>(prenexed));

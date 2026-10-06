@@ -374,11 +374,8 @@ result<htref> api<node>::eliminate_quantifiers(htref fm) {
 			result<htref> r;
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		// Definitions are applied before the tref overload, which simplifies
-		// and applies them again
-		return apply_all_defs(fm->get()).and_then(
-			[](tref applied) { return eliminate_quantifiers(applied); }
-		).transform([](tref v) { return tau::geth(v); });
+		return eliminate_quantifiers(fm->get()).transform(
+			[](tref v) { return tau::geth(v); });
 	});
 }
 
