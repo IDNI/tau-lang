@@ -114,7 +114,9 @@ struct interpreter {
 	 * check. Set from the `--spec-size-warn` CLI option; a runtime
 	 * parameter by policy, never a header constant.
 	 */
-	static inline size_t spec_size_warn_threshold = 0;
+	/// Environment fallback `TAU_SPEC_SIZE_WARN`.
+	static inline env_limit<size_t> spec_size_warn_threshold{
+		"TAU_SPEC_SIZE_WARN", 0 };
 
 	/**
 	 * @brief Runtime cap on the revision alternatives kept per spec part.
@@ -130,7 +132,9 @@ struct interpreter {
 	 * `--max-revision-alts` CLI option; a runtime parameter by policy,
 	 * never a header constant.
 	 */
-	static inline size_t max_revision_alts = 0;
+	/// Environment fallback `TAU_MAX_REVISION_ALTS`.
+	static inline env_limit<size_t> max_revision_alts{
+		"TAU_MAX_REVISION_ALTS", 0 };
 
 	/**
 	 * @brief Definitional propagation before a step's paths are enumerated.
@@ -161,8 +165,10 @@ struct interpreter {
 	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
 	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
 	 */
-	static inline size_t gc_min_size      = 256;
-	static inline double gc_growth_factor = 1.5;
+	/// Environment fallbacks `TAU_GC_MIN_SIZE` and `TAU_GC_GROWTH_FACTOR`.
+	static inline env_limit<size_t> gc_min_size{ "TAU_GC_MIN_SIZE", 256 };
+	static inline env_limit<double> gc_growth_factor{
+		"TAU_GC_GROWTH_FACTOR", 1.5 };
 
 	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).

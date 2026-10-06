@@ -18,6 +18,7 @@
 #include <limits>
 #include <optional>
 #include <unordered_set>
+#include "env_limits.h"
 
 #include "nso_rr.h"
 
@@ -49,7 +50,10 @@ inline bool bv_case_split_enabled() {
 /// instance count. SIZE_MAX = unlimited (0 through the option setter); set
 /// via --bv-case-split-max-tests or the REPL option
 /// bv-case-split-max-tests.
-inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
+/// Environment fallback `TAU_BV_CASE_SPLIT_MAX_TESTS`.
+inline env_limit<size_t> bv_case_split_max_tests{
+	"TAU_BV_CASE_SPLIT_MAX_TESTS", std::numeric_limits<size_t>::max(),
+	env_zero::unlimited };
 
 // Test-point elimination of a quantified bitvector variable v that occurs
 // only in comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`, possibly negated)

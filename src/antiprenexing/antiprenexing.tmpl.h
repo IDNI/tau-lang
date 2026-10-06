@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "antiprenexing/antiprenexing.h"
+#include "env_limits.h"
 // `solver_placement`/`solver_site` and the preprocessing-placement knobs
 // (`preprocessing`, `preprocess_placement`, `preprocess_site`,
 // `preprocess_method`, `preprocess_mode`): a dependency-free core header,
@@ -70,13 +71,17 @@ struct blast_reentry_guard {
 /// runtime parameter, never a header constant -- `preprocessing`
 /// (heuristics/preprocess_placement.h) is the precedent. Like it, this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
-inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
+/// Environment fallback `TAU_BLOCK_MAX_SPLITS`.
+inline env_limit<size_t> block_boole_max_splits{ "TAU_BLOCK_MAX_SPLITS",
+	std::numeric_limits<size_t>::max(), env_zero::unlimited };
 
 /// Maximum rounds `process_quantifier_blocks` may take before giving up.
 /// Unconditional: the termination argument at its use site is subtle enough
 /// that a regression must fail loudly rather than hang Release forever.
 /// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
-inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
+/// Environment fallback `TAU_BLOCK_MAX_ROUNDS`.
+inline env_limit<size_t> block_max_rounds{ "TAU_BLOCK_MAX_ROUNDS",
+	std::numeric_limits<size_t>::max(), env_zero::unlimited };
 
 /// Maximum number of DNF clauses complete_quantifier_elimination may
 /// distribute one scope into (estimated as the product of the per-factor
@@ -86,7 +91,9 @@ inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 /// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
 /// clauses. Runtime-tunable via `api::set_cqe_max_clauses`; same caveats
 /// as block_max_rounds above.
-inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
+/// Environment fallback `TAU_CQE_MAX_CLAUSES`.
+inline env_limit<size_t> cqe_max_clauses{ "TAU_CQE_MAX_CLAUSES",
+	std::numeric_limits<size_t>::max(), env_zero::unlimited };
 
 /**
  * @internal

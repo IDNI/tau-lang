@@ -138,6 +138,8 @@ inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
 	mix(ltl_closed_regions_timeout());
 	mix(ltl_data_game_max_nodes());
 	mix(ltl_data_game_max_memo());
+	mix(ltl_data_game_max_combinations());
+	mix(ltl_max_observations());
 	return seed;
 }
 

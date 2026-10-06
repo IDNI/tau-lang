@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cerrno>
+#include <cmath>
 #include <cstdlib>
 #include <optional>
 #include <fstream>
@@ -86,9 +87,10 @@ cli::options tau_options() {
 		.set_description("debug mode");)
 	opts["experimental"] = cli::option("experimental", 'x', false)
 		.set_description("enables transitioning features");
-	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
+	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "")
 		.set_description("warn when an updated specification exceeds "
-			"this many characters (0 = off)");
+			"this many characters (default: TAU_SPEC_SIZE_WARN or 0; "
+			"0 = off)");
 	opts["pwr-semantic"] = cli::option("pwr-semantic", 'Z', false)
 		.set_description("enable the semantic (winning-region) fallback "
 			"of the temporal pointwise revision (off by default)");
@@ -96,57 +98,60 @@ cli::options tau_options() {
 		cli::option("step-definitional-propagation", 't', true)
 		.set_description("propagate the constants a step formula determines "
 			"before its paths are enumerated (enabled by default)");
-	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
+	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "")
 		.set_description("cap the revision alternatives kept per "
 			"specification part, dropping middle preference tiers "
-			"(0 = unlimited)");
-	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "0")
+			"(default: TAU_MAX_REVISION_ALTS or 0; 0 = unlimited)");
+	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "")
 		.set_description("cap per-block Boole-decomposition splits in "
-			"anti-prenexing (0 = unlimited)");
-	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
+			"anti-prenexing (default: TAU_BLOCK_MAX_SPLITS or 0; "
+			"0 = unlimited)");
+	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "")
 		.set_description("decided tau-algebra rows whose key tree is kept "
-			"alive across the step sweep (default 4096, 0 = none)");
-	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
+			"alive across the step sweep (default: "
+			"TAU_BA_DECISION_PINS or 4096; 0 = none)");
+	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "")
 		.set_description("cap anti-prenexing quantifier-block driver "
-			"rounds (0 = unlimited)");
-	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "0")
+			"rounds (default: TAU_BLOCK_MAX_ROUNDS or 0; "
+			"0 = unlimited)");
+	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "")
 		.set_description("cap the DNF clauses complete quantifier "
-			"elimination may distribute one scope into (0 = unlimited)");
-	opts["lgrs-max-vars"] = cli::option("lgrs-max-vars", 'g', "8")
+			"elimination may distribute one scope into (default: "
+			"TAU_CQE_MAX_CLAUSES or 0; 0 = unlimited)");
+	opts["lgrs-max-vars"] = cli::option("lgrs-max-vars", 'g', "")
 		.set_description("hand a pure-equality bitvector system with more "
 			"distinct variables than this to the solver instead of "
-			"solving it algebraically per width (default 8, "
-			"0 = unlimited)");
-	// Must agree with max_fixpoint_steps in satisfiability.tmpl.h: the
-	// option is applied unconditionally, so its default is what every
-	// `tau` run gets.
-	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "500")
+			"solving it algebraically per width (default: "
+			"TAU_LGRS_MAX_VARS or 8; 0 = unlimited)");
+	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "")
 		.set_description("cap temporal-normalization fixpoint steps "
-			"(default 500; 0 = unlimited)");
+			"(default: TAU_MAX_FIXPOINT_STEPS or 500; 0 = unlimited)");
 	opts["max-flag-search-steps"] =
-		cli::option("max-flag-search-steps", 'F', "500")
+		cli::option("max-flag-search-steps", 'F', "")
 		.set_description("cap the eventual-flag search past the flag "
 			"boundary; a give-up reports an error, not a verdict "
-			"(default 500; 0 = unlimited)");
-	opts["block-squeeze-cap"] = cli::option("block-squeeze-cap", 'z', "0")
+			"(default: TAU_MAX_FLAG_SEARCH_STEPS or 500; "
+			"0 = unlimited)");
+	opts["block-squeeze-cap"] = cli::option("block-squeeze-cap", 'z', "")
 		.set_description("skip block squeezing above this operand-set "
-			"size (0 = unlimited)");
+			"size (default: TAU_BLOCK_SQUEEZE_CAP or 0; 0 = unlimited)");
 	opts["max-simplify-rounds"] =
-		cli::option("max-simplify-rounds", 'm', "0")
+		cli::option("max-simplify-rounds", 'm', "")
 		.set_description("cap bitvector simplification rewrite rounds "
-			"(0 = unlimited)");
-	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "0")
+			"(default: TAU_MAX_SIMPLIFY_ROUNDS or 0; 0 = unlimited)");
+	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "")
 		.set_description("cap definition-expansion passes "
-			"(0 = unlimited)");
-	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "10000")
+			"(default: TAU_MAX_DEF_PASSES or 0; 0 = unlimited)");
+	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "")
 		.set_description("cap the untyped saturation probe over a residual "
-			"recurrence reference (default 10000, 0 = unlimited)");
-	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "0")
+			"recurrence reference (default: TAU_MAX_PROBE_STEPS or "
+			"10000; 0 = unlimited)");
+	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "")
 		.set_description("cap recurrence-relation enumeration steps "
-			"(0 = unlimited)");
-	opts["max-rewrite-rounds"] = cli::option("max-rewrite-rounds", 'R', "0")
+			"(default: TAU_MAX_ENUM_STEPS or 0; 0 = unlimited)");
+	opts["max-rewrite-rounds"] = cli::option("max-rewrite-rounds", 'R', "")
 		.set_description("cap rewrite-to-fixpoint rounds "
-			"(0 = unlimited)");
+			"(default: TAU_MAX_REWRITE_ROUNDS or 0; 0 = unlimited)");
 	// The k-ary walk cap ships FINITE: the walk is 2^n synthesis checks
 	// on mostly-feasible atoms; a fired cap is sound (false UNREALIZABLE
 	// at worst, warned loudly), an uncapped walk is a hang.
@@ -161,12 +166,14 @@ cli::options tau_options() {
 			"expansion (default: TAU_LTL_MAX_COVER_PRODUCTS or 256; "
 			"0 = unlimited)");
 	opts["max-constant-size"] =
-		cli::option("max-constant-size", 'u', "2000")
+		cli::option("max-constant-size", 'u', "")
 		.set_description("largest region of fresh values, in tree nodes, "
-			"a run keeps across steps (default 2000; 0 = unlimited)");
-	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
+			"a run keeps across steps (default: TAU_MAX_CONSTANT_SIZE "
+			"or 2000; 0 = unlimited)");
+	opts["cache-bound"] = cli::option("cache-bound", 'A', "")
 		.set_description("bound the string-keyed synthesis caches, "
-			"FIFO eviction (default 4096; 0 = unbounded)");
+			"FIFO eviction (default: TAU_CACHE_BOUND or 4096; "
+			"0 = unbounded)");
 	// Every LTL(ABA) knob below keeps an environment fallback (TAU_LTL_*)
 	// for scripts that set one; an empty default means "not given", so the
 	// fallback stays in force unless the flag is passed. --ltl-qe-max-vars
@@ -219,6 +226,37 @@ cli::options tau_options() {
 		.set_description("cap the operation memo entries of the BDD of a "
 			"data game over codes; a full memo is emptied (default: "
 			"TAU_LTL_DATA_GAME_MAX_MEMO or 33554432; 0 = unlimited)");
+	opts["ltl-data-game-max-combinations"] =
+		cli::option("ltl-data-game-max-combinations", '\0', "")
+		.set_description("cap the value combinations the data game "
+			"tabulates for one comparison its circuits do not encode "
+			"(default: TAU_LTL_DATA_GAME_MAX_COMBINATIONS or 4096; "
+			"0 = unlimited)");
+	opts["ltl-max-observations"] =
+		cli::option("ltl-max-observations", '\0', "")
+		.set_description("cap the observation props whose impossible "
+			"joint values the synthesis skeleton assumes away (default: "
+			"TAU_LTL_MAX_OBSERVATIONS or 8; at most 30, 0 = 30)");
+	opts["ltl-mealy-max-states"] =
+		cli::option("ltl-mealy-max-states", '\0', "")
+		.set_description("most states of the Mealy view a data-game "
+			"strategy is played through (default: "
+			"TAU_LTL_MEALY_MAX_STATES or 4096; 0 = no view)");
+	opts["ltl-mealy-max-edges"] =
+		cli::option("ltl-mealy-max-edges", '\0', "")
+		.set_description("most edges of the Mealy view a data-game "
+			"strategy is played through (default: "
+			"TAU_LTL_MEALY_MAX_EDGES or 65536; 0 = no view)");
+	opts["compile-max-table-edges"] =
+		cli::option("compile-max-table-edges", '\0', "")
+		.set_description("most edges of a Mealy view gen/compile carries "
+			"as a table instead of solving as the program runs (default: "
+			"TAU_COMPILE_MAX_TABLE_EDGES or 400; 0 = none)");
+	opts["bf-dependence-max-nodes"] =
+		cli::option("bf-dependence-max-nodes", '\0', "")
+		.set_description("cap the BDD nodes built to tell whether a "
+			"Boolean function depends on a variable (default: "
+			"TAU_BF_DEPENDENCE_MAX_NODES or 65536; 0 = unlimited)");
 	opts["tref-budget"] = cli::option("tref-budget", 'y', "")
 		.set_description("cap the live interned tree nodes; an api call "
 			"that starts with the store at or above the cap fails "
@@ -228,12 +266,13 @@ cli::options tau_options() {
 		.set_description("percentage of --tref-budget at which a sweep "
 			"is forced regardless of the gc growth trigger "
 			"(default: TAU_TREF_BUDGET_SOFT or 75)");
-	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
+	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "")
 		.set_description("tree-node count floor before gc may trigger "
-			"(default 256)");
-	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
+			"(default: TAU_GC_MIN_SIZE or 256)");
+	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "")
 		.set_description("gc triggers when node count grows by this "
-			"factor since last sweep (default 1.5; <= 0 disables gc)");
+			"factor since last sweep (default: TAU_GC_GROWTH_FACTOR or "
+			"1.5; <= 0 disables gc)");
 	// BA-declared options: one CLI flag per option a BA in the configured
 	// pack declares about itself, registered as --<family>-<option> (e.g.
 	// --bv-blasting), with default and description taken from the BA's own
@@ -459,32 +498,9 @@ int main(int argc, char** argv) {
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
-	// convention; the gc knobs take raw values).
-	auto optnum = [&opts](const char* name) -> size_t {
-		return (size_t)std::atoll(opts[name].get<string>().c_str()); };
-	tau_api::set_spec_size_warn(optnum("spec-size-warn"));
-	tau_api::set_max_revision_alts(optnum("max-revision-alts"));
-	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
-	tau_api::set_step_definitional_propagation(
-		opts["step-definitional-propagation"].get<bool>());
-	tau_api::set_block_max_splits(optnum("block-max-splits"));
-	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
-	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
-	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
-	tau_api::set_lgrs_max_vars(optnum("lgrs-max-vars"));
-	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
-	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
-	tau_api::set_block_squeeze_cap(optnum("block-squeeze-cap"));
-	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
-	tau_api::set_max_def_passes(optnum("max-def-passes"));
-	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
-	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
-	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
-	tau_api::set_max_constant_size(optnum("max-constant-size"));
-	tau_api::set_cache_bound(optnum("cache-bound"));
-	// An option with an environment fallback is applied only when it was
-	// given: a flag that always wrote its own default would shadow the
-	// variable the limit's accessor would otherwise read. Garbage is an
+	// convention; the gc knobs take raw values). A limit is applied only
+	// when its flag was given: a flag that always wrote its own default
+	// would shadow the TAU_* variable the limit falls back to. Garbage is an
 	// error rather than atoll's silent 0, which is "unlimited" for every
 	// cap here; the first bad value is reported once, below.
 	string bad_option;
@@ -504,6 +520,38 @@ int main(int argc, char** argv) {
 		}
 		return (size_t) n;
 	};
+	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
+	tau_api::set_step_definitional_propagation(
+		opts["step-definitional-propagation"].get<bool>());
+	const std::pair<const char*, void (*)(size_t)> count_flags[] = {
+		{ "spec-size-warn", &tau_api::set_spec_size_warn },
+		{ "max-revision-alts", &tau_api::set_max_revision_alts },
+		{ "block-max-splits", &tau_api::set_block_max_splits },
+		{ "block-max-rounds", &tau_api::set_block_max_rounds },
+		{ "ba-decision-pins", &tau_api::set_ba_decision_pins },
+		{ "cqe-max-clauses", &tau_api::set_cqe_max_clauses },
+		{ "lgrs-max-vars", &tau_api::set_lgrs_max_vars },
+		{ "max-fixpoint-steps", &tau_api::set_max_fixpoint_steps },
+		{ "max-flag-search-steps", &tau_api::set_max_flag_search_steps },
+		{ "block-squeeze-cap", &tau_api::set_block_squeeze_cap },
+		{ "max-simplify-rounds", &tau_api::set_max_simplify_rounds },
+		{ "max-def-passes", &tau_api::set_max_def_passes },
+		{ "max-enum-steps", &tau_api::set_max_enum_steps },
+		{ "max-probe-steps", &tau_api::set_max_probe_steps },
+		{ "max-rewrite-rounds", &tau_api::set_max_rewrite_rounds },
+		{ "max-constant-size", &tau_api::set_max_constant_size },
+		{ "cache-bound", &tau_api::set_cache_bound },
+		{ "gc-min-size", &tau_api::set_gc_min_size },
+		{ "ltl-data-game-max-combinations",
+			&tau_api::set_ltl_data_game_max_combinations },
+		{ "ltl-max-observations", &tau_api::set_ltl_max_observations },
+		{ "ltl-mealy-max-states", &tau_api::set_ltl_mealy_max_states },
+		{ "ltl-mealy-max-edges", &tau_api::set_ltl_mealy_max_edges },
+		{ "compile-max-table-edges", &tau_api::set_compile_max_table_edges },
+		{ "bf-dependence-max-nodes", &tau_api::set_bf_dependence_max_nodes },
+	};
+	for (const auto& [name, set] : count_flags)
+		if (auto n = given_count(name); n) set(*n);
 	if (const string t = opts["ltl-timeout"].get<string>(); !t.empty()) {
 		char* end = nullptr;
 		errno = 0;
@@ -515,7 +563,8 @@ int main(int argc, char** argv) {
 	}
 	if (const string a = opts["ltl-alg"].get<string>(); !a.empty())
 		tau_api::set_ltl_algorithm(a);
-	tau_api::set_ltl_qe_max_vars(optnum("ltl-qe-max-vars"));
+	if (auto n = given_count("ltl-qe-max-vars"); n)
+		tau_api::set_ltl_qe_max_vars(*n);
 	if (auto n = given_count("ltl-hoa-max-states"); n)
 		tau_api::set_ltl_hoa_max_states(*n);
 	if (auto n = given_count("ltl-guard-max-cubes"); n)
@@ -539,9 +588,16 @@ int main(int argc, char** argv) {
 	if (auto n = given_count("tref-budget-soft"); n)
 		tau_api::set_tref_budget_soft_percent(*n);
 	if (!bad_option.empty()) return error(bad_option);
-	tau_api::set_gc_min_size(optnum("gc-min-size"));
-	tau_api::set_gc_growth_factor(
-		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
+	if (const string g = opts["gc-growth-factor"].get<string>(); !g.empty()) {
+		char* end = nullptr;
+		errno = 0;
+		const double f = std::strtod(g.c_str(), &end);
+		if (end == g.c_str() || *end != '\0' || errno == ERANGE
+			|| !std::isfinite(f))
+			return error("--gc-growth-factor expects a number, got '"
+				+ g + "'");
+		tau_api::set_gc_growth_factor(f);
+	}
 	// Apply each BA-declared CLI option through its own getter/setter pair
 	// -- the same "two views of the same knob" wiring every option above
 	// already uses, just addressed by family-option instead of a bare name.

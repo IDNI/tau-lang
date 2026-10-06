@@ -724,7 +724,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 		// Absent from every conjunct's support: nothing to eliminate, the
 		// BDD never mentions this bit in the first place.
 
-	// Defensive budget: 500k unique BDD nodes. TAU_CACHE is off in Debug
+	// Defensive budget, `bv_blasting_max_nodes` unique BDD nodes (500k by
+	// default; 0 = unlimited). TAU_CACHE is off in Debug
 	// (project convention), so bdd_and/bdd_ex recursion has no memo to
 	// fall back on if the live frontier turns out bigger than expected
 	// for some formula shape early quantification doesn't help with, while
@@ -732,7 +733,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	// ceiling. Exceeding it aborts to the same fallback a decline uses --
 	// the path must be structurally unable to hang, not just fast in the
 	// common case.
-	constexpr size_t NODE_BUDGET = 500'000;
+	const size_t node_budget = bv_blasting_max_nodes.get()
+		? bv_blasting_max_nodes.get() : std::numeric_limits<size_t>::max();
 	std::unordered_set<typename tbdd::ref> size_scratch;
 	auto node_count_of = [&](typename tbdd::ref x) {
 		size_scratch.clear();
@@ -751,7 +753,7 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	//    the budget, so the expensive-but-exact check is available with
 	//    margin before a true overrun, when it matters most.
 	// Between true-ups, `running_nodes` is simply set to the cheap
-	// additive estimate (already gated at <= NODE_BUDGET by the pre-fold
+	// additive estimate (already gated at <= node_budget by the pre-fold
 	// decline below), which keeps the pre-fold estimate for the next
 	// batch reasonably accurate without paying for a real scan.
 	constexpr size_t RESCAN_EVERY_BATCHES = 8;
@@ -767,15 +769,15 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 		return running_nodes;
 	};
 	auto over_budget = [&](typename tbdd::ref x) {
-		return rescan(x) > NODE_BUDGET;
+		return rescan(x) > node_budget;
 	};
 	// Amortized post-fold check: `estimate` is the same additive estimate
 	// already computed pre-fold for this batch (see new_members_estimate
 	// below), reused here as a cheap stand-in for `x`'s true node count.
 	auto over_budget_after_fold = [&](typename tbdd::ref x, size_t estimate) {
 		if (batches_since_rescan + 1 >= RESCAN_EVERY_BATCHES ||
-			estimate >= size_t(NODE_BUDGET * RESCAN_HEADROOM_FRACTION))
-			return rescan(x) > NODE_BUDGET;
+			estimate >= size_t(node_budget * RESCAN_HEADROOM_FRACTION))
+			return rescan(x) > node_budget;
 		running_nodes = estimate;
 		++batches_since_rescan;
 		return false;
@@ -827,7 +829,7 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 			new_members.push_back(c);
 		}
 		size_t estimate = new_members_estimate(new_members);
-		if (estimate > NODE_BUDGET) return r.with_value(result);
+		if (estimate > node_budget) return r.with_value(result);
 		running = tbdd::bdd_and_many(std::move(batch), bit_ord);
 		if (over_budget_after_fold(running, estimate)) return r.with_value(result);
 		if (!elim_at[j].empty()) {

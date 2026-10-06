@@ -42,6 +42,7 @@
 #include <cvc5/cvc5.h>
 
 #include "backends/cvc5/cvc5.h"
+#include "env_limits.h"
 #include "backends/cvc5/cvc5_options.h"
 #include "backends/cvc5/cvc5_bitblast.h"
 #include "bounded_call.h"
@@ -98,18 +99,24 @@ inline bool bv_quantifier_free_decision_enabled() {
 /// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
 /// the nodes it may keep in use at once before it leaves the formula to
 /// cvc5; 0 leaves every formula to cvc5. The option `bv-bitblast-max-nodes`.
-inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
+/// Environment fallback `TAU_BV_BITBLAST_MAX_NODES`.
+inline env_limit<size_t> bv_bitblast_max_nodes{ "TAU_BV_BITBLAST_MAX_NODES",
+	size_t{1} << 20 };
 
-/// Widest bit-vector the BDD decision takes. A product of two wider values
-/// outgrows any useful budget.
-inline constexpr size_t bv_bitblast_max_width = 16;
+/// Widest bit-vector the BDD decision takes; a formula with a wider one goes
+/// to cvc5 (0 sends every formula there). A product of two wider values
+/// outgrows any useful budget. The option `bv-bitblast-max-width`,
+/// environment fallback `TAU_BV_BITBLAST_MAX_WIDTH`.
+inline env_limit<size_t> bv_bitblast_max_width{ "TAU_BV_BITBLAST_MAX_WIDTH",
+	16 };
 
 /// Wall-clock budget, in seconds, of one quantified cvc5 decision of
 /// `bv_formula_sat_status`: the query runs in a child process killed at the
 /// bound (bounded_call.h), and a query killed there has no answer, which
 /// makes the command asking it UNKNOWN. 0 runs every query in the process,
 /// unbounded. The option `bv-solve-timeout`.
-inline size_t bv_solve_timeout = 60;
+/// Environment fallback `TAU_BV_SOLVE_TIMEOUT`.
+inline env_limit<size_t> bv_solve_timeout{ "TAU_BV_SOLVE_TIMEOUT", 60 };
 
 /**
  * @brief Configure a solver for a quantifier-free decision-only query.

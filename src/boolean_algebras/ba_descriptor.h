@@ -217,7 +217,9 @@ concept ba_has_component_factoring = ba_has_descriptor_v<Node, BA>
 template <typename Node, typename BA>
 concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t n) {
-		ba_descriptor<BA, Node>::set_ba_decision_pins(n); };
+		ba_descriptor<BA, Node>::set_ba_decision_pins(n);
+		{ ba_descriptor<BA, Node>::ba_decision_pins() }
+			-> std::convertible_to<size_t>; };
 
 template <typename Node, typename BA>
 concept ba_has_zero_constant = ba_has_descriptor_v<Node, BA>

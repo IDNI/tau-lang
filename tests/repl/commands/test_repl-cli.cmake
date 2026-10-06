@@ -101,7 +101,7 @@ add_repl_test(cli-max_fixpoint_steps_flag
 	"get fixpointsteps" "fixpointsteps: *9" NO_TRACE
 	FLAGS --max-fixpoint-steps 9)
 
-# The option is applied on every run, so its default must be the library's.
+# Without the flag the library's own default (or its TAU_* variable) applies.
 add_repl_test(cli-max_fixpoint_steps_default
 	"get fixpointsteps" "fixpointsteps: *500" NO_FAIL_REGEX NO_TRACE)
 add_repl_test(cli-gc_growth_factor_flag
@@ -125,7 +125,8 @@ add_raw_repl_test(cli-help_flag_search_giveup_is_no_verdict
 
 # --- every limit flag, long AND short form (2026-08-17 coverage plan) --------
 # Each row: testname|longflag|shortflag|value|get-option|expected-value.
-# The round trip proves flag -> optnum() -> api setter -> library global -> get.
+# The round trip proves flag -> given_count() -> api setter -> library global
+# -> get.
 # Values are distinct from the defaults so a silently-ignored flag fails.
 # An empty shortflag field means the option has no short form.
 set(TAU_CLI_LIMIT_ROWS
@@ -152,6 +153,12 @@ set(TAU_CLI_LIMIT_ROWS
 	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
 	"ltl_data_game_max_nodes|ltl-data-game-max-nodes||4096|ltldatagamemaxnodes|4096"
 	"ltl_data_game_max_memo|ltl-data-game-max-memo||4096|ltldatagamemaxmemo|4096"
+	"ltl_data_game_max_combinations|ltl-data-game-max-combinations||77|ltldatagamemaxcombinations|77"
+	"ltl_max_observations|ltl-max-observations||5|ltlmaxobservations|5"
+	"ltl_mealy_max_states|ltl-mealy-max-states||77|ltlmealymaxstates|77"
+	"ltl_mealy_max_edges|ltl-mealy-max-edges||99|ltlmealymaxedges|99"
+	"compile_max_table_edges|compile-max-table-edges||50|compilemaxtableedges|50"
+	"bf_dependence_max_nodes|bf-dependence-max-nodes||1000|bfdependencemaxnodes|1000"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

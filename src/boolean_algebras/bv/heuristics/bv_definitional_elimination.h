@@ -18,6 +18,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include "env_limits.h"
 #include <optional>
 #include <utility>
 #include <vector>
@@ -41,23 +42,31 @@ inline bool bv_definitional_elimination = true;
 /// the nesting); a conjunct beyond it stays a reader. SIZE_MAX = unlimited
 /// (0 through the option setter); the REPL/CLI option
 /// `bv-defelim-max-clauses`.
-inline size_t bv_defelim_max_clauses = 16;
+/// Environment fallback `TAU_BV_DEFELIM_MAX_CLAUSES`.
+inline env_limit<size_t> bv_defelim_max_clauses{ "TAU_BV_DEFELIM_MAX_CLAUSES",
+	16, env_zero::unlimited };
 
 /// Cap on the distinct atoms the propositional check of a guard set may
 /// brute-force over (2^atoms assignments); above it the set is not refuted
 /// and the definition is not used. Never more than 30 whatever the setting.
 /// The option `bv-defelim-max-atoms`.
-inline size_t bv_defelim_max_atoms = 18;
+/// Environment fallback `TAU_BV_DEFELIM_MAX_ATOMS`.
+inline env_limit<size_t> bv_defelim_max_atoms{ "TAU_BV_DEFELIM_MAX_ATOMS",
+	18, env_zero::unlimited };
 
 /// Cap on the size of the clause subsets searched for a total definition
 /// (all subsets up to this size are tried). The option
 /// `bv-defelim-max-subset`.
-inline size_t bv_defelim_max_subset = 4;
+/// Environment fallback `TAU_BV_DEFELIM_MAX_SUBSET`.
+inline env_limit<size_t> bv_defelim_max_subset{ "TAU_BV_DEFELIM_MAX_SUBSET",
+	4, env_zero::unlimited };
 
 /// Cap on the elimination rounds per existential block (one variable is
 /// eliminated per round). SIZE_MAX = unlimited (0 through the setter); the
 /// option `bv-defelim-max-rounds`.
-inline size_t bv_defelim_max_rounds = 256;
+/// Environment fallback `TAU_BV_DEFELIM_MAX_ROUNDS`.
+inline env_limit<size_t> bv_defelim_max_rounds{ "TAU_BV_DEFELIM_MAX_ROUNDS",
+	256, env_zero::unlimited };
 
 // Eliminate the bitvector variables of a block of same-kind existential
 // binders that a total definition determines.

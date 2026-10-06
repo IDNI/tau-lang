@@ -1034,7 +1034,8 @@ struct code_regions {
 				x.values.push_back(e->get());
 			if (x.values.empty()) return std::nullopt;
 			combinations *= x.values.size();
-			if (combinations > 4096) return std::nullopt;
+			if (const size_t cap = ltl_data_game_max_combinations();
+				cap && combinations > cap) return std::nullopt;
 			vars.push_back(std::move(x));
 		}
 		region r = data_bdd::F;
@@ -1945,10 +1946,6 @@ protected:
 		return it != sol.end() ? it->second : build_bf_f_type<node>(tid);
 	}
 };
-
-// The bounds of a Mealy view (code_strategy::build_mealy).
-inline size_t data_game_mealy_max_states = 4096;
-inline size_t data_game_mealy_max_edges = size_t{1} << 16;
 
 // The strategy of a game played on code_regions.
 template <NodeType node>

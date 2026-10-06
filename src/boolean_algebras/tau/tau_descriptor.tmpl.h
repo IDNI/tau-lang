@@ -120,7 +120,12 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	/// Set the cap on pinned decided rows, owned by tau_ba.h.
 	static void set_ba_decision_pins(size_t n) {
-		ba_decision_pins = n;
+		idni::tau_lang::ba_decision_pins = n;
+	}
+
+	/// Read the cap on pinned decided rows, owned by tau_ba.h.
+	static size_t ba_decision_pins() {
+		return idni::tau_lang::ba_decision_pins;
 	}
 
 	/// Read tau's component-factoring switch, owned by tau_ba.h.

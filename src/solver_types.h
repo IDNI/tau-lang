@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include "env_limits.h"
 
 #include "tau_tree.h"
 
@@ -30,7 +31,8 @@ namespace idni::tau_lang {
 /// `--max-constant-size` or the REPL option `maxconstantsize`. Declared here
 /// rather than in solver.h: the verdict fingerprint of satisfiability.tmpl.h
 /// reads it, and that header cannot include solver.h.
-inline size_t max_constant_size = 2000;
+/// Environment fallback `TAU_MAX_CONSTANT_SIZE`.
+inline env_limit<size_t> max_constant_size{ "TAU_MAX_CONSTANT_SIZE", 2000 };
 
 /**
  * @typedef typed_nso

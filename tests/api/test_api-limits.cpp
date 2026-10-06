@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <set>
+#include <string>
 
 using tau_api = api<node_t>;
 
@@ -14,13 +16,13 @@ TEST_SUITE("Tau API - runtime limits") {
 	// default turns a non-converging spec into a hang. Keep this case
 	// first so it observes the shipped values, not another case's leftovers.
 	TEST_CASE("temporal caps ship finite defaults") {
-		CHECK( max_fixpoint_steps == 500 );
-		CHECK( max_flag_search_steps == 500 );
+		CHECK( tau_api::get_max_fixpoint_steps() == 500 );
+		CHECK( tau_api::get_max_flag_search_steps() == 500 );
 	}
 
 	// Raw-stored size_t caps: 0 means unlimited and is stored as 0.
 	TEST_CASE("plain caps write their globals verbatim") {
-		struct row { void (*set)(size_t); size_t* global; };
+		struct row { void (*set)(size_t); env_limit<size_t>* global; };
 		const row rows[] = {
 			{ &tau_api::set_block_squeeze_cap,   &block_squeeze_cap },
 			{ &tau_api::set_max_fixpoint_steps,  &max_fixpoint_steps },
@@ -36,25 +38,21 @@ TEST_SUITE("Tau API - runtime limits") {
 		for (const row& r : rows) {
 			const size_t saved = *r.global;
 			r.set(77);
-			CHECK( *r.global == 77 );
+			CHECK( r.global->get() == 77 );
 			r.set(0);
-			CHECK( *r.global == 0 );
+			CHECK( r.global->get() == 0 );
 			*r.global = saved;
 		}
 	}
 
-	// max_blast_reentry_depth (antiprenexing/antiprenexing.tmpl.h) is now
-	// reached only through bv's own bv-blastdepth REPL/CLI option, not
-	// through the api -- set_max_blast_reentry_depth was removed. Set the
-	// global directly, the same "raw-stored, verbatim" contract the loop
-	// above checks for its siblings, the way tests/test_init.h already
-	// sets preprocessing/preprocess_placement globals directly.
+	// max_blast_reentry_depth (antiprenexing/antiprenexing.h) is bv's
+	// bv-blastdepth CLI/REPL option, and the api reaches it in every pack.
 	TEST_CASE("max_blast_reentry_depth writes its global verbatim") {
 		const size_t saved = max_blast_reentry_depth;
-		max_blast_reentry_depth = 77;
-		CHECK( max_blast_reentry_depth == 77 );
-		max_blast_reentry_depth = 0;
-		CHECK( max_blast_reentry_depth == 0 );
+		tau_api::set_max_blast_reentry_depth(77);
+		CHECK( tau_api::get_max_blast_reentry_depth() == 77 );
+		tau_api::set_max_blast_reentry_depth(0);
+		CHECK( tau_api::get_max_blast_reentry_depth() == 0 );
 		max_blast_reentry_depth = saved;
 	}
 
@@ -63,14 +61,17 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t s1 = block_boole_max_splits;
 		const size_t s2 = block_max_rounds;
 		tau_api::set_block_max_splits(512);
-		CHECK( block_boole_max_splits == 512 );
+		CHECK( block_boole_max_splits.get() == 512 );
 		tau_api::set_block_max_splits(0);
-		CHECK( block_boole_max_splits
+		CHECK( block_boole_max_splits.get()
 			== std::numeric_limits<size_t>::max() );
+		CHECK( tau_api::get_block_max_splits() == 0 );
 		tau_api::set_block_max_rounds(33);
-		CHECK( block_max_rounds == 33 );
+		CHECK( block_max_rounds.get() == 33 );
 		tau_api::set_block_max_rounds(0);
-		CHECK( block_max_rounds == std::numeric_limits<size_t>::max() );
+		CHECK( block_max_rounds.get()
+			== std::numeric_limits<size_t>::max() );
+		CHECK( tau_api::get_block_max_rounds() == 0 );
 		block_boole_max_splits = s1;
 		block_max_rounds = s2;
 	}
@@ -428,7 +429,7 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t saved_atoms = bv_defelim_max_atoms;
 		CHECK( tau_api::set_ba_option("bv-defelim-max-atoms", 5)
 			.value() == 5 );
-		CHECK( bv_defelim_max_atoms == 5 );
+		CHECK( bv_defelim_max_atoms.get() == 5 );
 		bv_defelim_max_atoms = saved_atoms;
 
 		// bv-max-width ignores 0: the value in force is reported back.
@@ -446,9 +447,9 @@ TEST_SUITE("Tau API - runtime limits") {
 		using bv_descriptor = ba_descriptor<bv, node_t>;
 		const size_t saved = bv_case_split_max_tests;
 		bv_descriptor::set_case_split_max_tests_option(3);
-		CHECK( bv_case_split_max_tests == 3 );
+		CHECK( bv_case_split_max_tests.get() == 3 );
 		bv_descriptor::set_case_split_max_tests_option(0);
-		CHECK( bv_case_split_max_tests
+		CHECK( bv_case_split_max_tests.get()
 			== std::numeric_limits<size_t>::max() );
 		bv_case_split_max_tests = saved;
 	}
@@ -460,13 +461,15 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t gm = interpreter<node_t>::gc_min_size;
 		const double gf = interpreter<node_t>::gc_growth_factor;
 		tau_api::set_spec_size_warn(4096);
-		CHECK( interpreter<node_t>::spec_size_warn_threshold == 4096 );
+		CHECK( interpreter<node_t>::spec_size_warn_threshold.get() == 4096 );
 		tau_api::set_max_revision_alts(3);
-		CHECK( interpreter<node_t>::max_revision_alts == 3 );
+		CHECK( interpreter<node_t>::max_revision_alts.get() == 3 );
 		tau_api::set_gc_min_size(512);
-		CHECK( interpreter<node_t>::gc_min_size == 512 );
+		CHECK( interpreter<node_t>::gc_min_size.get() == 512 );
 		tau_api::set_gc_growth_factor(2.5);
-		CHECK( interpreter<node_t>::gc_growth_factor == doctest::Approx(2.5) );
+		CHECK( interpreter<node_t>::gc_growth_factor.get()
+			== doctest::Approx(2.5) );
+		CHECK( tau_api::get_gc_growth_factor() == doctest::Approx(2.5) );
 		interpreter<node_t>::spec_size_warn_threshold = sw;
 		interpreter<node_t>::max_revision_alts = ra;
 		interpreter<node_t>::gc_min_size = gm;
@@ -570,5 +573,110 @@ TEST_SUITE("Tau API - runtime limits") {
 		tau_api::set_indenting(!pretty_printer_indenting);
 		CHECK( cache.contains(key) );
 		cache.clear();
+	}
+
+	// Every count limit the bindings enumerate reads back what its setter
+	// wrote, through the getter of the same name.
+	TEST_CASE("every count limit round-trips through its getter") {
+		const auto limits = tau_api::count_limits();
+		CHECK( limits.size() >= 37 );
+		for (const auto& l : limits) {
+			CAPTURE( l.name );
+			const size_t saved = l.get();
+			l.set(7);
+			CHECK( l.get() == 7 );
+			l.set(saved);
+			CHECK( l.get() == saved );
+		}
+	}
+
+	// The names follow the setters, so a binding can build set_<name> and
+	// get_<name> from them.
+	TEST_CASE("count limit names are unique and name a setter") {
+		std::set<std::string> seen;
+		for (const auto& l : tau_api::count_limits())
+			CHECK( seen.insert(l.name).second );
+		for (const char* n : { "max_fixpoint_steps", "ltl_mealy_max_states",
+			"ltl_mealy_max_edges", "compile_max_table_edges",
+			"ltl_max_observations", "ltl_data_game_max_combinations",
+			"bf_dependence_max_nodes", "max_blast_reentry_depth" })
+		{
+			CAPTURE( n );
+			CHECK( seen.contains(n) );
+		}
+	}
+
+	TEST_CASE("the limits that are not a count read back") {
+		const long to = ltl_timeout_sec_param;
+		const std::string alg = ltl_algorithm_param;
+		tau_api::set_ltl_timeout_sec(30);
+		CHECK( tau_api::get_ltl_timeout_sec() == 30 );
+		tau_api::set_ltl_timeout_sec(0);
+		CHECK( tau_api::get_ltl_timeout_sec() == 0 );
+		tau_api::set_ltl_algorithm("d");
+		CHECK( tau_api::get_ltl_algorithm() == "D" );
+		tau_api::set_ltl_algorithm("auto");
+		CHECK( tau_api::get_ltl_algorithm() == "auto" );
+		ltl_timeout_sec_param = to;
+		ltl_algorithm_param = alg;
+	}
+
+	// The observation cap is at most its hard bound, and 0 means that bound.
+	TEST_CASE("ltl observation cap clamps to its hard bound") {
+		const long saved = ltl_max_observations_param;
+		tau_api::set_ltl_max_observations(5);
+		CHECK( tau_api::get_ltl_max_observations() == 5 );
+		tau_api::set_ltl_max_observations(0);
+		CHECK( tau_api::get_ltl_max_observations()
+			== ltl_max_observations_hard );
+		tau_api::set_ltl_max_observations(1000);
+		CHECK( tau_api::get_ltl_max_observations()
+			== ltl_max_observations_hard );
+		ltl_max_observations_param = saved;
+	}
+
+	TEST_CASE("the new verdict caps are part of the budget fingerprint") {
+		const long s1 = ltl_max_observations_param;
+		const long s2 = ltl_data_game_max_combinations_param;
+		const size_t base = verdict_budget_fingerprint<node_t>();
+		tau_api::set_ltl_max_observations(3);
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		ltl_max_observations_param = s1;
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
+		tau_api::set_ltl_data_game_max_combinations(5);
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		ltl_data_game_max_combinations_param = s2;
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
+	}
+
+	TEST_CASE("an env_limit resolves option, environment, default") {
+		setenv("TAU_TEST_ENV_LIMIT_A", "17", 1);
+		env_limit<size_t> a{ "TAU_TEST_ENV_LIMIT_A", 5 };
+		CHECK( a.get() == 17 );
+		a = 3;
+		CHECK( a.get() == 3 );
+		a.unset();
+		CHECK( a.get() == 17 );
+		unsetenv("TAU_TEST_ENV_LIMIT_A");
+		env_limit<size_t> b{ "TAU_TEST_ENV_LIMIT_B", 5 };
+		CHECK( b.get() == 5 );
+		setenv("TAU_TEST_ENV_LIMIT_C", "abc", 1);
+		env_limit<size_t> c{ "TAU_TEST_ENV_LIMIT_C", 5 };
+		CHECK( c.get() == 5 );
+		setenv("TAU_TEST_ENV_LIMIT_D", "0", 1);
+		env_limit<size_t> d{ "TAU_TEST_ENV_LIMIT_D", 5,
+			env_zero::unlimited };
+		CHECK( d.get() == std::numeric_limits<size_t>::max() );
+		env_limit<size_t> e{ "TAU_TEST_ENV_LIMIT_D", 5,
+			env_zero::keep_default };
+		CHECK( e.get() == 5 );
+		env_limit<size_t> f{ "TAU_TEST_ENV_LIMIT_D", 5 };
+		CHECK( f.get() == 0 );
+		setenv("TAU_TEST_ENV_LIMIT_E", "2.5", 1);
+		env_limit<double> g{ "TAU_TEST_ENV_LIMIT_E", 1.5 };
+		CHECK( g.get() == doctest::Approx(2.5) );
+		for (const char* v : { "TAU_TEST_ENV_LIMIT_C",
+			"TAU_TEST_ENV_LIMIT_D", "TAU_TEST_ENV_LIMIT_E" })
+				unsetenv(v);
 	}
 }

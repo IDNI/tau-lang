@@ -439,6 +439,21 @@ void pack_set_ba_decision_pins(size_t n) {
 }
 
 /**
+ * @brief Read the cap on pinned decided rows, owned by tau_ba.h.
+ *
+ * Optional: a pack without tau pins nothing, so 0 is the answer.
+ */
+template <typename Node>
+size_t pack_ba_decision_pins() {
+	size_t n = 0;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_decision_pins<Node, BA>)
+			n = ba_descriptor<BA, Node>::ba_decision_pins();
+	});
+	return n;
+}
+
+/**
  * @brief Read tau's OWN component-factoring switch, owned by tau_ba.h.
  *
  * Optional: a pack without tau declares nothing, so `false` is the answer --

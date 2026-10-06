@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU__TAU_BA_H__
 
 #include "tau_tree.h"
+#include "env_limits.h"
 #include "tau_diagnostics.h"
 #include "splitter_types.h"
 #include "splitter.h"
@@ -46,7 +47,8 @@ inline bool ba_component_factoring = true;
 /// re-decided at the next step (GitHub #92). 0 disables the pinning; set via
 /// api::set_ba_decision_pins, --ba-decision-pins, or the REPL option
 /// decisionpins.
-inline size_t ba_decision_pins = 4096;
+/// Environment fallback `TAU_BA_DECISION_PINS`.
+inline env_limit<size_t> ba_decision_pins{ "TAU_BA_DECISION_PINS", 4096 };
 
 /// Misses of the cached is_zero/is_one predicate (decisions computed rather
 /// than found), for tests and diagnostics.

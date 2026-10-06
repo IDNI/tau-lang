@@ -27,6 +27,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "env_limits.h"
 #include "tau_diagnostics.h"
 #include "eliminability.h"
 #include "block_atom_profile.h"
@@ -51,7 +52,8 @@ namespace idni::tau_lang {
 /// other two knobs are only ever touched from core (`api.tmpl.h`,
 /// `repl_evaluator.tmpl.h`), so they have no such cross-module need and stay
 /// put.
-inline size_t max_blast_reentry_depth = 0;
+/// Environment fallback `TAU_BV_BLASTDEPTH`, named after the option.
+inline env_limit<size_t> max_blast_reentry_depth{ "TAU_BV_BLASTDEPTH", 0 };
 
 /**
  * @brief The anti-prenex pipeline: push every quantifier as far inward as

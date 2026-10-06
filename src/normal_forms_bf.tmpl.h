@@ -3,10 +3,20 @@
 // normal_forms_bf.tmpl.h - BF simplification: syntactic simplification, squeeze_absorb
 // Split from normal_forms.tmpl.h for readability.
 
+#include "env_limits.h"
+
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "anti_prenex"
+
+/// Cap on the BDD nodes `bf_var_dependence` builds before it answers
+/// `unknown`, which leaves the variable to the slower simplifications;
+/// 0 = unlimited. Set via `--bf-dependence-max-nodes`, REPL
+/// `bfdependencemaxnodes`, `api::set_bf_dependence_max_nodes`, or the
+/// environment variable `TAU_BF_DEPENDENCE_MAX_NODES` (default 65536).
+inline env_limit<size_t> bf_dependence_max_nodes{
+	"TAU_BF_DEPENDENCE_MAX_NODES", size_t{1} << 16 };
 
 /// What bf_var_dependence could establish about a term and a variable.
 enum class bf_dependence { unknown, depends, zero, one };
@@ -17,8 +27,8 @@ enum class bf_dependence { unknown, depends, zero, one };
  * Builds a reduced ordered BDD of @p term with @p var as the top BDD variable:
  * the term depends on @p var (as a Boolean function) iff the root tests it,
  * and is constant iff the root is a terminal. Only terms built from 0, 1,
- * variables, ', &, | and ^ are handled. Anything else, or a BDD larger than a
- * fixed cap, answers `unknown`.
+ * variables, ', &, | and ^ are handled. Anything else, or a BDD larger than
+ * `bf_dependence_max_nodes`, answers `unknown`.
  * @param term A bf term
  * @param var The variable wrapped in a bf node, as syntactic_variable_simplification
  * substitutes it
@@ -27,7 +37,7 @@ enum class bf_dependence { unknown, depends, zero, one };
 template<NodeType node>
 bf_dependence bf_var_dependence(tref term, tref var) {
 	using tau = tree<node>;
-	static constexpr size_t cap = 1 << 16;
+	const size_t cap = bf_dependence_max_nodes;
 	// node 0 is the false terminal, node 1 the true terminal
 	struct bdd_node { size_t v, lo, hi; };
 	std::vector<bdd_node> nodes{ { SIZE_MAX, 0, 0 }, { SIZE_MAX, 1, 1 } };
@@ -79,7 +89,7 @@ bf_dependence bf_var_dependence(tref term, tref var) {
 		else if (t.child_is(tau::bf_xor))
 			r = apply(2, build(t[0].first()), build(t[0].second()));
 		else return failed = true, 0;
-		if (nodes.size() > cap) failed = true;
+		if (cap && nodes.size() > cap) failed = true;
 		done.emplace(n, r);
 		return r;
 	};

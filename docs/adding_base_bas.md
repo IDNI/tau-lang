@@ -220,6 +220,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
 | `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
+| `set_ba_decision_pins(size_t)`, `ba_decision_pins()` | your own cap on the decided rows kept alive across a sweep; today only the wrapper declares one | every declarer / the declarer's, 0 when none |
 | `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type | owner |
 | `uses_oracle` | deciding a question leaves the process, so comparison-based checks (the conformance laws) skip you; absent means decided here | per BA |
 | `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one, returned as a `result`; required only when `atomless`, though a BA that is not may still provide them (qlt does). For a BA without them the dispatcher returns the element itself / `nullptr`, so a caller checks `pack_type_is_atomless` before relying on a proper sub-element | the constant's own alternative / owner |
@@ -261,13 +262,17 @@ value. A switch that gates a preprocessing pass also needs core's master
 
 A `count` option is written back only when its flag is actually given on the
 command line, so a getter is free to resolve an environment fallback of its
-own and the CLI will not shadow it with the option's default. Read the
-variable in the getter with `env_limit_count` (`env_limits.h`), keep the
-setter writing a parameter that the getter prefers when set, and the option
-then resolves option > environment > default like core's own limits do;
-`qlt-t3-cap` (`TAU_QLT_T3_CAP`) is the example. Name the default in the help
-string: the CLI registers the option with an empty default, so `--help` shows
-the help string alone.
+own and the CLI will not shadow it with the option's default. Every count
+option has one, named `TAU_<FAMILY>_<NAME>` with dashes as underscores
+(`bv-defelim-max-atoms` reads `TAU_BV_DEFELIM_MAX_ATOMS`). The shortest way is
+to store the option in an `env_limit<size_t>` (`env_limits.h`): the setter
+assigns it, the getter reads it, and it resolves option > environment >
+default like core's own limits do (`bv_defelim_max_atoms` is the example).
+A getter that must re-read the variable on every call reads it with
+`env_limit_count` instead and keeps the setter writing a parameter it prefers
+when set (`qlt-t3-cap`, `TAU_QLT_T3_CAP`). Name the variable and the default
+in the help string: the CLI registers the option with an empty default, so
+`--help` shows the help string alone.
 
 ### Rewrite hooks
 

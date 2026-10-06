@@ -1660,6 +1660,13 @@ inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	if (x == "ltlclosedregionstimeout")  return ltl_closed_regions_timeout_opt;
 	if (x == "ltldatagamemaxnodes")      return ltl_data_game_max_nodes_opt;
 	if (x == "ltldatagamemaxmemo")       return ltl_data_game_max_memo_opt;
+	if (x == "ltldatagamemaxcombinations")
+		return ltl_data_game_max_combinations_opt;
+	if (x == "ltlmaxobservations")       return ltl_max_observations_opt;
+	if (x == "ltlmealymaxstates")        return ltl_mealy_max_states_opt;
+	if (x == "ltlmealymaxedges")         return ltl_mealy_max_edges_opt;
+	if (x == "compilemaxtableedges")     return compile_max_table_edges_opt;
+	if (x == "bfdependencemaxnodes")     return bf_dependence_max_nodes_opt;
 	err << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1741,6 +1748,10 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	// directly would otherwise be misreported here. Both "unlimited"
 	// representations print alike: 0 for the caps and SIZE_MAX for the
 	// two decrementing block budgets.
+	// Resolve every limit first: one whose environment variable is garbage
+	// warns on its first read, and that warning must not split a line.
+	for (const auto& l : api<node>::count_limits()) l.get();
+	api<node>::get_gc_growth_factor();
 	auto climit = count_limit_str;
 	std::map<repl_option, std::function<void()>> limit_printers = {
 	{ block_max_splits_opt, [climit, this]() {
@@ -1814,6 +1825,24 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "ltldatagamemaxnodes: " << climit(ltl_data_game_max_nodes()) << "\n"; } },
 	{ ltl_data_game_max_memo_opt, [climit, this]() {
 		out << "ltldatagamemaxmemo:  " << climit(ltl_data_game_max_memo()) << "\n"; } },
+	{ ltl_data_game_max_combinations_opt, [climit, this]() {
+		out << "ltldatagamemaxcombinations: "
+			<< climit(ltl_data_game_max_combinations()) << "\n"; } },
+	{ ltl_max_observations_opt, [this]() {
+		out << "ltlmaxobservations:  " << ltl_max_observations() << "\n"; } },
+	// raw counts: 0 builds no view / carries no table, not unlimited
+	{ ltl_mealy_max_states_opt, [this]() {
+		out << "ltlmealymaxstates:   "
+			<< data_game_mealy_max_states.get() << "\n"; } },
+	{ ltl_mealy_max_edges_opt, [this]() {
+		out << "ltlmealymaxedges:    "
+			<< data_game_mealy_max_edges.get() << "\n"; } },
+	{ compile_max_table_edges_opt, [this]() {
+		out << "compilemaxtableedges: "
+			<< compile_max_table_edges.get() << "\n"; } },
+	{ bf_dependence_max_nodes_opt, [climit, this]() {
+		out << "bfdependencemaxnodes: "
+			<< climit(bf_dependence_max_nodes) << "\n"; } },
 	{ tref_budget_opt, [climit, this]() {
 		out << "trefbudget:          " << climit(tref_budget())
 			<< " (live: " << api<node>::tref_count() << ")\n"; } },
@@ -2034,6 +2063,19 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_ltl_data_game_max_nodes(*n); } },
 	{ ltl_data_game_max_memo_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_data_game_max_memo(*n); } },
+	{ ltl_data_game_max_combinations_opt, [&]() {
+		if (auto n = str2count(); n)
+			api<node>::set_ltl_data_game_max_combinations(*n); } },
+	{ ltl_max_observations_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_max_observations(*n); } },
+	{ ltl_mealy_max_states_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_mealy_max_states(*n); } },
+	{ ltl_mealy_max_edges_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_mealy_max_edges(*n); } },
+	{ compile_max_table_edges_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_compile_max_table_edges(*n); } },
+	{ bf_dependence_max_nodes_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_bf_dependence_max_nodes(*n); } },
 	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_tref_budget(*n); } },
 	{ tref_budget_soft_opt, [&]() { if (auto n = str2count(); n)
@@ -2154,10 +2196,10 @@ void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
 	auto [family, name] = split_ba_option_name(dotted);
 	const ba_option* o = resolve_ba_option(family, name);
 	if (!o) return;
-	out << family << "-" << name << ": "
-		<< (o->kind == ba_option_kind::flag
-			? pbool[o->get_flag()] : count_limit_str(o->get_count()))
-		<< "\n";
+	// read before printing: a first read may warn about its variable
+	const std::string v = o->kind == ba_option_kind::flag
+		? pbool[o->get_flag()] : count_limit_str(o->get_count());
+	out << family << "-" << name << ": " << v << "\n";
 }
 
 template <typename... BAs>
@@ -2540,7 +2582,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	static const std::string numeric_options =
 		"and the numeric limit options, set with `set <option> <n>` "
 		"(0 = unlimited;\nspecsizewarn: 0 = off; gcgrowth <= 0 disables "
-		"gc; each mirrors the CLI option\nof the same meaning):\n"
+		"gc; each mirrors the CLI option\nof the same meaning, and until "
+		"it is set reads the TAU_* variable `tau --help`\nnames for it):\n"
 		"  <option>               <description>                        <default>\n"
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
@@ -2574,7 +2617,13 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n"
 		"  ltlclosedregionstimeout data game on closed regions (s)     20\n"
 		"  ltldatagamemaxnodes    data-game BDD live nodes             8388608\n"
-		"  ltldatagamemaxmemo     data-game BDD memo entries           33554432\n";
+		"  ltldatagamemaxmemo     data-game BDD memo entries           33554432\n"
+		"  ltldatagamemaxcombinations data-game tabulated values       4096\n"
+		"  ltlmaxobservations     observations assumed consistent (<=30) 8\n"
+		"  ltlmealymaxstates      Mealy view states (0 = no view)      4096\n"
+		"  ltlmealymaxedges       Mealy view edges (0 = no view)       65536\n"
+		"  compilemaxtableedges   edges compiled as a table (0 = none) 400\n"
+		"  bfdependencemaxnodes   bf variable-dependence BDD nodes     65536\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts

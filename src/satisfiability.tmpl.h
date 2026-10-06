@@ -4,6 +4,7 @@
 #include "normalizer.h"
 #include "ltl_aba.h"
 #include "solver_types.h"
+#include "env_limits.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "heuristics/preprocess_placement.h"
 
@@ -31,14 +32,17 @@ inline static bool use_debug_output_in_sat = false;
 /// pre-parameter constant had): reaching it is an error without a verdict,
 /// where an unlimited run may hang `sat`/`run`/pointwise revision. Pass 0 to
 /// opt into unlimited. The CLI default in main.cpp must agree with this value.
-inline size_t max_fixpoint_steps = 500;
+/// Environment fallback `TAU_MAX_FIXPOINT_STEPS`.
+inline env_limit<size_t> max_fixpoint_steps{ "TAU_MAX_FIXPOINT_STEPS", 500 };
 
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
 /// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps`, and
 /// reaching it is likewise an error without a verdict. Shipped default 500
 /// (finite, see above); set via `--max-flag-search-steps`, REPL `flagsteps`,
 /// or `api::set_max_flag_search_steps`.
-inline size_t max_flag_search_steps = 500;
+/// Environment fallback `TAU_MAX_FLAG_SEARCH_STEPS`.
+inline env_limit<size_t> max_flag_search_steps{
+	"TAU_MAX_FLAG_SEARCH_STEPS", 500 };
 
 /**
  * @brief Fingerprint of every runtime parameter that can change a

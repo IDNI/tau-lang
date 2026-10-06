@@ -118,6 +118,61 @@ inline long ltl_data_game_max_nodes_param = -1;
 inline long ltl_data_game_max_memo_param = -1;
 
 /**
+ * @brief Most value combinations the data game tabulates for one comparison
+ * its circuits do not encode (`tabulate`); past it the comparison has no
+ * code, and the game falls back to formula regions or is undecided.
+ *
+ * Runtime parameter by policy (`--ltl-data-game-max-combinations`, REPL
+ * `set ltldatagamemaxcombinations`,
+ * `api::set_ltl_data_game_max_combinations`); 0 = unlimited. The sentinel
+ * -1 means "not set", in which case `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` is
+ * consulted and 4096 applies when that is absent too. Read through
+ * @ref ltl_data_game_max_combinations.
+ */
+inline long ltl_data_game_max_combinations_param = -1;
+
+/**
+ * @brief Most observation props whose impossible joint values the skeleton
+ * assumes away (`assume_observation_consistency`, 3^n feasibility checks);
+ * beyond it nothing is assumed, which leaves the environment moves no data
+ * produces.
+ *
+ * Runtime parameter by policy (`--ltl-max-observations`, REPL
+ * `set ltlmaxobservations`, `api::set_ltl_max_observations`). At most
+ * @ref ltl_max_observations_hard, and 0 means that bound. The sentinel -1
+ * means "not set", in which case `TAU_LTL_MAX_OBSERVATIONS` is consulted and
+ * 8 applies when that is absent too. Read through
+ * @ref ltl_max_observations.
+ */
+inline long ltl_max_observations_param = -1;
+
+/// Hard bound on @ref ltl_max_observations_param: the masks of the
+/// observations are `size_t` bit sets, and 3^30 checks is hopeless anyway.
+inline constexpr size_t ltl_max_observations_hard = 30;
+
+/// The bounds of the Mealy view a data-game strategy is played through
+/// (`code_strategy::build_mealy`); past either the moves are played directly,
+/// and 0 builds no view. Set via `--ltl-mealy-max-states` /
+/// `--ltl-mealy-max-edges`, REPL `ltlmealymaxstates` / `ltlmealymaxedges`,
+/// `api::set_ltl_mealy_max_states` / `api::set_ltl_mealy_max_edges`, or the
+/// environment variables `TAU_LTL_MEALY_MAX_STATES` (default 4096) and
+/// `TAU_LTL_MEALY_MAX_EDGES` (default 65536).
+inline env_limit<size_t> data_game_mealy_max_states{
+	"TAU_LTL_MEALY_MAX_STATES", 4096 };
+/// @copydoc data_game_mealy_max_states
+inline env_limit<size_t> data_game_mealy_max_edges{
+	"TAU_LTL_MEALY_MAX_EDGES", size_t{1} << 16 };
+
+/// The most edges of a Mealy view `tau gen` / `tau compile` carries as a
+/// table: past a few hundred edges the C++ compiler takes longer over the
+/// table than over the program that solves the spec as it runs. 0 carries
+/// none. Set via `--compile-max-table-edges`, REPL `compilemaxtableedges`,
+/// `api::set_compile_max_table_edges`, or the environment variable
+/// `TAU_COMPILE_MAX_TABLE_EDGES` (default 400).
+inline env_limit<size_t> compile_max_table_edges{
+	"TAU_COMPILE_MAX_TABLE_EDGES", 400 };
+
+/**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
  * assignments are enumerated as `1 << n`: a signed shift is undefined at
  * 31 and the enumeration is hopeless long before. Not tunable.
@@ -335,6 +390,35 @@ inline size_t ltl_data_game_max_memo() {
 	if (ltl_data_game_max_memo_param >= 0)
 		return (size_t) ltl_data_game_max_memo_param;
 	return env_limit_count("TAU_LTL_DATA_GAME_MAX_MEMO", size_t{1} << 25);
+}
+
+/**
+ * @brief Effective cap on the value combinations the data game tabulates per
+ * comparison (0 = unlimited).
+ *
+ * Precedence: @ref ltl_data_game_max_combinations_param when set (>= 0),
+ * else `TAU_LTL_DATA_GAME_MAX_COMBINATIONS`, else 4096.
+ */
+inline size_t ltl_data_game_max_combinations() {
+	if (ltl_data_game_max_combinations_param >= 0)
+		return (size_t) ltl_data_game_max_combinations_param;
+	return env_limit_count("TAU_LTL_DATA_GAME_MAX_COMBINATIONS", 4096);
+}
+
+/**
+ * @brief Effective cap on the observation props whose joint values are
+ * assumed consistent, within [1, @ref ltl_max_observations_hard].
+ *
+ * Precedence: @ref ltl_max_observations_param when set (>= 0), else
+ * `TAU_LTL_MAX_OBSERVATIONS`, else 8; 0 and values above the hard bound
+ * read as the hard bound.
+ */
+inline size_t ltl_max_observations() {
+	const size_t n = ltl_max_observations_param >= 0
+		? (size_t) ltl_max_observations_param
+		: env_limit_count("TAU_LTL_MAX_OBSERVATIONS", 8);
+	return n == 0 || n > ltl_max_observations_hard
+		? ltl_max_observations_hard : n;
 }
 
 /**

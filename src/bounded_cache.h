@@ -71,6 +71,7 @@
 
 #include <cstddef>
 #include <list>
+#include "env_limits.h"
 #include <map>
 #include <utility>
 
@@ -84,9 +85,10 @@ namespace idni::tau_lang {
  * (see `call_ltlsynt_game`). A cache constructed with `&cache_bound` reads
  * the current value on every insert, so `--cache-bound` / REPL `set
  * cachebound` / `api::set_cache_bound` take effect immediately. Runtime
- * parameter by policy; 0 = unbounded.
+ * parameter by policy; 0 = unbounded. Environment fallback
+ * `TAU_CACHE_BOUND`.
  */
-inline std::size_t cache_bound = 4096;
+inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
 
 /**
  * @brief std::map with a configurable max-size bound and FIFO eviction
@@ -123,6 +125,9 @@ struct bounded_cache {
 	/// every insert (see the class comment).
 	explicit bounded_cache(const std::size_t* runtime_bound)
 		: runtime_bound_(runtime_bound) {}
+	/// @brief Runtime mode over a limit with an environment fallback.
+	explicit bounded_cache(const env_limit<std::size_t>* runtime_limit)
+		: runtime_limit_(runtime_limit) {}
 
 	// --- queries ----------------------------------------------------
 
@@ -134,7 +139,8 @@ struct bounded_cache {
 	static constexpr std::size_t max_size() noexcept { return Max; }
 	/// @brief The bound in effect: the runtime pointee, else `Max`.
 	std::size_t bound() const noexcept {
-		return runtime_bound_ ? *runtime_bound_ : Max;
+		return runtime_limit_ ? runtime_limit_->get()
+			: runtime_bound_ ? *runtime_bound_ : Max;
 	}
 
 	/// @brief Lookup by key, as std::map::find.
@@ -228,7 +234,8 @@ private:
 	// Whether the FIFO queue is maintained at all: always in runtime
 	// mode (the bound can become non-zero later), only for Max != 0 in
 	// compile-time mode.
-	bool tracked() const noexcept { return Max != 0 || runtime_bound_; }
+	bool tracked() const noexcept { return Max != 0 || runtime_bound_
+		|| runtime_limit_; }
 
 	void on_insert(iterator it) {
 		if (!tracked()) return; // unbounded, compile-time mode
@@ -251,6 +258,7 @@ private:
 	std::list<iterator> order_;
 
 	const std::size_t* runtime_bound_ = nullptr;
+	const env_limit<std::size_t>* runtime_limit_ = nullptr;
 
 	std::size_t evictions_ = 0;
 };

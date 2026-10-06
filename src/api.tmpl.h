@@ -84,6 +84,7 @@ size_t semantic_options_fingerprint() {
 	mix(max_probe_steps);
 	mix(max_rewrite_rounds);
 	mix(max_simplify_rounds);
+	mix(bf_dependence_max_nodes);
 	mix((size_t) preprocess_placement);
 	mix((size_t) preprocess_method);
 	mix((size_t) solver_placement);
@@ -357,6 +358,39 @@ void api<node>::set_ltl_data_game_max_memo(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_data_game_max_combinations(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_game_max_combinations_param = (long) n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_max_observations(size_t n) {
+	option_change_guard<node> guard;
+	ltl_max_observations_param = (long) n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_mealy_max_states(size_t n) {
+	data_game_mealy_max_states = n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_mealy_max_edges(size_t n) {
+	data_game_mealy_max_edges = n;
+}
+
+template <NodeType node>
+void api<node>::set_compile_max_table_edges(size_t n) {
+	compile_max_table_edges = n;
+}
+
+template <NodeType node>
+void api<node>::set_bf_dependence_max_nodes(size_t n) {
+	option_change_guard<node> guard;
+	bf_dependence_max_nodes = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	option_change_guard<node> guard;
 	pwr_semantic_fallback = on;
@@ -438,6 +472,263 @@ std::vector<std::string> api<node>::ba_option_names() {
 	for (const auto& e : pack_ba_options<node>())
 		names.push_back(e.family + "-" + e.option.name);
 	return names;
+}
+
+namespace api_detail {
+
+// The budgets whose loops decrement them keep SIZE_MAX as "unlimited"; the
+// option surface reads it as 0.
+inline size_t cap_or_zero(size_t n) {
+	return n == std::numeric_limits<size_t>::max() ? 0 : n;
+}
+
+} // namespace api_detail
+
+template <NodeType node>
+size_t api<node>::get_block_max_splits() {
+	return api_detail::cap_or_zero(block_boole_max_splits);
+}
+
+template <NodeType node>
+size_t api<node>::get_block_max_rounds() {
+	return api_detail::cap_or_zero(block_max_rounds);
+}
+
+template <NodeType node>
+size_t api<node>::get_cqe_max_clauses() {
+	return api_detail::cap_or_zero(cqe_max_clauses);
+}
+
+template <NodeType node>
+size_t api<node>::get_lgrs_max_vars() {
+	return api_detail::cap_or_zero(lgrs_max_vars);
+}
+
+template <NodeType node>
+size_t api<node>::get_max_blast_reentry_depth() {
+	return max_blast_reentry_depth;
+}
+
+template <NodeType node>
+size_t api<node>::get_block_squeeze_cap() { return block_squeeze_cap; }
+
+template <NodeType node>
+size_t api<node>::get_max_fixpoint_steps() { return max_fixpoint_steps; }
+
+template <NodeType node>
+size_t api<node>::get_max_flag_search_steps() {
+	return max_flag_search_steps;
+}
+
+template <NodeType node>
+size_t api<node>::get_max_def_passes() { return max_def_passes; }
+
+template <NodeType node>
+size_t api<node>::get_max_enum_steps() { return max_enum_steps; }
+
+template <NodeType node>
+size_t api<node>::get_max_probe_steps() { return max_probe_steps; }
+
+template <NodeType node>
+size_t api<node>::get_max_rewrite_rounds() { return max_rewrite_rounds; }
+
+template <NodeType node>
+size_t api<node>::get_max_simplify_rounds() { return max_simplify_rounds; }
+
+template <NodeType node>
+size_t api<node>::get_gc_min_size() {
+	return interpreter<node>::gc_min_size;
+}
+
+template <NodeType node>
+double api<node>::get_gc_growth_factor() {
+	return interpreter<node>::gc_growth_factor;
+}
+
+template <NodeType node>
+size_t api<node>::get_tref_budget() { return tref_budget(); }
+
+template <NodeType node>
+size_t api<node>::get_tref_budget_soft_percent() {
+	return tref_budget_soft_percent();
+}
+
+template <NodeType node>
+size_t api<node>::get_spec_size_warn() {
+	return interpreter<node>::spec_size_warn_threshold;
+}
+
+template <NodeType node>
+size_t api<node>::get_max_revision_alts() {
+	return interpreter<node>::max_revision_alts;
+}
+
+template <NodeType node>
+size_t api<node>::get_max_consistency_subsets() {
+	return max_consistency_subsets();
+}
+
+template <NodeType node>
+size_t api<node>::get_cache_bound() { return cache_bound; }
+
+template <NodeType node>
+size_t api<node>::get_max_cover_products() { return max_cover_products(); }
+
+template <NodeType node>
+size_t api<node>::get_max_constant_size() { return max_constant_size; }
+
+template <NodeType node>
+long api<node>::get_ltl_timeout_sec() { return ltl_timeout_sec(); }
+
+template <NodeType node>
+std::string api<node>::get_ltl_algorithm() {
+	const std::string a = ltl_algorithm_choice();
+	return a.empty() ? "auto" : a;
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_qe_max_vars() { return ltl_qe_max_vars(); }
+
+template <NodeType node>
+size_t api<node>::get_ltl_hoa_max_states() { return ltl_hoa_max_states(); }
+
+template <NodeType node>
+size_t api<node>::get_ltl_guard_max_cubes() { return ltl_guard_max_cubes(); }
+
+template <NodeType node>
+size_t api<node>::get_ltl_max_refinement_rounds() {
+	return ltl_max_refinement_rounds();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_window_max_paths() {
+	return ltl_window_max_paths();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_closed_regions_timeout() {
+	return ltl_closed_regions_timeout();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_data_game_max_nodes() {
+	return ltl_data_game_max_nodes();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_data_game_max_memo() {
+	return ltl_data_game_max_memo();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_data_game_max_combinations() {
+	return ltl_data_game_max_combinations();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_max_observations() {
+	return ltl_max_observations();
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_mealy_max_states() {
+	return data_game_mealy_max_states;
+}
+
+template <NodeType node>
+size_t api<node>::get_ltl_mealy_max_edges() {
+	return data_game_mealy_max_edges;
+}
+
+template <NodeType node>
+size_t api<node>::get_compile_max_table_edges() {
+	return compile_max_table_edges;
+}
+
+template <NodeType node>
+size_t api<node>::get_bf_dependence_max_nodes() {
+	return bf_dependence_max_nodes;
+}
+
+template <NodeType node>
+size_t api<node>::get_ba_decision_pins() {
+	return pack_ba_decision_pins<node>();
+}
+
+template <NodeType node>
+std::span<const typename api<node>::count_limit> api<node>::count_limits() {
+	using a = api<node>;
+	static const count_limit limits[] = {
+		{ "block_max_splits", &a::set_block_max_splits,
+			&a::get_block_max_splits },
+		{ "block_max_rounds", &a::set_block_max_rounds,
+			&a::get_block_max_rounds },
+		{ "cqe_max_clauses", &a::set_cqe_max_clauses,
+			&a::get_cqe_max_clauses },
+		{ "lgrs_max_vars", &a::set_lgrs_max_vars, &a::get_lgrs_max_vars },
+		{ "max_blast_reentry_depth", &a::set_max_blast_reentry_depth,
+			&a::get_max_blast_reentry_depth },
+		{ "block_squeeze_cap", &a::set_block_squeeze_cap,
+			&a::get_block_squeeze_cap },
+		{ "max_fixpoint_steps", &a::set_max_fixpoint_steps,
+			&a::get_max_fixpoint_steps },
+		{ "max_flag_search_steps", &a::set_max_flag_search_steps,
+			&a::get_max_flag_search_steps },
+		{ "max_def_passes", &a::set_max_def_passes, &a::get_max_def_passes },
+		{ "max_enum_steps", &a::set_max_enum_steps, &a::get_max_enum_steps },
+		{ "max_probe_steps", &a::set_max_probe_steps,
+			&a::get_max_probe_steps },
+		{ "max_rewrite_rounds", &a::set_max_rewrite_rounds,
+			&a::get_max_rewrite_rounds },
+		{ "max_simplify_rounds", &a::set_max_simplify_rounds,
+			&a::get_max_simplify_rounds },
+		{ "gc_min_size", &a::set_gc_min_size, &a::get_gc_min_size },
+		{ "tref_budget", &a::set_tref_budget, &a::get_tref_budget },
+		{ "tref_budget_soft_percent", &a::set_tref_budget_soft_percent,
+			&a::get_tref_budget_soft_percent },
+		{ "spec_size_warn", &a::set_spec_size_warn, &a::get_spec_size_warn },
+		{ "max_revision_alts", &a::set_max_revision_alts,
+			&a::get_max_revision_alts },
+		{ "max_consistency_subsets", &a::set_max_consistency_subsets,
+			&a::get_max_consistency_subsets },
+		{ "cache_bound", &a::set_cache_bound, &a::get_cache_bound },
+		{ "max_cover_products", &a::set_max_cover_products,
+			&a::get_max_cover_products },
+		{ "max_constant_size", &a::set_max_constant_size,
+			&a::get_max_constant_size },
+		{ "ltl_qe_max_vars", &a::set_ltl_qe_max_vars,
+			&a::get_ltl_qe_max_vars },
+		{ "ltl_hoa_max_states", &a::set_ltl_hoa_max_states,
+			&a::get_ltl_hoa_max_states },
+		{ "ltl_guard_max_cubes", &a::set_ltl_guard_max_cubes,
+			&a::get_ltl_guard_max_cubes },
+		{ "ltl_max_refinement_rounds", &a::set_ltl_max_refinement_rounds,
+			&a::get_ltl_max_refinement_rounds },
+		{ "ltl_window_max_paths", &a::set_ltl_window_max_paths,
+			&a::get_ltl_window_max_paths },
+		{ "ltl_closed_regions_timeout", &a::set_ltl_closed_regions_timeout,
+			&a::get_ltl_closed_regions_timeout },
+		{ "ltl_data_game_max_nodes", &a::set_ltl_data_game_max_nodes,
+			&a::get_ltl_data_game_max_nodes },
+		{ "ltl_data_game_max_memo", &a::set_ltl_data_game_max_memo,
+			&a::get_ltl_data_game_max_memo },
+		{ "ltl_data_game_max_combinations",
+			&a::set_ltl_data_game_max_combinations,
+			&a::get_ltl_data_game_max_combinations },
+		{ "ltl_max_observations", &a::set_ltl_max_observations,
+			&a::get_ltl_max_observations },
+		{ "ltl_mealy_max_states", &a::set_ltl_mealy_max_states,
+			&a::get_ltl_mealy_max_states },
+		{ "ltl_mealy_max_edges", &a::set_ltl_mealy_max_edges,
+			&a::get_ltl_mealy_max_edges },
+		{ "compile_max_table_edges", &a::set_compile_max_table_edges,
+			&a::get_compile_max_table_edges },
+		{ "bf_dependence_max_nodes", &a::set_bf_dependence_max_nodes,
+			&a::get_bf_dependence_max_nodes },
+		{ "ba_decision_pins", &a::set_ba_decision_pins,
+			&a::get_ba_decision_pins },
+	};
+	return limits;
 }
 
 template <NodeType node>

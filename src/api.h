@@ -32,6 +32,8 @@
 #include "tau_memory_budget.h"
 #include "reset_hooks.h"
 
+#include <span>
+
 namespace idni::tau_lang {
 
 /// Operator-preference strengthening order for `api::apply_preferences`.
@@ -406,6 +408,48 @@ struct api {
 	 */
 	static void set_ltl_data_game_max_memo(size_t n);
 	/**
+	 * @brief Cap on the value combinations the data game tabulates for one
+	 * comparison its circuits do not encode
+	 * (`ltl_data_game_max_combinations_param`); past it the comparison has
+	 * no code. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` environment fallback (default
+	 * 4096).
+	 */
+	static void set_ltl_data_game_max_combinations(size_t n);
+	/**
+	 * @brief Cap on the observation props whose impossible joint values the
+	 * synthesis skeleton assumes away (`ltl_max_observations_param`); at
+	 * most 30, and 0 means 30. The parameter wins over the
+	 * `TAU_LTL_MAX_OBSERVATIONS` environment fallback (default 8).
+	 */
+	static void set_ltl_max_observations(size_t n);
+	/**
+	 * @brief Bounds of the Mealy view a data-game strategy is played
+	 * through (`data_game_mealy_max_states` / `data_game_mealy_max_edges`);
+	 * past either the moves are played directly, and 0 builds no view.
+	 * The parameters win over the `TAU_LTL_MEALY_MAX_STATES` (default
+	 * 4096) and `TAU_LTL_MEALY_MAX_EDGES` (default 65536) environment
+	 * fallbacks.
+	 */
+	static void set_ltl_mealy_max_states(size_t n);
+	/// @copydoc set_ltl_mealy_max_states
+	static void set_ltl_mealy_max_edges(size_t n);
+	/**
+	 * @brief Most edges of a Mealy view `tau gen` / `tau compile` carries
+	 * as a table (`compile_max_table_edges`); a larger strategy is solved
+	 * as the program runs. 0 carries none. The parameter wins over the
+	 * `TAU_COMPILE_MAX_TABLE_EDGES` environment fallback (default 400).
+	 */
+	static void set_compile_max_table_edges(size_t n);
+	/**
+	 * @brief Cap on the BDD nodes the syntactic variable simplification
+	 * builds to tell whether a Boolean function depends on a variable
+	 * (`bf_dependence_max_nodes`); past it the question is left open.
+	 * 0 = unlimited. The parameter wins over the
+	 * `TAU_BF_DEPENDENCE_MAX_NODES` environment fallback (default 65536).
+	 */
+	static void set_bf_dependence_max_nodes(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */
@@ -422,7 +466,8 @@ struct api {
 	/// constant/valid tests (tau_ba.tmpl.h). On by default.
 	static void set_ba_component_factoring(bool state);
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
-	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096.
+	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096, or the
+	/// `TAU_BA_DECISION_PINS` environment fallback.
 	static void set_ba_decision_pins(size_t n);
 	/**
 	 * @brief Set an option an algebra of the pack declares about itself,
@@ -444,6 +489,67 @@ struct api {
 	/// The `<family>-<option>` names of every BA-declared option of the
 	/// pack.
 	static std::vector<std::string> ba_option_names();
+
+	// -----------------------------------------------------------------------
+	// Runtime limits read back
+	// -----------------------------------------------------------------------
+	// Each getter returns the effective value of the limit its setter of the
+	// same name sets: the value set, else the limit's TAU_* environment
+	// fallback, else its default. A cap reads 0 when unlimited, as its
+	// setter takes it.
+	static size_t get_block_max_splits();
+	static size_t get_block_max_rounds();
+	static size_t get_cqe_max_clauses();
+	static size_t get_lgrs_max_vars();
+	static size_t get_max_blast_reentry_depth();
+	static size_t get_block_squeeze_cap();
+	static size_t get_max_fixpoint_steps();
+	static size_t get_max_flag_search_steps();
+	static size_t get_max_def_passes();
+	static size_t get_max_enum_steps();
+	static size_t get_max_probe_steps();
+	static size_t get_max_rewrite_rounds();
+	static size_t get_max_simplify_rounds();
+	static size_t get_gc_min_size();
+	static double get_gc_growth_factor();
+	static size_t get_tref_budget();
+	static size_t get_tref_budget_soft_percent();
+	static size_t get_spec_size_warn();
+	static size_t get_max_revision_alts();
+	static size_t get_max_consistency_subsets();
+	static size_t get_cache_bound();
+	static size_t get_max_cover_products();
+	static size_t get_max_constant_size();
+	/// The ltlsynt watchdog in seconds; 0 when it is off.
+	static long get_ltl_timeout_sec();
+	/// The omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or `"auto"`.
+	static std::string get_ltl_algorithm();
+	static size_t get_ltl_qe_max_vars();
+	static size_t get_ltl_hoa_max_states();
+	static size_t get_ltl_guard_max_cubes();
+	static size_t get_ltl_max_refinement_rounds();
+	static size_t get_ltl_window_max_paths();
+	static size_t get_ltl_closed_regions_timeout();
+	static size_t get_ltl_data_game_max_nodes();
+	static size_t get_ltl_data_game_max_memo();
+	static size_t get_ltl_data_game_max_combinations();
+	static size_t get_ltl_max_observations();
+	static size_t get_ltl_mealy_max_states();
+	static size_t get_ltl_mealy_max_edges();
+	static size_t get_compile_max_table_edges();
+	static size_t get_bf_dependence_max_nodes();
+	static size_t get_ba_decision_pins();
+
+	/// A numeric runtime limit addressed by name, as the bindings enumerate
+	/// them: `name` is its setter's and getter's name without the `set_` /
+	/// `get_` prefix.
+	struct count_limit {
+		const char* name;
+		void (*set)(size_t);
+		size_t (*get)();
+	};
+	/// Every numeric runtime limit with a `size_t` setter and getter above.
+	static std::span<const count_limit> count_limits();
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
 	/// Enable or disable ANSI colour in engine output, the same switch

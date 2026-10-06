@@ -317,6 +317,18 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_bitblast_max_nodes_option(size_t n) {
 		bv_bitblast_max_nodes = n;
 	}
+	static size_t get_blasting_max_nodes_option() {
+		return bv_blasting_max_nodes;
+	}
+	static void set_blasting_max_nodes_option(size_t n) {
+		bv_blasting_max_nodes = n;
+	}
+	static size_t get_bitblast_max_width_option() {
+		return bv_bitblast_max_width;
+	}
+	static void set_bitblast_max_width_option(size_t n) {
+		bv_bitblast_max_width = n;
+	}
 	static size_t get_solve_timeout_option() { return bv_solve_timeout; }
 	// the verdicts remembered under the old budget are dropped with it
 	static void set_solve_timeout_option(size_t n) {
@@ -337,8 +349,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `bv-definitional-elimination`, `bv-defelim-max-clauses`,
 	 * `bv-defelim-max-atoms`, `bv-defelim-max-subset`,
 	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
-	 * `bv-bitblast-max-nodes`, `bv-solve-timeout`, `bv-widening` and
-	 * `bv-max-width`.
+	 * `bv-blasting-max-nodes`, `bv-bitblast-max-nodes`,
+	 * `bv-bitblast-max-width`, `bv-solve-timeout`, `bv-widening` and
+	 * `bv-max-width`. Each count option `bv-<name>` falls back to the
+	 * environment variable `TAU_BV_<NAME>` until it is set.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -353,13 +367,15 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * the four `defelim-max-*` caps mirror `bv_definitional_elimination`
 	 * and its caps (heuristics/bv_definitional_elimination.h), read by
 	 * @ref eliminate_definitional_existentials. `quantifier-free-decision`
-	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h), and
-	 * `bitblast-max-nodes` its `bv_bitblast_max_nodes` budget and
-	 * `solve-timeout` its `bv_solve_timeout`.
+	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h),
+	 * `bitblast-max-nodes` and `bitblast-max-width` its
+	 * `bv_bitblast_max_nodes` and `bv_bitblast_max_width` budgets and
+	 * `solve-timeout` its `bv_solve_timeout`. `blasting-max-nodes` mirrors
+	 * `bv_blasting_max_nodes` (heuristics/bv_predicate_blasting.h).
 	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
 	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 14> options() {
+	static std::array<ba_option, 16> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -371,7 +387,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				get_blastdepth_option, set_blastdepth_option,
 				"cap blast-block re-entry nesting in anti-prenexing "
-				"(0 = unlimited)" },
+				"(default: TAU_BV_BLASTDEPTH or 0; 0 = unlimited)" },
 			{ "case-split", ba_option_kind::flag,
 				get_case_split_option, set_case_split_option,
 				nullptr, nullptr,
@@ -382,7 +398,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				get_case_split_max_tests_option,
 				set_case_split_max_tests_option,
 				"cap the constants a quantified bitvector variable may "
-				"be tested against for the case split (0 = unlimited)" },
+				"be tested against for the case split (default: "
+				"TAU_BV_CASE_SPLIT_MAX_TESTS or 0; 0 = unlimited)" },
 			{ "definitional-elimination", ba_option_kind::flag,
 				get_defelim_option, set_defelim_option,
 				nullptr, nullptr,
@@ -394,44 +411,63 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				get_defelim_max_clauses_option,
 				set_defelim_max_clauses_option,
 				"cap the clauses a conjunct is flattened into for the "
-				"definitional elimination (default 16, 0 = unlimited)" },
+				"definitional elimination (default: "
+				"TAU_BV_DEFELIM_MAX_CLAUSES or 16; 0 = unlimited)" },
 			{ "defelim-max-atoms", ba_option_kind::count,
 				nullptr, nullptr,
 				get_defelim_max_atoms_option, set_defelim_max_atoms_option,
 				"cap the guard atoms the definitional elimination "
-				"brute-forces over (default 18, at most 30)" },
+				"brute-forces over (default: TAU_BV_DEFELIM_MAX_ATOMS "
+				"or 18; at most 30, and 0 = 30)" },
 			{ "defelim-max-subset", ba_option_kind::count,
 				nullptr, nullptr,
 				get_defelim_max_subset_option,
 				set_defelim_max_subset_option,
 				"cap the clause-subset size searched for a total "
-				"definition (default 4, 0 = unlimited)" },
+				"definition (default: TAU_BV_DEFELIM_MAX_SUBSET or 4; "
+				"0 = unlimited)" },
 			{ "defelim-max-rounds", ba_option_kind::count,
 				nullptr, nullptr,
 				get_defelim_max_rounds_option,
 				set_defelim_max_rounds_option,
 				"cap the definitional-elimination rounds per existential "
-				"block (default 256, 0 = unlimited)" },
+				"block (default: TAU_BV_DEFELIM_MAX_ROUNDS or 256; "
+				"0 = unlimited)" },
 			{ "quantifier-free-decision", ba_option_kind::flag,
 				get_qf_decision_option, set_qf_decision_option,
 				nullptr, nullptr,
 				"decide a closed bitvector formula whose binders are all "
 				"of one kind quantifier-free (off by default)" },
+			{ "blasting-max-nodes", ba_option_kind::count,
+				nullptr, nullptr,
+				get_blasting_max_nodes_option,
+				set_blasting_max_nodes_option,
+				"cap the BDD nodes one bv predicate blasting may build "
+				"before it declines (default: "
+				"TAU_BV_BLASTING_MAX_NODES or 500000; 0 = unlimited)" },
+			{ "bitblast-max-width", ba_option_kind::count,
+				nullptr, nullptr,
+				get_bitblast_max_width_option,
+				set_bitblast_max_width_option,
+				"widest bit-vector a formula may hold to be decided on "
+				"its bits instead of by cvc5 (default: "
+				"TAU_BV_BITBLAST_MAX_WIDTH or 16; 0 = always cvc5)" },
 			{ "bitblast-max-nodes", ba_option_kind::count,
 				nullptr, nullptr,
 				get_bitblast_max_nodes_option,
 				set_bitblast_max_nodes_option,
 				"cap the BDD nodes in use at once when a bitvector "
-				"formula of at most 16 bits is decided on its bits, "
-				"before cvc5 takes it (default 1048576, 0 = always "
+				"formula of at most bv-bitblast-max-width bits is "
+				"decided on its bits, before cvc5 takes it (default: "
+				"TAU_BV_BITBLAST_MAX_NODES or 1048576; 0 = always "
 				"cvc5)" },
 			{ "solve-timeout", ba_option_kind::count,
 				nullptr, nullptr,
 				get_solve_timeout_option, set_solve_timeout_option,
 				"cap in seconds each quantified bitvector question "
 				"cvc5 decides, run in a separate process; past it the "
-				"answer is unknown (default 60, 0 = unbounded, in the "
-				"process)" },
+				"answer is unknown (default: TAU_BV_SOLVE_TIMEOUT or 60; "
+				"0 = unbounded, in the process)" },
 			{ "widening", ba_option_kind::flag,
 				get_widening_option, set_widening_option,
 				nullptr, nullptr,
@@ -440,8 +476,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 			{ "max-width", ba_option_kind::count,
 				nullptr, nullptr,
 				get_max_width_option, set_max_width_option,
-				"cap the width widening may compute up to (0 leaves the "
-				"cap unchanged)" },
+				"cap the width widening may compute up to (default: "
+				"TAU_BV_MAX_WIDTH or 1024; 0 leaves the cap unchanged)" },
 		}};
 	}
 

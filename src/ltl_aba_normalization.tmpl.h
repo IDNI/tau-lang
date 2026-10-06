@@ -2867,12 +2867,13 @@ static result<strategy_data_verdict> strategy_wins_on_data(
 // The observations are functions of the data, so a combination of their
 // values no data produces is not a move of the environment: it is assumed
 // away, as the minimal infeasible partial valuations G(!(...)) wrapped
-// around the skeleton. Beyond `max_observations` props nothing is assumed,
-// which only leaves the environment more choices.
+// around the skeleton. Beyond `ltl_max_observations()` props nothing is
+// assumed, which only leaves the environment more choices.
 template <NodeType node>
 static result<void> assume_observation_consistency(
-	ltl_aba_solution<node>& sol, size_t max_observations = 8)
+	ltl_aba_solution<node>& sol)
 {
+	const size_t max_observations = ltl_max_observations();
 	using tau = tree<node>;
 	result<void> r;
 	const auto& obs = sol.observation_props;

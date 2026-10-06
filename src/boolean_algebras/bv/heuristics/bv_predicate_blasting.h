@@ -21,6 +21,7 @@
 // reliably pulled in by tau_tree.h/tau_bdd.h, so name it explicitly rather
 // than depend on inclusion order elsewhere.
 #include "tau_diagnostics.h"
+#include "env_limits.h"
 // `preprocessing` and the preprocessing/solver placement parameters. They
 // belong here, and used to be spelled out here, but live in their own
 // dependency-free header so tests/test_init.h can apply environment
@@ -45,6 +46,13 @@ namespace idni::tau_lang {
 // NOT thread-safe, like `preprocessing` above: the tau library assumes
 // single-threaded access. Do not set it concurrently from multiple threads.
 inline bool bv_blasting = true;
+
+// Cap on the unique BDD nodes one predicate blasting may build; past it the
+// blasting declines and the formula takes the path a decline takes. 0 =
+// unlimited. The option `bv-blasting-max-nodes`, environment fallback
+// TAU_BV_BLASTING_MAX_NODES (default 500000).
+inline env_limit<size_t> bv_blasting_max_nodes{ "TAU_BV_BLASTING_MAX_NODES",
+	500'000 };
 
 // Forward declarations needed by wff_predicate_blasting/quantify_aux_vars
 // (bv_predicate_blasting.tmpl.h) to anti-prenex/eliminate its own

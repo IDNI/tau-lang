@@ -16,17 +16,13 @@
 
 #include "cpp_codegen.h"
 #include "definitions.h"
+#include "ltl_aba_limits.h"
 #include "self_exe_path.h"
 #include "tau_artifact_template.h"
 #include "tau_pack.h"
 #include "utility/escapes.h"
 
 namespace idni::tau_lang {
-
-// The most edges of a Mealy view `tau compile` carries as a table: past a
-// few hundred edges the C++ compiler takes longer over the table than over
-// the program that solves the spec as it runs.
-inline size_t compile_max_table_edges = 400;
 
 namespace compile_detail {
 
@@ -762,7 +758,7 @@ result<codegen_result> gen_spec(
 			for (const auto& es : run.cached_solution->aut.edges)
 				edges += es.size();
 		if (run.plays_data_game() && run.cached_solution && !revises
-			&& edges <= compile_max_table_edges)
+			&& edges <= compile_max_table_edges.get())
 				sol = run.cached_solution;
 		else solves_each_step = true;
 	}
