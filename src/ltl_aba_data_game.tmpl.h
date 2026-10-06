@@ -155,10 +155,15 @@ struct formula_regions {
 	std::map<tref, tref> normal;
 	std::optional<size_t> closed_type;
 
+	// `closed`: the type whose closed formulas decide the regions (see
+	// above); nullopt to normalize every region instead.
 	explicit formula_regions(const arena& ar,
 		std::optional<size_t> closed = std::nullopt)
 		: a(ar), closed_type(closed) {}
 
+	// `f` with its quantifiers eliminated, cached in `normal`; `f` itself
+	// with `closed_type`. `F` once the regions failed, and `F`, failing
+	// them, when the elimination fails.
 	tref norm(tref f) {
 		if (failed) return tau::_F();
 		const auto& t = tau::get(f);
@@ -192,6 +197,8 @@ struct formula_regions {
 		if (t.equals_F()) return false;
 		return pack_decide_closed<node>(*closed_type, q);
 	}
+	// The region operations data_game_solver calls: every position, none,
+	// intersection, union and difference, each result normalized.
 	tref top() { return tau::_T(); }
 	tref bottom() { return tau::_F(); }
 	tref conj(tref x, tref y) {
@@ -208,6 +215,8 @@ struct formula_regions {
 		return norm(tau::build_wff_and(x, tau::build_wff_neg(y)));
 	}
 
+	// Whether region `f` holds no position. An undecided check fails the
+	// regions and answers true.
 	bool empty(tref f) {
 		const auto& t = tau::get(f);
 		if (t.equals_F()) return true;
@@ -232,6 +241,9 @@ struct formula_regions {
 		rep.append(std::move(sat).report());
 		return empty;
 	}
+	// Whether the steps before step 0 can reach region `f` of the initial
+	// vertex (data_quantifier::reached_before_start); nullopt when
+	// undecided.
 	std::optional<bool> reached(tref f) {
 		if (!closed_type) {
 			auto v = dq.reached_before_start(f);
@@ -252,6 +264,11 @@ struct formula_regions {
 		return norm(tau::build_wff_and(e.label, tgt));
 	}
 
+	// The controllable predecessor of `Y` at vertex `i` for player `p`:
+	// the positions from which some edge (at p's vertex) or every edge (at
+	// the other player's) leads into `Y`, a move of the other player out of
+	// the subgame `G` not counting. The values the vertex picks are
+	// quantified: ex at p's vertex, all at the other's.
 	tref pre(int p, size_t i, const std::vector<tref>& Y,
 		const std::vector<tref>& G)
 	{
@@ -363,17 +380,23 @@ struct code_window {
 	std::map<std::pair<size_t, size_t>, int> fixed;
 	std::vector<uint32_t> shift;
 
+	// The variables of one bit layer: one per stream and step back.
 	uint32_t block() const {
 		return (uint32_t)((depth + 1) * streams.size());
 	}
+	// The variable of bit b of stream s at step t-k.
 	uint32_t var(size_t s, size_t k, size_t b) const {
 		return (uint32_t)(b * block() + k * streams.size() + s);
 	}
+	// The number of code bit variables; the relation variables follow.
 	uint32_t code_vars() const { return (uint32_t)(max_width * block()); }
+	// All variables: the code bits, then `lt` and `eq` per relation.
 	uint32_t vars() const {
 		return code_vars() + (uint32_t)(2 * rel_points.size());
 	}
+	// Whether the window codes any order relation.
 	bool has_order() const { return !rel_points.empty(); }
+	// The point of slot (stream s, step back k); SIZE_MAX when none.
 	size_t slot_point(size_t s, size_t k) const {
 		for (size_t p = 0; p < points.size(); ++p)
 			if (points[p].s == s && points[p].k == k) return p;
@@ -899,6 +922,7 @@ struct code_regions {
 			? max_nodes : data_bdd::max_ids, max_memo,
 			data_bdd::memo_policy::clear) {}
 
+	// The region operations data_game_solver calls, as in formula_regions.
 	region top() { return data_bdd::T; }
 	region bottom() { return data_bdd::F; }
 	region conj(region x, region y) { return check(bdd.conj(x, y)); }
@@ -907,6 +931,7 @@ struct code_regions {
 		return check(bdd.conj(x, bdd.neg(y)));
 	}
 	bool empty(region r) { return r == data_bdd::F; }
+	// `r`, failing the regions when the table is full.
 	region check(region r) {
 		if (bdd.full) failed = true;
 		return r;
@@ -1067,6 +1092,7 @@ struct code_regions {
 
 	using bits = bit_circuits::bits;
 
+	// The circuits of bit_circuits, built on this BDD.
 	bits add(const bits& x, const bits& y) {
 		return bit_circuits::add(bdd, x, y);
 	}
@@ -1318,6 +1344,8 @@ struct code_regions {
 		return true;
 	}
 
+	// The controllable predecessor, as formula_regions::pre. A shift the
+	// BDD cannot rename declines the regions.
 	region pre(int p, size_t i, const std::vector<region>& Y,
 		const std::vector<region>& G)
 	{
@@ -1342,6 +1370,7 @@ struct code_regions {
 		return check(body);
 	}
 
+	// The positions from which edge `j` of vertex `i` is taken into `Y`.
 	region move(size_t i, size_t j, const std::vector<region>& Y) {
 		const auto& e = a.v[i].edges[j];
 		region tgt = Y[e.dst];
@@ -1353,6 +1382,8 @@ struct code_regions {
 		return check(bdd.conj(labels[edge_base[i] + j], tgt));
 	}
 
+	// Whether, at each step before step 0 and whatever its inputs, some
+	// outputs reach region `r`; nullopt when the table fills.
 	std::optional<bool> reached(region r) {
 		for (size_t k = 1; k <= w.depth; ++k) {
 			r = quantify_step(r, k, false, true);
@@ -1385,6 +1416,8 @@ struct data_game_solver {
 	std::vector<int> priority, owner;
 	std::vector<size_t> edges;
 
+	// `rounds` caps the rounds of each attractor (0: no cap) and
+	// `keep_strategy` records the system's strategy.
 	data_game_solver(R& regions, const auto& arena, size_t rounds,
 		bool keep_strategy = false)
 		: r(regions), n(arena.v.size()), max_rounds(rounds),
@@ -1421,6 +1454,7 @@ struct data_game_solver {
 			s.held_moves.resize(moves);
 		}
 	};
+	// A frame that drops, when it closes, what was held after it opened.
 	frame enter() { return { *this, held.size(), held_moves.size() }; }
 
 	// Frees the nodes that neither the held regions nor those of the
@@ -1443,18 +1477,21 @@ struct data_game_solver {
 		});
 	}
 
+	// Empty moves for every edge of every system vertex when recording.
 	moves_t no_moves() const {
 		moves_t m(n);
 		if (record) for (size_t i = 0; i < n; ++i)
 			if (owner[i] == 1) m[i].assign(edges[i], r.bottom());
 		return m;
 	}
+	// Adds the moves of `from` to those of `to`, edge by edge.
 	void add_moves(moves_t& to, const moves_t& from) {
 		for (size_t i = 0; i < from.size(); ++i)
 			for (size_t j = 0; j < from[i].size(); ++j)
 				to[i][j] = r.disj(to[i][j], from[i][j]);
 	}
 
+	// Whether every region of `X` is empty.
 	bool empty(const std::vector<region>& X) {
 		for (const auto& x : X) if (!r.empty(x)) return false;
 		return true;
@@ -1519,6 +1556,7 @@ struct data_game_solver {
 		return Y;
 	}
 
+	// `X` minus `Y`, vertex by vertex.
 	std::vector<region> minus(const std::vector<region>& X,
 		const std::vector<region>& Y)
 	{
@@ -1637,6 +1675,8 @@ struct data_game_strategy {
 
 	virtual ~data_game_strategy() = default;
 
+	// Restarts the play at the initial vertex; the values before step 0
+	// are chosen again at the next step.
 	void reset() {
 		at = init;
 		ready = false;
@@ -1929,6 +1969,8 @@ protected:
 		return std::nullopt;
 	}
 
+	// The first vertex from `x` on that somebody picks at, following the
+	// single edge of the vertices nobody picks at.
 	size_t follow(size_t x) const {
 		while (v[x].picks < 0 && v[x].dst.size() == 1 && v[x].dst[0] != x)
 			x = v[x].dst[0];
@@ -1963,9 +2005,11 @@ struct code_strategy : data_game_strategy<node> {
 	std::vector<std::vector<data_bdd::id>> labels, moves;
 	data_bdd::id won_init = data_bdd::F;
 
+	// The strategy over window `win`, its regions held in `b`.
 	code_strategy(code_window win, data_bdd b)
 		: w(std::move(win)), bdd(std::move(b)) {}
 
+	// Builds the Mealy view; see the comment at its definition.
 	bool build_mealy(size_t max_states, size_t max_edges,
 		const std::vector<int>* from = nullptr);
 
@@ -2009,6 +2053,7 @@ protected:
 		return out;
 	}
 
+	// The complement of value `x`, normalized.
 	static result<tref> complement(tref x) {
 		return normalize_ba<node>(tau::build_bf_neg(x));
 	}
@@ -2176,6 +2221,8 @@ protected:
 		return true;
 	}
 
+	// The code of stream `s` at step back `k` in `bits`; an unknown bit
+	// reads as 0.
 	size_t code_of(const std::vector<int>& bits, size_t s, size_t k) const {
 		size_t c = 0;
 		for (size_t b = 0; b < w.streams[s].width; ++b)
@@ -3330,6 +3377,8 @@ protected:
 		return rewriter::replace<node>(f, m);
 	}
 
+	// The truth of `f` at the values of `win`; nullopt when the normalizer
+	// leaves it open.
 	std::optional<bool> truth(tref f, const window& win) {
 		auto n = normalize_non_temp<node>(at_step(f, win, 0));
 		if (!n.has_value() || !n.value()) {

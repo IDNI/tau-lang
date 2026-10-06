@@ -6,7 +6,19 @@
 namespace idni::tau_lang {
 
 
-// Can be used for Tau formula and Boolean function
+/**
+ * @brief Push one negation one level down, or desugar one connective.
+ *
+ * For a negated wff (`is_wff`) or bf (`!is_wff`) node, returns the dual of
+ * the negated connective with the negation moved onto its operands
+ * (De Morgan, quantifier, temporal, LTL, CTL* and comparison duals, and the
+ * sugar connectives). For a wff whose child is `->`, `<-`, `<->`, `^^` or
+ * `? :`, rebuilds it with the construction builders, which desugar it.
+ * @tparam node Tree node type.
+ * @tparam is_wff `true` for wff rules, `false` for bf rules.
+ * @param fm A `wff` or `bf` node.
+ * @return The rewritten node, or @p fm when no rule applies.
+ */
 template <NodeType node, bool is_wff>
 tref push_negation_one_in(tref fm) {
 	using tau = tree<node>;
@@ -144,7 +156,7 @@ tref push_negation_one_in(tref fm) {
 	return fm;
 }
 
-// Can be used for Tau formula and Boolean function
+/** @internal @copydoc push_negation_in @endinternal */
 template <NodeType node, bool is_wff>
 tref push_negation_in(tref fm) {
 	auto pn = [](tref n) {
@@ -157,7 +169,7 @@ tref push_negation_in(tref fm) {
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(pn);
 }
 
-// Conversion to dnf while applying reductions during the process
+/** @internal @copydoc to_dnf @endinternal */
 template <NodeType node, bool is_wff>
 result<tref> to_dnf(tref fm) {
 	using tau = tree<node>;
@@ -215,7 +227,9 @@ result<tref> to_dnf(tref fm) {
 	return r.with_value(out);
 }
 
-// Conversion of temporal layer to dnf
+// The temporal layer of fm in DNF: like to_dnf, but the descent stops at
+// every temporal quantifier, whose body is left as it is. A failed reduce
+// travels in the returned result.
 template <NodeType node>
 result<tref> temporal_layer_to_dnf(tref fm) {
 	using tau = tree<node>;
@@ -249,7 +263,7 @@ result<tref> temporal_layer_to_dnf(tref fm) {
 	return r.with_value(out);
 }
 
-// Conversion to cnf while applying reductions during the process
+/** @internal @copydoc to_cnf @endinternal */
 template <NodeType node, bool is_wff>
 result<tref> to_cnf(tref fm) {
 	using tau = tree<node>;
@@ -304,7 +318,17 @@ result<tref> to_cnf(tref fm) {
 	return r.with_value(out);
 }
 
-// Shift the lookback in a formula
+/**
+ * @brief Deepen the lookback of the io variables of a formula.
+ *
+ * Every non-initial io variable `x[t-k]` of @p io_vars is replaced in @p fm
+ * by `x[t-(k+shift)]`; initial conditions (`x[n]`) are kept.
+ * @param fm Formula to rewrite.
+ * @param io_vars The io variables of @p fm to shift.
+ * @param shift How many steps to add; @p fm is returned unchanged when it
+ *        is not positive.
+ * @return The rewritten formula.
+ */
 template <NodeType node>
 tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 	using tau = tree<node>;
@@ -327,6 +351,18 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 	return rewriter::replace<node>(fm, changes);
 }
 
+/**
+ * @brief Move the initial conditions of a formula later in time.
+ *
+ * Every initial io variable `x[n]` of @p io_vars is replaced in @p fm by
+ * `x[n+shift]`; other io variables are kept.
+ * @param fm Formula to rewrite.
+ * @param io_vars The io variables of @p fm to shift.
+ * @param shift How many steps to add; @p fm is returned unchanged when it
+ *        is not positive.
+ * @return The rewritten formula, or `F` when a time point would become
+ *         negative.
+ */
 template <NodeType node>
 tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 	using tau = tree<node>;
@@ -347,9 +383,16 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 	return rewriter::replace<node>(fm, changes);
 }
 
-// Conjunction of the bodies of two always statements. They form one always
-// part, enforced from its deepest lookback (README "Lookback
-// initialization"), so the bodies are conjoined as they stand.
+/**
+ * @brief Conjunction of the bodies of two always statements.
+ *
+ * They form one always part, enforced from its deepest lookback (README
+ * "Lookback initialization"), so the bodies are conjoined as they stand.
+ * @param fm1_aw An always statement or its body.
+ * @param fm2_aw An always statement or its body.
+ * @return The conjunction of the two bodies, without the `always` wrapper;
+ *         `T` and `F` operands are folded.
+ */
 template <NodeType node>
 tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	using tau = tree<node>;
@@ -367,7 +410,18 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	return tau::build_wff_and(fm1, fm2);
 }
 
-// Squeeze all equalities found in n
+/**
+ * @brief Squeeze the topmost equations of type @p type_id in @p n into one
+ * term.
+ *
+ * Each `f = g` becomes `f + g = 0` and the term is the disjunction of the
+ * sides, so it is 0 exactly when all those equations hold.
+ * @pre @p n is in NNF: an equation under a `!` would be read as positive
+ *      (asserted in DEBUG).
+ * @param n Formula to search.
+ * @param type_id Type id of the equations to collect.
+ * @return The squeezed `bf` term, or nullptr when @p n has no such equation.
+ */
 template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id) {
 	using tau = tree<node>;
@@ -407,6 +461,13 @@ tref squeeze_positives(tref n, size_t type_id) {
 	return nullptr;
 }
 
+/**
+ * @brief Replace every free variable of @p fm by @p val.
+ * @param fm Formula to rewrite.
+ * @param val Replacement; must not be a `bf` wrapper node (asserted in
+ *        DEBUG).
+ * @return The rewritten formula, or @p fm when it has no free variable.
+ */
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
 	DBG(assert(!is<node>(val, tree<node>::bf));)

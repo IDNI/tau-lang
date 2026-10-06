@@ -47,6 +47,10 @@ namespace idni::tau_lang {
  * anything not built by the make_term_* / make_bitvector_* builders), or
  * the BDD outgrows @p max_nodes, or the time @p deadline passes, which
  * sets @p late. nullopt says nothing about the formula.
+ * @param deadline Time after which the BDD stops and the call declines;
+ * no limit by default.
+ * @param late Optional out flag (may be null); on return it is true exactly
+ * when the BDD stopped at @p deadline.
  */
 inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 	size_t max_width, size_t max_nodes,

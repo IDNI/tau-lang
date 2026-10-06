@@ -8,6 +8,12 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Parse a qint literal (without the `{ }` wrapper).
+ * @param src Literal text.
+ * @return The element; a parse error naming the cause otherwise, with a
+ *         dedicated message for a bare number other than 0 / 1.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<qint> parse_qint_grammar(const std::string& src) {
@@ -41,6 +47,11 @@ result<qint> parse_qint_grammar(const std::string& src) {
 	return r.with_value(qval);
 }
 
+/**
+ * @brief Parse a qint constant source and pair it with the qint type.
+ * @param src Constant source; strip_ba_constant_source() removes its wrapper.
+ * @return The constant and qint_type(); a parse error otherwise.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<BAs...>::constant_with_type> parse_qint(

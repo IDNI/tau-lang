@@ -61,8 +61,8 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return merged_tid.value();
 	}
-	// LS-5: store under the ROOT -- type_id_of looks the root up, so a
-	// type attached to a non-root member would be silently invisible.
+	// Store under the ROOT -- type_id_of looks the root up, so a type
+	// attached to a non-root member would be silently invisible.
 	type_ids.insert_or_assign(root, tid);
 	return tid;
 }
@@ -240,13 +240,11 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 			keys.insert(typeable);
 		}
 	}
-	// Actually OPEN a scope, as the name says and as the callers (the
-	// functional rec_relation and fixpoint-fallback branches of
-	// infer_ba_types) require: both close() it on leave, and both used to
-	// assign into the CURRENT scope instead -- which leaked a functional
+	// Open a scope, as the callers (the functional rec_relation and
+	// fixpoint-fallback branches of infer_ba_types) require: both close() it
+	// on leave. Assigning into the current scope would leak a functional
 	// definition's argument types into the surrounding (global) scope, so
-	// an unrelated later use of the same variable name silently inherited
-	// the type (and, downstream, recurrence rules stopped matching).
+	// an unrelated later use of the same variable name would inherit them.
 	subtree_map<node, size_t> scoped;
 	for (auto t : keys) scoped[t] = inferred_type;
 	resolver.open(scoped);
@@ -266,9 +264,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 			if (!unified.has_value())
 				return inference_error{t, inferred_type, type};
 			else inferred_type = unified.value();
-			// LS-4 (TY-4): store the INFERRED type like the map
-			// variant does -- default_type discarded the more
-			// specific unification result.
+			// Store the type inferred so far, not default_type.
 			scoped[t] = inferred_type;
 		}
 	}

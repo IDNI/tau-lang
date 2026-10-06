@@ -11,15 +11,10 @@
  * included before any tau header) can read and write them and apply the
  * `TAU_CVC5_OPTIONS` / `TAU_SOLVER_PLACEMENT` environment overrides before
  * the first test runs. The option strings themselves are applied by
- * `config_cvc5_solver` (boolean_algebras/bv_ba.h), the single place every
+ * `config_cvc5_solver` (boolean_algebras/bv/bv_ba.h), the single place every
  * solver instance is configured. The api setters are `api::set_cvc5_options`
- * and `api::set_solver_placement`.
- *
- * `solver_site`/`solver_placement` moved here from
- * `heuristics/preprocess_placement.h` (which still includes this file, so
- * every existing user keeps seeing them unchanged): they select where cvc5
- * runs, which belongs with how it is configured, not with the preprocessing
- * knobs.
+ * and `api::set_solver_placement`. `heuristics/preprocess_placement.h`
+ * includes this file, so its users see `solver_site`/`solver_placement` too.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
@@ -41,14 +36,12 @@ namespace idni::tau_lang {
  * `cvc5_options` for the numbers and the selection rationale.
  */
 enum class cvc5_option_set {
-	/// The shipped pre-existing configuration: `produce-models=true`,
-	/// `produce-proofs=false`, logic BV, plus the alternation gate.
+	/// `produce-models=true`, `produce-proofs=false`, logic BV, plus the
+	/// alternation gate; no further option.
 	baseline = 0,
 	/// `baseline`, but a decision-only query (checkSat with no model
 	/// extraction afterwards, i.e. `bv_formula_sat_status`) drops
-	/// `produce-models` and `incremental`. (`unconstrained-simp` was the
-	/// intended companion, but cvc5 rejects it in any logic admitting
-	/// quantifiers, and the decision path is exactly the quantified one.)
+	/// `produce-models` and `incremental`.
 	decision_no_models = 1,
 	/// + `miniscope-quant=agg`: aggressive miniscoping (cvc5's own
 	/// anti-prenexing) on top of the default `conj-and-fv`.
@@ -106,20 +99,9 @@ enum class cvc5_option_set {
 // | 10 ext_rewrite_no_models  |  73.9s   | 15.1s | 26.5s | 515 MB  |
 // | 11 combined_best          |  76.6s   |       |       |         |
 //
-// A CLI pre-screen on the three archived monolithic alternating-quantifier
-// queries (tau-meta performance/andrei-bv-stress-artifacts/q65-q67.smt2)
-// additionally rejected `cegqi-nested-qe` (timeout), `cegqi-full`, `no-cbqi`,
-// `inst-when=full`, `bv-solver=bitblast-internal`, `simplification=none`,
-// `no-static-learning`, `user-pat=ignore` and `enum-inst-interleave` (all
-// within noise of, or worse than, the shipped alternation gate on q65/q66,
-// with no winner on any query). The historical-rules probes were
-// option-insensitive: rules16.txt N=2 passes under 0 and 10 alike, and the
-// open N=3 mixed `*`/`/`/`%` case times out under 0/3/10/11 alike.
-//
-// Decision: `ext_rewrite_no_models`. `ext-rewrite-quant` is the one option
-// that actually moves the hard config (-30% H1 wall AND -52% peak RSS,
-// neutral H2/W1 -- its CLI regression on the monolithic q65 does not
-// materialize on the query mix tau actually produces), and dropping model
+// Default: `ext_rewrite_no_models`. `ext-rewrite-quant` is the one option
+// that moves the hard config (-30% H1 wall and -52% peak RSS, neutral
+// H2/W1), and dropping model
 // production plus incrementality on decision-only queries is principled
 // (models are only ever read while *solving*, `solve_bv`; the
 // validity/sat/unsat checks never look at one, and every solver instance
@@ -128,7 +110,7 @@ enum class cvc5_option_set {
 // wall and memory -- so the no-models half is kept on principle and for
 // the solver-side bookkeeping it avoids, not for additional wall time.
 // `cegqi_bv_ineq_keep` (-20% alone) does not stack either (11 vs 10) and is
-// EXPERT-flagged, so it stays a considered-not-selected row.
+// an expert option in cvc5, so it is selectable but not the default.
 //
 // @warning Do NOT add a resource limit (`rlimit`/`rlimit-per`) to any set: a
 // truncated instantiation search can report a plain `sat` for an unsat
@@ -141,8 +123,10 @@ enum class cvc5_option_set {
 // alone, so flipping this mid-process would serve answers computed under the
 // previous option set.
 //
-// NOT thread-safe, exactly like the blasting knobs: the tau library assumes
-// single-threaded access. Do not call set_cvc5_options() concurrently.
+/// @brief The cvc5 option set every solver instance is configured with.
+///
+/// NOT thread-safe, exactly like the blasting knobs: the tau library assumes
+/// single-threaded access. Do not call set_cvc5_options() concurrently.
 inline cvc5_option_set cvc5_options = cvc5_option_set::ext_rewrite_no_models;
 
 /**
@@ -153,7 +137,7 @@ inline cvc5_option_set cvc5_options = cvc5_option_set::ext_rewrite_no_models;
  * `per_closed_block` and `per_formula` rely on.
  */
 enum class solver_site {
-	/// Today's behaviour: the resolve passes, `blast_block`'s solver-first
+	/// Every site: the resolve passes, `blast_block`'s solver-first
 	/// attempt, `leaf_clause`'s bv branch, and the final check.
 	eager = 0,
 	/// Only on a fully-processed, closed quantifier block (plus the final
@@ -163,15 +147,14 @@ enum class solver_site {
 	per_formula = 2,
 };
 
-// `eager` is the measured winner, not just the pre-existing default: the
-// Task 9 matrix's Row A (`preprocessing=false` crossed with
-// `solver_placement`, see the table above `preprocessing` in
-// heuristics/preprocess_placement.h) found `per_closed_block`/`per_formula`
-// fail 2 wff_normalization cases outright (Task 8 smoke), leaving `eager`
-// the only cell standing -- and it already wins W2/W3 among the three.
-//
-// NOT thread-safe, exactly like `preprocessing`: the tau library assumes
-// single-threaded access. Do not call set_solver_placement() concurrently.
+/// @brief Where cvc5 may be queried; see solver_site.
+///
+/// `eager` is the default because `per_closed_block`/`per_formula` fail two
+/// wff_normalization cases outright (see the measurement table in
+/// heuristics/preprocess_placement.h).
+///
+/// NOT thread-safe, exactly like `preprocessing`: the tau library assumes
+/// single-threaded access. Do not call set_solver_placement() concurrently.
 inline solver_site solver_placement = solver_site::eager;
 
 } // namespace idni::tau_lang

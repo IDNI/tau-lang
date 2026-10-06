@@ -17,14 +17,17 @@ __extension__ typedef __int128 int128_t_;
 
 namespace {
 
+// |v|; v must not be the minimum int128.
 int128_t_ abs128(int128_t_ v) { return v < 0 ? -v : v; }
 
+// gcd(|a|, |b|), or 1 when both are 0, so it is always a safe divisor.
 int128_t_ gcd128(int128_t_ a, int128_t_ b) {
 	a = abs128(a), b = abs128(b);
 	while (b) { int128_t_ t = a % b; a = b; b = t; }
 	return a ? a : 1;
 }
 
+// True when v fits a long long.
 bool fits(int128_t_ v) {
 	return v >= std::numeric_limits<long long>::min()
 		&& v <= std::numeric_limits<long long>::max();

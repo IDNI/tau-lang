@@ -225,6 +225,9 @@ inline hsb hsb::inner() const {
 // ── Complement check helper ───────────────────────────────────────────────────
 
 namespace hsb_detail {
+// True when a and b are syntactic complements: one is `not` of the other, or
+// both are halfspace leaves whose pool indices complement each other. May
+// insert the complement of a's halfspace into the pool.
 inline bool is_complement_tref(tref a, tref b) {
 	auto ka = static_cast<hsb::kind>(hsb_tree::get(a).value.nt);
 	auto kb = static_cast<hsb::kind>(hsb_tree::get(b).value.nt);
@@ -293,6 +296,7 @@ inline std::uint64_t double_hash(double d) {
 	return std::bit_cast<std::uint64_t>(std::fpclassify(d) == FP_ZERO ? 0.0 : d);
 }
 
+// Content hash of w and b, in uint64_t on every platform.
 inline std::uint64_t halfspace_hash(const hsb_halfspace& h) {
 	std::uint64_t seed = h.w.size();
 	for (double x : h.w) idni::hash_combine(seed, double_hash(x));
@@ -349,6 +353,7 @@ inline std::strong_ordering hsb::operator<=>(const hsb& o) const {
 // ── Serialization ─────────────────────────────────────────────────────────────
 
 namespace hsb_detail {
+// Render the formula tree rooted at n; null renders as "bot".
 inline std::string to_string_tref(tref n) {
 	if (!n) return "bot";
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
@@ -412,14 +417,15 @@ namespace hsb_grammar_detail {
 using tt   = hsb_parser::tree::traverser;
 using type = hsb_parser::nonterminal;
 
+// A linear expression: coefficient per variable index, plus a constant.
 struct linexpr_result {
 	std::map<size_t, double> coeffs;
 	double bias = 0.0;
 };
 
-// A number that does not parse, or a fraction with a zero denominator
-// (`1/0` used to become `inf`), yields NaN; build_halfspace rejects every
-// non-finite coefficient, so the literal fails to parse instead of
+// The value of an unsigned number or fraction. A number that does not parse,
+// or a fraction with a zero denominator, yields NaN; build_halfspace rejects
+// every non-finite coefficient, so the literal fails to parse instead of
 // producing an unbounded half-space. Compare qint's checked parser.
 inline double parse_unum(const std::string& s) {
 	try {
@@ -436,14 +442,17 @@ inline double parse_unum(const std::string& s) {
 	}
 }
 
+// The index n of a variable node `x[n]`.
 inline size_t eval_var(const tt& v) {
 	return static_cast<size_t>(std::stoull((v | tt::only_child) | tt::terminals));
 }
 
+// The value of an unsigned-number node, NaN when malformed (see parse_unum).
 inline double eval_unum(const tt& u) {
 	return parse_unum(u | tt::terminals);
 }
 
+// One signed term of a linear expression: a scaled variable or a constant.
 inline linexpr_result eval_lterm(const tt& t) {
 	auto child = t | tt::only_child;
 	auto nt    = child | tt::nonterminal;
@@ -463,6 +472,7 @@ inline linexpr_result eval_lterm(const tt& t) {
 	return r;
 }
 
+// A sum/difference of terms, collected per variable.
 inline linexpr_result eval_linexpr(const tt& t) {
 	auto child = t | tt::only_child;
 	auto nt    = child | tt::nonterminal;
@@ -489,6 +499,8 @@ inline linexpr_result eval_linexpr(const tt& t) {
 	}
 }
 
+// The halfspace `le <op> 0`, of dimension one past the highest variable;
+// nullopt when no variable is left or a value is not finite.
 inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
 	size_t dim = 0;
 	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
@@ -506,6 +518,10 @@ inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
 	return h;
 }
 
+// The formula tree of a parsed hsb literal, built through the simplifying
+// operators. An error for a halfspace whose written strictness does not
+// match its canonical one; no value and no error for a malformed halfspace
+// or an unknown node, which parse_hsb turns into an error.
 inline result<tref> eval_parse_tree(const tt& t) {
 	result<tref> r;
 	auto n  = t | tt::only_child;
@@ -535,9 +551,7 @@ inline result<tref> eval_parse_tree(const tt& t) {
 	case type::hsb_hs: {
 		// `lhs op rhs` with both sides linear expressions; the half-space
 		// is `(lhs - rhs) op 0`, so `x[0] < 1` is `x[0] - 1 < 0` and
-		// `x[0] <= x[1]` is `x[0] - x[1] <= 0`. A right-hand side of a
-		// plain `0` (the only form the grammar used to accept) subtracts
-		// nothing.
+		// `x[0] <= x[1]` is `x[0] - x[1] <= 0`.
 		auto hs_child = (n | tt::only_child) | tt::only_child;
 		auto ch       = (hs_child | tt::children)();
 		if (ch.size() < 2) return r;

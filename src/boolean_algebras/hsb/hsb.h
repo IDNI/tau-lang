@@ -89,7 +89,8 @@ struct hsb_halfspace {
 	/// only the first x.size() components are used and the rest are treated as 0.
 	double eval(const std::vector<double>& x) const noexcept;
 
-	/// @brief Returns true iff x satisfies the halfspace constraint.
+	/// @brief Returns true iff x satisfies the halfspace constraint (strict
+	/// or not per is_strict()); missing coordinates read as 0, see eval().
 	bool contains(const std::vector<double>& x) const noexcept;
 
 	/**
@@ -100,7 +101,10 @@ struct hsb_halfspace {
 	 */
 	hsb_halfspace negate() const;
 
+	/// @brief Exact component-wise equality of w and b; a NaN never compares
+	/// equal. Halfspaces of different dimension are unequal.
 	bool operator==(const hsb_halfspace& o) const noexcept;
+	/// @brief Negation of operator==.
 	bool operator!=(const hsb_halfspace& o) const noexcept;
 
 	/**
@@ -112,7 +116,8 @@ struct hsb_halfspace {
 	 */
 	hsb_halfspace normalize() const;
 
-	/// @brief Lexicographic ordering on (w, b) — used to sort boundary expressions.
+	/// @brief Lexicographic ordering on (w, b), missing components read as 0
+	/// — used to sort boundary expressions and as the pool's map order.
 	bool operator<(const hsb_halfspace& o) const noexcept;
 
 	/// @brief Returns a string like "2*x[0] - x[1] + 3 < 0".
@@ -128,17 +133,19 @@ struct hsb_halfspace {
 /// real halfspaces are 1-indexed; slot 0 holds an inert dummy entry.
 struct hsb_halfspace_pool {
 	/// Insert h AS-IS and return its pool index; an existing index is
-	/// returned only for a structurally equal halfspace. NOTE (BA1-19):
+	/// returned only for a structurally equal halfspace. NOTE:
 	/// no normalization happens here -- normalize_all_leaves runs later,
 	/// so scalar multiples of one constraint (x[0]<0 vs 2x[0]<0) intern
 	/// separately and the pool-index complement shortcuts miss them
 	/// (semantics stay correct via the LRA fallback; trees just grow).
 	static size_t insert(const hsb_halfspace& h);
 
-	/// Retrieve a halfspace by pool index.
+	/// Retrieve a halfspace by pool index; an index past the pool returns an
+	/// empty halfspace (and asserts in DEBUG).
 	static const hsb_halfspace& get(size_t idx);
 
 	/// Return the pool index of the complement (~h), inserting if needed.
+	/// @p idx must be a valid pool index; it is not checked.
 	static size_t complement_index(size_t idx);
 
 	/// Number of interned halfspaces (excludes the reserved sentinel entry).
@@ -184,8 +191,11 @@ struct hsb {
 	/// Cached content_hash(); 0 means not computed yet.
 	mutable std::uint64_t content_hash_cache = 0;
 
+	/// @brief The bottom element.
 	hsb();
+	/// @brief Wrap the formula tree @p r; bottom when @p r is null.
 	explicit hsb(tref r);
+	/// @brief Wrap the handle @p h; bottom when @p h is null.
 	explicit hsb(htref h);
 
 	// ── Internal tref access ─────────────────────────────────────────────────
@@ -196,12 +206,19 @@ struct hsb {
 	// ── Node factories (return tref for use in tree construction) ────────────
 
 	/// @cond INTERNAL
+	/// The interned `bot` node.
 	static tref mk_bot();
+	/// The interned `top` node.
 	static tref mk_top();
+	/// A halfspace leaf for @p h, interned AS-IS in hsb_halfspace_pool.
 	static tref mk_hs(const hsb_halfspace& h);
+	/// A halfspace leaf for an existing pool index.
 	static tref mk_hs_by_index(size_t pool_idx);
+	/// An `and` node over @p l and @p r, with no simplification.
 	static tref mk_and(tref l, tref r);
+	/// An `or` node over @p l and @p r, with no simplification.
 	static tref mk_or(tref l, tref r);
+	/// A `not` node over @p inner, with no simplification.
 	static tref mk_not(tref inner);
 	/// @endcond
 
@@ -221,7 +238,7 @@ struct hsb {
 
 	// ── Tree accessor helpers ─────────────────────────────────────────────────
 
-	/// Returns the kind of the root node.
+	/// Returns the kind of the root node (bot for a null root).
 	kind root_kind() const noexcept;
 
 	/// Returns the halfspace stored at the root (valid only if root_kind() == kind::halfspace).
@@ -272,20 +289,26 @@ struct hsb {
 
 	/// Hash of the formula and its halfspace values, not of a pool index or
 	/// a pointer, so the order is the same on every run and platform.
+	/// Computed once and cached in content_hash_cache.
 	std::uint64_t content_hash() const;
+	/// @brief Negation of operator==(const hsb&).
 	bool operator!=(const hsb& o) const noexcept;
 
-	/// @brief Compares with a bool: `true` iff equal to top/bot respectively.
+	/// @brief Compares with a bool: `true` iff the root is the top node,
+	/// `false` iff it is the bot node. Structural: an unsimplified formula
+	/// equivalent to top or bot does not compare equal.
 	bool operator==(bool b) const;
+	/// @brief Negation of operator==(bool).
 	bool operator!=(bool b) const;
 
 	/// @brief Structural ordering via `to_string()` output.
 	bool operator<(const hsb& o) const;
+	/// @brief Three-way form of operator<; equal only for the same root.
 	std::strong_ordering operator<=>(const hsb& o) const;
 
 	// ── Serialisation ────────────────────────────────────────────────────────
 
-	/// @brief Returns a human-readable string, e.g. `"(x[0] < 0 & ~(x[1] < 0))"`.
+	/// @brief Returns a human-readable string, e.g. `"(x[0] < 0 | -x[1] <= 0)"`.
 	std::string to_string() const;
 
 	/**

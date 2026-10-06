@@ -36,37 +36,37 @@ inline env_limit<size_t> max_constant_size{ "TAU_MAX_CONSTANT_SIZE", 2000 };
 
 /**
  * @typedef typed_nso
- * @brief Alias for tau tree node.
+ * @brief A tree node (unused alias).
  */
 using typed_nso = tref;
 
 /**
  * @typedef var
- * @brief Alias for tau tree node.
+ * @brief A variable node.
  */
 using var = tref;
 
 /**
  * @typedef minterm
- * @brief Alias for tau tree node.
+ * @brief A minterm node: a conjunction of possibly negated variables.
  */
 using minterm = tref;
 
 /**
  * @typedef equality
- * @brief Alias for tau tree node.
+ * @brief An equation node `f = 0`.
  */
 using equality = tref;
 
 /**
  * @typedef inequality
- * @brief Alias for tau tree node.
+ * @brief An inequation node `f != 0`.
  */
 using inequality = tref;
 
 /**
  * @typedef equation
- * @brief Alias for tau tree node.
+ * @brief An equation or inequation node.
  */
 using equation = tref;
 
@@ -79,7 +79,8 @@ using equations = subtree_set<node>;
 
 /**
  * @typedef equation_system
- * @brief Alias for a pair consisting of an optional equality and a set of inequalities.
+ * @brief An optional equality and a set of inequalities, read as their
+ * conjunction.
  */
 template<NodeType node>
 using equation_system = std::pair<std::optional<equality>,
@@ -94,21 +95,25 @@ using inequality_system = subtree_set<node>;
 
 /**
  * @typedef minterm_system
- * @brief Alias for a set of inequalities.
+ * @brief A set of minterm inequalities.
  */
 template<NodeType node>
 using minterm_system = subtree_set<node>;
 
 /**
  * @typedef solution
- * @brief Alias for a map of variables to tau templates.
+ * @brief A map of variables to the values (terms) assigned to them.
  */
 template<NodeType node>
 using solution = subtree_map<node, tref>;
 
 /**
  * @enum solver_mode
- * @brief Enumeration for solver modes.
+ * @brief Which solution solve_system looks for.
+ *
+ * `maximum` and `minimum` look only for a maximal or a minimal solution and
+ * give none when it fails; `general` tries a maximal one, then a minimal
+ * one, then the general procedure.
  */
 enum solver_mode {
 	maximum, /**< Maximum mode */
@@ -127,11 +132,13 @@ enum solver_mode {
  * untemplated on `node`.
  */
 struct fresh_element_ledger {
+	/// One minted value and the exclusion set it is disjoint from.
 	struct generator {
 		size_t index; /**< Position in generators, returned by mint() */
 		tref value; /**< The minted splitter share */
 		trefs disjoint_from; /**< Exclusion set in scope at mint time */
 	};
+	/// Every minted generator, in mint order (index == position).
 	std::vector<generator> generators;
 
 	// GC roots: this ledger's storage is invisible to interpreter::
@@ -141,9 +148,9 @@ struct fresh_element_ledger {
 	// site in solver.tmpl.h.
 	htrefs pins;
 
-	// Records a generator built disjoint from disjoint_from at mint time.
-	// Pinning is the caller's job (pin(), above) -- this method only
-	// compares/copies by identity, never dereferences.
+	// Records a generator built disjoint from disjoint_from at mint time and
+	// returns its index. Pinning is the caller's job (pin(), below) -- this
+	// method only compares/copies by identity, never dereferences.
 	size_t mint(tref value, trefs disjoint_from) {
 		size_t index = generators.size();
 		generators.push_back({ index, value, std::move(disjoint_from) });
@@ -155,7 +162,8 @@ struct fresh_element_ledger {
 	void pin(htref h) { pins.push_back(std::move(h)); }
 
 	// Monotone-scope invariant: exclusion must be a recorded superset of
-	// the generator's mint-time disjoint-from set.
+	// the generator's mint-time disjoint-from set. Asserts it in DEBUG
+	// builds only; a no-op otherwise.
 	void consult([[maybe_unused]] size_t index,
 			[[maybe_unused]] const trefs& exclusion) const {
 		DBG(for ([[maybe_unused]] tref e : generators.at(index).disjoint_from)
@@ -213,12 +221,16 @@ struct fresh_element_ledger {
 
 /**
  * @struct solver_options
- * @brief Structure for solver options.
+ * @brief Options of one solver call.
  */
 struct solver_options {
+	/// A splitter of the top element, used when a value must lie strictly
+	/// inside 1; may be null.
 	tref splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
+	/// Type id of the algebra the system is over.
 	size_t type_id = 0;
+	/// Without a ledger (nullptr) every value comes from the general solver.
 	fresh_element_ledger* ledger = nullptr; /**< Fresh-generator ledger, per interpreter run; nullptr = today's behavior */
 };
 
