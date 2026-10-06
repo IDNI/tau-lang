@@ -1027,6 +1027,7 @@ result<tref> api<node>::get_formula_or_term(const std::string& expr, bool simpli
 
 template <NodeType node>
 bool api<node>::contains(tref expression, typename node::type nt) {
+	if (!expression) return false;
 	bool found = false;
 	const auto searcher = [&nt, &found](tref n) -> bool {
 		if (tau::get(n).get_type() == nt) return found = true, false;
@@ -1041,12 +1042,12 @@ bool api<node>::contains(tref expression, typename node::type nt) {
 
 template <NodeType node>
 bool api<node>::is_term(tref term) {
-	return tau::get(term).is_term();
+	return term && tau::get(term).is_term();
 }
 
 template <NodeType node>
 bool api<node>::is_formula(tref fm) {
-	return tau::get(fm).is(tau::wff);
+	return fm && tau::get(fm).is(tau::wff);
 }
 
 // Using definitions

@@ -198,6 +198,14 @@ TEST_SUITE("Tau API - tref - parsing") {
 
 TEST_SUITE("Tau API - tref - querying") {
 
+	// A null tref answers false, as a null htref does.
+	TEST_CASE_FIXTURE(api_fixture, "the predicates answer false on a null tref") {
+		CHECK(!tau_api::is_term(static_cast<tref>(nullptr)));
+		CHECK(!tau_api::is_formula(static_cast<tref>(nullptr)));
+		CHECK(!tau_api::contains(static_cast<tref>(nullptr), tau::bf));
+		CHECK(!tau_api::contains(htref{}, tau::bf));
+	}
+
 	TEST_CASE_FIXTURE(api_fixture, "contains") {
 		DBG(using node = node_t;)
 		auto tr = tau_api::get_term("x + 0", false);

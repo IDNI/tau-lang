@@ -797,7 +797,8 @@ struct api {
 	// ------------------------------------------------------------
 
 	/// Check whether @p expression (or any of its descendants) contains
-	/// a node of nonterminal type @p nt.  Uses a pre-order DFS.
+	/// a node of nonterminal type @p nt.  Uses a pre-order DFS. A null
+	/// expression contains nothing.
 	static bool contains(tref expression, typename node::type nt);
 	/// @copydoc contains(tref,typename node::type)
 	static bool contains(htref expression, typename node::type nt);
@@ -805,9 +806,8 @@ struct api {
 	/// Return true if @p expression parses as (or is) a bf term.
 	/// The string overload attempts get_term() and checks for success.
 	static bool is_term(const std::string& expression);
-	/// Return true if the root node of @p expression is flagged as a term.
-	/// @p expression must not be null (the htref overload returns false
-	/// for a null handle).
+	/// Return true if the root node of @p expression is flagged as a term;
+	/// false for a null expression.
 	static bool is_term(tref expression);
 	/// @copydoc is_term(tref)
 	static bool is_term(htref expression);
@@ -815,9 +815,8 @@ struct api {
 	/// Return true if @p expression parses as (or is) a wff.
 	/// The string overload attempts get_formula() and checks for success.
 	static bool is_formula(const std::string& expression);
-	/// Return true if the root node of @p expression has type wff.
-	/// @p expression must not be null (the htref overload returns false
-	/// for a null handle).
+	/// Return true if the root node of @p expression has type wff; false
+	/// for a null expression.
 	static bool is_formula(tref expression);
 	/// @copydoc is_formula(tref)
 	static bool is_formula(htref expression);
