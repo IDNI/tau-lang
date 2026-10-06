@@ -191,7 +191,8 @@ private:
 	static tref wff_interval   (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `shift` nodes: fold a numeric `n - k` into the integer
 	/// it denotes; keep a variable or capture `t - k` raw.
-	/// @return nullptr when `k > n` (a negative time point).
+	/// @return nullptr when `k > n` (a negative time point), which the
+	/// rewriter reads as the rule not applying.
 	static tref shift          (const node& v, const tref* ch, size_t len, tref r);
 };
 

@@ -770,7 +770,9 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 
 /** @internal @copydoc get_hook::shift @endinternal */
 // Folds `n - k` over constants to the integer n - k; keeps a variable or
-// capture offset raw, and returns nullptr when n < k.
+// capture offset raw, and returns nullptr when n < k: the rewriter reads a
+// null instantiated body as "this rule does not apply", so a recurrence
+// step that would reach a negative index is not taken.
 template <NodeType node>
 tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("shift", v, ch, len, r);)
@@ -792,7 +794,7 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 		right = get_payload_int<node>(tau::get(ch[1]));
 	DBG(assert(right >= 0);)
 	if (left >= right) return tau::get(tau::get_integer(left - right), r);
-	return nullptr; // Return error
+	return nullptr; // a negative time point: the rule does not apply
 }
 
 } // namespace idni::tau_lang

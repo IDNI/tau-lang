@@ -137,6 +137,12 @@ add_repl_test(normalize_cmd-recursive_defs_in_argument_position
 # applied to the enumerated steps and calculate_fixed_point enumerated bare
 # g[i](y) refs forever -- a silent REPL hang with no cap set. Indexed calls
 # (`n g[5](y)`, above) always worked, since their signature matches exactly.
+# A recurrence step whose index would go negative is not taken: the call
+# stays as it is.
+add_repl_test(normalize_cmd-negative_index_step_not_taken
+	"g[n](y) := g[n-1](y)'. normalize g[0](1)"
+	"%1[^%]*: g[[]0[]][(]1[)]")
+
 add_repl_test(normalize_cmd-fp_call_function_loop_default_fallback
 	"g[0](x) := 0. g[n](x) := g[n-1](x)'. normalize g(y)"
 	": 0")
