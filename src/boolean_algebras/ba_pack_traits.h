@@ -1133,6 +1133,16 @@ const std::vector<ba_named_option>& pack_ba_options() {
 	return opts;
 }
 
+/// The current value of @p o as one word, for a fingerprint.
+inline size_t ba_option_value_hash(const ba_option& o) {
+	switch (o.kind) {
+	case ba_option_kind::flag:  return (size_t) o.get_flag();
+	case ba_option_kind::count: return o.get_count();
+	case ba_option_kind::text:  break;
+	}
+	return std::hash<std::string>{}(o.get_text());
+}
+
 /**
  * @brief @p seed mixed with the current value of every BA-declared option
  * of @p Node's pack.
@@ -1145,8 +1155,7 @@ const std::vector<ba_named_option>& pack_ba_options() {
 template <typename Node>
 size_t pack_ba_options_fingerprint(size_t seed = 0) {
 	for (const auto& e : pack_ba_options<Node>()) {
-		const size_t v = e.option.kind == ba_option_kind::flag
-			? (size_t) e.option.get_flag() : e.option.get_count();
+		const size_t v = ba_option_value_hash(e.option);
 		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 	}
 	return seed;

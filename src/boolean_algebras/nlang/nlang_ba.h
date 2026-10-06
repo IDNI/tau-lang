@@ -16,6 +16,7 @@
 #include "ba_constants.h"
 #include "env_limits.h"
 #include "splitter_types.h"
+#include "boolean_algebras/nlang/nlang_llm.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 
 namespace idni::tau_lang {
@@ -35,8 +36,8 @@ template <NodeType node> size_t nlang_type_id();
 // Elements are natural language propositions/statements represented as
 // structural formula trees. The logical engine catches contradictions and
 // tautologies structurally — A & ~A = bottom, A | ~A = top, ~~A = A —
-// without any LLM calls. An OpenAI-compatible language model is only
-// invoked on atomic propositions (leaf nodes of the formula tree).
+// without any LLM calls. A language model (an OpenAI-compatible or an
+// Anthropic endpoint) is only invoked on atomic propositions (leaf nodes of the formula tree).
 //
 // This minimises LLM mistakes: compound formulas built by the engine are
 // simplified algebraically; only irreducible atoms need semantic judgement.
@@ -46,18 +47,30 @@ template <NodeType node> size_t nlang_type_id();
 // propositions p < q there always exists r with p < r < q.
 // -----------------------------------------------------------------------------
 
-// Configuration (environment variables):
-//   TAU_LLM_API_KEY   — required; OpenAI-compatible API key (falls back to
-//                       OPENAI_API_KEY). Without it every oracle query
-//                       returns a conservative default and a warning is
-//                       printed once.
-//   TAU_LLM_ENDPOINT  — optional; API base URL (default:
-//                       https://api.openai.com/v1)
-//   TAU_LLM_MODEL     — optional; when unset no model is sent and the
-//                       endpoint picks its own.
-//   TAU_NLANG_HTTP_TIMEOUT — optional; seconds per request (default 15,
-//                       0 = no cap). Environment fallback of the
-//                       `nlang-http-timeout` option, which wins when given.
+// Configuration: the `nlang-*` options of nlang_descriptor.tmpl.h, each with
+// an environment fallback (option > environment > default). nlang_llm.h
+// holds the resolution rules.
+//   nlang-provider / TAU_LLM_PROVIDER  — `openai` (chat completions) or
+//                       `anthropic` (Messages API). Unset: `anthropic` when
+//                       the endpoint names an anthropic host or when
+//                       ANTHROPIC_API_KEY is the only key, else `openai`.
+//   nlang-api-key / TAU_LLM_API_KEY    — required; falls back to the
+//                       provider's own OPENAI_API_KEY / ANTHROPIC_API_KEY.
+//                       Without it every oracle query returns a
+//                       conservative default and a warning is printed once.
+//   nlang-endpoint / TAU_LLM_ENDPOINT  — API base URL (default:
+//                       https://api.openai.com/v1 or
+//                       https://api.anthropic.com/v1)
+//   nlang-model / TAU_LLM_MODEL        — openai: when unset no model is sent
+//                       and the endpoint picks its own. anthropic:
+//                       claude-opus-5-5.
+//   nlang-effort / TAU_LLM_EFFORT      — anthropic; `low` for the default
+//                       model, none for a model the user names.
+//   nlang-max-tokens / TAU_LLM_MAX_TOKENS — anthropic; default 16000.
+//   nlang-fallback / TAU_LLM_FALLBACK  — anthropic server-side fallback; on
+//                       for the default model on the default endpoint.
+//   nlang-http-timeout / TAU_NLANG_HTTP_TIMEOUT — seconds per request
+//                       (default 15, 0 = no cap).
 
 /**
  * @brief Wall-clock cap, in seconds, on each LLM HTTP request the nlang
@@ -317,6 +330,17 @@ inline std::ostream& operator<<(std::ostream& os, const nlang_ba& n) {
  * subobject becomes the atom @p s in place.
  */
 nlang_ba::fptr llm_decompose(const std::string& s);
+/**
+ * @brief The formula tree an LLM decomposition reply spells.
+ *
+ * @p response may carry prose around the JSON object. A reply with no
+ * object, or a node that is none of `and`, `or`, `not` and `atom`, yields
+ * the atom of the whole @p statement.
+ */
+nlang_ba::fptr llm_parse_decomposition(const std::string& response,
+	const std::string& statement);
+/// Drop every cached oracle answer: an answer of one model is not another's.
+void llm_clear_cache();
 
 // --- Mutually recursive structural emptiness/universality checks ---
 // Oracle is only called on atomic leaf nodes.

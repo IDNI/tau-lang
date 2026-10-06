@@ -972,7 +972,9 @@ decision by cells evaluates before it is left open, default 65536,
 `TAU_QLT_CELLS_BUDGET`) and `--qlt-cells-max-params` (other free variables,
 and named endpoints, such a decision ranges over, default 2,
 `TAU_QLT_CELLS_MAX_PARAMS`); `nlang` declares `--nlang-http-timeout`
-(seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`). Every count
+(seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`) and
+`--nlang-max-tokens` (tokens per reply of an Anthropic model, default 16000,
+`TAU_LLM_MAX_TOKENS`). Every other count
 option `<ba>-<option>` falls back to `TAU_<BA>_<OPTION>` (dashes as
 underscores), so `bv`'s caps read `TAU_BV_BLASTDEPTH`,
 `TAU_BV_CASE_SPLIT_MAX_TESTS`, `TAU_BV_DEFELIM_MAX_CLAUSES`,
@@ -1014,6 +1016,22 @@ its limit is needed:
 A program `tau compile` builds has no flags for these limits; the ones its run
 uses still read their variables.
 
+An algebra also declares options that are a flag or a text, on the same
+surfaces. The text options are those of the `nlang` oracle:
+`--nlang-provider`, `--nlang-endpoint`, `--nlang-model`, `--nlang-api-key`
+and `--nlang-effort`, beside the flag `--nlang-fallback`. In the REPL
+`set nlang-model claude-opus-5-5` or
+`set nlang-endpoint = http://localhost:8080/v1` writes one and
+`get nlang-model` reads it; a text takes letters, digits and `. - _ : /`.
+A text may go in double quotes, which hold any characters, and one with a
+`.` should: `set nlang-endpoint "https://api.anthropic.com/v1"`,
+`set nlang-model "gemini-2.0-flash"`. A `.` also separates two commands, so
+without the quotes the value may end at the dot. Empty quotes clear the
+option: `set nlang-model ""` goes back to the environment variable or the
+default.
+The table of the [`nlang` section](#nlang--natural-language-boolean-algebra-experimental)
+lists each with its environment variable and its default.
+
 **Other environment variables.** Three Boolean switches keep an environment
 fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
 value other than `0` enables, `0` disables; read once, then it overrides
@@ -1027,8 +1045,10 @@ a temporal operator of its own, so that the whole formula decides),
 disables, any other value enables; overrides `bv-case-split` in both
 directions) and `TAU_BV_QF_DECISION` (a value other than `0` enables the
 quantifier-free bitvector decision; `bv-quantifier-free-decision` enables it
-too). The nlang oracle reads `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`),
-`TAU_LLM_ENDPOINT` and `TAU_LLM_MODEL`. Two diagnostic gates change logging
+too). The nlang oracle reads `TAU_LLM_PROVIDER`, `TAU_LLM_API_KEY` (or the
+provider's own `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`), `TAU_LLM_ENDPOINT`,
+`TAU_LLM_MODEL`, `TAU_LLM_EFFORT`, `TAU_LLM_MAX_TOKENS` and
+`TAU_LLM_FALLBACK`, each the fallback of its `nlang-*` option. Two diagnostic gates change logging
 only, never a verdict: `TAU_LEAN_DECIDE_CROSSCHECK` re-decides the lean
 constant tests through the full path and reports disagreements, and
 `TAU_PHI_DELTA_CROSSCHECK=1` shadows the ABA oracle with the closed-form
@@ -1141,10 +1161,11 @@ copies the first input into every step.
   argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
 - **Semantic negation (`-`)**: `- φ` under a temporal operator reads φ as
   started fresh at that point (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
-- **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
-  back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
-  `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
-  request capped by the `nlang-http-timeout` option (15 s, or
+- **nlang needs an LLM API key**: the oracle reads the `nlang-api-key` option,
+  else `TAU_LLM_API_KEY`, else the provider's own `OPENAI_API_KEY` or
+  `ANTHROPIC_API_KEY`. The provider (`nlang-provider`: `openai` or
+  `anthropic`), the endpoint and the model are optional, and each HTTP
+  request is capped by the `nlang-http-timeout` option (15 s, or
   `TAU_NLANG_HTTP_TIMEOUT`). Without a key
   every emptiness, universality and equivalence question over `nlang`
   elements is answered `false` (not cached), a warning is printed once, and
@@ -2293,7 +2314,7 @@ The Tau Language currently supports the following base types:
 3. `bv[n]`: the type of bitvectors of bit width `n`,
 4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
 5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
-6. `nlang`: the Natural Language Boolean Algebra (its oracle needs `TAU_LLM_API_KEY` or `OPENAI_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
+6. `nlang`: the Natural Language Boolean Algebra (its oracle needs an API key: `nlang-api-key`, `TAU_LLM_API_KEY`, or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
 In addition, user-defined type names — aliases of base types and tuple
@@ -2520,7 +2541,7 @@ integration, and LTL(hsb) realizability.
 #### `nlang` — Natural Language Boolean Algebra (experimental)
 
 > **Note:** `nlang` is experimental.  Its semantics depend on an external LLM
-> oracle (DeepSeek) and results may be non-deterministic or inconsistent across
+> oracle and results may be non-deterministic or inconsistent across
 > API calls.  Use for exploration and prototyping only.
 
 `nlang` represents a Boolean algebra whose elements are natural language concept
@@ -2531,17 +2552,63 @@ connectives:
 - `{ A }:nlang & { B }:nlang` produces `"(A) and (B)"`
 - `~{ A }:nlang` produces `"not (A)"`
 
-An OpenAI-compatible chat completion endpoint serves as the semantic oracle
-for equality, emptiness, and universality tests: the key is read from
-`TAU_LLM_API_KEY` (or `OPENAI_API_KEY`), the base URL from `TAU_LLM_ENDPOINT`
-(default `https://api.openai.com/v1`) and the model from `TAU_LLM_MODEL`
-(unset: the endpoint's default); each request is capped by the
-`nlang-http-timeout` option (15 s, or `TAU_NLANG_HTTP_TIMEOUT`).  Without a
-key, or when a request fails or the endpoint answers with a non-2xx status,
-every emptiness, universality and equivalence question is answered `false`
-(a warning is printed once; the default is not cached, so a later question
-asks the endpoint again), and verdicts over `nlang` elements are not
-reliable.
+An LLM endpoint serves as the semantic oracle for equality, emptiness, and
+universality tests. Two providers are supported: `openai`, any
+OpenAI-compatible chat completions endpoint (`<endpoint>/chat/completions`),
+and `anthropic`, the Anthropic Messages API (`<endpoint>/messages`).
+
+Every setting is an option of `nlang`, with the same name on each surface:
+the command line (`--nlang-model claude-opus-5-5`), the REPL
+(`set nlang-model claude-opus-5-5`, `get nlang-model`), the C++ API and the
+Python and JavaScript bindings (`set_ba_text_option("nlang-model", ...)` for
+a text and `set_ba_option("nlang-max-tokens", ...)` for a count or a flag;
+`setBaTextOption` and `setBaOption` in JavaScript). An
+option that is not given reads its environment variable, and then its
+default:
+
+| option               | kind  | environment              | default |
+|----------------------|-------|--------------------------|---------|
+| `nlang-provider`     | text  | `TAU_LLM_PROVIDER`       | detected, else `openai` |
+| `nlang-endpoint`     | text  | `TAU_LLM_ENDPOINT`       | `https://api.openai.com/v1` or `https://api.anthropic.com/v1` |
+| `nlang-model`        | text  | `TAU_LLM_MODEL`          | `openai`: none, the endpoint picks its own; `anthropic`: `claude-opus-5-5` |
+| `nlang-api-key`      | text  | `TAU_LLM_API_KEY`, then `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` by provider | none |
+| `nlang-effort`       | text  | `TAU_LLM_EFFORT`         | `low` for the default `anthropic` model, none otherwise |
+| `nlang-max-tokens`   | count | `TAU_LLM_MAX_TOKENS`     | 16000 (0 = the default) |
+| `nlang-http-timeout` | count | `TAU_NLANG_HTTP_TIMEOUT` | 15 seconds (0 = no cap) |
+| `nlang-fallback`     | flag  | `TAU_LLM_FALLBACK` (`on` / `off`) | on for the default `anthropic` model on the default endpoint |
+
+- **Provider detection.** When neither `nlang-provider` nor
+  `TAU_LLM_PROVIDER` names a provider, it is `anthropic` when the endpoint
+  names an anthropic host, or when no endpoint is given and
+  `ANTHROPIC_API_KEY` is the only key configured; otherwise it is `openai`.
+  A value other than `openai` or `anthropic` is refused by the option and
+  ignored in the variable.
+- **The key is never read back.** `nlang-api-key` is accepted on every
+  surface, and every read (`get nlang-api-key`, `get_ba_text_option`) answers
+  `set` or `unset`. A key given on the command line is visible in the
+  process list and in the shell history, and one typed in the REPL is saved
+  in its history file (`.tau_history`): prefer the environment variable.
+  Giving a key does not change which provider is detected.
+- **`nlang-effort`, `nlang-max-tokens` and `nlang-fallback` apply to
+  `anthropic` only.** The effort is one of `low`, `medium`, `high`, `xhigh`
+  and `max`. A model the user names gets no effort and no fallback unless
+  they are set, because not every model accepts them. With the fallback on,
+  the Anthropic API may answer from another model when the named one declines
+  the request.
+- **A reply that holds no answer** (a refusal, a reply cut at
+  `nlang-max-tokens`, an error object, an HTTP error or a request that fails
+  or times out) is treated as unanswered: the conservative default is used,
+  it is not cached, and a warning is printed once.
+- **Changing the provider, endpoint, model or effort drops the cached oracle
+  answers**, since an answer of one model is not another's.
+- The 15 second default of `nlang-http-timeout` may be short for a model that
+  thinks before it answers; raise it when requests time out.
+
+Without a
+key every emptiness,
+universality and equivalence question is answered `false` (a warning is
+printed once; the default is not cached), so verdicts over `nlang` elements
+are not reliable without the key.
 
 Elements are written as natural language strings inside `{...}:nlang`:
 
@@ -2556,8 +2623,9 @@ structural layer: `nothing` and `everything` denote bottom and top, and
 `not (φ)`, `(φ) and (ψ)`, `(φ) or (ψ)` compose phrases (this is the canonical
 form the Boolean operations print).  Any other text is a single atom.
 
-**Requirement**: `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) must be set in the
-environment for the oracle to answer.
+**Requirement**: an API key (`nlang-api-key`, `TAU_LLM_API_KEY`, or the
+provider's `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) must be configured for the
+oracle to answer.
 
 #### `bv` — bit width and unification
 
@@ -3841,7 +3909,7 @@ python -m ide.server --port 8080 --tau-binary /path/to/tau
 | **Run**     | Execute specs (`Shift+Enter`), evaluate formulas (`Ctrl+Enter`), quick actions (SAT / valid / normalize / DNF / CNF / …) |
 | **Help**    | 10 searchable help topics, grammar reference derived from `parser/tau.tgf`, keyboard shortcut reference |
 | **Visualize** | Timeline diagrams for temporal operators, AST tree view, color-coded operator legend |
-| **AI** | DeepSeek-powered NL ↔ Tau translation, context-aware code assistance, code explanations |
+| **AI** | LLM-powered (DeepSeek, OpenAI or Anthropic) NL ↔ Tau translation, context-aware code assistance, code explanations |
 
 ### Keyboard shortcuts
 
@@ -3901,14 +3969,33 @@ formula (or selected text).  The visualization panel shows:
 This is a presentation/teaching aid — useful for understanding what a formula
 means over time.
 
-## AI Assistant (DeepSeek)
+## AI Assistant
 
-The IDE includes a DeepSeek-powered AI assistant for working with Tau code.
+The IDE includes an AI assistant for working with Tau code, answered by one
+of three providers: `deepseek` and `openai` (chat completions) and
+`anthropic` (the Messages API, through the `anthropic` Python package that
+`ide/requirements.txt` installs).
 Click the **AI** button in the top bar or use the AI tab in the bottom panel.
 
-**Setup:** Click the gear icon to enter your DeepSeek API key.  The key is
-stored in browser `localStorage` only — it is never written to disk or sent
-anywhere except directly to the DeepSeek API.
+**Setup:** Pick a model in the selector; the model names its provider.  Click
+the gear icon to enter the API key of that provider.  The IDE keeps one key
+per provider in browser `localStorage` only — a key is never written to disk
+and goes with a request to the IDE server, which passes it to that provider's
+API and nowhere else.
+
+**Server-side defaults:** a request names its provider, model and key.  For
+what a request leaves out, the server reads `TAU_LLM_PROVIDER` (default
+`deepseek`), `TAU_LLM_MODEL` (default: `deepseek-reasoner` for `deepseek`,
+`claude-opus-5-5` for `anthropic`, none for `openai`, which must be given a
+model) and the provider's own `DEEPSEEK_API_KEY`, `OPENAI_API_KEY` or
+`ANTHROPIC_API_KEY`.  `TAU_LLM_MODEL` and `TAU_LLM_API_KEY` belong to the
+provider `TAU_LLM_PROVIDER` names: they apply to a request for that provider
+only, and not at all when the variable is unset, so a key never reaches
+another provider.  The selector opens on the server's default model.  `python -m ide.server
+--llm-provider anthropic --llm-model claude-opus-5-5` gives the first two on
+the command line.  With a key in the server's environment the browser needs
+none, and anyone who can reach the server's port can spend it: keep the
+default `--host 127.0.0.1` in that case.
 
 **Three modes:**
 
@@ -3925,8 +4012,8 @@ anywhere except directly to the DeepSeek API.
    structured natural-language explanation: one-sentence summary, operator-by-
    operator breakdown, I/O behavior, required fragment.
 
-**Models:** Choose between DeepSeek R1 (reasoning, slower, more accurate) and
-DeepSeek V3 (fast chat).
+**Models:** Choose between DeepSeek R1 (reasoning, slower, more accurate),
+DeepSeek V3 (fast chat) and Claude Opus 5.5 (Anthropic).
 
 Generated code can be inserted at cursor or replace the editor content with one
 click.
@@ -3993,7 +4080,11 @@ without the dashes in front: `set_ba_option("bv-widening", 1)` or
 `set_ba_option("bv-defelim-max-atoms", 5)` (a flag takes 0 or 1) returns the
 value now in force, `get_ba_option(name)` reads it back, both answer an error
 when no algebra of the build declares the name, and `ba_option_names()` lists
-the names the build has.
+the names the build has. A text option has its own pair:
+`set_ba_text_option("nlang-model", "claude-opus-5-5")` returns the text the
+option now reads and `get_ba_text_option(name)` reads it back. An empty text
+clears the option, `nlang-api-key` reads `set` or `unset`, and each pair
+answers an error for an option of the other kind.
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and
@@ -4039,8 +4130,9 @@ the same names (`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
 getter for each budget (`tau.get_max_fixpoint_steps()`,
 `tau.get_ltl_timeout_sec()`, `tau.get_gc_growth_factor()`, ...) and the
 options the algebras declare (`tau.ba_option_names()`,
-`tau.set_ba_option("bv-widening", 1)`, `tau.get_ba_option(name)`, both
-returning a `tau.result`).
+`tau.set_ba_option("bv-widening", 1)`, `tau.get_ba_option(name)`, and for a
+text option `tau.set_ba_text_option("nlang-provider", "anthropic")`,
+`tau.get_ba_text_option(name)`, all returning a `tau.result`).
 
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
 
@@ -4064,7 +4156,10 @@ back with the getter of the same name (`tau.getMaxConstantSize()`,
 carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
 `tau.setBaOption("qlt-cells-budget", 0)`,
 `tau.getBaOption(name)`, which return the value now in force, or `null` with
-the reason in `tau.getLastError()` when the build declares no such option).
+the reason in `tau.getLastError()` when the build declares no such option;
+`tau.setBaTextOption(name, text)` and `tau.getBaTextOption(name)` do the same
+for a text option. The WebAssembly build has no `nlang`, which needs curl, so
+it declares no text option today).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`, `set_ltl_guard_max_cubes`,
@@ -4118,7 +4213,8 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * `S` (since) and `T` (trigger) past LTL operators are decided through the
     ppLTLTT temporal-tester encoding on the synthesis path and compiled away
     to auxiliary output variables for pure-past execution.
-  * `nlang` type requires `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) to be set;
+  * `nlang` type requires an API key (`nlang-api-key`, `TAU_LLM_API_KEY`, or
+    `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) to be set;
     without it every oracle question is answered `false` (not cached), so
     verdicts are not reliable.
   * **Algorithm A** is intentionally restricted to pure-output formulas. If
@@ -4134,8 +4230,8 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * Improve the performance of Boolean function normalization.
 * **Past LTL S/T operators**: currently compiled away to auxiliary variables; full
   integration with ltlsynt for pure past-LTL fragments is planned.
-* **nlang_ba**: support for additional LLM backends (OpenAI, local models) beyond
-  the current DeepSeek oracle.
+* **nlang_ba**: an oracle transport for the WebAssembly build, which has no
+  `nlang` because curl has no wasm port.
 * **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
   over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
   are supported, qlt's elimination by cells handles the `qlt` ω-categorical theory,

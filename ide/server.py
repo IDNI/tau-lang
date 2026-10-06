@@ -25,7 +25,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ide.grammar import get_grammar, grammar_to_autocomplete, grammar_to_help_sections
-from ide.llm import nl_to_tau, tau_to_nl, tau_assist
+from ide.llm import (PROVIDERS, nl_to_tau, provider_label, resolve_settings,
+                     tau_assist, tau_to_nl)
 
 IDE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = IDE_DIR.parent
@@ -513,21 +514,56 @@ async def api_substitute(body: dict[str, Any]):
 
 
 # ---------------------------------------------------------------------------
-# DeepSeek LLM integration
+# LLM integration
 # ---------------------------------------------------------------------------
+
+def _llm_settings(body: dict[str, Any]) -> tuple[dict[str, str], JSONResponse | None]:
+    """Provider, model and key of a request, or the 400 that refuses it."""
+    settings = resolve_settings(body)
+    provider = settings["provider"]
+    if provider not in PROVIDERS:
+        return settings, JSONResponse(
+            {"error": f"Unknown LLM provider '{provider}'"}, status_code=400)
+    if not settings["api_key"]:
+        return settings, JSONResponse(
+            {"error": f"{provider_label(provider)} API key required"},
+            status_code=400)
+    return settings, None
+
+
+@app.get("/api/llm/config")
+async def api_llm_config():
+    """What the server falls back to when a request names no provider,
+    model or key. Never a key: only whether the server holds one."""
+    defaults = resolve_settings({})
+    return JSONResponse({
+        "provider": defaults["provider"],
+        "model": defaults["model"],
+        "providers": {
+            name: {
+                "label": info["label"],
+                "default_model": info["default_model"],
+                "server_key": bool(
+                    resolve_settings({"provider": name})["api_key"]),
+            }
+            for name, info in PROVIDERS.items()
+        },
+    })
+
 
 @app.post("/api/llm/generate")
 async def api_llm_generate(body: dict[str, Any]):
     """Natural language → Tau code generation."""
-    api_key = body.get("api_key", "").strip()
+    settings, refused = _llm_settings(body)
     prompt = body.get("prompt", "").strip()
     context = body.get("context", "")
-    model = body.get("model", "deepseek-reasoner")
-    if not api_key:
-        return JSONResponse({"error": "DeepSeek API key required"}, status_code=400)
+    if refused:
+        return refused
     if not prompt:
         return JSONResponse({"error": "Prompt required"}, status_code=400)
-    result = await nl_to_tau(api_key, prompt, context=context, model=model)
+    result = await nl_to_tau(settings["api_key"], prompt, context=context,
+                             model=settings["model"],
+                             provider=settings["provider"])
     if "error" in result:
         return JSONResponse(result, status_code=502)
     return JSONResponse(result)
@@ -536,14 +572,15 @@ async def api_llm_generate(body: dict[str, Any]):
 @app.post("/api/llm/explain")
 async def api_llm_explain(body: dict[str, Any]):
     """Tau code → natural language explanation."""
-    api_key = body.get("api_key", "").strip()
+    settings, refused = _llm_settings(body)
     code = body.get("code", "").strip()
-    model = body.get("model", "deepseek-reasoner")
-    if not api_key:
-        return JSONResponse({"error": "DeepSeek API key required"}, status_code=400)
+    if refused:
+        return refused
     if not code:
         return JSONResponse({"error": "Code required"}, status_code=400)
-    result = await tau_to_nl(api_key, code, model=model)
+    result = await tau_to_nl(settings["api_key"], code,
+                             model=settings["model"],
+                             provider=settings["provider"])
     if "error" in result:
         return JSONResponse(result, status_code=502)
     return JSONResponse(result)
@@ -552,17 +589,18 @@ async def api_llm_explain(body: dict[str, Any]):
 @app.post("/api/llm/assist")
 async def api_llm_assist(body: dict[str, Any]):
     """Context-aware code assistance — answers questions about the current program."""
-    api_key = body.get("api_key", "").strip()
+    settings, refused = _llm_settings(body)
     question = body.get("question", "").strip()
     editor_content = body.get("editor_content", "")
     cursor_line = body.get("cursor_line", 0)
-    model = body.get("model", "deepseek-reasoner")
-    if not api_key:
-        return JSONResponse({"error": "DeepSeek API key required"}, status_code=400)
+    if refused:
+        return refused
     if not question:
         return JSONResponse({"error": "Question required"}, status_code=400)
-    result = await tau_assist(api_key, question, editor_content,
-                              cursor_line=cursor_line, model=model)
+    result = await tau_assist(settings["api_key"], question, editor_content,
+                              cursor_line=cursor_line,
+                              model=settings["model"],
+                              provider=settings["provider"])
     if "error" in result:
         return JSONResponse(result, status_code=502)
     return JSONResponse(result)
@@ -1233,7 +1271,20 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--tau-binary", default=None, help="Path to tau binary")
+    parser.add_argument("--llm-provider", default=None,
+                        choices=sorted(PROVIDERS),
+                        help="LLM provider of a request that names none "
+                             "(default: TAU_LLM_PROVIDER, else deepseek)")
+    parser.add_argument("--llm-model", default=None,
+                        help="LLM model of a request that names none "
+                             "(default: TAU_LLM_MODEL, else the provider's)")
     args = parser.parse_args()
+
+    # The arguments are the environment fallbacks, given on the command line.
+    if args.llm_provider:
+        os.environ["TAU_LLM_PROVIDER"] = args.llm_provider
+    if args.llm_model:
+        os.environ["TAU_LLM_MODEL"] = args.llm_model
 
     global _tau_binary
     if args.tau_binary:

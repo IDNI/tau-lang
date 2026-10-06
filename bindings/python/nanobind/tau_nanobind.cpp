@@ -396,6 +396,23 @@ NB_MODULE(tau, m) {
 		}, "name"_a,
 		"The value of a BA-declared option (a flag reads 0 or 1), or no "
 		"value when no algebra of this build declares the name.");
+	m.def("set_ba_text_option",
+		[](const std::string& name, const std::string& value) {
+			return to_py_result(
+				tau_api::set_ba_text_option(name, value));
+		}, "name"_a, "value"_a,
+		"Set a BA-declared text option (nlang-provider, nlang-model, "
+		"nlang-endpoint, nlang-api-key, nlang-effort); the empty string "
+		"clears it. Returns a result carrying the text the option now "
+		"reads (nlang-api-key reads 'set' or 'unset'); no value, and "
+		"the reason in the report, when the name is not a text option "
+		"of this build or the option does not take the value.");
+	m.def("get_ba_text_option",
+		[](const std::string& name) {
+			return to_py_result(tau_api::get_ba_text_option(name));
+		}, "name"_a,
+		"The text a BA-declared text option reads, or no value when "
+		"the name is not a text option of this build.");
 
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")

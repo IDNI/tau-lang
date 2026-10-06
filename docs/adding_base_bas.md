@@ -251,7 +251,8 @@ nested in the fold's lambda crashes gcc 13.
 
 `options()` returns a range of `ba_option` (`ba_descriptor.h`): a bare `name`,
 a `kind` -- `flag`, which the REPL's `set` also accepts as enable/disable/toggle,
-or `count`, which takes a number -- a getter and a setter, and a help string.
+`count`, which takes a number, or `text`, which takes a word -- a getter and a
+setter, and a help string.
 The REPL and CLI address it as `<family>-<name>` (`bv-blasting`), `<family>`
 being your `type_name`, so every width of a parameterised family shares one
 option set; `pack_find_ba_option` tells "no such family" from "no such option"
@@ -260,7 +261,19 @@ process-wide storage of your own, so every pack in one process shares the
 value. A switch that gates a preprocessing pass also needs core's master
 `preprocessing` switch on: `bv-blasting` is the example.
 
-A `count` option is written back only when its flag is actually given on the
+A `text` option fills `get_text` and `set_text`, which follow `help` in the
+struct, and leaves the four numeric accessors null. Its setter returns `false`
+for a word it does not take, and the REPL, the CLI and the API then report an
+invalid value; let an empty text clear the option. A getter returns what a
+reader may see: an option that holds a secret answers `set` or `unset`
+(`nlang-api-key`). The REPL grammar gives a value letters, digits and
+`. - _ : /`, optionally in double quotes (a host name needs them, since a
+`.` also separates commands). The API reaches a text option through `set_ba_text_option` and
+`get_ba_text_option`, and the numeric pair refuses it. The value joins
+`pack_ba_options_fingerprint` like a flag or a count does.
+
+A `flag` is written back from the command line only when the given value
+differs from the one in force, and a `count` or `text` option only when its flag is actually given on the
 command line, so a getter is free to resolve an environment fallback of its
 own and the CLI will not shadow it with the option's default. Every count
 option has one, named `TAU_<FAMILY>_<NAME>` with dashes as underscores

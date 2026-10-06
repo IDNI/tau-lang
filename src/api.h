@@ -519,13 +519,33 @@ struct api {
 	 * The value is the option's value afterwards, which differs from
 	 * @p value where the option clamps or ignores it (`bv-max-width 0`).
 	 * An error, and nothing changes, when no algebra of the pack declares
-	 * @p name.
+	 * @p name or when @p name is a text option (@ref set_ba_text_option).
 	 */
 	static result<size_t> set_ba_option(const std::string& name,
 		size_t value);
 	/// The value of a BA-declared option (a flag reads 0 or 1); an error
-	/// when no algebra of the pack declares @p name.
+	/// when no algebra of the pack declares @p name or when @p name is a
+	/// text option.
 	static result<size_t> get_ba_option(const std::string& name);
+	/**
+	 * @brief Set a BA-declared text option (`nlang-provider`,
+	 * `nlang-model`, `nlang-endpoint`, ...), named as in
+	 * @ref set_ba_option.
+	 *
+	 * The value is what the option reads afterwards. That is not always
+	 * @p value: an empty @p value clears the option, which then reads its
+	 * environment fallback or default, and an option holding a secret
+	 * (`nlang-api-key`) reads `set` or `unset`. An error, and nothing
+	 * changes, when no algebra of the pack declares @p name, when
+	 * @p name is a flag or a count, or when the option does not take
+	 * @p value.
+	 */
+	static result<std::string> set_ba_text_option(const std::string& name,
+		const std::string& value);
+	/// The value of a BA-declared text option, as a reader may see it; an
+	/// error when no algebra of the pack declares @p name or when @p name
+	/// is a flag or a count.
+	static result<std::string> get_ba_text_option(const std::string& name);
 	/// The `<family>-<option>` names of every BA-declared option of the
 	/// pack.
 	static std::vector<std::string> ba_option_names();

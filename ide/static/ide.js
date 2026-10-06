@@ -30,6 +30,7 @@ const IDE = {
     await this.loadExamples();
     await this.loadHelp();
     this.loadTemplates();
+    this.initAIModel();
     this.checkStatus();
     this.toast('Tau-lang IDE ready', 'info');
   },
@@ -1034,16 +1035,79 @@ const IDE = {
   },
 
   // -----------------------------------------------------------------------
-  // AI Assistant (DeepSeek)
+  // AI Assistant (DeepSeek, OpenAI, Anthropic)
   // -----------------------------------------------------------------------
-  _getAPIKey() {
-    return localStorage.getItem('tau_ide_deepseek_key') || '';
+  _providerLabels: { deepseek: 'DeepSeek', openai: 'OpenAI', anthropic: 'Anthropic' },
+
+  // The provider of the model the selector shows.
+  _getProvider() {
+    const select = document.getElementById('ai-model');
+    const option = select && select.options[select.selectedIndex];
+    return (option && option.dataset.provider) || 'deepseek';
+  },
+
+  _providerLabel(provider) {
+    return this._providerLabels[provider] || provider;
+  },
+
+  // One key per provider. The deepseek key keeps its first name, so a key
+  // saved before the IDE had providers is still found.
+  _keyName(provider) {
+    return provider === 'deepseek' ? 'tau_ide_deepseek_key'
+      : `tau_ide_${provider}_key`;
+  },
+
+  _getAPIKey(provider = this._getProvider()) {
+    return localStorage.getItem(this._keyName(provider)) || '';
+  },
+
+  // What the server falls back to: asked once.
+  async _getLLMConfig() {
+    if (!this._llmConfig) {
+      try {
+        this._llmConfig = await (await fetch('/api/llm/config')).json();
+      } catch (e) {
+        return {};
+      }
+    }
+    return this._llmConfig;
+  },
+
+  // Whether the server holds a key of its own for the provider, so a
+  // request may go without one.
+  async _serverHasKey(provider) {
+    const info = ((await this._getLLMConfig()).providers || {})[provider];
+    return !!(info && info.server_key);
+  },
+
+  // Select the server's default model, adding it to the selector when the
+  // page does not list it (an openai model, or one named on the command
+  // line of the server).
+  async initAIModel() {
+    const config = await this._getLLMConfig();
+    const select = document.getElementById('ai-model');
+    if (!select || !config.provider || !config.model) return;
+    let option = Array.from(select.options).find((o) =>
+      o.value === config.model && o.dataset.provider === config.provider);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = config.model;
+      option.dataset.provider = config.provider;
+      option.textContent =
+        `${config.model} (${this._providerLabel(config.provider)})`;
+      select.appendChild(option);
+    }
+    select.value = config.model;
   },
 
   showAPIKeyDialog() {
     const dialog = document.getElementById('api-key-dialog');
     const input = document.getElementById('api-key-input');
-    input.value = this._getAPIKey();
+    const provider = this._getProvider();
+    document.getElementById('api-key-title').textContent =
+      `${this._providerLabel(provider)} API Key`;
+    dialog.dataset.provider = provider;
+    input.value = this._getAPIKey(provider);
     dialog.style.display = '';
     input.focus();
   },
@@ -1053,13 +1117,16 @@ const IDE = {
   },
 
   saveAPIKey() {
+    const dialog = document.getElementById('api-key-dialog');
+    const provider = dialog.dataset.provider || this._getProvider();
+    const label = this._providerLabel(provider);
     const key = document.getElementById('api-key-input').value.trim();
     if (key) {
-      localStorage.setItem('tau_ide_deepseek_key', key);
-      this.toast('API key saved (browser only)', 'info');
+      localStorage.setItem(this._keyName(provider), key);
+      this.toast(`${label} API key saved (browser only)`, 'info');
     } else {
-      localStorage.removeItem('tau_ide_deepseek_key');
-      this.toast('API key removed', 'info');
+      localStorage.removeItem(this._keyName(provider));
+      this.toast(`${label} API key removed`, 'info');
     }
     this.hideAPIKeyDialog();
   },
@@ -1071,10 +1138,12 @@ const IDE = {
   },
 
   async sendAI() {
-    const apiKey = this._getAPIKey();
-    if (!apiKey) {
+    const provider = this._getProvider();
+    const providerLabel = this._providerLabel(provider);
+    const apiKey = this._getAPIKey(provider);
+    if (!apiKey && !(await this._serverHasKey(provider))) {
       this.showAPIKeyDialog();
-      this.toast('Please set your DeepSeek API key first', 'error');
+      this.toast(`Please set your ${providerLabel} API key first`, 'error');
       return;
     }
 
@@ -1096,12 +1165,12 @@ const IDE = {
         return;
       }
       status.textContent = 'Thinking...';
-      output.innerHTML = '<div style="color:#6c7086;">Sending to DeepSeek...</div>';
+      output.innerHTML = `<div style="color:#6c7086;">Sending to ${escHtml(providerLabel)}...</div>`;
       try {
         const resp = await fetch('/api/llm/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api_key: apiKey, code, model }),
+          body: JSON.stringify({ api_key: apiKey, provider, code, model }),
         });
         const data = await resp.json();
         if (data.error) {
@@ -1132,7 +1201,7 @@ const IDE = {
     }
 
     status.textContent = 'Thinking...';
-    output.innerHTML = '<div style="color:#6c7086;">Sending to DeepSeek...</div>';
+    output.innerHTML = `<div style="color:#6c7086;">Sending to ${escHtml(providerLabel)}...</div>`;
     input.value = '';
 
     try {
@@ -1143,6 +1212,7 @@ const IDE = {
           api_key: apiKey,
           prompt,
           context: textarea ? textarea.value : '',
+          provider,
           model,
         };
       } else {
@@ -1154,6 +1224,7 @@ const IDE = {
           question: prompt,
           editor_content: textarea ? textarea.value : '',
           cursor_line: cursorLine,
+          provider,
           model,
         };
       }

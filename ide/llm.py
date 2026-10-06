@@ -1,5 +1,5 @@
 """
-DeepSeek LLM integration for the Tau IDE.
+LLM integration for the Tau IDE (DeepSeek, OpenAI, Anthropic).
 
 Provides production-grade natural-language ↔ Tau translation with
 comprehensive context: full grammar, language semantics, worked examples,
@@ -7,7 +7,7 @@ operator reference, common patterns, and error avoidance.
 """
 from __future__ import annotations
 
-import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -228,53 +228,231 @@ def get_system_prompt() -> str:
 
 
 # ---------------------------------------------------------------------------
-# DeepSeek API calls
+# Providers
 # ---------------------------------------------------------------------------
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+# `kind` is the wire protocol. `default_model` is empty where the provider
+# has none worth naming here: the request must then name one.
+PROVIDERS: dict[str, dict[str, str]] = {
+    "deepseek": {
+        "label": "DeepSeek",
+        "kind": "chat",
+        "base_url": "https://api.deepseek.com/v1",
+        "default_model": "deepseek-reasoner",
+        "key_env": "DEEPSEEK_API_KEY",
+    },
+    "openai": {
+        "label": "OpenAI",
+        "kind": "chat",
+        "base_url": "https://api.openai.com/v1",
+        "default_model": "",
+        "key_env": "OPENAI_API_KEY",
+    },
+    "anthropic": {
+        "label": "Anthropic",
+        "kind": "anthropic",
+        "default_model": "claude-opus-5-5",
+        "key_env": "ANTHROPIC_API_KEY",
+    },
+}
+
+DEFAULT_PROVIDER = "deepseek"
+ANTHROPIC_MAX_TOKENS = 16000
 
 
-async def call_deepseek(
+def provider_label(provider: str) -> str:
+    """The name of @p provider as the UI shows it."""
+    return PROVIDERS.get(provider, {}).get("label", provider)
+
+
+def resolve_settings(body: dict[str, Any],
+                     env: dict[str, str] | None = None) -> dict[str, str]:
+    """Provider, model and key of one request.
+
+    Each comes from the request, else from the environment
+    (`TAU_LLM_PROVIDER`, `TAU_LLM_MODEL`, `TAU_LLM_API_KEY`, then the
+    provider's own key variable), else from the provider's default.
+    `TAU_LLM_MODEL` and `TAU_LLM_API_KEY` belong to the provider
+    `TAU_LLM_PROVIDER` names and apply to that provider only. The
+    server's `--llm-provider` / `--llm-model` arguments write the first two
+    variables.
+    """
+    env = os.environ if env is None else env
+    env_provider = (env.get("TAU_LLM_PROVIDER") or "").strip()
+    provider = (str(body.get("provider") or "").strip() or env_provider
+                or DEFAULT_PROVIDER)
+    info = PROVIDERS.get(provider, {})
+    model = str(body.get("model") or "").strip()
+    # TAU_LLM_MODEL names a model of the environment's provider
+    if not model and provider == (env_provider or DEFAULT_PROVIDER):
+        model = (env.get("TAU_LLM_MODEL") or "").strip()
+    if not model:
+        model = info.get("default_model", "")
+    # TAU_LLM_API_KEY is a key of the provider TAU_LLM_PROVIDER names: sent
+    # to another provider it would hand that provider someone else's key.
+    shared_key = ((env.get("TAU_LLM_API_KEY") or "").strip()
+                  if env_provider and provider == env_provider else "")
+    api_key = (str(body.get("api_key") or "").strip() or shared_key
+               or (env.get(info.get("key_env", "")) or "").strip())
+    return {"provider": provider, "model": model, "api_key": api_key}
+
+
+# ---------------------------------------------------------------------------
+# LLM API calls
+# ---------------------------------------------------------------------------
+
+def _chat_transport() -> httpx.AsyncBaseTransport | None:
+    """The transport of the chat completions client (None: httpx's own)."""
+    return None
+
+
+def _usage(prompt: int, completion: int, total: int | None = None) -> dict[str, int]:
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": prompt + completion if total is None else total,
+    }
+
+
+async def _call_chat_completions(
+    provider: str,
     api_key: str,
-    messages: list[dict[str, str]],
-    model: str = "deepseek-reasoner",
-    temperature: float = 0.3,
-    max_tokens: int = 4096,
+    system: str,
+    user_msg: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
 ) -> dict[str, Any]:
-    """Call the DeepSeek API with comprehensive error handling."""
+    """An OpenAI-compatible chat completions endpoint."""
+    info = PROVIDERS[provider]
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-
-    # Build payload - deepseek-reasoner doesn't support temperature
     payload: dict[str, Any] = {
         "model": model,
-        "messages": messages,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_msg},
+        ],
         "max_tokens": max_tokens,
     }
+    # deepseek-reasoner doesn't support temperature
     if model != "deepseek-reasoner":
         payload["temperature"] = temperature
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(DEEPSEEK_API_URL, headers=headers, json=payload)
-        if resp.status_code != 200:
-            return {
-                "error": f"DeepSeek API error {resp.status_code}: {resp.text}",
-                "status": resp.status_code,
-            }
-        data = resp.json()
-        choice = data.get("choices", [{}])[0]
-        message = choice.get("message", {})
+    url = info["base_url"] + "/chat/completions"
+    try:
+        async with httpx.AsyncClient(timeout=120.0,
+                                     transport=_chat_transport()) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+    except httpx.HTTPError as e:
+        return {"error": f"{info['label']} API request failed: {e}"}
+    if resp.status_code != 200:
         return {
-            "content": message.get("content", ""),
-            "reasoning": message.get("reasoning_content", ""),
-            "model": data.get("model", model),
-            "usage": data.get("usage", {}),
+            "error": f"{info['label']} API error {resp.status_code}: {resp.text}",
+            "status": resp.status_code,
         }
+    data = resp.json()
+    choice = (data.get("choices") or [{}])[0]
+    message = choice.get("message") or {}
+    usage = data.get("usage") or {}
+    return {
+        "content": message.get("content") or "",
+        "reasoning": message.get("reasoning_content") or "",
+        "model": data.get("model", model),
+        "usage": _usage(usage.get("prompt_tokens") or 0,
+                        usage.get("completion_tokens") or 0,
+                        usage.get("total_tokens")),
+    }
 
 
-async def nl_to_tau(api_key: str, prompt: str, context: str = "", model: str = "deepseek-reasoner") -> dict[str, Any]:
+async def _call_anthropic(
+    api_key: str,
+    system: str,
+    user_msg: str,
+    model: str,
+) -> dict[str, Any]:
+    """The Anthropic Messages API, through the official SDK."""
+    try:
+        import anthropic
+    except ImportError:
+        return {"error": "The Anthropic provider needs the anthropic "
+                         "package: pip install anthropic"}
+
+    try:
+        async with anthropic.AsyncAnthropic(api_key=api_key) as client:
+            # The system prompt is the same on every call, so it is cached.
+            # No temperature: the current models reject one.
+            response = await client.messages.create(
+                model=model,
+                max_tokens=ANTHROPIC_MAX_TOKENS,
+                system=[{
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }],
+                thinking={"type": "adaptive", "display": "summarized"},
+                messages=[{"role": "user", "content": user_msg}],
+            )
+    except anthropic.APIStatusError as e:
+        return {
+            "error": f"Anthropic API error {e.status_code}: {e.message}",
+            "status": e.status_code,
+        }
+    except anthropic.APIConnectionError as e:
+        return {"error": f"Anthropic API request failed: {e}"}
+
+    if response.stop_reason == "refusal":
+        return {"error": "Anthropic API: the model declined this request"}
+
+    text = "".join(b.text for b in response.content if b.type == "text")
+    reasoning = "\n".join(b.thinking for b in response.content
+                          if b.type == "thinking" and b.thinking)
+    u = response.usage
+    prompt = ((u.input_tokens or 0)
+              + (getattr(u, "cache_read_input_tokens", 0) or 0)
+              + (getattr(u, "cache_creation_input_tokens", 0) or 0))
+    return {
+        "content": text,
+        "reasoning": reasoning,
+        "model": response.model,
+        "usage": _usage(prompt, u.output_tokens or 0),
+    }
+
+
+async def call_llm(
+    provider: str,
+    api_key: str,
+    system: str,
+    user_msg: str,
+    model: str,
+    temperature: float = 0.3,
+    max_tokens: int = 4096,
+) -> dict[str, Any]:
+    """Put one question to @p provider.
+
+    Returns `content`, `reasoning`, `model` and `usage` (`prompt_tokens`,
+    `completion_tokens`, `total_tokens`) whatever the provider, or `error`
+    (and `status` when the API answered with one). @p temperature and
+    @p max_tokens apply to the chat completions providers.
+    """
+    info = PROVIDERS.get(provider)
+    if info is None:
+        return {"error": f"Unknown LLM provider '{provider}' "
+                         f"(one of: {', '.join(PROVIDERS)})"}
+    if not model:
+        return {"error": f"{info['label']} needs a model: none was given "
+                         "and the provider has no default"}
+    if info["kind"] == "anthropic":
+        return await _call_anthropic(api_key, system, user_msg, model)
+    return await _call_chat_completions(provider, api_key, system, user_msg,
+                                        model, temperature, max_tokens)
+
+
+async def nl_to_tau(api_key: str, prompt: str, context: str = "",
+                    model: str = "deepseek-reasoner",
+                    provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
     """Convert natural language description to Tau code."""
     system = get_system_prompt()
     user_msg = f"""Convert the following natural language description into valid Tau language code.
@@ -293,10 +471,7 @@ REQUIREMENTS:
 
     user_msg += f"DESCRIPTION:\n{prompt}"
 
-    result = await call_deepseek(api_key, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_msg},
-    ], model=model)
+    result = await call_llm(provider, api_key, system, user_msg, model)
 
     if "error" in result:
         return result
@@ -313,7 +488,8 @@ REQUIREMENTS:
     }
 
 
-async def tau_to_nl(api_key: str, code: str, model: str = "deepseek-reasoner") -> dict[str, Any]:
+async def tau_to_nl(api_key: str, code: str, model: str = "deepseek-reasoner",
+                    provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
     """Convert Tau code to a natural language explanation."""
     system = get_system_prompt()
     user_msg = f"""Explain the following Tau language code in clear, structured natural language.
@@ -332,10 +508,7 @@ TAU CODE:
 {code}
 ```"""
 
-    result = await call_deepseek(api_key, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_msg},
-    ], model=model)
+    result = await call_llm(provider, api_key, system, user_msg, model)
 
     if "error" in result:
         return result
@@ -354,6 +527,7 @@ async def tau_assist(
     editor_content: str,
     cursor_line: int = 0,
     model: str = "deepseek-reasoner",
+    provider: str = DEFAULT_PROVIDER,
 ) -> dict[str, Any]:
     """Context-aware code assistance — answers questions about the current program.
 
@@ -388,10 +562,7 @@ CURRENT EDITOR CONTENT (line {cursor_line} is where the cursor is):
 USER QUESTION:
 {question}"""
 
-    result = await call_deepseek(api_key, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_msg},
-    ], model=model)
+    result = await call_llm(provider, api_key, system, user_msg, model)
 
     if "error" in result:
         return result

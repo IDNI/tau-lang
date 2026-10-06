@@ -188,10 +188,27 @@ function runBaOptions(tau) {
 		'every BA option is named <family>-<option>');
 	for (const name of names) {
 		const v = tau.getBaOption(name);
+		const t = tau.getBaTextOption(name);
+		check((v === null) !== (t === null),
+			`${name} is a number or a text: ${v} / ${t}`);
+		if (v === null) {
+			check(typeof t === 'string', `getBaTextOption(${name}) -> ${t}`);
+			continue;
+		}
 		check(typeof v === 'number', `getBaOption(${name}) -> ${v}`);
 		check(tau.setBaOption(name, v) === v,
 			`setBaOption(${name}, ${v}) keeps it`);
 	}
+	check(tau.setBaTextOption('nope-nothing', 'x') === null
+		&& tau.getLastError().length > 0,
+		'setBaTextOption refuses an undeclared name');
+	check(tau.getBaTextOption('nope-nothing') === null
+		&& tau.getLastError().length > 0,
+		'getBaTextOption refuses an undeclared name');
+	if (names.includes('qlt-t3-cap'))
+		check(tau.setBaTextOption('qlt-t3-cap', 'x') === null
+			&& tau.getBaTextOption('qlt-t3-cap') === null,
+			'a count option refuses the text calls');
 	check(tau.setBaOption('nope-nothing', 1) === null
 		&& tau.getLastError().length > 0,
 		'setBaOption refuses an undeclared name');

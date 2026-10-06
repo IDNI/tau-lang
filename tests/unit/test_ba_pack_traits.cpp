@@ -436,6 +436,45 @@ TEST_SUITE("options") {
 			== ba_option_lookup_status::no_such_option);
 #endif
 	}
+	TEST_CASE("every option carries the accessors of its kind") {
+		for (const auto& e : pack_ba_options<node_t>()) {
+			CAPTURE(e.family);
+			CAPTURE(e.option.name);
+			const ba_option& o = e.option;
+			CHECK((o.get_flag && o.set_flag)
+				== (o.kind == ba_option_kind::flag));
+			CHECK((o.get_count && o.set_count)
+				== (o.kind == ba_option_kind::count));
+			CHECK((o.get_text && o.set_text)
+				== (o.kind == ba_option_kind::text));
+		}
+	}
+#ifdef TAU_PACK_HAS_BA_NLANG
+	TEST_CASE("a text option is part of the options fingerprint") {
+		auto f = pack_find_ba_option<node_t>("nlang", "model");
+		REQUIRE(f.option != nullptr);
+		CHECK(f.option->kind == ba_option_kind::text);
+		const llm_options saved = nlang_llm_options();
+		const size_t base = pack_ba_options_fingerprint<node_t>();
+		REQUIRE(f.option->set_text("some-other-model"));
+		CHECK(f.option->get_text() == "some-other-model");
+		CHECK(pack_ba_options_fingerprint<node_t>() != base);
+		nlang_llm_options() = saved;
+		CHECK(pack_ba_options_fingerprint<node_t>() == base);
+	}
+	TEST_CASE("a text setter refuses a word outside its set, and the key reads masked") {
+		const llm_options saved = nlang_llm_options();
+		auto opt = [](const char* n) {
+			return pack_find_ba_option<node_t>("nlang", n).option; };
+		nlang_llm_options() = {};
+		REQUIRE(opt("provider")->set_text("openai"));
+		CHECK_FALSE(opt("provider")->set_text("nobody"));
+		CHECK(opt("provider")->get_text() == "openai");
+		REQUIRE(opt("api-key")->set_text("sk-x"));
+		CHECK(opt("api-key")->get_text() == "set");
+		nlang_llm_options() = saved;
+	}
+#endif
 	TEST_CASE("pack_ba_options is de-duplicated per (family, name)") {
 		const auto& opts = pack_ba_options<node_t>();
 		for (size_t i = 0; i < opts.size(); ++i)

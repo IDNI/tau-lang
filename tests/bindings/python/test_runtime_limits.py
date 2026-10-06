@@ -96,15 +96,50 @@ def test_tref_budget_refuses_a_call():
 	assert not refused and refused.report.has_error, repr(refused)
 	assert verdict(tau.sat(SPEC)) is True
 
+def test_ba_text_options(names):
+	if "nlang-model" not in names:
+		return
+	assert verdict(tau.set_ba_text_option("nlang-model", "my-model-1")) \
+		== "my-model-1"
+	assert verdict(tau.get_ba_text_option("nlang-model")) == "my-model-1"
+	assert verdict(tau.set_ba_text_option("nlang-endpoint",
+		"http://localhost:8080/v1")) == "http://localhost:8080/v1"
+	assert verdict(tau.set_ba_text_option("nlang-provider", "anthropic")) \
+		== "anthropic"
+	refused = tau.set_ba_text_option("nlang-provider", "nobody")
+	assert not refused and refused.report.has_error, repr(refused)
+	assert verdict(tau.get_ba_text_option("nlang-provider")) == "anthropic"
+	# the key is never read back
+	assert verdict(tau.set_ba_text_option("nlang-api-key", "sk-secret")) \
+		== "set"
+	assert verdict(tau.get_ba_text_option("nlang-api-key")) == "set"
+	# a text option and a numeric one refuse each other's call
+	assert not tau.set_ba_option("nlang-model", 1)
+	assert not tau.get_ba_option("nlang-model")
+	assert not tau.set_ba_text_option("nlang-max-tokens", "x")
+	assert verdict(tau.set_ba_option("nlang-max-tokens", 512)) == 512
+	for name in ("nlang-model", "nlang-endpoint", "nlang-provider",
+			"nlang-api-key"):
+		assert tau.set_ba_text_option(name, "")
+
 def test_ba_options():
 	names = tau.ba_option_names()
 	assert all("-" in n for n in names), names
 	for name in names:
 		r = tau.get_ba_option(name)
-		assert r and isinstance(r.value, int), f"{name}: {r!r}"
+		t = tau.get_ba_text_option(name)
+		assert bool(r) != bool(t), f"{name}: {r!r} {t!r}"
+		if r:
+			assert isinstance(r.value, int), f"{name}: {r!r}"
+		else:
+			assert isinstance(t.value, str), f"{name}: {t!r}"
 	unknown = tau.set_ba_option("nope-nothing", 1)
 	assert not unknown and unknown.report.has_error, repr(unknown)
 	assert not tau.get_ba_option("nope-nothing")
+	unknown = tau.set_ba_text_option("nope-nothing", "x")
+	assert not unknown and unknown.report.has_error, repr(unknown)
+	assert not tau.get_ba_text_option("nope-nothing")
+	test_ba_text_options(names)
 	if "bv-definitional-elimination" not in names:
 		return
 	assert verdict(tau.set_ba_option("bv-definitional-elimination", 0)) == 0

@@ -137,8 +137,9 @@ body { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; backgr
                   <option value="explain">Explain code</option>
                 </select>
                 <select id="ai-model" style="background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:3px 6px;font-size:12px;">
-                  <option value="deepseek-reasoner">DeepSeek R1</option>
-                  <option value="deepseek-chat">DeepSeek V3</option>
+                  <option value="deepseek-reasoner" data-provider="deepseek">DeepSeek R1</option>
+                  <option value="deepseek-chat" data-provider="deepseek">DeepSeek V3</option>
+                  <option value="claude-opus-5-5" data-provider="anthropic">Claude Opus 5.5</option>
                 </select>
                 <button class="tb-btn" onclick="IDE.showAPIKeyDialog()" style="font-size:11px;">&#9881; API Key</button>
                 <span id="ai-status" style="font-size:11px;color:#6c7086;"></span>
@@ -185,7 +186,7 @@ body { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; backgr
 <div id="api-key-dialog" style="display:none;position:fixed;inset:0;z-index:10000;">
   <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);" onclick="IDE.hideAPIKeyDialog()"></div>
   <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e2e;border:1px solid #45475a;border-radius:8px;padding:24px;width:460px;max-width:90vw;">
-    <h3 style="color:#cdd6f4;margin-bottom:12px;">DeepSeek API Key</h3>
+    <h3 id="api-key-title" style="color:#cdd6f4;margin-bottom:12px;">API Key</h3>
     <p style="color:#a6adc8;font-size:12px;margin-bottom:12px;">Your key is stored in browser localStorage only — never sent to the server storage.</p>
     <input type="password" id="api-key-input" placeholder="sk-..." style="width:100%;background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:8px 12px;font-family:inherit;font-size:13px;margin-bottom:12px;">
     <div style="display:flex;gap:8px;justify-content:flex-end;">

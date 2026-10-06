@@ -257,8 +257,8 @@ cli::options tau_options() {
 	// descriptor.
 	for (const auto& e : pack_ba_options<node_t>()) {
 		std::string cli_name = e.family + "-" + e.option.name;
-		// A count option is registered with an empty default on
-		// purpose: writing the descriptor's own value back would
+		// A count or text option is registered with an empty default
+		// on purpose: writing the descriptor's own value back would
 		// shadow whatever environment fallback the algebra resolves
 		// for itself, and the option's own help text names its default.
 		if (e.option.kind == ba_option_kind::flag)
@@ -621,11 +621,21 @@ int main(int argc, char** argv) {
 	for (const auto& e : pack_ba_options<node_t>()) {
 		std::string cli_name = e.family + "-" + e.option.name;
 		if (e.option.kind == ba_option_kind::flag) {
-			e.option.set_flag(opts[cli_name].get<bool>());
+			// Written only when given: a flag left alone keeps
+			// whatever its algebra resolves for it.
+			if (std::ranges::find(args, "--" + cli_name) != args.end())
+				e.option.set_flag(opts[cli_name].get<bool>());
 			continue;
 		}
 		// Not given: the algebra keeps whatever it resolves itself --
 		// its own environment fallback, else its default.
+		if (e.option.kind == ba_option_kind::text) {
+			const string v = opts[cli_name].get<string>();
+			if (!v.empty() && !e.option.set_text(v))
+				return error("Invalid value for --" + cli_name
+					+ ": " + v);
+			continue;
+		}
 		auto n = given_count(cli_name.c_str());
 		if (!bad_option.empty()) return error(bad_option);
 		if (n) e.option.set_count(*n);

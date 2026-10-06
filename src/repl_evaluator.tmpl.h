@@ -1585,6 +1585,27 @@ inline const char* count_value_error(const std::string& v) {
 		: "Invalid value: expected a count\n";
 }
 
+/// The text of an option_value node: what its quotes hold when it has them.
+inline std::string option_value_text(const std::string& v) {
+	if (v.size() >= 2 && v.front() == '"' && v.back() == '"')
+		return v.substr(1, v.size() - 2);
+	return v;
+}
+
+/**
+ * @brief The value of @p o as `get` prints it: on/off, a count with 0 as
+ * its limit reads, or the text, `(none)` standing for an empty one.
+ */
+inline std::string ba_option_str(const ba_option& o) {
+	switch (o.kind) {
+	case ba_option_kind::flag:  return o.get_flag() ? "on" : "off";
+	case ba_option_kind::count: return count_limit_str(o.get_count());
+	case ba_option_kind::text:  break;
+	}
+	const std::string t = o.get_text();
+	return t.empty() ? "(none)" : t;
+}
+
 /**
  * @brief Parse @p v as an on/off flag value, or nullopt on failure.
  *
@@ -1921,9 +1942,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		});
 		for (const auto& e : ba_opts) {
 			out << e.family << "-" << e.option.name << ": ";
-			if (e.option.kind == ba_option_kind::flag)
-				out << pbool[e.option.get_flag()] << "\n";
-			else out << count_limit_str(e.option.get_count()) << "\n";
+			out << ba_option_str(e.option) << "\n";
 		}
 		return;
 	}
@@ -1939,14 +1958,14 @@ void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	{
 		auto ov = n | tau::option_value;
 		if (!ov) { err << "Invalid value\n"; return; }
-		set_cmd_ba_option(*raw, ov | tt::string);
+		set_cmd_ba_option(*raw, option_value_text(ov | tt::string));
 		get_cmd_ba_option(*raw);
 		return;
 	}
 	repl_option o = get_opt<node>(n, err);
 	auto ov = n | tau::option_value;
 	if (!ov) { err << "Invalid value\n"; return; }
-	set_cmd(o, ov | tt::string);
+	set_cmd(o, option_value_text(ov | tt::string));
 	get_cmd(n);
 }
 
@@ -2223,13 +2242,11 @@ const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
-	static std::string pbool[] = { "off", "on" };
 	auto [family, name] = split_ba_option_name(dotted);
 	const ba_option* o = resolve_ba_option(family, name);
 	if (!o) return;
 	// read before printing: a first read may warn about its variable
-	const std::string v = o->kind == ba_option_kind::flag
-		? pbool[o->get_flag()] : count_limit_str(o->get_count());
+	const std::string v = ba_option_str(*o);
 	out << family << "-" << name << ": " << v << "\n";
 }
 
@@ -2246,6 +2263,8 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	if (o->kind == ba_option_kind::flag) {
 		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
 		else err << "Invalid value\n";
+	} else if (o->kind == ba_option_kind::text) {
+		if (!o->set_text(v)) err << "Invalid value\n";
 	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
 	else err << count_value_error(v);
 }
@@ -2264,7 +2283,9 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 		// (block_max_splits_opt and friends, above), just addressed with
 		// this option's qualified name instead of a bare one.
 		print_error(code::invalid_argument,
-			"This option takes a count, not a flag",
+			o->kind == ba_option_kind::text
+				? "This option takes a text, not a flag"
+				: "This option takes a count, not a flag",
 			{{label::name, dotted}});
 		error = true;
 		return;
@@ -2675,9 +2696,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts
-	// (no enable/disable/toggle, same as core's numeric limit options) join
-	// only the get/set list. Both are empty in a pack where no BA declares
-	// any option.
+	// (no enable/disable/toggle, same as core's numeric limit options) and
+	// texts join only the get/set list. All are empty in a pack where no BA
+	// declares any option.
 	auto sorted_ba_options = [](ba_option_kind kind) {
 		auto opts = pack_ba_options<node>();
 		std::vector<ba_named_option> out;
@@ -2698,10 +2719,11 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	};
 	const std::string ba_flag_options = sorted_ba_options(ba_option_kind::flag);
 	const std::string ba_count_options = sorted_ba_options(ba_option_kind::count);
+	const std::string ba_text_options = sorted_ba_options(ba_option_kind::text);
 	const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options + ba_flag_options +
 		"  severity               severity                             error/info/debug/trace\n"
-		+ numeric_options + ba_count_options;
+		+ numeric_options + ba_count_options + ba_text_options;
 	const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options + ba_flag_options;
 	switch (nt) {

@@ -453,6 +453,18 @@ inline size_t ba_option_value(const ba_option& o) {
 		: o.get_count();
 }
 
+/// The option @p name when it is, or is not, a text option as @p text asks.
+template <NodeType node>
+result<const ba_option*> find_ba_option_of(const std::string& name, bool text) {
+	result<const ba_option*> r;
+	TAU_TRY(const ba_option* o, find_ba_option<node>(name));
+	if ((o->kind == ba_option_kind::text) != text)
+		return r.with_error(code::invalid_argument, text
+			? "The BA option takes a flag or a count, not a text"
+			: "The BA option takes a text", {{ label::value, name }});
+	return r.with_value(o);
+}
+
 } // namespace api_detail
 
 template <NodeType node>
@@ -461,7 +473,8 @@ result<size_t> api<node>::set_ba_option(const std::string& name,
 {
 	option_change_guard<node> guard;
 	result<size_t> r;
-	TAU_TRY(const ba_option* o, api_detail::find_ba_option<node>(name));
+	TAU_TRY(const ba_option* o,
+		api_detail::find_ba_option_of<node>(name, false));
 	if (o->kind == ba_option_kind::flag) o->set_flag(value != 0);
 	else o->set_count(value);
 	return r.with_value(api_detail::ba_option_value(*o));
@@ -470,8 +483,32 @@ result<size_t> api<node>::set_ba_option(const std::string& name,
 template <NodeType node>
 result<size_t> api<node>::get_ba_option(const std::string& name) {
 	result<size_t> r;
-	TAU_TRY(const ba_option* o, api_detail::find_ba_option<node>(name));
+	TAU_TRY(const ba_option* o,
+		api_detail::find_ba_option_of<node>(name, false));
 	return r.with_value(api_detail::ba_option_value(*o));
+}
+
+template <NodeType node>
+result<std::string> api<node>::set_ba_text_option(const std::string& name,
+	const std::string& value)
+{
+	option_change_guard<node> guard;
+	result<std::string> r;
+	TAU_TRY(const ba_option* o,
+		api_detail::find_ba_option_of<node>(name, true));
+	if (!o->set_text(value))
+		return r.with_error(code::invalid_argument, "The BA option "
+			"does not take this value", {{ label::name, name },
+				{ label::value, value }});
+	return r.with_value(o->get_text());
+}
+
+template <NodeType node>
+result<std::string> api<node>::get_ba_text_option(const std::string& name) {
+	result<std::string> r;
+	TAU_TRY(const ba_option* o,
+		api_detail::find_ba_option_of<node>(name, true));
+	return r.with_value(o->get_text());
 }
 
 template <NodeType node>

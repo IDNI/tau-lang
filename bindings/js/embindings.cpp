@@ -222,6 +222,30 @@ val js_get_ba_option(const std::string& name) {
 	} catch (const std::exception&) { return val::null(); }
 }
 
+// The text a BA-declared text option reads after the call, or null with the
+// reason in getLastError().
+val js_ba_text_option_value(const result<std::string>& r) {
+	if (r.has_value()) return val(r.value());
+	set_last_error(r);
+	return val::null();
+}
+
+val js_set_ba_text_option(const std::string& name, const std::string& value) {
+	g_last_error.clear();
+	try {
+		return js_ba_text_option_value(
+			tau_api::set_ba_text_option(name, value));
+	} catch (const std::exception&) { return val::null(); }
+}
+
+val js_get_ba_text_option(const std::string& name) {
+	g_last_error.clear();
+	try {
+		return js_ba_text_option_value(
+			tau_api::get_ba_text_option(name));
+	} catch (const std::exception&) { return val::null(); }
+}
+
 val js_ba_option_names() {
 	val out = val::array();
 	size_t i = 0;
@@ -356,6 +380,8 @@ EMSCRIPTEN_BINDINGS(tau) {
 	emscripten::function("baOptionNames", &js_ba_option_names);
 	emscripten::function("setBaOption", &js_set_ba_option);
 	emscripten::function("getBaOption", &js_get_ba_option);
+	emscripten::function("setBaTextOption", &js_set_ba_text_option);
+	emscripten::function("getBaTextOption", &js_get_ba_text_option);
 
 	emscripten::function("interpreterCreate", &js_interpreter_create);
 	emscripten::function("interpreterStep", &js_interpreter_step);
