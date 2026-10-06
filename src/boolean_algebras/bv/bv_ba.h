@@ -637,8 +637,8 @@ template <NodeType node> result<size_t> get_bv_width(size_t ba_type_id);
 // they decline the fold -- leaving the node symbolic -- whenever the exact
 // result would not fit, so the later widening pass can compute it at a wider
 // width instead of wrapping it here. div, mod and shr cannot overflow and
-// always fold. Each returns the folded node, @p symbol unchanged when there
-// is nothing to fold, or nullptr when a constant's width cannot be read.
+// always fold. Each returns the folded node, or @p symbol unchanged when
+// there is nothing to fold or a constant's width cannot be read.
 /** @brief Simplify an `add` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_add(tref symbol);
 /** @brief Simplify a `sub` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */

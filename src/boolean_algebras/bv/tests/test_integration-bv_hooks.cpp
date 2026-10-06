@@ -358,3 +358,29 @@ TEST_SUITE("bv operator hooks:corner cases") {
 		CHECK(src == expected);
 	}
 }
+// A symbol hook that cannot read a constant's width leaves the symbol as it
+// is: the tree under construction never receives a null node.
+TEST_SUITE("bv operator hooks:unreadable width") {
+
+	TEST_CASE("each arithmetic hook returns the symbol unchanged") {
+		tref bare = tau::get(tau::typed,
+			tau::get(node_t(tau::type, dict("bv"))));
+		const size_t id = ba_types<node_t>::id(bare);
+		REQUIRE( is_bv_type_family<node_t>(id) );
+		REQUIRE( !get_bv_width<node_t>(id).has_value() );
+		typename node_t::constant v = { make_bitvector_value(8, 5) };
+		use_hooks_guard<node_t> hooks_off(false);
+		tref c = tau::build_bf_ba_constant(v, id);
+		tref one = tau::build_bf_t_type(id);
+		auto unchanged = [](tref symbol, tref (*hook)(tref)) {
+			return hook(symbol) == symbol;
+		};
+		CHECK( unchanged(tau::build_bf_add(one, c), term_add<node_t>) );
+		CHECK( unchanged(tau::build_bf_sub(one, c), term_sub<node_t>) );
+		CHECK( unchanged(tau::build_bf_mul(one, c), term_mul<node_t>) );
+		CHECK( unchanged(tau::build_bf_div(one, c), term_div<node_t>) );
+		CHECK( unchanged(tau::build_bf_mod(one, c), term_mod<node_t>) );
+		CHECK( unchanged(tau::build_bf_shr(one, c), term_shr<node_t>) );
+		CHECK( unchanged(tau::build_bf_shl(one, c), term_shl<node_t>) );
+	}
+}
