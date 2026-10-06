@@ -29,6 +29,19 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief True the first time the calling thread asks about @p key.
+ *
+ * The warn-once gate of the environment readers: a limit may be read per
+ * HOA guard, and a warning per read would bury the rest of the output.
+ * Per thread, so concurrent readers need no lock.
+ * @param key What the warning is about, e.g. the variable's name.
+ */
+inline bool env_first_warning(const std::string& key) {
+	static thread_local std::set<std::string> warned;
+	return warned.insert(key).second;
+}
+
+/**
  * @brief Value of the environment variable @p var as a count, or @p dflt.
  *
  * An absent variable is the default. A value that is not a non-negative
@@ -48,8 +61,7 @@ inline size_t env_limit_count(const char* var, size_t dflt) {
 	errno = 0;
 	const long n = std::strtol(v, &end, 10);
 	if (end == v || *end != '\0' || n < 0 || errno == ERANGE) {
-		static thread_local std::set<std::string> warned;
-		if (warned.insert(var).second)
+		if (env_first_warning(var))
 			TAU_LOG_WARNING << var << "='" << v << "' is not a "
 				"non-negative number; keeping the default "
 				<< dflt;
@@ -76,8 +88,7 @@ inline double env_limit_real(const char* var, double dflt) {
 	errno = 0;
 	const double d = std::strtod(v, &end);
 	if (end == v || *end != '\0' || errno == ERANGE || !std::isfinite(d)) {
-		static thread_local std::set<std::string> warned;
-		if (warned.insert(var).second)
+		if (env_first_warning(var))
 			TAU_LOG_WARNING << var << "='" << v << "' is not a "
 				"number; keeping the default " << dflt;
 		return dflt;

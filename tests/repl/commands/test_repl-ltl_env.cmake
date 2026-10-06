@@ -77,6 +77,19 @@ add_repl_test(ltl_env-alg_garbage_reads_as_auto
 add_repl_test(ltl_env-qe_env_is_validated
 	"get ltlqemaxvars" "keeping the default 2" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)
+# A garbage value is reported once, however often the limit is read.
+add_repl_test(ltl_env-timeout_garbage_warns_once
+	"get ltltimeout. get ltltimeout. get ltltimeout" "ltltimeout: *60s" NO_TRACE
+	FAIL_REGEX "is not a non-negative number[^\n]*\n(.|\n)*is not a non-negative number"
+	ENV TAU_LTL_TIMEOUT_SEC=abc)
+add_repl_test(ltl_env-timeout_clamp_warns_once
+	"get ltltimeout. get ltltimeout" "ltltimeout: *86400s" NO_TRACE
+	FAIL_REGEX "exceeds the maximum[^\n]*\n(.|\n)*exceeds the maximum"
+	ENV TAU_LTL_TIMEOUT_SEC=100000)
+add_repl_test(ltl_env-qe_garbage_warns_once
+	"get ltlqemaxvars. get ltlqemaxvars. get ltlqemaxvars" "ltlqemaxvars: *2" NO_TRACE
+	FAIL_REGEX "is not a positive number[^\n]*\n(.|\n)*is not a positive number"
+	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)
 add_repl_test(ltl_env-qe_flag_beats_env
 	"get ltlqemaxvars" "ltlqemaxvars: *3" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_OMCAT_QE_MAX_VARS=4)

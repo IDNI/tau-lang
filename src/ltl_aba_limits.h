@@ -226,7 +226,9 @@ inline size_t ltl_qe_max_vars_param = 0;
  * `TAU_LTL_TIMEOUT_SEC` environment variable, else 60. Garbage in the
  * variable keeps the default instead of `atoi`'s 0 silently removing the
  * cap (LS-9); out-of-range values clamp to @ref ltl_timeout_sec_max with a
- * warning (SY-R5). A parameter above the maximum clamps silently.
+ * warning (SY-R5). Each warning is given once per thread (@ref
+ * env_first_warning); the variable is read on every call. A parameter above
+ * the maximum clamps silently.
  * @return The timeout in seconds, in [0, @ref ltl_timeout_sec_max].
  */
 inline int ltl_timeout_sec() {
@@ -240,13 +242,15 @@ inline int ltl_timeout_sec() {
 		// 2^32 as out of range instead of clamping it
 		long long v = std::strtoll(env_sec, &end, 10);
 		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
-			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
-				<< "' is not a non-negative number; keeping the default "
-				<< timeout_sec << "s";
+			if (env_first_warning("TAU_LTL_TIMEOUT_SEC"))
+				TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
+					<< "' is not a non-negative number; keeping the "
+					"default " << timeout_sec << "s";
 		} else if (v > ltl_timeout_sec_max) {
-			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC=" << v
-				<< " exceeds the maximum; clamping to "
-				<< ltl_timeout_sec_max << "s";
+			if (env_first_warning("TAU_LTL_TIMEOUT_SEC>max"))
+				TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC=" << v
+					<< " exceeds the maximum; clamping to "
+					<< ltl_timeout_sec_max << "s";
 			timeout_sec = (int) ltl_timeout_sec_max;
 		} else timeout_sec = (int) v;
 	}
@@ -259,8 +263,9 @@ inline int ltl_timeout_sec() {
  *
  * Precedence: @ref ltl_algorithm_param when non-empty, else the
  * `TAU_LTL_ALG` environment variable, else the default. Anything other
- * than A, B, D or auto (case-insensitive) is reported once and read as the
- * default: a typo must not silently disable every gate.
+ * than A, B, D or auto (case-insensitive) is reported once per value and
+ * thread and read as the default: a typo must not silently disable every
+ * gate.
  * @return The upper-cased choice, or `""` for `auto`, unset or invalid.
  */
 inline std::string ltl_algorithm_choice() {
@@ -270,13 +275,10 @@ inline std::string ltl_algorithm_choice() {
 	for (auto& c : v) c = (char) std::toupper((unsigned char) c);
 	if (v.empty() || v == "AUTO") return "";
 	if (v == "A" || v == "B" || v == "D") return v;
-	static std::string warned_for;
-	if (warned_for != v) {
-		warned_for = v;
+	if (env_first_warning("TAU_LTL_ALG=" + v))
 		TAU_LOG_WARNING << "[ltl_aba] synthesis algorithm \"" << v
 			<< "\" is not recognised (only A, B, D and auto are); "
 			"using the default routing";
-	}
 	return "";
 }
 
@@ -286,7 +288,7 @@ inline std::string ltl_algorithm_choice() {
  * Precedence: @ref ltl_qe_max_vars_param when non-zero, else the
  * `TAU_LTL_OMCAT_QE_MAX_VARS` environment variable (validated with
  * `strtol`; garbage or a non-positive value keeps the default with a
- * warning), else 2.
+ * warning, given once per thread), else 2.
  * @return The cap, always >= 1.
  */
 inline size_t ltl_qe_max_vars() {
@@ -297,9 +299,10 @@ inline size_t ltl_qe_max_vars() {
 		errno = 0;
 		long v = std::strtol(env_cap, &end, 10);
 		if (end == env_cap || *end != '\0' || v <= 0 || errno == ERANGE) {
-			TAU_LOG_WARNING << "TAU_LTL_OMCAT_QE_MAX_VARS='" << env_cap
-				<< "' is not a positive number; keeping the default "
-				<< cap;
+			if (env_first_warning("TAU_LTL_OMCAT_QE_MAX_VARS"))
+				TAU_LOG_WARNING << "TAU_LTL_OMCAT_QE_MAX_VARS='"
+					<< env_cap << "' is not a positive number; "
+					"keeping the default " << cap;
 		} else cap = (size_t) v;
 	}
 	return cap;
