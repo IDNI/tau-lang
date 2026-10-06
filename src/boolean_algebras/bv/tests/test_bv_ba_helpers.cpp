@@ -187,6 +187,29 @@ TEST_SUITE("bv solver budgets and declines") {
 		CHECK( !st.has_value() );
 	}
 
+	// An undecided question is neither sat, unsat nor valid.
+	TEST_CASE("an untranslatable formula is neither unsat nor valid") {
+		tref fm = closed_form(
+			"ex x:bv[8] (x + { 1 }:bv[8] = { 0 }:bv[8] && q(x)).");
+		CHECK( !bv_formula_sat_status<node_t>(fm).has_value() );
+		CHECK( !is_bv_formula_unsat<node_t>(fm) );
+		CHECK( !is_bv_formula_valid<node_t>(fm) );
+	}
+
+	TEST_CASE("an unknown verdict is neither unsat nor valid") {
+		tref fm = closed_form("ex x:bv[8] (x + { 1 }:bv[8] = { 2 }:bv[8]).");
+		{
+			time_budget_handled scope(std::chrono::seconds(0));
+			CHECK( bv_formula_sat_status<node_t>(fm)
+				== bv_sat_status::unknown );
+			CHECK( !is_bv_formula_sat<node_t>(fm) );
+			CHECK( !is_bv_formula_unsat<node_t>(fm) );
+			CHECK( !is_bv_formula_valid<node_t>(fm) );
+		}
+		CHECK( is_bv_formula_sat<node_t>(fm) );
+		CHECK( !is_bv_formula_unsat<node_t>(fm) );
+	}
+
 	// The unknown of a spent budget answers for that budget only: the
 	// formula is decided again once the scope closes, and nothing of the
 	// scope's budget reaches a later question.

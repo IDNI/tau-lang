@@ -71,12 +71,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		// wrappers: the value is the value of the single child.
 		// bf_parenthesis is transparent too -- "(" bf ")" carries no
 		// semantics of its own (needed_width/widen_term already treat it
-		// as a pass-through, bv_widening.h); missing it here meant any
-		// bv formula containing one (e.g. bv_widening's own `(x*y)'`
-		// shape, forced by the grammar around a complement/cast operand)
-		// silently failed to translate, which made both a formula AND its
-		// negation "fail to translate", so is_bv_formula_valid (unsat of
-		// the negation) came back true regardless of the real semantics.
+		// as a pass-through, bv_widening.h), and bv_widening's own
+		// `(x*y)'` shape, forced by the grammar around a complement/cast
+		// operand, carries one.
 		case tau::wff_always: case tau::wff_sometimes:
 		case tau::wff: case tau::bf: case tau::bf_parenthesis:
 		case tau::ctnvar:
@@ -857,15 +854,13 @@ bool is_bv_formula_sat(tref form) {
 	return bv_formula_sat_status<node>(form) == bv_sat_status::sat;
 }
 
-// The negation of is_bv_formula_sat: an unknown verdict or a translation
-// failure also answers `true` here.
+/** @internal @copydoc is_bv_formula_unsat @endinternal */
 template <NodeType node>
 bool is_bv_formula_unsat(tref form) {
-	return !is_bv_formula_sat<node>(form);
+	return bv_formula_sat_status<node>(form) == bv_sat_status::unsat;
 }
 
-// `is_bv_formula_unsat` of the negation, so it inherits that function's
-// answer on an unknown verdict or a translation failure.
+/** @internal @copydoc is_bv_formula_valid @endinternal */
 template <NodeType node>
 bool is_bv_formula_valid(tref form) {
 	using tau = tree<node>;

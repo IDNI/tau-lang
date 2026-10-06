@@ -457,27 +457,27 @@ bool has_blasting_residue(tref form);
  * @brief Checks whether a given bit-vector formula is valid, as
  * `is_bv_formula_unsat` of its negation.
  *
- * Not a definite answer: when cvc5 answers unknown for the negation, or the
- * negation cannot be translated, this returns true as well. A caller that
- * must not take an undecided formula as valid uses `bv_formula_sat_status`
- * on the negation instead.
+ * A false return is not a definite answer: when cvc5 answers unknown for
+ * the negation (a timeout included), or the negation cannot be translated,
+ * this returns false as well. A caller that must tell "not valid" from
+ * "cannot decide" uses `bv_formula_sat_status` on the negation instead.
  *
  * @param form The formula to be checked for validity.
- * @return true if the negation of @p form is not definitely satisfiable.
+ * @return true iff the negation of @p form is definitely unsatisfiable.
  */
 template <NodeType node>
 bool is_bv_formula_valid(tref form);
 
 /**
- * @brief Checks whether a given bit-vector formula is unsatisfiable, as
- * `!is_bv_formula_sat`.
+ * @brief Checks whether a given bit-vector formula is unsatisfiable.
  *
- * Not a definite answer: a cvc5 unknown (a timeout included) and a
- * translation failure also return true. A caller that would conclude the
- * formula is false from it uses `bv_formula_sat_status` instead.
+ * A false return is not a definite answer: a cvc5 unknown (a timeout
+ * included) and a translation failure return false as well. A caller that
+ * must tell "satisfiable" from "cannot decide" uses `bv_formula_sat_status`
+ * instead.
  *
  * @param form The bit-vector formula to be checked for unsatisfiability.
- * @return true if @p form is not definitely satisfiable.
+ * @return true iff @p form is definitely unsatisfiable.
  */
 template <NodeType node>
 bool is_bv_formula_unsat(tref form);
