@@ -449,6 +449,18 @@ add_repl_test(normalize_cmd-qlt_named_ground_both
 	"normalize {c}:qlt < {d}:qlt && {d}:qlt < {c}:qlt" "%1[^%]*: F")
 add_repl_test(normalize_cmd-qlt_named_ground_kept
 	"normalize {c}:qlt < {d}:qlt" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
+# An interval between two names is empty when they are out of order, so its
+# emptiness is kept; a single named point is never empty.
+add_repl_test(normalize_cmd-qlt_named_interval_empty_kept
+	"normalize {(c, d)}:qlt = 0" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
+add_repl_test(normalize_cmd-qlt_named_interval_nonempty_kept
+	"normalize {[c, d]}:qlt != 0" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
+add_repl_test(normalize_cmd-qlt_named_interval_empty_or_ordered
+	"normalize {(c, d)}:qlt = 0 || {c}:qlt < {d}:qlt" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_interval_empty_and_ordered
+	"normalize {(c, d)}:qlt = 0 && {c}:qlt < {d}:qlt" "%1[^%]*: F")
+add_repl_test(normalize_cmd-qlt_named_point_not_empty
+	"normalize {[c, c]}:qlt = 0" "%1[^%]*: F")
 
 # The cell decisions keep their binder past qlt-cells-max-params parameters.
 add_repl_test(normalize_cmd-qlt_cells_max_params_zero_is_unlimited

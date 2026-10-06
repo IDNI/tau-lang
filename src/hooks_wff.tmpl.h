@@ -433,6 +433,12 @@ template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
 	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
+	// The emptiness of an inexact constant is the owner's to decide.
+	if (l && !folds_exactly<node>(l | tt::ba_constant)) {
+		if (auto h = hooks_detail::try_wff_eq<node>(ch, r,
+			arg1(ch).get_ba_type())) return *h;
+		return tau::get_raw(v, ch, len, r);
+	}
 	if (l && (l | tt::ba_constant) == false) return bare_wff_T<node>(r);
 	else if (l) return bare_wff_F<node>(r);
 	return tau::get_raw(v, ch, len, r);
@@ -529,6 +535,11 @@ template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
 	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
+	if (l.has_value() && !folds_exactly<node>(l | tt::ba_constant)) {
+		if (auto h = hooks_detail::try_wff_neq<node>(ch, r,
+			arg1(ch).get_ba_type())) return *h;
+		return tau::get_raw(v, ch, len, r);
+	}
 	if (l.has_value() && (l | tt::ba_constant) == false)
 		return bare_wff_F<node>(r);
 	else if (l.has_value()) return bare_wff_T<node>(r);

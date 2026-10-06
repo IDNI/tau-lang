@@ -326,7 +326,9 @@ concept ba_has_literal_incomplete = ba_has_descriptor_v<Node, BA>
  * Optional capability: a constant whose value depends on an unknown part (qlt's
  * named endpoints) may be an over-approximation, and folding two constants
  * into such a value would decide comparisons the operands do not decide. Core
- * keeps the operation as a term when `exact_constant` answers false. Probed at
+ * keeps the operation as a term when `exact_constant` answers false, and leaves
+ * the comparison of such a constant with 0 or 1 to the owner's `=`/`!=` hooks,
+ * keeping it when they decline. Probed at
  * the point of use, like `print_constant`; absent means every constant is
  * exact.
  */
