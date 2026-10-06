@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include <cctype> // isalpha/isalnum used below
+#include <limits>
 #include "qlt.h"
 
 namespace idni::tau_lang {
@@ -37,7 +38,7 @@ static long long qlt_gcd(long long a, long long b) {
 void qlt_rational::normalise() {
 	if (is_sym()) return; // symbolic: no reduction
 	if (q < 0) { p = -p; q = -q; }
-	long long g = qlt_gcd(p < 0 ? -p : p, q);
+	long long g = qlt_gcd(p, q);
 	p /= g; q /= g;
 }
 
@@ -63,21 +64,32 @@ bool qlt_rational::operator<(const qlt_rational& o) const {
 	return (int128_t_) p * o.q < (int128_t_) o.p * q;
 }
 
+// Divide num and den by their gcd; den > 0.
+static void qlt_reduce_wide(int128_t_& num, int128_t_& den) {
+	int128_t_ a = num < 0 ? -num : num, b = den;
+	while (b) { int128_t_ t = a % b; a = b; b = t; }
+	if (a > 1) num /= a, den /= a;
+}
+
 qlt_rational qlt_rational::midpoint(const qlt_rational& o) const {
 	// Compute wide, then reduce by gcd before narrowing -- the
 	// unreduced cross products overflow long long for large operands.
 	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
 	int128_t_ den = (int128_t_) 2 * q * o.q;
-	int128_t_ a = num < 0 ? -num : num, b = den < 0 ? -den : den;
-	while (b) { int128_t_ t = a % b; a = b; b = t; }
-	if (a > 1) num /= a, den /= a;
+	qlt_reduce_wide(num, den);
 	// A gcd-irreducible result outside long long is truncated (extreme
 	// parse-level literals only).
 	return qlt_rational((long long) num, (long long) den);
 }
 
-qlt_rational qlt_rational::operator+(const qlt_rational& o) const {
-	return qlt_rational(p * o.q + o.p * q, q * o.q);
+std::optional<qlt_rational> qlt_rational::add(const qlt_rational& o) const {
+	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
+	int128_t_ den = (int128_t_) q * o.q;
+	qlt_reduce_wide(num, den);
+	const int128_t_ lo = std::numeric_limits<long long>::min(),
+		hi = std::numeric_limits<long long>::max();
+	if (num < lo || num > hi || den > hi) return std::nullopt;
+	return qlt_rational((long long) num, (long long) den);
 }
 
 std::string qlt_rational::to_string() const {
@@ -736,23 +748,19 @@ qlt qlt_splitter(const qlt& x, splitter_type /*st*/) {
 	}
 
 	if (lo_val.is_neg_inf()) {
-		// Take (-inf, midpoint)
-		qlt_rational mid;
-		if (hi_val.is_finite()) {
-			// midpoint between hi - 1 and hi
-			mid = qlt_rational(hi_val.p - hi_val.q, hi_val.q);
-		} else {
-			mid = qlt_rational(0, 1);
-		}
+		// Take (-inf, hi - 1); the piece when hi - 1 does not fit
+		auto mid = hi_val.add(qlt_rational(-1, 1));
+		if (!mid) return qlt{{ p }};
 		return qlt{{ { qlt_endpoint{qlt_rational::make_neg_inf(), qlt_bound::OPEN},
-		                  qlt_endpoint{mid, qlt_bound::OPEN} } }};
+		                  qlt_endpoint{*mid, qlt_bound::OPEN} } }};
 	}
 
 	if (hi_val.is_pos_inf()) {
-		// Take [lo, lo+1)
-		qlt_rational mid(lo_val.p + lo_val.q, lo_val.q);
+		// Take [lo, lo + 1); the piece when lo + 1 does not fit
+		auto mid = lo_val.add(qlt_rational(1, 1));
+		if (!mid) return qlt{{ p }};
 		return qlt{{ { p.lo,
-		                  qlt_endpoint{mid, qlt_bound::OPEN} } }};
+		                  qlt_endpoint{*mid, qlt_bound::OPEN} } }};
 	}
 
 	// Both finite: use midpoint

@@ -194,6 +194,21 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		// the type's 0 is no point of the order
 		CHECK_FALSE(pack_dense_order_compare<node_t>(q, zero,
 			build_bf_f_type<node_t>(q)).has_value());
+		// no rational of the representation lies beyond the extreme ones
+		auto point = [&](long long v) {
+			const qlt_rational r(v, 1);
+			return tau::get(tau::bf, tau::get_ba_constant(
+				typename node_t::constant(qlt{ { { { r, qlt_bound::CLOSED },
+					{ r, qlt_bound::CLOSED } } } }), q));
+		};
+		tref max = point(std::numeric_limits<long long>::max());
+		tref min = point(std::numeric_limits<long long>::min() + 1);
+		tref past_max = pack_dense_order_between<node_t>(q, max, nullptr);
+		tref past_min = pack_dense_order_between<node_t>(q, nullptr, min);
+		CHECK((!past_max
+			|| pack_dense_order_compare<node_t>(q, past_max, max) == 1));
+		CHECK((!past_min
+			|| pack_dense_order_compare<node_t>(q, past_min, min) == -1));
 #endif
 	}
 	TEST_CASE("pack_type_is_atomless agrees with every descriptor's flag") {

@@ -350,18 +350,21 @@ namespace qlt_cells_detail {
 
 // The greatest integer not above the finite rational r.
 inline qlt_rational floor_of(const qlt_rational& r) {
-	return qlt_rational(r.p >= 0 ? r.p / r.q : -((-r.p + r.q - 1) / r.q), 1);
+	return qlt_rational(r.p / r.q - (r.p < 0 && r.p % r.q != 0 ? 1 : 0), 1);
 }
 
 // The least integer not below the finite rational r.
 inline qlt_rational ceil_of(const qlt_rational& r) {
 	const qlt_rational f = floor_of(r);
-	return f == r ? f : f + qlt_rational(1, 1);
+	// f < r <= LLONG_MAX, so f.p + 1 fits
+	return f == r ? f : qlt_rational(f.p + 1, 1);
 }
 
 // A point strictly between lo and hi, either of which may be missing: 0 when
-// it lies there, else the integer nearest to 0, else the midpoint.
-inline qlt_rational between(const std::optional<qlt_rational>& lo,
+// it lies there, else the integer nearest to 0, else the midpoint; nullopt
+// when an unbounded side holds no rational the representation fits.
+inline std::optional<qlt_rational> between(
+	const std::optional<qlt_rational>& lo,
 	const std::optional<qlt_rational>& hi)
 {
 	const qlt_rational zero(0, 1);
@@ -369,10 +372,11 @@ inline qlt_rational between(const std::optional<qlt_rational>& lo,
 		return (!lo || *lo < r) && (!hi || r < *hi);
 	};
 	if (inside(zero)) return zero;
-	const qlt_rational c = lo && !(*lo < zero)
-		? floor_of(*lo) + qlt_rational(1, 1)
-		: ceil_of(*hi) + qlt_rational(-1, 1);
-	if (inside(c)) return c;
+	const auto c = lo && !(*lo < zero)
+		? floor_of(*lo).add(qlt_rational(1, 1))
+		: ceil_of(*hi).add(qlt_rational(-1, 1));
+	if (c && inside(*c)) return c;
+	if (!lo || !hi) return std::nullopt;
 	return lo->midpoint(*hi);
 }
 
@@ -382,24 +386,30 @@ struct cell {
 	qlt_rational point; // a point of piece
 };
 
-// The cells of Q cut by pts, which is sorted and free of repeats.
-inline std::vector<cell> cells_of(const std::vector<qlt_rational>& pts) {
+// The cells of Q cut by pts, which is sorted and free of repeats; nullopt
+// when a cell holds no rational the representation fits (see between).
+inline std::optional<std::vector<cell>> cells_of(
+	const std::vector<qlt_rational>& pts)
+{
 	const qlt_endpoint below{ qlt_rational::make_neg_inf(), qlt_bound::OPEN };
 	const qlt_endpoint above{ qlt_rational::make_pos_inf(), qlt_bound::OPEN };
 	std::vector<cell> out;
 	std::optional<qlt_rational> lo;
 	auto gap = [&](const std::optional<qlt_rational>& hi) {
+		auto point = between(lo, hi);
+		if (!point) return false;
 		out.push_back({ { lo ? qlt_endpoint{ *lo, qlt_bound::OPEN } : below,
 			hi ? qlt_endpoint{ *hi, qlt_bound::OPEN } : above },
-			between(lo, hi) });
+			*point });
+		return true;
 	};
 	for (const auto& p : pts) {
-		gap(p);
+		if (!gap(p)) return std::nullopt;
 		out.push_back({ { { p, qlt_bound::CLOSED }, { p, qlt_bound::CLOSED } },
 			p });
 		lo = p;
 	}
-	gap(std::nullopt);
+	if (!gap(std::nullopt)) return std::nullopt;
 	return out;
 }
 
@@ -428,7 +438,8 @@ inline qlt point_set(const qlt_rational& v) {
  * constants and the typed 0 and 1 (every point of one side below every point
  * of the other, see qlt_order_holds). A named endpoint is read
  * through its value in @ref named. Anything else, a variable or a name
- * without a value or a spent budget is nullopt.
+ * without a value, a spent budget or a cell holding no rational the
+ * representation fits is nullopt.
  */
 template<NodeType node>
 class qlt_point_eval {
@@ -497,28 +508,37 @@ public:
 	explicit qlt_point_eval(std::vector<qlt_rational> ends)
 		: ends(std::move(ends)) {}
 
-	/// False once the budget is spent, which makes every answer nullopt;
-	/// otherwise spends one unit.
+	/// False once exhausted, which makes every answer nullopt; otherwise
+	/// spends one unit.
 	bool spend() {
-		if (!budget) return false;
+		if (exhausted()) return false;
 		--budget;
 		return true;
 	}
-	/// True once the budget is spent: a verdict reached since is not one.
-	bool exhausted() const { return !budget; }
+	/// True once the budget is spent or out_of_range: a verdict reached
+	/// since is not one.
+	bool exhausted() const { return !budget || beyond; }
+	/// True once a cell held no rational the representation fits, as past
+	/// the greatest `long long`.
+	bool out_of_range() const { return beyond; }
 
-	/// The cells cut by the endpoints and by the values in @ref env.
-	std::vector<qlt_cells_detail::cell> cells() const {
+	/// The cells cut by the endpoints and by the values in @ref env; none,
+	/// and out_of_range from then on, when a cell holds no rational the
+	/// representation fits.
+	std::vector<qlt_cells_detail::cell> cells() {
 		std::vector<qlt_rational> pts(ends);
 		for (const auto& [_, v] : env) pts.push_back(v);
 		for (const auto& [_, v] : named) pts.push_back(v);
 		std::sort(pts.begin(), pts.end());
 		pts.erase(std::unique(pts.begin(), pts.end()), pts.end());
-		return qlt_cells_detail::cells_of(pts);
+		auto cs = qlt_cells_detail::cells_of(pts);
+		if (!cs) beyond = true;
+		return cs ? std::move(*cs) : std::vector<qlt_cells_detail::cell>{};
 	}
 
 	/// The truth of @p fm under @ref env and @ref named; nullopt when a
-	/// part of it is not read (see the class comment) or the budget ran out.
+	/// part of it is not read (see the class comment) or the evaluator is
+	/// exhausted.
 	std::optional<bool> holds(tref fm) {
 		const auto& t = tau::get(fm);
 		if (t.equals_T()) return true;
@@ -589,7 +609,9 @@ public:
 	std::optional<bool> quantified(tref var, tref body, bool universal) {
 		if (!is_point_var(var)) return std::nullopt;
 		bool unknown = false;
-		for (const auto& c : cells()) {
+		const auto cs = cells();
+		if (exhausted()) return std::nullopt;
+		for (const auto& c : cs) {
 			if (!spend()) return std::nullopt;
 			env.emplace_back(var, c.point);
 			auto v = holds(body);
@@ -608,14 +630,17 @@ public:
 	 * @param names The names to place.
 	 * @param i Index of the first name not yet placed (0 from a caller).
 	 * @param f Callback returning whether to continue.
-	 * @return False when @p f stopped the walk or the budget ran out.
+	 * @return False when @p f stopped the walk or the evaluator is
+	 * exhausted.
 	 */
 	template <typename F>
 	bool each_naming(const std::vector<std::string>& names, size_t i,
 		F&& f)
 	{
 		if (i == names.size()) return f();
-		for (const auto& c : cells()) {
+		const auto cs = cells();
+		if (exhausted()) return false;
+		for (const auto& c : cs) {
 			if (!spend()) return false;
 			named.emplace_back(names[i], c.point);
 			const bool go = each_naming(names, i + 1, f);
@@ -632,12 +657,15 @@ public:
 	 * @param vars The qlt variables to place.
 	 * @param i Index of the first variable not yet placed (0 from a caller).
 	 * @param f Callback returning whether to continue.
-	 * @return False when @p f stopped the walk or the budget ran out.
+	 * @return False when @p f stopped the walk or the evaluator is
+	 * exhausted.
 	 */
 	template <typename F>
 	bool each_position(const trefs& vars, size_t i, F&& f) {
 		if (i == vars.size()) return f();
-		for (const auto& c : cells()) {
+		const auto cs = cells();
+		if (exhausted()) return false;
+		for (const auto& c : cs) {
 			if (!spend()) return false;
 			env.emplace_back(vars[i], c.point);
 			const bool go = each_position(vars, i + 1, f);
@@ -649,6 +677,7 @@ public:
 
 private:
 	std::vector<qlt_rational> ends;
+	bool beyond = false;
 	size_t budget = qlt_cells_budget() ? qlt_cells_budget()
 		: std::numeric_limits<size_t>::max();
 

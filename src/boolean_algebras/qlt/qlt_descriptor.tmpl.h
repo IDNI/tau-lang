@@ -292,7 +292,8 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 * @param lo Lower singleton constant, or nullptr.
 	 * @param hi Upper singleton constant, or nullptr.
 	 * @return The singleton as a bf constant; nullptr when a given bound is
-	 * not a finite closed singleton.
+	 * not a finite closed singleton, or when one above @p lo or below @p hi
+	 * does not fit the representation.
 	 */
 	static tref dense_order_between(size_t ba_type, tref lo, tref hi) {
 		auto point = [](tref c) -> std::optional<qlt_rational> {
@@ -314,14 +315,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 			auto a = point(lo), b = point(hi);
 			if (!a || !b) return nullptr;
 			v = a->midpoint(*b);
-		} else if (lo) {
-			auto a = point(lo);
+		} else if (lo || hi) {
+			auto a = point(lo ? lo : hi);
 			if (!a) return nullptr;
-			v = *a + qlt_rational(1, 1);
-		} else if (hi) {
-			auto b = point(hi);
-			if (!b) return nullptr;
-			v = *b + qlt_rational(-1, 1);
+			auto s = a->add(qlt_rational(lo ? 1 : -1, 1));
+			if (!s) return nullptr;
+			v = *s;
 		}
 		qlt z;
 		qlt_piece p;

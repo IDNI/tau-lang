@@ -215,10 +215,23 @@ TEST_CASE("midpoint of 1/3 and 2/3 is 1/2") {
 	CHECK(m == qlt_rational(1, 2));
 }
 
-TEST_CASE("operator+: 1/3 + 1/6 = 1/2") {
+TEST_CASE("add: 1/3 + 1/6 = 1/2") {
 	qlt_rational a(1, 3), b(1, 6);
-	auto s = a + b;
-	CHECK(s == qlt_rational(1, 2));
+	auto s = a.add(b);
+	REQUIRE(s);
+	CHECK(*s == qlt_rational(1, 2));
+}
+
+TEST_CASE("add: a sum outside long long is nullopt") {
+	constexpr long long max = std::numeric_limits<long long>::max();
+	constexpr long long min = std::numeric_limits<long long>::min();
+	CHECK_FALSE(qlt_rational(max, 1).add(qlt_rational(1, 1)));
+	CHECK_FALSE(qlt_rational(min, 1).add(qlt_rational(-1, 1)));
+	CHECK(qlt_rational(max, 1).add(qlt_rational(-1, 1))
+		== qlt_rational(max - 1, 1));
+	// the cross products overflow, the reduced sum fits
+	CHECK(qlt_rational(1, max).add(qlt_rational(1, max))
+		== qlt_rational(2, max));
 }
 
 TEST_CASE("to_string: integer") {

@@ -225,9 +225,9 @@ struct qlt_rational {
 	/// in 128 bits and reduced; a reduced result outside `long long` is
 	/// truncated.
 	qlt_rational midpoint(const qlt_rational& o) const;
-	/// Sum of two finite rationals, computed in `long long` (no overflow
-	/// check).
-	qlt_rational operator+(const qlt_rational& o) const;
+	/// Sum of two finite rationals, computed in 128 bits and reduced;
+	/// nullopt when the sum does not fit `long long`.
+	std::optional<qlt_rational> add(const qlt_rational& o) const;
 
 	/// The name, `+inf`, `-inf`, `p` or `p/q`.
 	std::string to_string() const;

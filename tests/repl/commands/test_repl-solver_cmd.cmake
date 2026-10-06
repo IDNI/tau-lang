@@ -130,6 +130,10 @@ add_repl_test(solver_cmd-qlt-solve-undecided_atom
 	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "UNKNOWN: the qlt point solver could not decide")
 add_repl_test(solver_cmd-qlt-solve-undecided_named
 	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide")
+# No rational of 64-bit numerator and denominator lies above the greatest one:
+# the system is UNKNOWN, not unsatisfiable.
+add_repl_test(solver_cmd-qlt-solve-past_greatest_rational
+	"solve x:qlt > {9223372036854775807}:qlt." "UNKNOWN: the qlt point solver could not decide the system: a value lies past the rationals")
 # x >= c puts x at or above every point of c.
 add_repl_test(solver_cmd-qlt-solve-gteq_interval
 	"solve x:qlt >= {[0,1]}:qlt && x < {2}:qlt." "x := \\{ 1 \\}:qlt")

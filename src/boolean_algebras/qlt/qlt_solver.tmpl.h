@@ -69,13 +69,15 @@ enum class rel : uint8_t { none = 0, le = 1, lt = 2 };
 
 // The greatest integer not above r (r.q > 0).
 inline qlt_rational floor_int(const qlt_rational& r) {
-	long long f = r.p >= 0 ? r.p / r.q : -((-r.p + r.q - 1) / r.q);
-	return qlt_rational(f, 1);
+	return qlt_rational(r.p / r.q - (r.p < 0 && r.p % r.q != 0 ? 1 : 0), 1);
 }
 
 // A rational strictly inside (lo, hi) -- either side optional (unbounded) --
 // not contained in `used`. Integers are preferred for readable models.
-inline qlt_rational pick_between(const std::optional<qlt_rational>& lo,
+// nullopt when an unbounded side has no free rational the representation
+// fits.
+inline std::optional<qlt_rational> pick_between(
+	const std::optional<qlt_rational>& lo,
 	const std::optional<qlt_rational>& hi,
 	const std::vector<qlt_rational>& used)
 {
@@ -85,15 +87,17 @@ inline qlt_rational pick_between(const std::optional<qlt_rational>& lo,
 	auto inside = [&](const qlt_rational& r) {
 		return (!lo || *lo < r) && (!hi || r < *hi);
 	};
-	qlt_rational c = lo ? floor_int(*lo) + qlt_rational(1, 1)
-		: hi ? floor_int(*hi) + qlt_rational(hi->q == 1 ? -1 : 0, 1)
+	std::optional<qlt_rational> c = lo
+		? floor_int(*lo).add(qlt_rational(1, 1))
+		: hi ? floor_int(*hi).add(qlt_rational(hi->q == 1 ? -1 : 0, 1))
 		: qlt_rational(0, 1);
 	const qlt_rational step(lo || !hi ? 1 : -1, 1);
-	for (size_t i = 0; i <= used.size() && inside(c); ++i, c = c + step)
-		if (!is_used(c)) return c;
-	// Bounded on both sides and no free integer inside: bisect towards lo.
-	// (An unbounded side always yields a free integer above.)
-	DBG(assert(lo && hi);)
+	for (size_t i = 0; i <= used.size() && c && inside(*c);
+		++i, c = c->add(step))
+		if (!is_used(*c)) return c;
+	// An unbounded side yields a free integer unless it runs past the
+	// representation; bounded on both sides, bisect towards lo.
+	if (!lo || !hi) return std::nullopt;
 	qlt_rational m = lo->midpoint(*hi);
 	while (is_used(m)) m = lo->midpoint(m);
 	return m;
@@ -280,6 +284,7 @@ static std::optional<solution<node>> qlt_dlo_order_solve(
 			// the closure makes lo < hi (defensive check).
 			if (lo && hi && !(*lo < *hi)) return {};
 			val[v] = pick_between(lo, hi, used);
+			if (!val[v]) return {};
 			used.push_back(*val[v]);
 		} else if (lo && !(*lo < *val[v])) return {};
 		done[v] = true;
@@ -402,6 +407,9 @@ static result<std::optional<solution<node>>> qlt_point_search(
 		return false;
 	};
 	if (!check(0) || !search(0)) {
+		if (ev.out_of_range())
+			return undecided("a value lies past the rationals of "
+				"64-bit numerator and denominator", all);
 		if (ev.exhausted())
 			return undecided("the cell budget is spent", all);
 		if (unread) return undecided("an atom it does not read",
