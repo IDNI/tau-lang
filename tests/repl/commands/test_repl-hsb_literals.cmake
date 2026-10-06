@@ -7,11 +7,11 @@ add_repl_test(hsb_literal-constant_rhs  "normalize o1[t]:hsb = {x[0] < 1}:hsb"  
 add_repl_test(hsb_literal-variable_rhs  "normalize o1[t]:hsb = {x[0] < x[1]}:hsb"         "x\\[0\\] - x\\[1\\] < 0")
 add_repl_test(hsb_literal-both_sides    "normalize o1[t]:hsb = {2*x[0] < x[1] - 1}:hsb"   "2\\*x\\[0\\] - x\\[1\\] \\+ 1 < 0")
 add_repl_test(hsb_literal-cancelling    "normalize o1[t]:hsb = {x[0] + x[1] < x[1] + 3}:hsb" "x\\[0\\] - 3 < 0")
-add_repl_test(hsb_literal-all_cancel "normalize o1[t]:hsb = {x[0] < x[0]}:hsb"        "failed for type" NO_FAIL_REGEX)
+add_repl_test(hsb_literal-all_cancel "normalize o1[t]:hsb = {x[0] < x[0]}:hsb"        "Unable to parse" NO_FAIL_REGEX)
 add_repl_test(hsb_literal-closed_bound   "normalize o1[t]:hsb = {1 <= x[0]}:hsb"           "-x\\[0\\] \\+ 1 <= 0")
 add_repl_test(hsb_literal-variable_closed "normalize o1[t]:hsb = {x[1] <= x[0]}:hsb"       "-x\\[0\\] \\+ x\\[1\\] <= 0")
 # `x[0] <= 1` and `1 < x[0]` are not elements: the hsb constant parser
 # refuses them (see hsb.tmpl.h), which surfaces as the same generic
 # constant-parse-failure report as hsb_literal-all_cancel above.
-add_repl_test(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}:hsb" "failed for type" NO_FAIL_REGEX)
-add_repl_test(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "failed for type" NO_FAIL_REGEX)
+add_repl_test(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}:hsb" "Unable to parse" NO_FAIL_REGEX)
+add_repl_test(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "Unable to parse" NO_FAIL_REGEX)

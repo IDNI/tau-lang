@@ -691,16 +691,18 @@ result<tref> tree<node>::get_ba_constant_from_source(
 	assert(ba_type_id > 0);
 #endif // DEBUG
 
-	auto cnst_r = ba_constants<node>::get(dict(constant_source_sid), type_tree);
-	tref value = cnst_r.has_value()
-		? get_ba_constant(cnst_r.value().first, type_tree)
-		: nullptr;
-	// TODO (HIGH) dropped error: ba_constants::get's report -- the LOG_ERROR line cannot abort for it.
-	if (value == nullptr) LOG_ERROR << "Parsing constant `"
-		<< dict(constant_source_sid) << "` failed for type `"
-		<< ba_types<node>::name(ba_type_id).value_or(std::string())
-		<< "` (valid: " << node::ba::types_joined() << ").";
-	else LOG_TRACE << " -- result: " << LOG_FM(value);
+	auto cnst = r.merge_take(
+		ba_constants<node>::get(dict(constant_source_sid), type_tree));
+	if (!cnst) {
+		auto nm = r.merge_take(ba_types<node>::name(ba_type_id));
+		return r.with_error(code::parse_error,
+			"parsing a constant failed for its type",
+			{{label::value, std::string(dict(constant_source_sid))},
+			 {label::type_name, nm.value_or(std::string())},
+			 {label::expected, std::string(node::ba::types_joined())}});
+	}
+	tref value = get_ba_constant(cnst->first, type_tree);
+	LOG_TRACE << " -- result: " << LOG_FM(value);
 	return r.with_value(value);
 }
 

@@ -392,8 +392,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/**
 	 * @brief Parse the pre-interned source @p constant_source_sid as a
 	 * constant of type @p ba_type_id (`> 0`).
-	 * @return The constant node, or a null value (with an error logged)
-	 * when the source does not parse for that type.
+	 * @return The constant node, or a `parse_error` naming the source and
+	 * the type when the source does not parse for that type.
 	 */
 	static result<tref> get_ba_constant_from_source(size_t constant_source_sid, size_t ba_type_id);
 	/**

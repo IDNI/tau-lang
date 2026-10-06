@@ -1278,6 +1278,15 @@ TEST_SUITE("tree node-level API") {
 		CHECK( tau::get_ba_constant(size_t(-1), tau_type_id<node_t>())
 			.has_error() );
 	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	TEST_CASE("a constant source that does not parse is a parse error") {
+		auto c = tau::get_ba_constant(std::string("a &&& b"),
+			sbf_type<node_t>());
+		CHECK_FALSE( c.has_value() );
+		CHECK( c.has_error() );
+	}
+#endif
 }
 
 // ── tree<node> builder wrappers ─────────────────────────────────────────────
