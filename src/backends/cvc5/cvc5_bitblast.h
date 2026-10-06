@@ -99,12 +99,12 @@ inline std::optional<bool> cvc5_bitblast_sat(const cvc5::Term& f,
 			if (k == Kind::BITVECTOR_MULT
 				&& t.getSort().getBitVectorSize() > max_product_width)
 			{
-				size_t variable = 0;
-				for (size_t i = 0; i < t.getNumChildren(); ++i)
-					if (t[i].getKind() != Kind::CONST_BITVECTOR
-						&& t[i] != t[0]) ++variable;
-				if (variable && t[0].getKind() != Kind::CONST_BITVECTOR)
-					return std::nullopt;
+				std::optional<Term> factor;
+				for (size_t i = 0; i < t.getNumChildren(); ++i) {
+					if (t[i].getKind() == Kind::CONST_BITVECTOR) continue;
+					if (!factor) factor = t[i];
+					else if (t[i] != *factor) return std::nullopt;
+				}
 			}
 			for (size_t i = t.getNumChildren(); i-- > 0; )
 				todo.push_back(t[i]);

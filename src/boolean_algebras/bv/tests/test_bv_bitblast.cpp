@@ -185,6 +185,28 @@ TEST_SUITE("cvc5_bitblast_sat") {
 			size_t{1} << 20) == std::optional<bool>(false) );
 	}
 
+	TEST_CASE("a product of two values past 10 bits declines whatever its first factor") {
+		cvc5::Term a = cvc5_term_manager.mkConst(bv_sort(11), "pa");
+		cvc5::Term b = cvc5_term_manager.mkConst(bv_sort(11), "pb");
+		cvc5::Term three = make_bitvector_value(11, 3);
+		auto product = [](std::vector<cvc5::Term> factors) {
+			return cvc5_term_manager.mkTerm(cvc5::Kind::BITVECTOR_MULT,
+				factors);
+		};
+		auto equals_two = [](const cvc5::Term& p) {
+			return make_term_equal(p, make_bitvector_value(11, 2));
+		};
+		const size_t nodes = size_t{1} << 21;
+		CHECK( !cvc5_bitblast_sat(equals_two(product({ a, b })), 16, nodes) );
+		CHECK( !cvc5_bitblast_sat(equals_two(product({ three, a, b })), 16,
+			nodes) );
+		CHECK( !cvc5_bitblast_sat(equals_two(product({ a, three, b })), 16,
+			nodes) );
+		// a square by a constant stays small
+		CHECK( cvc5_bitblast_sat(equals_two(product({ three, a, a })), 16,
+			nodes).has_value() );
+	}
+
 	TEST_CASE("a passed deadline declines, and says so") {
 		bool late = false;
 		const auto past = data_bdd::clock::now() - std::chrono::seconds(1);
