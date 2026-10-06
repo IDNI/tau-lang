@@ -122,18 +122,21 @@ struct bdd_handle {
 
 	// Hash-consing factories: return THE handle for a function,
 	// creating and interning it (and its bdd universe entry) on
-	// first sight. While the BDD node table is exhausted
-	// (bdd_node_table_exhausted) a new handle stands for F and is not
-	// interned.
+	// first sight. A function the full BDD node table cannot hold
+	// (see bdd_node_table_exhausted) gets the interned hfalse, as the
+	// engine answers F for it.
 
 	/// Handle for a decoded decision node, keyed in Mn
 	static hbdd<B, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
-		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>(); //(new bdd_handle);
-		h->b = bdd<B, o>::add(x);
-		// a full table gave F for x: that handle must not stand for x
-		if (!bdd_node_table_exhausted) Mn.emplace(x, h);
+		bdd_ref r = bdd<B, o>::add(x);
+		// a full table gave F for x; hfalse is null only while
+		// bdd_init interns the F node itself
+		if (r == bdd<B, o>::F && hfalse) return hfalse;
+		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
+		h->b = r;
+		Mn.emplace(x, h);
 		return h;
 	}
 
@@ -141,9 +144,11 @@ struct bdd_handle {
 	static hbdd<B, o> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
-		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();//(new bdd_handle);
-		h->b = bdd<B, o>::add(x);
-		if (!bdd_node_table_exhausted) Mb.emplace(x, h);
+		bdd_ref r = bdd<B, o>::add(x);
+		if (r == bdd<B, o>::F && hfalse) return hfalse;
+		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
+		h->b = r;
+		Mb.emplace(x, h);
 		return h;
 	}
 
@@ -421,10 +426,12 @@ struct bdd_handle<Bool, o> {
 	static hbdd<Bool, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
-		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>(); //(new bdd_handle);
-		h->b = bdd<Bool, o>::add(x);
-		// a full table gave F for x: that handle must not stand for x
-		if (!bdd_node_table_exhausted) Mn.emplace(x, h);
+		bdd_ref r = bdd<Bool, o>::add(x);
+		// a full table gave F for x (see the primary template)
+		if (r == bdd<Bool, o>::F && hfalse) return hfalse;
+		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>();
+		h->b = r;
+		Mn.emplace(x, h);
 		return h;
 	}
 

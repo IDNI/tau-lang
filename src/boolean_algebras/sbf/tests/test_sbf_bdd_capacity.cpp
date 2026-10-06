@@ -33,6 +33,21 @@ thbdd equal_pairs(uint_t n) {
 
 size_t capacity() { return size_t{1} << tiny.idW; }
 
+// A second table of 32 entries for the interning cases, so their nodes
+// do not depend on what the cases above left in the tiny one.
+constexpr auto small = bdd_options<>::create(5, 12);
+using sbdd = bdd<Bool, small>;
+using sh = bdd_handle<Bool, small>;
+
+hbdd<Bool, small> small_equal_pairs(uint_t n) {
+	hbdd<Bool, small> f = sh::htrue;
+	for (uint_t i = 1; i <= n; ++i) {
+		auto x = sh::bit(true, i), y = sh::bit(true, n + i);
+		f = f & ((x & y) | (~x & ~y));
+	}
+	return f;
+}
+
 // Every case restores the process-wide flag it may raise.
 struct flag_guard {
 	~flag_guard() { bdd_node_table_exhausted = false; }
@@ -104,6 +119,35 @@ TEST_CASE("a full table raises the flag and interns nothing more") {
 		CHECK(bdd_node_table_exhausted);
 		CHECK(tbdd::V.size() == capacity());
 	}
+}
+
+TEST_CASE("a handle made while the table is full is the interned one") {
+	flag_guard g;
+	bdd_init<Bool, small>();
+	// an engine node that no handle stands for yet
+	auto r = sbdd::add(3, sbdd::T, sbdd::F);
+	REQUIRE(r != sbdd::F);
+	bdd_node_table_exhausted = true;
+	auto during = sh::get(r);
+	bdd_node_table_exhausted = false;
+	auto after = sh::get(r);
+	CHECK(during.get() == after.get());
+	CHECK(during == after);
+}
+
+TEST_CASE("a node the full table cannot hold gets the interned zero") {
+	flag_guard g;
+	bdd_init<Bool, small>();
+	auto x = sbdd::bit(77);
+	for (uint_t n = 1; n <= 8 && !bdd_node_table_exhausted; ++n)
+		(void) small_equal_pairs(n);
+	REQUIRE(bdd_node_table_exhausted);
+	bdd_node_table_exhausted = false;
+	// 60 ? x77 : 0 needs a skeleton no function above has
+	auto h = sh::get(typename sh::bdd_node_t(60, x, sbdd::F));
+	CHECK(bdd_node_table_exhausted);
+	CHECK(h.get() == sh::hfalse.get());
+	CHECK(h == sh::hfalse);
 }
 
 } // TEST_SUITE
