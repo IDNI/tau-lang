@@ -642,6 +642,90 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 
 }
 
+// The comparison atom of a one-atom formula.
+static tref atom_of(const char* s) {
+	tref fm = spec(s);
+	if (!fm) return nullptr;
+	return tau::get(fm).find_top([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::wff) && t.has_child()
+			&& (t[0].is(tau::bf_eq) || t[0].is(tau::bf_neq)
+				|| t[0].is(tau::bf_lt) || t[0].is(tau::bf_gt));
+	});
+}
+
+static std::vector<omcat::rational> cuts(std::initializer_list<long long> c) {
+	std::vector<omcat::rational> v;
+	for (long long x : c) v.emplace_back(x, 1);
+	return v;
+}
+
+// A stream at T1 position pos of the cut points, read by the evaluator of
+// Algorithm A (pure outputs) and by that of Algorithm B (o1 is the role y).
+static std::pair<atom_verdict, atom_verdict> both_at(const char* s, int pos,
+	const std::vector<omcat::rational>& c)
+{
+	tref a = atom_of(s);
+	REQUIRE(a != nullptr);
+	auto pa = eval_pure_output_atom_at<node_t>(a, { { "o1", pos } }, c);
+	REQUIRE(pa.has_value());
+	omcat::qlt_type3 t3;
+	t3.pos_y = pos;
+	t3.constants = c;
+	auto pb = qlt_atom_holds_in_type3<node_t>(a, t3, c);
+	REQUIRE(pb.has_value());
+	return { pa.value(), pb.value() };
+}
+
+TEST_SUITE("[QLT-ATOM: Algorithms A and B read a stream as a point]") {
+
+	TEST_CASE("[QLT-ATOM-01] a stream never equals an interval") {
+		const auto c = cuts({ 0, 1 });
+		for (int pos : { 1, 2, 3 }) {
+			auto [a, b] = both_at("o1[t]:qlt = {[0,1]}:qlt.", pos, c);
+			CHECK(a == atom_verdict::fails);
+			CHECK(b == atom_verdict::fails);
+			auto [na, nb] = both_at("o1[t]:qlt != {[0,1]}:qlt.", pos, c);
+			CHECK(na == atom_verdict::holds);
+			CHECK(nb == atom_verdict::holds);
+		}
+	}
+
+	TEST_CASE("[QLT-ATOM-02] a ray is not the point of its endpoint") {
+		auto [a, b] = both_at("o1[t]:qlt = {[0,+inf)}:qlt.", 1, cuts({ 0 }));
+		CHECK(a == atom_verdict::fails);
+		CHECK(b == atom_verdict::fails);
+	}
+
+	TEST_CASE("[QLT-ATOM-03] a stream equals a one-point constant at it") {
+		auto [a, b] = both_at("o1[t]:qlt = {0}:qlt.", 1, cuts({ 0 }));
+		CHECK(a == atom_verdict::holds);
+		CHECK(b == atom_verdict::holds);
+		auto [na, nb] = both_at("o1[t]:qlt = {0}:qlt.", 2, cuts({ 0 }));
+		CHECK(na == atom_verdict::fails);
+		CHECK(nb == atom_verdict::fails);
+	}
+
+	TEST_CASE("[QLT-ATOM-04] an order atom compares with every point of an interval") {
+		const auto c = cuts({ 0, 1 });
+		auto [a0, b0] = both_at("o1[t]:qlt < {[0,1]}:qlt.", 0, c);
+		CHECK(a0 == atom_verdict::holds);
+		CHECK(b0 == atom_verdict::holds);
+		auto [a1, b1] = both_at("o1[t]:qlt < {[0,1]}:qlt.", 1, c);
+		CHECK(a1 == atom_verdict::fails);
+		CHECK(b1 == atom_verdict::fails);
+		auto [a3, b3] = both_at("o1[t]:qlt > {(0,1)}:qlt.", 3, c);
+		CHECK(a3 == atom_verdict::holds);
+		CHECK(b3 == atom_verdict::holds);
+	}
+
+	TEST_CASE("[QLT-ATOM-05] a named endpoint leaves the atom undecided") {
+		auto [a, b] = both_at("o1[t]:qlt = {c}:qlt.", 1, cuts({ 0 }));
+		CHECK(a == atom_verdict::undecided);
+		CHECK(b == atom_verdict::undecided);
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

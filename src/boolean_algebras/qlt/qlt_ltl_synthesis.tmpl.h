@@ -30,6 +30,7 @@
 #include "ba_types.h"
 #include "boolean_algebras/qlt/omcat_constants.h"
 #include "boolean_algebras/qlt/qlt.h"
+#include "boolean_algebras/qlt/qlt_qe.tmpl.h"
 #include "ltl_aba_limits.h"
 #include <limits>
 // Unlike ltl_aba.h / normalizer.h, definitions.h only reaches io_context.h,
@@ -152,6 +153,42 @@ static bool is_algorithm_a_applicable(
 	return true;
 }
 
+// The verdict of the comparison @p op of @p atom with each stream it reads at
+// the point @p value_of gives it, read as qlt_point_eval reads points: `=` a
+// constant is being that set, an order atom compares with every point of it.
+// The point stands for its whole T1 cell only when every finite endpoint of the
+// atom's constants is one of @p constants; otherwise, and for a named or
+// inexact endpoint, the verdict is undecided.
+template <NodeType node, typename F>
+static atom_verdict qlt_atom_at_points(tref atom, size_t op,
+	const std::vector<omcat::rational>& constants, F&& value_of)
+{
+	using tau = tree<node>;
+	auto ends = qlt_point_eval<node>::ends_of(atom);
+	if (!ends) return atom_verdict::undecided;
+	for (const auto& e : *ends) {
+		bool cut = false;
+		for (const auto& c : constants)
+			if (omcat::cmp(c, omcat::rational(e.p, e.q)) == 0) {
+				cut = true;
+				break;
+			}
+		if (!cut) return atom_verdict::undecided;
+	}
+	qlt_point_eval<node> ev(std::move(*ends));
+	for (tref v : tau::get(atom).select_all([](tref n) {
+		return is_child<node>(n, tau::io_var); }))
+	{
+		std::optional<omcat::rational> x = value_of(v);
+		if (!x) return atom_verdict::undecided;
+		ev.env.emplace_back(v, qlt_rational(x->p, x->q));
+	}
+	const auto& t = tau::get(atom);
+	auto h = ev.compare(op, t[0].first(), t[0].second());
+	if (!h) return atom_verdict::undecided;
+	return verdict_from_bool(*h);
+}
+
 // The atom's verdict in T3, or `undecided` when it is not a comparison this
 // path can evaluate.
 template <NodeType node>
@@ -214,36 +251,14 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 	}
 
 	if (lhs_io || rhs_io) {
-		tref io_var = lhs_io ? lhs_io : rhs_io;
-		tref const_side = lhs_io ? rhs : lhs;
-		bool io_is_lhs = (lhs_io != nullptr);
-		auto role = t3_role_of<node>(io_var);
-		if (!role) return r.with_value(atom_verdict::undecided);
-		omcat::qlt_type1 t1;
-		if      (*role == t3_var_role::M) t1 = T3.restrict_m();
-		else if (*role == t3_var_role::X) t1 = T3.restrict_x();
-		else                            t1 = T3.restrict_y();
-		TAU_TRY(auto cs,
-			omcat::collect_qlt_constants<node>(const_side));
-		if (cs.size() != 1) return r.with_value(atom_verdict::undecided);
-		int j = -1;
-		for (int k = 0; k < (int)constants.size(); ++k)
-			if (omcat::cmp(constants[(size_t) k], cs[0]) == 0) { j = k; break; }
-		if (j < 0) return r.with_value(atom_verdict::undecided);
-		auto eff = op;
-		if (!io_is_lhs) {
-			if      (eff == tau::bf_lt)   eff = tau::bf_gt;
-			else if (eff == tau::bf_gt)   eff = tau::bf_lt;
-			else if (eff == tau::bf_lteq) eff = tau::bf_gteq;
-			else if (eff == tau::bf_gteq) eff = tau::bf_lteq;
-		}
-		if (eff == tau::bf_lt)   return r.with_value(verdict_from_bool(t1.less_than(j)));
-		if (eff == tau::bf_lteq) return r.with_value(verdict_from_bool(t1.less_than(j) || t1.equal_to(j)));
-		if (eff == tau::bf_gt)   return r.with_value(verdict_from_bool(t1.greater_than(j)));
-		if (eff == tau::bf_gteq) return r.with_value(verdict_from_bool(t1.greater_than(j) || t1.equal_to(j)));
-		if (eff == tau::bf_eq)   return r.with_value(verdict_from_bool(t1.equal_to(j)));
-		if (eff == tau::bf_neq)  return r.with_value(verdict_from_bool(!t1.equal_to(j)));
-		return r.with_value(atom_verdict::undecided);
+		return r.with_value(qlt_atom_at_points<node>(atom, op, constants,
+			[&](tref io) -> std::optional<omcat::rational> {
+				auto role = t3_role_of<node>(io);
+				if (!role) return std::nullopt;
+				if (*role == t3_var_role::M) return T3.restrict_m().realize();
+				if (*role == t3_var_role::X) return T3.restrict_x().realize();
+				return T3.restrict_y().realize();
+			}));
 	}
 	return r.with_value(atom_verdict::undecided);
 }
@@ -379,57 +394,12 @@ static result<atom_verdict> eval_pure_output_atom_at(
 		return r.with_value(verdict_from_bool(rel_holds(rel, op)));
 	}
 	if (lhs_io || rhs_io) {
-		tref io = lhs_io ? lhs_io : rhs_io;
-		bool io_is_lhs = (lhs_io != nullptr);
-		auto p = lookup(io);
-		if (!p) return r.with_value(atom_verdict::undecided);
-		omcat::qlt_type1 t1{*p, constants};
-		TAU_TRY(auto cs,
-			omcat::collect_qlt_constants<node>(io_is_lhs ? rhs : lhs));
-		// Range constant handling: {[a,b]} collects two endpoints.
-		// Interpret `io_var = {[a,b]}` as closed-interval membership,
-		// `!=` as non-membership.
-		if (cs.size() == 2 && (op == tau::bf_eq || op == tau::bf_neq)) {
-			omcat::rational a = cs[0], b = cs[1];
-			if (omcat::cmp(a, b) > 0) std::swap(a, b);
-			int ja = -1, jb = -1;
-			for (int k = 0; k < (int)constants.size(); ++k) {
-				if (omcat::cmp(constants[(size_t) k], a) == 0) ja = k;
-				if (omcat::cmp(constants[(size_t) k], b) == 0) jb = k;
-			}
-			if (ja < 0 || jb < 0) return r.with_value(atom_verdict::undecided);
-			// Membership: pos_y ∈ [2*ja+1, 2*jb+1] (point-at-a through point-at-b).
-			long lo_pos = 2L * ja + 1;
-			long hi_pos = 2L * jb + 1;
-			long pp = static_cast<long>(*p);
-#if defined(__GNUC__)
-			#pragma GCC diagnostic push
-			#pragma GCC diagnostic ignored "-Wstrict-overflow"
-#endif
-			bool in_range = (pp >= lo_pos && pp <= hi_pos);
-#if defined(__GNUC__)
-			#pragma GCC diagnostic pop
-#endif
-			return r.with_value(verdict_from_bool((op == tau::bf_eq) ? in_range : !in_range));
-		}
-		if (cs.size() != 1) return r.with_value(atom_verdict::undecided);
-		int j = -1;
-		for (int k = 0; k < (int)constants.size(); ++k)
-			if (omcat::cmp(constants[(size_t) k], cs[0]) == 0) { j = k; break; }
-		if (j < 0) return r.with_value(atom_verdict::undecided);
-		auto eff = op;
-		if (!io_is_lhs) {
-			if      (eff == tau::bf_lt)   eff = tau::bf_gt;
-			else if (eff == tau::bf_gt)   eff = tau::bf_lt;
-			else if (eff == tau::bf_lteq) eff = tau::bf_gteq;
-			else if (eff == tau::bf_gteq) eff = tau::bf_lteq;
-		}
-		if (eff == tau::bf_lt)   return r.with_value(verdict_from_bool(t1.less_than(j)));
-		if (eff == tau::bf_lteq) return r.with_value(verdict_from_bool(t1.less_than(j) || t1.equal_to(j)));
-		if (eff == tau::bf_gt)   return r.with_value(verdict_from_bool(t1.greater_than(j)));
-		if (eff == tau::bf_gteq) return r.with_value(verdict_from_bool(t1.greater_than(j) || t1.equal_to(j)));
-		if (eff == tau::bf_eq)   return r.with_value(verdict_from_bool(t1.equal_to(j)));
-		if (eff == tau::bf_neq)  return r.with_value(verdict_from_bool(!t1.equal_to(j)));
+		return r.with_value(qlt_atom_at_points<node>(atom, op, constants,
+			[&](tref io) -> std::optional<omcat::rational> {
+				auto p = lookup(io);
+				if (!p) return std::nullopt;
+				return omcat::qlt_type1{ *p, constants }.realize();
+			}));
 	}
 	return r.with_value(atom_verdict::undecided);
 }
