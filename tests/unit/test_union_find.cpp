@@ -144,4 +144,20 @@ TEST_SUITE("scoped_union_find") {
 		CHECK(r.scopes.size() == 1);
 		CHECK(r.current == 2);
 	}
+
+	TEST_CASE("push after a close registers in the innermost active scope") {
+		scoped_union_find<size_t> r;
+		r.open();
+		r.open();
+		r.close();
+		// scope 2 is closed: a push must land in scope 1, where insert finds it
+		auto pushed = r.push(7);
+		CHECK(pushed.first == 1);
+		CHECK(r.insert(7) == pushed);
+		r.close();
+		// back at the global scope: a push is visible from it
+		auto global = r.push(8);
+		CHECK(global.first == 0);
+		CHECK(r.insert(8) == global);
+	}
 }

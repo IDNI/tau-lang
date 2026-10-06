@@ -169,7 +169,7 @@ struct scoped_less {
  *
  * `insert` finds an element in the innermost active scope that holds it and
  * otherwise registers it in the global scope, visible from every scope.
- * `push` registers it in the most recently opened scope, which shadows any
+ * `push` registers it in the innermost active scope, which shadows any
  * outer registration until that scope is closed.
  * @tparam data_t Element type.
  * @tparam less_t Comparator for choosing the root on merge.
@@ -189,7 +189,8 @@ struct scoped_union_find {
 
 	/// The disjoint sets over (scope, element) pairs.
 	union_find_by_less<std::pair<size_t, data_t>, scoped_less<data_t, less_t>> uf;
-	/// Id of the most recently opened scope; never decreases.
+	/// Id of the most recently opened scope; never decreases, so a closed
+	/// scope's id is never reused.
 	scope current = 0;
 	/// Ids of the active scopes, outermost first.
 	std::deque<size_t> scopes;
@@ -245,13 +246,12 @@ struct scoped_union_find {
 	}
 
 	/**
-	 * @brief Insert @p data into the most recently opened scope (`current`),
-	 * the innermost active one while no scope has been closed since.
+	 * @brief Insert @p data into the innermost active scope.
 	 * @param data Element to push.
 	 * @return Scoped element for @p data.
 	 */
 	element push(const data_t& data) {
-		return uf.insert(element{current, data});
+		return uf.insert(element{scopes.back(), data});
 	}
 
 	/**
