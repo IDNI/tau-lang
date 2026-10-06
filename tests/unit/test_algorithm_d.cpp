@@ -114,6 +114,17 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b011, 11)
 			== ((1 << 10) | (1 << 2)));
 	}
+
+	TEST_CASE("[ALG-D-75] a D AP index longer than nine digits is rejected") {
+		// 4294967296 is 2^32: an int accumulator wraps it to d_0.
+		CHECK(alg_d::d_index_from_ap_name("d_4294967296") == -1);
+		CHECK(alg_d::d_index_from_ap_name("d_99999999999999999999") == -1);
+		CHECK(alg_d::d_index_from_ap_name("d_999999999") == 999999999);
+		alg_d::synth_game g;
+		g.aps = {"d_4294967296"};
+		g.controllable = {true};
+		CHECK(alg_d::d_pattern_from_assignment(g, 0b1, 1) == 0);
+	}
 }
 
 // ── Phase 1: HOA game parser ──────────────────────────────────────────────

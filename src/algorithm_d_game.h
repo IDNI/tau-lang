@@ -802,9 +802,11 @@ struct product_game {
 };
 
 /// @brief Parse the disjunct index N from a `d_N` atomic-proposition name.
-/// Returns -1 if @p ap is not a `d_` AP.
+/// Returns -1 if @p ap is not a `d_` AP or N has more than nine digits.
 inline int d_index_from_ap_name(const std::string& ap) {
 	if (ap.size() <= 2 || ap[0] != 'd' || ap[1] != '_') return -1;
+	// At most nine digits, so the index fits an int.
+	if (ap.size() - 2 > 9) return -1;
 	int idx = 0;
 	for (size_t i = 2; i < ap.size(); ++i) {
 		if (!std::isdigit(static_cast<unsigned char>(ap[i]))) return -1;
