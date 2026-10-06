@@ -192,3 +192,23 @@ TEST_SUITE("get_one_zero") {
 		}
 	}
 }
+
+TEST_SUITE("Bool engine members") {
+	TEST_CASE("eliminations and evaluation over the two leaves") {
+		bdd_init<Bool>();
+		auto a = hb::bit(true, 1), b = hb::bit(true, 2);
+		auto f = a & ~b;
+		CHECK(hb::htrue->get_uelim() == true);
+		CHECK(hb::hfalse->get_uelim() == false);
+		CHECK(f->get_uelim() == false);
+		CHECK(hb::htrue->get_eelim() == true);
+		CHECK(hb::hfalse->get_eelim() == false);
+		CHECK(f->get_eelim() == true);
+		CHECK((a | ~a)->get_uelim() == true);
+		for (unsigned row = 0; row < 4; ++row) {
+			std::map<int_t, Bool> m{ { 1, Bool((row & 1u) != 0) },
+				{ 2, Bool((row & 2u) != 0) } };
+			CHECK(f->eval(m) == (row == 1));
+		}
+	}
+}

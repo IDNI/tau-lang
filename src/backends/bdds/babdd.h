@@ -589,8 +589,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(std::move(x), std::move(r));
@@ -603,8 +602,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 					      bdd_ref::to_cache_node(x, x.shift),
 					      abs((int_t)v - x.shift - 1)},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -621,8 +619,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 					      bdd_ref::to_cache_node(x, d),
 					      bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			uint_t d = min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
@@ -1036,46 +1033,10 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	static B eval(bdd_ref x, const std::map<int_t, B>& m) {
 		if (leaf(x)) return get_elem(x);
 		const bdd_node_t& n = get_node(x);
-		B a = get_elem(eval(n.h, m)), b = get_elem(eval(n.l, m));
-		if (auto it = m.find(n.v); it == m.end()) assert(0);
-		else return ite(it->second, a, b);
-	}
-
-	// Conjunction of a leaf constant and signed literals -- the
-	// inverse of one dnf() callback
-	static bdd_ref from_clause(const std::pair<B, std::vector<int_t>>& v) {
-		bdd_ref r = bdd_and(T, v.first);
-		for (int_t t : v.second) r = bdd_and(r, bit(t));
-		return r;
-	}
-
-	// Disjunction of clauses -- the inverse of dnf()
-	static bdd_ref from_dnf(
-		const std::set<std::pair<B, std::vector<int_t>>>& s)
-	{
-		bdd_ref r = F;
-		for (auto& x : s) r = bdd_or(r, from_clause(x));
-		return r;
-	}
-
-	// treat x as a *disjoint* union of elements of s: every clause whose
-	// constant meets e is split into its parts with each element of s
-	// and with the remainder p of one outside s
-	static bdd_ref split(bdd_ref x, const B& e, const std::set<B>& s) {
-		std::set<std::pair<B, std::vector<int_t>>> r;
-		B p = get_one<B>();
-		for (const B& y : s)
-			if ((p = (p & ~y)) == false)
-				break;
-		dnf(x, [&r, &e, &s, &p](auto x) {
-			if ((x.first & e) == false) r.insert(x);
-			else {
-				r.emplace(x.first & p, x.second);
-				for (const B& y : x.second)
-					r.emplace(x.first & y, x.second);
-			}
-		});
-		return from_dnf(r);
+		B a = eval(n.h, m), b = eval(n.l, m);
+		auto it = m.find(n.v);
+		assert(it != m.end());
+		return (it->second & a) | (~it->second & b);
 	}
 
 	// remove the leftmost single clause in the bdd
@@ -1143,7 +1104,7 @@ result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
 	else if (!leaf(n.l)) {
 		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.l, n.h), m));
-		m.emplace(n.v, get_elem(eval(n.l, m)));
+		m.emplace(n.v, eval(n.l, m));
 	}
 	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
 	else {
@@ -1288,8 +1249,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(std::move(x), std::move(r));
@@ -1302,8 +1262,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 				bdd_ref::to_cache_node(x, x.shift),
 				abs((int_t)v - x.shift - 1)},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -1320,8 +1279,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 				bdd_ref::to_cache_node(x, d),
 				bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			auto d = std::min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
@@ -1645,21 +1603,11 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return r;
 	}
 
-	static Bool get_uelim(bdd_ref x) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return std::get<Bool>(xx);
-		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
-		if (Bool r = get_uelim(nx.h); r == false) return r;
-		else return r & get_uelim(nx.l);
-	}
+	// The only leaves are T and F: x has no F leaf exactly when x is
+	// T, and no T leaf exactly when x is F
+	static Bool get_uelim(bdd_ref x) { return Bool(x == T); }
 
-	static Bool get_eelim(bdd_ref x) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return std::get<Bool>(xx);
-		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
-		if (Bool r = get_eelim(nx.h); r == true) return r;
-		else return r | get_eelim(nx.l);
-	}
+	static Bool get_eelim(bdd_ref x) { return Bool(x != F); }
 
 	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
 		const bdd& xx = get(x);
@@ -1748,49 +1696,16 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		else return ite(it->second, a, b);
 	}
 
-	// m must include all vars in x, otherwise use compose()
+	// Follow the branches m selects down to a leaf; m must include
+	// every variable on that path, otherwise use compose()
 	static Bool eval(bdd_ref x, const std::map<int_t, Bool>& m) {
-		if (x == T) return {true};
-		if (x == F) return {false};
-		const bdd_node_t& n = get(x);
-		Bool a = eval(n.h, m), b = eval(n.l, m);
-		if (auto it = m.find(n.v); it == m.end()) assert(0);
-		else return ite(it->second, a, b);
-	}
-
-	static bdd_ref from_clause(const std::pair<Bool, std::vector<int_t>>& v)
-	{
-		bdd_ref r = bdd_and(T, v.first);
-		for (int_t t : v.second) r = bdd_and(r, bit(t));
-		return r;
-	}
-
-	static bdd_ref from_dnf(
-		const std::set<std::pair<Bool, std::vector<int_t>>>& s)
-	{
-		bdd_ref r = F;
-		for (auto& x : s) r = bdd_or(r, from_clause(x));
-		return r;
-	}
-
-	// treat x as a *disjoint* union of elements of s
-	static bdd_ref split(bdd_ref x, const Bool& e, const std::set<Bool>& s){
-		std::set<std::pair<Bool, std::vector<int_t>>> r;
-		Bool p = Bool(true);
-		for (const Bool& y : s)
-			if ((p = (p & ~y)) == false)
-				break;
-		dnf(x, [&r, &e, &s, &p](auto x) {
-			if ((x.first & e) == false) r.insert(x);
-			else {
-				r.emplace(x.first & p, x.second);
-				// Iterate the split set s, not the clause's
-				// variable list.
-				for (const Bool& y : s)
-					r.emplace(x.first & y, x.second);
-			}
-		});
-		return from_dnf(r);
+		while (!leaf(x)) {
+			const bdd_node_t& n = get(x);
+			auto it = m.find(static_cast<int_t>(n.v));
+			assert(it != m.end());
+			x = it->second == true ? n.h : n.l;
+		}
+		return Bool(x == T);
 	}
 
 	// remove the leftmost single clause in the bdd
