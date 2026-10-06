@@ -120,6 +120,7 @@ namespace idni::tau_lang {
  * | ltl_mealy_max_states (`ltlmealymaxstates`) | 4096 | no Mealy view | `TAU_LTL_MEALY_MAX_STATES` |
  * | ltl_mealy_max_edges (`ltlmealymaxedges`) | 65536 | no Mealy view | `TAU_LTL_MEALY_MAX_EDGES` |
  * | compile_max_table_edges (`compilemaxtableedges`) | 400 | no table | `TAU_COMPILE_MAX_TABLE_EDGES` |
+ * | compile_build_timeout (`compilebuildtimeout`, seconds) | 3600 | no timeout | `TAU_COMPILE_BUILD_TIMEOUT` |
  * | bf_dependence_max_nodes (`bfdependencemaxnodes`) | 65536 | unlimited | `TAU_BF_DEPENDENCE_MAX_NODES` |
  * | lgrs_max_vars (`lgrsmaxvars`) | 8 | unlimited | `TAU_LGRS_MAX_VARS` |
  *
@@ -151,7 +152,8 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	ltl_data_game_max_nodes_opt, ltl_data_game_max_memo_opt,
 	ltl_data_game_max_combinations_opt, ltl_max_observations_opt,
 	ltl_mealy_max_states_opt, ltl_mealy_max_edges_opt,
-	compile_max_table_edges_opt, bf_dependence_max_nodes_opt,
+	compile_max_table_edges_opt, compile_build_timeout_opt,
+	bf_dependence_max_nodes_opt,
 	// The solver's lgrs-route variable cap (`-g --lgrs-max-vars`).
 	lgrs_max_vars_opt,
 	// Boolean, like the first group: the semantic (winning-region) fallback

@@ -301,6 +301,11 @@ NB_MODULE(tau, m) {
 			&tau_api::set_compile_max_table_edges,
 			"Edges of a Mealy view gen/compile carries as a table "
 			"(--compile-max-table-edges); default 400, 0 = none." },
+		{ "set_compile_build_timeout",
+			&tau_api::set_compile_build_timeout,
+			"Seconds the cmake build of compile may take before it is "
+			"stopped (--compile-build-timeout); default 3600, "
+			"0 = no timeout." },
 		{ "set_bf_dependence_max_nodes",
 			&tau_api::set_bf_dependence_max_nodes,
 			"BDD nodes built to tell whether a Boolean function "

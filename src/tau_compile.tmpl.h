@@ -3,11 +3,13 @@
 #ifndef __IDNI__TAU__TAU_COMPILE_TMPL_H__
 #define __IDNI__TAU__TAU_COMPILE_TMPL_H__
 
+#include <algorithm>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -140,7 +142,8 @@ inline result<bool> write_artifact_presets(const std::string& out_dir,
 // script output goes to compile.log there, and a failure reports its end.
 // `native` selects the running tau's own build over a platform preset;
 // `target_sdk`, when not empty, is the SDK the configure resolves from.
-// Returns out_exe.
+// The script is stopped after compile_build_timeout seconds (0 = never).
+// Returns the program path: out_exe, or out_exe.js for a wasm build.
 inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	const std::string& artifact_dir, const std::string& out_exe,
 	const std::string& cxx, const std::string& preset,
@@ -165,15 +168,18 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 
 	// Build beside the destination and move it into place only after a zero
 	// exit, so a failed build never removes an output that already exists.
-	// A wasm artifact lands as <name>.js plus its .wasm.
+	// The script writes a native program to TAU_OUTPUT and a wasm one to
+	// TAU_OUTPUT.js plus TAU_OUTPUT.wasm, so the temporaries add the
+	// suffix after ".tau-build".
+	const std::string temp_base = out_exe + ".tau-build";
 	std::vector<std::string> outputs = { out_exe, out_exe + ".js",
 		out_exe + ".wasm" };
-	std::vector<std::string> temps;
-	for (const auto& o : outputs) temps.push_back(o + ".tau-build");
+	std::vector<std::string> temps = { temp_base, temp_base + ".js",
+		temp_base + ".wasm" };
 
 	std::vector<std::string> argv = { "cmake" };
 	argv.push_back("-DTAU_ARTIFACT_DIR=" + artifact_dir);
-	argv.push_back("-DTAU_OUTPUT=" + temps[0]);
+	argv.push_back("-DTAU_OUTPUT=" + temp_base);
 	if (native) argv.push_back("-DTAU_NATIVE=ON");
 	else argv.push_back("-DTAU_PRESET=" + (preset.empty()
 		? std::string("release") : preset));
@@ -199,8 +205,13 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 		.string();
 	spawn_options opts;
 	opts.stderr_path = script_log;
-	auto spawned = spawn_capture(argv, 0, [](int c) { return c == 0; }, opts);
+	const size_t timeout = std::min<size_t>(compile_build_timeout.get(),
+		(size_t) std::numeric_limits<int>::max());
+	auto spawned = spawn_capture(argv, (int) timeout,
+		[](int c) { return c == 0; }, opts);
 	if (!spawned.has_value()) {
+		const bool timed_out = report_has_attr(spawned.report(),
+			label::timeout);
 		r.merge(std::move(spawned));
 		std::ifstream log_in(script_log, std::ios::binary);
 		std::ostringstream log_text;
@@ -211,8 +222,11 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 		// Long enough to hold the cmake error above the call stack of tau_exit.
 		const size_t tail_len = 400;
 		if (tail.size() > tail_len) tail.remove_prefix(tail.size() - tail_len);
-		return r.with_error(code::runtime_error,
-			"compile: the cmake build failed",
+		return r.with_error(code::runtime_error, timed_out
+			? "compile: the cmake build was stopped by the build timeout "
+				"(--compile-build-timeout / `set compilebuildtimeout` / "
+				"TAU_COMPILE_BUILD_TIMEOUT)"
+			: "compile: the cmake build failed",
 			{{label::path, script_log},
 			 {label::value, tail.empty() ? std::string("(no output)")
 				: truncate_for_message(tail, tail_len)}});
@@ -223,13 +237,16 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 		fs::rename(from, to, ec);
 		return !ec;
 	};
-	if (!move_into_place(temps[0], outputs[0])
-		&& !move_into_place(temps[1], outputs[1]))
+	if (move_into_place(temps[0], outputs[0]))
+		return r.with_value(out_exe);
+	// A wasm program is its js loader, which loads the .wasm beside it.
+	if (!move_into_place(temps[1], outputs[1]))
 		return r.with_error(code::not_found,
 			"compile: the cmake build produced no " + out_exe);
-	move_into_place(temps[1], outputs[1]);
-	move_into_place(temps[2], outputs[2]);
-	return r.with_value(std::move(out_exe));
+	if (!move_into_place(temps[2], outputs[2]))
+		return r.with_error(code::not_found,
+			"compile: the cmake build produced no " + outputs[2]);
+	return r.with_value(outputs[1]);
 }
 
 // Writes to f the includes, the embedded spec of d and the option handling

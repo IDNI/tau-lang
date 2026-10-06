@@ -23,8 +23,8 @@ COUNT_SETTERS = (
 	"set_ltl_data_game_max_nodes", "set_ltl_data_game_max_memo",
 	"set_ltl_data_game_max_combinations", "set_ltl_max_observations",
 	"set_ltl_mealy_max_states", "set_ltl_mealy_max_edges",
-	"set_compile_max_table_edges", "set_bf_dependence_max_nodes",
-	"set_max_blast_reentry_depth",
+	"set_compile_max_table_edges", "set_compile_build_timeout",
+	"set_bf_dependence_max_nodes", "set_max_blast_reentry_depth",
 )
 
 # The shipped default of each count setter, restored after the round trip.
@@ -43,6 +43,7 @@ COUNT_DEFAULTS = {
 	"set_ltl_data_game_max_combinations": 4096,
 	"set_ltl_max_observations": 8, "set_ltl_mealy_max_states": 4096,
 	"set_ltl_mealy_max_edges": 65536, "set_compile_max_table_edges": 400,
+	"set_compile_build_timeout": 3600,
 	"set_bf_dependence_max_nodes": 65536,
 }
 

@@ -225,6 +225,11 @@ cli::options tau_options() {
 		.set_description("most edges of a Mealy view gen/compile carries "
 			"as a table instead of solving as the program runs (default: "
 			"TAU_COMPILE_MAX_TABLE_EDGES or 400; 0 = none)");
+	opts["compile-build-timeout"] =
+		cli::option("compile-build-timeout", '\0', "")
+		.set_description("seconds the cmake build of compile may take "
+			"before it is stopped (default: TAU_COMPILE_BUILD_TIMEOUT "
+			"or 3600; 0 = no timeout)");
 	opts["bf-dependence-max-nodes"] =
 		cli::option("bf-dependence-max-nodes", '\0', "")
 		.set_description("cap the BDD nodes built to tell whether a "
@@ -559,6 +564,7 @@ int main(int argc, char** argv) {
 		{ "ltl-mealy-max-states", &tau_api::set_ltl_mealy_max_states },
 		{ "ltl-mealy-max-edges", &tau_api::set_ltl_mealy_max_edges },
 		{ "compile-max-table-edges", &tau_api::set_compile_max_table_edges },
+		{ "compile-build-timeout", &tau_api::set_compile_build_timeout },
 		{ "bf-dependence-max-nodes", &tau_api::set_bf_dependence_max_nodes },
 	};
 	for (const auto& [name, set] : count_flags)

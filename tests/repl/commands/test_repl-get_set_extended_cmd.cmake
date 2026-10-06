@@ -91,6 +91,9 @@ add_repl_test(get_cmd-ltlmealymaxedges "get ltlmealymaxedges" "ltlmealymaxedges:
 add_repl_test(set_cmd-ltlmealymaxedges "set ltlmealymaxedges 12" "ltlmealymaxedges: *12")
 add_repl_test(get_cmd-compilemaxtableedges "get compilemaxtableedges" "compilemaxtableedges: *400")
 add_repl_test(set_cmd-compilemaxtableedges "set compilemaxtableedges 12" "compilemaxtableedges: *12")
+add_repl_test(get_cmd-compilebuildtimeout "get compilebuildtimeout" "compilebuildtimeout: *3600 s")
+add_repl_test(set_cmd-compilebuildtimeout "set compilebuildtimeout 12" "compilebuildtimeout: *12 s")
+add_repl_test(set_cmd-compilebuildtimeout_off "set compilebuildtimeout 0" "compilebuildtimeout: *off")
 add_repl_test(get_cmd-bfdependencemaxnodes "get bfdependencemaxnodes" "bfdependencemaxnodes: *65536")
 add_repl_test(set_cmd-bfdependencemaxnodes "set bfdependencemaxnodes 0" "bfdependencemaxnodes: *unlimited")
 add_repl_test(get_cmd-bv_blasting_max_nodes "get bv-blasting-max-nodes" "bv-blasting-max-nodes: *500000")
@@ -98,7 +101,8 @@ add_repl_test(set_cmd-bv_blasting_max_nodes "set bv-blasting-max-nodes 12" "bv-b
 add_repl_test(get_cmd-bv_bitblast_max_width "get bv-bitblast-max-width" "bv-bitblast-max-width: *16")
 add_repl_test(set_cmd-bv_bitblast_max_width "set bv-bitblast-max-width 8" "bv-bitblast-max-width: *8")
 foreach(opt ltldatagamemaxcombinations ltlmaxobservations ltlmealymaxstates
-		ltlmealymaxedges compilemaxtableedges bfdependencemaxnodes)
+		ltlmealymaxedges compilemaxtableedges compilebuildtimeout
+		bfdependencemaxnodes)
 	add_repl_test(help_set_lists_${opt} "help set" "${opt}")
 endforeach()
 add_repl_test(get_cmd-qlt_const_output_max "get qlt-const-output-max"   "qlt-const-output-max: *100")

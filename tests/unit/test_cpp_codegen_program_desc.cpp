@@ -148,6 +148,69 @@ captured_run run_capture_ec(const std::string& exe_path,
 
 } // namespace
 
+namespace {
+
+// A stand-in SDK whose cmake/tau-compile.cmake runs @p body instead of a
+// build, for the checks of what run_compile_script makes of the result.
+std::string fake_sdk(const std::string& tag, const std::string& body) {
+	namespace fs = std::filesystem;
+	const fs::path sdk = fs::path(cg_tmp("_tau_fake_sdk_" + tag));
+	fs::create_directories(sdk / "cmake");
+	std::ofstream(sdk / "cmake" / "tau-compile.cmake") << body;
+	fs::create_directories(sdk / "artifact");
+	return sdk.string();
+}
+
+} // namespace
+
+#ifndef __EMSCRIPTEN__
+TEST_SUITE("run_compile_script") {
+
+	TEST_CASE("a native build returns the program path") {
+		const std::string sdk = fake_sdk("native",
+			"file(WRITE \"${TAU_OUTPUT}\" \"exe\")\n");
+		const std::string out = cg_tmp("_tau_fake_native_prog");
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "", {}, sdk, true);
+		REQUIRE(r.has_value());
+		CHECK(r.value() == out);
+		CHECK(std::filesystem::exists(out));
+	}
+
+	// The script writes a wasm program as TAU_OUTPUT.js and TAU_OUTPUT.wasm.
+	TEST_CASE("a wasm build returns the js loader beside its wasm") {
+		const std::string sdk = fake_sdk("wasm",
+			"file(WRITE \"${TAU_OUTPUT}.js\" \"js\")\n"
+			"file(WRITE \"${TAU_OUTPUT}.wasm\" \"wasm\")\n");
+		const std::string out = cg_tmp("_tau_fake_wasm_prog");
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "release-wasm", {}, sdk, false);
+		REQUIRE(r.has_value());
+		CHECK(r.value() == out + ".js");
+		CHECK(std::filesystem::exists(out + ".js"));
+		CHECK(std::filesystem::exists(out + ".wasm"));
+		CHECK(!std::filesystem::exists(out));
+	}
+
+	TEST_CASE("the build timeout stops a build that runs too long") {
+		const std::string sdk = fake_sdk("slow",
+			"execute_process(COMMAND \"${CMAKE_COMMAND}\" -E sleep 60)\n"
+			"file(WRITE \"${TAU_OUTPUT}\" \"exe\")\n");
+		const std::string out = cg_tmp("_tau_fake_slow_prog");
+		api<node_t>::set_compile_build_timeout(1);
+		const auto start = std::chrono::steady_clock::now();
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "", {}, sdk, true);
+		const auto took = std::chrono::steady_clock::now() - start;
+		compile_build_timeout.unset();
+		CHECK(!r.has_value());
+		CHECK(report_has_attr(r.report(), label::timeout));
+		CHECK(took < std::chrono::seconds(30));
+		CHECK(!std::filesystem::exists(out));
+	}
+}
+#endif
+
 TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("the emitted CMakeLists links the SDK and names the target") {

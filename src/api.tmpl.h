@@ -385,6 +385,11 @@ void api<node>::set_compile_max_table_edges(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_compile_build_timeout(size_t seconds) {
+	compile_build_timeout = seconds;
+}
+
+template <NodeType node>
 void api<node>::set_bf_dependence_max_nodes(size_t n) {
 	option_change_guard<node> guard;
 	bf_dependence_max_nodes = n;
@@ -649,6 +654,11 @@ size_t api<node>::get_compile_max_table_edges() {
 }
 
 template <NodeType node>
+size_t api<node>::get_compile_build_timeout() {
+	return compile_build_timeout;
+}
+
+template <NodeType node>
 size_t api<node>::get_bf_dependence_max_nodes() {
 	return bf_dependence_max_nodes;
 }
@@ -726,6 +736,8 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_ltl_mealy_max_edges },
 		{ "compile_max_table_edges", &a::set_compile_max_table_edges,
 			&a::get_compile_max_table_edges },
+		{ "compile_build_timeout", &a::set_compile_build_timeout,
+			&a::get_compile_build_timeout },
 		{ "bf_dependence_max_nodes", &a::set_bf_dependence_max_nodes,
 			&a::get_bf_dependence_max_nodes },
 		{ "ba_decision_pins", &a::set_ba_decision_pins,

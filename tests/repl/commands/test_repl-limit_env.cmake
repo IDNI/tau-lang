@@ -36,6 +36,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"ltl_mealy_max_states|TAU_LTL_MEALY_MAX_STATES|7|ltlmealymaxstates|7|ltl-mealy-max-states|9"
 	"ltl_mealy_max_edges|TAU_LTL_MEALY_MAX_EDGES|7|ltlmealymaxedges|7|ltl-mealy-max-edges|9"
 	"compile_max_table_edges|TAU_COMPILE_MAX_TABLE_EDGES|7|compilemaxtableedges|7|compile-max-table-edges|9"
+	"compile_build_timeout|TAU_COMPILE_BUILD_TIMEOUT|7|compilebuildtimeout|7 s|compile-build-timeout|9"
 	"bf_dependence_max_nodes|TAU_BF_DEPENDENCE_MAX_NODES|7|bfdependencemaxnodes|7|bf-dependence-max-nodes|9"
 	"bv_blastdepth|TAU_BV_BLASTDEPTH|7|bv-blastdepth|7|bv-blastdepth|9"
 	"bv_case_split_max_tests|TAU_BV_CASE_SPLIT_MAX_TESTS|7|bv-case-split-max-tests|7|bv-case-split-max-tests|9"

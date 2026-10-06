@@ -471,6 +471,13 @@ struct api {
 	 */
 	static void set_compile_max_table_edges(size_t n);
 	/**
+	 * @brief Seconds the cmake build of `tau compile` may take
+	 * (`compile_build_timeout`); past it the build is stopped and the
+	 * compile fails. 0 waits without bound. The parameter wins over the
+	 * `TAU_COMPILE_BUILD_TIMEOUT` environment fallback (default 3600).
+	 */
+	static void set_compile_build_timeout(size_t seconds);
+	/**
 	 * @brief Cap on the BDD nodes the syntactic variable simplification
 	 * builds to tell whether a Boolean function depends on a variable
 	 * (`bf_dependence_max_nodes`); past it the question is left open.
@@ -645,6 +652,9 @@ struct api {
 	/// The effective Mealy table edge bound of `tau gen` / `tau compile`
 	/// (`TAU_COMPILE_MAX_TABLE_EDGES`; default 400, 0 = no table).
 	static size_t get_compile_max_table_edges();
+	/// The effective build timeout of `tau compile` in seconds
+	/// (`TAU_COMPILE_BUILD_TIMEOUT`; default 3600, 0 = no timeout).
+	static size_t get_compile_build_timeout();
 	/// The effective BDD node cap of the variable-dependence test
 	/// (`TAU_BF_DEPENDENCE_MAX_NODES`; default 65536, 0 = unlimited).
 	static size_t get_bf_dependence_max_nodes();

@@ -164,6 +164,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"ltl_mealy_max_states|ltl-mealy-max-states||77|ltlmealymaxstates|77"
 	"ltl_mealy_max_edges|ltl-mealy-max-edges||99|ltlmealymaxedges|99"
 	"compile_max_table_edges|compile-max-table-edges||50|compilemaxtableedges|50"
+	"compile_build_timeout|compile-build-timeout||50|compilebuildtimeout|50 s"
 	"bf_dependence_max_nodes|bf-dependence-max-nodes||1000|bfdependencemaxnodes|1000"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)

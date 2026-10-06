@@ -330,6 +330,9 @@ artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 | `-D NAME=VALUE` | cmake cache variable for the emitted project configure (repeat as needed). A value wins over the preset |
 | `-G <generator>` | cmake generator for the emitted project configure |
 
+The cmake build stops, and the compile fails, after `--compile-build-timeout`
+seconds (`TAU_COMPILE_BUILD_TIMEOUT`, 3600 by default; 0 waits without bound).
+
 Without `--preset`, `tau compile` builds for the machine tau runs on. It uses
 the tau SDK of its own build folder (`<build>/sdk`) or the installed box beside
 the binary, found by the path of the binary. cmake's default compiler builds
@@ -943,6 +946,7 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_MEALY_MAX_STATES` | 4096 | States of the Mealy view a data-game strategy is played through; past it the moves are played directly (0 = no view). Environment fallback of `--ltl-mealy-max-states` / REPL `set ltlmealymaxstates`. |
 | `TAU_LTL_MEALY_MAX_EDGES` | 65536 | Edges of that Mealy view (0 = no view). Environment fallback of `--ltl-mealy-max-edges` / REPL `set ltlmealymaxedges`. |
 | `TAU_COMPILE_MAX_TABLE_EDGES` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table; a larger strategy is solved as the program runs (0 = never a table). Environment fallback of `--compile-max-table-edges` / REPL `set compilemaxtableedges`. |
+| `TAU_COMPILE_BUILD_TIMEOUT` | 3600 | Seconds the cmake build `tau compile` runs may take; past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped; on Windows only the cmake process `tau compile` started is, and the compilers it launched may run to their end. Environment fallback of `--compile-build-timeout` / REPL `set compilebuildtimeout`. |
 
 Every limit above is a runtime parameter carried by every surface -- a CLI
 flag, a REPL option, an `api::set_*` setter with its `api::get_*` getter, the
@@ -3070,6 +3074,7 @@ non-negative number is an error):
 |     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default `TAU_LTL_MEALY_MAX_STATES` or 4096; 0 = no view) |
 |     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default `TAU_LTL_MEALY_MAX_EDGES` or 65536; 0 = no view) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default `TAU_COMPILE_MAX_TABLE_EDGES` or 400; 0 = none) |
+|     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default `TAU_COMPILE_BUILD_TIMEOUT` or 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default `TAU_BF_DEPENDENCE_MAX_NODES` or 65536; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
@@ -3475,6 +3480,11 @@ the moves are played directly, and 0 builds no view.
 carries as a table (`--compile-max-table-edges`). 400 by default, or
 `TAU_COMPILE_MAX_TABLE_EDGES` when that is set; a larger strategy is solved
 as the program runs, and 0 never carries a table.
+
+* `compilebuildtimeout`: seconds the cmake build of `tau compile` may take
+before it is stopped and the compile fails (`--compile-build-timeout`). 3600
+by default, or `TAU_COMPILE_BUILD_TIMEOUT` when that is set; 0 waits without
+bound.
 
 * `bfdependencemaxnodes`: cap on the BDD nodes the syntactic variable
 simplification builds to tell whether a Boolean function depends on a
@@ -4061,8 +4071,9 @@ of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
 `set_ltl_data_game_max_combinations`, `set_ltl_max_observations`,
-`set_ltl_mealy_max_states`, `set_ltl_mealy_max_edges` and
-`set_compile_max_table_edges`) have no counterpart there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
+`set_ltl_mealy_max_states`, `set_ltl_mealy_max_edges`,
+`set_compile_max_table_edges` and `set_compile_build_timeout`) have no
+counterpart there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
 each of them in use.
 
 On Linux arm64 the binding builds and tests both natively and by cross

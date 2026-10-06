@@ -1688,6 +1688,7 @@ inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	if (x == "ltlmealymaxstates")        return ltl_mealy_max_states_opt;
 	if (x == "ltlmealymaxedges")         return ltl_mealy_max_edges_opt;
 	if (x == "compilemaxtableedges")     return compile_max_table_edges_opt;
+	if (x == "compilebuildtimeout")      return compile_build_timeout_opt;
 	if (x == "bfdependencemaxnodes")     return bf_dependence_max_nodes_opt;
 	err << "Invalid option: " << x << "\n";
 	return invalid_opt;
@@ -1864,6 +1865,10 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ compile_max_table_edges_opt, [this]() {
 		out << "compilemaxtableedges: "
 			<< compile_max_table_edges.get() << "\n"; } },
+	{ compile_build_timeout_opt, [this]() {
+		const size_t s = compile_build_timeout.get();
+		out << "compilebuildtimeout: ";
+		if (s) out << s << " s\n"; else out << "off\n"; } },
 	{ bf_dependence_max_nodes_opt, [climit, this]() {
 		out << "bfdependencemaxnodes: "
 			<< climit(bf_dependence_max_nodes) << "\n"; } },
@@ -2093,6 +2098,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_ltl_mealy_max_edges(*n); } },
 	{ compile_max_table_edges_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_compile_max_table_edges(*n); } },
+	{ compile_build_timeout_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_compile_build_timeout(*n); } },
 	{ bf_dependence_max_nodes_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_bf_dependence_max_nodes(*n); } },
 	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
@@ -2646,6 +2653,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltlmealymaxstates      Mealy view states (0 = no view)      4096\n"
 		"  ltlmealymaxedges       Mealy view edges (0 = no view)       65536\n"
 		"  compilemaxtableedges   edges compiled as a table (0 = none) 400\n"
+		"  compilebuildtimeout    compile's cmake build in seconds (0 = off) 3600\n"
 		"  bfdependencemaxnodes   bf variable-dependence BDD nodes     65536\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration

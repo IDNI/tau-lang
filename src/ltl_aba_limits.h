@@ -172,6 +172,14 @@ inline env_limit<size_t> data_game_mealy_max_edges{
 inline env_limit<size_t> compile_max_table_edges{
 	"TAU_COMPILE_MAX_TABLE_EDGES", 400 };
 
+/// Seconds the cmake build `tau compile` runs may take before it is stopped
+/// and the compile fails. 0 waits for it without bound. Set via
+/// `--compile-build-timeout`, REPL `compilebuildtimeout`,
+/// `api::set_compile_build_timeout`, or the environment variable
+/// `TAU_COMPILE_BUILD_TIMEOUT` (default 3600).
+inline env_limit<size_t> compile_build_timeout{
+	"TAU_COMPILE_BUILD_TIMEOUT", 3600 };
+
 /**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
  * assignments are enumerated as `1 << n`: a signed shift is undefined at
