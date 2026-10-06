@@ -83,19 +83,20 @@ inline long nlang_http_timeout_sec() {
 }
 
 // --- LLM API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
-// The yes/no oracles answer from a process-wide cache first. Without an API
-// key they warn once on stderr and answer false without caching; an empty
-// or unrecognised reply is a cached false.
+// The oracles answer from a process-wide cache first. Without an API key,
+// or when the request fails or the status is not 2xx, they warn once on
+// stderr and give the conservative default without caching it; an empty or
+// unrecognised reply is a cached false.
 
 /**
  * @brief Send one chat-completion request to the configured endpoint.
  *
  * Blocking; bounded by nlang_http_timeout_sec().
  * @param prompt The user message.
- * @return The reply's content, or "" when no API key is set, the request
- * fails or the status is not 2xx (the last warns once on stderr).
+ * @return The reply's content, or nullopt when no API key is set, the
+ * request fails or the status is not 2xx (the last two warn once on stderr).
  */
-std::string llm_query(const std::string& prompt);
+std::optional<std::string> llm_query(const std::string& prompt);
 /// @brief Ask the oracle whether @p description is a contradiction.
 /// @return true for "nothing", false for "everything", else the oracle's yes.
 bool llm_is_empty(const std::string& description);
@@ -113,6 +114,8 @@ bool llm_equivalent(const std::string& a, const std::string& b);
  * specifically so"` when there is no key or no reply.
  */
 std::string llm_stronger_statement(const std::string& description);
+/// @brief Number of oracle answers the process-wide cache holds.
+size_t llm_cache_size();
 // llm_decompose declared after nlang_ba struct (return type needs nlang_ba::fptr)
 
 // -----------------------------------------------------------------------------

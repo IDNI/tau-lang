@@ -2533,10 +2533,11 @@ for equality, emptiness, and universality tests: the key is read from
 (default `https://api.openai.com/v1`) and the model from `TAU_LLM_MODEL`
 (unset: the endpoint's default); each request is capped by the
 `nlang-http-timeout` option (15 s, or `TAU_NLANG_HTTP_TIMEOUT`).  Without a
-key every emptiness,
-universality and equivalence question is answered `false` (a warning is
-printed once; the default is not cached), so verdicts over `nlang` elements
-are not reliable without the key.
+key, or when a request fails or the endpoint answers with a non-2xx status,
+every emptiness, universality and equivalence question is answered `false`
+(a warning is printed once; the default is not cached, so a later question
+asks the endpoint again), and verdicts over `nlang` elements are not
+reliable.
 
 Elements are written as natural language strings inside `{...}:nlang`:
 

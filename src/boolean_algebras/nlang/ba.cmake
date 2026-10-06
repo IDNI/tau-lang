@@ -7,6 +7,7 @@ set(TAU_BA_REQUIRES_PACKAGES CURL)
 set(TAU_BA_SOURCES boolean_algebras/nlang/nlang_ba.cpp)
 set(TAU_BA_TESTS
 	tests/test_nlang_grammar.cpp
+	tests/test_nlang_oracle.cpp
 )
 
 # nlang's HTTP oracle links curl, which has no wasm port.

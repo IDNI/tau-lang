@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <optional>
 #include <string>
 #include <cstdio>
 #include <cstdlib>
@@ -43,6 +44,17 @@ static void warn_llm_http_status(long status) {
 		"WARNING: nlang oracle endpoint returned HTTP %ld; the query is treated\n"
 		"  as unanswered and a conservative default is used. If the endpoint\n"
 		"  requires an explicit model, set TAU_LLM_MODEL.\n", status);
+}
+
+// One-time warning when the request itself failed (no connection, timeout).
+static void warn_llm_request_failed(CURLcode res) {
+	static bool warned = false;
+	if (warned) return;
+	warned = true;
+	fprintf(stderr,
+		"WARNING: nlang oracle request failed (%s); the query is treated as\n"
+		"  unanswered and a conservative default is used.\n",
+		curl_easy_strerror(res));
 }
 
 // TAU_LLM_ENDPOINT, else the OpenAI base URL.
@@ -206,12 +218,12 @@ static nlang_ba::fptr parse_formula_json(const std::string& json,
 
 } // namespace
 
-std::string llm_query(const std::string& prompt) {
+std::optional<std::string> llm_query(const std::string& prompt) {
 	const char* key = llm_api_key();
-	if (!key) return "";
+	if (!key) return std::nullopt;
 
 	CURL* curl = curl_easy_init();
-	if (!curl) return "";
+	if (!curl) return std::nullopt;
 
 	std::string response;
 
@@ -261,10 +273,13 @@ std::string llm_query(const std::string& prompt) {
 	curl_slist_free_all(headers);
 	curl_easy_cleanup(curl);
 
-	if (res != CURLE_OK) return "";
+	if (res != CURLE_OK) {
+		warn_llm_request_failed(res);
+		return std::nullopt;
+	}
 	if (status < 200 || status >= 300) {
 		warn_llm_http_status(status);
-		return "";
+		return std::nullopt;
 	}
 
 	// Extract "content" value from the last occurrence to skip any
@@ -343,7 +358,8 @@ bool llm_is_empty(const std::string& description) {
 		+ "' a logical contradiction (always false, impossible)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = parse_yes_no(ans);
+	if (!ans) return false; // unanswered: not cached, like a missing key
+	bool result = parse_yes_no(*ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.is_empty_cache.emplace(description, result).first->second;
 }
@@ -367,7 +383,8 @@ bool llm_is_universal(const std::string& description) {
 		+ "' a tautology (always true, necessarily true in all situations)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = parse_yes_no(ans);
+	if (!ans) return false; // unanswered: not cached, like a missing key
+	bool result = parse_yes_no(*ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.is_universal_cache.emplace(description, result).first->second;
 }
@@ -393,7 +410,8 @@ bool llm_equivalent(const std::string& a, const std::string& b) {
 		+ "' logically equivalent (true in exactly the same situations)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = parse_yes_no(ans);
+	if (!ans) return false; // unanswered: not cached, like a missing key
+	bool result = parse_yes_no(*ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.equivalent_cache.emplace(key_pair, result).first->second;
 }
@@ -416,7 +434,9 @@ std::string llm_stronger_statement(const std::string& description) {
 		+ description
 		+ "' but is not equivalent to it."
 		  " Reply with only the statement, no punctuation.";
-	auto ans = llm_query(prompt);
+	auto reply = llm_query(prompt);
+	if (!reply) return description + " and specifically so"; // not cached
+	std::string ans = std::move(*reply);
 	if (ans.empty()) ans = description + " and specifically so";
 	ans.erase(0, ans.find_first_not_of(" \t\n\r."));
 	auto last = ans.find_last_not_of(" \t\n\r.");
@@ -424,6 +444,14 @@ std::string llm_stronger_statement(const std::string& description) {
 	if (ans.empty()) ans = description + " and specifically so";
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.sub_cache.emplace(description, ans).first->second;
+}
+
+size_t llm_cache_size() {
+	auto& cache = get_cache();
+	std::lock_guard<std::mutex> lk(cache.mtx);
+	return cache.is_empty_cache.size() + cache.is_universal_cache.size()
+		+ cache.equivalent_cache.size() + cache.sub_cache.size()
+		+ cache.decompose_cache.size();
 }
 
 nlang_ba::fptr llm_decompose(const std::string& s) {
@@ -456,7 +484,8 @@ nlang_ba::fptr llm_decompose(const std::string& s) {
 		"Statement: \"" + s + "\"";
 
 	auto response = llm_query(prompt);
-	auto json = extract_outermost_json(response);
+	if (!response) return F::mk_atom(s); // unanswered: not cached
+	auto json = extract_outermost_json(*response);
 
 	nlang_ba::fptr result;
 	if (json.empty()) {
