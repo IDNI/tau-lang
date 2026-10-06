@@ -1153,7 +1153,7 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 	}
 }
 
-// NZ-1 regression. normalize_non_temp can legitimately return a formula that is
+// Regression: normalize_non_temp can legitimately return a formula that is
 // neither T nor F: a closed bv scope the solver cannot settle (here bv
 // arithmetic plus an unresolved wff_ref, which is_bv_solvable_formula accepts
 // because it inspects only variable nodes, and which cvc5 then fails to
@@ -1211,17 +1211,17 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 	}
 }
 
-// check_decided's NZ-1 arm (added with the bc99a82b port): a temporal
+// check_decided's temporal-under-quantifier arm: a temporal
 // operator directly inside a quantifier scope is undecidable by any
 // case-split on the bound variable alone, so complete_quantifier_elimination
 // leaves it quantified and check_decided reports it at WARNING (message
-// carries the "NZ-1" marker) instead of ERROR. Every other undecided shape
+// names the quantifier scope) instead of ERROR. Every other undecided shape
 // must keep the ERROR path so a genuine regression still trips loudly.
-TEST_SUITE("NZ1TemporalUnderQuantifier") {
+TEST_SUITE("TemporalUnderQuantifier") {
 
 	// The grammar has no quantifier-over-always position; build the shape
 	// the way the pipeline meets it, internally.
-	static tref nz1() {
+	static tref temporal_under_quantifier() {
 		tref spec = get_nso_rr("always o1[t]b != 0.").value().main->get();
 		return tau::build_wff_all_many(get_free_vars<node_t>(spec), spec);
 	}
@@ -1240,8 +1240,8 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 		return ss->str();
 	}
 
-	TEST_CASE("normalization keeps the NZ-1 shape quantified and temporal") {
-		auto res_r = normalize_non_temp<node_t>(nz1());
+	TEST_CASE("normalization keeps a temporal operator under a quantifier") {
+		auto res_r = normalize_non_temp<node_t>(temporal_under_quantifier());
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
 		REQUIRE( res != nullptr );
@@ -1250,18 +1250,18 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 			is_child<node_t, tau::wff_always>) != nullptr );
 	}
 
-	TEST_CASE("check_decided answers false with the NZ-1 marker") {
-		auto res_r = normalize_non_temp<node_t>(nz1());
+	TEST_CASE("check_decided answers false naming the quantifier scope") {
+		auto res_r = normalize_non_temp<node_t>(temporal_under_quantifier());
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
 		bool decided = true;
 		std::string log = log_of([&]() {
-			decided = check_decided<node_t>("nz1-test", res); });
+			decided = check_decided<node_t>("temporal-test", res); });
 		CHECK( !decided );
-		CHECK( log.find("NZ-1") != std::string::npos );
+		CHECK( log.find("inside a quantifier scope") != std::string::npos );
 	}
 
-	TEST_CASE("non-temporal undecided keeps the error path (no NZ-1 marker)") {
+	TEST_CASE("non-temporal undecided keeps the error path") {
 		auto res_r = normalize_non_temp<node_t>(bv_undecided());
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
@@ -1270,7 +1270,7 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 			decided = check_decided<node_t>("bv-test", res); });
 		CHECK( !decided );
 		CHECK( log.find("could not decide") != std::string::npos );
-		CHECK( log.find("NZ-1") == std::string::npos );
+		CHECK( log.find("inside a quantifier scope") == std::string::npos );
 	}
 
 	TEST_CASE("decided formulas stay decided") {
@@ -1281,8 +1281,8 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 	// No end-to-end are_nso_equivalent case here: its
 	// has_no_boolean_combs_of_models precondition (DBG-asserted) rejects
 	// a quantified temporal formula handed in directly. The pipeline
-	// reaches check_decided's NZ-1 arm with formulas it built itself;
-	// the direct check_decided cases above pin both arms.
+	// reaches check_decided's temporal-under-quantifier arm with formulas
+	// it built itself; the direct check_decided cases above pin both arms.
 }
 
 // NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks

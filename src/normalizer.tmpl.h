@@ -849,7 +849,7 @@ bool check_decided(const char* who, tref normalized,
 		LOG_WARNING << who << ": normalization could not decide "
 			<< LOG_FM(normalized) << "; answering negatively. This is a "
 			"conservative fallback, not a proof -- a temporal operator "
-			"directly inside a quantifier scope (NZ-1) is undecidable by "
+			"directly inside a quantifier scope is undecidable by "
 			"this pipeline.";
 		return false;
 	}

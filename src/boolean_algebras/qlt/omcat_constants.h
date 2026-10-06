@@ -44,12 +44,12 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 			long long q = std::stoll(src.substr(slash + 1));
 			if (q == 0)
 				return r.with_error(code::invalid_argument,
-					"rational parse failed for 'p/q', returning sentinel",
+					"rational parse failed for 'p/q'",
 					{{label::value, src}});
 			return r.with_value(rational(p, q));
 		} catch (...) {
 			return r.with_error(code::invalid_argument,
-				"rational parse failed for 'p/q', returning sentinel",
+				"rational parse failed for 'p/q'",
 				{{label::value, src}});
 		}
 	}
@@ -66,8 +66,7 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 				return r.with_error(code::invalid_argument,
 					"rational parse: '" + src + "' has "
 					+ std::to_string(fpart.size()) + " fractional digits, "
-					"more than the 18 an exact rational literal supports; "
-					"returning sentinel",
+					"more than the 18 an exact rational literal supports",
 					{{label::value, src}});
 			long long ival = ipart.empty() ? 0 : std::stoll(ipart);
 			long long fval = fpart.empty() ? 0 : std::stoll(fpart);
@@ -84,7 +83,7 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 			if (num128 > LLONG_MAX || num128 < LLONG_MIN)
 				return r.with_error(code::invalid_argument,
 					"rational parse: '" + src + "' does not fit an "
-					"exact rational literal; returning sentinel",
+					"exact rational literal",
 					{{label::value, src}});
 			num = (long long) num128;
 			(void)scaled;
@@ -95,14 +94,14 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 			{
 				return r.with_error(code::invalid_argument,
 					"rational parse: '" + src + "' does not fit an "
-					"exact rational literal; returning sentinel",
+					"exact rational literal",
 					{{label::value, src}});
 			}
 #endif
 			return r.with_value(rational(num, denom));
 		} catch (...) {
 			return r.with_error(code::invalid_argument,
-				"rational parse failed for decimal, returning sentinel",
+				"rational parse failed for decimal",
 				{{label::value, src}});
 		}
 	}
@@ -111,7 +110,7 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 		return r.with_value(rational(std::stoll(src), 1));
 	} catch (...) {
 		return r.with_error(code::invalid_argument,
-			"rational parse failed for integer, returning sentinel",
+			"rational parse failed for integer",
 			{{label::value, src}});
 	}
 }

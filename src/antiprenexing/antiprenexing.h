@@ -143,8 +143,8 @@ result<tref> resolve_quantifiers(tref formula);
  * every resulting OR-free clause with the same squeeze a whole block uses --
  * which is sound for ANY Boolean algebra, atomless or atomic, not just
  * `bool`, and itself declines (keeping the binder) exactly where that is not
- * the case. A quantifier whose scope still holds a temporal operator (the
- * NZ-1 shape normalizer.tmpl.h documents as genuinely undecidable) or a
+ * the case. A quantifier whose scope still holds a temporal operator (a
+ * shape check_decided in normalizer.tmpl.h reports as undecidable) or a
  * `wff_ref` is left exactly as found, before any of that is attempted, and
  * so is one whose distribution would exceed `cqe_max_clauses` clauses (a
  * warning is logged).
