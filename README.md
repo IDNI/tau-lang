@@ -3289,9 +3289,13 @@ builds, where it's on by default.
 
 Besides the boolean options above, the REPL exposes every limit option as a
 numeric option. These take a count via `set <option> <n>` (so `enable`,
-`disable` and `toggle` do not apply); `0` means unlimited, except for the two
-gc knobs, which keep their tuned defaults (`gcgrowth` at or below `0` disables
-the growth-triggered sweeps). Each mirrors the command line option shown alongside, and until it is set
+`disable` and `toggle` refuse them, as they refuse `severity` and `ltlalg`); a
+count above the largest the command line accepts is refused, never wrapped.
+`0` means unlimited, except where an option's entry below says otherwise:
+`specsizewarn` and `ltlclosedregionstimeout` read `0` as off, `decisionpins`
+as none, `gcminsize` as no floor, `ltlqemaxvars` as its default,
+`trefbudgetsoft` as 75 and `ltlmaxobservations` as 30, and `gcgrowth` at or
+below `0` disables the growth-triggered sweeps. Each mirrors the command line option shown alongside, and until it is set
 reads the `TAU_*` environment variable of that option (see
 [Realizability algorithm](#realizability-algorithm) for the list); `get` shows the value
 in force:

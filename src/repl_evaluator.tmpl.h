@@ -2599,10 +2599,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  stepprop               step definitional propagation        on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string numeric_options =
-		"and the numeric limit options, set with `set <option> <n>` "
-		"(0 = unlimited;\nspecsizewarn: 0 = off; gcgrowth <= 0 disables "
-		"gc; each mirrors the CLI option\nof the same meaning, and until "
-		"it is set reads the TAU_* variable `tau --help`\nnames for it):\n"
+		"and the numeric limit options, set with `set <option> <n>`. 0 "
+		"means unlimited, except:\nspecsizewarn and "
+		"ltlclosedregionstimeout 0 = off; decisionpins 0 = none;\n"
+		"gcminsize 0 = no floor; ltlqemaxvars 0 = the default; "
+		"trefbudgetsoft 0 = 75;\nltlmaxobservations 0 = 30; gcgrowth <= 0 "
+		"disables gc; and the rows that say so.\nEach mirrors the CLI "
+		"option of the same meaning, and until it is set reads\nthe TAU_* "
+		"variable `tau --help` names for it:\n"
 		"  <option>               <description>                        <default>\n"
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
