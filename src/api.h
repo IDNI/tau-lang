@@ -37,8 +37,8 @@
 namespace idni::tau_lang {
 
 /// Operator-preference strengthening order for `api::apply_preferences`.
-/// Full definition in preferences.h, included by callers that build one;
-/// only a reference to it crosses the api boundary here.
+/// Defined in preferences.h, which a caller building one includes; only a
+/// reference crosses the api boundary.
 struct preference_order;
 
 /**
@@ -63,11 +63,15 @@ struct stream_at {
  */
 template <NodeType node>
 struct option_change_guard {
+	/// Record the fingerprint of the semantic options.
 	option_change_guard();
+	/// Empty the tree caches (`tree::clear_caches`) when the fingerprint
+	/// differs from the one recorded.
 	~option_change_guard();
 	option_change_guard(const option_change_guard&) = delete;
 	option_change_guard& operator=(const option_change_guard&) = delete;
 private:
+	/// Fingerprint recorded on entry.
 	size_t before;
 };
 
@@ -81,8 +85,13 @@ struct interpreter_options {
 
 /**
  * @brief One-time setup for @p node: the BDD backend and the grammar's
- * dynamic type names. Call once before the first parse, the way callers
- * already call `bdd_init<Bool>()` -- this replaces that call.
+ * dynamic type names. Call before the first parse; it replaces a direct
+ * `bdd_init<Bool>()` call.
+ *
+ * Registers the core type names (`nat`, `untyped`, `bool`) and every type
+ * name of the pack as dynamic `type_name` terminals, and makes a type a
+ * spec declares parse as a `type_name` for the rest of that spec. A second
+ * call only re-runs `bdd_init<Bool>()`.
  */
 template <NodeType node>
 void tau_init();
@@ -122,7 +131,9 @@ void tau_init();
 /// (see `with_budget` in `tau_memory_budget.h`).
 template <NodeType node>
 struct api {
+	/// Tree type of the pack.
 	using tau = tree<node>;
+	/// Boost.Log severity taken by @ref set_severity.
 	using severity_level = boost::log::trivial::severity_level;
 
 	friend tau;
@@ -132,14 +143,15 @@ struct api {
 	// -----------------------------------------------------------------------
 	/// Switch between single-char variable names ("charvar" mode, e.g. x, y)
 	/// and multi-char variable names ("var" mode, e.g. foo, bar).
-	/// Affects both the tau parser and the SBF parser.
+	/// Affects the tau grammar, every BA of the pack that declares a
+	/// charvar switch, and the pretty printer.
 	static void set_charvar(bool state);
 	/**
 	 * @brief Enable/disable the core master preprocessing switch
 	 * (`preprocessing` in heuristics/preprocess_placement.h).
 	 *
 	 * This is the pipeline-scheduling gate core itself reads; a BA's own
-	 * preprocessing pass (bv predicate blasting today) also needs its own
+	 * preprocessing pass (bv predicate blasting) also needs its own
 	 * per-BA switch on -- see `bv-blasting` (bv_descriptor.tmpl.h's
 	 * options()) -- so flipping this alone does not by itself turn a BA's
 	 * pass on if that BA's own switch is off. To set every BA's own switch
@@ -150,15 +162,15 @@ struct api {
 	/**
 	 * @brief Select where preprocessing may run (see `preprocess_site`).
 	 *
-	 * 0 = `per_leaf` (default, today's behaviour), 1 = `per_block`,
+	 * 0 = `per_leaf` (default), 1 = `per_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default.
 	 */
 	static void set_preprocess_placement(int site);
 	/**
 	 * @brief Select what happens to a preprocessed formula (see `preprocess_mode`).
 	 *
-	 * 0 = `anti_prenex_result` (default, today's behaviour: re-enter
-	 * `anti_prenex` on the preprocessed formula), 1 = `defer` (rewrite only
+	 * 0 = `anti_prenex_result` (default: re-enter `anti_prenex` on the
+	 * preprocessed formula), 1 = `defer` (rewrite only
 	 * and leave the introduced quantifiers to the next resolve pass). An
 	 * out-of-range value clamps to the default.
 	 */
@@ -166,7 +178,7 @@ struct api {
 	/**
 	 * @brief Select where the cvc5 solver may be queried (see `solver_site`).
 	 *
-	 * 0 = `eager` (default, today's behaviour), 1 = `per_closed_block`,
+	 * 0 = `eager` (default), 1 = `per_closed_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default. The
 	 * final closed-formula check of `eliminate_arithmetic_and_quantifiers` runs
 	 * under every setting -- it is the "final" site the other two rely on.
@@ -176,7 +188,7 @@ struct api {
 	 * @brief Select the cvc5 option set (see `cvc5_option_set`).
 	 *
 	 * Values follow the `cvc5_option_set` enumerators; an out-of-range
-	 * value clamps to the default. Must be set before the first solver
+	 * value selects the default `ext_rewrite_no_models`. Must be set before the first solver
 	 * query: `bv_formula_sat_status` memoizes verdicts keyed on the
 	 * formula alone, so a mid-process flip would serve answers computed
 	 * under the previous option set.
@@ -189,6 +201,7 @@ struct api {
 	 * whole recursion rather than along one path. Exhausting it costs
 	 * precision, not soundness: the elimination takes its graceful re-wrap
 	 * path and leaves the quantifier in place. 0 = unlimited (the default).
+	 * Environment fallback `TAU_BLOCK_MAX_SPLITS`.
 	 */
 	static void set_block_max_splits(size_t n);
 	/**
@@ -197,7 +210,7 @@ struct api {
 	 * Bounds how many times the driver re-collects innermost blocks before
 	 * giving up and returning the formula unprocessed, with a log line.
 	 * 0 = unlimited (the default); convergence is normally reached in well
-	 * under 20 rounds.
+	 * under 20 rounds. Environment fallback `TAU_BLOCK_MAX_ROUNDS`.
 	 */
 	static void set_block_max_rounds(size_t n);
 	/**
@@ -205,32 +218,35 @@ struct api {
 	 * distribute one quantifier scope into (estimated as the product of
 	 * the scope's CNF factors' disjunct counts). Above the cap the
 	 * quantifier is kept verbatim, with a log line. 0 = unlimited (the
-	 * default).
+	 * default). Environment fallback `TAU_CQE_MAX_CLAUSES`.
 	 */
 	static void set_cqe_max_clauses(size_t n);
 	/**
 	 * @brief Above this many distinct variables a pure-equality bitvector
 	 * partition goes to the pack solver instead of being squeezed per width
 	 * and solved algebraically (`find_solution`), whose Boole expansion is
-	 * exponential in them (default 8; 0 = unlimited).
+	 * exponential in them (default 8; 0 = unlimited). Environment
+	 * fallback `TAU_LGRS_MAX_VARS`.
 	 */
 	static void set_lgrs_max_vars(size_t n);
 	/**
 	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
 	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
+	 * Environment fallback `TAU_BV_BLASTDEPTH`.
 	 */
 	static void set_max_blast_reentry_depth(size_t n);
 	/**
 	 * @brief Operand-set size above which block squeezing declines and the
 	 * general Boole decomposition runs instead; 0 = unlimited (default:
-	 * always squeeze).
+	 * always squeeze). Environment fallback `TAU_BLOCK_SQUEEZE_CAP`.
 	 */
 	static void set_block_squeeze_cap(size_t n);
 	/**
 	 * @brief Cap the temporal-normalization fixpoint searches
 	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); default 500, 0 = unlimited.
 	 *
-	 * Reaching the cap is an error without a verdict.
+	 * Reaching the cap is an error without a verdict. Environment fallback
+	 * `TAU_MAX_FIXPOINT_STEPS`.
 	 */
 	static void set_max_fixpoint_steps(size_t n);
 	/**
@@ -238,48 +254,54 @@ struct api {
 	 * `to_unbounded_continuation`; default 500, 0 = unlimited.
 	 *
 	 * Reaching the cap is an error without a verdict, not a proof of
-	 * unsatisfiability.
+	 * unsatisfiability. Environment fallback `TAU_MAX_FLAG_SEARCH_STEPS`.
 	 */
 	static void set_max_flag_search_steps(size_t n);
 	/**
 	 * @brief Cap definition-expansion passes in
 	 * `expand_defs_until_settled`; 0 = unlimited (default). Reaching the
-	 * cap is an error.
+	 * cap is an error. Environment fallback `TAU_MAX_DEF_PASSES`.
 	 */
 	static void set_max_def_passes(size_t n);
 	/**
 	 * @brief Cap recurrence-relation enumeration steps in
 	 * `calculate_fixed_point`; 0 = unlimited (default). A bounded give-up
 	 * is a bound on the search, not a proof that no fixed point exists.
+	 * Environment fallback `TAU_MAX_ENUM_STEPS`.
 	 */
 	static void set_max_enum_steps(size_t n);
 	/**
 	 * @brief Cap the untyped saturation probe `calculate_fixed_point` runs
 	 * over a residual recurrence reference; 0 = unlimited. Defaults to
 	 * 10000, since a diverging probe never stabilizes; a finite
-	 * `max_enum_steps` tightens it further.
+	 * `max_enum_steps` tightens it further. Environment fallback
+	 * `TAU_MAX_PROBE_STEPS`.
 	 */
 	static void set_max_probe_steps(size_t n);
 	/**
 	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
 	 * (default). Oscillation is detected regardless; this bounds only
-	 * ever-growing rewrites.
+	 * ever-growing rewrites. Environment fallback `TAU_MAX_REWRITE_ROUNDS`.
 	 */
 	static void set_max_rewrite_rounds(size_t n);
 	/**
 	 * @brief Cap `bv_ba_custom_simplification` rewrite rounds; 0 =
-	 * unlimited (default). Oscillation is detected regardless.
+	 * unlimited (default). Oscillation is detected regardless. Environment
+	 * fallback `TAU_MAX_SIMPLIFY_ROUNDS`.
 	 */
 	static void set_max_simplify_rounds(size_t n);
 	/**
 	 * @brief Tree-node count floor before the interpreter's gc may
-	 * trigger. Default 256 (kept — a tuned value, not a cap).
+	 * trigger. Default 256, a tuned value rather than a cap; 0 = no floor,
+	 * only the growth factor decides. Environment fallback
+	 * `TAU_GC_MIN_SIZE`.
 	 */
 	static void set_gc_min_size(size_t n);
 	/**
 	 * @brief Growth factor of the interpreter's adaptive gc trigger; a
 	 * sweep fires when the node count grew by this factor since the last
-	 * sweep. Default 1.5 (kept); <= 0 disables gc.
+	 * sweep. Default 1.5; <= 0 disables gc. Environment fallback
+	 * `TAU_GC_GROWTH_FACTOR`.
 	 */
 	static void set_gc_growth_factor(double f);
 	/**
@@ -289,26 +311,28 @@ struct api {
 	 * store already at or above the cap returns an error without doing
 	 * any work, while a call that was allowed to start returns its value
 	 * whatever it does to the store. See `tau_memory_budget.h` for what
-	 * this does and does not bound.
+	 * this does and does not bound. Environment fallback `TAU_TREF_BUDGET`.
 	 */
 	static void set_tref_budget(size_t n);
 	/**
 	 * @brief Percentage of the tref budget at which the store counts as
 	 * approaching its cap and the interpreter sweeps regardless of its
-	 * own growth trigger. Default 75.
+	 * own growth trigger. Default 75; 0 or a value above 100 reads as 75,
+	 * with a warning. Environment fallback `TAU_TREF_BUDGET_SOFT`.
 	 */
 	static void set_tref_budget_soft_percent(size_t pct);
 	/// Live interned tree node count.
 	static size_t tref_count();
 	/**
 	 * @brief Warn when an updated specification exceeds this many printed
-	 * characters (the I7 size guard); 0 = off (default).
+	 * characters; 0 = off (default). Environment fallback
+	 * `TAU_SPEC_SIZE_WARN`.
 	 */
 	static void set_spec_size_warn(size_t n);
 	/**
 	 * @brief Cap the revision alternatives kept per specification part,
 	 * dropping middle preference tiers with a warning; 0 = unlimited
-	 * (default).
+	 * (default). Environment fallback `TAU_MAX_REVISION_ALTS`.
 	 */
 	static void set_max_revision_alts(size_t n);
 	/**
@@ -322,7 +346,8 @@ struct api {
 	static void set_max_consistency_subsets(size_t n);
 	/**
 	 * @brief Bound the string-keyed synthesis caches (FIFO eviction,
-	 * LG-27); default 4096 entries, 0 = unbounded.
+	 * LG-27); default 4096 entries, 0 = unbounded. Environment fallback
+	 * `TAU_CACHE_BOUND`.
 	 */
 	static void set_cache_bound(size_t n);
 	/**
@@ -333,28 +358,32 @@ struct api {
 	 */
 	static void set_max_cover_products(size_t n);
 	/** @brief Set the largest region of fresh values, in tree nodes, the
-	 * solver keeps across the steps of a run (0 = unlimited). */
+	 * solver keeps across the steps of a run; past it values come from the
+	 * general solver. Default 2000, 0 = unlimited. Environment fallback
+	 * `TAU_MAX_CONSTANT_SIZE`. */
 	static void set_max_constant_size(size_t n);
 	/**
 	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
 	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
 	 * a negative value unsets the parameter so the `TAU_LTL_TIMEOUT_SEC`
 	 * environment fallback (default 60) applies again. Values above one
-	 * day clamp.
+	 * day (86400) clamp.
 	 */
 	static void set_ltl_timeout_sec(long seconds);
 	/**
 	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
 	 * `"auto"` (`ltl_algorithm_param`); the empty string unsets the
 	 * parameter so the `TAU_LTL_ALG` environment fallback applies again.
-	 * An unrecognised value is reported once and read as `auto`.
+	 * Case-insensitive; an unrecognised value is reported once and read
+	 * as `auto`.
 	 */
 	static void set_ltl_algorithm(const std::string& alg);
 	/**
 	 * @brief Free-variable cap of the omcat quantifier-elimination fast
 	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
 	 * that is not sound. 0 unsets the parameter so the
-	 * `TAU_LTL_OMCAT_QE_MAX_VARS` environment fallback (default 2) applies.
+	 * `TAU_LTL_OMCAT_QE_MAX_VARS` environment fallback (default 2) applies;
+	 * that variable set to 0 or garbage keeps the default, with a warning.
 	 */
 	static void set_ltl_qe_max_vars(size_t n);
 	/**
@@ -463,11 +492,15 @@ struct api {
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable support-component factoring of the Tau-BA
-	/// constant/valid tests (tau_ba.tmpl.h). On by default.
+	/// constant/valid tests (tau_ba.tmpl.h). On by default. The environment
+	/// variable `TAU_BA_COMPONENT_FACTORING` overrides it in both
+	/// directions (`0` disables, any other value enables). A pack without
+	/// tau ignores it.
 	static void set_ba_component_factoring(bool state);
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
-	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096, or the
-	/// `TAU_BA_DECISION_PINS` environment fallback.
+	/// interpreter's sweep, oldest released first (0 = no pinning;
+	/// tau_ba.h). Default 4096; environment fallback `TAU_BA_DECISION_PINS`.
+	/// A pack without tau ignores it.
 	static void set_ba_decision_pins(size_t n);
 	/**
 	 * @brief Set an option an algebra of the pack declares about itself,
@@ -496,59 +529,143 @@ struct api {
 	// Each getter returns the effective value of the limit its setter of the
 	// same name sets: the value set, else the limit's TAU_* environment
 	// fallback, else its default. A cap reads 0 when unlimited, as its
-	// setter takes it.
+	// setter takes it. Each line names the environment variable, the
+	// default and what 0 reads as.
+	/// The effective per-block Boole-decomposition split budget
+	/// (`TAU_BLOCK_MAX_SPLITS`; default and 0 = unlimited).
 	static size_t get_block_max_splits();
+	/// The effective anti-prenex driver's round cap (`TAU_BLOCK_MAX_ROUNDS`;
+	/// default and 0 = unlimited).
 	static size_t get_block_max_rounds();
+	/// The effective DNF clause cap of `complete_quantifier_elimination`
+	/// (`TAU_CQE_MAX_CLAUSES`; default and 0 = unlimited).
 	static size_t get_cqe_max_clauses();
+	/// The effective variable count above which a bitvector equality partition
+	/// goes to the pack solver (`TAU_LGRS_MAX_VARS`; default 8, 0 = unlimited).
 	static size_t get_lgrs_max_vars();
+	/// The effective blast-then-re-enter nesting cap (`TAU_BV_BLASTDEPTH`;
+	/// default and 0 = unlimited).
 	static size_t get_max_blast_reentry_depth();
+	/// The effective operand-set size above which block squeezing declines
+	/// (`TAU_BLOCK_SQUEEZE_CAP`; default and 0 = unlimited).
 	static size_t get_block_squeeze_cap();
+	/// The effective temporal-normalization fixpoint cap
+	/// (`TAU_MAX_FIXPOINT_STEPS`; default 500, 0 = unlimited).
 	static size_t get_max_fixpoint_steps();
+	/// The effective eventual-flag search cap (`TAU_MAX_FLAG_SEARCH_STEPS`;
+	/// default 500, 0 = unlimited).
 	static size_t get_max_flag_search_steps();
+	/// The effective definition-expansion pass cap (`TAU_MAX_DEF_PASSES`;
+	/// default and 0 = unlimited).
 	static size_t get_max_def_passes();
+	/// The effective recurrence enumeration step cap (`TAU_MAX_ENUM_STEPS`;
+	/// default and 0 = unlimited).
 	static size_t get_max_enum_steps();
+	/// The effective untyped saturation probe cap (`TAU_MAX_PROBE_STEPS`;
+	/// default 10000, 0 = unlimited).
 	static size_t get_max_probe_steps();
+	/// The effective `repeat_all` round cap (`TAU_MAX_REWRITE_ROUNDS`; default
+	/// and 0 = unlimited).
 	static size_t get_max_rewrite_rounds();
+	/// The effective bv custom simplification round cap
+	/// (`TAU_MAX_SIMPLIFY_ROUNDS`; default and 0 = unlimited).
 	static size_t get_max_simplify_rounds();
+	/// The effective interpreter gc's tree-node floor (`TAU_GC_MIN_SIZE`;
+	/// default 256, 0 = no floor).
 	static size_t get_gc_min_size();
+	/// The effective interpreter gc's growth factor (`TAU_GC_GROWTH_FACTOR`;
+	/// default 1.5, <= 0 = gc off).
 	static double get_gc_growth_factor();
+	/// The effective live tree-node cap (`TAU_TREF_BUDGET`; default and 0 =
+	/// unlimited).
 	static size_t get_tref_budget();
+	/// The effective soft mark of the tref budget, in percent
+	/// (`TAU_TREF_BUDGET_SOFT`; default 75, always in 1..100).
 	static size_t get_tref_budget_soft_percent();
+	/// The effective updated-spec size warning threshold (`TAU_SPEC_SIZE_WARN`;
+	/// default and 0 = off).
 	static size_t get_spec_size_warn();
+	/// The effective revision alternatives cap per spec part
+	/// (`TAU_MAX_REVISION_ALTS`; default and 0 = unlimited).
 	static size_t get_max_revision_alts();
+	/// The effective consistency-subset check cap per atom group
+	/// (`TAU_LTL_MAX_CONSISTENCY_SUBSETS`; default 4096, 0 = unlimited).
 	static size_t get_max_consistency_subsets();
+	/// The effective bound of the string-keyed synthesis caches
+	/// (`TAU_CACHE_BOUND`; default 4096, 0 = unbounded).
 	static size_t get_cache_bound();
+	/// The effective oracle's mixed-type coverage cap
+	/// (`TAU_LTL_MAX_COVER_PRODUCTS`; default 256, 0 = unlimited).
 	static size_t get_max_cover_products();
+	/// The effective fresh-value region cap, in tree nodes
+	/// (`TAU_MAX_CONSTANT_SIZE`; default 2000, 0 = unlimited).
 	static size_t get_max_constant_size();
-	/// The ltlsynt watchdog in seconds; 0 when it is off.
+	/// The effective ltlsynt watchdog in seconds (`TAU_LTL_TIMEOUT_SEC`;
+	/// default 60, 0 = off, at most 86400).
 	static long get_ltl_timeout_sec();
-	/// The omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or `"auto"`.
+	/// The effective omcat synthesis algorithm (`TAU_LTL_ALG`; default and an
+	/// unrecognised value read `"auto"`): `"A"`, `"B"`, `"D"` or `"auto"`.
 	static std::string get_ltl_algorithm();
+	/// The effective free-variable cap of the omcat QE fast path
+	/// (`TAU_LTL_OMCAT_QE_MAX_VARS`; default 2, never 0).
 	static size_t get_ltl_qe_max_vars();
+	/// The effective largest accepted HOA state count
+	/// (`TAU_LTL_HOA_MAX_STATES`; default 2^22, 0 = unlimited).
 	static size_t get_ltl_hoa_max_states();
+	/// The effective DNF cube cap of a HOA guard (`TAU_LTL_GUARD_MAX_CUBES`;
+	/// default 512, 0 = unlimited).
 	static size_t get_ltl_guard_max_cubes();
+	/// The effective ABA-oracle refinement round cap
+	/// (`TAU_LTL_REFINEMENT_ROUNDS`; default 64, 0 = unlimited).
 	static size_t get_ltl_max_refinement_rounds();
+	/// The effective window oracle's path cap (`TAU_LTL_WINDOW_MAX_PATHS`;
+	/// default 4096, 0 = unlimited).
 	static size_t get_ltl_window_max_paths();
+	/// The effective data game's closed-regions budget in seconds
+	/// (`TAU_LTL_CLOSED_REGIONS_TIMEOUT`; default 20, 0 = no attempt).
 	static size_t get_ltl_closed_regions_timeout();
+	/// The effective data game's BDD node cap (`TAU_LTL_DATA_GAME_MAX_NODES`;
+	/// default 2^23, 0 = unlimited).
 	static size_t get_ltl_data_game_max_nodes();
+	/// The effective data game's BDD memo cap (`TAU_LTL_DATA_GAME_MAX_MEMO`;
+	/// default 2^25, 0 = unlimited).
 	static size_t get_ltl_data_game_max_memo();
+	/// The effective data game's tabulated-combination cap
+	/// (`TAU_LTL_DATA_GAME_MAX_COMBINATIONS`; default 4096, 0 = unlimited).
 	static size_t get_ltl_data_game_max_combinations();
+	/// The effective observation prop cap (`TAU_LTL_MAX_OBSERVATIONS`; default
+	/// 8, always in 1..30: 0 reads as 30).
 	static size_t get_ltl_max_observations();
+	/// The effective Mealy view state bound (`TAU_LTL_MEALY_MAX_STATES`;
+	/// default 4096, 0 = no view).
 	static size_t get_ltl_mealy_max_states();
+	/// The effective Mealy view edge bound (`TAU_LTL_MEALY_MAX_EDGES`; default
+	/// 65536, 0 = no view).
 	static size_t get_ltl_mealy_max_edges();
+	/// The effective Mealy table edge bound of `tau gen` / `tau compile`
+	/// (`TAU_COMPILE_MAX_TABLE_EDGES`; default 400, 0 = no table).
 	static size_t get_compile_max_table_edges();
+	/// The effective BDD node cap of the variable-dependence test
+	/// (`TAU_BF_DEPENDENCE_MAX_NODES`; default 65536, 0 = unlimited).
 	static size_t get_bf_dependence_max_nodes();
+	/// The effective Tau-BA decision pin cap (`TAU_BA_DECISION_PINS`; default
+	/// 4096, 0 = no pinning; 0 in a pack without tau).
 	static size_t get_ba_decision_pins();
 
 	/// A numeric runtime limit addressed by name, as the bindings enumerate
 	/// them: `name` is its setter's and getter's name without the `set_` /
 	/// `get_` prefix.
 	struct count_limit {
+		/// Setter/getter name without the prefix.
 		const char* name;
+		/// The `set_<name>` setter.
 		void (*set)(size_t);
+		/// The `get_<name>` getter.
 		size_t (*get)();
 	};
-	/// Every numeric runtime limit with a `size_t` setter and getter above.
+	/// Every numeric runtime limit with a `size_t` setter and getter above,
+	/// in declaration order. The span refers to a static table, valid for
+	/// the whole process.
 	static std::span<const count_limit> count_limits();
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
@@ -585,7 +702,9 @@ struct api {
 
 	/// Parse a function definition (rec_relation with bf body).
 	/// The input must parse as a rec_relation whose body is a bf or a ref.
-	/// The definition is automatically registered in the global definition store.
+	/// The definition is registered in the global definition store only
+	/// once it is validated. @p simplified is not read: the definition is
+	/// always parsed with type inference and hooks.
 	/// @return Parsed tree, or a structured error if the body is not a bf/ref.
 	static result<tref> get_function_def(const std::string& function_def, bool simplified = true);
 	/// @copydoc get_function_def
@@ -593,7 +712,9 @@ struct api {
 
 	/// Parse a predicate definition (rec_relation with wff body).
 	/// The input must parse as a rec_relation whose body is a wff or a ref.
-	/// The definition is automatically registered in the global definition store.
+	/// The definition is registered in the global definition store only
+	/// once it is validated. @p simplified is not read, as for
+	/// @ref get_function_def.
 	/// @return Parsed tree, or a structured error if the body is not a wff/ref.
 	static result<tref> get_predicate_def(const std::string& predicate_def, bool simplified = true);
 	/// @copydoc get_predicate_def
@@ -627,12 +748,15 @@ struct api {
 
 	/// Parse input as a spec first; if that fails, try parsing as a bf term.
 	/// Useful for REPL-style input where the user may type either.
+	/// @p simplified applies to the term fallback only; the spec's parse
+	/// errors are reported only when the term parse fails too.
 	/// @return Parsed tree, or a structured error if neither parse succeeds.
 	static result<tref> get_spec_or_term(const std::string& expression, bool simplified = true);
 	/// @copydoc get_spec_or_term
 	static result<htref> geth_spec_or_term(const std::string& expression, bool simplified = true);
 
 	/// Parse input as either a wff or a bf term (single production rule).
+	/// A wff gets its io_vars classified as @ref get_formula does.
 	/// @return Parsed and trimmed tree, or a structured error on failure.
 	static result<tref> get_formula_or_term(const std::string& expression, bool simplified = true);
 	/// @copydoc get_formula_or_term
@@ -682,6 +806,8 @@ struct api {
 	/// The string overload attempts get_term() and checks for success.
 	static bool is_term(const std::string& expression);
 	/// Return true if the root node of @p expression is flagged as a term.
+	/// @p expression must not be null (the htref overload returns false
+	/// for a null handle).
 	static bool is_term(tref expression);
 	/// @copydoc is_term(tref)
 	static bool is_term(htref expression);
@@ -690,6 +816,8 @@ struct api {
 	/// The string overload attempts get_formula() and checks for success.
 	static bool is_formula(const std::string& expression);
 	/// Return true if the root node of @p expression has type wff.
+	/// @p expression must not be null (the htref overload returns false
+	/// for a null handle).
 	static bool is_formula(tref expression);
 	/// @copydoc is_formula(tref)
 	static bool is_formula(htref expression);
@@ -699,7 +827,8 @@ struct api {
 	// -----------------------------------------------------------------------
 
 	/// Apply a single recursive definition to an expression.
-	/// Parses both strings, then delegates to the tref overload.
+	/// Same as @ref apply_defs with a one-element set, including its
+	/// registration of the definition in the global store.
 	/// @return The rewritten expression, or a structured error on parse failure.
 	static result<std::string> apply_def(
 		const std::string& def,
@@ -711,9 +840,18 @@ struct api {
 	static result<htref> apply_def(htref def, htref expression);
 
 	/// Apply a set of recursive definitions to an expression.
-	/// Each definition's head/body pair is added to the expression's
-	/// rec_relation list, then apply_rr_to_formula() rewrites the tree.
-	/// @return The rewritten expression, or a structured error on failure.
+	/// Each definition's head/body pair is added to the expression's own
+	/// rec_relations (a spec's definitions), then `nso_rr_apply` rewrites
+	/// the main formula. The definitions registered in the global store are
+	/// not applied; @ref apply_all_defs applies those. The tref and htref
+	/// overloads skip a null or non-rec_relation definition. The string
+	/// overload parses each definition with @ref get_definition, which
+	/// registers it in the global store, and fails on the first one that
+	/// does not parse; it reads @p expression untyped, so a call still
+	/// matches an untyped definition head, and returns the main formula of
+	/// a spec.
+	/// @return The rewritten expression, or a structured error on failure
+	///         (invalid_argument for a null expression).
 	static result<std::string> apply_defs(
 		const std::set<std::string>& defs,
 		const std::string& expression);
@@ -722,9 +860,10 @@ struct api {
 	/// @copydoc apply_defs(const std::set<std::string>&,const std::string&)
 	static result<htref> apply_defs(const std::set<htref>& defs, htref expression);
 
-	/// Apply all globally registered definitions to an expression.
-	/// Equivalent to apply_defs() with an empty definition set (which
-	/// causes only the global store's definitions to be used).
+	/// Apply all globally registered definitions, together with the
+	/// expression's own (a spec's definitions), to an expression.
+	/// @return The rewritten expression, or a structured error on failure
+	///         (invalid_argument for a null expression).
 	static result<std::string> apply_all_defs(
 		const std::string& expression);
 	/// @copydoc apply_all_defs(const std::string&)
@@ -754,7 +893,7 @@ struct api {
 
 	/// Replace every occurrence of @p that in @p expression with @p with.
 	/// All three arguments must be either all terms or all formulas;
-	/// mismatched types produce a structured error and log it.
+	/// mismatched types or a null argument are an invalid_argument error.
 	static result<std::string> substitute(
 		const std::string& expression,
 		const std::string& that,
@@ -772,7 +911,9 @@ struct api {
 		const std::map<std::string, std::string>& that_with);
 	/** @brief Apply all substitutions in @p that_with to @p expression
 	 * simultaneously: every match is found against the original
-	 * expression and no pair's replacement is re-matched by another. */
+	 * expression and no pair's replacement is re-matched by another.
+	 * Each pair is checked as the single-pair overload checks it, and two
+	 * structurally equal keys are an invalid_argument error. */
 	static result<tref> substitute(tref expression, std::map<tref, tref> that_with);
 	/** @brief Apply all substitutions in @p that_with to @p expression
 	 * simultaneously: every match is found against the original
@@ -1010,7 +1151,8 @@ struct api {
 	/// Applies all definitions, then runs the solver.  Rejects formulas
 	/// containing temporal quantifiers.
 	/// @param formula  A quantifier-free wff.
-	/// @param mode     Solver strategy: general, maximum, minimum, or bitvector.
+	/// @param mode     Solver strategy: general, maximum or minimum (see
+	///                 `solver_mode`).
 	/// @return A map from variable names (or trefs/htrefs) to their
 	///         solution values, or a structured error (code::unsat when no
 	///         solution exists) on failure.
@@ -1044,11 +1186,16 @@ struct api {
 
 	/// Construct an interpreter from a Tau specification string.
 	/// Parses, normalizes, and checks for free variables.  Returns a
-	/// structured error on parse failure, normalization failure, or if
-	/// the normalized formula has free variables.
+	/// structured error on parse failure, normalization failure, if
+	/// the normalized formula has free variables, or if the specification
+	/// cannot be compiled (code::solver_error). A time constraint that
+	/// never holds once its clause applies adds a warning. On success the
+	/// remaps of the options (none here) are written into the global
+	/// io_context; a failed call leaves it unchanged.
 	static result<interpreter<node>> get_interpreter(
 		const std::string& spec);
-	/// Construct an interpreter with explicit I/O stream remapping.
+	/// Construct an interpreter with explicit I/O stream remapping,
+	/// written into the global io_context on success.
 	static result<interpreter<node>> get_interpreter(
 		const std::string& spec,
 		interpreter_options& options);
@@ -1078,7 +1225,10 @@ struct api {
 	/// Advance the interpreter by one time step with explicit inputs.
 	/// Parses each input value string into the appropriate BA constant,
 	/// calls the interpreter's step, writes outputs, and processes any
-	/// specification update stream.
+	/// specification update stream. An entry for `this` is ignored; an
+	/// input stream the context does not declare is a
+	/// code::invalid_input_stream error, and a value that does not parse
+	/// as its stream's type, or holds an open tau formula, is an error.
 	/// @param interactive  When true (default), reports code::invalid_state
 	///   if the interpreter signals auto_continue=false (used by CLI tools
 	///   to pause and prompt).  When false, outputs are always returned.
@@ -1120,8 +1270,8 @@ struct api {
 	/// @param quit_on_idle  When true, stop instead of prompting once the
 	///   loop goes idle (matches the CLI's `-q`); when false (default),
 	///   prompt interactively.
-	/// @return false (with a structured error) if a step's output failed
-	///   to write; true otherwise.
+	/// @return true when the loop ends; an error without a value
+	///   (code::runtime_error) when a step fails.
 	static result<bool> run(interpreter<node>& i, bool quit_on_idle = false);
 
 	/// Per-revision realisability pre-check: would merging `psi` with
@@ -1189,6 +1339,7 @@ private:
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	/// get_spec(), with @p as_written choosing get_spec_as_written().
 	static result<tref> get_spec(const std::string& spec, bool as_written);
 	/// get_formula_or_term() without the construction hooks, for the
 	/// decision procedures, which keep the warm-ups as written.

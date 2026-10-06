@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -11,7 +11,7 @@ namespace idni::tau_lang {
 // ------------------------------------------------------------
 
 // Lifts a tref->tref map (e.g. a solver solution) into owning htref
-// handles so results survive independently of the caches.
+// handles, so the result survives a tree sweep.
 template <NodeType node>
 std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 	std::map<htref, htref> hm;
@@ -24,6 +24,8 @@ std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 // ------------------------------------------------------------
 // Each method delegates to the corresponding tref overload and wraps
 // the result with tau::geth() to produce a GC-safe shared-pointer handle.
+// A null handle argument is an invalid_argument error (false for the
+// boolean queries).
 
 // Parsing
 // ------------------------------------------------------------
@@ -372,8 +374,8 @@ result<htref> api<node>::eliminate_quantifiers(htref fm) {
 			result<htref> r;
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		// Apply defs at the tref level before eliminating quantifiers
-		// (the tref overload also calls apply_all_defs internally)
+		// Definitions are applied before the tref overload, which simplifies
+		// and applies them again
 		return apply_all_defs(fm->get()).and_then(
 			[](tref applied) { return eliminate_quantifiers(applied); }
 		).transform([](tref v) { return tau::geth(v); });

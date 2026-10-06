@@ -1,8 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Shared option table for the tau CLI and a compiled artifact's own main:
-// each caller declares which subset it supports so unknown/unsupported
-// flags fail with the same idni::cli error/help both callers already share.
+/**
+ * @file cli_options.h
+ * @brief Option table of a compiled artifact's own main.
+ *
+ * The main that `tau gen` emits (tau_compile.tmpl.h) builds its options with
+ * @ref tau_cli_options and the artifact subset, so its `--help` and its
+ * unknown-flag error come from the same idni::cli code as the tau CLI's. The
+ * tau executable builds its own, larger table in main.cpp (`tau_options()`).
+ */
 
 #ifndef __IDNI__TAU__CLI_OPTIONS_H__
 #define __IDNI__TAU__CLI_OPTIONS_H__
@@ -14,13 +20,20 @@
 
 namespace idni::tau_lang {
 
-// full: every flag the CLI supports; artifact: the run-time-meaningful
-// subset a compiled artifact's own main parses.
+/// Which option table @ref tau_cli_options builds: `full`, the general and
+/// REPL flags (no runtime limit), or `artifact`, the run-time-meaningful
+/// subset a compiled artifact's own main parses.
 enum class cli_option_set { full, artifact };
 
-// Builds the tau option table for the requested subset. The artifact subset
-// is a prefix of the full table -- same names, short letters, defaults and
-// descriptions -- so both --help and an unknown-flag error read identically.
+/**
+ * @brief Build the option table for @p set.
+ *
+ * The artifact subset is a prefix of the full table -- same names, short
+ * letters, defaults and descriptions -- so both `--help` and an unknown-flag
+ * error read identically.
+ * @param set The table to build.
+ * @return The options, keyed by long name.
+ */
 inline idni::cli::options tau_cli_options(cli_option_set set = cli_option_set::full) {
 	idni::cli::options opts;
 	opts["help"] = idni::cli::option("help", 'h', false)
@@ -62,8 +75,12 @@ inline idni::cli::options tau_cli_options(cli_option_set set = cli_option_set::f
 	return opts;
 }
 
-// Maps --severity's string value to a Boost.Log severity level; anything
-// other than trace/debug/error (including the default "info") is info.
+/**
+ * @brief The Boost.Log severity level that `--severity`'s value @p s names.
+ * @param s "trace", "debug", "info" or "error".
+ * @return The level; anything other than trace/debug/error (including the
+ * default "info") is info.
+ */
 inline boost::log::trivial::severity_level tau_cli_parse_severity(
 	const std::string& s)
 {

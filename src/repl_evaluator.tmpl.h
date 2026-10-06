@@ -7,7 +7,8 @@
 
 namespace idni::tau_lang {
 
-// 0 and SIZE_MAX both mean no cap.
+/// @brief The text `get` prints for the count limit @p v: "unlimited" for
+/// 0 and SIZE_MAX (both mean no cap), else the number.
 inline std::string count_limit_str(size_t v) {
 	return v == 0 || v == std::numeric_limits<size_t>::max()
 		? "unlimited" : std::to_string(v);
@@ -20,6 +21,7 @@ inline std::string count_limit_str(size_t v) {
 #define TC_PROMPT        TC(term::color::WHITE, term::color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN() // TODO: change to term::color::GREEN()
 
+/** @internal @copydoc repl_evaluator::invalid_argument @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::invalid_argument() const {
@@ -27,6 +29,7 @@ tref repl_evaluator<BAs...>::invalid_argument() const {
 	return nullptr;
 }
 
+/** @internal @copydoc repl_evaluator::print_error @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_error(code c, std::string_view msg,
@@ -37,6 +40,7 @@ void repl_evaluator<BAs...>::print_error(code c, std::string_view msg,
 	rep.print(err);
 }
 
+/** @internal @copydoc repl_evaluator::print_warning @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_warning(std::string_view msg,
@@ -47,6 +51,7 @@ void repl_evaluator<BAs...>::print_warning(std::string_view msg,
 	rep.print(err);
 }
 
+/** @internal @copydoc repl_evaluator::get_history_index @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
@@ -87,6 +92,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
 
+/** @internal @copydoc repl_evaluator::history_retrieve @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
@@ -98,6 +104,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 	return {};
 }
 
+/** @internal @copydoc repl_evaluator::print_history @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
@@ -114,6 +121,7 @@ void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
 	tau_api::print(out, mem) << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::history_print_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
@@ -123,6 +131,7 @@ void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
 	if (idx) print_history(H[idx.value()], idx.value(), H.size());
 }
 
+/** @internal @copydoc repl_evaluator::history_list_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::history_list_cmd() {
@@ -131,6 +140,7 @@ void repl_evaluator<BAs...>::history_list_cmd() {
 		print_history(H[i], i, H.size());
 }
 
+/** @internal @copydoc repl_evaluator::history_store @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::history_store(tref o) {
@@ -142,12 +152,14 @@ void repl_evaluator<BAs...>::history_store(tref o) {
 		print_history(H.back(), H.size() - 1, H.size(), false);
 }
 
+/** @internal @copydoc repl_evaluator::history_store_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::history_store_cmd(const tt& command) {
 	history_store(command | tt::first | tt::ref);
 }
 
+/** @internal @copydoc repl_evaluator::get_ @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
@@ -170,20 +182,19 @@ tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	return nullptr;
 }
 
+/** @internal @copydoc repl_evaluator::get_bf @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_bf(tref n, bool suppress_error) const {
 	return get_(tau::bf, n, suppress_error);
 }
+/** @internal @copydoc repl_evaluator::get_wff @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_wff(tref n) const {
 	return get_(tau::wff, n, false);
 }
 
-// Puts an expression into the type-annotated form that substitution matching
-// compares against.
-//
 // Matching is sensitive to the resolved BA type id on each node. A history
 // entry produced by dnf/cnf/normalize has already been through inference and
 // carries those ids, whereas an expression parsed straight off the command line
@@ -192,8 +203,8 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 //
 // Inference is idempotent on an already inferred tree, so this is safe to apply
 // to every argument. An expression inference rejects is returned unchanged
-// rather than turned into an error, which keeps this from failing substitutions
-// that used to work.
+// rather than turned into an error.
+/** @internal @copydoc repl_evaluator::infer_for_match @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
@@ -207,6 +218,7 @@ tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
 // a fully unannotated pattern against occurrences whose types were resolved
 // by inference -- a pattern parsed from the command line can never carry
 // those resolved ids, so it could never be strictly equal to them.
+/** @internal @copydoc repl_evaluator::equal_modulo_types @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::equal_modulo_types(tref a, tref b) const {
@@ -231,6 +243,7 @@ bool repl_evaluator<BAs...>::equal_modulo_types(tref a, tref b) const {
 	return true;
 }
 
+/** @internal @copydoc repl_evaluator::get_any @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_any(tref arg) const {
@@ -239,6 +252,7 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 	return nullptr;
 }
 
+/** @internal @copydoc repl_evaluator::get_spec_as_written @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
@@ -250,6 +264,7 @@ tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
 	return get_any(arg);
 }
 
+/** @internal @copydoc repl_evaluator::get_applied @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
@@ -258,71 +273,23 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	if (as_written) spec.keep_as_written();
 	spec.add(arg);
 	auto& defs = definitions<node>::instance();
-	// type_defs is spliced first only for parallel structure with rr_defs/
-	// io_defs below -- tau_spec::add's type_def case is a no-op (see its
-	// own comment, tau_spec.tmpl.h), so this loop has no functional effect
-	// on the spec assembled here today; get_applied()'s actual cross-line
-	// ADT visibility comes from upstream, via make_cli()'s
-	// session_type_defs (see this file's def_type_cmd/make_cli), which
-	// resolves an io/rr def's own ADT annotations at ITS declaration parse,
-	// before it ever reaches type_defs/get_applied.
-	// (->get(): type_defs/rr_defs/io_defs store htref, not tref -- see
-	// their declaration comment in repl_evaluator.h for why.)
+	// type_defs go first: tau_spec::add records each in the spec's own
+	// session type defs. An io/rr def's ADT annotations were already
+	// resolved when make_cli() parsed its declaration with the session's
+	// type_defs, so nothing added here is parsed again.
 	for (const htref& hd : type_defs) spec.add(hd->get());
 	for (const htref& hd : rr_defs) spec.add(hd->get());
 	for (const htref& hd : io_defs) {
 		tref d = hd->get();
-		// A tuple-typed (ADT) io def's per-member registration and its
-		// ctx->adt_streams grouping layout were already fully built when
-		// it was first declared: adt_flatten_rewrite_io_def, called from
-		// adt_flatten_rewrite's def_input_cmd/def_output_cmd case (see
-		// src/adt/adt_flatten.tmpl.h), at the def's own original parse.
-		// io_defs itself still holds that def's ORIGINAL, un-flattened
-		// tree (its `typed: <ADT name>` annotation intact) so
-		// def_input_cmd()/def_output_cmd() can echo it back to the user.
-		// Splicing that raw tree back in here, on every later
-		// normalize/sat/solve/run, re-runs infer_ba_types/update_types on
-		// it with no ADT registry left to resolve `<ADT name>` -- which
-		// used to fabricate a SECOND, un-grouped "bare root" stream
-		// registration in ctx alongside the correct per-member one,
-		// silently duplicating it. rebuild_inputs/rebuild_outputs
-		// (interpreter.tmpl.h) would then also try to read/write through
-		// that stray bare-root stream, producing spurious "Failed to
-		// read/write ..." errors during `run`.
-		//
-		// This is still safe now that session type_defs became visible
-		// cross-line (this file's own type_defs is now threaded through
-		// make_cli()'s get_options into adt_flatten/adt_registry::build,
-		// so an ADT type declared on an earlier REPL line is no longer
-		// invisible to a later line's parse -- see the REPL test file's
-		// header comment). That makes THIS def's own original
-		// declaration parse resolve correctly even when its ADT type
-		// came from an earlier line (adt_flatten_rewrite_io_def now sees
-		// it too there), but it does not change what re-splicing here
-		// would do. get_applied() only ever calls tau_spec::add(tref) on
-		// spec (never tau_spec::parse(string)), so spec's parts_/parsed_
-		// stay empty; get_nso_rr() -> get() (tau_spec.tmpl.h) DOES still
-		// call tau::get(...) once, at :54-55, but on the ptree
-		// build_parse_tree() returns for that empty parts_ -- an empty
-		// `spec` ptree node with no children (build_parse_tree()'s own
-		// defs.empty()/!main branch) -- so that one tau::get call parses
-		// NONE of the user's actual text or spliced trees; nothing is
-		// there yet for adt_flatten to see either way. The real spliced
-		// content -- this def's raw tree (added via add()'s
-		// input_def/output_def case into defs_) and arg's formula (via
-		// add()'s wff/bf case into main_) -- is merged in AFTERWARDS by
-		// plain tree-node constructors (tau::get(tau::main, main_),
-		// tau::get(tau::definitions, spec_defs), tau::get(tau::spec, ...),
-		// tau_spec.tmpl.h:63-72), which build a node from an existing
-		// tref and never re-parse or re-flatten it. So splicing this raw,
-		// un-flattened tree back in would still hit "no ADT registry left
-		// to resolve `<ADT name>`" regardless of session visibility --
-		// bypassed by construction (no parse ever touches it), not by
-		// content; unlike an ordinary (non-ADT) cross-line io def --
-		// which DOES still need this splice, since infer_ba_types (which
-		// DOES run here, via get()'s own direct call, tau_spec.tmpl.h:76)
-		// resolves its base type -- a tuple-typed def has nothing left to
-		// contribute here, so it is skipped outright rather than spliced.
+		// A tuple-typed (ADT) io def was flattened and registered per
+		// member when it was declared (adt_flatten_rewrite_io_def,
+		// src/adt/adt_flatten.tmpl.h); io_defs keeps its original tree so
+		// def_list_cmd() can echo it. Typing that tree again here has no
+		// ADT registry to resolve its `typed: <ADT name>` annotation, and
+		// registers a second, bare-root stream beside the per-member ones,
+		// which `run` then fails to read or write. So it is skipped; an
+		// ordinary io def is added, since infer_ba_types resolves its type
+		// here.
 		tref head = tt(d) | tt::first | tt::ref;
 		size_t root_sid = head ? tau::get(head).get_string_id() : 0;
 		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
@@ -353,6 +320,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	return applied;
 }
 
+/** @internal @copydoc repl_evaluator::get_type_and_arg @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
@@ -378,6 +346,7 @@ std::optional<std::pair<size_t, tref>>
 	return { { tau::get(r).get_type(), r } };
 }
 
+/** @internal @copydoc repl_evaluator::print_benchmarks(const result<T>&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 template <typename T>
@@ -385,6 +354,7 @@ void repl_evaluator<BAs...>::print_benchmarks(const result<T>& res) const {
 	if (opt.print_benchmarks) print_benchmarks(res.report());
 }
 
+/** @internal @copydoc repl_evaluator::print_benchmarks(const report&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
@@ -392,6 +362,7 @@ void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
 	rep.print(err);
 }
 
+/** @internal @copydoc repl_evaluator::print_warnings @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_warnings(const report& rep) const {
@@ -399,6 +370,7 @@ void repl_evaluator<BAs...>::print_warnings(const report& rep) const {
 		.error = {}, .warning = &err, .info = {} });
 }
 
+/** @internal @copydoc repl_evaluator::onf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
@@ -416,6 +388,7 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::dnf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
@@ -429,6 +402,7 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::cnf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
@@ -443,6 +417,7 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 }
 
 
+/** @internal @copydoc repl_evaluator::nnf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
@@ -456,6 +431,7 @@ tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::anf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
@@ -470,6 +446,7 @@ tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::pnf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
@@ -483,6 +460,7 @@ tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::mnf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
@@ -496,6 +474,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::subst_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
@@ -651,6 +630,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	return in;
 }
 
+/** @internal @copydoc repl_evaluator::inst_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
@@ -670,6 +650,7 @@ tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
 	return subst_cmd(n);
 }
 
+/** @internal @copydoc repl_evaluator::normalize_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
@@ -699,6 +680,7 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::qelim_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
@@ -714,6 +696,7 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::reset_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::reset_cmd() {
@@ -733,6 +716,7 @@ void repl_evaluator<BAs...>::reset_cmd() {
 		<< api<node>::tref_count() << ").\n";
 }
 
+/** @internal @copydoc repl_evaluator::whatis_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
@@ -759,6 +743,7 @@ tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
 	return value;
 }
 
+/** @internal @copydoc repl_evaluator::run_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
@@ -834,6 +819,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	continue_running();
 }
 
+/** @internal @copydoc repl_evaluator::stop_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::stop_cmd() {
@@ -842,6 +828,7 @@ void repl_evaluator<BAs...>::stop_cmd() {
 	out << "run stopped\n";
 }
 
+/** @internal @copydoc repl_evaluator::ltl_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
@@ -849,7 +836,7 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 	tref value = get_spec_as_written(n[1].get());
 	if (!value) return;
-	// IN-N5: `ltl` was the one formula command with no fragment gate.
+	// IN-N5: `ltl` is fragment-gated like the other formula commands.
 	if (reject_ctl_star_if_disabled(value)) return;
 
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
@@ -857,12 +844,10 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	report rep;
 	{
 		auto s = rep.open_if(opt.print_benchmarks, "ltl");
-		// IN-R4: the synthesis backend reports "no verdict" as a
-		// result<T> error, not an exception; nothing above this frame
-		// would catch a throw, so a slow or missing ltlsynt (or a
-		// refused CTL* placement) used to terminate the REPL. Print the
-		// whole report -- UNKNOWN summary plus the refusal detail --
-		// exactly once here instead.
+		// IN-R4: the synthesis backend reports "no verdict" (a slow or
+		// missing ltlsynt, or a refused CTL* placement) as a result<T>
+		// error. Print the whole report -- UNKNOWN summary plus the
+		// refusal detail -- exactly once here.
 		//
 		// ltl_explain prints its verdict itself, so it runs inside the
 		// same boundary as the api calls, writing to a buffer: a bdd
@@ -895,6 +880,7 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 // Drives a `run` session's step loop, suspending via `pending` (instead of
 // blocking) when it needs input; the next eval() call resumes it.
+/** @internal @copydoc repl_evaluator::continue_running @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::continue_running(
@@ -1026,6 +1012,7 @@ void repl_evaluator<BAs...>::continue_running(
 	}
 }
 
+/** @internal @copydoc repl_evaluator::finish_running @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::finish_running() {
@@ -1034,6 +1021,7 @@ void repl_evaluator<BAs...>::finish_running() {
 	pending.reset();
 }
 
+/** @internal @copydoc repl_evaluator::stream_value_incomplete @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::stream_value_incomplete(
@@ -1063,6 +1051,7 @@ bool repl_evaluator<BAs...>::stream_value_incomplete(
 }
 
 #ifdef TAU_PARSER_HAS_FTXUI
+/** @internal @copydoc repl_evaluator::on_repl_key @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 repl_key_action repl_evaluator<BAs...>::on_repl_key(const std::string& key) {
@@ -1084,8 +1073,8 @@ repl_key_action repl_evaluator<BAs...>::on_repl_key(const std::string& key) {
 }
 #endif
 
-// Reads the solver mode requested by a solve command tree: minimum or
-// maximum when a solver_mode node is present, general otherwise.
+/// @brief The solver mode the solve command tree @p n requests: minimum or
+/// maximum when a solver_mode node is present, general otherwise.
 template <NodeType node>
 solver_mode get_solver_cmd_mode(tref n) {
 	using tau = tree<node>;
@@ -1098,12 +1087,11 @@ solver_mode get_solver_cmd_mode(tref n) {
 	} else return solver_mode::general;
 }
 
-// BA type id a solve command runs under: the first type annotation found
-// in the command tree, or the default BA type's id when it has none.
-// Prints a solve command's result to @p out: "no solution" for nullopt,
-// otherwise one `var := value` line per assignment. bf_t/bf_f values are
-// rendered as the typed one/zero constant of the variable's own annotated
-// type when it has one, falling back to type_id (the command's type).
+/// @brief Print a solve command's result to @p out: "no solution" for
+/// nullopt, otherwise one `var := value` line per assignment. bf_t/bf_f
+/// values are rendered as the typed one/zero constant of the variable's own
+/// annotated type when it has one, falling back to @p type_id (the
+/// command's type).
 template <NodeType node>
 void print_solver_cmd_solution(std::ostream& out,
 		std::optional<solution<node>>& solution, size_t type_id)
@@ -1144,8 +1132,10 @@ void print_solver_cmd_solution(std::ostream& out,
 	out << "}\n";
 }
 
-// Prints the interpreter memory plus a binding count. Uses the type-agnostic
-// form because memory entries span BA types and not all have a resolvable one.
+/// @brief Print the interpreter memory @p memory plus a binding count to
+/// @p out, io variables first in stream order, the rest by printed form.
+/// Uses the type-agnostic form because memory entries span BA types and not
+/// all have a resolvable one.
 template <NodeType node>
 void print_memory(std::ostream& out, const assignment<node>& memory) {
 	using tau = tree<node>;
@@ -1173,6 +1163,7 @@ void print_memory(std::ostream& out, const assignment<node>& memory) {
 		<< (memory.size() == 1 ? "" : "s") << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::memory_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::memory_cmd() {
@@ -1184,6 +1175,7 @@ void repl_evaluator<BAs...>::memory_cmd() {
 	print_memory<node>(out, running->interp.memory);
 }
 
+/** @internal @copydoc repl_evaluator::solve_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
@@ -1210,6 +1202,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		find_ba_type_or_default<node>(value));
 }
 
+/** @internal @copydoc repl_evaluator::lgrs_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
@@ -1235,6 +1228,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		find_ba_type_or_default<node>(value));
 }
 
+/** @internal @copydoc repl_evaluator::valid_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
@@ -1251,6 +1245,7 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::sat_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
@@ -1267,6 +1262,7 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::unsat_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
@@ -1283,6 +1279,7 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::realizable_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
@@ -1297,6 +1294,7 @@ tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::unrealizable_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
@@ -1311,6 +1309,7 @@ tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::def_rr_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
@@ -1341,6 +1340,7 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	if (head) definitions<node>::instance().add(head, body);
 }
 
+/** @internal @copydoc repl_evaluator::def_list_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
@@ -1358,6 +1358,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	out << *defs.get_io_context();
 }
 
+/** @internal @copydoc repl_evaluator::def_print_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
@@ -1376,6 +1377,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	return;
 }
 
+/** @internal @copydoc repl_evaluator::def_input_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
@@ -1403,6 +1405,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 	out << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::def_output_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
@@ -1430,6 +1433,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	out << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::def_type_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
@@ -1453,13 +1457,13 @@ void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
 		<< tau::get(type_defs[idx]->get()).to_str() << "\n";
 }
 
-// make a nso_rr from the given tau source and binder.
+/** @internal @copydoc repl_evaluator::make_cli @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	result<tref> r;
-	// Remove ascii char 22 only. '#' comments are handled by the grammar;
-	// a manual strip here was brace-blind and swallowed {#b...} constants.
+	// Remove ascii char 22 only; '#' comments are handled by the grammar,
+	// which tells them from `#` inside a {#b...} constant.
 	std::string filt;
 	filt.reserve(src.size());
 	for (size_t i = 0; i < src.size(); ) {
@@ -1562,10 +1566,8 @@ inline std::optional<bool> ba_option_str2bool(const std::string& v) {
  * @brief Raw text of @p n's option_name node, or nullopt when @p n names no
  * option at all (the bare `get`/`enable`/... form).
  *
- * Split out from @ref get_opt so a qualified name (`bv-blasting`) can be
- * recognised and routed to the BA-option path before get_opt's plain-name
- * matching ever sees it. get_opt itself is unchanged and still owns
- * resolution of every core option name.
+ * Lets a qualified name (`bv-blasting`) be routed to the BA-option path
+ * before @ref get_opt, which resolves every core option name, sees it.
  */
 template <NodeType node>
 std::optional<std::string> option_name_str(
@@ -1576,11 +1578,11 @@ std::optional<std::string> option_name_str(
 	return o | tree<node>::traverser::string;
 }
 
-// Maps an option name (short or long alias) to its repl_option. Empty
-// input yields none_opt; an unrecognized name prints an error and yields
-// invalid_opt, so callers can tell "no option given" from a typo.
-// @p err receives that message; it is a direct echo of the user's text, not
-// a report.
+/// @brief The repl_option an option name (short or long alias) @p x names.
+///
+/// Empty input yields none_opt; an unrecognized name prints an error to
+/// @p err and yields invalid_opt, so callers can tell "no option given" from
+/// a typo. The message is a direct echo of the user's text, not a report.
 inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	if (x.empty())                       return none_opt;
 	if (x == "S" || x == "severity"
@@ -1609,9 +1611,10 @@ inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	// the note above). These two are numeric options, not flags.
 	//
 	// No underscore in the spelling: the grammar has
-	// `option_name => alnum+` (parser/tau.tgf:231), so `block_max_splits`
-	// does not even parse as an option name. Every existing option is a
-	// single alnum word for the same reason (`charvar`, `benchmarks`).
+	// `option_name => (alnum | '-')+` (parser/tau.tgf), so
+	// `block_max_splits` does not parse as an option name, and a '-'
+	// names a BA-declared option. Every core option is a single alnum
+	// word for the same reason (`charvar`, `benchmarks`).
 	if (x == "maxsplits"
 		|| x == "blockmaxsplits")    return block_max_splits_opt;
 	if (x == "maxrounds"
@@ -1671,8 +1674,8 @@ inline repl_option get_opt(const std::string& x, std::ostream& err) {
 	return invalid_opt;
 }
 
-// Reads the option_name child of a get/set command tree and resolves it
-// via get_opt(string); none_opt when the command names no option.
+/// @brief Resolve the option_name child of the get/set command tree @p n
+/// with get_opt(string); none_opt when the command names no option.
 template <NodeType node>
 repl_option get_opt(const typename tree<node>::traverser& n,
 	std::ostream& err)
@@ -1682,9 +1685,9 @@ repl_option get_opt(const typename tree<node>::traverser& n,
 	return get_opt(o | tree<node>::traverser::string, err);
 }
 
-// Parses a severity option value ("e"/"error", "d"/"debug", "t"/"trace",
-// "i"/"info") into a boost severity level; anything else prints a direct
-// echo of the value to @p err and yields nullopt.
+/// @brief The boost severity level a severity option value names
+/// ("e"/"error", "d"/"debug", "t"/"trace", "i"/"info"); anything else prints
+/// a direct echo of the value to @p err and yields nullopt.
 inline std::optional<boost::log::trivial::severity_level>
 	str2severity(const std::string& v, std::ostream& err)
 {
@@ -1698,6 +1701,7 @@ inline std::optional<boost::log::trivial::severity_level>
 	return {};
 }
 
+/** @internal @copydoc repl_evaluator::get_cmd(const tt&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd(const tt& n) {
@@ -1707,6 +1711,7 @@ void repl_evaluator<BAs...>::get_cmd(const tt& n) {
 	return get_cmd(get_opt<node>(n, err));
 }
 
+/** @internal @copydoc repl_evaluator::get_cmd(repl_option) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd(repl_option o) {
@@ -1746,8 +1751,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	// Read from the library globals, not from `opt`: they are what the
 	// algorithm actually consults, and a caller using the api setters
 	// directly would otherwise be misreported here. Both "unlimited"
-	// representations print alike: 0 for the caps and SIZE_MAX for the
-	// two decrementing block budgets.
+	// representations print alike: 0 for most caps and SIZE_MAX for the
+	// anti-prenexing budgets.
 	// Resolve every limit first: one whose environment variable is garbage
 	// warns on its first read, and that warning must not split a line.
 	for (const auto& l : api<node>::count_limits()) l.get();
@@ -1854,8 +1859,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	// RE-2: answering a query about an option this build does not carry is
-	// not an error condition, it is the answer. Reported at info level so a
-	// plain `get debug` no longer prints "(Error)" in a release build.
+	// not an error condition, it is the answer, so it is reported at info
+	// level.
 	if (o == debug_opt) {
 		TAU_LOG_INFO << "Debug option not available in release build\n";
 		return;
@@ -1884,6 +1889,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	printers[o]();
 }
 
+/** @internal @copydoc repl_evaluator::set_cmd(const tt&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
@@ -1903,6 +1909,7 @@ void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	get_cmd(n);
 }
 
+/** @internal @copydoc repl_evaluator::set_cmd(repl_option, const std::string&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
@@ -1916,9 +1923,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		return;
 	}
 #endif // DEBUG
-	// A count. Zero is accepted and means "unlimited" (specsizewarn: off)
-	// by the unified limit-option convention -- the api setters translate
-	// it to each knob's internal representation.
+	// A count. Zero is accepted; what it means (unlimited for most caps,
+	// off, none, or the default) is each api setter's, which translates it
+	// to the limit's internal representation. A count beyond SIZE_MAX
+	// wraps.
 	auto str2count = [&v, this](void) -> std::optional<size_t> {
 		size_t n = 0;
 		if (v.empty()) { err << "Invalid value\n"; return {}; }
@@ -2083,6 +2091,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	setters[o]();
 }
 
+/** @internal @copydoc repl_evaluator::update_bool_opt_cmd(const tt&, const std::function<bool(bool&)>&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
@@ -2100,6 +2109,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 	if (!error) get_cmd(n);
 }
 
+/** @internal @copydoc repl_evaluator::update_bool_opt_cmd(repl_option, const std::function<bool(bool&)>&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
@@ -2167,6 +2177,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	}
 }
 
+/** @internal @copydoc repl_evaluator::resolve_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
@@ -2189,6 +2200,7 @@ const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
 	return nullptr; // unreachable: switch above is exhaustive
 }
 
+/** @internal @copydoc repl_evaluator::get_cmd_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
@@ -2202,6 +2214,7 @@ void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
 	out << family << "-" << name << ": " << v << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::set_cmd_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
@@ -2218,6 +2231,7 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	else err << "Invalid value: expected a count\n";
 }
 
+/** @internal @copydoc repl_evaluator::update_bool_opt_cmd_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
@@ -2242,6 +2256,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 	o->set_flag(v);
 }
 
+/** @internal @copydoc repl_evaluator::update_charvar @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
@@ -2249,6 +2264,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	return value;
 }
 
+/** @internal @copydoc repl_evaluator::update_preprocessing @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_preprocessing(bool value) {
@@ -2256,6 +2272,7 @@ bool repl_evaluator<BAs...>::update_preprocessing(bool value) {
 	return value;
 }
 
+/** @internal @copydoc repl_evaluator::reject_ctl_star_if_disabled @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::reject_ctl_star_if_disabled(tref fm) {
@@ -2270,6 +2287,7 @@ bool repl_evaluator<BAs...>::reject_ctl_star_if_disabled(tref fm) {
 	return false;
 }
 
+/** @internal @copydoc repl_evaluator::fragment_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
@@ -2293,6 +2311,7 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 	}
 }
 
+/** @internal @copydoc repl_evaluator::update_factoring @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_factoring(bool value) {
@@ -2300,6 +2319,7 @@ bool repl_evaluator<BAs...>::update_factoring(bool value) {
 	return value;
 }
 
+/** @internal @copydoc repl_evaluator::eval_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
@@ -2307,9 +2327,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command_type = command | tt::nt;
 	// Refuse before the command runs, not after: a command allowed to
 	// start keeps its result. This covers the commands that do not go
-	// through the api -- anf_cmd today, and whatever is added next --
-	// while the api's own guard covers the rest; the check is a cheap
-	// measurement, so doing it twice costs nothing.
+	// through the api, while the api's own guard covers the rest; the
+	// check is a cheap measurement, so doing it twice costs nothing.
 	//
 	// The control commands are exempt, and have to be: they are how a
 	// session at its budget recovers. Gating `quit` strands the user in a
@@ -2423,6 +2442,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	return 0;
 }
 
+/** @internal @copydoc repl_evaluator::repl_evaluator @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 repl_evaluator<BAs...>::repl_evaluator(options opt, std::ostream& out,
@@ -2433,9 +2453,8 @@ repl_evaluator<BAs...>::repl_evaluator(options opt, std::ostream& out,
 	if (opt.experimental) out << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
 	// Propagate the CLI-provided charvar/preprocessing values to the api's
-	// global state; without this, --charvar/--preprocessing have no effect
-	// in REPL mode until the user runs "set"/"toggle" (they were only ever
-	// applied to the api in main.cpp's non-interactive spec-file path).
+	// global state; main.cpp applies them to the api itself only on its
+	// spec-file path.
 	update_charvar(opt.charvar);
 	update_preprocessing(opt.preprocessing);
 	// console input streams resolve through the REPL cycle, never blocking
@@ -2445,6 +2464,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt, std::ostream& out,
 		};
 }
 
+/** @internal @copydoc repl_evaluator::reprompt @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::reprompt() {
@@ -2472,6 +2492,7 @@ void repl_evaluator<BAs...>::reprompt() {
 #endif
 }
 
+/** @internal @copydoc repl_evaluator::eval @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
@@ -2546,6 +2567,7 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 	return idni::diagnostics::result<int>(quit);
 }
 
+/** @internal @copydoc repl_evaluator::version_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::version_cmd() {
@@ -2553,6 +2575,7 @@ void repl_evaluator<BAs...>::version_cmd() {
 		<< "algebras: " << node::ba::types_joined() << "\n";
 }
 
+/** @internal @copydoc repl_evaluator::help_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::help_cmd(const tt& n) const {
@@ -2561,6 +2584,7 @@ void repl_evaluator<BAs...>::help_cmd(const tt& n) const {
 	help(nt);
 }
 
+/** @internal @copydoc repl_evaluator::help @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::help(size_t nt) const {
@@ -2629,8 +2653,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	// order. Flags join the enable/disable/toggle-eligible list; counts
 	// (no enable/disable/toggle, same as core's numeric limit options) join
 	// only the get/set list. Both are empty in a pack where no BA declares
-	// any option, leaving all_available_options/bool_available_options
-	// byte-identical to before.
+	// any option.
 	auto sorted_ba_options = [](ba_option_kind kind) {
 		auto opts = pack_ba_options<node>();
 		std::vector<ba_named_option> out;

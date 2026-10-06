@@ -38,6 +38,13 @@ using node_t = tau_lang::tau_pack::node_t;
 using tau = tree<node_t>;
 using tau_api = api<node_t>;
 
+/// @brief The option table of the tau executable.
+///
+/// Every runtime limit flag defaults to the empty string, which means "not
+/// given": main() then leaves the limit to its TAU_* environment fallback and
+/// its default, both named in the flag's description. A BA-declared option
+/// of the configured pack is added as `--<family>-<option>`.
+/// @return The options, keyed by long name.
 cli::options tau_options() {
 	cli::options opts;
 	opts["help"] = cli::option("help", 'h', false)
@@ -48,9 +55,8 @@ cli::options tau_options() {
 		.set_description("show license for Tau");
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
-	// GitHub #74: the default comes from the library's `preprocessing`
-	// global, not a second hardcoded value -- a CLI-only value here once
-	// silently overrode the library and hung a plain `tau` run.
+	// The default is the library's `preprocessing` global: a value of the
+	// CLI's own would override the library for every plain `tau` run.
 	opts["preprocessing"] = cli::option("preprocessing", 'B', preprocessing)
 		.set_description(std::string("BA preprocessing, e.g. bv predicate "
 			"blasting (")
@@ -293,6 +299,9 @@ cli::options tau_options() {
 	return opts;
 }
 
+/// @brief The verbs of the tau executable: `gen` (with its alias `codegen`)
+/// and `compile`, with their options.
+/// @return The commands, keyed by name.
 cli::commands tau_commands() {
 	cli::commands cs;
 	cli::command gen("gen",
@@ -329,11 +338,18 @@ cli::commands tau_commands() {
 	return cs;
 }
 
+/// @brief Log @p s as an error.
+/// @return 1, the exit status of a failed run.
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-// Reads a spec file into src; "-" reads stdin. False when the file cannot be
-// opened. `tau gen` and `tau compile` share it with the interpreter's own
-// spec-file path.
+/// @brief Read the spec file @p spec_file into @p src; "-" reads stdin.
+///
+/// `tau gen` and `tau compile` share it with the interpreter's own spec-file
+/// path.
+/// @param spec_file Path of the file, or "-" for stdin.
+/// @param src Receives the whole content; untouched when the file cannot be
+/// opened.
+/// @return False when the file cannot be opened.
 bool read_spec_file(const std::string& spec_file, std::string& src) {
 	if (spec_file == "-") {
 		std::ostringstream oss;
@@ -352,9 +368,13 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 	return true;
 }
 
-// The cli table has no attached short-option value, so `-DNAME=VALUE` and
-// `-GNinja`, the spellings `./dev preset` accepts, are split into the option
-// and its value before the cli parses the compile verb's arguments.
+/// @brief Split `-DNAME=VALUE` and `-GNinja` after the `compile` verb into
+/// the option and its value, in place.
+///
+/// The cli table has no attached short-option value, and these are the
+/// spellings `./dev preset` accepts. Arguments before `compile`, and every
+/// argument when there is no `compile`, are left alone.
+/// @param args The command line, argv[0] first; modified in place.
 void expand_attached_short_values(std::vector<std::string>& args) {
 	size_t start = args.size();
 	for (size_t i = 1; i < args.size(); ++i)
@@ -373,10 +393,16 @@ void expand_attached_short_values(std::vector<std::string>& args) {
 	}
 }
 
-// `tau compile` forwards -D and -G to the emitted project's configure. The cli
-// table keeps only the last value of a repeated option, so the raw arguments
-// from the verb onward are scanned: a define is -DNAME=VALUE or -D NAME=VALUE
-// and may repeat, a generator is -G <gen>.
+/// @brief The -D and -G arguments `tau compile` forwards to the emitted
+/// project's configure.
+///
+/// The cli table keeps only the last value of a repeated option, so the raw
+/// arguments from the verb onward are scanned: a define is -DNAME=VALUE,
+/// -D NAME=VALUE or --define NAME=VALUE and may repeat, a generator is
+/// -G <gen>, -G<gen> or --generator <gen>.
+/// @param args The command line, argv[0] first.
+/// @return The arguments in cmake form (`-DNAME=VALUE`, `-G`, `<gen>`), in
+/// command-line order; empty when there is no `compile` verb.
 std::vector<std::string> collect_compile_extra_args(
 	const std::vector<std::string>& args)
 {
@@ -403,6 +429,15 @@ std::vector<std::string> collect_compile_extra_args(
 	return extra;
 }
 
+/// @brief Run the specification in @p spec_file with the interpreter until it
+/// ends.
+///
+/// Prints the setup warnings before the run, and the benchmark report (in
+/// plain text, to stderr) after it when `--benchmarks` is on. With `--quit`
+/// the run ends when no input is left.
+/// @param spec_file Path of the spec file, or "-" for stdin.
+/// @param opts The processed command-line options.
+/// @return 0 when the file is empty or the run succeeded, 1 otherwise.
 int run_tau_spec(string spec_file, cli::options& opts) {
 	const bool benchmarks = opts["benchmarks"].get<bool>();
 	report rep;
@@ -451,6 +486,7 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	return finish(run_ok.has_value() && run_ok.value() ? 0 : 1);
 }
 
+/// @brief Log the REPL's welcome banner.
 void welcome() {
 	TAU_LOG_INFO << "Welcome to the " << full_version << " by IDNI AG.\n"
 		<< "This product is protected by patents and copyright."
@@ -462,6 +498,14 @@ void welcome() {
 }
 
 // TODO (MEDIUM) add command to read input file,...
+/// @brief Entry point of the tau executable.
+///
+/// Applies every option through its api setter, then runs one of: the `gen`
+/// / `codegen` or `compile` verb, the given spec file, the `--evaluate` REPL
+/// command, or the interactive REPL (FTXUI unless `--legacy-repl`).
+/// @return The exit status: 0 on success, 1 on an error; for `--evaluate`,
+/// the REPL's code (0 done, 1 quit or error with error-quits, 2 incomplete
+/// input).
 int main(int argc, char** argv) {
 	tau_init<node_t>();
 
@@ -497,12 +541,12 @@ int main(int argc, char** argv) {
 		opts["ba-component-factoring"].get<bool>());
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
-	// REPL `set` command share one wiring surface (0 = unlimited by
-	// convention; the gc knobs take raw values). A limit is applied only
+	// REPL `set` command share one wiring surface; 0 means what the flag's
+	// description says (unlimited for most caps). A limit is applied only
 	// when its flag was given: a flag that always wrote its own default
-	// would shadow the TAU_* variable the limit falls back to. Garbage is an
-	// error rather than atoll's silent 0, which is "unlimited" for every
-	// cap here; the first bad value is reported once, below.
+	// would shadow the TAU_* variable the limit falls back to. A value that
+	// is not a non-negative number is an error, never read as 0; the first
+	// bad value is reported once, below.
 	string bad_option;
 	auto given_count = [&opts, &bad_option](const char* name)
 		-> std::optional<size_t>

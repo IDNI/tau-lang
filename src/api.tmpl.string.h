@@ -15,7 +15,7 @@ namespace idni::tau_lang {
 // ------------------------------------------------------------
 
 // Renders a tref->tref map (e.g. a solver solution) as printed strings,
-// skipping entries with a null key or value.
+// key and value each through to_str<node>.
 template <NodeType node>
 std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
 	std::map<std::string, std::string> sm;
@@ -129,11 +129,10 @@ result<std::string> api<node>::apply_defs(
 		result<std::string> r;
 		subtree_set<node> tdefs;
 		trefs heads;
-		// A definition that fails to parse used to be inserted as nullptr and
-		// then silently skipped by the tref-level apply_defs' "if (def)"
-		// guard, so the caller had no way to tell a malformed definition was
-		// dropped from a definition that legitimately had no effect. Report
-		// the failure instead of silently continuing without it.
+		// A definition that fails to parse fails the call: the tref-level
+		// apply_defs skips a null definition, which would hide it. Each
+		// definition is parsed with get_definition, so it is also
+		// registered in the global definition store.
 		for (const std::string& def : defs) {
 			auto d = r.merge_take(get_definition(def));
 			if (!d) {
@@ -211,8 +210,7 @@ template <NodeType node>
 result<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
 	return with_budget<node>([&] {
-		// AP1-17: delegate to the tref overload (it runs simplify first);
-		// the inlined copy skipped it and could diverge on canonization.
+		// The tref overload runs simplify first, so both overloads agree.
 		return get_formula_or_term(expr).and_then(
 			[](tref e) { return boole_normal_form(e); }
 		).transform([](tref v) { return to_str(v); });
@@ -336,7 +334,6 @@ result<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
 	return with_budget<node>([&] {
-		// AP1-17: delegate to the tref overload (see boole_normal_form).
 		return get_formula(expr).and_then(
 			[](tref e) { return eliminate_quantifiers(e); }
 		).transform([](tref v) { return to_str(v); });
@@ -503,7 +500,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 	return with_budget<node>([&] {
 		result<interpreter<node>> r;
 		DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
-		// Parse the specification string into a tau_spec, logging any
+		// Parse the specification string into a tau_spec, reporting any
 		// parse errors, then delegate to the tau_spec overload.
 		tau_spec<node> spec;
 		if (!spec.parse(specification)) {
@@ -691,8 +688,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
 	return with_budget<node>([&] {
-		// tau is only consulted by DBG tracing since AP1-12 switched the
-		// output serialization to serialize_constant.
+		// tau is only consulted by DBG tracing.
 		using tau [[maybe_unused]] = tree<node>;
 
 		result<std::map<stream_at, std::string>> r;
@@ -715,11 +711,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!r.merge_take(i.write(output.value())))
 			return r;
 
-		// Build outputs for the step. AP1-12: serialize via
-		// serialize_constant like the with-inputs overload -- raw to_str()
-		// skipped the bf_t/bf_f-to-BA-element mapping and the no-element
-		// failure check, so the two overloads printed different values for
-		// the same step.
+		// Build outputs for the step, serialized with serialize_constant as
+		// the with-inputs overload does, so both print the same values.
 		std::map<stream_at, std::string> outputs;
 		for (const auto& [out, val] : output.value()) {
 			DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)

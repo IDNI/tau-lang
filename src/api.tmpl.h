@@ -420,6 +420,8 @@ void api<node>::set_ba_decision_pins(size_t n) {
 
 namespace api_detail {
 
+// The pack option named `<family>-<option>`; an invalid_argument error for a
+// name without that shape, not_found when no BA of the pack declares it.
 template <NodeType node>
 result<const ba_option*> find_ba_option(const std::string& name) {
 	result<const ba_option*> r;
@@ -440,6 +442,7 @@ result<const ba_option*> find_ba_option(const std::string& name) {
 		{{ label::value, name }});
 }
 
+// The value of @p o as the option surface reads it: 0 or 1 for a flag.
 inline size_t ba_option_value(const ba_option& o) {
 	return o.kind == ba_option_kind::flag ? (size_t) o.get_flag()
 		: o.get_count();
@@ -812,19 +815,15 @@ template <NodeType node>
 result<tref> api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
 	return with_budget<node>([&] {
 		result<tref> r;
-		// AP1-5: parse and validate BEFORE registering -- routing through
-		// get_definition registered unconditionally, so a rejected
-		// definition stayed in the global store and leaked into later
-		// apply_defs_to_spec calls.
+		// Parse and validate before registering, so a rejected definition
+		// never reaches the global store.
 		TAU_TRY(tref def, tau::get(function_def,
 			get_options<node>(tau::rec_relation, true)));
 		if (!def) {
 			return r.with_assert_check_error(code::parse_error, "Failed to parse function definition");
 		}
 		// The second child of a rec_relation is the body;
-		// accept bf or ref (a ref body may resolve to a bf later --
-		// AP1-26: the code rejected refs while doc and the predicate
-		// sibling accepted them)
+		// accept bf or ref (a ref body may resolve to a bf later)
 		auto nt = tau::get(def)[1].get_type();
 		if (nt != tau::bf && nt != tau::ref) {
 			return r.with_assert_check_error(code::invalid_argument, "Not a function definition");
@@ -843,7 +842,7 @@ template <NodeType node>
 result<tref> api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
 	return with_budget<node>([&] {
 		result<tref> r;
-		// AP1-5: parse and validate BEFORE registering (see get_function_def).
+		// Parse and validate before registering (see get_function_def).
 		TAU_TRY(tref def, tau::get(predicate_def,
 			get_options<node>(tau::rec_relation, true)));
 		if (!def) {
@@ -924,8 +923,7 @@ result<size_t> api<node>::add_definition(tref head, tref body) {
 		}
 		DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
 		DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
-		// AP1-6: 1-based -- the store's 0-based index made the very first
-		// definition return 0, the documented failure value.
+		// AP1-6: 1-based, so the first definition is not 0.
 		return r.with_assert_check_value(definitions<node>::instance().add(
 			tau::geth(head), tau::geth(body)) + 1);
 	});
@@ -975,9 +973,9 @@ result<tref> api<node>::get_spec_or_term(const std::string& expression, bool sim
 		result<tref> r;
 		// Try parsing as a full spec first (which handles multiline and
 		// formula inputs); fall back to a bare bf term if that fails.
-		// AP1-18: the spec attempt is quiet -- its parse errors reach the
-		// report only when the term fallback ALSO fails, so a legitimate bare
-		// term does not carry spurious errors on the successful path.
+		// The spec attempt is quiet: its parse errors reach the report only
+		// when the term fallback also fails, so a bare term carries no
+		// spurious errors.
 		tau_spec<node> spec;
 		result<tref> spec_r;
 		tref expr = nullptr;
@@ -1012,9 +1010,8 @@ result<tref> api<node>::get_formula_or_term(const std::string& expr, bool simpli
 			return r.with_assert_check_error(code::parse_error, "Failed to parse formula or term");
 		}
 		e = tau::trim(e);
-		// AP1-32: classify io_vars like get_formula does, so the same text
-		// yields the same tree through either entry (downstream re-resolution
-		// hid the difference from sat machinery, but the trees differed).
+		// Classify io_vars like get_formula does, so the same text yields
+		// the same tree through either entry.
 		if (tau::get(e).is(tau::wff))
 			e = resolve_io_vars<node>(
 				*definitions<node>::instance().get_io_context(), e);
@@ -1089,11 +1086,9 @@ result<tref> api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 template <NodeType node>
 result<tref> api<node>::apply_all_defs(tref expr) {
 	return with_budget<node>([&] {
-		// AP1-4: this must apply the globally registered definitions --
-		// routing through apply_defs({}) applied nothing, so after
-		// get_definition() the dnf/cnf/nnf/solve/lgrs pipelines received
-		// refs unexpanded, contradicting the documented contract. Mirrors
-		// the normalizer's apply_defs_to_spec.
+		// AP1-4: the globally registered definitions are added to the
+		// expression's own, as the normalizer's apply_defs_to_spec does;
+		// apply_defs({}) would apply only the expression's own.
 		result<tref> r;
 		if (!expr) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
@@ -1591,8 +1586,8 @@ result<bool> api<node>::realizable(tref fm) {
 		// Whole-query BA fast path; falls through when undecided. It decides
 		// SATISFIABILITY (every stream chosen existentially), which equals
 		// realizability only when no input stream is involved: over inputs it
-		// answered `(o1:bv[1] = 1) && (i1:bv[1] = 0)` REALIZABLE, although the
-		// environment owns i1 (found by the CROSS-bv1 fuzz suite).
+		// would answer `(o1:bv[1] = 1) && (i1:bv[1] = 0)` REALIZABLE, although
+		// the environment owns i1.
 		if (!atom_has_any_input<node>(fm) && !has_ctl_star_operators<node>(fm))
 			if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
 				return r.with_assert_check_value(fast.value());
@@ -1610,11 +1605,10 @@ result<bool> api<node>::realizable(tref fm) {
 		if (has_ctl_star_operators<node>(fm)) {
 			return adopt(is_ctl_star_realizable<node>(target, 0, true));
 		} else if (realizability_has_game_operators<node>(fm)) {
-			// is_tau_formula_sat now answers satisfiability only,
-			// where an unrealizable full-LTL formula is undecided
-			// rather than false; realizable() needs the real
-			// verdict, so ask the realizability procedure directly
-			// instead of going through it.
+			// is_tau_formula_sat answers satisfiability only, where
+			// an unrealizable full-LTL formula is undecided rather
+			// than false; realizable() needs the real verdict, so
+			// it asks the realizability procedure directly.
 			return adopt(is_ltl_aba_realizable<node>(target, 0, true));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
@@ -1679,8 +1673,8 @@ result<bool> api<node>::sat_prepared(tref fm) {
 		if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
 			return r.with_assert_check_value(fast.value());
 		}
-		// Same contract as realizable() above: a normalization failure
-		// decides unsatisfiable rather than propagating an error.
+		// A normalization failure is an error without a verdict, as in
+		// realizability_target_of().
 		TAU_TRY_OR(tref nf, normalize_formula(fm),
 			code::internal_error,
 			"Could not normalize the formula; "
@@ -1880,10 +1874,9 @@ result<bool> api<node>::valid_spec(tref fm) {
 		if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value()) {
 			return r.with_assert_check_value(fast.value());
 		}
-		// Same contract as realizable(): is_tau_impl() normalizes both
-		// arguments straight away and cannot be handed a null formula, so a
-		// normalization failure decides invalid rather than propagating an
-		// error.
+		// is_tau_impl() normalizes both arguments straight away and cannot
+		// be handed a null formula, so a normalization failure is an error
+		// without a verdict.
 		TAU_TRY_OR(tref nfm, normalize_formula(fm),
 			code::internal_error,
 			"Could not normalize the formula; "
@@ -1942,8 +1935,8 @@ result<subtree_map<node, tref>> api<node>::solve(
 				splitter_one(tau_type<node>()),
 			.mode = mode
 		};
-		// Use fully-expanded formula (a) so function/predicate refs are resolved
-		// before reaching type-specific solvers (fixes bug with typed functions).
+		// Use the fully-expanded formula (a) so function/predicate refs are
+		// resolved before reaching type-specific solvers.
 		TAU_TRY_OR(r, tau_lang::solve<node>(a, options), code::internal_error,
 			"tau_lang::solve returned neither a value nor an error");
 		DBG(assert(r.is_well_formed());)
@@ -1973,9 +1966,7 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		// Exclude non-Boolean operations from equation. The two sides live under
 		// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
-		// single child, so indexing it with [1] tripped the `c != nullptr`
-		// assert in tree<node>::child_tree (Debug) and read a null child
-		// (Release).
+		// single child.
 		if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
 			tau::get(equality)[1].find_top(is_non_boolean_term<node>))
 			return r.with_assert_check_error(code::invalid_argument,
@@ -2009,9 +2000,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 	return with_budget<node>([&] {
 		result<interpreter<node>> r;
 		// Assign the remaps into the global io_context only after every
-		// validation step succeeds: assigning them up front left them in
-		// place -- corrupting later, unrelated calls -- on every one of the
-		// early-return failure paths below.
+		// validation step succeeds, so a failed call leaves it unchanged.
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		// Before pin_main rebuilds the spec, whose hooks rewrite the time
 		// constraints the user wrote.
@@ -2031,8 +2020,8 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		ctx.output_remaps = options.output_remaps;
 		// LT-7: make_interpreter reaches ltlsynt through
 		// ltl_to_safety_formula_full; a backend failure must not terminate the
-		// caller.  No interpreter is the honest answer here, and
-		// make_interpreter's own result<T> error propagates through r.
+		// caller. make_interpreter's own result<T> error propagates through r
+		// and no interpreter is returned.
 		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
 			code::solver_error,
 			"the specification could not be compiled");
@@ -2094,9 +2083,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 // private helper methods
 // ------------------------------------------------------------
 
-// Private: extract rr<node> from expression tree.
-// For spec nodes, delegates to tau_lang::get_nso_rr.
-// For bare wff/bf nodes, wraps via resolve_io_vars.
+/** @internal @copydoc api::get_nso_rr @endinternal */
 template <NodeType node>
 result<rr<node>> api<node>::get_nso_rr(tref expr) {
 	return with_budget<node>([&] {
@@ -2105,8 +2092,7 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
 		rr<node> nso_rr;
-		// AP1-16: by reference -- copying the io_context (three subtree maps
-		// + remaps + console factory) per call was pure waste; all uses read.
+		// By reference: every use only reads the io_context.
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		// A spec root is always unwrapped, whether or not it holds a ref: a
 		// spec handed whole to the normalizer as its main formula is negated
