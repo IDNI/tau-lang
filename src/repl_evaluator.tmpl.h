@@ -1535,21 +1535,37 @@ inline std::pair<std::string, std::string> split_ba_option_name(
 	return { x.substr(0, pos), x.substr(pos + 1) };
 }
 
+/// Largest count `set` accepts: the CLI's bound (`strtol`), so a value the
+/// CLI refuses is refused here too, and every count fits the `long`
+/// parameters whose -1 means "not set".
+inline constexpr size_t repl_count_max =
+	static_cast<size_t>(std::numeric_limits<long>::max());
+
 /**
  * @brief Parse @p v as a plain non-negative integer, or nullopt on failure.
  *
- * Same digits-only rule as set_cmd's local str2count lambda, kept as a free
- * function here so the BA-option path (which set_cmd's lambda is not in
- * scope for) can share it without duplicating the parsing logic.
+ * Digits only, at most @ref repl_count_max: a larger count is refused, never
+ * wrapped. Shared by set_cmd and the BA-option path; @ref
+ * count_value_error names the reason of a refusal.
  */
 inline std::optional<size_t> ba_option_str2count(const std::string& v) {
 	if (v.empty()) return std::nullopt;
 	size_t n = 0;
 	for (char c : v) {
 		if (c < '0' || c > '9') return std::nullopt;
-		n = n * 10 + static_cast<size_t>(c - '0');
+		const size_t d = static_cast<size_t>(c - '0');
+		if (n > (repl_count_max - d) / 10) return std::nullopt;
+		n = n * 10 + d;
 	}
 	return n;
+}
+
+/// The message for a value @ref ba_option_str2count refused.
+inline const char* count_value_error(const std::string& v) {
+	if (v.empty()) return "Invalid value\n";
+	return std::ranges::all_of(v, [](char c) { return c >= '0' && c <= '9'; })
+		? "Invalid value: count out of range\n"
+		: "Invalid value: expected a count\n";
 }
 
 /**
@@ -1928,18 +1944,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 #endif // DEBUG
 	// A count. Zero is accepted; what it means (unlimited for most caps,
 	// off, none, or the default) is each api setter's, which translates it
-	// to the limit's internal representation. A count beyond SIZE_MAX
-	// wraps.
+	// to the limit's internal representation.
 	auto str2count = [&v, this](void) -> std::optional<size_t> {
-		size_t n = 0;
-		if (v.empty()) { err << "Invalid value\n"; return {}; }
-		for (char c : v) {
-			if (c < '0' || c > '9') {
-				err << "Invalid value: expected a count\n";
-				return {};
-			}
-			n = n * 10 + static_cast<size_t>(c - '0');
-		}
+		auto n = ba_option_str2count(v);
+		if (!n) err << count_value_error(v);
 		return n;
 	};
 	// A decimal number (gcgrowth); the grammar admits digits and '.'.
@@ -2231,7 +2239,7 @@ void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
 		else err << "Invalid value\n";
 	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
-	else err << "Invalid value: expected a count\n";
+	else err << count_value_error(v);
 }
 
 /** @internal @copydoc repl_evaluator::update_bool_opt_cmd_ba_option @endinternal */

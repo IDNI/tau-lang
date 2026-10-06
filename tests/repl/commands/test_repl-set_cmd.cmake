@@ -29,6 +29,11 @@ add_repl_test(set_cmd-fixpointsteps
 add_repl_test(set_cmd-fixpointsteps_zero_unlimited
 	"set fixpointsteps 7. set fixpointsteps 0. get fixpointsteps"
 	"fixpointsteps: *unlimited")
+# A count past the CLI's bound (LONG_MAX) is refused, as the CLI refuses it,
+# never wrapped (2^64 would wrap to 0, which reads as unlimited).
+add_repl_test(set_cmd-count_past_size_max_refused
+	"set fixpointsteps 7. set fixpointsteps 18446744073709551616. get fixpointsteps"
+	"count out of range.*fixpointsteps: *7" NO_FAIL_REGEX)
 add_repl_test(set_cmd-flagsteps
 	"set flagsteps 12. get flagsteps" "flagsteps: *12")
 add_repl_test(set_cmd-bv_blastdepth
@@ -109,6 +114,9 @@ add_repl_test(set_cmd-bvmaxwidth_zero_keeps_current
 	"set bv-max-width 64. set bv-max-width 0. get bv-max-width" "bv-max-width: *64")
 add_repl_test(set_cmd-bvmaxwidth_flag_value_rejected
 	"set bv-max-width on" "Invalid value: expected a count" NO_FAIL_REGEX)
+add_repl_test(set_cmd-bvmaxwidth_past_size_max_refused
+	"set bv-max-width 64. set bv-max-width 18446744073709551680. get bv-max-width"
+	"count out of range.*bv-max-width: *64" NO_FAIL_REGEX)
 add_repl_test(set_cmd-bvmaxwidth_enable_rejected
 	"enable bv-max-width" "takes a count, not a flag" NO_FAIL_REGEX)
 # The mode actually changes what the decision procedures answer: 16 * 16
