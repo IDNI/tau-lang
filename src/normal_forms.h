@@ -54,6 +54,9 @@ tref replace_free_vars_by(tref fm, tref val);
 /**
  * @brief Lexicographic ordering over variables, used to fix a canonical
  * variable order when reducing Boolean functions to DNF (see `bf_reduced_dnf`).
+ *
+ * Compares the printed forms of the two trees; memoized in a tree cache when
+ * `TAU_CACHE` is defined.
  * @tparam node Tree node type.
  */
 template <NodeType node>
@@ -77,22 +80,25 @@ auto lex_var_comp = [](tref x, tref y) {
 /**
  * @brief Predicate that classifies a wff node as a BDD variable.
  *
- * In BDD-based DNF/CNF reductions of well-formed formulas the following node
- * types are treated as atomic BDD variables: `bf_eq`, the ordering
- * comparisons `bf_lt` and `bf_lteq`, `wff_ref`, `wff_ex`, `wff_sometimes`,
- * `wff_always`, `wff_all`, and `constraint`.
+ * In BDD-based DNF/CNF reductions of well-formed formulas a `wff` node is
+ * treated as an atomic BDD variable when its child is `bf_eq`, the ordering
+ * comparisons `bf_lt` and `bf_lteq`, `wff_ref`, `wff_ex`, `wff_all`,
+ * `constraint`, or one of the temporal and CTL* scopes (`wff_sometimes`,
+ * `wff_always`, `wff_until`, `wff_release`, `wff_weak_until`, `wff_since`,
+ * `wff_trigger`, `wff_A`, `wff_E`, `wff_semantic_neg`).
  *
  * The classification has to cover *every* atom kind that can reach `reduce`,
  * not just the ones it can reason about. An atom missing from this set matches
  * no branch of `clause_to_vector`, which then simply descends past it: the atom
  * never enters the clause's path vector and `build_reduced_formula` rebuilds
- * the clause without it (`x < y && s = 0` came back as `s = 0`). When such an
- * atom is the only one in the formula the variable set comes out empty and
- * `reduce` answers `F` for a satisfiable formula. `dnf_cnf_to_reduced` runs
+ * the clause without it. When such an atom is the only one in the formula the
+ * variable set comes out empty and `reduce` answers `F` for a satisfiable
+ * formula. `dnf_cnf_to_reduced` runs
  * `unequal_to_not_equal` and `order_atoms_to_literals` before reaching this
  * predicate, so every order atom arrives as `bf_lt` or `bf_lteq`, possibly
- * under `wff_neg`; they are listed here and treated as opaque, exactly as
- * `constraint` already is.
+ * under `wff_neg`; they are listed here and treated as opaque, as
+ * `constraint` is. Debug builds assert that no `bf_neq` or other order
+ * comparison reaches it.
  * @tparam node Tree node type.
  * @todo Extend for the full grammar.
  */
@@ -134,11 +140,12 @@ inline auto is_wff_bdd_var = [](tref n) {
  * @brief The atomic formula kinds `boole_normal_form` treats as BDD variables:
  * `bf_eq`, `bf_lt` and `bf_lteq`.
  *
- * Kept as one predicate so the filter that selects them and the two consumers
- * that assert on them cannot drift apart -- they did, and a bitvector
- * comparison (which the construction hooks do not expand) aborted Debug builds
- * while Release decomposed it correctly.
+ * Kept as one predicate so the filter that selects them and the consumers
+ * that assert on them cannot drift apart: a bitvector comparison, which the
+ * construction hooks do not expand, must pass both.
  * @tparam node Tree node type.
+ * @param n Tree node to classify.
+ * @return Whether @p n is a `wff` whose child is one of those comparisons.
  * @endinternal
  */
 template <NodeType node>
@@ -176,15 +183,18 @@ inline auto is_bf_bdd_var = [](tref n) {
 /**
  * @brief Functor that converts a formula to Ordered Normal Form (ONF) w.r.t. a variable.
  *
- * Assumes the input formula is already in DNF. For each conjunct it rewrites
- * every equality `f = 0` (resp. `f != 0`) that contains the given variable
- * into an interval constraint `f[0] <= var <= f[1]` (resp. `f[0] > var || var > f[1]`),
- * where `f[0]` and `f[1]` are obtained by substituting 0 and 1 for the variable.
+ * Assumes the body under the quantifier prefix is already in DNF. For each
+ * conjunct it rewrites the bottom-most equality `f = 0` that mentions the
+ * variable into the interval `f[var:=0] <= var <= f'[var:=1]`, and every
+ * `f != 0` that mentions it into `!(f[var:=0] <= var) || !(var <= f'[var:=1])`,
+ * both bounds canonically reduced. A conjunct containing a non-Boolean term
+ * is left unchanged, and the quantifier prefix is kept.
  * @tparam node Tree node type.
  */
 template <NodeType node>
 struct onf_wff {
-	/// @brief Construct with the variable to order with respect to.
+	/// @brief Construct with the variable to order with respect to; a node
+	/// that is not a `bf` is wrapped in one.
 	explicit onf_wff(tref _var);
 	/// @brief Apply ONF conversion to formula `n`.
 	tref operator()(tref n) const;
@@ -201,7 +211,7 @@ template <NodeType node>
 using onf_wff_t = onf_wff<node>;
 
 /**
- * @brief Pipe operator: apply `onf_wff` to a tree traverser.
+ * @brief Pipe operator: apply `onf_wff` to the tree @p t holds.
  * @tparam node Tree node type.
  */
 template <NodeType node>
@@ -211,24 +221,25 @@ typename tree<node>::traverser operator|(
 /**
  * @brief Convert formula `n` to Ordered Normal Form with respect to `var`.
  *
- * First converts to DNF, then applies `onf_wff` twice (to stabilize).
+ * Converts to DNF, applies `onf_wff` once, then converts the result to DNF
+ * again. Quantifiers are not taken into account beyond keeping the prefix.
  * @tparam node Tree node type.
  * @param n Formula to convert.
  * @param var The variable that defines the ordering dimension.
- * @return Formula in ONF with respect to `var`.
+ * @return Formula in ONF with respect to `var`, or the error of a DNF
+ * conversion.
  *
  * @par Example
  * @code{.cpp}
  * // "x = y" and "y = x" describe the same equation; ONF w.r.t. x rewrites
- * // both to the same canonical interval form (see
- * // tests/unit/test_normal_forms.cpp:218-227).
+ * // both to the same canonical interval form (see the test suite
+ * // "normal forms: onf" in tests/unit/test_normal_forms.cpp).
  * tref x = build_variable<node_t>("x", tau_type_id<node_t>());
  * tref fm_lhs = get_nso_rr("x = y.").value().main->get();
  * tref fm_rhs = get_nso_rr("y = x.").value().main->get();
- * tref result_lhs = onf<node_t>(fm_lhs, x);
- * tref result_rhs = onf<node_t>(fm_rhs, x);
+ * tref result_lhs = onf<node_t>(fm_lhs, x).value();
+ * tref result_rhs = onf<node_t>(fm_rhs, x).value();
  * // tau::get(result_lhs).to_str() == tau::get(result_rhs).to_str()
- * //   == "yx' = 0 && xy' = 0"
  * @endcode
  */
 template <NodeType node>
@@ -237,21 +248,26 @@ result<tref> onf(tref n, tref var);
 /**
  * @brief Reduce a DNF or CNF formula by removing redundant clauses.
  *
- * Converts the formula to a path representation and eliminates dominated or
- * tautological clauses via `dnf_cnf_to_reduced`. Returns the simplified formula.
+ * Works on a wff or a term. Converts the formula to a path representation
+ * over its BDD variables (`is_wff_bdd_var` / `is_bf_bdd_var`) via
+ * `dnf_cnf_to_reduced`, which merges and drops dominated paths, then rebuilds
+ * the formula with negations pushed in. A term containing a non-Boolean
+ * operation only gets `syntactic_path_simplification`. Results are memoized
+ * when `TAU_CACHE` is defined.
  * @tparam node Tree node type.
  * @tparam is_cnf When `true`, treat `fm` as CNF instead of DNF.
  * @param fm Formula in DNF (or CNF when `is_cnf` is `true`).
- * @return Reduced formula.
+ * @return Reduced formula (`T`/`F` or `1`/`0` when it collapses), or the
+ * error of the path collection.
  *
  * @par Example
  * @code{.cpp}
  * // A contradiction reduces to F, a tautology to T
- * // (see tests/unit/test_normal_forms.cpp:771-784).
+ * // (see the test suite "ReduceWff" in tests/unit/test_normal_forms.cpp).
  * tref contradiction = get_nso_rr("x = 0 && x != 0.").value().main->get();
  * tref tautology     = get_nso_rr("x = 0 || x != 0.").value().main->get();
- * CHECK( tau::get(reduce<node_t>(contradiction)).equals_F() );
- * CHECK( tau::get(reduce<node_t>(tautology)).equals_T() );
+ * CHECK( tau::get(reduce<node_t>(contradiction).value()).equals_F() );
+ * CHECK( tau::get(reduce<node_t>(tautology).value()).equals_T() );
  * @endcode
  */
 template <NodeType node, bool is_cnf = false>
@@ -260,26 +276,30 @@ result<tref> reduce(tref fm);
 /**
  * @brief Compute the reduced DNF of a Boolean function.
  *
- * Enumerates all variable assignments via `assign_and_reduce` using the
- * lexicographic variable order `lex_var_comp`, then reconstructs the minimal
- * DNF from the resulting coefficient-path map.
+ * Expands XOR, then enumerates the assignments of the variables
+ * (`variable`, `bf_fall` and `bf_fex` children) via `assign_and_reduce` in
+ * the lexicographic order `lex_var_comp`, and rebuilds the DNF from the
+ * resulting coefficient-path map. Results are memoized when `TAU_CACHE` is
+ * defined.
  * @tparam node Tree node type.
- * @param fm Boolean function to reduce.
+ * @param fm Boolean function (`bf` node) to reduce.
  * @param make_paths_disjoint When `true`, skip the `join_paths` merging step
  *        so that every surviving path is explicitly disjoint.
- * @return Reduced DNF of `fm`.
+ * @return Reduced DNF of `fm`; `fm` itself when it contains a non-Boolean
+ * operation; `0` when no path survives; an error if the reduction yields an
+ * inconsistent coefficient map or `assign_and_reduce` fails.
  *
  * @par Example
  * @code{.cpp}
  * // ab|ab' = a(b|b') = a; ab|a'b = (a|a')b = b
- * // (see tests/unit/test_normal_forms.cpp:786-802).
+ * // (see the test suite "BfReducedDNF" in tests/unit/test_normal_forms.cpp).
  * tref fm1 = get_nso_rr("ab|ab' = 0.").value().main->get();
  * tref bf1 = tau::get(fm1)[0].first();
- * CHECK( tau::get(bf_reduced_dnf<node_t>(bf1)).to_str() == "a" );
+ * CHECK( tau::get(bf_reduced_dnf<node_t>(bf1).value()).to_str() == "a" );
  *
  * tref fm2 = get_nso_rr("ab|a'b = 0.").value().main->get();
  * tref bf2 = tau::get(fm2)[0].first();
- * CHECK( tau::get(bf_reduced_dnf<node_t>(bf2)).to_str() == "b" );
+ * CHECK( tau::get(bf_reduced_dnf<node_t>(bf2).value()).to_str() == "b" );
  * @endcode
  */
 template <NodeType node>
@@ -294,12 +314,16 @@ result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
  */
 template <NodeType node>
 struct bf_reduce_canonical {
-	/// @brief Apply canonical DNF reduction to `fm`.
+	/// @brief Apply canonical DNF reduction to every top-level `bf` of `fm`.
+	///
+	/// An error of `bf_reduced_dnf` is not reported: the functor returns a
+	/// plain `tref` for the `operator|` pipeline.
 	///
 	/// @par Example
 	/// @code{.cpp}
 	/// // A tautology over uninterpreted constants <:a>, <:b>, <:c> reduces to T
-	/// // (see tests/unit/test_normal_forms.cpp:96-108).
+	/// // (see the test suite "normal forms: bf_reduce_canonical" in
+	/// // tests/unit/test_normal_forms.cpp).
 	/// tref fm = tt(tau::get(uninterp_constants_sample))
 	///     | tau::spec | tau::main | tau::wff
 	///     | bf_reduce_canonical<node_t>() | tt::ref;
@@ -309,7 +333,7 @@ struct bf_reduce_canonical {
 };
 
 /**
- * @brief Pipe operator: apply `bf_reduce_canonical` to a tree traverser.
+ * @brief Pipe operator: apply `bf_reduce_canonical` to the tree @p t holds.
  * @tparam node Tree node type.
  */
 template <NodeType node>
@@ -325,7 +349,10 @@ typename tree<node>::traverser operator|(
  */
 template <NodeType node>
 struct wff_reduce_dnf {
-	/// @brief Reduce `fm` to DNF.
+	/// @brief Reduce `fm`, assumed in DNF, with `reduce<node, false>`.
+	///
+	/// @return The reduced formula, or `nullptr` if `reduce` failed (its
+	/// report is dropped).
 	///
 	/// @par Example
 	/// @code{.cpp}
@@ -345,7 +372,10 @@ struct wff_reduce_dnf {
  */
 template <NodeType node>
 struct wff_reduce_cnf {
-	/// @brief Reduce `fm` to CNF.
+	/// @brief Reduce `fm`, assumed in CNF, with `reduce<node, true>`.
+	///
+	/// @return The reduced formula, or `nullptr` if `reduce` failed (its
+	/// report is dropped).
 	///
 	/// @par Example
 	/// @code{.cpp}
@@ -378,20 +408,22 @@ typename tree<node>::traverser operator|(
 /**
  * @brief Convert a formula to Disjunctive Normal Form (DNF).
  *
- * Pushes negations in, then distributes conjunctions over disjunctions while
- * interleaving reductions via `wff_reduce_dnf` (or `reduce` for bf).
+ * Pushes negations in (and, for bf, expands XOR), then distributes
+ * conjunctions over disjunctions while interleaving reductions via
+ * `wff_reduce_dnf` (or `reduce` for bf). For wff it does not descend into
+ * the scopes `visit_wff` skips.
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
- * @return Equivalent formula in DNF.
+ * @return Equivalent formula in DNF, or the error of a bf `reduce`.
  *
  * @par Example
  * @code{.cpp}
  * // x=0 && (y=0 || z=0) distributes to (x=0 && y=0) || (x=0 && z=0)
- * // (see tests/unit/test_normal_forms.cpp:740-750).
+ * // (see the test suite "ToDNF" in tests/unit/test_normal_forms.cpp).
  * tref fm = get_nso_rr("x = 0 && (y = 0 || z = 0).").value().main->get();
- * tref res = to_dnf<node_t, true>(fm);
- * // tau::get(res).to_str() == "x = 0 && y = 0 || x = 0 && z = 0"
+ * tref res = to_dnf<node_t, true>(fm).value();
+ * // res is a disjunction of the two conjunctions
  * @endcode
  */
 template <NodeType node, bool is_wff = true>
@@ -400,20 +432,21 @@ result<tref> to_dnf(tref fm);
 /**
  * @brief Convert a formula to Conjunctive Normal Form (CNF).
  *
- * Pushes negations in, then distributes disjunctions over conjunctions while
- * interleaving reductions via `wff_reduce_cnf` (or `reduce<true>` for bf).
+ * Pushes negations in (and, for bf, expands XOR into its conjunctive shape),
+ * then distributes disjunctions over conjunctions while interleaving
+ * reductions via `wff_reduce_cnf` (or `reduce<node, true>` for bf).
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
- * @return Equivalent formula in CNF.
+ * @return Equivalent formula in CNF, or the error of a bf `reduce`.
  *
  * @par Example
  * @code{.cpp}
- * // (x=0||y=0) && (z=0||w=0) is already in CNF, so to_cnf is a no-op here
- * // (see tests/unit/test_normal_forms.cpp:762-768).
+ * // (x=0||y=0) && (z=0||w=0) is already in CNF
+ * // (see the test suite "ToCNF" in tests/unit/test_normal_forms.cpp).
  * tref fm = get_nso_rr("(x = 0 || y = 0) && (z = 0 || w = 0).").value().main->get();
- * tref res = to_cnf<node_t, true>(fm);
- * // tau::get(res).to_str() == "(x = 0 || y = 0) && (z = 0 || w = 0)"
+ * tref res = to_cnf<node_t, true>(fm).value();
+ * // res is a conjunction of the two disjunctions
  * @endcode
  */
 template <NodeType node, bool is_wff = true>
@@ -422,7 +455,8 @@ result<tref> to_cnf(tref fm);
 /**
  * @brief Convert a formula to Negation Normal Form (NNF).
  *
- * Convenience wrapper around `push_negation_in<node, true>`.
+ * Convenience wrapper around `push_negation_in<node, true>`, memoized when
+ * `TAU_CACHE` is defined.
  * @tparam node Tree node type.
  * @param fm Formula to convert.
  * @return Equivalent formula in NNF.
@@ -430,7 +464,7 @@ result<tref> to_cnf(tref fm);
  * @par Example
  * @code{.cpp}
  * // Double negation collapses; De Morgan's law distributes negation over &&
- * // (see tests/unit/test_normal_forms.cpp:712-727).
+ * // (see the test suite "ToNNF" in tests/unit/test_normal_forms.cpp).
  * tref fm1 = get_nso_rr("!!(a = 0).").value().main->get();
  * tref res1 = to_nnf<node_t>(fm1);
  * // tau::get(res1).to_str() == "a = 0"
@@ -446,22 +480,26 @@ tref to_nnf(tref fm);
 /**
  * @brief Convert a formula to Boole Normal Form (full procedure).
  *
- * The full four-step procedure:
- *   1. Syntactic simplification.
- *   2. Squeeze-absorb pre-processing.
- *   3. Term Boole decomposition for all equations.
- *   4. Formula-level Boole decomposition (`rec_boole_decomposition`).
- * Finally applies `to_nnf` and `simplify_using_equality`.
+ * The full procedure:
+ *   1. Syntactic simplification, then squeeze-absorb.
+ *   2. Term Boole decomposition of both sides of every `=` and `!=`.
+ *   3. Syntactic simplification again, then `fold_modular_value_cover`.
+ *   4. Formula-level Boole decomposition (`rec_boole_decomposition`) over the
+ *      atoms `is_atomic_bdd_var` selects outside quantifiers, sorted by
+ *      `atm_formula_order_for_simplification`; skipped when there are none.
+ * Finally applies `to_nnf` and `simplify_using_equality`. Results and their
+ * reports are memoized when `TAU_CACHE` is defined.
  * @tparam node Tree node type.
  * @param formula Formula to normalize.
- * @return Formula in Boole normal form.
+ * @return Formula in Boole normal form, or the error of a simplification
+ * step.
  *
  * @par Example
  * @code{.cpp}
  * // f(0,0)f(0,1)=0 && f(1,1)f(1,0)=0 && (f(1,0)f(1,1)|f(0,1)f(0,0) != 0) is
  * // unsatisfiable: the first two conjuncts force every f(i,j) product to be
- * // 0, contradicting the third (see
- * // tests/integration/test_integration-wff_normalization.cpp:288-293).
+ * // 0, contradicting the third (see the test suite "boole_normal_form" in
+ * // tests/integration/test_integration-wff_normalization.cpp).
  * tref fm = get_nso_rr(
  *     "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && "
  *     "f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.").value().main->get();
@@ -475,12 +513,13 @@ result<tref> boole_normal_form(tref formula);
 /**
  * @brief Convert a formula to term-level Boole Normal Form.
  *
- * A lighter variant of `boole_normal_form` that only applies syntactic
- * simplification and term-level Boole decomposition, skipping the
- * formula-level BDD step.
+ * A lighter variant of `boole_normal_form`: steps 1 to 3 without the
+ * squeeze-absorb, skipping the formula-level BDD step. Memoized when
+ * `TAU_CACHE` is defined.
  * @tparam node Tree node type.
  * @param formula Formula to normalize.
- * @return Formula with all terms in Boole normal form.
+ * @return Formula with all terms in Boole normal form, or the error of a
+ * simplification step.
  *
  * @par Example
  * @code{.cpp}
@@ -501,11 +540,10 @@ result<tref> term_boole_normal_form(tref formula);
  * @tparam node Tree node type.
  * @tparam type BA type identifier.
  * @param n Formula to convert.
- * @return Formula in ANF, or an error report when the conversion is not
- * available.
+ * @return Always a `code::unsupported_operation` error for now.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body reports
- * an unsupported-operation error.
+ * @warning Not implemented yet (normal_forms_boole.tmpl.h): the current body
+ * reports an unsupported-operation error.
  */
 template <NodeType node, size_t type>
 result<tref> anf(tref n);
@@ -517,11 +555,10 @@ result<tref> anf(tref n);
  * form `Q1 x1. Q2 x2. ... Qn xn. matrix` where the matrix is quantifier-free.
  * @tparam node Tree node type.
  * @param n Formula to convert.
- * @return Formula in PNF, or an error report when the conversion is not
- * available.
+ * @return Always a `code::unsupported_operation` error for now.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body reports
- * an unsupported-operation error.
+ * @warning Not implemented yet (normal_forms_boole.tmpl.h): the current body
+ * reports an unsupported-operation error.
  */
 template <NodeType node>
 result<tref> pnf(tref n);

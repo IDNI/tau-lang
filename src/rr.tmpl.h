@@ -84,14 +84,12 @@ constexpr auto rr<node>::operator!=(const rr<node>& that) const {
 
 template <NodeType node>
 std::uint64_t rr_hash(const rr<node>& r) noexcept {
-	// GitHub #80: hash the trees' content, never the `htref` handles.
-	// htref is a shared_ptr<htree>: hashing it directly (as the generic
-	// hash_combine(seed, rr.rec_relations, rr.main) used to) falls
-	// through to std::hash<shared_ptr<htree>>, which hashes the raw
-	// pointer -- non-reproducible across processes/allocators. The tree's
-	// own 64-bit hash is read instead: std::hash of a tree is a size_t and
-	// keeps only 32 bits on wasm32. A non-null htref can still wrap a null
-	// tref (htree::null()), so both levels of null are checked.
+	// Hash the trees' content, never the `htref` handles: htref is a
+	// shared_ptr<htree>, and std::hash of it hashes the raw pointer,
+	// which is not reproducible across processes. The tree's own 64-bit
+	// hash is read: std::hash of a tree is a size_t and keeps only 32
+	// bits on wasm32. A non-null htref can still wrap a null tref
+	// (htree::null()), so both levels of null are checked.
 	auto htref_hash = [](const idni::htref& h) -> std::uint64_t {
 		return (h && h->get()) ? tree<node>::get(h->get()).hash : 0;
 	};

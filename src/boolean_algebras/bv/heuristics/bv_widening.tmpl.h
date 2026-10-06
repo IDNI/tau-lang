@@ -24,25 +24,25 @@ namespace idni::tau_lang {
  *
  * A constant amount does not always survive as a `ba_constant`: the
  * all-ones value of a bv type is canonicalized to the *top element*
- * `bf_t` at construction time (test_bv_ba_hooks.cpp, "an all-ones literal
- * is the top element": `{255}:bv[8]` and `1:bv[8]` are the same node), and
+ * `bf_t` at construction time (tests/unit/test_bv_ba_hooks.cpp, "an all-ones
+ * literal is the top element": `{255}:bv[8]` and `1:bv[8]` are the same node), and
  * the zero to `bf_f`. A `bf_t` amount is just as literal as a
  * `ba_constant` -- `2^w - 1` for its own declared width `w` -- and is read
  * as such here, otherwise `x << { 255 }:bv[8]` would silently fall into
  * the "no known growth" branch and be widened to 8 instead of the exact
- * `l + 255` the design's `bf_shl` rule requires. An *untyped* `bf_t` (the
+ * `l + 255` the `bf_shl` rule requires. An *untyped* `bf_t` (the
  * plain Boolean top, `ba_type == 0`) carries no width, so its value is
  * unknown here and it is treated as non-constant. A `bf_f` amount needs no
  * case of its own: it is a literal zero, whose growth is the `0` the
  * fallthrough already returns (and `term_shl` folds `X << 0` to `X` at
- * construction anyway, bv_ba_hooks.tmpl.h:661-663).
+ * construction anyway, in bv_ba_hooks.tmpl.h).
  *
  * `op` is the operator node directly under a `bf` wrapper (i.e. `n[0]`
  * for the `bf` node whose operator is `bf_shl`). Its second child (`op[1]`)
  * is itself a `bf` wrapper around the shift-amount operand, and `op[1][0]`
  * drills one level further to the actual leaf/operator -- the same
  * two-level access idiom `term_shl` uses to read its operands
- * (bv_ba_hooks.tmpl.h:596-597: `tau::get(symbol)[0][1][0]`).
+ * (`tau::get(symbol)[0][1][0]`).
  *
  * @tparam node Tree node type.
  * @param op The `bf_shl` operator node (the child of its `bf` wrapper).
@@ -215,9 +215,8 @@ result<size_t> needed_width(tref bf_node, size_t base_w, size_t& maxW) {
  * Handles a `bf_parenthesis`/`bf_neg`-style single-child wrapper when
  * `r == nullptr`. The result has exactly the shape `build_bf_min` (etc.)
  * produce, except typed at `wide_tid` via `tree<node>::get_typed`. Wrapping in `bf`
- * triggers the ordinary construction-time hooks (constant folding etc.,
- * see the module doc comment's Trap 1) exactly as any other `bf` node
- * construction would.
+ * triggers the ordinary construction-time hooks (constant folding etc.)
+ * exactly as any other `bf` node construction would.
  *
  * @tparam node Tree node type.
  * @param nt The operator's nonterminal (`bf_add`, `bf_neg`, ...).
@@ -258,7 +257,7 @@ tref widen_term(tref bf_node, size_t base_w, size_t W) {
 	// nand/nor/xnor/neg/shl/shr, and the purely transparent
 	// bf_parenthesis wrapper, which needs no special case since it has
 	// one child just like bf_neg) is rebuilt with widened children and
-	// retyped bv[W]. No interior truncations anywhere (amended D2/D3):
+	// retyped bv[W]. No interior truncations anywhere:
 	// bitwise ops and both shift operands run at W like everything else.
 	default: {
 		tref l = widen_term<node>(op.child(0), base_w, W);
@@ -281,11 +280,11 @@ tref widen_term(tref bf_node, size_t base_w, size_t W) {
  * parenthesised).
  *
  * A `variable` covers io_vars and uninterpreted constants alike (see
- * parser/tau.tgf:149, `variable => (uconst | io_var | var_name) [
+ * the `variable` rule of parser/tau.tgf, `variable => (uconst | io_var | var_name) [
  * member_path ] [ typed ]` -- so no separate uconst check is needed),
  * possibly under one or more transparent `bf_parenthesis` wrappers. A
- * user-cast side (`bf_cast`) is deliberately NOT bare storage: per the
- * design, a cast is an independent sub-computation boundary, not the
+ * user-cast side (`bf_cast`) is deliberately NOT bare storage: a cast is
+ * an independent sub-computation boundary, not the
  * declared storage target itself.
  *
  * @tparam node Tree node type.
@@ -314,7 +313,7 @@ bool is_bare_storage_side(tref side) {
  * The width is unknown for an untyped operand (e.g. a tree parsed with
  * inference off) or a non-bv-family one. Reads the operand's own `bf` wrapper first
  * and falls back to the node underneath it, the same source-width lookup
- * bv_term_cast itself performs (bv_ba_hooks.tmpl.h:872-873).
+ * `term_cast` (bv_ba_hooks.tmpl.h) itself performs.
  *
  * @tparam node Tree node type.
  * @param cast_op The `bf_cast` operator node.
@@ -350,8 +349,8 @@ result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
  *
  * This is the idempotency guard for the extend-all-sides atom shapes (see
  * widen_atom's doc comment): it is checked BEFORE needed_width ever runs
- * again, specifically because needed_width's bf_cast-boundary rule (Task
- * 3, locked behavior) cannot distinguish "a genuinely wide value" from "a
+ * again, specifically because needed_width's bf_cast-boundary rule
+ * cannot distinguish "a genuinely wide value" from "a
  * zero-extended narrower one" -- re-running it on an already-widened,
  * non-truncated comparison would blindly re-sum already-wide cast-boundary
  * widths (e.g. a bf_mul of two already-(bv[W])-cast operands recomputes to
@@ -361,7 +360,8 @@ result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
  * that shape's idempotency is already handled correctly by needed_width's
  * own recomputation (the outer truncating cast is itself a boundary
  * matching base_w, so W == base_w naturally on a second call) -- see the
- * "idempotent (assignment shape)" test.
+ * "idempotent (assignment shape)" test in
+ * boolean_algebras/bv/tests/test_bv_widening.cpp.
  *
  * Per node kind:
  *
@@ -371,15 +371,14 @@ result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
  *    mean this side was never elaborated.
  *  - `ba_constant` / `bf_t` / `bf_f` -> saturated iff the leaf's OWN type
  *    is bv-family of width exactly `W`. A constant leaf's `(bv[W])` cast
- *    does NOT survive: `bv_term_cast` (bv_ba_hooks.tmpl.h:862-941) folds
+ *    does NOT survive: `term_cast` (bv_ba_hooks.tmpl.h) folds
  *    any cast of a constant / top / bottom element into a bare, retyped
  *    constant at construction time. Returning `false` here unconditionally
- *    (as this guard originally did) therefore made every widened atom with
- *    a folded constant leaf -- `i1*i2 <= {200}`, `x << {3}`, ... -- fail
- *    the guard on re-entry and re-widen without bound, up to the D4 cap
- *    and its answer-flipping conservative fallback. Re-entry is routine
- *    (normalize_non_temp runs inside is_tau_formula_sat, solve() and the
- *    fixpoint loops), so this is the load-bearing half of the fix.
+ *    would make every widened atom with a folded constant leaf --
+ *    `i1*i2 <= {200}`, `x << {3}`, ... -- fail the guard on re-entry and
+ *    re-widen without bound, up to the `bv_max_width` cap. Re-entry is
+ *    routine (normalize_non_temp runs inside is_tau_formula_sat, solve()
+ *    and the fixpoint loops).
  *  - `bf_cast` -> saturated iff its own declared target is exactly `W`.
  *    Its operand is not inspected for saturation, mirroring widen_term's
  *    own treatment of casts as opaque boundaries; its *width* is read only
@@ -403,7 +402,7 @@ result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
  *  (2) A growing operator whose operands are all constants folds away at
  *      construction (`term_add`/`term_mul`/`term_shl` all fold constant
  *      pairs, and at `W` the exact result fits by construction, so the
- *      fit-gate of Task 2 never keeps it symbolic) -- an all-constant atom
+ *      overflow fit-gate never keeps it symbolic) -- an all-constant atom
  *      collapses to T/F during elaboration and never survives to re-entry.
  *      So a surviving growing operator has a non-constant leaf under it.
  *  (3) That leaf is a `(bv[W])` cast over a variable of the atom's own
@@ -426,8 +425,8 @@ result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
  * be its own fixed point, hence any input that coincides with one is left
  * alone. The cost is bounded and self-inflicted -- the user pinned every
  * operand's width with explicit casts, which is precisely how the default
- * mode is asked for locally (README, "casts pin widths exactly as today")
- * -- and it does NOT extend to same-width user casts:
+ * mode is asked for locally -- and it does NOT extend to same-width user
+ * casts:
  * `(bv[8]) x:bv[8] * (bv[8]) y:bv[8] <= {200}:bv[8]` has no cast over a
  * narrower operand, so it is not accepted as saturated and still widens to
  * W = 16 as the mode requires. Nor does it affect the common
@@ -465,8 +464,8 @@ result<bool> is_side_saturated_at(tref side, size_t W, bool& saw_widening_cast) 
 		// An operand of unknown width (0, from a tree never run through
 		// type inference) counts as narrower: erring towards "already
 		// widened" keeps the pass terminating, which is the stronger
-		// safety property here -- escalation ends at the D4 cap, whose
-		// conservative fallback flips answers.
+		// safety property here -- escalation ends only at the
+		// bv_max_width cap.
 		TAU_TRY(size_t operand_width, bf_cast_operand_width<node>(op));
 		if (operand_width < W) saw_widening_cast = true;
 		return r.with_value(true);
@@ -476,7 +475,7 @@ result<bool> is_side_saturated_at(tref side, size_t W, bool& saw_widening_cast) 
 	case tau::ba_constant:
 	case tau::bf_t:
 	case tau::bf_f: {
-		// A constant leaf keeps no cast (bv_term_cast folds it away), so
+		// A constant leaf keeps no cast (term_cast folds it away), so
 		// its own declared width is the only evidence available.
 		const size_t leaf_type = op.get_ba_type();
 		if (leaf_type == 0 || !is_bv_type_family<node>(leaf_type))
@@ -548,7 +547,7 @@ result<tref> widen_atom(tref atom) {
 	}
 
 	// Step 3: W == base_w -> nothing to elaborate; W > bv_max_width ->
-	// cap error (D4).
+	// cap error.
 	const size_t W = maxW;
 	if (W == base_w) return r.with_value(atom);
 	if (W > bv_max_width)
@@ -592,7 +591,8 @@ result<tref> widen_bv_arithmetic(tref fm) {
 	if (!bv_widening) return r.with_value(fm); // pass fully inert when the flag is off
 
 	// The full bv-family atom nt set widen_atom knows how to elaborate --
-	// parser/tau.tgf:64-74. `is<node>({...})` (tau_tree_queries.tmpl.h) is
+	// the comparison alternatives of `wff` in parser/tau.tgf.
+	// `is<node>({...})` (tau_tree_queries.tmpl.h) is
 	// the factory overload that returns a std::function<bool(tref)>,
 	// suitable directly as select_top's predicate.
 	//
@@ -618,7 +618,7 @@ result<tref> widen_bv_arithmetic(tref fm) {
 	// normal_forms_transformations.tmpl.h's shift_io_vars_in_fm).
 	subtree_map<node, tref> changes;
 	for (tref atom : atoms) {
-		// D4 cap: TAU_TRY propagates widen_atom's own report on failure.
+		// Width cap: TAU_TRY propagates widen_atom's own report on failure.
 		TAU_TRY(auto widened, widen_atom<node>(atom));
 		if (widened != atom) changes[atom] = widened;
 	}

@@ -37,6 +37,9 @@ namespace idni::tau_lang {
  * may be read per HOA guard, and a warning per read would bury the rest of
  * the output. Zero is accepted and passed through; what it means (unlimited,
  * or a limit's own hard bound) belongs to the limit, not to its reader.
+ * @param var Name of the environment variable; must not be null.
+ * @param dflt Value returned when @p var is unset or invalid.
+ * @return The parsed value, or @p dflt.
  */
 inline size_t env_limit_count(const char* var, size_t dflt) {
 	const char* v = std::getenv(var);

@@ -10,8 +10,8 @@
 #include "union_find_with_sets.h"
 #include "heuristics/simplify_using_equality.h"
 
-// Split into logical sub-files for readability.
-// Include order matches the original code order.
+// The definitions of normal_forms.h, split into sub-files; a later
+// sub-file may use templates of an earlier one, so keep the order.
 #include "normal_forms_helpers.tmpl.h"
 #include "normal_forms_dnf.tmpl.h"
 #include "normal_forms_nnf.tmpl.h"

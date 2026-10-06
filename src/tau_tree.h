@@ -212,14 +212,11 @@ struct node {
 	/** @brief Return the full 64-bit payload. */
 	uint64_t get_data() const;
 
-	// TT1-11: node::retype(new_nt), nnull() and the extension()
-	// pack/unpack pair were deleted: zero callers, and the extension
-	// packing could not round-trip -- data(54) + term(1) + ext(1) + nt(9)
-	// needs 65 bits in a 64-bit word, so any nt >= 256 lost its MSB.
-	// Recover from git if the `ext` child-storage design is ever built;
-	// it needs data_bits = bits - nt_bits - 2 first.
-
-	/** @brief Three-way comparison (by hash, then field-by-field). */
+	/**
+	 * @brief Three-way comparison: by hash, then nt, ba_type and ext, then
+	 * the pooled string for a string nonterminal or the raw data otherwise.
+	 * The term bit is not compared (it follows from nt).
+	 */
 	std::weak_ordering operator<=>(const node& that) const;
 	/** @brief Strict less-than. */
 	constexpr bool     operator<  (const node& that) const;
@@ -383,15 +380,26 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref get_ba_constant(const constant& constant, const tref type_tree);
 	/** @brief Create a BA-constant node from @p constant and type id @p ba_type_id. */
 	static tref get_ba_constant(const constant& constant, size_t ba_type_id);
-	/** @brief Parse source string @p constant_source and create a BA-constant node. */
+	/**
+	 * @brief Parse source string @p constant_source as a constant of the
+	 * type @p type_tree names; same contract as `get_ba_constant_from_source`.
+	 */
 	static result<tref> get_ba_constant(const std::string& constant_source, tref type_tree);
-	/** @brief Create a BA-constant node from pre-interned source id and type id. */
+	/**
+	 * @brief Parse the pre-interned source @p constant_source_sid as a
+	 * constant of type @p ba_type_id (`> 0`).
+	 * @return The constant node, or a null value (with an error logged)
+	 * when the source does not parse for that type.
+	 */
 	static result<tref> get_ba_constant_from_source(size_t constant_source_sid, size_t ba_type_id);
-	/** @brief Create a BA-constant node from pre-registered constant id and type id. */
+	/**
+	 * @brief Create a BA-constant node from pre-registered constant id and
+	 * type id; fails when @p constant_id is not in the pool.
+	 */
 	static result<tref> get_ba_constant(size_t constant_id, size_t ba_type_id);
 	/** @brief Create a BA-constant node from a typed-constant pair. */
 	static tref get_ba_constant(const std::pair<constant, tref>& typed_const);
-	/** @brief Create a BA-constant node from an optional typed-constant pair. */
+	/** @brief Create a BA-constant node from an optional typed-constant pair; nullptr when empty. */
 	static tref get_ba_constant(const std::optional<std::pair<constant, tref>>& typed_const);
 
 
@@ -529,11 +537,14 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	uint64_t get_num() const;
 	/** @brief Return the BA-constant registry id for this node. */
 	size_t get_ba_constant_id() const;
-	/** @brief Return the BA constant value for this node. */
+	/**
+	 * @brief Return the BA constant value for this node; a
+	 * default-constructed constant when the pool lookup fails.
+	 */
 	constant get_ba_constant() const;
 	/** @brief Return the BA type id for this node. */
 	size_t get_ba_type() const;
-	/** @brief Return the BA type tree ref for this node. */
+	/** @brief Return the BA type tree of this node's type id, or the error of the lookup. */
 	result<tref> get_ba_type_tree() const;
 	/** @brief Return the free variables reachable from this node. */
 	const trefs& get_free_vars() const;
@@ -543,15 +554,17 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
  * ba_constants keep theirs (their data is a typed pool index). */
 	static tref untype(tref term);
 
-	/** @brief Replace @p that with @p with in this subtree. */
+	/**
+	 * @brief Replace @p that with @p with in this subtree; quantifier ids
+	 * are recanonized when @p with contains a quantifier.
+	 */
 	tref substitute(tref that, tref with) const;
-	/** @brief Apply all substitutions in @p changes to this subtree. */
+	/**
+	 * @brief Apply all substitutions in @p changes (a map from subtree to
+	 * replacement) to this subtree; quantifier ids are recanonized when a
+	 * replacement contains a quantifier.
+	 */
 	tref substitute(const auto& changes) const;
-
-	// TT1-22: the select_top/select_all[_until]_by_predicates family (12
-	// overloads plus or_predicate/select_by_predicates helpers) was
-	// deleted: zero callers and zero tests. Recover from git if a
-	// multi-predicate selection API is ever wanted.
 
 	// -----------------------------------------------------------------------
 	// From-parser API (tau_tree_from_parser.tmpl.h)
@@ -790,13 +803,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_wff_rimply(tref l, tref r);
 	/** @brief Build `l <-> r`. */
 	static tref build_wff_equiv(tref l, tref r);
-	/** @brief Build `l | r`. */
+	/** @brief Build `l || r`. */
 	static tref build_wff_or(tref l, tref r);
 	/** @brief Build disjunction over all formulas in @p wffs. */
 	static tref build_wff_or(const auto& wffs);
-	/** @brief Build `l ^ r`. */
+	/** @brief Build `l ^^ r`. */
 	static tref build_wff_xor(tref l, tref r);
-	/** @brief Build `l & r`. */
+	/** @brief Build `l && r`. */
 	static tref build_wff_and(tref l, tref r);
 	/** @brief Build conjunction over all formulas in @p wffs. */
 	static tref build_wff_and(const auto& wffs);
@@ -818,7 +831,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_wff_ctn_lt(tref ctnvar, tref num);
 
 	// Term relational builders (wff using bf)
-	/** @brief Build `x[y, z]` interval formula. */
+	/** @brief Build the interval `x <= y <= z`, as `x <= y && y <= z`. */
 	static tref build_bf_interval(tref x, tref y, tref z);
 	/** @brief Build `l = r`. */
 	static tref build_bf_eq(tref l, tref r);
@@ -856,19 +869,19 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_or(tref l, tref r);
 	/** @brief Build disjunction of all terms in @p bfs with type @p type_id. */
 	static tref build_bf_or(const auto& bfs, size_t type_id);
-	/** @brief Build `l nor r` (negated or). */
+	/** @brief Build `l !| r` (negated or). */
 	static tref build_bf_nor(tref l, tref r);
 	/** @brief Build `l ^ r`. */
 	static tref build_bf_xor(tref l, tref r);
-	/** @brief Build `l xnor r`. */
+	/** @brief Build `l !^ r` (negated xor). */
 	static tref build_bf_xnor(tref l, tref r);
 	/** @brief Build `l & r`. */
 	static tref build_bf_and(tref l, tref r);
 	/** @brief Build conjunction of all terms in @p bfs with type @p type_id. */
 	static tref build_bf_and(const auto& bfs, size_t type_id);
-	/** @brief Build `l nand r`. */
+	/** @brief Build `l !& r` (negated and). */
 	static tref build_bf_nand(tref l, tref r);
-	/** @brief Build `! l`. */
+	/** @brief Build `l'` (complement). */
 	static tref build_bf_neg(tref l);
 	/** @brief Build `l << r` (left shift). */
 	static tref build_bf_shl(tref l, tref r);
@@ -890,23 +903,24 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_max(tref l, tref r);
 
 	// Terminal, variable and constant builders
-	/** @brief Build the `T` (true) BA constant for type @p ba_tid. */
+	/** @brief Build the `1` (top) constant of type @p ba_tid (`> 0`). */
 	static tref build_bf_t_type(size_t ba_tid);
-	/** @brief Build the `F` (false) BA constant for type @p ba_tid. */
+	/** @brief Build the `0` (bottom) constant of type @p ba_tid (`> 0`). */
 	static tref build_bf_f_type(size_t ba_tid);
 	/** @brief Build a raw BA-constant node for @p constant with type @p ba_type_id. */
 	static tref build_ba_constant(const constant& constant, size_t ba_type_id);
 	/** @brief Build a `bf` BA-constant node, optionally with right sibling @p right. */
 	static tref build_bf_ba_constant(const constant& constant, size_t ba_type_id, tref right = nullptr);
-	/** @brief Build an uninterpreted constant node with names @p name1, @p name2. */
+	/** @brief Build the uninterpreted constant `<name1:name2>` of type @p type_id. */
 	static tref build_bf_uconst(const std::string& name1, const std::string& name2, size_t type_id);
 	/** @brief Build a variable-name node from string id @p sid. */
 	static tref build_var_name(size_t sid);
 	/** @brief Build a variable-name node from @p name. */
 	static tref build_var_name(const std::string& name);
-	/** @brief Build a variable-name node with auto-generated name from @p index. */
-	/// `<prefix><index>` as a var_name node; "i" for input streams, "o" for
-	/// output streams (the out-var builders below pass "o").
+	/**
+	 * @brief Build the var_name node `<prefix><index>`: "i" for input
+	 * streams, "o" for output streams (the out-var builders pass "o").
+	 */
 	static tref build_var_name_indexed(size_t index,
 		const std::string& prefix = "i");
 	/** @brief Build a canonised I/O variable from @p name. */
@@ -1141,11 +1155,11 @@ bool is_temporal_quantifier(tref n);
 template <NodeType node>
 bool is_child_temporal_quantifier(tref n);
 
-/** @brief Return `true` if @p n is a BA element (constant or variable). */
+/** @brief Return `true` if @p n is a BA element: a `ba_constant`, a `variable`, `1` or `0`. */
 template <NodeType node>
 bool is_ba_element(tref n);
 
-/** @brief Return `true` if @p n is an uninterpreted constant. */
+/** @brief Return `true` if @p n is an uninterpreted constant's name node (`uconst_name`). */
 template <NodeType node>
 bool is_uconst(tref n);
 
@@ -1161,7 +1175,13 @@ bool is_input_var(tref n);
 template <NodeType node>
 bool is_output_var(tref n);
 
-/** @brief Classify an io_var's direction: 0 unknown, 1 input, 2 output. */
+/**
+ * @brief Classify an io_var's direction: 0 unknown, 1 input, 2 output.
+ *
+ * Reads the direction tag in the node's data; untagged, falls back to the
+ * name (`i...` or `this` is input, `o...` or `u` is output). 0 for a node
+ * that is not an `io_var`.
+ */
 template <NodeType node>
 size_t io_var_direction(tref n);
 
@@ -1189,7 +1209,7 @@ bool is_logical_or_functional_quant(tref n);
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
-/** @brief Return `true` if @p n is an atomic formula (no connectives). */
+/** @brief Return `true` if @p n is a `wff` whose child is an (in)equality or order comparison. */
 template <NodeType node>
 bool is_atomic_fm(tref n);
 
@@ -1214,15 +1234,15 @@ bool order_is_total(tref a, tref b);
 template <NodeType node>
 bool is_cli_cmd(tref n);
 
-/** @brief Return `true` if @p n contains a fallback sub-formula. */
+/** @brief Return `true` if @p n has an `fp_fallback` whose value is neither `first` nor `last`. */
 template <NodeType node>
 bool has_fallback (tref n);
 
-/** @brief Return `true` if @p eq is an equational assignment. */
+/** @brief Return `true` if @p eq is a `wff` equation `=` with a variable on either side. */
 template <NodeType node>
 bool is_equational_assignment(tref eq);
 
-/** @brief Return `true` if @p eq is a boolean operation. */
+/** @brief Return `true` if @p op is `&`, `|`, `^`, `'`, `fex` or `fall` (the node itself, not its child). */
 template <NodeType node>
 bool is_boolean_operation(tref op);
 
@@ -1232,7 +1252,7 @@ bool is_formula(tref op);
 
 // Visiting continuation predicates (for use with `visit`, `find`,...)
 
-/** @brief Return `true` if @p n is a boolean operation or an intermediate bf. */
+/** @brief Return `true` if @p n is a `bf` or a Boolean operation (see `is_boolean_operation`). */
 template <NodeType node>
 bool while_is_boolean_operation(tref n);
 
@@ -1240,36 +1260,46 @@ bool while_is_boolean_operation(tref n);
 template <NodeType node>
 bool while_is_formula(tref n);
 
-// (TT1-23: until_is_quantified deleted -- zero callers, zero tests.)
-
-/** @brief Return `true` if @p n is a non-boolean term. */
+/**
+ * @brief Return `true` if @p n itself is a non-Boolean operation: arithmetic,
+ * shift, `!&`/`!|`/`!^`, min/max or a cast. Descendants are not inspected.
+ */
 template <NodeType node>
 bool is_non_boolean_term(tref n);
 
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
-/** @brief Return the temporally quantified formula of @p n, n otherwise. */
+/**
+ * @brief Return the body of the temporal operator that @p n is, or that is
+ * @p n's child; @p n otherwise.
+ */
 template <NodeType node>
 tref get_temporally_quantified_formula(tref n);
 
-// Interned free-var set shared by get_free_vars / get_free_tau_vars: equal sets
-// share one allocation and a cache can hand back a stable trefs&. for_each_tref
-// opts into the gc walk (expand-keep on live key, prune on dead key).
+/**
+ * @brief Interned free-var set shared by get_free_vars / get_free_tau_vars:
+ * equal sets share one allocation and a cache can hand back a stable trefs&.
+ */
 struct free_vars_ref {
+	/// The interned set; null if none.
 	std::shared_ptr<const trefs> sp;
+	/// Call @p f on every tref of the set; opts into the gc walk
+	/// (expand-keep on live key, prune on dead key).
 	template <typename F>
 	void for_each_tref(F&& f) const { if (sp) for (tref t : *sp) f(t); }
 };
 
-// Content-hash-bucketed intern pool of live free-var sets (one instance shared
-// across TUs and node types).
+/// Content-hash-bucketed intern pool of live free-var sets.
 using interned_fv_pool_t =
 	std::unordered_map<size_t, std::vector<std::weak_ptr<const trefs>>>;
+/// The process-wide pool, one instance shared across TUs and node types.
 inline interned_fv_pool_t& interned_free_vars_pool() {
 	static interned_fv_pool_t pool;
 	return pool;
 }
 
+/// Bucket key of @p fv in the pool: mixes the tref addresses, so it is
+/// stable only within one process.
 inline size_t hash_free_vars(const trefs& fv) {
 	size_t h = fv.size();
 	for (tref t : fv)
@@ -1278,8 +1308,9 @@ inline size_t hash_free_vars(const trefs& fv) {
 	return h;
 }
 
-// Intern a sorted free-var set. gc-safe: matches only LIVE entries (weak_ptr
-// lock); expired ones are dropped without touching freed trefs.
+/// Intern a sorted free-var set and return the shared copy equal to @p fv.
+/// gc-safe: matches only LIVE entries (weak_ptr lock); expired ones are
+/// dropped without touching freed trefs.
 inline free_vars_ref intern_free_vars(trefs fv) {
 	auto& bucket = interned_free_vars_pool()[hash_free_vars(fv)];
 	for (auto it = bucket.begin(); it != bucket.end(); ) {
@@ -1293,8 +1324,8 @@ inline free_vars_ref intern_free_vars(trefs fv) {
 	return { std::move(sp) };
 }
 
-// Drop expired entries and empty buckets. Registered as a gc callback (see
-// get_free_vars); gc-safe since weak_ptr::expired() never derefs a tref.
+/// Drop expired entries and empty buckets. Registered as a gc callback (see
+/// get_free_vars); gc-safe since weak_ptr::expired() never derefs a tref.
 inline void sweep_interned_free_vars() {
 	auto& pool = interned_free_vars_pool();
 	for (auto it = pool.begin(); it != pool.end(); ) {
@@ -1309,12 +1340,11 @@ inline void sweep_interned_free_vars() {
  * @brief RAII guard for the process-global `tree<node>::use_hooks` flag.
  *
  * `use_hooks` is a static member, so a pass that disables construction hooks
- * for the duration of a traversal has to restore it on *every* exit, including
- * an exceptional one -- the bitvector paths do throw (see the
- * `std::bad_variant_access` discussion in `bv_ba_solver.tmpl.h`), and leaving
- * hooks disabled corrupts every tree built afterwards in the process. Assigning
- * `true` unconditionally at the end is wrong for the same reason: it force-enables
- * hooks for a caller that had deliberately disabled them.
+ * for the duration of a traversal has to restore it on *every* exit, early
+ * returns included: leaving hooks disabled corrupts every tree built
+ * afterwards in the process. Assigning `true` unconditionally at the end is
+ * wrong too: it force-enables hooks for a caller that had deliberately
+ * disabled them.
  *
  * @par Example
  * @code
@@ -1326,11 +1356,13 @@ inline void sweep_interned_free_vars() {
  */
 template <NodeType node>
 struct use_hooks_guard {
+	/// Save the current `use_hooks` and set it to @p enable.
 	explicit use_hooks_guard(bool enable)
 		: previous_(tree<node>::use_hooks)
 	{
 		tree<node>::use_hooks = enable;
 	}
+	/// Restore the saved `use_hooks`.
 	~use_hooks_guard() { tree<node>::use_hooks = previous_; }
 	use_hooks_guard(const use_hooks_guard&) = delete;
 	use_hooks_guard& operator=(const use_hooks_guard&) = delete;

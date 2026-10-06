@@ -8,6 +8,11 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Parse @p src with the qlt grammar and evaluate it.
+ * @return The value, or a `code::parse_error` when the grammar rejects
+ * @p src or the parse does not evaluate to a qlt literal.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<qlt> parse_qlt_grammar(const std::string& src) {
@@ -31,6 +36,12 @@ result<qlt> parse_qlt_grammar(const std::string& src) {
 	return r.with_value(qval);
 }
 
+/**
+ * @brief Parse a qlt constant source (braces stripped by
+ * `strip_ba_constant_source`) into a pack constant typed `qlt`.
+ * @return The constant and the qlt type tree, or the error of
+ * `parse_qlt_grammar`.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<BAs...>::constant_with_type> parse_qlt(

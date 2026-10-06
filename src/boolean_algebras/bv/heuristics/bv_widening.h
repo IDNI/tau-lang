@@ -53,15 +53,15 @@
 
 namespace idni::tau_lang {
 
-// Opt-in exact bitvector arithmetic: atoms are elaborated to compute at
-// the minimum overflow-free width and truncate at the output assignment.
-// Default false = today's modular semantics, pass fully inert.
-// NOT thread-safe (single-threaded library assumption, as bv_blasting).
+/// Opt-in exact bitvector arithmetic: atoms are elaborated to compute at
+/// the minimum overflow-free width and truncate at the output assignment.
+/// Default false = modular semantics, pass fully inert.
+/// NOT thread-safe (single-threaded library assumption, as bv_blasting).
 inline bool bv_widening = false;
 
-// Cap on the computed width W; exceeding it is a loud elaboration error.
-// 0 passed to the setter leaves the current cap unchanged.
-// Environment fallback TAU_BV_MAX_WIDTH, where 0 keeps the default too.
+/// Cap on the computed width W (inclusive); exceeding it is an elaboration
+/// error. 0 passed to the setter leaves the current cap unchanged.
+/// Environment fallback `TAU_BV_MAX_WIDTH`, where 0 keeps the default too.
 inline env_limit<size_t> bv_max_width{ "TAU_BV_MAX_WIDTH", 1024,
 	env_zero::keep_default };
 
@@ -91,7 +91,7 @@ inline env_limit<size_t> bv_max_width{ "TAU_BV_MAX_WIDTH", 1024,
  * auto opts = tau::get_options{ .parse = { .start = tau::bf },
  *                                .infer_ba_types = false,
  *                                .reget_with_hooks = false };
- * tref src = tree<node_t>::get("x * y", opts);
+ * tref src = tree<node_t>::get("x * y", opts).value();
  * size_t maxW = 0;
  * CHECK( needed_width<node_t>(src, 8, maxW).value_or(0) == 16 );
  * CHECK( maxW == 16 );
@@ -118,8 +118,8 @@ result<size_t> needed_width(tref bf, size_t base_w, size_t& maxW);
  * Every other operator node (`bf_add`, `bf_sub`, `bf_mul`, `bf_div`,
  * `bf_mod`, `bf_min`, `bf_max`, `bf_and`, `bf_or`, `bf_xor`, `bf_nand`,
  * `bf_nor`, `bf_xnor`, `bf_neg`, `bf_shl`, `bf_shr` -- the bitwise ops and
- * both shift operands included, per the amended D2/D3 rule that ALL
- * operators run at `W`) is rebuilt with its children widened first, then
+ * both shift operands included: ALL operators run at `W`) is rebuilt
+ * with its children widened first, then
  * retyped `bv[W]` via `tree<node>::get_typed`. There are no interior
  * truncations anywhere.
  *
@@ -146,7 +146,7 @@ result<size_t> needed_width(tref bf, size_t base_w, size_t& maxW);
  * // it prints as "(bv[16]) x*(bv[16]) y" (see boolean_algebras/bv/tests/test_bv_widening.cpp,
  * // "widen_term: a variable leaf becomes one (bv[W]) cast ...").
  * tref src = tree<node_t>::get("x:bv[8] * y <= z",
- *     tau::get_options{ .parse = { .start = tau::wff } });
+ *     tau::get_options{ .parse = { .start = tau::wff } }).value();
  * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
  * tref side = tree<node_t>::get(atom).child(0);
  * tref wide = widen_term<node_t>(side, 8, 16);
@@ -172,8 +172,8 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *    exactly, with no truncation.
  *  - **`bf_eq`/`bf_neq` with exactly one bare-storage side** (a
  *    `variable` -- which covers io_vars and uninterpreted constants
- *    alike, they all parse into `tau::variable`, see
- *    `parser/tau.tgf:149`, possibly under transparent `bf_parenthesis`
+ *    alike, they all parse into `tau::variable`, see the `variable` rule
+ *    of `parser/tau.tgf`, possibly under transparent `bf_parenthesis`
  *    wrappers): the bare side is left completely untouched, the other
  *    side is elaborated at `W` via `widen_term`, and the result is
  *    wrapped in a truncating `build_bf_cast<node>(..., bv_type_id<node>(
@@ -206,8 +206,8 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *   that shape, because its untouched bare side is never "saturated").
  *   Returns no value, carrying a `code::out_of_range` error (the `{label::limit,
  *   ...}`/`{label::width, ...}` attrs give the cap and the required width),
- *   when the computed `W` exceeds `bv_max_width` (the D4 width cap; the cap
- *   itself is inclusive, `W == bv_max_width` is allowed).
+ *   when the computed `W` exceeds `bv_max_width` (the cap itself is
+ *   inclusive, `W == bv_max_width` is allowed).
  *
  * @par Example
  * @code{.cpp}
@@ -217,7 +217,7 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  * //   o = (bv[8]) min((bv[16]) x*(bv[16]) y, {200}:bv[16])
  * // (see boolean_algebras/bv/tests/test_bv_widening.cpp, "assignment truncation").
  * tref src = tree<node_t>::get("o:bv[8] = min(x * y, { 200 })",
- *     tau::get_options{ .parse = { .start = tau::wff } });
+ *     tau::get_options{ .parse = { .start = tau::wff } }).value();
  * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_eq));
  * tref wide = widen_atom<node_t>(atom).value_or(nullptr);
  * CHECK( tree<node_t>::get(wide).get_ba_type() == bv_type_id<node_t>(8) );
@@ -226,7 +226,7 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  * // Comparison shape: "x:bv[8] * y <= z" extends every side to bv[16] and
  * // truncates nothing, so the atom itself is typed bv[16] afterwards.
  * src = tree<node_t>::get("x:bv[8] * y <= z",
- *     tau::get_options{ .parse = { .start = tau::wff } });
+ *     tau::get_options{ .parse = { .start = tau::wff } }).value();
  * atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
  * CHECK( tree<node_t>::get(widen_atom<node_t>(atom).value_or(nullptr)).get_ba_type()
  *     == bv_type_id<node_t>(16) );
@@ -247,7 +247,8 @@ result<tref> widen_atom(tref atom);
  *
  * Collects every node whose own nt is one of `bf_eq`, `bf_neq`, `bf_lt`,
  * `bf_nlt`, `bf_lteq`, `bf_nlteq`, `bf_gt`, `bf_ngt`, `bf_gteq`, `bf_ngteq`,
- * or `bf_interval` (`parser/tau.tgf:64-74`) anywhere in `fm` -- including
+ * or `bf_interval` (the comparison alternatives of `wff` in
+ * `parser/tau.tgf`) anywhere in `fm` -- including
  * under quantifiers, since the search descends through the whole tree --
  * runs `widen_atom` on each, and rewrites only the ones that actually
  * changed (a non-bv-family atom, or a bv atom already at its saturated
@@ -261,7 +262,7 @@ result<tref> widen_atom(tref atom);
  *   needs rewriting; otherwise `fm` with every changed bv atom replaced by
  *   its `widen_atom` result. Returns no value, carrying `widen_atom`'s own
  *   error report, the moment any one atom's required width exceeds
- *   `bv_max_width` (the D4 width cap) -- callers should treat that the same
+ *   `bv_max_width` -- callers should treat that the same
  *   way they treat a failed normalization.
  *
  * @par Example
@@ -274,10 +275,10 @@ result<tref> widen_atom(tref atom);
  * // comparison no longer wraps").
  * bv_widening = true;
  * tref fm = tree<node_t>::get("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]",
- *     tau::get_options{ .parse = { .start = tau::wff } });
- * CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
+ *     tau::get_options{ .parse = { .start = tau::wff } }).value();
+ * CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm).value()) );
  * bv_widening = false;
- * CHECK( widen_bv_arithmetic<node_t>(fm) == fm ); // off: pass-through
+ * CHECK( widen_bv_arithmetic<node_t>(fm).value() == fm ); // off: pass-through
  * @endcode
  */
 template <NodeType node>

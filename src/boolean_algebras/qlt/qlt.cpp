@@ -5,7 +5,7 @@
 
 namespace idni::tau_lang {
 
-// BA1-4: pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
+// Pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
 #if defined(_MSC_VER) && !defined(__clang__)
 #	include <__msvc_int128.hpp>
 using int128_t_ = std::_Signed128;
@@ -14,6 +14,9 @@ __extension__ typedef __int128 int128_t_;
 #endif
 
 // --- internal helper ---
+
+// gcd of |a| and |b|, computed unsigned so LLONG_MIN is safe; 1 when both
+// are 0.
 
 #if !defined(_MSC_VER)
 #pragma GCC diagnostic push
@@ -55,21 +58,21 @@ bool qlt_rational::operator<(const qlt_rational& o) const {
 	if (neg_inf) return !o.neg_inf;
 	if (o.pos_inf) return !pos_inf;
 	if (pos_inf || o.neg_inf) return false;
-	// BA1-4: cross-multiplication overflows long long for parse-reachable
+	// Cross-multiplication overflows long long for parse-reachable
 	// magnitudes (~9.2e18); widen to __int128.
 	return (int128_t_) p * o.q < (int128_t_) o.p * q;
 }
 
 qlt_rational qlt_rational::midpoint(const qlt_rational& o) const {
-	// BA1-4: compute wide, then reduce by gcd before narrowing -- the
+	// Compute wide, then reduce by gcd before narrowing -- the
 	// unreduced cross products overflow long long for large operands.
 	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
 	int128_t_ den = (int128_t_) 2 * q * o.q;
 	int128_t_ a = num < 0 ? -num : num, b = den < 0 ? -den : den;
 	while (b) { int128_t_ t = a % b; a = b; b = t; }
 	if (a > 1) num /= a, den /= a;
-	// A gcd-irreducible result outside long long keeps the historical
-	// truncation (extreme parse-level literals only).
+	// A gcd-irreducible result outside long long is truncated (extreme
+	// parse-level literals only).
 	return qlt_rational((long long) num, (long long) den);
 }
 
@@ -189,8 +192,8 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 // +inf and that it equals itself; its position relative to a specific
 // rational, or to a differently-named constant, is unknown.
 //
-// Reading the canonical order as semantic is what made `{c} & ~{c}` come out
-// as `(c, +inf)`: `qlt_hi_min({c,CLOSED}, {+inf,OPEN})` answered `+inf`
+// Reading the canonical order as semantic would make `{c} & ~{c}` come out
+// as `(c, +inf)`: `qlt_hi_min({c,CLOSED}, {+inf,OPEN})` would answer `+inf`
 // because `c < +inf` is false canonically.
 std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b)
 {
@@ -212,9 +215,6 @@ std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b)
 }
 
 // --- interval helpers ---
-
-// (BA1-3: qlt_lo_less deleted -- zero callers, and its tie-break was
-// inverted relative to its own comment and to normalise's live comparator.)
 
 // Does piece p contain point val (for overlap testing)?
 // Pieces are intervals, so we check lo <= x < hi (or lo < x <= hi, etc.)
@@ -368,8 +368,8 @@ qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 // When it is not -- a named constant against a specific rational, or two
 // different names -- there is no representable exact answer, and the three
 // available choices are not equal:
-//   * inventing a mixed endpoint pair (the old behaviour: `{c} & [0,1]` =
-//     `[c,1]`) yields a set that is a subset of neither operand: always wrong;
+//   * inventing a mixed endpoint pair (`{c} & [0,1]` = `[c,1]`) yields a
+//     set that is a subset of neither operand: always wrong;
 //   * dropping the piece under-approximates, which would make
 //     `x = {c} && 0 <= x <= 1` report UNSAT even though it holds for
 //     c in [0,1] -- a silently wrong verdict;
@@ -385,7 +385,7 @@ qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 //
 // Over-approximation is not closed under complement: an exact `operator~` of
 // an over-approximated set under-approximates. `~({c} & [0,1])` computed as
-// `~{c}` = `(-inf,c) | (c,+inf)` used to make `x = {c} && ~({c} & [0,1])`
+// `~{c}` = `(-inf,c) | (c,+inf)` would make `x = {c} && ~({c} & [0,1])`
 // collapse to bot -- a wrong UNSAT -- whereas the true complement is all of
 // Q when c is outside [0,1]. The value therefore carries an `inexact` flag
 // (qlt::inexact): `operator&` sets it whenever this branch fires (or a

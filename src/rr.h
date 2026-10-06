@@ -38,7 +38,10 @@ struct rr {
 	/** @brief Default-construct an empty recurrence relation. */
 	rr();
 
-	/** @brief Three-way comparison (lexicographic over rec_relations, then main). */
+	/**
+	 * @brief Content three-way comparison: by rule count first, then rule by
+	 * rule (head, then body), then main; null handles order first.
+	 */
 	std::weak_ordering operator<=>(const rr& that) const;
 	/** @brief Less-than derived from `<=>`. */
 	constexpr bool     operator<  (const rr& that) const;
@@ -57,7 +60,11 @@ struct rr {
 	htref main;                    ///< Handle to the main formula.
 };
 
-/** @brief Content hash of @p r over the 64-bit tree hashes, the same on every platform. */
+/**
+ * @brief Content hash of @p r over the 64-bit tree hashes, the same on every platform.
+ * @param r Recurrence relation; null handles hash as 0.
+ * @return Combined hash of every rule head and body, then of main.
+ */
 template <NodeType node>
 std::uint64_t rr_hash(const rr<node>& r) noexcept;
 
@@ -69,7 +76,7 @@ std::uint64_t rr_hash(const rr<node>& r) noexcept;
  */
 template <idni::tau_lang::NodeType node>
 struct std::hash<idni::tau_lang::rr<node>> {
-	/** @brief Compute hash by combining hashes of rec_relations and main. */
+	/** @brief `rr_hash(f)` narrowed to `size_t`. */
 	size_t operator()(const idni::tau_lang::rr<node>& f) const
 								noexcept;
 };

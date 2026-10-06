@@ -103,7 +103,7 @@ trefs get_cnf_bf_clauses(tref n);
  * In other words, disjunctions underneath a temporal quantifier are not taken
  * into account.
  *
- * Preconditions and contracts (TT2-20):
+ * Preconditions and contracts:
  * - For terms, `bf_xor` is treated as an or-fork: an xor's operands are
  *   enumerated as if they were disjuncts, and "removing" a path keeps only
  *   the other operand. This is sound only for the DNF-ish normal forms the
@@ -116,9 +116,10 @@ trefs get_cnf_bf_clauses(tref n);
 template <NodeType node>
 struct expression_paths {
 	using tau = tree<node>;
+	/// Wrap @p expr, the term or formula whose paths are enumerated.
 	explicit expression_paths(tref expr) : _expr(expr) {}
-	// Forward iterator materializing one path per dereference, steered by
-	// a stack of left/right decisions, one per disjunction fork met so far.
+	/// Forward iterator materializing one path per dereference, steered by
+	/// a stack of left/right decisions, one per disjunction fork met so far.
 	struct iterator {
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = tref;
@@ -126,20 +127,27 @@ struct expression_paths {
 		using pointer = tref*;
 		using reference = tref&;
 
+		/// Iterator positioned on the first path of @p expr; a null
+		/// @p expr is the end iterator.
 		explicit iterator(tref expr) : _expr(expr) {}
-		// Get path according to decisions
+		/// Get path according to decisions
 		value_type operator*();
-		// WARNING: Only use after calling operator*() at least once on
-		// current state
-		// Adjust decisions to point to next path
+		/// Adjust decisions to point to next path.
+		/// WARNING: Only use after calling operator*() at least once on
+		/// current state
 		iterator& operator++();
-		// Apply the function f to current path and return the result
-		// while erasing the path from _expr
-		// NOTE that this changes the result of operator*()
+		/// Apply the function f to current path and return the result
+		/// while erasing the path from _expr
+		/// NOTE that this changes the result of operator*()
 		tref apply(const auto& f);
+		/// Restore the expression saved by the last apply().
 		void undo_apply();
+		/// The expression as it stands after the applies so far.
 		tref get_expr() const { return _expr; }
+		/// Equal when both wrap equal expressions and their decisions
+		/// agree, a missing trailing decision counting as left.
 		bool operator==(const iterator& other) const;
+		/// Negation of operator==.
 		bool operator!=(const iterator& other) const;
 	private:
 		// True is left, false is right
@@ -148,22 +156,24 @@ struct expression_paths {
 		tref _expr;
 		tref _prev_expr;
 	};
+	/// Iterator on the first path of the wrapped expression.
 	iterator begin() const;
+	/// The end iterator (a null expression).
 	iterator end() const;
-	// Apply the function f on each path while replacing the path with the
-	// result in the expression. Note that this affects Boole normal form
-	// structure.
+	/// Apply path_transform on each path while replacing the path with
+	/// the result in the expression. Note that this affects Boole normal
+	/// form structure.
 	tref apply(const auto& path_transform);
-	// Apply the function f on each path while replacing the path with the
-	// result in the expression. Note that this affects Boole normal form
-	// structure
-	// If callback returns false, the current result is returned
+	/// Apply path_transform on each path while replacing the path with
+	/// the result in the expression. Note that this affects Boole normal
+	/// form structure.
+	/// If callback returns false, the current result is returned
 	tref apply(const auto& path_transform, const auto& callback);
-	// Apply the function f on the first pre-order path. If callback returns
-	// false on the result, leave the expression unchanged and try the next path
-	// until callback returns true or all paths are visited
-	// Note that this affects Boole normal form structure, if callback
-	// returns true on any path
+	/// Apply path_transform on the first pre-order path. If callback returns
+	/// false on the result, leave the expression unchanged and try the next
+	/// path until callback returns true or all paths are visited.
+	/// Note that this affects Boole normal form structure, if callback
+	/// returns true on any path
 	tref apply_only_if(const auto& path_transform, const auto& callback);
 private:
 	tref _expr;
@@ -256,28 +266,43 @@ int_t get_max_initial(const trefs& io_vars);
 template <NodeType node>
 const trefs& get_free_vars(tref n);
 
+/**
+ * @brief Partition @p fms into the connected groups of formulas linked by
+ * a shared free variable of @p vars, preserving the order of @p fms.
+ */
 template <NodeType node>
 std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
 
+/**
+ * @brief True if @p n contains an io_var (any offset form, constant
+ * positions included) or, lacking one, a `constraint`.
+ */
 template <NodeType node>
 bool has_temp_var(tref n);
 
 /**
- * @brief Report (with an error log) a Tau-formula BA constant in @p fm
- * that is not closed, i.e. still has free variables. Returns false
- * without checking further constants when one is met that has not been
- * converted yet (BA constant id 0).
+ * @brief Report (as a warning in the result) a Tau-formula BA constant in
+ * @p fm that is not closed, i.e. still has free variables. A constant not
+ * converted yet (BA constant id 0) is skipped.
+ * @return true when an open constant is found; the error of `is_closed`
+ * on failure.
  */
 template <NodeType node>
 result<bool> has_open_tau_fm_in_constant(tref fm);
 
 /**
- * @brief Report (with an error log) a temporal quantifier nested inside
- * the scope of another temporal quantifier in @p fm.
+ * @brief Whether a temporal quantifier nested inside another is invalid
+ * in @p fm: always false, since full LTL lets temporal quantifiers nest
+ * freely.
  */
 template <NodeType node>
 bool invalid_nesting_of_temp_quants(tref fm);
 
+/**
+ * @brief True when @p fm has a temporal quantifier and some part of it,
+ * past the Boolean connectives, is not in the scope of one; the report
+ * (info) names that part.
+ */
 template <NodeType node>
 result<bool> missing_temp_quants(tref fm);
 
@@ -293,6 +318,7 @@ result<bool> invalid_nesting_of_quants(tref fm);
 /**
  * @brief Report a recurrence-relation reference in @p fm carrying a
  * negative integer offset.
+ * @return true when one is found, with an info naming the reference.
  */
 template <NodeType node>
 result<bool> has_negative_offset(tref fm);
@@ -309,6 +335,11 @@ result<bool> has_negative_offset(tref fm);
 template <NodeType node>
 result<bool> has_semantic_error(tref fm);
 
+/**
+ * @brief Rewrite `G(A && G(B))` to `G(A) && G(B)`, recursively, so a
+ * parse of `G(A) && G(B)` reads back as written. Returns @p fm unchanged
+ * when there is nothing to rewrite; a null @p fm is returned as is.
+ */
 template <NodeType node>
 tref unnest_nested_always(tref fm);
 
@@ -450,22 +481,15 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 	if (!base_t::use_hooks) return get_raw(v, ch, len, r);
 	// get with hooks: set hook first if not hooked. Construct the
 	// (stateless) get_hook inside the lambda -- the stored std::function
-	// outlives this call, so capturing a local by reference would dangle
-	// (TT1-7).
+	// outlives this call, so capturing a local by reference would dangle.
 	if (!base_t::is_hooked()) base_t::set_hook(
 		[](const node& v, const tref* ch, size_t len, tref r) {
 			return get_hook<node>{}(v, ch, len, r);
 		});
-	// We only propagate the type information up.
-	// NOTE (TT1-2): an earlier guard here, `v.ba_type != 4`, claimed to stop
-	// bool-type propagation ("reserved for predicate definitions") but 4 is
-	// qint's pre-registered id, not bool's (bool is registered lazily and
-	// gets an id >= 7), and the clause was a provable no-op anyway: with
-	// v.ba_type nonzero, get_type returns it unchanged and ba_retype is the
-	// identity. It was removed rather than "fixed" because suppressing
-	// bool-child propagation would need bool_type_id here, which calls back
-	// into this get() — a circular dependency; if that intent is ever
-	// implemented it needs a lazily-cached id looked up outside this path.
+	// We only propagate the type information up: an untyped node takes
+	// the type of its first typed child. Suppressing bool-child
+	// propagation would need bool_type_id here, which calls back into
+	// this get() -- a circular dependency.
 	if (v.nt != wff && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
@@ -668,11 +692,6 @@ result<tref> tree<node>::get_ba_constant_from_source(
 	tref value = cnst_r.has_value()
 		? get_ba_constant(cnst_r.value().first, type_tree)
 		: nullptr;
-	// (A 2026-08-18 REVIEW note here blamed lazy provider init for
-	// order-dependent constant-parse failures in test packs; the real
-	// cause was the Bool-pack test harness's get() specialization
-	// ignoring the requested type — fixed in tests/test_Bool_helpers.h,
-	// 2026-08-19. Nothing is wrong at this call site.)
 	// TODO (HIGH) dropped error: ba_constants::get's report -- the LOG_ERROR line cannot abort for it.
 	if (value == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
@@ -1052,8 +1071,8 @@ tref tree<node>::untype(tref term) {
 	for (auto c : n.get_children())
 		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
 	// A ba_constant keeps its type: its data field is always a BA
-	// constants pool index (node::hashit reads the pool unconditionally
-	// since 509fbb37), and constants of different types are distinct
+	// constants pool index (node::hashit reads the pool unconditionally),
+	// and constants of different types are distinct
 	// values anyway, so there is nothing to erase -- clearing the type
 	// would only detach the node from its algebra.
 	auto retyped = n.is(tau::ba_constant) ? n.value
@@ -1082,9 +1101,6 @@ tref tree<node>::substitute(const auto& changes) const {
 	} else return this->replace(changes);
 }
 
-// (TT1-22: or_predicate/select_by_predicates and the 12
-// select_*_by_predicates member definitions deleted -- zero callers,
-// zero tests; see the note in tau_tree.h.)
 
 template<NodeType node>
 tref untype(tref term) {

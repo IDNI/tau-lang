@@ -55,8 +55,8 @@ inline env_limit<size_t> bv_defelim_max_atoms{ "TAU_BV_DEFELIM_MAX_ATOMS",
 	18, env_zero::unlimited };
 
 /// Cap on the size of the clause subsets searched for a total definition
-/// (all subsets up to this size are tried). The option
-/// `bv-defelim-max-subset`.
+/// (all subsets up to this size are tried). SIZE_MAX = unlimited (0 through
+/// the setter); the option `bv-defelim-max-subset`.
 /// Environment fallback `TAU_BV_DEFELIM_MAX_SUBSET`.
 inline env_limit<size_t> bv_defelim_max_subset{ "TAU_BV_DEFELIM_MAX_SUBSET",
 	4, env_zero::unlimited };
@@ -68,46 +68,52 @@ inline env_limit<size_t> bv_defelim_max_subset{ "TAU_BV_DEFELIM_MAX_SUBSET",
 inline env_limit<size_t> bv_defelim_max_rounds{ "TAU_BV_DEFELIM_MAX_ROUNDS",
 	256, env_zero::unlimited };
 
-// Eliminate the bitvector variables of a block of same-kind existential
-// binders that a total definition determines.
-//
-// The block is the run of `ex` binders in conjunct position hanging off
-// `root`. For a bound bitvector x, the conjuncts of a block scope that
-// mention x are flattened into clauses `D_i || x = c_i` with x-free D_i (a
-// bare equation has D_i = F; clauses with the same c merge). The smallest
-// subset whose D-conjunction is propositionally unsatisfiable is a total
-// definition: it forces x in every cell. If every pair `D_i || D_j` is valid
-// the cells are exclusive and
-//
-//     ex x (definition && psi(x))  ==  \/_i (!D_i && psi[x := c_i])
-//
-// which is T when nothing reads x. Non-exclusive cells keep the consistency
-// atoms `D_j || c_i = c_j`. Variables are taken in reverse dependency order
-// (one whose witnesses no other definition mentions first), a witness that
-// a binder inside the scope would capture declines the substitution, and a
-// variable without a total definition keeps its binder. An identity on the
-// formula.
-//
-// Why it is here: a run's closure quantifies the outputs existentially, and
-// an output defined by arithmetic and read by k guarded comparisons reaches
-// the case split and the solver as an `ex` chain nested by occurrence; the
-// case split then carries the chain into every instance (GitHub #124). The
-// substitution pass `ex_subs_based_elimination` runs inside anti-prenexing,
-// after both, and knows no conditional definitions.
-//
-// `root` is a `wff` whose child is the outermost `wff_ex` of the block; the
-// rewritten block is returned, or `root` when nothing applies.
+/// Eliminate the bitvector variables of a block of same-kind existential
+/// binders that a total definition determines.
+///
+/// The block is the run of `ex` binders in conjunct position hanging off
+/// `root`. For a bound bitvector x, the conjuncts of a block scope that
+/// mention x are flattened into clauses `D_i || x = c_i` with x-free D_i (a
+/// bare equation has D_i = F; clauses with the same c merge). The smallest
+/// subset whose D-conjunction is propositionally unsatisfiable is a total
+/// definition: it forces x in every cell. If every pair `D_i || D_j` is valid
+/// the cells are exclusive and
+///
+///     ex x (definition && psi(x))  ==  \/_i (!D_i && psi[x := c_i])
+///
+/// which is T when nothing reads x. Non-exclusive cells keep the consistency
+/// atoms `D_j || c_i = c_j`. Variables are taken in reverse dependency order
+/// (one whose witnesses no other definition mentions first), a witness that
+/// a binder inside the scope would capture declines the substitution, and a
+/// variable without a total definition keeps its binder. An identity on the
+/// formula.
+///
+/// Why it is here: a run's closure quantifies the outputs existentially, and
+/// an output defined by arithmetic and read by k guarded comparisons reaches
+/// the case split and the solver as an `ex` chain nested by occurrence; the
+/// case split then carries the chain into every instance (GitHub #124). The
+/// substitution pass `ex_subs_based_elimination` runs inside anti-prenexing,
+/// after both, and knows no conditional definitions.
+///
+/// Bounded by `bv_defelim_max_clauses`, `bv_defelim_max_atoms`,
+/// `bv_defelim_max_subset` and `bv_defelim_max_rounds`.
+///
+/// @param root A `wff` whose child is the outermost `wff_ex` of the block.
+/// @return The rewritten block, or `root` when nothing applies.
 template <NodeType node>
 tref bv_definitional_block_elimination(tref root);
 
-// As above; when no binder of the block holds a definition any more and
-// none was declined, every binder of the block goes into @p settled: as a
-// block of its own it would be returned unchanged.
+/// As above; when no binder of the block holds a definition any more and
+/// none was declined, every binder of the block goes into @p settled: as a
+/// block of its own it would be returned unchanged.
+/// @param settled Out: binders known to hold no definition; may be null.
 template <NodeType node>
 tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled);
 
-// Apply `bv_definitional_block_elimination` to every existential block of
-// `fm`, outermost first (pre-order continues into the rewritten node).
+/// Apply `bv_definitional_block_elimination` to every existential block of
+/// `fm`, outermost first (pre-order continues into the rewritten node).
+/// A binder already settled is not searched again.
+/// @return The rewritten formula, equivalent to @p fm.
 template <NodeType node>
 tref bv_eliminate_definitional_existentials(tref fm);
 

@@ -15,6 +15,7 @@
 
 namespace idni::tau_lang {
 
+/// Node type of the configured pack, the one libTAU.a pre-instantiates.
 using artifact_node_t = tau_pack::node_t;
 
 #define TAU_PACK_FN(ret, name, args) \

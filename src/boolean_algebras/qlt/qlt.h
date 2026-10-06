@@ -131,7 +131,7 @@ template <NodeType node> size_t qlt_type_id();
 // -----------------------------------------------------------------------------
 // qlt — the theory (Q, <).
 //
-// NOTE: qlt is NOT a Boolean algebra.  It is the first-order theory of the
+// qlt is NOT a Boolean algebra.  It is the first-order theory of the
 // dense linear order without endpoints over the rationals, which is
 // ω-categorical (all countable models are isomorphic) and hence admits
 // quantifier elimination.  The project supports it because of ω-categoricity,
@@ -150,80 +150,119 @@ template <NodeType node> size_t qlt_type_id();
 // Additionally we allow +inf / -inf (represented with special sentinels).
 // -----------------------------------------------------------------------------
 
+/// Whether an interval endpoint belongs to the interval.
 enum class qlt_bound : uint8_t { OPEN = 0, CLOSED = 1 };
 
-// qlt_rational: a rational number endpoint for qlt intervals.
-// Three kinds:
-//   • Specific rational: sym empty, not inf  (p/q in reduced form, q > 0)
-//   • ±infinity:         sym empty, pos_inf/neg_inf set
-//   • Named constant:    sym non-empty — an uninterpreted constant whose
-//                        position in Q is unknown.  Named constants are placed
-//                        AFTER +inf in the normalisation order (lex by name) so
-//                        the sorting/merging algorithm keeps symbolic pieces
-//                        isolated from specific-rational pieces.
+/**
+ * @brief A rational number endpoint for qlt intervals.
+ *
+ * Three kinds:
+ *   - Specific rational: sym empty, not inf  (p/q in reduced form, q > 0)
+ *   - ±infinity:         sym empty, pos_inf/neg_inf set
+ *   - Named constant:    sym non-empty — an uninterpreted constant whose
+ *                        position in Q is unknown.  Named constants are placed
+ *                        AFTER +inf in the normalisation order (lex by name) so
+ *                        the sorting/merging algorithm keeps symbolic pieces
+ *                        isolated from specific-rational pieces.
+ */
 struct qlt_rational {
+	/// Numerator and denominator of a specific rational.
 	long long p = 0, q = 1; // value = p/q, q > 0, normalised by gcd
+	/// +inf when set (and sym is empty).
 	bool pos_inf = false;
+	/// -inf when set (and sym is empty).
 	bool neg_inf = false;
+	/// Name of a named constant; empty otherwise.
 	std::string sym; // non-empty → named/uninterpreted constant
 
+	/// The rational 0.
 	qlt_rational() = default;
+	/// The rational p_/q_, normalised; q_ must not be 0.
 	qlt_rational(long long p_, long long q_) : p(p_), q(q_) { normalise(); }
 
+	/// +inf.
 	static qlt_rational make_pos_inf() { qlt_rational r; r.pos_inf = true; return r; }
+	/// -inf.
 	static qlt_rational make_neg_inf() { qlt_rational r; r.neg_inf = true; return r; }
+	/// The named constant @p name.
 	static qlt_rational make_sym(const std::string& name) {
 		qlt_rational r; r.sym = name; return r;
 	}
 
+	/// True for a named constant.
 	bool is_sym()     const { return !sym.empty(); }
+	/// True for +inf.
 	bool is_pos_inf() const { return pos_inf && sym.empty(); }
+	/// True for -inf.
 	bool is_neg_inf() const { return neg_inf && sym.empty(); }
+	/// True for a specific rational.
 	bool is_finite()  const { return !pos_inf && !neg_inf && sym.empty(); }
 
+	/// Make q positive and reduce p/q by their gcd; a named constant is left
+	/// as is.
 	void normalise();
 
+	/// Equal names for named constants, equal infinities, or equal p/q.
 	bool operator==(const qlt_rational& o) const;
+	/// Negation of operator==.
 	bool operator!=(const qlt_rational& o) const { return !(*this == o); }
 
-	// Total order for normalisation: -inf < finite < +inf < sym (lex).
-	// For symbolic endpoints this is purely a canonical order — it does NOT
-	// imply a semantic ordering relative to specific rationals.  Use
-	// `qlt_sem_cmp` (below) wherever the *semantic* order is meant; reading
-	// this one as semantic is what made `{c} & ~{c}` evaluate to `(c,+inf)`.
+	/// Total order for normalisation: -inf < finite < +inf < sym (lex).
+	/// For symbolic endpoints this is purely a canonical order — it does NOT
+	/// imply a semantic ordering relative to specific rationals.  Use
+	/// `qlt_sem_cmp` (below) wherever the *semantic* order is meant: read as
+	/// semantic, this one makes `{c} & ~{c}` evaluate to `(c,+inf)`. Finite
+	/// values compare in 128 bits, so the cross products do not overflow.
 	bool operator<(const qlt_rational& o) const;
+	/// Canonical order, see operator<.
 	bool operator<=(const qlt_rational& o) const { return !(o < *this); }
+	/// Canonical order, see operator<.
 	bool operator>(const qlt_rational& o) const  { return o < *this; }
+	/// Canonical order, see operator<.
 	bool operator>=(const qlt_rational& o) const { return !(*this < o); }
 
-	// Midpoint between two finite rationals: (p1/q1 + p2/q2) / 2
+	/// Midpoint between two finite rationals: (p1/q1 + p2/q2) / 2, computed
+	/// in 128 bits and reduced; a reduced result outside `long long` is
+	/// truncated.
 	qlt_rational midpoint(const qlt_rational& o) const;
+	/// Sum of two finite rationals, computed in `long long` (no overflow
+	/// check).
 	qlt_rational operator+(const qlt_rational& o) const;
 
+	/// The name, `+inf`, `-inf`, `p` or `p/q`.
 	std::string to_string() const;
 
-	// Parse a rational from a string: integer, p/q, +inf/-inf, or identifier.
-	// Identifiers (letter/underscore start, alnum/underscore body) are parsed as
-	// named (uninterpreted) constants.
+	/// Parse a rational from a string: integer, p/q, decimal (`0.45`, `.5`,
+	/// `5.`), +inf/inf/-inf, or identifier. Identifiers (letter/underscore
+	/// start, alnum/underscore body) are parsed as named (uninterpreted)
+	/// constants. Surrounding whitespace is ignored.
+	/// @return Whether @p s parsed; @p out is written only on success.
 	static bool parse(const std::string& s, qlt_rational& out);
 };
 
-// An endpoint of an interval: a rational with open/closed bound
+/// An endpoint of an interval: a rational with open/closed bound
 struct qlt_endpoint {
+	/// The endpoint's value.
 	qlt_rational val;
+	/// Whether the endpoint belongs to the interval.
 	qlt_bound    bound; // OPEN or CLOSED
 
+	/// The open endpoint at 0.
 	qlt_endpoint() : val(), bound(qlt_bound::OPEN) {}
+	/// The endpoint @p v with bound @p b.
 	qlt_endpoint(qlt_rational v, qlt_bound b) : val(v), bound(b) {}
 
+	/// Structural equality of value and bound.
 	bool operator==(const qlt_endpoint& o) const {
 		return val == o.val && bound == o.bound;
 	}
 };
 
-// A single interval piece
+/// A single interval piece
 struct qlt_piece {
+	/// Lower and upper endpoint.
 	qlt_endpoint lo, hi;
+	/// Structural equality of both endpoints.
 	bool operator==(const qlt_piece& o) const {
 		return lo == o.lo && hi == o.hi;
 	}
@@ -231,74 +270,117 @@ struct qlt_piece {
 
 // --- free function declarations ---
 
-// Semantic order of two endpoint values, as opposed to the canonical order of
-// `qlt_rational::operator<`.  A named constant denotes an unknown rational, so
-// only three facts about it are decidable: it is above -inf, below +inf, and
-// equal to itself.  Everything else -- a named constant against a specific
-// rational, or against a differently-named constant -- is genuinely unknown
-// and is reported as `unordered`.
+/// Semantic order of two endpoint values, as opposed to the canonical order of
+/// `qlt_rational::operator<`.  A named constant denotes an unknown rational, so
+/// only three facts about it are decidable: it is above -inf, below +inf, and
+/// equal to itself.  Everything else -- a named constant against a specific
+/// rational, or against a differently-named constant -- is genuinely unknown
+/// and is reported as `unordered`.
 std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b);
+/// True when @p x is above the lower endpoint @p lo (on it, if closed);
+/// false whenever a named constant is involved.
 bool qlt_above_lo(const qlt_endpoint& lo, const qlt_rational& x);
+/// True when @p x is below the upper endpoint @p hi (on it, if closed);
+/// false whenever a named constant is involved.
 bool qlt_below_hi(const qlt_endpoint& hi, const qlt_rational& x);
+/// True when upper endpoint @p a is semantically below @p b, or at the same
+/// value but open where @p b is closed; false when undecidable.
 bool qlt_hi_less(const qlt_endpoint& a, const qlt_endpoint& b);
-// The intersection endpoints.  `nullopt` means the two endpoints are not
-// semantically comparable (see qlt_sem_cmp), so no exact answer exists;
-// callers over-approximate rather than invent one.
+/// The intersection endpoints: the tighter lower (qlt_lo_max) or upper
+/// (qlt_hi_min) endpoint.  `nullopt` means the two endpoints are not
+/// semantically comparable (see qlt_sem_cmp), so no exact answer exists;
+/// callers over-approximate rather than invent one.
 std::optional<qlt_endpoint> qlt_lo_max(const qlt_endpoint& a, const qlt_endpoint& b);
+/// See qlt_lo_max.
 std::optional<qlt_endpoint> qlt_hi_min(const qlt_endpoint& a, const qlt_endpoint& b);
+/// The looser of two upper endpoints (for a union); @p a when undecidable.
 qlt_endpoint qlt_hi_max(const qlt_endpoint& a, const qlt_endpoint& b);
+/// True when @p p is provably empty; a piece whose emptiness is undecidable
+/// counts as non-empty (over-approximation).
 bool qlt_piece_empty(const qlt_piece& p);
+/// True when the pieces provably share a point; undecidable is false.
 bool qlt_pieces_overlap(const qlt_piece& a, const qlt_piece& b);
+/// True when @p a ends where @p b starts, at the same value, with at least
+/// one of the two touching endpoints closed.
 bool qlt_pieces_adjacent(const qlt_piece& a, const qlt_piece& b);
+/// True when the pieces overlap or are adjacent and their union is
+/// representable (both lower and both upper endpoints comparable).
 bool qlt_pieces_mergeable(const qlt_piece& a, const qlt_piece& b);
+/// Union of two mergeable pieces (see qlt_pieces_mergeable).
 qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b);
-// Intersection of two pieces; `nullopt` when the result is empty.  When the
-// endpoints are not comparable the intersection is over-approximated (see the
-// definition in qlt.cpp).
+/// Intersection of two pieces; `nullopt` when the result is empty.  When the
+/// endpoints are not comparable the intersection is over-approximated by the
+/// symbolic operand (see the definition in qlt.cpp).
 std::optional<qlt_piece> qlt_piece_intersect(const qlt_piece& a, const qlt_piece& b);
 
 // -----------------------------------------------------------------------------
 // qlt: finite normalised union of intervals
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief A qlt constant: a definable subset of Q held as a finite
+ * normalised union of interval pieces.
+ */
 struct qlt {
+	/// The interval pieces.
 	std::vector<qlt_piece> pieces; // sorted by lo, disjoint, normalised
-	// Set when `pieces` OVER-approximates the true set: an intersection
-	// whose endpoint comparison was undecidable kept a whole operand
-	// (qlt_piece_intersect), or a piece's emptiness is undecidable
-	// (qlt_piece_empty). The flag propagates through `|` and `&`, and
-	// `operator~` returns `top` for an inexact value: complementing an
-	// over-approximation exactly would UNDER-approximate, which is how
-	// `x = {c} && ~({c} & [0,1])` used to reach a wrong UNSAT. Structural
-	// equality ignores the flag (it compares the representation).
+	/// Set when `pieces` OVER-approximates the true set: an intersection
+	/// whose endpoint comparison was undecidable kept a whole operand
+	/// (qlt_piece_intersect), or a piece's emptiness is undecidable
+	/// (qlt_piece_empty). The flag propagates through `|` and `&`, and
+	/// `operator~` returns `top` for an inexact value: complementing an
+	/// over-approximation exactly would UNDER-approximate, so that
+	/// `x = {c} && ~({c} & [0,1])` would reach a wrong UNSAT. Structural
+	/// equality ignores the flag (it compares the representation).
 	bool inexact = false;
 
+	/// The empty set.
 	static qlt bottom() { return {}; }
+	/// All of Q, the single piece (-inf, +inf).
 	static qlt top();
 
+	/// True when there is no piece.
 	bool is_empty() const { return pieces.empty(); }
-	// NOTE: structural, so it can under-report.  With symbolic endpoints
-	// `normalise` cannot always merge (the union of two pieces whose relative
-	// order is unknown is not representable), so a value covering all of Q may
-	// still be held as several pieces.  For the same reason `==` and hence
-	// associativity of `|` are structural, not semantic, once named constants
-	// are involved.
+	/// True when the value is the single piece (-inf, +inf).
+	///
+	/// Structural, so it can under-report.  With symbolic endpoints
+	/// `normalise` cannot always merge (the union of two pieces whose relative
+	/// order is unknown is not representable), so a value covering all of Q may
+	/// still be held as several pieces.  For the same reason `==` and hence
+	/// associativity of `|` are structural, not semantic, once named constants
+	/// are involved.
 	bool is_full() const;
 
+	/// Structural equality of the pieces; ignores `inexact`.
 	bool operator==(const qlt& o) const { return pieces == o.pieces; }
+	/// Negation of operator==.
 	bool operator!=(const qlt& o) const { return !(*this == o); }
+	/// Against `true`: is_full(); against `false`: is_empty().
 	bool operator==(bool b) const { return b ? is_full() : is_empty(); }
+	/// Negation of operator==(bool).
 	bool operator!=(bool b) const { return !(*this == b); }
+	/// Canonical order: by piece count, then piece by piece in the canonical
+	/// endpoint order; ignores `inexact`.
 	bool operator<(const qlt& o) const;
+	/// Three-way form of operator== and operator<.
 	std::strong_ordering operator<=>(const qlt& o) const;
 
+	/// Union, normalised; inexact if either operand is.
 	qlt operator|(const qlt& o) const;
+	/// Pairwise intersection of the pieces, normalised; inexact if either
+	/// operand is or an intersection had to be over-approximated.
 	qlt operator&(const qlt& o) const;
+	/// Complement. `top` for an inexact value; an inexact `top` when the
+	/// pieces cannot be placed in the order of Q (qlt_pieces_unordered).
 	qlt operator~() const;
+	/// Symmetric difference, `(a | b) & ~(a & b)`.
 	qlt operator^(const qlt& o) const;
+	/// `bot`, `top`, or the pieces joined by ` | ` (a closed singleton as its
+	/// value alone).
 	std::string to_string() const;
 
 private:
+	/// Drop the empty pieces, sort, and merge what is mergeable.
 	static qlt normalise(std::vector<qlt_piece> ps);
 };
 
@@ -313,27 +395,44 @@ bool qlt_piece_emptiness_undecidable(const qlt_piece& p);
 bool qlt_pieces_unordered(const qlt& q);
 
 // --- stream output ---
+/// Print `q.to_string()` to @p os.
 std::ostream& operator<<(std::ostream& os, const qlt& q);
 
 // --- parsing helpers (called from templates in qlt.tmpl.h) ---
+/// The single-piece value of an `interval` parse node, or `nullopt` when it
+/// lacks a bracket or two endpoints, an endpoint does not parse, or the
+/// (non-symbolic) interval is empty.
 std::optional<qlt> qlt_eval_interval(
 	const qlt_parser::tree::traverser& interval_node);
+/// The value of a `qlt` parse node: top, bot, a singleton, an interval or a
+/// union. No value, without an error, when a singleton or an interval does
+/// not evaluate; an internal error for an unknown node.
 result<qlt> qlt_eval_parse_tree(
 	const qlt_parser::tree::traverser& t);
 
 // --- free functions expected by the dispatcher ---
 
+/// True when @p x is the empty set.
 bool is_qlt_zero(const qlt& x);
+/// True when @p x is structurally all of Q (see qlt::is_full).
 bool is_qlt_one(const qlt& x);
+/// Identity: a qlt value is kept normalised by construction.
 qlt normalize_qlt(const qlt& x);
+/// Identity: qlt has no symbol simplification.
 tref simplify_qlt_symbol(tref sym);
+/// Identity: qlt has no term simplification.
 tref simplify_qlt_term(tref t);
+/// Return a non-empty part of the first piece of @p x: (-1, 0) for all of
+/// Q, the lower half (by midpoint, or one unit wide toward an infinite
+/// side) otherwise; bottom for bottom.
+///
 /// BA1-5 contract note: unlike sbf_splitter (which honors every
 /// splitter_type and always makes progress), this splitter ignores @p st
 /// and MAY RETURN @p x UNCHANGED when the element is atomic/degenerate
 /// (e.g. a singleton piece). Callers looping "split until proper subset"
 /// must guard against a fixpoint.
 qlt qlt_splitter(const qlt& x, splitter_type st);
+/// A fixed element that is neither bottom nor top: (0, 1).
 qlt qlt_splitter_one();
 
 /// Content hashes in uint64_t, the same on every platform.
@@ -346,6 +445,7 @@ inline std::uint64_t qlt_rational_hash(const qlt_rational& r) {
 	return h;
 }
 
+/// Content hash of the pieces (endpoints and bounds); ignores `inexact`.
 inline std::uint64_t qlt_hash(const qlt& q) {
 	std::uint64_t h = 0;
 	for (auto& p : q.pieces) {
@@ -359,7 +459,7 @@ inline std::uint64_t qlt_hash(const qlt& q) {
 
 } // namespace idni::tau_lang
 
-// Hash specialization for qlt_rational
+/// Hash specialization for qlt_rational
 template<>
 struct std::hash<idni::tau_lang::qlt_rational> {
 	size_t operator()(const idni::tau_lang::qlt_rational& r) const noexcept {
@@ -367,7 +467,7 @@ struct std::hash<idni::tau_lang::qlt_rational> {
 	}
 };
 
-// Hash specialization for qlt
+/// Hash specialization for qlt
 template<>
 struct std::hash<idni::tau_lang::qlt> {
 	size_t operator()(const idni::tau_lang::qlt& q) const noexcept {

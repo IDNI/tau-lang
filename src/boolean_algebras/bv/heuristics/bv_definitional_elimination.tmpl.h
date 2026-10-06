@@ -16,6 +16,8 @@ namespace bv_defelim_detail {
 // atoms; the shift below would overflow past it.
 inline constexpr size_t hard_atom_cap = 30;
 
+// The effective caps: the option values, the atom cap clamped to
+// hard_atom_cap.
 inline size_t clause_cap() { return bv_defelim_max_clauses; }
 inline size_t atom_cap() {
 	return std::min<size_t>(bv_defelim_max_atoms, hard_atom_cap);
