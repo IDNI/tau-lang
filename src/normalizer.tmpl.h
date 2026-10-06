@@ -521,6 +521,32 @@ tref eliminate_functional_quantifiers(tref fm) {
 	return post_order<node>(fm).apply_unique(f);
 }
 
+// fm decided by the owner of its type when it has no variable, stream,
+// reference or temporal operator and its constants are all of one type
+// (pack_decide_ground); fm itself otherwise.
+template <NodeType node>
+tref decide_ground_formula(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.equals_T() || t.equals_F()) return fm;
+	if (t.find_top([](tref n) {
+		const auto& m = tau::get(n);
+		return m.is(tau::variable) || m.is(tau::capture)
+			|| m.is(tau::io_var) || m.is(tau::ref)
+			|| is_temporal_quantifier<node>(n);
+	})) return fm;
+	std::optional<size_t> type;
+	for (tref k : t.select_all(is<node, tau::ba_constant>)) {
+		const size_t ty = tau::get(k).get_ba_type();
+		if (type && *type != ty) return fm;
+		type = ty;
+	}
+	if (!type) return fm;
+	auto v = pack_decide_ground<node>(*type, fm);
+	if (!v) return fm;
+	return *v ? tau::_T() : tau::_F();
+}
+
 // Assumes that the formula passed does not have temporal quantifiers
 // This normalization will not perform the temporal normalization
 /** @internal @copydoc normalize_non_temp @endinternal */
@@ -584,6 +610,7 @@ result<tref> normalize_non_temp(tref fm) {
 	// "a term containing a bf_ref still normalizes"
 	// (test_integration-normalizer_helpers.cpp).
 	result = fold_trivial_quantifiers<node>(result);
+	result = decide_ground_formula<node>(result);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -1832,7 +1859,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	// If after normalization no temporal quantifier is present, the formula
 	// is non-temporal
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>)) {
-		return r.with_assert_check_value(fm);
+		return r.with_assert_check_value(decide_ground_formula<node>(fm));
 	}
 	// A full-LTL or CTL* operator is left untouched above, so a negation
 	// over it is still in place and the temporal layer is not in DNF:

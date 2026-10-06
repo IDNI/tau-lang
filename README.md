@@ -2329,9 +2329,10 @@ only when it has the same truth wherever the names lie among the other
 endpoints, so `{c}:qlt = {c}:qlt` is `T` and `ex x (x = {c}:qlt)` is `T`, while
 `{c}:qlt != {0}:qlt` and `({c}:qlt & {0}:qlt) = 0` stay as they are (c may be
 0).  An operation whose result would depend on where a name lies is kept as a
-term instead of being folded into one constant.  This is decided atom by atom,
-so a Boolean combination of such atoms that holds wherever the names lie
-(`{c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt`) still stays as it is.
+term instead of being folded into one constant.  A formula made of such
+comparisons alone is decided whole, by the same rule:
+`{c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt` is `T`, while `{c}:qlt < {d}:qlt`
+stays.
 
 An order atom against a constant reads every point of it: `x < c` holds when
 `x` is below every point of `c` (below `inf c`, or at it when `c` does not
@@ -3960,14 +3961,6 @@ This is a short list of known issues that will be fixed in a subsequent release:
     verdicts are not reliable.
   * **Algorithm A** is intentionally restricted to pure-output formulas. If
     input variables are present, the dispatcher uses Algorithm B.
-* `qlt`:
-  * Algorithms A and B read an equality between a stream and an interval
-    constant (`o1[t] = {[0,1]}:qlt`) as membership of the point in the
-    interval, whereas everywhere else it holds only when the constant is that
-    single point.
-  * Ground formulas over named endpoints are decided atom by atom (see the
-    `qlt` section), so a combination that holds for every position of the
-    names can stay undecided.
 
 
 # **Future work**

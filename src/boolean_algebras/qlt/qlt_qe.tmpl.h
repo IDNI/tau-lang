@@ -898,6 +898,29 @@ static std::optional<bool> qlt_named_ground_truth(size_t op, tref lhs,
 	return verdict;
 }
 
+// The truth of a formula without variables, when it is the same for every
+// position of its named endpoints among the finite endpoints; nullopt
+// otherwise, or past the cell bounds.
+template<NodeType node>
+static std::optional<bool> qlt_ground_truth(tref fm) {
+	using eval = qlt_point_eval<node>;
+	const auto names = eval::names_of(fm);
+	if (qlt_cells_too_many(names.size())) return std::nullopt;
+	auto ends = eval::ends_of(fm, true);
+	if (!ends) return std::nullopt;
+	eval ev(std::move(*ends));
+	std::optional<bool> verdict;
+	bool decided = true;
+	ev.each_naming(names, 0, [&] {
+		auto v = ev.holds(fm);
+		if (!v || (verdict && *verdict != *v)) return decided = false;
+		verdict = v;
+		return true;
+	});
+	if (!decided || ev.exhausted()) return std::nullopt;
+	return verdict;
+}
+
 // True when body is a conjunction of disequations `var != t` with t free of
 // var. Such a body excludes finitely many points from infinitely many, so
 // `ex var body` holds.

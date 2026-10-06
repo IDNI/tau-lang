@@ -253,6 +253,16 @@ concept ba_has_closed_decision = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::decide_closed(f) }
 			-> std::convertible_to<std::optional<bool>>; };
 
+// decide_ground decides a formula without variables, streams or temporal
+// operators whose constants are all of the type, which normalization leaves
+// standing when the type cannot decide its comparisons one at a time: true
+// when it holds, false when not, nullopt when undecided.
+template <typename Node, typename BA>
+concept ba_has_ground_decision = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::decide_ground(f) }
+			-> std::convertible_to<std::optional<bool>>; };
+
 // The type's values, read by = and the order comparisons, form a dense
 // linear order without endpoints; dense_order_compare orders two constants
 // (-1, 0, 1), nullopt when either is not a point of the order, and

@@ -441,6 +441,14 @@ add_repl_test(normalize_cmd-qlt_named_and_finite_kept
 	"normalize ex x:qlt (x < {c}:qlt && x > {0}:qlt)" "%1[^%]*: ex ")
 add_repl_test(normalize_cmd-qlt_named_residual
 	"normalize ex x:qlt (x > y:qlt && x < {c}:qlt)" "%1[^%]*: y\\{ \\(-inf, c\\) \\}:qlt != 0")
+# A formula of such comparisons alone is decided whole: it holds when it holds
+# wherever the names lie.
+add_repl_test(normalize_cmd-qlt_named_ground_either
+	"normalize {c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt" "%1[^%]*: T")
+add_repl_test(normalize_cmd-qlt_named_ground_both
+	"normalize {c}:qlt < {d}:qlt && {d}:qlt < {c}:qlt" "%1[^%]*: F")
+add_repl_test(normalize_cmd-qlt_named_ground_kept
+	"normalize {c}:qlt < {d}:qlt" "%1[^%]*: [^TF]" FAIL_REGEX "%1[^%]*: [TF]\n")
 
 # The cell decisions keep their binder past qlt-cells-max-params parameters.
 add_repl_test(normalize_cmd-qlt_cells_max_params_zero_is_unlimited

@@ -618,6 +618,22 @@ std::optional<bool> pack_decide_closed(size_t ba_type, tref form) {
 }
 
 /**
+ * @brief The truth of the formula @p form without variables, streams or
+ * temporal operators, all of whose constants are of @p ba_type, decided by
+ * the BA owning the type; nullopt when undecided or when the owner does not
+ * decide such formulas (see ba_has_ground_decision).
+ */
+template <typename Node>
+std::optional<bool> pack_decide_ground(size_t ba_type, tref form) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_ground_decision<Node, BA>)
+				return ba_descriptor<BA, Node>::decide_ground(form);
+			return std::nullopt;
+		});
+}
+
+/**
  * @brief The integer the constant @p c of @p ba_type holds, when the type is
  * read with modular semantics (see pack_modular_width); nullopt otherwise.
  */

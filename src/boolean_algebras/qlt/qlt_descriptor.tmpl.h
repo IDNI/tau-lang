@@ -35,6 +35,9 @@ template <NodeType node>
 static tref qlt_point_meets(tref body);
 
 template <NodeType node>
+static std::optional<bool> qlt_ground_truth(tref fm);
+
+template <NodeType node>
 static result<std::optional<solution<node>>>
 	qlt_omcat_solve_inequality_system(const inequality_system<node>& sys,
 		const solver_options& options);
@@ -300,6 +303,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 */
 	static std::optional<bool> omcat_qe(tref var, tref body) {
 		return qlt_omcat_qe<node_t>(var, body);
+	}
+
+	/**
+	 * @brief Decide a formula over qlt constants alone whose comparisons the
+	 * hooks leave standing, which happens when a constant has a named
+	 * endpoint: the formula holds when it holds wherever the names lie.
+	 */
+	static std::optional<bool> decide_ground(tref form) {
+		return qlt_ground_truth<node_t>(form);
 	}
 
 	/**

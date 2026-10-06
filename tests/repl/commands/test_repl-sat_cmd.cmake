@@ -223,3 +223,7 @@ if(TEST "test_repl-sat_cmd-bv_budget_asked_twice")
 	set_tests_properties("test_repl-sat_cmd-bv_budget_asked_twice" PROPERTIES
 		PASS_REGULAR_EXPRESSION "passed its time budget.*passed its time budget")
 endif()
+
+# A ground qlt formula over named endpoints that holds wherever they lie.
+add_repl_test(sat_cmd-qlt_named_ground_tautology
+	"sat {c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt" "%1[^%]*: T")
