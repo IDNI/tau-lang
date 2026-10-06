@@ -845,10 +845,9 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, co
  * @param time_point Time step at which unrolling starts.
  * @return A result carrying the pair `(phi, steps)`: `phi` is the
  * formula at the fixpoint and `steps` is the number of steps taken to
- * reach it. When the time budget runs out first (`time_budget_exhausted`),
- * the value is `(nullptr, steps)`. A failed result means the step cap
- * `max_fixpoint_steps` was hit before a fixpoint was reached, or a step
- * could not be built.
+ * reach it. A failed result means the time budget ran out
+ * (`time_budget_exhausted`) or the step cap `max_fixpoint_steps` was hit
+ * before a fixpoint was reached, or a step could not be built.
  * @endinternal
  *
  * @par Example
@@ -912,7 +911,9 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 		// a solver question left without an answer ends the search: no
 		// step after it gives a result to trust
 		if (!time_budget_exhausted().empty())
-			return r.with_value(std::pair<tref, int_t>{ nullptr, step_num });
+			return r.with_error(code::solver_error,
+				"the search stopped once a solver question went "
+				"unanswered");
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi

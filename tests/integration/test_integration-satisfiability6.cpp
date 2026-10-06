@@ -1198,6 +1198,19 @@ TEST_SUITE("satisfiability argument guards and limits") {
 		CHECK( !tau::get(plain.value().first).equals_F() );
 	}
 
+	// With a lookback of two the search takes a second step, where it
+	// finds the time budget spent: an error, as in find_fixpoint_chi.
+	TEST_CASE("find_fixpoint_phi stops with an error once a time budget ran out") {
+		tref fm = spec_always_body("always o1[t] = o1[t-2].");
+		trefs io_vars = io_vars_of(fm);
+		std::set<std::pair<std::string, int_t>> initials;
+		time_budget_handled scope;
+		note_time_budget_exhausted("test budget");
+		auto res = find_fixpoint_phi<node_t>(fm, tau::_T(), io_vars,
+			initials, 2);
+		CHECK( rejected_with(res, code::solver_error) );
+	}
+
 	TEST_CASE("print_fixpoint_info writes to stderr in debug output mode") {
 		std::stringstream captured;
 		auto* old = std::cerr.rdbuf(captured.rdbuf());
