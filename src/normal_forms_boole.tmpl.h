@@ -11,8 +11,11 @@ namespace idni::tau_lang {
  * Assumes that the decomposition is valid.
  * @tparam node Tree node type
  * @param term The term on which to apply Boole decomposition step
- * @param var The variable on which to do Boole decomposition
- * @return The resulting term
+ * @param var The variable on which to do Boole decomposition (a `variable`
+ * node, not yet wrapped in `bf`)
+ * @return `var p1 | var' p2` for the cofactors p1 = term[var:=1] and
+ * p2 = term[var:=0]; the shared cofactor when both are equal; @p term itself
+ * when it holds a non-Boolean subterm
  */
 template<NodeType node>
 tref term_boole_decomposition(tref term, tref var) {
@@ -41,6 +44,8 @@ tref term_boole_decomposition(tref term, tref var) {
 /// (hash-consed) term already decomposed on vars[idx..] to its result.
 using boole_memo_t = std::vector<std::unordered_map<tref, tref>>;
 
+/// Memoized recursion of rec_term_boole_decomposition; @p memo needs one
+/// entry per variable plus one.
 template<NodeType node>
 result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs, boole_memo_t& memo);
@@ -53,9 +58,13 @@ result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const si
  * Assumes that the decomposition is valid for all provided variables.
  * @tparam node Tree node type
  * @param term Term on which to do Boole decomposition
- * @param vars The variables to do Boole decomposition on
+ * @param vars The variables (or `bf_ref` function symbols) to do Boole
+ * decomposition on
  * @param idx The current variable index
- * @return The resulting Boole decomposition
+ * @param free_funcs `false` to normalize each leaf with normalize_ba and then
+ * decompose it on its `bf_ref` function symbols; `true` when @p vars already
+ * are those symbols
+ * @return The resulting Boole decomposition, or the error of normalize_ba
  */
 template<NodeType node>
 result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
@@ -64,6 +73,9 @@ result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const si
 	return rec_term_boole_decomposition<node>(term, vars, idx, free_funcs, memo);
 }
 
+// One unmemoized level of rec_term_boole_decomposition: splits @p term on
+// vars[idx] and recurses on both cofactors; at idx == vars.size() it
+// normalizes the leaf (unless free_funcs). Errors come from normalize_ba.
 template<NodeType node>
 result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, const size_t idx,
 	const bool free_funcs, boole_memo_t& memo) {
@@ -96,8 +108,8 @@ result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, con
 	// Ensure early detection of F
 	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
 	// free_funcs has to be forwarded: without it every leaf of the recursion
-	// re-entered the !free_funcs block above -- another normalize_ba, another
-	// select_top(bf_ref) and another nested decomposition -- and terminated
+	// re-enters the !free_funcs block above -- another normalize_ba, another
+	// select_top(bf_ref) and another nested decomposition -- and terminates
 	// only because substituting a top-level bf_ref also removes the nested
 	// ones, i.e. on an invariant nothing states.
 	if (tau::get(p1) == tau::get(p2)) {
@@ -146,9 +158,14 @@ result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const si
 /**
  * @brief Convert term to Boole normal form. Also treats normalization of
  * encountered tau constants.
+ *
+ * A term holding a non-Boolean subterm is only simplified by the pack's
+ * `simplify_term` and normalize_ba, or returned unchanged when that does not
+ * remove the non-Boolean part. Cached per term under `TAU_CACHE`.
  * @tparam node Tree node type
  * @param term The term to do the Boole decomposition on
- * @return The resulting Boole decomposition
+ * @return The resulting Boole decomposition, or the error of simplify_term or
+ * normalize_ba
  */
 template<NodeType node>
 result<tref> term_boole_decomposition(tref term) {
@@ -240,20 +257,25 @@ result<tref> term_boole_decomposition(tref term) {
  * Assumes that the decomposition is valid for all provided variables.
  * @tparam node Tree node type
  * @param formula The formula to do Boole decomposition on
- * @param vars The variable to perform the Boole decomposition on
+ * @param vars The atomic formulas (BDD variables, see is_atomic_bdd_var) to
+ * perform the Boole decomposition on, in decomposition order
  * @param idx The current variable index
+ * @param memo Per-level memo, one entry per atom plus one
  * @return The resulting Boole decomposition
  */
 template<NodeType node>
 tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
 	boole_memo_t& memo);
 
+/// rec_boole_decomposition with a fresh memo.
 template<NodeType node>
 tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx) {
 	boole_memo_t memo(vars.size() + 1);
 	return rec_boole_decomposition<node>(formula, vars, idx, memo);
 }
 
+// One unmemoized level of rec_boole_decomposition: splits @p formula on the
+// atom vars[idx] (replaced by T and F) and recurses on both cofactors.
 template<NodeType node>
 tref rec_boole_decomposition_step(tref formula, const trefs& vars, const size_t idx,
 	boole_memo_t& memo) {
@@ -263,9 +285,9 @@ tref rec_boole_decomposition_step(tref formula, const trefs& vars, const size_t 
 		DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
 		return formula;
 	}
-	// Same three atom kinds as boole_normal_form's is_atomic: decomposing on
-	// an order atom treats it as an opaque Boolean variable, which is sound
-	// and is what Release has always done here (the assert is DBG-only).
+	// Same atom kinds as boole_normal_form's is_atomic_bdd_var: decomposing
+	// on an order atom treats it as an opaque Boolean variable, which is
+	// sound.
 	DBG(assert(is_atomic_bdd_var<node>(vars[idx]));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
 	// Ensure early detection of F
@@ -308,13 +330,7 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
 	return r;
 }
 
-/**
- * This procedure converts the formula to Boole normal form. It also converts all
- * terms to Boole normal form.
- * @tparam node Tree node type
- * @param bnf The formula to convert to Boole normal form
- * @return The resulting Boole normal form
- */
+/** @internal @copydoc boole_normal_form @endinternal */
 template<NodeType node>
 result<tref> boole_normal_form(tref formula) {
 	using tau = tree<node>;
@@ -338,10 +354,8 @@ result<tref> boole_normal_form(tref formula) {
 	TAU_TRY(tref bnf, syntactic_formula_simplification<node>(formula));
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Squeeze and absorb for additional simplifications during term
-	// normalization. NF-16: kept deliberately -- an older note warned of
-	// major blow-ups here, but the current gates (510 tests incl. the
-	// anti-prenex block work) pass with it unconditional; if a blow-up
-	// reappears, this call is the first suspect.
+	// normalization. If a blow-up appears in Boole normal form, this call
+	// is the first suspect.
 	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [&r](tref n) {
@@ -402,6 +416,7 @@ result<tref> boole_normal_form(tref formula) {
 	return r.with_value(eq_bnf);
 }
 
+/** @internal @copydoc term_boole_normal_form @endinternal */
 template<NodeType node>
 result<tref> term_boole_normal_form(tref formula) {
 	using tau = tree<node>;
@@ -458,15 +473,7 @@ result<tref> term_boole_normal_form(tref formula) {
 	return r.with_value(tbnf);
 }
 
-/**
- * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
- * statements and ensures that formulas containing temporal variables are
- * explicitly quantified while non-temporal formulas are not quantified temporally.
- * @tparam node Tree node type
- * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
- * @param fm The formula that is to be temporally normalized
- * @return The resulting formula after normalizing the temporal quantifiers
- */
+/** @internal @copydoc normalize_temporal_quantifiers @endinternal */
 template <NodeType node, bool normalize_scopes>
 result<tref> normalize_temporal_quantifiers(tref fm) {
 	using tau = tree<node>;
@@ -489,7 +496,7 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 	// Full LTL / CTL* operators manage their own temporal scope; do not
 	// wrap them in wff_always — pass through unchanged. wff_sometimes is
 	// NOT here: like wff_always, it is decided by the safety pipeline and
-	// goes through the always/sometimes machinery below. NF-6: A/E and
+	// goes through the always/sometimes machinery below. A/E and
 	// wff_semantic_neg belong here too (kept in sync with
 	// is_temporal_quantifier) — without them a formula whose only
 	// branching-time ops are A/E would fall into the always/sometimes
@@ -572,9 +579,7 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 #define LOG_CHANNEL_NAME "normal_forms" // NF-14: "to_snf" was a stale channel name
 
 
-// (NF-7: build_split_wff_using deleted -- zero callers.)
-
-
+/** @internal @copydoc anf @endinternal */
 template <NodeType node, size_t type>
 result<tref> anf(tref) {
 	// ANF (Algebraic Normal Form / Zhegalkin polynomial):
@@ -587,6 +592,7 @@ result<tref> anf(tref) {
 		"use 'dnf' or 'cnf' as an alternative");
 }
 
+/** @internal @copydoc pnf @endinternal */
 template <NodeType node>
 result<tref> pnf(tref) {
 	// PNF (Prenex Normal Form): pull all quantifiers (all/ex) to the

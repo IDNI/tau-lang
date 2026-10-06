@@ -27,8 +27,13 @@
 
 namespace idni::tau_lang::omcat {
 
-// Parse a rational-literal source string like "1/4", "-3/7", "0.25" into
-// a rational.  Anything that is not an exact rational literal is an error.
+/**
+ * @brief Parses a rational literal ("1/4", "-3/7", "0.25" or an integer).
+ * @param src The literal's source text.
+ * @return The exact rational, or an `invalid_argument` error when @p src is
+ * not a literal of those forms, has a zero denominator, has more than 18
+ * fractional digits, or does not fit `long long`.
+ */
 inline result<rational> parse_rat_literal(const std::string& src) {
 	result<rational> r;
 	// Try "p/q" first.
@@ -55,7 +60,7 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 			std::string ipart = src.substr(0, dot);
 			std::string fpart = src.substr(dot + 1);
 			// 10^k must stay within long long: 19 or more fractional
-			// digits used to overflow `denom` silently (signed overflow,
+			// digits would overflow `denom` silently (signed overflow,
 			// no exception) and yield a garbage rational.
 			if (fpart.size() > 18)
 				return r.with_error(code::invalid_argument,
@@ -111,8 +116,16 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 	}
 }
 
-// Walk the formula AST and gather every qlt-constant literal we find,
-// returned sorted and deduplicated.
+/**
+ * @brief Collects the finite rational endpoints of every qlt constant in a
+ * formula.
+ *
+ * A compiled qlt constant contributes the finite endpoints of its pieces; one
+ * that still carries only its source text is read with parse_rat_literal.
+ * @param fm The formula; may be null.
+ * @return The rationals sorted ascending and deduplicated (empty for a null
+ * @p fm), or the error of a source literal that does not parse.
+ */
 template <NodeType node>
 inline result<std::vector<rational>> collect_qlt_constants(tref fm) {
 	using tau = tree<node>;

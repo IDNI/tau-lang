@@ -45,9 +45,9 @@ enum MemorySlotPost {
 };
 
 /**
- * @brief Convert `!=` (bf_neq) atoms to negated equalities `!(= 0)`.
+ * @brief Convert `!=` (bf_neq) atoms to negated equalities.
  *
- * Rewrites every sub-formula of the form `$X != 0` into `!($X = 0)`.
+ * Rewrites every sub-formula of the form `$X != $Y` into `!($X = $Y)`.
  * @tparam node Tree node type.
  * @param fm The formula to transform.
  * @return Transformed formula with all `bf_neq` replaced by negated `bf_eq`.
@@ -79,7 +79,8 @@ tref order_atoms_to_literals(tref fm);
  * by introducing an XOR term.
  * @tparam node Tree node type.
  * @param eq The equation (wrapped in wff) to normalize.
- * @return Normalized equation with zero right-hand side.
+ * @return Normalized equation with zero right-hand side, or @p eq unchanged
+ * when it is not a `bf_eq`/`bf_neq` wff.
  */
 template <NodeType node>
 tref norm_equation(tref eq);
@@ -101,8 +102,8 @@ tref norm_all_equations(tref fm);
 /**
  * @brief Expand one XOR node `A ^ B` into `A B' | A' B`.
  * @tparam node Tree node type.
- * @param fm The node to transform.
- * @return The expansion, or `fm` unchanged when it is not an XOR.
+ * @param fm The node to transform: a `bf` whose child is `bf_xor`.
+ * @return The expansion, or `fm` unchanged when it has no `bf_xor` child.
  */
 template <NodeType node>
 tref apply_xor_def(tref fm);
@@ -110,8 +111,8 @@ tref apply_xor_def(tref fm);
 /**
  * @brief Expand one XOR node `A ^ B` into `(A | B) & (A' | B')`.
  * @tparam node Tree node type.
- * @param fm The node to transform.
- * @return The expansion, or `fm` unchanged when it is not an XOR.
+ * @param fm The node to transform: a `bf` whose child is `bf_xor`.
+ * @return The expansion, or `fm` unchanged when it has no `bf_xor` child.
  */
 template <NodeType node>
 tref apply_xor_def_cnf(tref fm);
@@ -131,8 +132,8 @@ tref apply_all_xor_def(tref fm);
 /**
  * @brief Push all negations to the literal level (NNF pre-step for DNF).
  *
- * Applies `push_negation_one_in` via `pre_order` until no negation remains
- * above a non-literal node. Operates on wff or bf depending on `is_wff`.
+ * Applies `push_negation_one_in` in one `pre_order` pass, cached in slot
+ * `push_negation_in_m`. Operates on wff or bf depending on `is_wff`.
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to transform.
@@ -148,9 +149,8 @@ tref push_negation_in(tref fm);
  * `syntactic_path_simplification` (path contradiction/tautology removal) in
  * sequence.
  *
- * @note This pass takes no `skip` predicate, and deliberately so: it used to
- * accept one for interface consistency with `anti_prenex_block`'s other steps
- * and then discard it, which read as a guarantee it never gave. Neither
+ * @note This pass takes no `skip` predicate, unlike `anti_prenex_block`'s
+ * other steps. Neither
  * `simplify_using_equality` nor `syntactic_path_simplification` has a
  * BV-specific check to guard, so a caller that skips bitvector content
  * elsewhere in the pipeline must not assume this step leaves it alone --
@@ -158,18 +158,20 @@ tref push_negation_in(tref fm);
  * comparison atoms.
  * @tparam node Tree node type.
  * @param formula Formula to simplify.
- * @return Simplified formula.
+ * @return Simplified formula, or the error of `simplify_using_equality`.
  */
 template <NodeType node>
 result<tref> syntactic_formula_simplification(tref formula);
 
 // Forward declarations needed by .tmpl.h bodies.
 // Full declarations/definitions come from their respective heuristic headers.
+/// @cond FORWARD_DECL
 template <NodeType node>
 result<tref> simplify_using_equality(tref fm);
 
 template <NodeType node>
 tref syntactic_path_simplification(tref fm);
+/// @endcond
 
 #include "normal_forms_transformations.tmpl.h"
 

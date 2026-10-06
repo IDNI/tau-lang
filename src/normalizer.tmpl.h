@@ -137,27 +137,27 @@ tref scope_out_independent_conjuncts(tref fm) {
  * @brief Push/eliminate all quantifiers in `form`, resolving arithmetic
  * content along the way.
  *
- * Sequence: resolve any closed arithmetic (sub-)formula through the owning
- * BA's solver first (pushing a preprocessed formula's quantifiers through
- * Boolean normalization before it is closed is exponential, while the solver
- * decides the closed formula directly); push/eliminate the rest via
- * `anti_prenex_block` (which, for a block containing arithmetic-typed
- * variables, attempts the BA's preprocessing on the isolated clause itself);
- * resolve again; then, since preprocessing can leave genuinely unsupported
- * arithmetic (e.g. multiplication/division by a non-constant) behind, collect
- * that residue and run `anti_prenex_block` once more skipping exactly it, so
- * any quantifier not touching surviving arithmetic still gets pushed/resolved;
- * a final resolve pass collapses whatever closed (sub-)formula that step
- * produces.
+ * Sequence: the pack's definitional-existential elimination and case split
+ * (both identities on the formula's meaning);
+ * `scope_out_independent_conjuncts`; `resolve_quantifiers`, which hands a
+ * closed arithmetic (sub-)formula to the owning BA's solver; `anti_prenex`
+ * guided by an eliminability analysis that treats arithmetic as solver-owned,
+ * and a resolve pass; a second analysis, which lets Boole decomposition take
+ * arithmetic scopes when a foreign BA constant means no solver can own them,
+ * with another `anti_prenex` and resolve pass. With an arithmetic theory in
+ * the pack, an optional whole-formula preprocessing attempt follows
+ * (`preprocess_placement == per_formula`), and a closed solvable result
+ * collapses to `T`/`F` on a definite solver answer.
  * @tparam node Tree node type.
  * @param form Formula to process.
- * @return Formula with quantifiers pushed/eliminated as far as possible.
+ * @return Formula with quantifiers pushed/eliminated as far as possible, or
+ * the error of a failing resolve, anti-prenex or preprocessing step.
  *
  * @par Example
  * @code{.cpp}
  * // ex x (x|y = 0): x is eliminated entirely, leaving just y = 0
  * tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
- * tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
+ * tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
  * // tau::get(res).to_str() == "y = 0"
  * CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
  * @endcode
@@ -209,26 +209,14 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	// Recomputed before each pass: the set is keyed on tref nodes of the
 	// tree being scanned, and `form` is rebuilt in between.
 	//
-	// The two passes are NOT collapsible into one, measured 2026-08-04. The
-	// redesign plan's Task 9 proposed replacing them with a single call, on
-	// the reading that the second pass's skip subsumes the first's and that
-	// the per-block eliminability analysis has made the staging redundant.
-	// Both single-pass variants fail `test_integration-interpreter`'s
-	// "nested conditionals over mixed tau/bv streams stay sat" -- the issue
-	// #70 regression test -- in both configurations: keeping the second
-	// pass's conditional bv skip reports "Tau specification is unsat", and
-	// keeping the first pass's unconditional one SIGSEGVs. What the second
-	// pass depends on is not the first pass's *verdicts* but its having
-	// already run: it works on a formula whose non-bv structure is resolved.
-	//
-	// The analysis cannot substitute for that today, and the plan's premise
-	// that it could does not hold as built: `blasteable` is consumed only
-	// inside `eliminate_block_over_clause`, whereas the decisions that
-	// matter here -- which quantifiers `collect_quantifier_block` treats as
-	// transparent, and what `blast_block` hands to the solver -- still read
-	// only the boolean `el.skip(n)`, not the verdict behind it. Collapsing
-	// needs those rewired to the verdicts first (the plan's own Task 9
-	// step 2), not merely one call deleted.
+	// The two passes are not collapsible into one: either single-pass
+	// variant fails `test_integration-interpreter`'s "nested conditionals
+	// over mixed tau/bv streams stay sat". The second pass depends on the
+	// first having already run, on a formula whose non-bv structure is
+	// resolved. The analysis cannot replace that staging: `blasteable` is
+	// consumed only inside `eliminate_block_over_clause`, whereas which
+	// quantifiers `collect_quantifier_block` treats as transparent, and what
+	// `blast_block` hands to the solver, read only the boolean `el.skip(n)`.
 	{
 		analysis_context<node> ctx1;          // arith_is_solver_owned = true
 		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
@@ -243,7 +231,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	// arithmetic residue the `arithmetic` verdict marks. Blasting
 	// rewrites arithmetic into per-bit equality/comparison atoms that
 	// are still arithmetic-typed but no longer arithmetic-tainted, so
-	// that verdict stops applying to them and they became eligible for
+	// that verdict stops applying to them and they become eligible for
 	// generic Boole decomposition -- hundreds of atoms per blasted
 	// operation, each split copying the whole formula, and every BDD
 	// node operation on an arithmetic leaf allocating solver terms
@@ -299,10 +287,10 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	TAU_TRY(form, anti_prenex<node>(form, el2));
 	TAU_TRY(form, resolve_quantifiers<node>(form));
 	if constexpr (pack_has_arithmetic_theory_v<node>) {
-		// Option 5a -- the per-formula preprocessing destination: one
-		// attempt on the whole formula, after the last anti-prenex/resolve
-		// pass and before the final closed-formula check below. Inert at
-		// the shipped default (`preprocess_placement == per_leaf`).
+		// The per-formula preprocessing destination: one attempt on the
+		// whole formula, after the last anti-prenex/resolve pass and before
+		// the final closed-formula check below. Inert at the default
+		// (`preprocess_placement == per_leaf`).
 		//
 		// The final check itself is deliberately NOT gated on
 		// `solver_placement`: it is the single "final" solver site that
@@ -335,6 +323,8 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 // by T or F when normalize_non_temp decides it, and leaves it untouched
 // otherwise; rebuilding through the hooks then applies the constant-operand
 // laws (`φ U F = F`, `F W ψ = ψ`, ...). Data quantifiers are not entered.
+// Returns fm itself when nothing folds; a normalization error counts as
+// undecided.
 template <NodeType node>
 tref fold_constant_temporal_operands(tref fm) {
 	using tau = tree<node>;
@@ -386,9 +376,7 @@ result<tref> normalize(tref form) {
 	if (auto it = cache.find(form); it != cache.end()) {
 		return r.with_assert_check_value(it->second);
 	}
-	// NF-3: key the memo on the ORIGINAL input -- `form` is reassigned
-	// below, so caching under the intermediate never hits for a repeated
-	// input and fills the map with keys nobody looks up.
+	// Key the memo on the original input: `form` is reassigned below.
 	const tref cache_key = form;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
@@ -402,19 +390,12 @@ result<tref> normalize(tref form) {
 			subtree_map<node, tref> changes;
 			for (tref temp : temps) {
 				bool is_aw = is_child<node>(temp, tau::wff_always);
-				// IN-R1: is_child_temporal_quantifier also matches the
-				// full-LTL / CTL* operators (F/U/R/W/S/T, A/E, -). This
-				// loop predates them and rebuilt EVERY matched node as
-				// `sometimes(first operand)`: the right operand of a
-				// binary operator was silently dropped (`p U q` became
-				// `sometimes p`), A/E were erased into `sometimes`
-				// (nesting a temporal quantifier inside another and
-				// tripping the !find_top(wff_always) assert below), and
-				// `F φ` lost its realizability semantics on every
-				// api/REPL path. Those operators manage their own scope
-				// in the ltl_aba pipeline (which normalizes its own
-				// data atoms) -- leave them untouched here, exactly as
-				// normalize_temporal_quantifiers already does.
+				// is_child_temporal_quantifier also matches the
+				// full-LTL / CTL* operators (F/U/R/W/S/T, A/E, -). Those
+				// manage their own scope in the ltl_aba pipeline (which
+				// normalizes its own data atoms): only their constant
+				// operands are folded here, never rebuilt as `sometimes`,
+				// as normalize_temporal_quantifiers also leaves them.
 				if (!is_aw && !is_child<node>(temp, tau::wff_sometimes)) {
 					if (tref f = fold_constant_temporal_operands<node>(temp);
 						f != temp)
@@ -527,7 +508,8 @@ tref eliminate_functional_quantifiers(tref fm) {
 
 // fm decided by the owner of its type when it has no variable, stream,
 // reference or temporal operator and its constants are all of one type
-// (pack_decide_ground); fm itself otherwise.
+// (pack_decide_ground); fm itself otherwise, including when the owner
+// cannot decide it.
 template <NodeType node>
 tref decide_ground_formula(tref fm) {
 	using tau = tree<node>;
@@ -604,13 +586,12 @@ result<tref> normalize_non_temp(tref fm) {
 	//
 	// It has to run here, not only in normalize_with_temp_simp. Every
 	// `is_non_temp_nso_*` / `are_nso_equivalent` predicate reads THIS
-	// function's result as T, F or "undecided" via check_decided, and that
-	// happens well before normalize_with_temp_simp's fold. A residual
-	// `all b2, b1 T` -- which the resolve passes above can leave behind when
-	// a scope folds to a constant after its quantifier prefix was already
-	// re-attached -- was therefore being reported as a formula normalization
-	// could not decide, and `are_nso_equivalent` answered negatively on a
-	// formula that is plainly T. Pinned by
+	// function's result as T, F or "undecided" via check_decided, before
+	// normalize_with_temp_simp's fold. A residual `all b2, b1 T` -- which the
+	// resolve passes above can leave behind when a scope folds to a constant
+	// after its quantifier prefix was already re-attached -- would otherwise
+	// read as undecided, and `are_nso_equivalent` would answer negatively on
+	// a formula that is plainly T. Pinned by
 	// "a term containing a bf_ref still normalizes"
 	// (test_integration-normalizer_helpers.cpp).
 	result = fold_trivial_quantifiers<node>(result);
@@ -660,7 +641,7 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		if (tmp.size() <= prefix.size()
 			|| tmp.compare(0, prefix.size(), prefix) != 0) continue;
 		std::string id = tmp.substr(prefix.size());
-		// NF-15: an over-long user-written digit suffix (e.g.
+		// An over-long user-written digit suffix (e.g.
 		// :split99999999999999) must not throw out of the splitter;
 		// skip anything that does not fit.
 		if (is_number(id)) try {
@@ -756,10 +737,11 @@ tref get_ref(tref n) {
 	return ref.value();
 }
 
-// Check that the Tau formula does not use Boolean combinations of models.
-// LTL formulas (containing wff_sometimes / wff_until / wff_release / wff_weak_until) are handled
-// by the LTL(ABA) pipeline and bypass the safety pipeline entirely, so they
-// are exempt from this check.
+// LTL formulas (containing wff_sometimes / wff_until / wff_release /
+// wff_weak_until / wff_A / wff_E / wff_semantic_neg) are handled by the
+// LTL(ABA) pipeline and bypass the safety pipeline entirely, so they are
+// exempt from this check.
+/** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
 template <NodeType node>
 result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
@@ -805,9 +787,9 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
  * settle -- cvc5 answering `unknown`, or a translation failure such as an
  * unresolved `wff_ref` inside bv arithmetic -- comes back with its quantifier
  * intact, and `is_bv_solvable_formula` does not reject it because it inspects
- * only `variable` nodes. Asserting decidability here aborted Debug builds on a
- * user-reachable input; the predicates now fall back to their negative answer,
- * which is the conservative direction for every current caller
+ * only `variable` nodes. Such an input is user-reachable, so the predicates
+ * fall back to their negative answer, which is the conservative direction for
+ * every current caller
  * (`api::is_valid` reports "not valid", `simplify_temporal_clause` declines to
  * eliminate a part, `find_fixpoint_phi`/`chi` keep unrolling until their step
  * cap) -- and say so loudly instead of silently.
@@ -823,7 +805,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
  *
  * One shape among the undecided ones is not a gap to chase: a temporal
  * operator (`always`, `sometimes`, ...) directly inside a quantifier scope
- * (e.g. `all b (always b != c)`, NZ-1) is undecidable by this project's
+ * (e.g. `all b (always b != c)`) is undecidable by this project's
  * quantifier-elimination machinery on principle, not by omission --
  * substituting a time-invariant constant for `b` says nothing about a scope
  * whose truth varies over time, so no case-split on `b` alone can ever
@@ -838,7 +820,8 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
  * @param negative_fallback `true` (default) logs the negative answer the
  * caller will give; `false` logs at debug level only, for a caller that
  * reports UNKNOWN in its result instead.
- * @return `true` if the formula was decided (`T`, `F`, or a constraint).
+ * @return `true` if the formula was decided (`T`, `F`, or a constraint);
+ * `false` otherwise, after the log line described above.
  * @endinternal
  */
 template <NodeType node>
@@ -855,7 +838,7 @@ bool check_decided(const char* who, tref normalized,
 			<< LOG_FM(normalized) << "; reporting UNKNOWN.";
 		return false;
 	}
-	// NZ-1: a quantifier whose scope still holds a temporal operator.
+	// A quantifier whose scope still holds a temporal operator.
 	auto is_temporal_under_quantifier = [](tref m) {
 		return is_child_quantifier<node>(m)
 			&& tree<node>::get(tree<node>::get(m)[0].second())
@@ -924,8 +907,9 @@ std::optional<bool> lean_capture_conjunction_sat(tref n) {
 	return true;
 }
 
-// Cached getenv("TAU_LEAN_DECIDE_CROSSCHECK") -- read once per process; see
-// lean_capture_conjunction_sat's caller for what it gates.
+// Cached getenv("TAU_LEAN_DECIDE_CROSSCHECK") -- read once per process. When
+// set, is_non_temp_nso_satisfiable runs the full normalization even where
+// lean_capture_conjunction_sat answers, and reports an error on disagreement.
 inline bool lean_decide_crosscheck_enabled() {
 	static const bool on = std::getenv("TAU_LEAN_DECIDE_CROSSCHECK") != nullptr;
 	return on;
@@ -973,23 +957,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	return r.with_assert_check_value(full);
 }
 
-/**
- * @internal
- * @brief Checks whether a non-temporal NSO formula is unsatisfiable.
- *
- *  Wraps free variables with existential quantifiers, normalizes via
- *  `normalize_non_temp`, and returns `true` if the result is `F`.
- * @tparam node Tree node type.
- * @param n The non-temporal formula to test.
- * @return `true` if the formula is unsatisfiable, `false` otherwise.
- *
- * @par Example
- * @code{.cpp}
- * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( is_non_temp_nso_unsat<node_t>(fm).value() );
- * @endcode
- * @endinternal
- */
+/** @internal @copydoc is_non_temp_nso_unsat @endinternal */
 template <NodeType node>
 result<bool> is_non_temp_nso_unsat(tref n) {
 	result<bool> r;
@@ -1011,9 +979,9 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	return r.with_assert_check_value(tau::get(normalized).equals_F());
 }
 
-// Stays bool: called directly (not as result<T>) by splitter and by many
-// tests that predate this port; a normalization failure here degrades to
-// the conservative "not equivalent" answer instead of propagating.
+// Stays bool: called directly (not as result<T>) by the splitter and by many
+// tests; a normalization failure here degrades to the conservative "not
+// equivalent" answer instead of propagating.
 /** @internal @copydoc are_nso_equivalent @endinternal */
 template <NodeType node>
 bool are_nso_equivalent(tref n1, tref n2) {
@@ -1788,7 +1756,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		// whole-formula with a flat cross-scope join, so an arithmetic
 		// atom in a SIBLING clause sharing free variables with the
 		// block's atoms lifts those variables above `eliminable` and
-		// the binder is kept (R6).
+		// the binder is kept.
 		// Re-eliminate each surviving maximal block with block-local
 		// analysis, which sees no sibling content. Do not descend into
 		// terms: tau_ba constants carry their own wff_ex/wff_all over
@@ -2101,13 +2069,15 @@ tref get_unbindable_relative_offset(tref head, tref body) {
  * @internal
  * @brief Validates a recurrence relation.
  *
- *  Checks that the main formula has no relative offsets, that no rule's head
- *  contains a shift offset, and that integer-indexed rules do not depend on
- *  future states.
+ *  Checks that no rule's body uses a relative offset its head does not bind
+ *  (`get_unbindable_relative_offset`), that the main formula has no relative
+ *  offsets, that no rule's head contains a shift offset, and that an
+ *  integer-indexed rule neither depends on a relative offset nor on a future
+ *  state. Only the first offset of each reference is examined.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to validate.
- * @return `true` if all validity conditions are satisfied, or an error report
- * that names the first violation.
+ * @return `true` if all validity conditions are satisfied, or a
+ * `code::type_error` report that names the first violation.
  *
  * @par Example
  * @code{.cpp}
@@ -2196,7 +2166,9 @@ result<bool> is_valid(const rr<node>& nso_rr) {
  * @brief Checks that a recurrence relation is well-founded.
  *
  *  Requires at least one relative (capture-offset) rule and verifies that the
- *  dependency graph among rule signatures is acyclic.
+ *  dependency graph among rule signatures is acyclic, where a rule's head
+ *  depends on a body reference carrying the same first offset. A failure is
+ *  logged at error level.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to check.
  * @return `true` if the relation is well-founded, `false` otherwise.
@@ -2275,18 +2247,25 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * @brief Iterates the recurrence relation to find a fixed point starting from `max_lookback`.
  *
  *  Applies all rules at each step until the result stabilizes (fixed point) or
- *  a loop is detected. Returns the fixed-point formula, or a fallback value when
- *  a loop is found.
+ *  a loop is detected. Bounded by `max_enum_steps`; the untyped probe that
+ *  tells a type-blocked residual reference from an uninterpreted one is
+ *  bounded by `max_probe_steps`.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation driving the iteration.
  * @param form The main formula template to enumerate.
  * @param nt The non-terminal type (e.g. `wff` or `bf`) determining normalization and equivalence checks.
  * @param offset_arity The number of offsets in the main formula's reference.
- * @param fallback The formula to return when a loop (no fixed point) is detected.
+ * @param fallback The formula to return when a loop (no fixed point) is
+ * detected: a formula of type @p nt, or a `first_sym` / `last_sym` node to
+ * return the first or last value of the loop instead.
  * @param call_sig The signature of the call being resolved, when known --
  * narrows the type-mismatch check below to this call's own rules instead of
  * every rule in @p nso_rr. Absent (the default) checks every rule.
- * @return The fixed-point formula, or @p fallback if the iteration loops without converging.
+ * @return The fixed-point formula; on a loop, @p fallback (or the loop value it
+ * selects). `nullptr` on any failure, each logged at error level: a fallback or
+ * rule type mismatch, a relation that is not well-founded, the step cap, a call
+ * no rule ever applies to, a residual reference a type mismatch blocks, or a
+ * failed normalization of a step.
  *
  * @par Example
  * @code{.cpp}
@@ -2329,7 +2308,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// `nt` (the call site's type) must match every rule of this call's
 	// signature, not every rule in `nso_rr` -- the latter is the whole
 	// reachable definition set, most of which belongs to other calls --
-	// or the loop would spin silently until MAX_FP_STEPS.
+	// or the loop would spin silently until `max_enum_steps`.
 	for (const auto& r : nso_rr.rec_relations) {
 		if (call_sig && get_rr_sig<node>(tau::trim(r.first->get()))
 			!= call_sig.value())
@@ -2374,7 +2353,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// fixpoint-call family match. Name+arg_arity alone would conflate an
 	// indexed family like `f[n]/f[0]` with an unrelated plain function
 	// `f(x)` of the same name/arity (see validate_rr_case_types's family
-	// key in tau_tree_extractors.tmpl.h for the same fix and the fuller
+	// key in tau_tree_extractors.tmpl.h for the same rule and the fuller
 	// rationale) -- here that conflation would make this guard treat a
 	// residual belonging to the unrelated plain function as if it were
 	// part of the recurrence this call actually drives.
@@ -2432,8 +2411,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// on, and a fixed-offset rule only indices up to max_lookback, so if
 	// nothing fired at the first two steps nothing ever will: the call
 	// does not reach its definitions at all (typically a kind or type
-	// mismatch between the call site and the stored rules), and silently
-	// enumerating bare `name[i](args)` refs forever used to hang the REPL.
+	// mismatch between the call site and the stored rules), and enumerating
+	// bare `name[i](args)` refs would never end.
 	bool ever_changed = false;
 
 	for (size_t i = max_lookback; ; i++) {
@@ -2633,8 +2612,9 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		previous.push_back(current);
 		seen.insert(current);
 	}
-	// Unreachable: every exit from the loop above is a return, and the step cap
-	// guarantees one is taken.
+	// Unreachable: every exit from the loop above is a return. With
+	// `max_enum_steps` 0 (unlimited) the loop ends only on a fixed point, a
+	// loop or a failure.
 	return nullptr;
 }
 

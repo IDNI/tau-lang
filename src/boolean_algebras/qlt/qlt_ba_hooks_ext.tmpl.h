@@ -67,14 +67,17 @@ static std::optional<int> qlt_singleton_cmp(
  * (`end` 0), a variable being the set holding its point.
  */
 struct qlt_order_side {
+	/// -1 for the typed 0, 1 for the typed 1, 0 for a set of points.
 	int end = 0;
+	/// The points when `end` is 0; unused otherwise.
 	qlt points;
 };
 
 /**
  * @brief `a < b` (@p strict) or `a <= b` between two sides: every point of
  * @p a is below (at most) every point of @p b, so an empty side makes it
- * true. nullopt when an end needed is a named endpoint.
+ * true. nullopt when an end needed is a named endpoint or the two ends
+ * do not compare.
  */
 inline std::optional<bool> qlt_order_holds(const qlt_order_side& a,
 	const qlt_order_side& b, bool strict)
@@ -113,17 +116,25 @@ static std::optional<qlt_order_side> qlt_constant_side(const tree<node>& c) {
 }
 
 // Defined in qlt_qe.tmpl.h, which the descriptor includes after this file.
+/// The truth of comparison @p op between ground @p lhs and @p rhs over named
+/// endpoints when it holds wherever the names lie; nullopt otherwise.
 template<NodeType node>
 static std::optional<bool> qlt_named_ground_truth(size_t op, tref lhs,
 	tref rhs);
 
+/**
+ * @brief qlt's comparison hooks. Each `wff_*` member takes the children @p ch
+ * of the comparison node @p r and returns its T/F replacement, or nullptr to
+ * decline and leave the atom to the generic path.
+ */
 template <typename... PackBAs>
 struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
 
 	// ch[0] is the bf_<op> node; [i][0] is the i-th raw operand, matching
-	// what core's own arg1/arg2 helpers read.
+	// what core's own arg1/arg2 helpers read. arg1_hook returns the left
+	// operand, arg2_hook the right one.
 	static const tree<node_t>& arg1_hook(const tref* ch) {
 		return tau::get(ch[0])[0][0];
 	}
@@ -157,7 +168,9 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 	}
 
 	// `lhs < rhs` (strict) or `lhs <= rhs`, with the sides swapped for
-	// > and >= and the verdict negated for the n-forms.
+	// > and >= and the verdict negated for the n-forms. Tries `named` first;
+	// nullptr when a side is not a constant or an end, or the order of the
+	// two sides is undetermined.
 	static tref eval(const tref* ch, tref r, bool swap, bool strict,
 		bool negate)
 	{
@@ -171,27 +184,35 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 		return decide(ch, r, *h != negate);
 	}
 
+	/// Decides `a < b`; see eval.
 	static tref wff_lt(const tref* ch, tref r) {
 		return eval(ch, r, false, true, false);
 	}
+	/// Decides `a !< b`; see eval.
 	static tref wff_nlt(const tref* ch, tref r) {
 		return eval(ch, r, false, true, true);
 	}
+	/// Decides `a <= b`; see eval.
 	static tref wff_lteq(const tref* ch, tref r) {
 		return eval(ch, r, false, false, false);
 	}
+	/// Decides `a !<= b`; see eval.
 	static tref wff_nlteq(const tref* ch, tref r) {
 		return eval(ch, r, false, false, true);
 	}
+	/// Decides `a > b`; see eval.
 	static tref wff_gt(const tref* ch, tref r) {
 		return eval(ch, r, true, true, false);
 	}
+	/// Decides `a !> b`; see eval.
 	static tref wff_ngt(const tref* ch, tref r) {
 		return eval(ch, r, true, true, true);
 	}
+	/// Decides `a >= b`; see eval.
 	static tref wff_gteq(const tref* ch, tref r) {
 		return eval(ch, r, true, false, false);
 	}
+	/// Decides `a !>= b`; see eval.
 	static tref wff_ngteq(const tref* ch, tref r) {
 		return eval(ch, r, true, false, true);
 	}
@@ -214,9 +235,11 @@ struct ba_wff_hooks<qlt, node<PackBAs...>> {
 			&& !(b.is(tau::variable) && is_end(a))) return nullptr;
 		return decide(ch, r, !is_eq);
 	}
+	/// Decides `a = b` when one side is a variable and the other an end.
 	static tref wff_eq(const tref* ch, tref r) {
 		return end_eq(ch, r, true);
 	}
+	/// Decides `a != b` when one side is a variable and the other an end.
 	static tref wff_neq(const tref* ch, tref r) {
 		return end_eq(ch, r, false);
 	}

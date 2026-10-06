@@ -86,7 +86,8 @@ tref norm_all_equations (tref fm) {
  * Unlike `norm_equation`, the input is not wrapped in `wff`.
  * @tparam node Tree node type.
  * @param eq Trimmed equation node (`bf_eq` or `bf_neq`).
- * @return Normalized equation with XOR of operands compared to zero.
+ * @return Normalized equation with XOR of operands compared to zero, trimmed
+ * of its `wff` wrapper, or @p eq unchanged when it is neither.
  * @endinternal
  */
 // Convert X =(!=) Y to X + Y =(!=) 0
@@ -103,14 +104,7 @@ tref norm_trimmed_equation(tref eq) {
 
 // -----------------------------------------------------------------------------
 
-/**
- * @internal
- * @brief Expands a single `bf_xor` node: `A XOR B` → `(A & !B) | (!A & B)`.
- * @tparam node Tree node type.
- * @param fm Formula node to expand; must be wrapped in `bf` with a `bf_xor` child.
- * @return Expanded formula, or `fm` unchanged if no `bf_xor` child is present.
- * @endinternal
- */
+/** @internal @copydoc apply_xor_def @endinternal */
 template<NodeType node>
 tref apply_xor_def(tref fm) {
 	using tau = tree<node>;
@@ -126,15 +120,7 @@ tref apply_xor_def(tref fm) {
 }
 
 
-/**
- * @internal
- * @brief Expands a single `bf_xor` node in conjunctive shape:
- * `A XOR B` → `(A | B) & (!A | !B)`.
- * @tparam node Tree node type.
- * @param fm Formula node to expand; must be wrapped in `bf` with a `bf_xor` child.
- * @return Expanded formula, or `fm` unchanged if no `bf_xor` child is present.
- * @endinternal
- */
+/** @internal @copydoc apply_xor_def_cnf @endinternal */
 template<NodeType node>
 tref apply_xor_def_cnf(tref fm) {
 	using tau = tree<node>;

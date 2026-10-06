@@ -58,7 +58,7 @@ const typename tree<node>::template extractor<htref>
 template <NodeType node>
 const typename tree<node>::template extractor<const tree<node>&>
 	tree<node>::traverser::Tree =
-		// PRECONDITION (TT1-10): the traverser must be non-empty -- a
+		// PRECONDITION: the traverser must be non-empty -- a
 		// reference cannot be null, so unlike the sibling extractors
 		// there is no empty-guard here; piping an empty traverser is
 		// front() on an empty vector. Check `t` before | tt::Tree.
@@ -157,7 +157,7 @@ const typename tree<node>::template extractor<typename tree<node>::constant>
 	tree<node>::traverser::ba_constant =
 		typename tree<node>::template extractor<constant>(
 			[](const traverser& t) -> constant {
-				// Empty-traverser guard (TT1-10), like num/data.
+				// Empty-traverser guard, like num/data.
 				if (!t.has_value()) return constant{};
 				// TODO (HIGH) dropped error: ba_constants::get's report -- extractor<T>(const traverser&) has a fixed signature with no channel.
 				return ba_constants<node>::get(
@@ -265,7 +265,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 	tree<node>::traverser::f(const auto& fn)
 {
 	// Capture by value: the extractor's std::function may outlive the
-	// caller's callable argument (TT1-8).
+	// caller's callable argument.
 	return extractor<traverser>([fn](const traverser& t) {
 		trefs nvals;
 		for (tref v : t.values())

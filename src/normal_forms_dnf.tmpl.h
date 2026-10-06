@@ -3,7 +3,7 @@
 // normal_forms_dnf.tmpl.h - DNF/CNF core: reduce_paths, bf_reduced_dnf, reduce
 // Split from normal_forms.tmpl.h for readability.
 //
-// Path-vector encoding (NF-11), shared by reduce_paths, join_paths,
+// Path-vector encoding, shared by reduce_paths, join_paths,
 // clause_to_vector, collect_paths, build_reduced_formula and
 // dnf_cnf_to_reduced: a clause is a std::vector<int_t> indexed by the
 // position of its BDD variable in `vars`, with
@@ -18,7 +18,14 @@
 namespace idni::tau_lang {
 
 
-// Reduce current dnf due to update by coeff and variable assignment i
+// Merges the assignment `i` into `paths` by resolution, comparing the first
+// `p` positions: a path that differs from `i` in exactly one decided
+// position (and in no irrelevant one) is resolved on that position, which
+// becomes 2, and the merged clause is reduced again recursively. `surface`
+// is true when `i` is not yet in `paths`; a nested call empties the merged
+// path instead, and the caller erases empty paths. If a merged clause
+// becomes all-irrelevant, `paths` is cleared (the constant clause). Returns
+// true when some merge happened, false when `i` must be added as a new path.
 inline bool reduce_paths(std::vector<int_t>& i,
 	std::vector<std::vector<int_t>>& paths, size_t p, bool surface = true)
 {
@@ -58,6 +65,9 @@ inline bool reduce_paths(std::vector<int_t>& i,
 	return false;
 }
 
+// Simplifies `paths` in place: a path subsumed by another (the same decided
+// literals plus further ones) is erased, and two paths differing in one
+// decided literal, one subsuming the rest of the other, are resolved on it.
 inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 	for (int_t i = 0; i < (int_t)paths.size(); ++i) {
 		for (int_t j = 0; j < (int_t)paths.size(); ++j) {
@@ -138,7 +148,8 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 
 // ------------------------------
 
-// Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
+// Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment:
+// every var no longer selected by `is_var` in `fm` is set to 2.
 template <NodeType node>
 void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const size_t p, const auto& is_var)
@@ -159,7 +170,13 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "assign_and_reduce"
 
-// Create assignment in formula and reduce resulting clause
+// Enumerates the assignments of vars[p..] in `fm` (recording 1, -1 or 2 per
+// position in `i`), and at each complete assignment normalizes the remaining
+// coefficient and files its path under it in `dnf` (coefficient -> paths),
+// merging by reduce_paths. A zero coefficient is dropped. `is_wff` selects
+// T/F instead of 1/0. Returns true once some coefficient's paths reduce to
+// the whole space (the formula is that coefficient alone), which stops the
+// enumeration; the error of normalize_ba, to_dnf or reduce otherwise.
 template <NodeType node>
 result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	auto& dnf, const auto& is_var, size_t p, bool is_wff)
@@ -211,8 +228,8 @@ result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i
 		}
 
 		auto it = dnf.find(fm_simp);
-		// NF-14: p != 0 always here (the p == 0 arm returned above), so
-		// the vector size is simply 1.
+		// p != 0 always here (the p == 0 arm returned above), so the vector
+		// size is simply 1.
 		if (it == dnf.end()) {
 			dnf.emplace(fm_simp, std::vector(1, i));
 			return report(false);
@@ -263,13 +280,15 @@ result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i
 }
 
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the paths to true in the BDD) of b
-// where the variable order is given by the function lex_var_comp
+// where the variable order is given by the function lex_var_comp. A term with
+// a non-Boolean operation is returned unchanged.
+/** @internal @copydoc bf_reduced_dnf @endinternal */
 template <NodeType node>
 result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
 	result<tref> r;
 	LOG_TRACE << "bf_boole_normal_form: " << LOG_FM(fm);
-	// NF-13: not static -- a static [&] lambda dangles on later calls.
+	// Not static: a static [&] lambda dangles on later calls.
 	auto trace = [&](tref fm) {
 		LOG_TRACE << "bf_boole_normal_form result: " << LOG_FM(fm);
 		return fm;
@@ -365,7 +384,9 @@ result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	return r.with_value(trace(reduced_dnf));
 }
 
-// The needed class in order to make bf_reduced_dnf work with rule applying process
+// The needed class in order to make bf_reduced_dnf work with rule applying process.
+// Returns nullptr when a reduction fails.
+/** @internal @copydoc bf_reduce_canonical::operator() @endinternal */
 template <NodeType node>
 tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
@@ -376,10 +397,9 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		if (tau::get(bf).child_is(tau::bf_ref)) {
-			// NF-2: reduce the matched bf's OWN ref arguments --
-			// t[0][0] was the whole input's grandchild, which only
-			// coincides with the ref when the input is the bf
-			// itself, never for wff callers.
+			// Reduce the matched bf's own ref arguments, not the
+			// input's grandchild, which only coincides with the ref
+			// when the input is the bf itself.
 			for (tref arg : tau::get(bf)[0]
 					.select_top(is<node, tau::bf>)) {
 				auto dnf_r = bf_reduced_dnf<node>(arg);
@@ -412,9 +432,11 @@ typename tree<node>::traverser operator|(
 // 	return fm.has_value() ? r(fm.value()) : std::optional<tref>{};
 // }
 
-// (NF-7: is_contained_in deleted -- zero callers.)
-
-
+// The path vector of one DNF (or CNF) clause over the variable positions
+// `var_pos`, and whether the clause is decided: constantly F in DNF / T in
+// CNF (a constant literal, or a variable together with its negation), in
+// which case the vector is incomplete. An internal_error when a negated
+// literal is missing from `var_pos`.
 template <NodeType node>
 result<std::pair<std::vector<int_t>, bool>> clause_to_vector(tref clause,
 	const auto& var_pos, const bool wff, const bool is_cnf)
@@ -483,6 +505,11 @@ result<std::pair<std::vector<int_t>, bool>> clause_to_vector(tref clause,
 	return r.with_value(std::make_pair(std::move(i), clause_is_decided));
 }
 
+// The path vectors of the clauses of `new_fm` over `vars`, decided clauses
+// skipped. `decided` is set false as soon as one clause is not decided. With
+// `all_reductions` each path is merged by reduce_paths as it is added. An
+// empty result with `decided` false means a constant clause (T in DNF, F in
+// CNF) absorbed the formula; errors come from clause_to_vector.
 template <NodeType node>
 result<std::vector<std::vector<int_t>>> collect_paths(tref new_fm, bool wff,
 	const auto& vars, bool& decided, bool is_cnf, bool all_reductions)
@@ -520,6 +547,9 @@ result<std::vector<std::vector<int_t>>> collect_paths(tref new_fm, bool wff,
 	return r.with_value(std::move(paths));
 }
 
+// Rebuilds a wff (or a bf of type `type_id` when !wff) from `paths` over
+// `vars` in DNF (CNF when is_cnf), with `!(a = b)` turned back into `a != b`;
+// an empty `paths` gives the constant formula (F in DNF, T in CNF).
 template <NodeType node>
 tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 	bool wff, size_t type_id)
@@ -576,6 +606,12 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 }
 
 //TODO: decide if to treat xor in bf case
+// The reduced path representation of a DNF (CNF when is_cnf) formula or
+// term: its BDD variables and the joined, resolved paths over them, in the
+// encoding described at the top of this file. For a wff, negations are
+// pushed in, `sometimes φ` becomes `!always !φ`, and disequalities and order
+// atoms become literals first. Errors come from the simplification of a
+// `sometimes` body or from collect_paths.
 template<NodeType node>
 result<std::pair<std::vector<std::vector<int_t>>, trefs>>
 dnf_cnf_to_reduced(tref fm, bool is_cnf) {
@@ -639,10 +675,8 @@ dnf_cnf_to_reduced(tref fm, bool is_cnf) {
 	return r.with_value(std::make_pair(std::move(paths), std::move(vars)));
 }
 
-// (NF-7: group_dnf_expression deleted -- zero callers.)
-
-
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
+/** @internal @copydoc reduce @endinternal */
 template<NodeType node, bool is_cnf>
 result<tref> reduce(tref fm) {
 	using tau = tree<node>;
@@ -699,6 +733,8 @@ result<tref> reduce(tref fm) {
 	return r.with_value(reduced_fm);
 }
 
+// `true` when the sorted (by subtree_less) lists v1 and v2 share at least i
+// elements.
 template<NodeType node>
 bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
 	using tau = tree<node>;
@@ -715,6 +751,8 @@ bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
 	return i == 0;
 }
 
+// The number of elements the sorted (by subtree_less) lists v1 and v2
+// share.
 template<NodeType node>
 int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	using tau = tree<node>;
@@ -729,6 +767,7 @@ int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	return i;
 }
 
+/** @internal @copydoc wff_reduce_dnf::operator() @endinternal */
 template <NodeType node>
 tref wff_reduce_dnf<node>::operator() (tref fm) const {
 	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
@@ -737,6 +776,7 @@ tref wff_reduce_dnf<node>::operator() (tref fm) const {
 	return r.has_value() ? r.value() : nullptr;
 }
 
+/** @internal @copydoc wff_reduce_cnf::operator() @endinternal */
 template <NodeType node>
 tref wff_reduce_cnf<node>::operator() (tref fm) const {
 	// TODO (HIGH) dropped error: reduce's report -- this traverser functor
@@ -761,6 +801,8 @@ typename tree<node>::traverser operator|(
 	return typename tree<node>::traverser(r(fm.value()));
 }
 
+// The DNF of `d1 && d2` (or `d1 & d2` for bf) for two DNFs of the same kind,
+// by distributing every clause of d1 over every clause of d2.
 template <NodeType node>
 tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 	using tau = tree<node>;
@@ -788,6 +830,8 @@ tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 	}
 }
 
+// The CNF of `c1 || c2` (or `c1 | c2` for bf) for two CNFs of the same kind,
+// by distributing every clause of c1 over every clause of c2.
 template <NodeType node>
 tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 	using tau = tree<node>;

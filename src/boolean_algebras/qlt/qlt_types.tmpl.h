@@ -6,11 +6,13 @@
 namespace idni::tau_lang {
 
 // Derived from the descriptor, which builds both from its own type_name.
+/** @internal @copydoc qlt_type @endinternal */
 template <NodeType node>
 tref qlt_type() {
 	return ba_descriptor<qlt, node>::type_tree();
 }
 
+/** @internal @copydoc qlt_type_id @endinternal */
 template <NodeType node>
 size_t qlt_type_id() {
 	static const size_t id = ba_types<node>::id(

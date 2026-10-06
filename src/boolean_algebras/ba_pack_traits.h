@@ -31,6 +31,7 @@ namespace idni::tau_lang {
 template <typename T>
 struct is_tau_ba : std::false_type {};
 
+/** @brief Shorthand for `is_tau_ba<T>::value`. */
 template <typename T>
 inline constexpr bool is_tau_ba_v = is_tau_ba<T>::value;
 
@@ -72,6 +73,7 @@ inline constexpr bool pack_has_arithmetic_theory_v =
  *
  * @p probe is invoked as `probe.template operator()<BA>()` for each BA in pack
  * order and must return a `std::optional`; the first engaged result wins.
+ * @return The first engaged result, or nullopt when no BA's probe answers.
  */
 template <typename Node, typename Probe>
 auto pack_first_owner(Probe&& probe) {
@@ -115,6 +117,9 @@ void pack_visit_all(Visit&& visit) {
  * lacking the capability the caller wants is skipped by the caller's own
  * `if constexpr`, so the fold never instantiates a member for a BA without
  * it.
+ * @param ba_type Type id to resolve; 0 (the null id) owns nothing.
+ * @param f The per-BA callable, invoked for the owner only.
+ * @return The owner's result, or nullopt when no BA owns @p ba_type.
  */
 template <typename Node, typename F>
 auto pack_owner_apply(size_t ba_type, F&& f) {
@@ -175,6 +180,8 @@ std::optional<size_t> pack_owner_index(size_t ba_type) {
  * "not solved here". @p Solution is the caller's solution type, so these
  * traits need no solver header; the owner's answer must convert to
  * `std::optional<Solution>`.
+ * @param ba_type Type id of the atoms of @p form.
+ * @param form The formula to solve, passed to the owner's `solve`.
  */
 template <typename Node, typename Solution, typename Form>
 std::optional<Solution> pack_solve(size_t ba_type, Form form) {
@@ -247,6 +254,8 @@ std::optional<bool> pack_sat_status(Form form) {
 // instantiates a lambda inside a discarded `if constexpr` branch anyway and
 // errors with C2039. Called only from the true branch, this one is
 // instantiated for the declaring BA alone.
+/// @internal Runs @p BA's `preprocess` on the value of @p out; an error in
+/// @p out is passed through untouched. @endinternal
 template <typename Node, typename Form, typename BA>
 result<Form> pack_preprocess_one(result<Form>&& out) {
 	return std::move(out).and_then([](Form f) -> result<Form> {
@@ -262,6 +271,7 @@ result<Form> pack_preprocess_one(result<Form>&& out) {
  * consulting a flag. The chain stops at the first declaring BA whose
  * preprocess fails, carrying that report forward instead of running the rest
  * on a formula that never got fixed up.
+ * @return The preprocessed formula, or the first failing BA's error.
  */
 template <typename Node, typename Form>
 result<Form> pack_preprocess(Form form) {
@@ -308,6 +318,8 @@ Form pack_eliminate_definitional_existentials(Form form) {
 
 // See pack_preprocess_one for why the BA-naming lambda sits in its own
 // function template.
+/// @internal Runs @p BA's `widen_arithmetic` on the value of @p out; an error
+/// in @p out is passed through untouched. @endinternal
 template <typename Node, typename Form, typename BA>
 result<Form> pack_widen_arithmetic_one(result<Form>&& out) {
 	return std::move(out).and_then([](Form f) -> result<Form> {
@@ -323,6 +335,8 @@ result<Form> pack_widen_arithmetic_one(result<Form>&& out) {
  * formula, so this returns @p form unchanged -- the same "absent means
  * ordinary" convention as @ref pack_preprocess. Stops the chain and carries
  * the failing report forward the same way, too.
+ * @return The widened formula, which a BA may answer as nullptr when an atom
+ * exceeds its width cap; or the first failing BA's error.
  */
 template <typename Node, typename Form>
 result<Form> pack_widen_arithmetic(Form form) {
@@ -728,9 +742,9 @@ bool pack_type_is_non_aba_omcat(size_t ba_type) {
  * is what a hook needs in order to stop rather than fall through to another
  * type family's handling when the owner declines to fold. Distinct from asking
  * whether the fold produced a result -- an owner that returns nothing still
- * owns the operator. Unlike the reference this resolves the owner through
- * `owns_type(size_t)` rather than a type-tree round-trip, keeping these traits
- * free of ba_types.
+ * owns the operator. It resolves the owner through `owns_type(size_t)` rather
+ * than a type-tree round-trip, keeping these traits free of ba_types. Also
+ * defines the probe `ba_has_<mem>_hook_v<Node, BA>`.
  */
 #define TAU_PACK_TRAITS_WFF_HOOK(mem) \
 	template <typename Node, typename BA> \
@@ -763,8 +777,12 @@ TAU_PACK_TRAITS_WFF_HOOK(wff_neq)
  * @brief Position of @p name in the comma-separated @p order, or -1.
  *
  * The Boolean-carrier preference order arrives as one string from
- * `-DTAU_BOOL_CARRIERS`, so ranking a name means scanning it. Blanks are not
- * skipped; the resolver strips them at configure time.
+ * `-DTAU_BOOL_CARRIERS` (as the macro `TAU_PACK_BOOL_CARRIERS`), so ranking a
+ * name means scanning it. Blanks are not skipped; the resolver strips them at
+ * configure time.
+ * @param order Comma-separated BA type names, most preferred first.
+ * @param name The type name to rank.
+ * @return The zero-based position of @p name, or -1 when it is absent.
  */
 constexpr int ba_carrier_rank(const char* order, const char* name) {
 	int rank = 0;
@@ -1068,7 +1086,9 @@ bool pack_type_output_always_satisfiable(size_t ba_type) {
  * basis @ref pack_owns_ba_type_name matches on.
  */
 struct ba_named_option {
+	/// Owning descriptor's `type_name`.
 	std::string family;
+	/// The option as the descriptor declares it.
 	ba_option option;
 };
 
@@ -1111,6 +1131,8 @@ const std::vector<ba_named_option>& pack_ba_options() {
  *
  * These options steer how an algebra's formulas are decided, so a verdict
  * memo keyed on the formula alone drops its entries when this value moves.
+ * @param seed The value to mix into.
+ * @return The mixed hash; equal to @p seed when the pack declares no option.
  */
 template <typename Node>
 size_t pack_ba_options_fingerprint(size_t seed = 0) {
@@ -1149,11 +1171,13 @@ const std::vector<std::string>& pack_ba_families() {
 enum class ba_option_lookup_status {
 	no_such_family, ///< no BA in this pack has this family name
 	no_such_option, ///< the family exists but declares no such option
+	/// the option exists; see ba_option_lookup_result::option
 	found,
 };
 
 /** @brief Result of @ref pack_find_ba_option. */
 struct ba_option_lookup_result {
+	/// What the lookup found.
 	ba_option_lookup_status status;
 	/// Valid only when status == found; points into the static storage
 	/// pack_ba_options() owns, so it outlives the call that returned it.
@@ -1164,6 +1188,8 @@ struct ba_option_lookup_result {
  * @brief Resolve a `family-name` REPL/CLI option against @p Node's pack,
  * distinguishing "no such family" from "no such option" so callers can
  * report each on its own.
+ * @param family The family part of the name (a descriptor `type_name`).
+ * @param name The option name within that family.
  */
 template <typename Node>
 ba_option_lookup_result pack_find_ba_option(const std::string& family,
