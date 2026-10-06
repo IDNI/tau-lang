@@ -108,10 +108,10 @@ TEST_SUITE("rec relations fixed point") {
 			"h[0](X):tau := X.", "h(Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		tref main = rr_captures.main->get();
-		tref fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
 			tau::_0(tau_type_id<node_t>()));
-		REQUIRE( fp != nullptr );
-		CHECK( tau::get(fp).to_str() == "0" );
+		REQUIRE( fp.has_value() );
+		CHECK( tau::get(fp.value()).to_str() == "0" );
 	}
 
 	// Regression: nt disagreeing with the relation's own (bf) type used to
@@ -125,9 +125,10 @@ TEST_SUITE("rec relations fixed point") {
 			"h[0](X):tau := X.", "h(Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		tref main = rr_captures.main->get();
-		tref fp = calculate_fixed_point<node_t>(rr_captures, main, tau::wff,
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main, tau::wff,
 			1, tau::_F());
-		CHECK( fp == nullptr );
+		CHECK( !fp.has_value() );
+		CHECK( report_has_code(fp.report(), code::type_error) );
 	}
 
 	TEST_CASE("cross-family type-blocked mutual recursion") {

@@ -2168,10 +2168,11 @@ result<bool> is_valid(const rr<node>& nso_rr) {
  *
  *  Requires at least one relative (capture-offset) rule and verifies that the
  *  dependency graph among rule signatures is acyclic, where a rule's head
- *  depends on a body reference carrying the same first offset. A failure is
- *  logged at error level.
+ *  depends on a body reference carrying the same first offset.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to check.
+ * @param why When not null and the relation is not well-founded, receives
+ * the reason.
  * @return `true` if the relation is well-founded, `false` otherwise.
  *
  * @par Example
@@ -2188,7 +2189,9 @@ result<bool> is_valid(const rr<node>& nso_rr) {
  * @endinternal
  */
 template <NodeType node>
-bool is_well_founded(const rr<node>& nso_rr) {
+bool is_well_founded(const rr<node>& nso_rr,
+	std::string* why = nullptr)
+{
 	using tau = tree<node>;
 	LOG_TRACE << "-- is_well_founded: " << LOG_RR(nso_rr);
 	std::unordered_map<rr_sig, std::set<rr_sig>> graph;
@@ -2228,15 +2231,13 @@ bool is_well_founded(const rr<node>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		// TODO (HIGH) dropped error: the malformed recurrence relation -- logged instead of reported, calculate_fixed_point is a rewriter::post_order_traverser leaf returning tref.
-		LOG_ERROR << "Recurrence relation has no rules"
-			  << " other than initial conditions";
+		if (why) *why = "the recurrence relation has no rules other "
+			"than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			// TODO (HIGH) dropped error: the cyclic recurrence relation -- logged instead of reported, calculate_fixed_point is a rewriter::post_order_traverser leaf returning tref.
-			LOG_ERROR << "Recurrence relation is cyclic";
+			if (why) *why = "the recurrence relation is cyclic";
 			return false;
 		}
 	LOG_DEBUG << "Recurrence relation is well founded";
@@ -2263,10 +2264,10 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * narrows the type-mismatch check below to this call's own rules instead of
  * every rule in @p nso_rr. Absent (the default) checks every rule.
  * @return The fixed-point formula; on a loop, @p fallback (or the loop value it
- * selects). `nullptr` on any failure, each logged at error level: a fallback or
- * rule type mismatch, a relation that is not well-founded, the step cap, a call
- * no rule ever applies to, a residual reference a type mismatch blocks, or a
- * failed normalization of a step.
+ * selects). An error on any failure: a fallback or rule type mismatch, a
+ * relation that is not well-founded, the step cap, a call no rule ever applies
+ * to, a residual reference a type mismatch blocks, or a failed normalization
+ * of a step.
  *
  * @par Example
  * @code{.cpp}
@@ -2279,20 +2280,18 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
  * tref main = rr_captures.main->get(); // "h(Y)", the fixed-point call
  * tref fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
- *     tau::_0(tau_type_id<node_t>()));
+ *     tau::_0(tau_type_id<node_t>())).value();
  * // tau::get(fp).to_str() == "0"   (the fallback, since no fixed point exists)
  * @endcode
  * @endinternal
  */
-// Stays tref: called from fixed_point_transformer::operator(), a per-node
-// callback driven by rewriter::post_order_traverser, which needs a raw
-// tref-returning leaf.
 template <NodeType node>
-tref calculate_fixed_point(const rr<node>& nso_rr,
+result<tref> calculate_fixed_point(const rr<node>& nso_rr,
 	tref form, typename node::type nt, size_t offset_arity,
 	tref fallback, std::optional<rr_sig> call_sig = {})
 {
 	using tau = tree<node>;
+	result<tref> r;
 	LOG_DEBUG << "Calculating fixed point: " << LOG_FM(form);
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
@@ -2300,28 +2299,33 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	auto ft = tau::get(fallback).get_type();
 	bool first = ft == tau::first_sym, last = ft == tau::last_sym;
 	if (!first && !last && ft != nt) {
-		LOG_ERROR << "Fallback type mismatch";
-		return nullptr;
+		return r.with_error(code::type_error,
+			"the fallback of the fixed point call does not have the "
+			"type of the call", {{label::value,
+				truncate_for_message(TAU_TO_STR(form))}});
 	}
 
-	if (!is_well_founded<node>(nso_rr)) return nullptr;
+	if (std::string why; !is_well_founded<node>(nso_rr, &why))
+		return r.with_error(code::type_error, why,
+			{{label::value, truncate_for_message(TAU_TO_STR(form))}});
 
 	// `nt` (the call site's type) must match every rule of this call's
 	// signature, not every rule in `nso_rr` -- the latter is the whole
 	// reachable definition set, most of which belongs to other calls --
 	// or the loop would spin silently until `max_enum_steps`.
-	for (const auto& r : nso_rr.rec_relations) {
-		if (call_sig && get_rr_sig<node>(tau::trim(r.first->get()))
+	for (const auto& rule : nso_rr.rec_relations) {
+		if (call_sig && get_rr_sig<node>(tau::trim(rule.first->get()))
 			!= call_sig.value())
 			continue;
-		auto pt = tau::get(r.first->get()).get_type();
-		auto bt = tau::get(r.second->get()).get_type();
+		auto pt = tau::get(rule.first->get()).get_type();
+		auto bt = tau::get(rule.second->get()).get_type();
 		if (pt != nt || bt != nt) {
-			LOG_ERROR << "Recurrence relation type mismatch: rule "
-				<< LOG_FM(r.first->get()) << " := "
-				<< LOG_FM(r.second->get())
-				<< " does not match the call site's type";
-			return nullptr;
+			return r.with_error(code::type_error,
+				"a rule of the recurrence relation does not match "
+				"the type of the call site",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(rule.first->get()) + " := "
+					+ TAU_TO_STR(rule.second->get()))}});
 		}
 	}
 
@@ -2340,10 +2344,10 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 
 	size_t max_lookback = 0;
 	std::vector<size_t> lookbacks;
-	for (const auto& r : nso_rr.rec_relations) {
+	for (const auto& rule : nso_rr.rec_relations) {
 		size_t lookback = std::max(
-			get_max_lookback_in_rr<node>(r.first->get()),
-			get_max_lookback_in_rr<node>(r.second->get()));
+			get_max_lookback_in_rr<node>(rule.first->get()),
+			get_max_lookback_in_rr<node>(rule.second->get()));
 		lookbacks.push_back(lookback);
 		max_lookback = std::max(max_lookback, lookback);
 	}
@@ -2359,8 +2363,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// residual belonging to the unrelated plain function as if it were
 	// part of the recurrence this call actually drives.
 	std::set<rr_sig> def_families;
-	for (const auto& r : nso_rr.rec_relations)
-		if (tref h = unwrap_to_ref<node>(r.first->get()); h)
+	for (const auto& rule : nso_rr.rec_relations)
+		if (tref h = unwrap_to_ref<node>(rule.first->get()); h)
 			def_families.insert(get_rr_sig<node>(h));
 
 	// Support for the partial-match guard below (search "Partial-match
@@ -2419,13 +2423,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	for (size_t i = max_lookback; ; i++) {
 		++steps;
 		if (max_enum_steps && steps > max_enum_steps) {
-			LOG_ERROR << "calculate_fixed_point: no fixed point and no "
-				"loop after " << max_enum_steps
-				<< " enumeration steps (max-enum-steps) for "
-				<< LOG_FM(form)
-				<< "; giving up. This is a bound on the search, "
-				"not a proof that no fixed point exists.";
-			return nullptr;
+			return r.with_error(code::solver_error,
+				"calculate_fixed_point: no fixed point and no "
+				"loop after " + std::to_string(max_enum_steps)
+				+ " enumeration steps (max-enum-steps); giving up. "
+				"This is a bound on the search, not a proof that no "
+				"fixed point exists.",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(form))},
+				{label::limit, max_enum_steps}});
 		}
 		current = build_enumerated_main_step<node>(
 							form, i, offset_arity);
@@ -2435,25 +2441,26 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			for (size_t ri = 0;
 				ri != nso_rr.rec_relations.size(); ++ri)
 			{
-				const auto& r = nso_rr.rec_relations[ri];
+				const auto& rule = nso_rr.rec_relations[ri];
 				if (lookbacks[ri] > i) {
 					// LOG_DEBUG << "(I) -- current step " << i << " < " << lookbacks[ri] << " lookback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
-				current = nso_rr_apply<node>(r, prev);
+				current = nso_rr_apply<node>(rule, prev);
 				if (tau::get(current) != tau::get(prev)) changed = true,
 					ever_changed = true;
 			}
 		} while (changed);
 
 		if (!ever_changed && i > max_lookback) {
-			LOG_ERROR << "calculate_fixed_point: no recurrence rule "
-				"applies to " << LOG_FM(current) << "; the call "
-				"does not match its definitions (kind or type "
-				"mismatch between the call site and the rules); "
-				"giving up.";
-			return nullptr;
+			return r.with_error(code::type_error,
+				"calculate_fixed_point: no recurrence rule applies "
+				"to the call; it does not match its definitions "
+				"(kind or type mismatch between the call site and "
+				"the rules); giving up.",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(current))}});
 		}
 
 		// Partial-match guard: rules were applied to saturation, yet the
@@ -2545,12 +2552,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			// name whichever residual triggered this probe run.
 			if (!blocked && probe_exhausted) blocked = residuals.front();
 			if (blocked) {
-				LOG_ERROR << "calculate_fixed_point: `"
-					<< LOG_FM(blocked) << "` remains after every rule"
-					" was applied to saturation; one of its cases"
-					" never matches the call (kind or type mismatch);"
-					" giving up.";
-				return nullptr;
+				return r.with_error(code::type_error,
+					"calculate_fixed_point: a reference remains "
+					"after every rule was applied to saturation; "
+					"one of its cases never matches the call (kind "
+					"or type mismatch); giving up.",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(blocked))}});
 			}
 			for (tref rr_ref : residuals) legit_uninterpreted.insert(rr_ref);
 			DBG(LOG_TRACE << "calculate_fixed_point: " << residuals.size()
@@ -2564,21 +2572,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 
 		LOG_DEBUG << "Normalize step";
 		if (nt == tau::wff) {
-			auto nres = normalize<node>(current);
-			// TODO (HIGH) dropped error: normalize's report -- calculate_fixed_point returns tref, so nullptr has no channel for it.
-			if (!nres.has_value()) {
-				LOG_ERROR << "calculate_fixed_point: normalization "
-					"failed at enumeration step " << i;
-				return nullptr;
-			}
-			current = nres.value();
+			TAU_TRY_OR(current, normalize<node>(current),
+				code::internal_error, "calculate_fixed_point: "
+				"normalization of an enumeration step failed");
 		} else {
-			// TODO (HIGH) dropped error: bf_reduced_dnf's report --
-			// calculate_fixed_point returns tref, so nullptr has no
-			// channel for it.
-			auto dnf_r = bf_reduced_dnf<node>(current);
-			if (!dnf_r.has_value()) return nullptr;
-			current = dnf_r.value();
+			TAU_TRY_OR(current, bf_reduced_dnf<node>(current),
+				code::internal_error, "calculate_fixed_point: "
+				"reduction of an enumeration step failed");
 		}
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
@@ -2590,7 +2590,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			LOG_DEBUG << "End enumeration step: fixed point"
 						<< " found at step: " << i;
 			LOG_DEBUG << "previous.back(): " << LOG_FM(previous.back());
-			return previous.back();
+			return r.with_value(previous.back());
 		}
 		else if (previous.size() > 1 && (seen.contains(current) || (nt == tau::wff
 			? is_nso_equivalent_to_any_of<node>(current, previous)
@@ -2601,11 +2601,11 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				<< i << " returning fallback "
 				<< (first ? "first" : last ? "last" : "");
 
-			if (last) return previous.back();
-			if (first) return current;
+			if (last) return r.with_value(previous.back());
+			if (first) return r.with_value(current);
 			LOG_DEBUG << "End enumeration step - fallback: "
 							<< LOG_FM(fallback);
-			return fallback;
+			return r.with_value(fallback);
 		}
 		LOG_DEBUG << "End enumeration step - no fixed point resolution "
 			<< "at step: " << i << " incrementing";
@@ -2616,7 +2616,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// Unreachable: every exit from the loop above is a return. With
 	// `max_enum_steps` 0 (unlimited) the loop ends only on a fixed point, a
 	// loop or a failure.
-	return nullptr;
+	return r.with_error(code::internal_error,
+		"calculate_fixed_point: the enumeration ended without a result");
 }
 
 // Normalizes a Boolean function having no recurrence relation

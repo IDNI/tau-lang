@@ -314,8 +314,11 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
 	}
 	auto applied_r = nso_rr_apply(maybe_nso_rr.value());
-	tref applied = applied_r.has_value() ? applied_r.value() : nullptr;
-	// tref applied = tau_api::apply_defs(main);
+	if (!applied_r.has_value()) {
+		applied_r.print(err);
+		return nullptr;
+	}
+	tref applied = applied_r.value();
 	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
 	return applied;
 }

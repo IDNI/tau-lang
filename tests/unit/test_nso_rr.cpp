@@ -194,6 +194,21 @@ TEST_SUITE("rule counting") {
 	}
 }
 
+TEST_SUITE("calculate_all_fixed_points") {
+
+	TEST_CASE("an unsupported multi-index call names its cause") {
+		auto spec = get_nso_rr(
+			"g16m[0, 0](Y) := Y = 0."
+			"g16m[n, 0](Y) := g16m[n - 1, 0](Y)."
+			"g16m(Y).");
+		REQUIRE( spec.has_value() );
+		auto res = calculate_all_fixed_points<node_t>(
+			transform_ref_args_to_captures<node_t>(spec.value()));
+		CHECK( !res.has_value() );
+		CHECK( report_has_code(res.report(), code::unsupported_operation) );
+	}
+}
+
 // GitHub #80: std::hash<rr<node>> used to hash the htref handles' addresses
 // (via std::hash<shared_ptr>), while rr::operator== compares tree content. A
 // handle is a weak-cached shared_ptr (bintree::geth), so once the last owner of

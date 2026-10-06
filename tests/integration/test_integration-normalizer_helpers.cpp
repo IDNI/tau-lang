@@ -318,6 +318,10 @@ TEST_SUITE("recurrence relation validity") {
 			"h[0](X):tau := X.", "h[0](Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		CHECK( !is_well_founded<node_t>(rr_captures) );
+		std::string why;
+		CHECK( !is_well_founded<node_t>(rr_captures, &why) );
+		CHECK( why == "the recurrence relation has no rules other than "
+			"initial conditions" );
 	}
 
 	// The documented example: h alternates between X and X' forever, so no
@@ -329,22 +333,23 @@ TEST_SUITE("recurrence relation validity") {
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		tref main_fm = rr_captures.main->get();
 		tref fallback = tau::_0(tau_type_id<node_t>());
-		tref fp = calculate_fixed_point<node_t>(rr_captures, main_fm,
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main_fm,
 			tau::bf, 1, fallback);
-		CHECK( fp != nullptr );
-		CHECK( str(fp) == "0" );
+		REQUIRE( fp.has_value() );
+		CHECK( str(fp.value()) == "0" );
 	}
 
 	TEST_CASE("calculate_fixed_point rejects a fallback of the wrong type") {
-		// ft != nt and neither first_sym nor last_sym => nullptr with an
-		// error log (normalizer.tmpl.h:1214-1219).
+		// ft != nt and neither first_sym nor last_sym => a type error
 		auto nso_rr = get_bf_nso_rr(
 			"h[n](X):tau := h[n - 1](X)'."
 			"h[0](X):tau := X.", "h(Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		tref main_fm = rr_captures.main->get();
-		CHECK( calculate_fixed_point<node_t>(rr_captures, main_fm,
-			tau::bf, 1, tau::_T()) == nullptr );
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main_fm,
+			tau::bf, 1, tau::_T());
+		CHECK( !fp.has_value() );
+		CHECK( report_has_code(fp.report(), code::type_error) );
 	}
 
 	TEST_CASE("calculate_fixed_point rejects a non-well-founded relation") {
@@ -352,8 +357,10 @@ TEST_SUITE("recurrence relation validity") {
 			"h[0](X):tau := X.", "h(Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
 		tref main_fm = rr_captures.main->get();
-		CHECK( calculate_fixed_point<node_t>(rr_captures, main_fm,
-			tau::bf, 1, tau::_0(tau_type_id<node_t>())) == nullptr );
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main_fm,
+			tau::bf, 1, tau::_0(tau_type_id<node_t>()));
+		CHECK( !fp.has_value() );
+		CHECK( report_has_code(fp.report(), code::type_error) );
 	}
 }
 

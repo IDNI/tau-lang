@@ -173,7 +173,7 @@ struct fixed_point_transformer {
 	// memoize it in `changes`; otherwise return @p n as is (the caller
 	// substitutes `changes` afterwards). Returns nullptr on an unsupported
 	// multi-index call or a failed fixpoint calculation, which aborts the
-	// traversal.
+	// traversal; the cause is in `outcome`.
 	tref operator()(tref n) {
 		const auto& t = tau::get(n);
 		if (!t.has_child()) return n;
@@ -188,9 +188,11 @@ struct fixed_point_transformer {
 			auto offset_arity = fpopt.value().offset_arity;
 			// TODO we don't support FP calc for multiindex offsets yet
 			if (offset_arity > 1) {
-				LOG_ERROR << "Fixed point"
-					" calculation of multiindex offset "
-					"relations is not supported yet";
+				outcome.error(code::unsupported_operation,
+					"Fixed point calculation of multiindex "
+					"offset relations is not supported yet",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(n))}});
 				return nullptr;
 			}
 			auto typ = t.get_type();
@@ -198,11 +200,11 @@ struct fixed_point_transformer {
 			// set, so `defs` stays unfiltered here -- only the
 			// type-mismatch check inside narrows to this call's
 			// own signature, via call_sig.
-			auto fp = calculate_fixed_point<node>(defs, n, typ,
-				offset_arity, get_fallback(typ, ref),
-				fpopt.value());
+			auto fp = outcome.merge_take(calculate_fixed_point<node>(
+				defs, n, typ, offset_arity,
+				get_fallback(typ, ref), fpopt.value()));
 			if (!fp) return nullptr;
-			return changes.emplace(n, fp).first->second;
+			return changes.emplace(n, *fp).first->second;
 		}
 		// `changes` is only ever keyed by the wrapping parent nodes, so a
 		// non-call reference needs no propagation.
@@ -268,6 +270,8 @@ struct fixed_point_transformer {
 
 	// Calculated fixpoint per call node, for the caller to substitute.
 	subtree_map<node, tref> changes;
+	// The reports of the fixpoint calculations, and the cause of a failure.
+	result<tref> outcome;
 	// The recurrence relation the calls are calculated against.
 	rr<node> defs;
 	// Offset-free call signature -> indexed definition signature.
@@ -286,9 +290,12 @@ result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 	fixed_point_transformer<node> fpt(nso_rr);
 	tref new_main = rewriter::post_order_traverser<node, decltype(fpt),
 		decltype(all)>(fpt, all)(nso_rr.main->get());
-	if (!new_main)
+	r.merge(std::move(fpt.outcome));
+	if (!new_main) {
+		if (r.has_error()) return r;
 		return r.with_error(code::internal_error,
 			"fixed point calculation did not reach a fixed point");
+	}
 	if (fpt.changes.size()) {
 		new_main = rewriter::replace<node>(new_main, fpt.changes);
 		LOG_DEBUG << "Calculated fixed points.";
