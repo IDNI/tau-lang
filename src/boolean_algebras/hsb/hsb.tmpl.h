@@ -139,7 +139,7 @@ inline const hsb_halfspace& hsb_halfspace_pool::get(size_t idx) {
 }
 
 inline size_t hsb_halfspace_pool::complement_index(size_t idx) {
-	return insert(pool_[idx].negate());
+	return insert(get(idx).negate());
 }
 
 inline size_t hsb_halfspace_pool::size() {

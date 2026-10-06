@@ -257,6 +257,17 @@ TEST_SUITE("hsb — halfspace pool") {
 			== hsb_halfspace_pool::get(idx).negate());
 	}
 
+#ifndef DEBUG
+	// Like get(), an index past the pool reads as the empty halfspace
+	// (DEBUG builds assert instead, so the case runs in release only).
+	TEST_CASE("complement_index of an index past the pool is defined") {
+		size_t past = hsb_halfspace_pool::size() + (size_t{1} << 40);
+		size_t cidx = hsb_halfspace_pool::complement_index(past);
+		CHECK(cidx != 0);
+		CHECK(hsb_halfspace_pool::get(cidx) == hsb_halfspace{}.negate());
+	}
+#endif
+
 } // TEST_SUITE halfspace pool
 
 TEST_SUITE("hsb — BA operations") {

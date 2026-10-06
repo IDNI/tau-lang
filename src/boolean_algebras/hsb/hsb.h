@@ -145,7 +145,8 @@ struct hsb_halfspace_pool {
 	static const hsb_halfspace& get(size_t idx);
 
 	/// Return the pool index of the complement (~h), inserting if needed.
-	/// @p idx must be a valid pool index; it is not checked.
+	/// As in get(), an index past the pool reads as the empty halfspace
+	/// (and asserts in DEBUG).
 	static size_t complement_index(size_t idx);
 
 	/// Number of interned halfspaces (excludes the reserved sentinel entry).
