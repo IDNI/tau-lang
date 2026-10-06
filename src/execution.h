@@ -69,8 +69,7 @@ struct steps {
  * @brief Apply each step of a sequence in turn, repeating that step until its
  *        result repeats an earlier one (a fixpoint or a cycle).
  *
- * Unlike `repeat_all`, it obeys no `max_rewrite_rounds`: a step whose
- * rewrite keeps growing the formula never stops.
+ * Each step is bounded by `max_rewrite_rounds`, as `repeat_all` is.
  * @tparam node Tree node type.
  * @tparam step_t Individual step type.
  */
@@ -83,16 +82,20 @@ struct repeat_each {
 
 	/**
 	 * @brief Run each step to its fixpoint or cycle, in order.
+	 *
+	 * On hitting `max_rewrite_rounds` for a step, logs an error.
 	 * @param n Formula to rewrite.
-	 * @return The formula after the last step settled.
+	 * @return The formula after the last step settled, or `nullptr` if
+	 *         `max_rewrite_rounds` is set and a step's result did not
+	 *         repeat within that many rounds.
 	 */
 	tref operator()(tref n) const;
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };
 
-/// Round cap for `repeat_all` — a rewrite that neither settles nor cycles;
-/// 0 = unlimited (the default). A rewriting system given by user definitions
+/// Round cap for `repeat_all` and for each step of `repeat_each` — a rewrite
+/// that neither settles nor cycles; 0 = unlimited (the default). A rewriting system given by user definitions
 /// need not terminate, and a non-terminating one typically *grows* the
 /// formula rather than revisiting an earlier state, so `repeat_all`'s
 /// `visited` cycle check never fires on it — only a bound set here stops it.

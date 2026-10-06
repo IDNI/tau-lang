@@ -50,14 +50,23 @@ template <NodeType node, typename step_t>
 tref repeat_each<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	for (auto& l: s.libraries) {
-		// `visited` only catches cycles, not growth: an ever-growing
-		// rewrite loops forever here, since max_rewrite_rounds bounds
-		// repeat_all only.
+		// `visited` catches a fixpoint or a cycle; max_rewrite_rounds
+		// (0 = unlimited) bounds an ever-growing rewrite.
 		std::unordered_set<tref> visited;
-		while (true) {
+		bool settled = false;
+		for (size_t round = 0;
+			!max_rewrite_rounds || round < max_rewrite_rounds; ++round)
+		{
 			nn = l(nn);
-			if (visited.find(nn) != visited.end()) break;
+			if (visited.contains(nn)) { settled = true; break; }
 			visited.insert(nn);
+		}
+		if (!settled) {
+			LOG_ERROR << "Rewriting did not reach a fixpoint after "
+				<< max_rewrite_rounds << " rounds (max-rewrite-rounds)"
+				" and is still growing; the definitions in use are "
+				"most likely non-terminating for this argument";
+			return nullptr;
 		}
 	}
 	return nn;

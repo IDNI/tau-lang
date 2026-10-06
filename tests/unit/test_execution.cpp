@@ -53,6 +53,20 @@ TEST_SUITE("execution: repeat_each") {
 		repeat_each<node_t, step<node_t>> re(lib);
 		CHECK( re(x) == z );
 	}
+
+	// `x -> x'` grows the formula every application and never repeats a
+	// state, so only max_rewrite_rounds ends the loop. Hooks stay off: with
+	// them on, the double negation folds away and the rewrite oscillates.
+	TEST_CASE("ever-growing rewrite is bounded and reports failure") {
+		use_hooks_guard<node_t> g(false);
+		const size_t saved = max_rewrite_rounds;
+		max_rewrite_rounds = 64;
+		tref x = bf_var("x");
+		step<node_t> grow({ swap_rule(x, build_bf_neg<node_t>(x)) });
+		repeat_each<node_t, step<node_t>> re(grow);
+		CHECK( re(x) == nullptr );
+		max_rewrite_rounds = saved;
+	}
 }
 
 TEST_SUITE("execution: repeat_all") {

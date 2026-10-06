@@ -279,8 +279,8 @@ struct api {
 	 */
 	static void set_max_probe_steps(size_t n);
 	/**
-	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
-	 * (default). Oscillation is detected regardless; this bounds only
+	 * @brief Cap the rewrite-to-fixpoint rounds of `repeat_all` and of
+	 * each step of `repeat_each`; 0 = unlimited (default). Oscillation is detected regardless; this bounds only
 	 * ever-growing rewrites. Environment fallback `TAU_MAX_REWRITE_ROUNDS`.
 	 */
 	static void set_max_rewrite_rounds(size_t n);
@@ -564,7 +564,7 @@ struct api {
 	/// The effective untyped saturation probe cap (`TAU_MAX_PROBE_STEPS`;
 	/// default 10000, 0 = unlimited).
 	static size_t get_max_probe_steps();
-	/// The effective `repeat_all` round cap (`TAU_MAX_REWRITE_ROUNDS`; default
+	/// The effective `repeat_all` / `repeat_each` round cap (`TAU_MAX_REWRITE_ROUNDS`; default
 	/// and 0 = unlimited).
 	static size_t get_max_rewrite_rounds();
 	/// The effective bv custom simplification round cap
