@@ -1131,6 +1131,24 @@ TEST_SUITE("Tau API - string - solution and definition rendering") {
 		CHECK(a.value() == "y' = 0");
 	}
 
+	// The definitions given to apply_def(s) apply to that call only.
+	TEST_CASE_FIXTURE(api_fixture, "apply_def does not register its definition") {
+		auto a = tau_api::apply_def("str_apply_def_once(x) := x'",
+			"str_apply_def_once(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+		auto b = tau_api::apply_defs(
+			std::set<std::string>{ "str_apply_defs_once(x) := x + 1" },
+			"str_apply_defs_once(y) = 0");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y+1 = 0");
+		auto c = tau_api::apply_all_defs(
+			"str_apply_def_once(y) = 0 && str_apply_defs_once(y) = 0");
+		REQUIRE(c.has_value());
+		CHECK(c.value().find("str_apply_def_once") != std::string::npos);
+		CHECK(c.value().find("str_apply_defs_once") != std::string::npos);
+	}
+
 	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs applies the registered definitions") {
 		REQUIRE(tau_api::get_definition("str_apply_all_defs_jj(x) := x'")
 			.has_value());

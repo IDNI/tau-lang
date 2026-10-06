@@ -130,15 +130,18 @@ result<std::string> api<node>::apply_defs(
 		subtree_set<node> tdefs;
 		trefs heads;
 		// A definition that fails to parse fails the call: the tref-level
-		// apply_defs skips a null definition, which would hide it. Each
-		// definition is parsed with get_definition, so it is also
-		// registered in the global definition store.
+		// apply_defs skips a null definition, which would hide it. The
+		// definitions apply to this call only; they are not registered in
+		// the global definition store.
 		for (const std::string& def : defs) {
-			auto d = r.merge_take(get_definition(def));
+			auto d = r.merge_take(tau::get(def,
+				get_options<node>(tau::rec_relation, true)));
 			if (!d) {
 				DBG(assert(r.is_well_formed());)
 				return r;
 			}
+			if (!*d) return r.with_assert_check_error(code::parse_error,
+				"Failed to parse definition");
 			tdefs.insert(*d);
 			heads.push_back(tau::get(*d).first());
 		}

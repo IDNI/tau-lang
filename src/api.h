@@ -826,8 +826,8 @@ struct api {
 	// -----------------------------------------------------------------------
 
 	/// Apply a single recursive definition to an expression.
-	/// Same as @ref apply_defs with a one-element set, including its
-	/// registration of the definition in the global store.
+	/// Same as @ref apply_defs with a one-element set: the definition
+	/// applies to this call only.
 	/// @return The rewritten expression, or a structured error on parse failure.
 	static result<std::string> apply_def(
 		const std::string& def,
@@ -844,8 +844,8 @@ struct api {
 	/// the main formula. The definitions registered in the global store are
 	/// not applied; @ref apply_all_defs applies those. The tref and htref
 	/// overloads skip a null or non-rec_relation definition. The string
-	/// overload parses each definition with @ref get_definition, which
-	/// registers it in the global store, and fails on the first one that
+	/// overload parses each definition as @ref get_definition does, without
+	/// registering it in the global store, and fails on the first one that
 	/// does not parse; it reads @p expression untyped, so a call still
 	/// matches an untyped definition head, and returns the main formula of
 	/// a spec.
