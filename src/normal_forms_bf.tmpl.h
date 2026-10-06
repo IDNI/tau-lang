@@ -204,30 +204,15 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	return memo(res);
 }
 
-// `simplify_using_equality_dnf` and `syntactic_path_simplification_dnf` used
-// to live here as near-verbatim copies of the heuristics passes of the same
-// name. Every fix landed on one copy only -- the heuristics one accumulated
-// the io_var guard in `simplify_equation`, the release-mode union-find stack
-// underflow guard, the gc-aware consequence cache, the issue-69 decline of
-// `wff_imply`/`rimply`/`equiv`/`xor`/`conditional`, `while_is_boolean_operation`
-// as the bf substitution descent predicate -- while this one, the copy
-// production actually ran, got none of them. Both copies are deleted; the
-// callers below now use `simplify_using_equality`
-// (heuristics/simplify_using_equality.h), `syntactic_path_simplification` and
-// `syntactic_path_simplification_unsat_on_unchanged_negations`
-// (heuristics/syntactic_path_simplification.h), both pulled in ahead of this
-// file by normal_forms.tmpl.h / normal_forms.h respectively.
-
 /**
  * @brief Function to apply syntactical simplifications to formula in almost
  * linear time in the formula size and the number of paths found in terms
  * @tparam node tree node type
  * @param formula The formula to simplify
- * @return The simplified formula
+ * @return The simplified formula, or the report of a failed
+ * `simplify_using_equality`.
  *
- * @note This pass takes no `skip` predicate, and deliberately so: it used to
- * accept one for interface consistency with `anti_prenex_block`'s other steps
- * and then discard it, which read as a guarantee it never gave. Neither
+ * @note This pass takes no `skip` predicate: neither
  * `simplify_using_equality` nor `syntactic_path_simplification` has a
  * BV-specific check to guard, so a caller that skips bitvector content
  * elsewhere in the pipeline must not assume this step leaves it alone.
@@ -257,13 +242,9 @@ auto variable_order_for_simplification = [](tref l, tref r) {
 	if (tau::get(l) == tau::get(r)) return false;
 	// Non-io variables form a single class ordered *after* every io variable,
 	// as the comment above states ("... < input < output < other variable").
-	// This also makes the relation a valid strict weak ordering: the previous
-	// version returned false for every pair involving a non-io variable in
-	// both directions, which made each non-io variable equivalent to each io
-	// variable while io variables stayed strictly ordered among themselves --
-	// so incomparability was not transitive and std::ranges::stable_sort's
-	// precondition was violated, leaving the BDD variable order (and hence the
-	// normal form) unspecified.
+	// Keep it so: it makes the relation a strict weak ordering, which
+	// std::ranges::stable_sort requires for a specified BDD variable order
+	// (and hence normal form).
 	if (!is_io_var<node>(l)) return false;
 	if (!is_io_var<node>(r)) return true;
 	if (is_io_var<node>(l)) {
@@ -433,7 +414,16 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) {
 
 /**
  * @brief Comparator for the BDD variable order used during anti-prenex algorithm.
+ *
+ * Atoms whose deepest quantified variable is quantified deepest come first,
+ * then equational assignments, then the larger shallowest quantifier depth;
+ * ties break on the sorted printed names of the free variables and then on
+ * the printed atom.
  * @tparam node Type of tree node
+ * @param quant_pattern Map from each quantified variable to its quantifier
+ * depth; a variable not in it counts as depth 0. Captured by reference, so it
+ * must outlive the comparator.
+ * @return A strict weak ordering `bool(tref, tref)` over atoms.
  */
 template<NodeType node>
 auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
@@ -481,11 +471,10 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 		if (min_r > min_l) return false;
 		// Grammar-regeneration-stable tie-breaks. subtree_less compares
 		// node values, which embed parser nonterminal NUMBERS: a
-		// `./dev regen` with a newer pinned generator renumbers them and
-		// silently reorders every id-based tie. The 8f1a74c1
-		// regeneration did exactly that and re-rolled the
-		// Boole-decomposition pivot choice into a hang (GitHub #70
-		// family; bisected 2026-08-19). Ties therefore break on PRINTED
+		// regeneration of the parser renumbers them and silently
+		// reorders every id-based tie, and with it the
+		// Boole-decomposition pivot choice, which can turn into a hang
+		// (GitHub #70). Ties therefore break on PRINTED
 		// form — surface syntax is the one ordering a regeneration
 		// cannot change. Variable sets compare as name-sorted sequences
 		// so the verdict is also independent of get_free_vars's internal
@@ -549,7 +538,13 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	return atomic_formula;
 }
 
-// Squeeze two equations equal/unequal to zero into one equation
+/**
+ * @brief Squeeze two equations of the same polarity, `f = 0` and `g = 0`
+ * (or `f != 0` and `g != 0`), into one: `f | g = 0` (resp. `f | g != 0`).
+ * @param eq1 First equation, normalized to a zero right-hand side.
+ * @param eq2 Second equation, of the same kind as @p eq1.
+ * @return The squeezed equation; nullptr when @p eq1 is neither kind.
+ */
 template <NodeType node>
 tref squeeze(tref eq1, tref eq2) {
 	using tau = tree<node>;
@@ -582,6 +577,9 @@ tref squeeze(tref eq1, tref eq2) {
  * be unable to relate such atoms to one another at all -- even when they
  * are the exact same reference. Fall back to the atom's own top-level
  * bf_ref occurrences as comparison keys in that case.
+ * @param n The atom.
+ * @return Its free variables, or, when it has none, its top-level bf_ref
+ * occurrences (sorted, without duplicates).
  */
 template <NodeType node>
 trefs get_free_vars_or_refs(tref n) {
@@ -594,6 +592,23 @@ trefs get_free_vars_or_refs(tref n) {
 	return trefs(refs.begin(), refs.end());
 }
 
+/**
+ * @brief Absorbs the assumptions in scope into @p eq, by the rule table of
+ * the no-var `squeeze_absorb`, and records which assumptions @p eq joins.
+ *
+ * An assumption applies when it shares at least two free variables (or
+ * bf_refs) with @p eq, or @p eq has only one and shares it. A positive
+ * equation that shares a variable (non-dual) is merged with the assumption
+ * in @p joins; one that joins nothing is appended to @p additions.
+ * @param eq Equation `f = 0` or `f != 0`.
+ * @param assms Stack of assumption sets; only `assms.back()` is read.
+ * @param joins Union-find over assumption terms, updated with the merges.
+ * @param additions Receives `f` of an equation of the scope's own polarity
+ * that joined no assumption.
+ * @param dual True when the scope is the dual one (a disjunction's `!= 0`
+ * assumptions instead of a conjunction's `= 0` ones).
+ * @return The rewritten equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool dual = false) {
 	using tau = tree<node>;
@@ -627,7 +642,7 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 					joined = true;
 					eq = tau::build_bf_neq_0(tau::build_bf_or(
 						tau::trim2(eq), assm));
-				// NF-4: else, not fall-through -- the dual arm
+				// else, not fall-through -- the dual arm
 				// otherwise gets immediately AND-ed with the
 				// assumption's negation ((f|A) & A' == f & A'),
 				// contradicting the 3-arg overload and the
@@ -648,6 +663,14 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 	return eq;
 }
 
+/**
+ * @brief Absorbs the assumptions in `assms.back()` into @p eq by the rule
+ * table of the no-var `squeeze_absorb`, without recording joins.
+ * @param eq Equation `f = 0` or `f != 0`.
+ * @param assms Stack of assumption sets; only `assms.back()` is read.
+ * @param dual True for the dual scope.
+ * @return The rewritten equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 	using tau = tree<node>;
@@ -680,6 +703,16 @@ tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 	return eq;
 }
 
+/**
+ * @brief Absorbs the single assumption @p assm into @p eq by the rule table
+ * of `squeeze_absorb(formula, var)`, when @p eq contains @p var and has only
+ * one free variable or shares at least two with @p assm.
+ * @param eq Equation `f = 0` or `f != 0`.
+ * @param assm Assumption term.
+ * @param var The shared variable.
+ * @param dual True for the dual scope.
+ * @return The rewritten equation, or @p eq unchanged.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 	using tau = tree<node>;
@@ -711,6 +744,17 @@ tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 	return eq;
 }
 
+/**
+ * @brief As the overload without @p updates, and also appends @p eq (before
+ * rewriting) to @p updates when it contains @p var and has the scope's own
+ * polarity.
+ * @param eq Equation `f = 0` or `f != 0`.
+ * @param assm Assumption term.
+ * @param var The shared variable.
+ * @param updates Receives the equations that feed the next assumption.
+ * @param dual True for the dual scope.
+ * @return The rewritten equation, or @p eq unchanged.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual = false) {
 	using tau = tree<node>;
@@ -744,6 +788,14 @@ tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual =
 	return eq;
 }
 
+/**
+ * @brief Replaces each joined class of `assms.back()` by the disjunction of
+ * its members (from @p joins), dropping the other members, then appends
+ * @p additions.
+ * @param assms Stack of assumption sets; `assms.back()` is rewritten.
+ * @param joins Union-find over assumption terms.
+ * @param additions Terms to add as new assumptions.
+ */
 template <NodeType node>
 void update_assms(auto& assms, auto& joins, trefs& additions) {
 	using tau = tree<node>;

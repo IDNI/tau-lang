@@ -34,7 +34,7 @@ namespace idni::tau_lang {
 /// decision of an accumulating spec is replaced by one decision per
 /// component, each remembered across steps. On by default (GitHub #92: the
 /// accumulating run of #90 goes from 42 s to 5 s with identical output);
-/// disabled via `api::set_ba_component_factoring(false)`,
+/// disabled via `api<node>::set_ba_component_factoring(false)`,
 /// `--ba-component-factoring=false`, the REPL option `factoring`, or the
 /// environment variable TAU_BA_COMPONENT_FACTORING=0 (any other value
 /// enables; the variable overrides the flag in both directions).
@@ -45,7 +45,7 @@ inline bool ba_component_factoring = true;
 /// interpreter's per-step sweep, oldest released first. Rows whose key tree
 /// nothing else holds were dropped at every sweep and their constant
 /// re-decided at the next step (GitHub #92). 0 disables the pinning; set via
-/// api::set_ba_decision_pins, --ba-decision-pins, or the REPL option
+/// api<node>::set_ba_decision_pins, --ba-decision-pins, or the REPL option
 /// decisionpins.
 /// Environment fallback `TAU_BA_DECISION_PINS`.
 inline env_limit<size_t> ba_decision_pins{ "TAU_BA_DECISION_PINS", 4096 };
@@ -60,6 +60,16 @@ inline size_t tau_ba_predicate_misses = 0;
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP.
 
+/**
+ * @brief A Tau spec (recurrence relations plus a main formula) used as a
+ * Boolean-algebra element.
+ *
+ * The Boolean operations combine the main formulas and merge the
+ * recurrence relations; `is_zero`/`is_one` run the temporal decision
+ * procedure and are memoized (see `ba_component_factoring`,
+ * `ba_decision_pins`).
+ * @tparam BAs The other base algebras of the pack.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba {
@@ -67,98 +77,114 @@ struct tau_ba {
 	using tau = tau_lang::tree<node>;
 
 	/**
-	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
+	 * @brief Constructs the element from recurrence relations and a main
+	 * formula.
 	 *
-	 * @param rec_relations Reference to rules of tau_nso_t.
-	 * @param main Reference to main tau_nso_t.
+	 * @param rec_relations Recurrence relations of the spec.
+	 * @param main Main formula of the spec.
 	 */
 	tau_ba(const rewriter::rules& rec_relations, htref main);
 
 	/**
-	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
+	 * @brief Constructs the element from recurrence relations and a main
+	 * formula.
 	 *
-	 * @param rec_relations Reference to rules of tau_nso_t.
-	 * @param main Reference to main tau_nso_t.
+	 * @param rec_relations Recurrence relations of the spec.
+	 * @param main Main formula of the spec.
 	 */
 	tau_ba(const rewriter::rules& rec_relations, tref main);
 
 	/**
-	 * @brief Constructor initializing tau_ba with main tau_nso_t.
+	 * @brief Constructs the element from a main formula, with no recurrence
+	 * relations.
 	 *
-	 * @param main Reference to main tau_nso_t.
+	 * @param main Main formula of the spec.
 	 */
 	tau_ba(htref main);
 
 	/**
-	 * @brief Constructor initializing tau_ba with main tau_nso_t.
+	 * @brief Constructs the element from a main formula, with no recurrence
+	 * relations.
 	 *
-	 * @param main Reference to main tau_nso_t.
+	 * @param main Main formula of the spec.
 	 */
 	tau_ba(tref main);
 
+	/// Constructs an element with a default (empty) `nso_rr`.
 	tau_ba();
 
 	/**
-	 * @brief Three-way comparison operator.
+	 * @brief Three-way comparison, memberwise over `nso_rr`.
 	 *
-	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the comparison.
 	 */
 	auto operator<=>(const tau_ba<BAs...>&) const;
 
 	/**
-	 * @brief Bitwise NOT operator.
+	 * @brief Negation: the NNF of `¬main`, with the temporal quantifiers of
+	 * `main` normalized; the recurrence relations are kept.
 	 *
-	 * @return Result of the bitwise NOT operation.
+	 * Total: a failed normalization falls back to the unnormalized main.
+	 * @return The complement element.
 	 */
 	tau_ba<BAs...> operator~() const;
 
 	/**
-	 * @brief Bitwise AND operator.
+	 * @brief Conjunction of the (temporally normalized) main formulas, with
+	 * the recurrence relations of both operands merged.
 	 *
-	 * @param other Reference to another tau_ba<BAs...>.
-	 * @return Result of the bitwise AND operation.
+	 * @param other The right operand.
+	 * @return The meet of the two elements.
 	 */
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Bitwise OR operator.
+	 * @brief Disjunction of the (temporally normalized) main formulas, with
+	 * the recurrence relations of both operands merged.
 	 *
-	 * @param other Reference to another tau_ba<BAs...>.
-	 * @return Result of the bitwise OR operation.
+	 * @param other The right operand.
+	 * @return The join of the two elements.
 	 */
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Addition operator.
+	 * @brief Symmetric difference (exclusive or) of the (temporally
+	 * normalized) main formulas, with the recurrence relations merged.
 	 *
-	 * @param other Reference to another tau_ba<BAs...>.
-	 * @return Result of the addition operation.
+	 * @param other The right operand.
+	 * @return The symmetric difference of the two elements.
 	 */
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Bitwise XOR operator.
+	 * @brief Same as `operator+`.
 	 *
-	 * @param other Reference to another tau_ba<BAs...>.
-	 * @return Result of the bitwise XOR operation.
+	 * @param other The right operand.
+	 * @return The symmetric difference of the two elements.
 	 */
 	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Checks if the tau_ba is zero; the result reports why on a
-	 * decision failure.
+	 * @brief Checks if the tau_ba is zero, i.e. its normalized spec is
+	 * unsatisfiable; the result reports why on a decision failure.
+	 *
+	 * Memoized by main tree when the element has no recurrence relations;
+	 * obeys `ba_component_factoring`.
 	 */
 	result<bool> is_zero() const;
 
 	/**
-	 * @brief Checks if the tau_ba is one; the result reports why on a
-	 * decision failure.
+	 * @brief Checks if the tau_ba is one, i.e. its normalized spec is valid;
+	 * the result reports why on a decision failure.
+	 *
+	 * Memoized by main tree when the element has no recurrence relations;
+	 * obeys `ba_component_factoring`.
 	 */
 	result<bool> is_one() const;
 
 	/**
-	 * @brief Type equivalent to tau_spec<BAs...>.
+	 * @brief The spec this element stands for: its recurrence relations and
+	 * main formula.
 	 */
 	const rr<node> nso_rr;
 
@@ -166,31 +192,34 @@ private:
 };
 
 /**
- * @brief Equality operator for tau_ba and bool.
+ * @brief Compares a tau_ba with the bottom (`false`) or top (`true`) element.
  *
  * @tparam BAs Variadic template parameters.
  * @param other Reference to tau_ba.
- * @param b Reference to bool.
- * @return True if equal, otherwise false.
+ * @param b `true` asks `is_one()`, `false` asks `is_zero()`.
+ * @return The decision; an undecided `is_one()` gives false and an
+ * undecided `is_zero()` gives true (the decision report is dropped).
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& other, const bool& b);
 
 /**
- * @brief Equality operator for bool and tau_ba.
+ * @brief Compares a tau_ba with the bottom or top element; same as
+ * `other == b`.
  *
  * @tparam BAs Variadic template parameters.
- * @param b Reference to bool.
+ * @param b `true` for top, `false` for bottom.
  * @param other Reference to tau_ba.
- * @return True if equal, otherwise false.
+ * @return The result of `other == b`.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const bool& b, const tau_ba<BAs...>& other);
 
 /**
- * @brief Equality operator for two tau_ba objects.
+ * @brief Syntactic equality of two tau_ba objects: same main tree and same
+ * recurrence relations; no decision procedure runs.
  *
  * @tparam BAs Variadic template parameters.
  * @param lhs Reference to first tau_ba.
@@ -202,11 +231,11 @@ requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& lhs, const tau_ba<BAs...>& rhs);
 
 /**
- * @brief Inequality operator for tau_ba and bool.
+ * @brief Negation of `other == b`.
  *
  * @tparam BAs Variadic template parameters.
  * @param other Reference to tau_ba.
- * @param b Reference to bool.
+ * @param b `true` for top, `false` for bottom.
  * @return True if not equal, otherwise false.
  */
 template <typename... BAs>
@@ -214,10 +243,10 @@ requires BAsPack<BAs...>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b);
 
 /**
- * @brief Inequality operator for bool and tau_ba.
+ * @brief Negation of `other == b`.
  *
  * @tparam BAs Variadic template parameters.
- * @param b Reference to bool.
+ * @param b `true` for top, `false` for bottom.
  * @param other Reference to tau_ba.
  * @return True if not equal, otherwise false.
  */
@@ -228,31 +257,36 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other);
 /**
  * @brief Splits the given tau_ba based on splitter type.
  *
+ * Normalizes the spec (memoized when it has no recurrence relations) and
+ * runs `tau_splitter` on the result.
  * @tparam BAs Variadic template parameters.
  * @param fm Reference to tau_ba.
  * @param st Splitter type.
- * @return Split tau_ba, or the report of a failed normalization.
+ * @return Split tau_ba, with no recurrence relations, or the report of a
+ * failed normalization or split.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tau_ba<BAs...>> splitter(const tau_ba<BAs...>& fm, splitter_type st);
 
 /**
- * @brief Splits tau_ba into one.
+ * @brief Returns a splitter of the top element: `tau_bad_splitter` of `T`.
  *
  * @tparam BAs Variadic template parameters.
- * @return Split tau_ba.
+ * @return A tau_ba strictly between bottom and top.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_splitter_one();
 
 /**
- * @brief Checks if the tau_ba is closed; the result reports why on a
- * decision failure.
+ * @brief Checks if the tau_ba is closed: once its recurrence relations and
+ * definitions are applied, no reference remains and every free variable is
+ * a stream or an uninterpreted constant.
  *
  * @tparam BAs Variadic template parameters.
  * @param fm Reference to tau_ba.
+ * @return Whether @p fm is closed, or the report of a failed application.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -262,20 +296,24 @@ result<bool> is_tau_closed(const tau_ba<BAs...>& fm);
  * @brief Parse @p src as a Tau spec constant; the result reports why on failure.
  * @tparam BAs BA pack.
  * @param src Source string.
+ * @return The constant, typed `tau`, or the parse errors.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src);
 
-/** @brief Print the NSO recurrence-relation of a `tau_ba` to @p os. */
+/**
+ * @brief Print the NSO recurrence-relation of a `tau_ba` to @p os.
+ * @return @p os.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs);
 
 } // namespace idni::tau_lang
 
-// Hash for tau_ba using specialization to std::hash
+/// Hash for tau_ba: the hash of its `nso_rr`.
 template <typename... BAs>
 requires idni::tau_lang::BAsPack<BAs...>
 struct std::hash<idni::tau_lang::tau_ba<BAs...>> {

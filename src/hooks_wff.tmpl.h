@@ -45,11 +45,15 @@ TAU_HOOKS_DEFINE_WFF_TRY(neq, wff_neq)
 } // namespace hooks_detail
 
 /**
- * @brief The type whose BA answers for a comparison of @p ch.
+ * @brief The type whose BA answers for the comparison `a1 op a2`.
  *
  * The left operand's type normally decides, but a non-aba omega-categorical BA
  * answers from either side: its constants may sit on the right of an otherwise
  * untyped comparison.
+ * @param a1 Left operand.
+ * @param a2 Right operand.
+ * @return The type id of @p a1, or that of @p a2 when only @p a2's type is a
+ * non-aba omega-categorical one.
  */
 template <NodeType node>
 static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
@@ -59,6 +63,7 @@ static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
 	return pack_type_is_non_aba_omcat<node>(tr) ? tr : tl;
 }
 
+/** @internal @copydoc get_hook::wff @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff", v, ch, len, r);)
@@ -97,6 +102,7 @@ tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	}
 }
 
+/** @internal @copydoc get_hook::wff_and @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_and", v, ch, len, r);)
@@ -157,6 +163,7 @@ tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) 
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_or @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_or", v, ch, len, r);)
@@ -214,6 +221,7 @@ tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::ctn_neg @endinternal */
 template <NodeType node>
 tref get_hook<node>::ctn_neg(const tree<node>& n) {
 	auto num    = n.find_top(is<node, tau::num>);
@@ -249,6 +257,7 @@ tref get_hook<node>::ctn_neg(const tree<node>& n) {
 	return nullptr;
 }
 
+/** @internal @copydoc get_hook::wff_neg @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neg", v, ch, len, r);)
@@ -276,6 +285,7 @@ tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) 
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_xor @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_xor([[maybe_unused]] const node& v, const tref* ch,
 	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
@@ -323,6 +333,7 @@ tref get_hook<node>::wff_xor([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_xor(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
+/** @internal @copydoc get_hook::wff_ctn @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ctn", v, ch, len, r);)
@@ -342,6 +353,7 @@ tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) 
 	return n;
 }
 
+/** @internal @copydoc get_hook::wff_eq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
@@ -429,6 +441,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_eq_cte @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
@@ -444,6 +457,7 @@ tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref 
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_neq @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq", v, ch, len, r);)
@@ -531,6 +545,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 	return tau::get_raw(v, ch, len, r);
 }
 
+/** @internal @copydoc get_hook::wff_neq_cte @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)

@@ -48,6 +48,8 @@
 
 namespace idni::tau_lang {
 
+/// What @ref run_bounded got from its work: the status, the one-byte answer
+/// (meaningful only when `status == done`) and the wall-clock seconds spent.
 struct bounded_outcome {
 	enum kind { done, timed_out, failed } status = failed;
 	uint8_t value = 0;
@@ -70,6 +72,10 @@ constexpr bool bounded_calls_available() {
  * `done` carries the answer; `timed_out` means the child was killed at the
  * bound; `failed` means no child could be made or it died without
  * answering. With no process model, @p work runs in the process.
+ * @param work The computation; it runs in a forked child, so its side effects
+ * never reach the caller (except with no process model).
+ * @param timeout_ms Wall-clock bound in milliseconds, counted from the call.
+ * @return The outcome, with the answer in `value` when `status == done`.
  */
 inline bounded_outcome run_bounded(const std::function<uint8_t()>& work,
 	uint64_t timeout_ms)
@@ -152,7 +158,8 @@ inline std::string& time_budget_exhausted() {
 	return message;
 }
 
-/// Records that work ran past its time budget, described by @p message.
+/// Records that work ran past its time budget, described by @p message; the
+/// first message of a unit of work is kept, later ones are dropped.
 inline void note_time_budget_exhausted(std::string message) {
 	if (time_budget_exhausted().empty())
 		time_budget_exhausted() = std::move(message);
@@ -206,6 +213,9 @@ struct time_budget_handled {
 	std::optional<std::chrono::steady_clock::time_point> outer_deadline
 		= shared_deadline();
 	duration outer_question = shared_question_budget();
+	/// Takes over the budget state of the enclosing scope; @p share, when
+	/// given, opens a shared deadline that far from now, and @p per_question
+	/// (default: @p share) caps each question within it.
 	explicit time_budget_handled(std::optional<duration> share = {},
 		std::optional<duration> per_question = {})
 	{
@@ -217,6 +227,7 @@ struct time_budget_handled {
 	time_budget_handled& operator=(const time_budget_handled&) = delete;
 	/// Whether a budget ran out in the scope so far.
 	bool ran_out() const { return !time_budget_exhausted().empty(); }
+	/// Restores the enclosing scope's budget state, dropping what ran out here.
 	~time_budget_handled() {
 		time_budget_exhausted() = std::move(outer);
 		shared_deadline() = outer_deadline;

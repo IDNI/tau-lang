@@ -40,7 +40,7 @@ tref distribute_block_over_atoms(tref formula, const trefs& block);
 /// unlimited (the default: always squeeze). The cross product of an `∧` of
 /// `∨`s is multiplicative, so a bound caps the fast path's own blow-up — set
 /// it via `--block-squeeze-cap`, REPL `squeezecap`, or
-/// `api::set_block_squeeze_cap`. Runtime-tunable per the runtime-parameter
+/// `api<node>::set_block_squeeze_cap`. Runtime-tunable per the runtime-parameter
 /// policy; NOT thread-safe, like every knob in this pass.
 /// Environment fallback `TAU_BLOCK_SQUEEZE_CAP`.
 inline env_limit<size_t> block_squeeze_cap{ "TAU_BLOCK_SQUEEZE_CAP", 0 };
@@ -61,9 +61,10 @@ inline env_limit<size_t> block_squeeze_cap{ "TAU_BLOCK_SQUEEZE_CAP", 0 };
  *  - `T`           -> `[0]`   (`0 = 0` is true)
  *  - `F`           -> `[]`    (the empty disjunction is false)
  *
- * Returns `std::nullopt` when the cross product would exceed
+ * Returns `std::nullopt` when an intermediate list (the concatenation of an
+ * `∨` or the cross product of an `∧`) would exceed a nonzero
  * `block_squeeze_cap`, or when a node that is not one of the above is
- * reached. The caller must have established
+ * reached (a negated equation, a quantifier, ...). The caller must have established
  * `profile_block_atoms(formula, skip).all_positive()`.
  * @tparam node Tree node type.
  * @param formula All-positive matrix.

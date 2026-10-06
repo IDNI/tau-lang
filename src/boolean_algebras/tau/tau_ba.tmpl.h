@@ -23,11 +23,13 @@ namespace detail {
 // into a lookup, and a row lives as long as its key tree.
 template <typename node>
 struct tau_decision_cache {
+	/// Memo of `normalize_tau`: main tree -> normalized main.
 	static auto& normalize_memo() {
 		using cache_t = subtree_unordered_map<node, tref>;
 		static cache_t& m = tree<node>::template create_cache<cache_t>();
 		return m;
 	}
+	/// Memo of `normalize_for_splitter`: main tree -> normalized formula.
 	static auto& splitter_normalize_memo() {
 		using cache_t = subtree_unordered_map<node, tref>;
 		static cache_t& m = tree<node>::template create_cache<cache_t>();
@@ -163,9 +165,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
 	return *this + other;
 }
 
-/**
- * @internal
- * @brief Memoise a Tau-BA constant/valid test over the element's main tree.
+/*
+ * Memoise a Tau-BA constant/valid test over the element's main tree.
  *
  * `is_zero`/`is_one` are what every layer above probes a Tau-BA leaf with --
  * `nso_ba`'s `operator==(tree, bool)` routes through `node::ba::is_zero/is_one`,
@@ -194,15 +195,14 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
  * which is only a complete identity when the element carries no recurrence
  * relations -- `rewriter::rules` is not a tref-shaped key, and `normalizer`
  * folds those rules into the answer. Elements that carry them are therefore
- * computed uncached (correct, just as slow as before).
- * @endinternal
+ * computed uncached.
  */
-// Keeps the trees behind the most recent decided rows alive across the
-// interpreter's per-step sweep, so a decision made for a constant at one
-// step is found again at the next (GitHub #92). The caches themselves are
-// registered with the GC and drop any row whose key does not survive; a
-// pinned key survives. Bounded: the oldest pin is released first once
-// `ba_decision_pins` handles are held, and 0 disables the pinning.
+/// Keeps the trees behind the most recent decided rows alive across the
+/// interpreter's per-step sweep, so a decision made for a constant at one
+/// step is found again at the next (GitHub #92). The caches themselves are
+/// registered with the GC and drop any row whose key does not survive; a
+/// pinned key survives. Bounded: the oldest pin is released first once
+/// `ba_decision_pins` handles are held, and 0 disables the pinning.
 template <typename node>
 static void pin_decided_key(tref key) {
 	static std::deque<htref> pins;
@@ -214,6 +214,19 @@ static void pin_decided_key(tref key) {
 	while (pins.size() > ba_decision_pins) pins.pop_front();
 }
 
+/**
+ * @internal
+ * @brief Memoise a Tau-BA constant/valid test over the element's main tree
+ * (the note above `pin_decided_key` gives the reasons and the key
+ * discipline).
+ * @param fm The element to decide.
+ * @param cache The memo of this predicate, keyed by main tree; used only
+ * when @p fm has no recurrence relations.
+ * @param compute Decides the normalized formula: `result<bool>(tref)`.
+ * @return The verdict, or the report of a failed normalization or decision
+ * (a failure is not memoized).
+ * @endinternal
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -243,38 +256,9 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	return r.with_value(cache.insert_or_assign(key, *res).first->second);
 }
 
-/**
- * @internal
- * @brief Per-support-component sat/valid decision for a `:tau` constant.
- *
- * `is_zero`/`is_one` decide a constant by running the full temporal decision
- * procedure over its formula. When that formula is a conjunction of units
- * with pairwise disjoint free supports -- the shape a constant takes when
- * independent clauses accumulate into it -- every question pays for all
- * units, although the answer factors: a model of each unit assigns only its
- * own variables, so models over disjoint supports compose where no unit
- * refers to absolute time (`refers_to_absolute_time`), and validity
- * distributes over conjunction. `factored_tau_sat`/`factored_tau_valid`
- * decide per unit group and cache the verdicts per group (the `create_cache`
- * discipline of `cached_tau_ba_predicate`, compute before emplace), so a
- * constant that grows by one clause pays for that clause.
- *
- * Supports are compared by variable NAME, not by variable node: `o1[t]`,
- * `o1[t-1]` and `o1[0]` are one stream and must land in one group (a
- * node-identity grouping such as `group_by_shared_vars` would keep them
- * apart); the time offset variable is not part of the support
- * (`get_free_vars` does not descend into io variables). Bound-variable names
- * are included, which can only merge groups, never split them.
- *
- * Conservative gates, each falling back to the monolithic path: any embedded
- * BA constant inside a unit (its support is invisible from the outside), any
- * free variable without a printable name, fewer than two groups, and any
- * unit that refers to absolute time (`refers_to_absolute_time`). A single
- * `always` hull is split into per-unit hulls first (`always` distributes
- * over conjunction). Both decisions are taken at start time 0, which is the
- * only start time the callers use.
- * @endinternal
- */
+// Splits @p fm into its CNF clauses, an `always` clause further into one
+// `always` per clause of its body. Returns 0 with the clauses in @p units,
+// or -1 (leaving @p units untouched) when there are fewer than two.
 template <typename node>
 static int factored_tau_units(tref fm, trefs& units) {
 	using tau = tree<node>;
@@ -294,11 +278,11 @@ static int factored_tau_units(tref fm, trefs& units) {
 	return 0;
 }
 
-// Whether component factoring of is_zero/is_one is on: true if the
-// `ba_component_factoring` API flag (tau_ba.h) is set, or the environment
-// variable TAU_BA_COMPONENT_FACTORING is set to a non-empty value other
-// than exactly "0". The environment is read once and latched for the
-// lifetime of the process; the API flag is re-read on every call.
+/// Whether component factoring of is_zero/is_one is on. A non-empty
+/// environment variable TAU_BA_COMPONENT_FACTORING decides alone (off for
+/// exactly "0", on otherwise); unset or empty, the `ba_component_factoring`
+/// flag (tau_ba.h) decides. The environment is read once and latched for the
+/// lifetime of the process; the flag is re-read on every call.
 inline bool ba_component_factoring_enabled() {
 	static const std::optional<bool> env = []() -> std::optional<bool> {
 		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
@@ -342,8 +326,40 @@ static bool refers_to_absolute_time(tref unit) {
 		|| tau::get(tau::trim2(unit)).find_top(at_absolute_time<node>);
 }
 
+/**
+ * @internal
+ * @brief Per-support-component sat/valid decision for a `:tau` constant.
+ *
+ * `is_zero`/`is_one` decide a constant by running the full temporal decision
+ * procedure over its formula. When that formula is a conjunction of units
+ * with pairwise disjoint free supports -- the shape a constant takes when
+ * independent clauses accumulate into it -- every question pays for all
+ * units, although the answer factors: a model of each unit assigns only its
+ * own variables, so models over disjoint supports compose where no unit
+ * refers to absolute time (`refers_to_absolute_time`), and validity
+ * distributes over conjunction. `factored_tau_sat`/`factored_tau_valid`
+ * decide per unit group and cache the verdicts per group (the `create_cache`
+ * discipline of `cached_tau_ba_predicate`, compute before emplace), so a
+ * constant that grows by one clause pays for that clause.
+ *
+ * Supports are compared by variable NAME, not by variable node: `o1[t]`,
+ * `o1[t-1]` and `o1[0]` are one stream and must land in one group (a
+ * node-identity grouping such as `group_by_shared_vars` would keep them
+ * apart); the time offset variable is not part of the support
+ * (`get_free_vars` does not descend into io variables). Bound-variable names
+ * are included, which can only merge groups, never split them.
+ *
+ * Conservative gates, each falling back to the monolithic path: any embedded
+ * BA constant inside a unit (its support is invisible from the outside), any
+ * free variable without a printable name, fewer than two groups, and any
+ * unit that refers to absolute time (`refers_to_absolute_time`). A single
+ * `always` hull is split into per-unit hulls first (`always` distributes
+ * over conjunction). Both decisions are taken at start time 0, which is the
+ * only start time the callers use.
+ * @endinternal
+ */
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
-// 1 = sat.
+// 1 = sat. A failed decision of a group counts as unsat.
 template <typename node>
 static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
@@ -420,7 +436,8 @@ static int factored_tau_sat(tref fm) {
 }
 
 // Unit-wise validity (distributes over conjunction unconditionally);
-// -1 = not applicable, 0 = not valid, 1 = valid.
+// -1 = not applicable, 0 = not valid, 1 = valid. A failed decision of a unit
+// counts as not valid.
 template <typename node>
 static int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
@@ -515,11 +532,12 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
-// Normalizes a tau_ba constant: applies its rec relations to the main
-// formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
-// result carries the normalized main only — the rec relations, already
-// applied, are not copied into the returned tau_ba — or the report of a
-// failed step.
+/// Normalizes a tau_ba constant: applies its rec relations to the main
+/// formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
+/// result carries the normalized main only — the rec relations, already
+/// applied, are not copied into the returned tau_ba — or the report of a
+/// failed step. Memoized by main tree when @p fm has no rec relations and
+/// the BDD node table is not exhausted.
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
@@ -544,12 +562,13 @@ result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 	return r.with_value(std::move(out));
 }
 
-// Memoized normalizer<node>(nso_rr) for the splitter's normalized-formula
-// precondition (ba_descriptor<tau_ba<...>>::splitter), called once per
-// candidate inside atomless_choose_value's splitter ladder. Deliberately a
-// separate cache from normalize_memo: normalizer() only normalizes, unlike
-// normalize_tau's own simp_tau_unsat_valid pass, so the two aren't
-// interchangeable.
+/// Memoized normalizer<node>(nso_rr) for the splitter's normalized-formula
+/// precondition (ba_descriptor<tau_ba<...>>::splitter), called once per
+/// candidate inside atomless_choose_value's splitter ladder. Deliberately a
+/// separate cache from normalize_memo: normalizer() only normalizes, unlike
+/// normalize_tau's own simp_tau_unsat_valid pass, so the two aren't
+/// interchangeable. Returns the normalized formula (never null) or the
+/// normalizer's report.
 template <typename node>
 result<tref> normalize_for_splitter(const rr<node>& nso_rr) {
 	using cache = detail::tau_decision_cache<node>;
@@ -574,18 +593,18 @@ result<tref> normalize_for_splitter(const rr<node>& nso_rr) {
 	return r.with_value(normalized);
 }
 
-// Purely syntactic check: the main formula is literally T. No rec
-// relations are applied and no satisfiability check runs — a semantically
-// valid but non-literal main returns false (use is_one() for that).
+/// Purely syntactic check: the main formula is literally T. No rec
+/// relations are applied and no satisfiability check runs — a semantically
+/// valid but non-literal main returns false (use is_one() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_one(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
-// Purely syntactic check: the main formula is literally F. No rec
-// relations are applied and no satisfiability check runs — a semantically
-// unsat but non-literal main returns false (use is_zero() for that).
+/// Purely syntactic check: the main formula is literally F. No rec
+/// relations are applied and no satisfiability check runs — a semantically
+/// unsat but non-literal main returns false (use is_zero() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {

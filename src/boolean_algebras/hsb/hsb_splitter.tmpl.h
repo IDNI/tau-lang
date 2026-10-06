@@ -13,16 +13,21 @@ namespace idni::tau_lang {
 
 namespace detail {
 
+/// One linear constraint `⟨w,x⟩ + b < 0` (or `<= 0`) handed to the LRA solver.
 struct linear_constraint {
+	/// Coefficients; entries past the dimension are ignored.
 	std::vector<double> w;
+	/// Constant term.
 	double b;
 	bool strict; ///< true => strict (<), false => non-strict (<=)
 };
 
 /// Collect all halfspace constraints from an AND-tree into @p out.
-/// Returns false iff the node is structurally unsatisfiable (contains bot).
+/// Returns false iff the node is null or structurally unsatisfiable (contains
+/// bot).
 /// @pre Must only be called on individual DNF clauses (pure conjunctions of
-///      halfspaces); or_/not_ nodes at the clause root indicate a logic error.
+///      halfspaces); an or_/not_ node contributes no constraint, so the
+///      clause is over-approximated.
 inline bool collect_conjunction(tref n,
                                 std::vector<linear_constraint>& out) {
 	if (!n) return false;
@@ -45,7 +50,8 @@ inline bool collect_conjunction(tref n,
 }
 
 /// Set up a cvc5 QF_LRA solver, create real variables x0…x_{dim-1}, assert
-/// all constraints in @p cs, and return the variable terms.
+/// all constraints in @p cs, and return the variable terms. Doubles enter
+/// cvc5 as decimal rationals printed with 20 fractional digits.
 inline std::vector<cvc5::Term> setup_lra_solver(
 		cvc5::Solver& solver,
 		const std::vector<linear_constraint>& cs,
@@ -82,7 +88,8 @@ inline std::vector<cvc5::Term> setup_lra_solver(
 	return vars;
 }
 
-/// Check LP feasibility of @p cs using cvc5 QF_LRA.
+/// Check LP feasibility of @p cs over R^@p dim using cvc5 QF_LRA; an empty
+/// @p cs is feasible. Builds a fresh solver per call.
 inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (cs.empty()) return true;
 	cvc5::Solver solver(cvc5_term_manager);
@@ -90,7 +97,9 @@ inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
 	return solver.checkSat().isSat();
 }
 
-/// Find a feasible point for @p cs via cvc5 model extraction.
+/// Find a feasible point for @p cs via cvc5 model extraction; the origin for
+/// an empty @p cs, `std::nullopt` when @p cs is infeasible. The rational model
+/// values are rounded to `double`.
 inline std::optional<std::vector<double>>
 find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (cs.empty())
@@ -115,7 +124,9 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	return pt;
 }
 
-/// Find a feasible point additionally satisfying x[axis] > val or < val.
+/// Find a feasible point of @p cs additionally satisfying `x[axis] > val`
+/// (@p greater_than) or `x[axis] < val`; `std::nullopt` when there is none.
+/// @pre `axis < dim`.
 inline std::optional<std::vector<double>>
 find_second_feasible_point(const std::vector<linear_constraint>& cs,
                            size_t dim, size_t axis, double val, bool greater_than) {
@@ -131,7 +142,10 @@ find_second_feasible_point(const std::vector<linear_constraint>& cs,
 // Forward declaration needed by to_dnf.
 inline tref push_neg(tref n);
 
-/// Convert a formula node to DNF (vector of conjunctions of halfspace nodes).
+/// Append the DNF of @p n to @p dnf (each clause a conjunction of halfspace
+/// nodes; an empty clause is true, no clause is false). A not_ node is
+/// expanded through @ref push_neg; a null @p n clears @p dnf entirely. The
+/// clause count can grow exponentially.
 inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
 	if (!n) { dnf.clear(); return; }
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
@@ -166,7 +180,9 @@ inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
 	}
 }
 
-/// Push negation down to halfspace leaves (NNF step).
+/// Returns `¬n` with the negation pushed down to the halfspace leaves, each
+/// replaced by its complement halfspace (`¬¬A` gives `A` as is); a null @p n
+/// gives bottom.
 inline tref push_neg(tref n) {
 	if (!n) return hsb::mk_bot();
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
@@ -198,7 +214,8 @@ inline tref to_nnf(tref root) {
 	return post_order<hsb_node>(root).apply_unique(f);
 }
 
-/// Infer ambient dimension from the formula tree.
+/// Infer ambient dimension from the formula tree: the largest dimension of a
+/// halfspace in it, 0 when it has none.
 inline size_t infer_dim(tref n) {
 	if (!n) return 0;
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
@@ -223,6 +240,9 @@ inline size_t infer_dim(tref n) {
 
 /**
  * @brief Returns true iff @p x is semantically equivalent to bottom (∅).
+ *
+ * Expands @p x to DNF and asks cvc5 for LRA feasibility of each clause, so
+ * the cost can be exponential in the size of @p x.
  */
 inline bool is_hsb_zero(const hsb& x) {
 	auto k = x.root_kind();
@@ -265,10 +285,14 @@ inline tref simplify_hsb_term(tref t) { return t; }
 /**
  * @brief Returns a sub-element y with `bot < y < x` when one is found.
  *
- * BA1-5 contract note: @p st is ignored, and when no LRA split is found
+ * Contract note: @p st is ignored, and when no LRA split is found
  * the input @p x is returned UNCHANGED -- callers looping "split until
  * proper subset" must guard against a fixpoint (sbf_splitter, by
- * contrast, always makes progress).
+ * contrast, always makes progress). Bottom splits to bottom, top to
+ * `{x[0] < 0}`; otherwise the split cuts one feasible DNF clause in half
+ * along an axis between two of its points.
+ * @param x Element to split.
+ * @return The sub-element, or @p x itself when no split is found.
  */
 inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 	auto k = x.root_kind();

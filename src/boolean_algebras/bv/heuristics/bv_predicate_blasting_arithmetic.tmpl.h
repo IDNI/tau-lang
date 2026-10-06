@@ -43,6 +43,7 @@ namespace idni::tau_lang {
 //
 //
 
+/** @internal @copydoc bvadd @endinternal */
 template<NodeType node>
 result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 	using tau = tree<node>;
@@ -113,6 +114,7 @@ result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 //
 //
 
+/** @internal @copydoc bvsub @endinternal */
 template<NodeType node>
 result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	using tau = tree<node>;
@@ -166,6 +168,7 @@ result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 //
 //
 
+/** @internal @copydoc bvmul @endinternal */
 template<NodeType node>
 result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 	using tau = tree<node>;
@@ -268,7 +271,9 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
  * @param quotient Quotient term
  * @param remainder Remainder term
  * @param aux Collects the fresh auxiliary variables
- * @return The constraint conjunction, or nullptr if unsupported
+ * @return The constraint conjunction, or a nullptr value when the divisor is
+ * not a nonzero bv constant, is wider than 64 bits, or a sub-predicate cannot
+ * be blasted
  *
  * @par Example
  * Shared by @ref bvdiv, @ref bvmod, and @ref bved (each introduces a fresh
@@ -340,6 +345,7 @@ static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 	return r.with_value(body);
 }
 
+/** @internal @copydoc bvdiv @endinternal */
 template<NodeType node>
 result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 	using tau = tree<node>;
@@ -353,6 +359,7 @@ result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 		bf_remainder, aux);
 }
 
+/** @internal @copydoc bvmod @endinternal */
 template<NodeType node>
 result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 	using tau = tree<node>;
@@ -369,6 +376,7 @@ result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 		remainder, aux);
 }
 
+/** @internal @copydoc bved @endinternal */
 template<NodeType node>
 result<tref> bved(tref dividend, tref divisor, tref quotient, tref remainder,
 	trefs& aux)
@@ -383,6 +391,8 @@ result<tref> bved(tref dividend, tref divisor, tref quotient, tref remainder,
 // max reuses the same single bvlt recurrence with the copied sides swapped,
 // which at equal operands still picks the shared value through the negated
 // branch. Equality is spelled !bvneq, the one bit-level equality entry point.
+// Returns the predicate, a nullptr value when a comparison cannot be blasted,
+// or no value (with the report) when an operand carries no bitwidth.
 template<NodeType node>
 static result<tref> bv_pick_by_order(tref left, tref right, tref res, bool pick_smaller) {
 	using tau = tree<node>;
@@ -411,11 +421,13 @@ static result<tref> bv_pick_by_order(tref left, tref right, tref res, bool pick_
 		tau::build_wff_imply(tau::build_wff_neg(lt), eq_high)));
 }
 
+/** @internal @copydoc bvmin @endinternal */
 template<NodeType node>
 result<tref> bvmin(tref left, tref right, tref result) {
 	return bv_pick_by_order<node>(left, right, result, true);
 }
 
+/** @internal @copydoc bvmax @endinternal */
 template<NodeType node>
 result<tref> bvmax(tref left, tref right, tref result) {
 	return bv_pick_by_order<node>(left, right, result, false);

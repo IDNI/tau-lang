@@ -9,9 +9,9 @@
 
 namespace idni::tau_lang {
 
-// (TT2-9: tree::apply_builder deleted -- zero callers.)
 
 
+/** @internal @copydoc canonize_quantifier_ids @endinternal */
 template<NodeType node>
 tref canonize_quantifier_ids(tref fm) {
 	using tau = tree<node>;
@@ -329,9 +329,9 @@ int_t find_biggest_quant_id(tref fm) {
 	return id;
 }
 
-// A bound variable's name is purely numeric (canonize_quantifier_ids gives
-// it the quantifier depth below its binder plus one); every other variable
-// carries its source name.
+/// Whether @p s is a bound variable's name: purely numeric
+/// (canonize_quantifier_ids gives it the quantifier depth below its binder
+/// plus one); every other variable carries its source name.
 inline bool is_bound_var_name(const std::string& s) {
 	if (s.empty()) return false;
 	for (const char c : s)
@@ -967,9 +967,8 @@ tref build_var_name(const std::string& name) {
 template <NodeType node>
 tref build_var_name_indexed(size_t index, const std::string& prefix) {
 	// Both the direction bit and the name prefix classify a stream (the
-	// LTL layer's is_pure_input_atom falls back to the prefix), so an
-	// output built here used to carry an INPUT name `i<n>` -- the out-var
-	// builders pass "o".
+	// LTL layer's is_pure_input_atom falls back to the prefix), so the
+	// out-var builders must pass "o".
 	std::stringstream name;
 	return build_var_name<node>((name << prefix << index, name.str()));
 }
