@@ -11,7 +11,8 @@ namespace idni::tau_lang {
 // DNF clause of fm at a time (replacing it by 0 for terms, F for
 // formulas; clauses with temporary io streams are kept when check_temps)
 // and offers each reduced formula to callback. Returns the first reduced
-// formula callback accepts, or fm unchanged when it accepts none.
+// formula callback accepts, fm unchanged when it accepts none, or nullptr
+// when fm has no DNF clause.
 template<typename ... BAs> requires BAsPack<BAs...>
 tref split_path(tref fm, bool check_temps, const auto& callback) {
 	using node = node<BAs...>;
@@ -29,6 +30,7 @@ tref split_path(tref fm, bool check_temps, const auto& callback) {
 
 // Splits the BA constant held by t: delegates to the element's own BA
 // splitter and rewraps the result as a bf ba_constant tree of t's type.
+// t must be a ba_constant node; an error of the BA's splitter is returned.
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tref> tau_splitter(const tree<node<BAs...>>& t,
@@ -48,6 +50,9 @@ result<tref> tau_splitter(const tree<node<BAs...>>& t,
 // "spec" holds the original temporal Tau formula
 // If we check a non-temporal Tau formula, it suffices to place it in "fm" and
 // the proposed splitter in "splitter".
+// Returns true when the candidate is satisfiable and not equivalent to what
+// it replaces; false otherwise, also when the rewritten clause does not
+// normalize. A solver error travels in the report.
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
@@ -87,7 +92,8 @@ result<bool> is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 // strictly smaller function implying g — by dropping disjuncts of g, or
 // by splitting a coefficient inside one — such that swapping it into
 // clause yields a splitter of original_fm. Returns the rewritten clause,
-// or clause unchanged when no candidate passes is_splitter.
+// or clause unchanged when no candidate passes is_splitter; a solver error
+// stops the search and is returned.
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tref> good_splitter_using_function(tref f, tref clause,
@@ -158,7 +164,8 @@ result<tref> good_splitter_using_function(tref f, tref clause,
 // (g = 0): searches for a function implied by g — weakening one CNF
 // literal of a path to 1, or reverse-splitting a negated coefficient —
 // such that swapping it into clause yields a splitter of original_fm.
-// Returns the rewritten clause, or clause unchanged on failure.
+// Returns the rewritten clause, or clause unchanged on failure; a solver
+// error stops the search and is returned.
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<tref> good_reverse_splitter_using_function(tref f, splitter_type st,
@@ -227,9 +234,11 @@ result<tref> good_reverse_splitter_using_function(tref f, splitter_type st,
 	return r.with_value(clause);
 }
 
+/** @internal @copydoc tau_bad_splitter @endinternal */
 // Return a bad splitter for the provided formula: conjuncts a fresh
 // uninterpreted "split" constant != 0 into the left disjunct of the
-// bottom-most wff_or (or into fm as a whole when it has no disjunction),
+// first wff_or met in post-order (or into fm as a whole when it has no
+// disjunction),
 // so the result strictly implies fm but is only trivially smaller.
 // We assume the formula is fully normalized by normalizer
 template <typename... BAs>
@@ -260,7 +269,10 @@ tref tau_bad_splitter(tref fm) {
 	else return split_fm;
 }
 
-// Return a splitter for the provided non-temporal formula
+// Return a splitter for the provided non-temporal formula, paired with its
+// type: st when a real splitter is found (from an equality, then an
+// inequality, then by dropping a disjunct), splitter_type::bad for the
+// fallback. spec_clause is the temporal clause fm comes from, or nullptr.
 // We assume the formula is fully normalized by normalizer
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -426,6 +438,7 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 		tau_bad_splitter<BAs...>(fm), splitter_type::bad));
 }
 
+/** @internal @copydoc tau_splitter(tref, splitter_type) @endinternal */
 // Entry point: returns a formula strictly implying fm that is still
 // satisfiable and not equivalent to it. Non-temporal formulas go to
 // nso_tau_splitter; temporal ones are split per DNF clause, falling back
@@ -451,7 +464,7 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		bool good_splitter = false;
 		for (tref& spec : specs) {
 			bool is_aw = is_child<node>(spec, tau::wff_always);
-			// SO-4: only always/sometimes conjuncts carry an inner
+			// Only always/sometimes conjuncts carry an inner
 			// wff at [0].first(); a bare atomic conjunct (e.g.
 			// `x = 0` in a clause that has_temp_var through another
 			// conjunct) would have its left BF operand spliced back

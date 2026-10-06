@@ -40,10 +40,10 @@ static tref bit_mask_cte(size_t bit, size_t bitwidth) {
 //
 
 /**
- * @brief Creates a call to extract a specific bit from an operand (by index).
+ * @brief Creates a call to extract a specific bit from an operand (by offset tref).
  * @tparam node Node type
  * @param operand Operand
- * @param bit Bit index
+ * @param offset Bit position as an integer offset tree
  * @return The constructed call term
  */
 template<NodeType node>
@@ -139,6 +139,7 @@ static rewriter::rules bit_rules(size_t bitwidth) {
 	return rules;
 }
 
+/** @internal @copydoc bit @endinternal */
 template<NodeType node>
 result<tref> bit(tref operand, int_t bit) {
 	result<tref> r;
@@ -228,6 +229,7 @@ static result<rewriter::rule> bvshl_by_one_rule(size_t bitwidth) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvshl_by_one @endinternal */
 template<NodeType node>
 result<tref> bvshl_by_one(tref base, tref shifted) {
 	result<tref> r;
@@ -306,6 +308,7 @@ static result<rewriter::rule> bvshr_by_one_rule(size_t bitwidth) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvshr_by_one @endinternal */
 template<NodeType node>
 result<tref> bvshr_by_one(tref base, tref shifted) {
 	result<tref> r;
@@ -559,9 +562,9 @@ static tref make_bvshl_call(tref base, tref count /* bv constant */, tref shifte
  * @brief Returns the rule for bitvector shift-left (caching by bitwidth and shift amount).
  *
  * @tparam node Node type
- * @param count Shift amount (constant)
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
+ * @param count Shift amount (bv constant); its type gives the bitwidth
+ * @return The constructed rule; a `code::invalid_argument` error when
+ * @p count has no concrete value
  *
  * @par Example
  * @code{.cpp}
@@ -639,6 +642,8 @@ static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvshl @endinternal */
+// A null value when count is not a bv constant with a concrete value.
 template<NodeType node>
 result<tref> bvshl(tref base, tref count, tref shifted) {
 	using tau = tree<node>;
@@ -679,8 +684,8 @@ static tref make_bvshr_call(tref base, tref count /* bv constant */, tref shifte
  * @brief Returns the rule for bitvector right-shift (caching by bitwidth and shift amount).
  *
  * @tparam node Node type
- * @param count Shift count (bv constant)
- * @return The constructed rule
+ * @param count Shift count (bv constant); its type gives the bitwidth
+ * @return The constructed rule; an error when @p count has no concrete value
  *
  * @par Example
  * @code{.cpp}
@@ -758,6 +763,8 @@ static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 	return r.with_value(rule);
 }
 
+/** @internal @copydoc bvshr @endinternal */
+// A null value when count is not a bv constant with a concrete value.
 template<NodeType node>
 result<tref> bvshr(tref base, tref count, tref shifted) {
 	using tau = tree<node>;
@@ -867,13 +874,7 @@ static result<rewriter::rule> bvcast_rule(size_t src_width, size_t target_width)
 	return r.with_value(rule);
 }
 
-/**
- * @brief Computes a predicate constraining result to be the cast of src.
- * @tparam node Node type
- * @param src Source bitvector
- * @param res Result bitvector (fresh variable of target type)
- * @return The resulting predicate term
- */
+/** @internal @copydoc bvcast @endinternal */
 template<NodeType node>
 result<tref> bvcast(tref src, tref res) {
 	result<tref> r;

@@ -26,6 +26,7 @@ bool is_bv_syntactic_zero(const cvc5::Term& fm);
 // overflow-free would silently wrap.
 inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2);
 
+/** @internal @copydoc term_add @endinternal */
 template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
@@ -116,6 +117,7 @@ tref term_add(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_sub @endinternal */
 template<NodeType node>
 tref term_sub(tref symbol) {
 	using tau = tree<node>;
@@ -253,6 +255,7 @@ tref term_sub(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_mul @endinternal */
 template<NodeType node>
 tref term_mul(tref symbol) {
 	using tau = tree<node>;
@@ -368,6 +371,7 @@ tref term_mul(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_div @endinternal */
 template<NodeType node>
 tref term_div(tref symbol) {
 	using tau = tree<node>;
@@ -478,6 +482,7 @@ tref term_div(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_mod @endinternal */
 template<NodeType node>
 tref term_mod(tref symbol) {
 	using tau = tree<node>;
@@ -557,6 +562,7 @@ tref term_mod(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_shr @endinternal */
 template<NodeType node>
 tref term_shr(tref symbol) {
 	using tau = tree<node>;
@@ -668,6 +674,7 @@ tref term_shr(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc term_shl @endinternal */
 template<NodeType node>
 tref term_shl(tref symbol) {
 	using tau = tree<node>;
@@ -802,9 +809,10 @@ inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2) {
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
 }
 
-// Constant folding for the bv comparison wffs, called from the wff_*
-// handlers of get_hook in src/hooks.tmpl.h when the arguments' BA type is
-// in the bv family. Shared signature contract:
+// Constant folding for the bv comparison wffs, called through
+// ba_wff_hooks<bv> (bv_ba_hooks_ext.tmpl.h) from the wff_* handlers of
+// get_hook in src/hooks_tau.tmpl.h when the arguments' BA type is in the bv
+// family. Shared signature contract:
 //   ch — children array of the `wff` node being interned; ch[0] is the
 //        comparison operator node whose two `bf` children hold the
 //        operands as tau::get(ch[0])[0][0] / tau::get(ch[0])[1][0].
@@ -815,6 +823,7 @@ inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2) {
 // back to tau::get_raw on the unfolded comparison.
 
 // Folds c1 < c2 (unsigned).
+/** @internal @copydoc wff_bv_lt @endinternal */
 template<NodeType node>
 tref wff_bv_lt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -833,6 +842,7 @@ tref wff_bv_lt(const tref* ch, tref r) {
 }
 
 // Folds c1 !< c2, i.e. c1 >= c2 (unsigned).
+/** @internal @copydoc wff_bv_nlt @endinternal */
 template<NodeType node>
 tref wff_bv_nlt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -851,6 +861,7 @@ tref wff_bv_nlt(const tref* ch, tref r) {
 }
 
 // Folds c1 <= c2 (unsigned).
+/** @internal @copydoc wff_bv_lteq @endinternal */
 template<NodeType node>
 tref wff_bv_lteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -869,6 +880,7 @@ tref wff_bv_lteq(const tref* ch, tref r) {
 }
 
 // Folds c1 !<= c2, i.e. c1 > c2 (unsigned).
+/** @internal @copydoc wff_bv_nlteq @endinternal */
 template<NodeType node>
 tref wff_bv_nlteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -887,6 +899,7 @@ tref wff_bv_nlteq(const tref* ch, tref r) {
 }
 
 // Folds c1 > c2 (unsigned).
+/** @internal @copydoc wff_bv_gt @endinternal */
 template<NodeType node>
 tref wff_bv_gt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -905,6 +918,7 @@ tref wff_bv_gt(const tref* ch, tref r) {
 }
 
 // Folds c1 !> c2, i.e. c1 <= c2 (unsigned).
+/** @internal @copydoc wff_bv_ngt @endinternal */
 template<NodeType node>
 tref wff_bv_ngt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -923,6 +937,7 @@ tref wff_bv_ngt(const tref* ch, tref r) {
 }
 
 // Folds c1 >= c2 (unsigned).
+/** @internal @copydoc wff_bv_gteq @endinternal */
 template<NodeType node>
 tref wff_bv_gteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -941,6 +956,7 @@ tref wff_bv_gteq(const tref* ch, tref r) {
 }
 
 // Folds c1 !>= c2, i.e. c1 < c2 (unsigned).
+/** @internal @copydoc wff_bv_ngteq @endinternal */
 template<NodeType node>
 tref wff_bv_ngteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -958,6 +974,7 @@ tref wff_bv_ngteq(const tref* ch, tref r) {
 	return nullptr;
 }
 
+/** @internal @copydoc term_nor @endinternal */
 template<NodeType node>
 tref term_nor(tref symbol) {
 	using tau = tree<node>;
@@ -966,6 +983,7 @@ tref term_nor(tref symbol) {
 	return tau::build_bf_neg(tau::build_bf_or(c1, c2));
 }
 
+/** @internal @copydoc term_xnor @endinternal */
 template<NodeType node>
 tref term_xnor(tref symbol) {
 	using tau = tree<node>;
@@ -974,6 +992,7 @@ tref term_xnor(tref symbol) {
 	return tau::build_bf_neg(tau::build_bf_xor(c1, c2));
 }
 
+/** @internal @copydoc term_nand @endinternal */
 template<NodeType node>
 tref term_nand(tref symbol) {
 	using tau = tree<node>;
@@ -983,6 +1002,7 @@ tref term_nand(tref symbol) {
 }
 
 // Cast a bitvector constant to a different width (zero-extend or truncate)
+/** @internal @copydoc term_cast @endinternal */
 template<NodeType node>
 tref term_cast(tref symbol, size_t target_type_id) {
 	using tau = tree<node>;
@@ -1072,6 +1092,7 @@ tref term_cast(tref symbol, size_t target_type_id) {
 // min(a, b), unsigned. Every fold returns one of the two operands: 0 (the
 // bottom element) is absorbing and 1 (the all-ones top element) neutral,
 // and of two constants the smaller is kept, so no new constant is built.
+/** @internal @copydoc term_min @endinternal */
 template<NodeType node>
 tref term_min(tref symbol) {
 	using tau = tree<node>;
@@ -1109,6 +1130,7 @@ tref term_min(tref symbol) {
 }
 
 // max(a, b), unsigned: the dual of term_min above (1 absorbing, 0 neutral).
+/** @internal @copydoc term_max @endinternal */
 template<NodeType node>
 tref term_max(tref symbol) {
 	using tau = tree<node>;
@@ -1145,6 +1167,7 @@ tref term_max(tref symbol) {
 	return symbol;
 }
 
+/** @internal @copydoc simplify_bv_symbol @endinternal */
 template <NodeType node_t>
 tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;

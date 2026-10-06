@@ -22,11 +22,13 @@ namespace idni::tau_lang {
  *
  * Converts @p fm to NNF, traverses every conjunction path, and replaces
  * syntactically contradictory sub-formulas with `F`/`0` or tautological ones
- * with `T`/`1`. Handles both wff (formulas) and bf (boolean terms).
+ * with `T`/`1`. Handles both wff (formulas) and bf (boolean terms); a bf has
+ * its negations pushed in instead. Results are memoized per argument when
+ * built with `TAU_CACHE`.
  *
- * @tparam node Tree node type.
- * @param fm Formula or boolean term to simplify.
- * @return Simplified formula/term.
+ * @param fm Formula or boolean term to simplify; bound variables renamed
+ * apart from free ones.
+ * @return Simplified formula/term, equivalent to @p fm.
  *
  * @par Example
  * @code{.cpp}
@@ -47,9 +49,10 @@ tref syntactic_path_simplification(tref fm);
  * Like `syntactic_path_simplification` but skips the tautology-resolution pass
  * and does not push negations inward. Useful when negations must be preserved.
  *
- * @tparam node Tree node type.
- * @param fm Formula or boolean term to simplify.
- * @return Simplified formula/term with only contradictions removed.
+ * @param fm Formula or boolean term to simplify; bound variables renamed
+ * apart from free ones.
+ * @return Simplified formula/term with only contradictions removed;
+ * memoized per argument when built with `TAU_CACHE`.
  *
  * @par Example
  * @code{.cpp}

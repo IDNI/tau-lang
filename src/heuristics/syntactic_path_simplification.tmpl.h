@@ -66,16 +66,14 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
  * tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
  * CHECK( tau::get(res).equals_F() );
  * @endcode
- * @endinternal
- PRECONDITION (HE-7): bound variables must be canonically renamed apart
- * from free occurrences before calling (the normalizer's canonize pass
- * guarantees this on every production path). The conjunct-assumption
- * substitution below uses rewriter::replace over the WHOLE subtree with no
- * quantifier-scope guard, so a sibling scope rebinding an assumption's
- * variable name would have its bound occurrences wrongly replaced
- * (`x = 0 && ex x (x != 0)` would collapse to F).
  *
- * */
+ * @pre Bound variables are renamed apart from free occurrences. The
+ * conjunct-assumption substitution uses rewriter::replace over the whole
+ * subtree with no quantifier-scope guard, so a sibling scope rebinding an
+ * assumption's variable would have its bound occurrences replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
+ * @endinternal
+ */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_wff(tref root) {
 	using tau = tree<node>;
@@ -132,23 +130,13 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 			// Remove branch
 			return _F<node>();
 		}
-		// Rebuild assumptions. Sort the TRIMMED (always-positive) atoms,
+		// Rebuild assumptions. Sort the trimmed (always-positive) atoms,
 		// not the re-negated ones: `syntactic_path_simplification_wff_comp`
-		// classifies an atom as an equality via `child_is(tau::bf_eq)`,
-		// which only looks at the node's own direct child, so a `!(x = y)`
-		// rebuilt with `build_wff_neg` below would never be recognised as
-		// an equality and the eq-first rule would silently stop applying
-		// to every equality that happens to reach this AND negated (which
-		// is always true for an equality that was the positive side of an
-		// `||` before "resolve tautologies" pushed the negation in via De
-		// Morgan) -- leaving the order to the `subtree_less` tie-break,
-		// which is not guaranteed to agree with the order chosen when this
-		// AND is negated back into the original `||` in step 5. That made
-		// the disjunct order of a plain `p || (x = y)` step formula depend
-		// on incidental node-hash tie-breaks instead of being canonical
-		// (see the witness-stability regression: the interpreter picks the
-		// first solvable disjunct, so this decided which witness a free
-		// output got).
+		// recognises an equality only by its direct `bf_eq` child, so a
+		// `!(x = y)` would lose the eq-first rule and leave the order to
+		// node-hash tie-breaks. The order is observable: the interpreter
+		// picks the first solvable disjunct, which decides the witness of
+		// a free output.
 		trefs sorted_keys;
 		sorted_keys.reserve(assignments.size());
 		for (auto& [v, k] : assignments) sorted_keys.push_back(v);
@@ -194,16 +182,14 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
  * tref res = syntactic_path_simplification_simplify_bf<node_t>(fm);
  * CHECK( tau::get(res).equals_0() );
  * @endcode
- * @endinternal
- PRECONDITION (HE-7): bound variables must be canonically renamed apart
- * from free occurrences before calling (the normalizer's canonize pass
- * guarantees this on every production path). The conjunct-assumption
- * substitution below uses rewriter::replace over the WHOLE subtree with no
- * quantifier-scope guard, so a sibling scope rebinding an assumption's
- * variable name would have its bound occurrences wrongly replaced
- * (`x = 0 && ex x (x != 0)` would collapse to F).
  *
- * */
+ * @pre Bound variables are renamed apart from free occurrences. The
+ * substitution uses rewriter::replace_if, which descends through every
+ * Boolean operation including `bf_fex`/`bf_fall` with no quantifier-scope
+ * guard, so a sibling `fex`/`fall` rebinding an assumption's variable would
+ * have its bound occurrences replaced.
+ * @endinternal
+ */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_bf(tref root) {
 	using tau = tree<node>;
@@ -268,6 +254,7 @@ tref syntactic_path_simplification_simplify_bf(tref root) {
 
 // ── Public functions ──────────────────────────────────────────────────────────
 
+/** @internal @copydoc syntactic_path_simplification @endinternal */
 template <NodeType node>
 tref syntactic_path_simplification(tref fm) {
 	using tau = tree<node>;
@@ -309,11 +296,13 @@ tref syntactic_path_simplification(tref fm) {
 	return memo(res);
 }
 
+/** @internal @copydoc syntactic_path_simplification_unsat_on_unchanged_negations @endinternal */
 template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// -- an A/B measurement on satisfiability2's mixed_lookback cases
+	// An A/B measurement on the mixed_lookback cases of
+	// test_integration-satisfiability-bool
 	// showed medians of 11.23/12.88 s with the cache vs 11.51/16.09 s
 	// without, so the cache stays.
 	using cache_t = subtree_unordered_map<node, tref>;

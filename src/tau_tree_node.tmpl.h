@@ -10,18 +10,21 @@ namespace idni::tau_lang {
 // Tau tree node templates implementation
 // -----------------------------------------------------------------------------
 
+/** @internal @copydoc node::ba_retype @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 	return node(nt, data, term, new_ba, ext);
 }
 
+/** @internal @copydoc node::replace_data @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::replace_data(T new_data) const {
 	return node(nt, new_data, term, ba_type, ext);
 }
 
+/** @internal @copydoc node::ba_constant @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
@@ -35,12 +38,14 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 	// LOG_TRACE << " -- node::ba_constant result:" << n;
 }
 
+/** @internal @copydoc node::ba_typed @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
 	return node(nt, 0, true /* is_term */, ba_tid);
 }
 
+/** @internal @copydoc node::input_variable @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::input_variable(size_t ba_tid)
@@ -48,6 +53,7 @@ constexpr node<BAs...> node<BAs...>::input_variable(size_t ba_tid)
 	return node(type::io_var, 1 /* input */, true, ba_tid);
 }
 
+/** @internal @copydoc node::output_variable @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
@@ -58,7 +64,7 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 // Deliberately narrower than tree<node>::is_term_nt (see tau_tree.tmpl.h):
 // this variant only sets the node's `term` bit at construction time for the
 // core bf/io_var nonterminals, excluding the extended bf arithmetic/functional
-// operators and capture. NOTE (TT1-18): the DBG "all term nodes are typed"
+// operators and capture. NOTE: the DBG "all term nodes are typed"
 // invariant in tree<node>::get(const parser::tree&, get_options&)
 // (tau_tree_from_parser.tmpl.h) does NOT use this function -- unqualified
 // lookup there resolves to the wide member tree::is_term_nt, and that is
@@ -83,6 +89,7 @@ inline bool is_term_nt(size_t nt) {
 	}
 }
 
+/** @internal @copydoc node::node @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
@@ -108,18 +115,21 @@ constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 	// 	<< " node: `" << *this << "`";
 }
 
+/** @internal @copydoc node::name() const @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const std::string& node<BAs...>::name() const {
 	return name(nt);
 }
 
+/** @internal @copydoc node::name(size_t) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const std::string& node<BAs...>::name(size_t nt) {
 	return tau_parser::instance().name(nt);
 }
 
+/** @internal @copydoc node::get_nt @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 size_t node<BAs...>::get_nt() const {
@@ -127,6 +137,7 @@ size_t node<BAs...>::get_nt() const {
 	return static_cast<size_t>(nt);
 }
 
+/** @internal @copydoc node::get_string_id @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 size_t node<BAs...>::get_string_id() const {
@@ -137,6 +148,7 @@ size_t node<BAs...>::get_string_id() const {
 	return static_cast<size_t>(sid);
 }
 
+/** @internal @copydoc node::get_ba_constant_id @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 size_t node<BAs...>::get_ba_constant_id() const {
@@ -147,21 +159,21 @@ size_t node<BAs...>::get_ba_constant_id() const {
 	return static_cast<size_t>(id);
 }
 
+/** @internal @copydoc node::as_int @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
 
+/** @internal @copydoc node::get_data @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 uint64_t node<BAs...>::get_data() const {
 	return data;
 }
 
-// (TT1-11: nnull() and the extension() pack/unpack pair deleted -- zero
-// callers, and the packing lost nt's MSB; see the note in tau_tree.h.)
-
 #define NODE_CAST(x) static_cast<node<BAs...>::T>(x)
 
+/** @internal @copydoc node::operator<=> @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
@@ -190,26 +202,31 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
 #undef NODE_CAST
+/** @internal @copydoc node::operator< @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<(const node& that) const {
 	return (*this <=> that) < 0;
 }
+/** @internal @copydoc node::operator<= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<=(const node& that) const {
 	return (*this <=> that) <= 0;
 }
+/** @internal @copydoc node::operator> @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>(const node& that) const {
 	return (*this <=> that) > 0;
 }
+/** @internal @copydoc node::operator>= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>=(const node& that) const {
 	return (*this <=> that) >= 0;
 }
+/** @internal @copydoc node::operator== @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
@@ -217,6 +234,7 @@ constexpr auto node<BAs...>::operator==(const node& that) const {
 	return nt == that.nt /*&& term == that.term*/ && ba_type == that.ba_type
 			&& ext == that.ext && data == that.data;
 }
+/** @internal @copydoc node::operator!= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator!=(const node& that) const {
@@ -256,6 +274,7 @@ struct ba_constant_hasher {
 	}
 };
 
+// The hasher of every variant alternative, indexed by alternative.
 template <typename Node, std::size_t... Is>
 constexpr auto ba_constant_hasher_table(std::index_sequence<Is...>) {
 	return std::array<std::uint64_t (*)(const typename Node::constant&),
@@ -278,6 +297,7 @@ void hash_ba_constant_data(std::uint64_t& seed, size_t data) {
 	hash_combine(seed, table[c.index()](c));
 }
 
+/** @internal @copydoc node::hashit @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 uint64_t node<BAs...>::hashit() const {

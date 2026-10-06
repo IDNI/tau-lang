@@ -32,6 +32,7 @@ struct definitions {
 	 * @brief Add or update the rule @p head → @p body.
 	 *
 	 * If a rule with the same head already exists, it is updated in-place.
+	 * Linear in the number of rules.
 	 * @param head Rewrite rule head.
 	 * @param body Rewrite rule body.
 	 * @return Index of the (possibly updated) rule.
@@ -94,10 +95,11 @@ struct definitions {
 		return &global_scope;
 	}
 
-	/** @brief Replace the global type scope with @p global_scope. */
-	// RR-14: by value -- the old non-const lvalue reference moved from
-	// the caller's map silently; now the transfer is visible at the call
-	// site (pass std::move(...) to avoid the copy).
+	/**
+	 * @brief Replace the global type scope with @p global_scope.
+	 * @param global_scope the new scope, taken by value; pass
+	 * `std::move(...)` to avoid the copy.
+	 */
 	void set_global_scope(subtree_map<node, size_t> global_scope) {
 		this->global_scope = std::move(global_scope);
 	}
@@ -112,12 +114,15 @@ struct definitions {
 		subtree_map<node, size_t> global_scope;
 	};
 
-	/** @brief Capture the current rule table, I/O context and type scope. */
+	/** @brief A copy of the current rule table, I/O context and type scope. */
 	snapshot save() const {
 		return { heads, bodies, ctx, global_scope };
 	}
 
-	/** @brief Replace the rule table, I/O context and type scope with @p s. */
+	/**
+	 * @brief Replace the rule table, I/O context and type scope with @p s.
+	 * @param s a snapshot taken by save(); it is moved from.
+	 */
 	void restore(snapshot s) {
 		heads = std::move(s.heads);
 		bodies = std::move(s.bodies);
@@ -136,12 +141,12 @@ struct definitions {
 		return heads.size();
 	}
 
-	/** @brief Return the last registered rule as a head–body pair. */
+	/** @brief Return the last registered rule as a head–body pair; requires size() > 0. */
 	rewriter::rule back() const {
 		return std::make_pair(heads.back(), bodies.back());
 	}
 
-	/** @brief Return rule @p i as a head–body pair. */
+	/** @brief Return rule @p i as a head–body pair; @p i must be below size(). */
 	rewriter::rule operator[](const size_t i) const {
 		return std::make_pair(heads[i], bodies[i]);
 	}
@@ -151,13 +156,9 @@ struct definitions {
 	 *  Do not access this singleton from multiple threads concurrently. */
 	static definitions& instance() {
 		static definitions d;
-		// RR-7: the former gc callback here wiped global_scope and the
-		// whole io_context (inputs, outputs, types) on EVERY gc --
-		// destroying live stream/type registrations. It was also
-		// unnecessary: collect_live_refs pins every global_scope key
-		// into `keep` (so those trefs are never freed, never stale),
-		// and ctx.{types,inputs,outputs} are htref-keyed maps whose
-		// nodes survive gc by construction. No callback is needed.
+		// No gc callback may clear this registry: collect_live_refs
+		// pins every global_scope key, and ctx.{types,inputs,outputs}
+		// are htref-keyed maps whose nodes survive gc by construction.
 		return d;
 	}
 

@@ -30,6 +30,7 @@ namespace idni::tau_lang {
 // See default in the transformer's switch for example of usual transformation.
 //
 
+/** @internal @copydoc tree::get(const tau_parser::tree&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	using type = typename node::type;
@@ -43,7 +44,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 	// get tau tree node instance from parse tree node ref
 	// Explicit return type: deduction would decay the reference to a
 	// by-value tree copy, and `.get()` on a copy interns a pointer to a
-	// stack temporary (TT1-5).
+	// stack temporary.
 	auto m_get = [&m](tref t) -> const tree<node>& { return get(m.at(t)); };
 
 	result<tref> r;
@@ -175,15 +176,13 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				// data bitsize, create an ext node instead of
 				// failing. Maybe only if --ext_nodes is used?
 				//
-				// Two ways a literal can go wrong here, both of
-				// which used to be silent or fatal:
+				// Two ways a literal can go wrong here:
 				//  - above 2^64-1 std::stoul throws
 				//    std::out_of_range, and nothing on the parse
-				//    path catches it, so the process terminated;
+				//    path catches it;
 				//  - node::data is a bitfield narrower than 64
-				//    bits, so anything above node::data_mask was
-				//    truncated by the node constructor and the
-				//    parse silently continued with a wrong value.
+				//    bits, so the node constructor would truncate
+				//    anything above node::data_mask.
 				// Both are reported as a parse failure. The
 				// value is read at 64 bits and must also fit
 				// size_t, the type node data is read back as:
@@ -326,7 +325,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		// Hooks stay off for the whole transformation, and the guard
 		// puts them back on every exit from this scope -- including one
 		// taken by an exception thrown out of the transformer, which
-		// used to leave hooks disabled process-wide. The reget() below
+		// would otherwise leave hooks disabled process-wide. The reget() below
 		// is deliberately outside the scope: it wants hooks back on.
 		use_hooks_guard<node> hooks_off(false);
 		// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
@@ -383,7 +382,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 	if (options.reget_with_hooks) transformed = reget(transformed);
 
 #ifdef DEBUG
-	// Check that all term nodes have been typed. NOTE (TT1-18): unqualified
+	// Check that all term nodes have been typed. NOTE: unqualified
 	// lookup here resolves to the WIDE member tree::is_term_nt, not the
 	// narrow namespace-scope free function -- and that is load-bearing:
 	// qualifying the call to the narrow set makes the assert fire on
@@ -417,6 +416,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 	return r.with_value(transformed);
 }
 
+/** @internal @copydoc tree::get(const tau_parser::tree&, get_options&&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(const tau_parser::tree& t, get_options&& options) {
 	return get(t, options);
@@ -424,6 +424,7 @@ result<tref> tree<node>::get(const tau_parser::tree& t, get_options&& options) {
 
 //------------------------------------------------------------------------------
 
+/** @internal @copydoc tree::get(tau_parser::result&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(tau_parser::result& presult, get_options& options) {
 	if (!presult.found) {
@@ -437,11 +438,13 @@ result<tref> tree<node>::get(tau_parser::result& presult, get_options& options) 
 	return tree<node>::get(pt, options);
 }
 
+/** @internal @copydoc tree::get(tau_parser::result&, get_options&&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(tau_parser::result& result, get_options&& options) {
 	return get(result, options);
 }
 
+/** @internal @copydoc tree::get(const std::string&) @endinternal */
 template<NodeType node>
 result<tref> tree<node>::get(const std::string& str) {
 	get_options opts;
@@ -450,6 +453,7 @@ result<tref> tree<node>::get(const std::string& str) {
 	return get(str, opts);
 }
 
+/** @internal @copydoc tree::get(const std::string&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(const std::string& source, get_options& options) {
 	// A parse with no caller-owned context still needs one, so a name a
@@ -462,11 +466,13 @@ result<tref> tree<node>::get(const std::string& source, get_options& options) {
 	return tree<node>::get(result, options);
 }
 
+/** @internal @copydoc tree::get(const std::string&, get_options&&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(const std::string& source, get_options&& options) {
 	return get(source, options);
 }
 
+/** @internal @copydoc tree::get(std::istream&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(std::istream& is, get_options& options) {
 	// See the (const std::string&, get_options&) overload's own comment.
@@ -477,11 +483,13 @@ result<tref> tree<node>::get(std::istream& is, get_options& options) {
 	return tree<node>::get(result, options);
 }
 
+/** @internal @copydoc tree::get(std::istream&, get_options&&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(std::istream& is, get_options&& options) {
 	return get(is, options);
 }
 
+/** @internal @copydoc tree::get_from_file(const std::string&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get_from_file(const std::string& filename,
 	get_options& options)
@@ -494,6 +502,7 @@ result<tref> tree<node>::get_from_file(const std::string& filename,
 	return tree<node>::get(result, options);
 }
 
+/** @internal @copydoc tree::get_from_file(const std::string&, get_options&&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get_from_file(const std::string& filename,
 	get_options&& options)

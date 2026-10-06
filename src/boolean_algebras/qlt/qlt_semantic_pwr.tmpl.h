@@ -30,19 +30,26 @@ namespace idni::tau_lang {
 // The `pwr_semantic_fallback` runtime toggle for this fallback lives in
 // core's `pointwise_revision.h`, the only file that reads it -- not here.
 
-// ---------------------------------------------------------------------------
-// Build the Win formula from a winning region.
-//
-// Win = ∨ over all D-patterns reachable from winning states of the
-// conjunction of data-atom literals corresponding to that pattern.
-//
-// For a D-pattern bitmask p with K data atoms:
-//   formula(p) = ∧_i  (atoms[i] if bit i is set, ¬atoms[i] otherwise)
-// Win = ∨_p formula(p)
-//
-// This is exact for safety (single DPA state) and a sound approximation
-// for liveness/nested temporal (ignoring DPA state tracking).
-// ---------------------------------------------------------------------------
+/**
+ * @brief Builds the Win formula from a winning region.
+ *
+ * Win = ∨ over all D-patterns reachable from winning states of the
+ * conjunction of data-atom literals corresponding to that pattern.
+ *
+ * For a D-pattern bitmask p with K data atoms:
+ *   formula(p) = ∧_i  (atoms[i] if bit i is set, ¬atoms[i] otherwise)
+ * Win = ∨_p formula(p)
+ *
+ * This is exact for safety (single DPA state) and a sound approximation
+ * for liveness/nested temporal (ignoring DPA state tracking).
+ *
+ * @param result Algorithm D's result; only its base product-game states
+ * (below `synth_game.num_states * T1_size`) are read.
+ * @param atoms the data atoms, at least `result.K` of them.
+ * @param T3 the T_3 order types.
+ * @param type_A the D-pattern bitmask of each T_3 type, indexed like @p T3.
+ * @return Win, or nullptr when no pattern is reachable from a winning state.
+ */
 
 template <NodeType node>
 tref build_win_formula(
@@ -95,19 +102,28 @@ tref build_win_formula(
 	return win;
 }
 
-// ---------------------------------------------------------------------------
-// Semantic PWR optimal mode: try Algorithm D on clause ∧ update.
-//
-// Given a spec clause C and full update ψ:
-//   1. Extract data atoms from C ∧ ψ
-//   2. Build propositional skeleton φ*(D_i)
-//   3. Run Algorithm D (full) to get winning region W
-//   4. Build θ = ψ ∧ G(Win)
-//      (using Win_0 ∧ G(Win → X Win) ≡ G(Win) when Win_0 ⊆ Win)
-//
-// Returns a null tree if optimal mode is not applicable or fails. The caller
-// checks that θ is realizable -- that question is not order-type theory.
-// ---------------------------------------------------------------------------
+/**
+ * @brief Semantic PWR optimal mode: tries Algorithm D on clause ∧ update.
+ *
+ * Given a spec clause C and full update ψ:
+ *   1. Extract data atoms from C ∧ ψ
+ *   2. Build propositional skeleton φ*(D_i)
+ *   3. Run Algorithm D (full) to get winning region W
+ *   4. Build θ = ψ ∧ G(Win)
+ *      (using Win_0 ∧ G(Win → X Win) ≡ G(Win) when Win_0 ⊆ Win)
+ *
+ * Not applicable when an atom reads an input, Algorithm A's gate rejects the
+ * atoms, an atom has no T_3 classification, more than one output variable
+ * occurs, or the atom count passes `qlt_t3_encoding_cap_effective()`.
+ * Runs `ltlsynt` through Algorithm D.
+ *
+ * @param clause the spec clause C.
+ * @param update the full update ψ.
+ * @return θ; a null value when optimal mode is not applicable or its
+ * backend fails, so the caller falls back to fast mode; an error from
+ * collecting the qlt constants or classifying the atoms. The caller checks
+ * that θ is realizable -- that question is not order-type theory.
+ */
 
 template <NodeType node>
 result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
@@ -165,9 +181,9 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int K = (int)atoms.size();
 	size_t T1_size = 2 * constants.size() + 1;
-	// LS-11: named cap + a log line when it trips (the silent gate hid
-	// why optimal mode never ran for >= 21 atoms). The cap is qlt's
-	// runtime option `qlt-t3-cap` (qlt_t3_encoding_cap, qlt.h).
+	// Log when the cap trips, or nothing tells why optimal mode did not
+	// run. The cap is qlt's runtime option `qlt-t3-cap`
+	// (qlt_t3_encoding_cap, qlt.h).
 	const int semantic_pwr_max_atoms = qlt_t3_encoding_cap_effective();
 	if (T1_size == 0 || K <= 0 || K > semantic_pwr_max_atoms) {
 		if (K > semantic_pwr_max_atoms)
@@ -178,7 +194,7 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	}
 
 	// Compute D-bitmask for each T3 type and build the propositional
-	// skeleton φ*(D_i) (LS-12: shared helpers in qlt_ltl_synthesis.tmpl.h).
+	// skeleton φ*(D_i) (shared helpers in qlt_ltl_synthesis.tmpl.h).
 	TAU_TRY(auto type_A,
 		qlt_type_A_bitmasks<node>(atoms, T3, constants));
 	auto phi_star_skel_r = ltl_skeleton<node>(clause_and_update, atoms);

@@ -155,8 +155,8 @@ trefs get_variables(const equation_system<node>& system) {
 	return vars;
 }
 
-// SO-3: a variable-free equation is not automatically satisfied -- reduce it
-// and reject on F instead of reporting an empty solution for e.g. {c} = 0.
+// Whether the variable-free equation or inequality eq holds: it is not
+// automatically satisfied, so it is reduced and rejected on F (e.g. {c} = 0).
 // Reducing leaves a comparison whose sides are constants already as it is,
 // so it is rebuilt with the hooks on, which decide it.
 template <NodeType node>
@@ -234,6 +234,7 @@ std::optional<solution<node>> find_minimal_solution(
 		: substitution;
 }
 
+/** @internal @copydoc find_solution(equality) @endinternal */
 template <NodeType node>
 std::optional<solution<node>> find_solution(equality eq) {
 	using tau = tree<node>;
@@ -247,8 +248,7 @@ std::optional<solution<node>> find_solution(equality eq) {
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
 }
 
-// Reports why lgrs failed: no solution is code::unsat, a null equality is
-// code::invalid_argument.
+/** @internal @copydoc lgrs @endinternal */
 template <NodeType node>
 result<solution<node>> lgrs(equality eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
@@ -302,13 +302,10 @@ result<solution<node>> lgrs(equality eq) {
 // coefficient reduces to 0 are skipped. Dereferencing yields the current
 // minterm as a BF.
 //
-// SO-2: worst-case enumerates all 2^vars polarity combinations with no
-// cutoff or timeout, and solver_options has no budget/deadline field.
-// Capping this iterator would silently truncate the enumeration -- since
-// callers treat it as exhaustive, that would trade a hang for a wrong
-// (incomplete) solve result, so this is left undone pending a real
-// tri-state (sat/unsat/unknown) result contract through the solver
-// pipeline rather than a bolted-on iteration limit.
+// Worst case enumerates all 2^vars polarity combinations with no cutoff.
+// Do not cap it: callers treat the enumeration as exhaustive, so a cap
+// would turn a hang into a wrong (incomplete) solve result until the
+// solver pipeline can report an unknown answer.
 template <NodeType node>
 struct minterm_iterator {
 	// iterator traits
@@ -367,6 +364,7 @@ struct minterm_iterator {
 		} else exhausted = true;
 	}
 
+	/// Advances to the next non-zero minterm; no-op once exhausted.
 	minterm_iterator<node>& operator++() {
 		if (exhausted) return *this;
 		make_next_choice();
@@ -390,6 +388,7 @@ struct minterm_iterator {
 		return !exhausted;
 	}
 
+	/// The current minterm, nullptr once exhausted.
 	minterm operator*() const {
 		return exhausted ? nullptr : current;
 	}
@@ -434,9 +433,8 @@ private:
 	// flips first), refreshes the partials the flip invalidated, and
 	// skips vectors whose minterm is 0; sets exhausted once the counter
 	// wraps around.
-	// SO-6: iterative, not self-recursive -- one recursion frame per
-	// skipped zero-minterm overflowed the stack in debug builds for
-	// formulas with many variables.
+	// Iterative on purpose: one recursion frame per skipped zero minterm
+	// overflows the stack for formulas with many variables.
 	void make_next_choice() {
 		while (!exhausted) {
 			// update the choices from right to left
@@ -501,6 +499,7 @@ template <NodeType node>
 struct minterm_range {
 	explicit minterm_range(tref f): f (f) {}
 
+	/// True when f has no non-zero minterm (or no variable).
 	bool empty() { return begin() == end(); }
 
 	minterm_iterator<node> begin() {
@@ -562,6 +561,7 @@ struct minterm_inequality_system_iterator {
 		current = make_current_minterm_system();
 	}
 
+	/// Advances to the next candidate system; no-op once exhausted.
 	minterm_inequality_system_iterator<node> &operator++() {
 		if (exhausted) return *this;
 		make_next_choice();
@@ -642,6 +642,8 @@ public:
 	explicit minterm_inequality_system_range(
 		const inequality_system<node>& sys): sys(sys) {};
 
+	/// True when the system has no inequality; a non-empty system may
+	/// still yield no candidate.
 	bool empty() { return sys.empty(); }
 
 	minterm_inequality_system_iterator<node> begin() {
@@ -855,6 +857,7 @@ result<std::optional<minterm_system<node>>> make_minterm_system_disjoint(
 	return r.with_value(std::move(disjoints));
 }
 
+/** @internal @copydoc solve_minterm_system @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> solve_minterm_system(
 	const minterm_system<node>& system, const solver_options& options)
@@ -970,7 +973,7 @@ bool exceeds_constant_size(tref a, tref b = nullptr) {
 	return n > max_constant_size;
 }
 
-// Ledger-backed fast path for a per-coordinate exclusion system (Design A):
+// Ledger-backed fast path for a per-coordinate exclusion system:
 // a single variable `var`, every row a plain exclusion `var != v_j`. A
 // ledger-tracked v_j needs zero solver decisions: freeness (TABA,
 // Homomorphisms and Hemimorphisms) licenses treating any value disjoint
@@ -1388,6 +1391,7 @@ trefs atomless_stable_sort(trefs xs) {
 	return sorted;
 }
 
+/** @internal @copydoc solve_inequality_system_atomless @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> solve_inequality_system_atomless(
 	const inequality_system<node>& system, const solver_options& options)
@@ -1437,7 +1441,7 @@ result<std::optional<solution<node>>> solve_inequality_system_atomless(
 	// order as the rows, for the same reason.
 	vars = atomless_stable_sort<node>(vars);
 
-	// Ledger fast path (Design A): only for the single-variable exclusion
+	// Ledger fast path: only for the single-variable exclusion
 	// shape ocltl_direct_decode_edge hands in; runs ahead of the per-row
 	// zero pre-check below, which is provably redundant for that row shape
 	// (atomless_choose_value_ledger's own doc). Falls through unchanged on
@@ -1469,6 +1473,7 @@ result<std::optional<solution<node>>> solve_inequality_system_atomless(
 	return r.with_value(std::move(sol));
 }
 
+/** @internal @copydoc solve_inequality_system @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> solve_inequality_system(
 	const inequality_system<node>& system, const solver_options& options)
@@ -1697,6 +1702,7 @@ std::optional<solution<node>> solve_minimum_system(
 	else return {};
 }
 
+/** @internal @copydoc solve_system @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> solve_system(const equation_system<node>& system,
 					const solver_options& options)
@@ -1780,6 +1786,7 @@ static result<std::optional<solution<node>>> omcat_solve_verified(
 	return r.with_value(std::move(s));
 }
 
+/** @internal @copydoc solve(const equations<node>&, const solver_options&) @endinternal */
 template <NodeType node>
 result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 					const solver_options& options)
@@ -1850,15 +1857,7 @@ result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 	return solve_system<node>(system, options);
 }
 
-/**
- * @brief Check if adding the assignment var := term will introduce a loop given
- * the previous variable assignments.
- * @tparam node Tree node type
- * @param var_assignments A map that sends each variable to the set of variables reachable by assignments
- * @param var The current variable that is assigned
- * @param term The current term that is assigend
- * @return Whether adding the current variable assignment is valid
- */
+/** @internal @copydoc check_var_assignment @endinternal */
 template <NodeType node>
 bool check_var_assignment(auto& var_assignments, tref var, tref term) {
 	using tau = tree<node>;
@@ -1870,12 +1869,10 @@ bool check_var_assignment(auto& var_assignments, tref var, tref term) {
 	// Make sure that term does not contain var
 	for (tref tv : term_vars) if (tau::get(tv) == tau::get(var))
 		return false;
-	// SO-2: close the new assignment's reach set transitively FIRST --
-	// existing entries' sets are already closed (this function's
-	// invariant), so one merge pass suffices. The previous code compared
-	// only the term's DIRECT variables against predecessors and
-	// propagated only those, which made cycle detection map-order
-	// dependent (a chain p -> var -> q -> r -> p was accepted).
+	// Close the new assignment's reach set transitively first: existing
+	// entries' sets are already closed (this function's invariant), so one
+	// merge pass suffices, and cycle detection does not depend on map
+	// order.
 	subtree_set<node> term_cv(term_vars.begin(), term_vars.end());
 	for (const auto& [v, cv] : var_assignments)
 		if (term_cv.contains(v))
@@ -1895,14 +1892,7 @@ bool check_var_assignment(auto& var_assignments, tref var, tref term) {
 	return true;
 }
 
-/**
- * @brief Add the assignment var := term to var_assignments while making sure that
- * assigned variables do not appear in any assigned term.
- * @tparam node Tree node type
- * @param var_assignments Map of assignments of terms to variables
- * @param var The new variable that is assigned to term
- * @param term The new term that is assigned to var
- */
+/** @internal @copydoc normalize_and_add_assignment @endinternal */
 template <NodeType node>
 void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref var, tref term) {
 	using tau = tree<node>;
@@ -2032,8 +2022,10 @@ bool solution_below(const solution<node>& a, const solution<node>& b,
 }
 
 // entry point for the solver
-// Reports why solve failed: an unsupported clause is code::solver_error,
-// no solution is code::unsat.
+// Reports why solve failed: a null form is code::invalid_argument, a
+// full-LTL operator or an unsupported clause is code::unsupported_operation,
+// a failed normalization is code::internal_error, a point solver that cannot
+// decide is code::solver_error, no solution is code::unsat.
 //
 // In general mode the first expression path with a solution answers. In
 // minimum and maximum mode each path only yields the extreme solution of
@@ -2068,11 +2060,10 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 	}
 #endif // DEBUG
 	// Temporal quantifiers (always/sometimes) may wrap atomic equations
-	// and are unwrapped per-conjunct after path splitting (lines 1226+).
+	// and are unwrapped per-conjunct after path splitting below.
 	// The full-LTL operators (U, R, W, S, T) have no representation in a
-	// solution: refuse them at runtime -- this used to be a DEBUG-only
-	// assertion, so a release build solved past them and returned a
-	// solution for a formula it had silently misread.
+	// solution: refuse them in every build, or a release build would solve
+	// a formula it misread.
 	{
 		auto is_unsupported_temporal = [](tref n) {
 			const auto& t = tree<node>::get(n);
@@ -2402,12 +2393,11 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 	return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 }
 
-// (SO-7: the trefs overload of solve() was deleted -- zero callers.)
-
 // ------------------------------------------------------------
 // result-based API
 // ------------------------------------------------------------
 
+/** @internal @copydoc solve(tref, solver_options) @endinternal */
 template <NodeType node>
 result<solution<node>> solve(tref form, solver_options options) {
 	const size_t hits = constant_size_hits;
@@ -2421,6 +2411,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 		messages::generated_constant_too_large);
 }
 
+/** @internal @copydoc solve(const trefs&, solver_options) @endinternal */
 template <NodeType node>
 result<solution<node>> solve(const trefs& forms, solver_options options) {
 	result<solution<node>> r;

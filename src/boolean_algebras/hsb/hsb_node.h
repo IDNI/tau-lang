@@ -20,17 +20,22 @@ namespace idni::tau_lang {
 //   hsb_parser::hsb_top, hsb_bot, hsb_not, hsb_and, hsb_or, hsb_hs
 // =============================================================================
 
+/** @brief Node value of an hsb formula tree: a nonterminal and a pool index. */
 struct hsb_node {
+	/// @brief The grammar nonterminal naming the node kind.
 	using kind = hsb_parser::nonterminal;
 
+	/// The node kind.
 	kind   nt   = hsb_parser::hsb_bot;
 	size_t data = 0;    ///< Pool index for hsb_hs (always ≥ 1; the pool
 	                    ///< reserves index 0); 0 for all others.
 	size_t hash = 0;    ///< Precomputed hash of (nt, data).
 
+	/// @brief Equal kind and data; the hash is not compared.
 	bool operator==(const hsb_node& o) const noexcept {
 		return nt == o.nt && data == o.data;
 	}
+	/// @brief Orders by kind, then by data.
 	bool operator<(const hsb_node& o) const noexcept {
 		if (nt != o.nt) return static_cast<size_t>(nt)
 		                     < static_cast<size_t>(o.nt);
@@ -38,7 +43,11 @@ struct hsb_node {
 	}
 };
 
-// Construct an hsb_node with precomputed hash.
+/**
+ * @brief An hsb_node with its hash precomputed from @p nt and @p data.
+ * @param nt the node kind.
+ * @param data the halfspace pool index for `hsb_hs`, 0 otherwise.
+ */
 inline hsb_node make_hsb_node(hsb_parser::nonterminal nt,
                                size_t data = 0) noexcept {
 	std::uint64_t seed = 0;
@@ -47,11 +56,13 @@ inline hsb_node make_hsb_node(hsb_parser::nonterminal nt,
 	return hsb_node{ nt, data, static_cast<size_t>(seed) };
 }
 
+/// @brief An hsb formula tree.
 using hsb_tree = idni::lcrs_tree<hsb_node>;
 
 } // namespace idni::tau_lang
 
 // std::hash specialization required by bintree<hsb_node>
+/// @brief Returns the precomputed hsb_node::hash.
 template<>
 struct std::hash<idni::tau_lang::hsb_node> {
 	size_t operator()(const idni::tau_lang::hsb_node& n) const noexcept {
