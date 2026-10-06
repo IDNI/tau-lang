@@ -127,6 +127,16 @@ add_repl_test(option_numeric-enable_refused
 	"enable fixpointsteps" "takes a count" NO_FAIL_REGEX)
 add_repl_test(option_numeric-toggle_refused
 	"toggle gcgrowth" "takes a count" NO_FAIL_REGEX)
+# Every numeric option, the LTL and memory limits included, says so.
+foreach(_opt ltltimeout ltlqemaxvars ltlhoamaxstates ltlmaxobservations
+		ltlmealymaxstates compilemaxtableedges bfdependencemaxnodes
+		trefbudget trefbudgetsoft)
+	add_repl_test(option_numeric-enable_${_opt}_refused
+		"enable ${_opt}" "takes a count, not a flag" NO_FAIL_REGEX)
+endforeach()
+# severity and ltlalg take a word, not a count and not a flag.
+add_repl_test(option_word-enable_ltlalg_refused
+	"enable ltlalg" "takes a value, not a flag" NO_FAIL_REGEX)
 
 # bv's own options, addressed bv-widening / bv-max-width, with no core alias
 # and no short form, same shape as bv_blastdepth above.

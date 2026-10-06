@@ -2155,34 +2155,18 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
-	case block_max_splits_opt:
-	case block_max_rounds_opt:
-	case cqe_max_clauses_opt:
-	case decision_pins_opt:
-	case fixpoint_steps_opt:
-	case flag_search_steps_opt:
-	case squeeze_cap_opt:
-	case simplify_rounds_opt:
-	case def_passes_opt:
-	case enum_steps_opt:
-	case probe_steps_opt:
-	case rewrite_rounds_opt:
-	case gc_min_size_opt:
-	case gc_growth_opt:
-	case spec_size_warn_opt:
-	case revision_alts_opt:
-	case consistency_subsets_opt:
-	case cache_bound_opt:
-	case cover_products_opt:
-	case constant_size_opt:
-	case lgrs_max_vars_opt:
+	case severity_opt:
+	case ltl_alg_opt:
+		print_error(code::invalid_argument,
+			"This option takes a value, not a flag: use "
+			"`set <option> <value>`");
+		error = true;
+		return;
+	// Every other option is a numeric limit.
+	default:
 		print_error(code::invalid_argument,
 			"This option takes a count, not a flag: use "
 			"`set <option> <n>`");
-		error = true;
-		return;
-	default:
-		print_error(code::invalid_argument, "Invalid option");
 		error = true;
 		return;
 	}

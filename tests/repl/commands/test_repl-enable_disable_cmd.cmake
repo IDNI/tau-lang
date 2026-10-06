@@ -24,9 +24,9 @@ add_repl_test(disable_cmd-charvar      "disable charvar"      "off")
 add_repl_test(enable_disable_roundtrip "disable status. enable status" "on")
 add_repl_test(disable_enable_roundtrip "enable status. disable status" "off")
 
-# invalid option for bool-only commands
-add_repl_test(enable_cmd-invalid_severity "enable severity" "Invalid option" NO_FAIL_REGEX)
-add_repl_test(disable_cmd-invalid_severity "disable severity" "Invalid option" NO_FAIL_REGEX)
+# severity takes a word: the bool-only commands refuse it
+add_repl_test(enable_cmd-invalid_severity "enable severity" "takes a value, not a flag" NO_FAIL_REGEX)
+add_repl_test(disable_cmd-invalid_severity "disable severity" "takes a value, not a flag" NO_FAIL_REGEX)
 
 add_repl_test(enable_disable_cmd-preprocessing
 	"disable preprocessing. get preprocessing. enable preprocessing. get preprocessing"
