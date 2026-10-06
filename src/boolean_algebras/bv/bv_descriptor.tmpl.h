@@ -438,7 +438,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				set_case_split_max_tests_option,
 				"cap the constants a quantified bitvector variable may "
 				"be tested against for the case split (default: "
-				"TAU_BV_CASE_SPLIT_MAX_TESTS or 0; 0 = unlimited)" },
+				"TAU_BV_CASE_SPLIT_MAX_TESTS or unlimited; "
+				"0 = unlimited)" },
 			{ "definitional-elimination", ba_option_kind::flag,
 				get_defelim_option, set_defelim_option,
 				nullptr, nullptr,
