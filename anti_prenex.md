@@ -1461,8 +1461,9 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // (inv. 5).
 
     // CENSUS, rank order COVER: one pass over the member tops of ψ's
-    // disjunctive conjuncts (equation and order atoms; a negative tree's
-    // members count like any other), counting signed
+    // disjunctive conjuncts — a literal member, or a literal conjunct of
+    // an ∧-member, one level deep (equation and order atoms; a negative
+    // tree's members count like any other) — counting signed
     // coverage; a candidate must occur in BOTH signs; rank by total
     // coverage, ties by the weaker side, then content order. The rank
     // only orders the tries — the licence decides. Ranking by cofactor
