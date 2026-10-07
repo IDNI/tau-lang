@@ -221,7 +221,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		// TODO (HIGH) dropped error: widen_arithmetic's report -- sat_status returns a bare optional, which cannot carry it.
 		form = widen_arithmetic(form).value_or(nullptr);
 		if (!form) return std::nullopt;
-		auto status = bv_formula_sat_status<node_t>(form);
+		// TODO (HIGH) dropped error: bv_formula_sat_status's report -- sat_status returns a bare optional, which cannot carry it.
+		auto status = bv_formula_sat_status<node_t>(form).value_or(std::nullopt);
 		if (status == bv_sat_status::sat) return true;
 		if (status == bv_sat_status::unsat) return false;
 		return std::nullopt;

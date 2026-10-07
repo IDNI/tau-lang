@@ -107,7 +107,7 @@ TEST_SUITE("quantifier-free bitvector decision") {
 			qf_config c(true);
 			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || y:bv[2] = { 1 }:bv[2])");
 			REQUIRE(fm);
-			auto r = bv_formula_sat_status<node_t>(fm);
+			auto r = bv_formula_sat_status<node_t>(fm).value();
 			REQUIRE(r.has_value());
 			CHECK(r.value() == bv_sat_status::sat);
 		}
@@ -115,7 +115,7 @@ TEST_SUITE("quantifier-free bitvector decision") {
 			qf_config c(false);
 			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || z:bv[2] = { 1 }:bv[2])");
 			REQUIRE(fm);
-			auto r = bv_formula_sat_status<node_t>(fm);
+			auto r = bv_formula_sat_status<node_t>(fm).value();
 			REQUIRE(r.has_value());
 			CHECK(r.value() == bv_sat_status::sat);
 		}

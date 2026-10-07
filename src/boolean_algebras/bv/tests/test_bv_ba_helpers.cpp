@@ -185,7 +185,7 @@ TEST_SUITE("bv solver budgets and declines") {
 		const bool saved = bv_quantifier_free_decision;
 		bv_quantifier_free_decision = true;
 		auto st = bv_formula_sat_status<node_t>(closed_form(
-			"ex x:bv[8] (x + { 2 }:bv[8] = { 0 }:bv[8] && q(x))."));
+			"ex x:bv[8] (x + { 2 }:bv[8] = { 0 }:bv[8] && q(x)).")).value();
 		bv_quantifier_free_decision = saved;
 		CHECK( !st.has_value() );
 	}
@@ -194,7 +194,7 @@ TEST_SUITE("bv solver budgets and declines") {
 	TEST_CASE("an untranslatable formula is neither unsat nor valid") {
 		tref fm = closed_form(
 			"ex x:bv[8] (x + { 1 }:bv[8] = { 0 }:bv[8] && q(x)).");
-		CHECK( !bv_formula_sat_status<node_t>(fm).has_value() );
+		CHECK( !bv_formula_sat_status<node_t>(fm).value().has_value() );
 		CHECK( !is_bv_formula_unsat<node_t>(fm) );
 		CHECK( !is_bv_formula_valid<node_t>(fm) );
 	}
@@ -203,7 +203,7 @@ TEST_SUITE("bv solver budgets and declines") {
 		tref fm = closed_form("ex x:bv[8] (x + { 1 }:bv[8] = { 2 }:bv[8]).");
 		{
 			time_budget_handled scope(std::chrono::seconds(0));
-			CHECK( bv_formula_sat_status<node_t>(fm)
+			CHECK( bv_formula_sat_status<node_t>(fm).value()
 				== bv_sat_status::unknown );
 			CHECK( !is_bv_formula_sat<node_t>(fm) );
 			CHECK( !is_bv_formula_unsat<node_t>(fm) );
@@ -221,14 +221,14 @@ TEST_SUITE("bv solver budgets and declines") {
 			"ex x:bv[8] (x + { 3 }:bv[8] = { 5 }:bv[8]).");
 		{
 			time_budget_handled scope(std::chrono::seconds(0));
-			CHECK( bv_formula_sat_status<node_t>(fm)
+			CHECK( bv_formula_sat_status<node_t>(fm).value()
 				== bv_sat_status::unknown );
 			CHECK( scope.ran_out() );
 		}
-		CHECK( bv_formula_sat_status<node_t>(fm) == bv_sat_status::sat );
+		CHECK( bv_formula_sat_status<node_t>(fm).value() == bv_sat_status::sat );
 		CHECK( time_budget_exhausted().empty() );
 		CHECK( bv_formula_sat_status<node_t>(closed_form(
-			"ex x:bv[8] (x + { 4 }:bv[8] = { 5 }:bv[8])."))
+			"ex x:bv[8] (x + { 4 }:bv[8] = { 5 }:bv[8]).")).value()
 			== bv_sat_status::sat );
 	}
 }

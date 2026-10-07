@@ -91,7 +91,7 @@ static void run_child(const std::string& sample, const std::filesystem::path& ou
 		}
 
 		tref query = build_bf_neq<node_t>(t_bf, s_bf);
-		auto status = bv_formula_sat_status<node_t>(query);
+		auto status = bv_formula_sat_status<node_t>(query).value();
 		if (!status) {
 			out << "ORACLE_UNAVAILABLE|cvc5 translation failed T=" << t_str << " S=" << s_str << "\n";
 			return;

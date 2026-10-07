@@ -211,7 +211,7 @@ TEST_SUITE("bv_formula_sat_status (BA-1)") {
 	TEST_CASE("sat formula") {
 		const std::string sample = "ex x x = { 1 }:bv[4]";
 		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
-		auto status = bv_formula_sat_status<node_t>(formula);
+		auto status = bv_formula_sat_status<node_t>(formula).value();
 		REQUIRE( status.has_value() );
 		CHECK( status.value() == bv_sat_status::sat );
 		CHECK( is_bv_formula_sat<node_t>(formula) );
@@ -220,7 +220,7 @@ TEST_SUITE("bv_formula_sat_status (BA-1)") {
 	TEST_CASE("unsat formula") {
 		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
 		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
-		auto status = bv_formula_sat_status<node_t>(formula);
+		auto status = bv_formula_sat_status<node_t>(formula).value();
 		REQUIRE( status.has_value() );
 		CHECK( status.value() == bv_sat_status::unsat );
 		CHECK( !is_bv_formula_sat<node_t>(formula) );

@@ -665,9 +665,11 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
 
 /** @internal @copydoc bv_formula_sat_status @endinternal */
 template <NodeType node>
-std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
+result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	using res = result<std::optional<bv_sat_status>>;
+	res rep;
 
 #ifdef TAU_CACHE
 	// One cvc5::Solver construction plus one checkSat per call, and the callers
@@ -690,15 +692,17 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	tref key = tau::trim_right_sibling(form);
-	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	if (auto it = cache.find(key); it != end(cache)) return res{}.with_value(it->second);
 	bool ran_out = false;
 	auto memo = [&key, &ran_out](std::optional<bv_sat_status> r) {
 		if (!ran_out) cache.emplace(key, r);
-		return r;
+		return res{}.with_value(r);
 	};
 #else
 	bool ran_out = false;
-	auto memo = [](std::optional<bv_sat_status> r) { return r; };
+	auto memo = [](std::optional<bv_sat_status> r) {
+		return res{}.with_value(r);
+	};
 #endif // TAU_CACHE
 	// Once a budget ran out, the unit of work asking has no answer to
 	// give, and nothing it asks later can change that.
@@ -764,8 +768,8 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 					<< (invert ? " (universal, inverted)" : "") << ": " << LOG_FM(matrix);
 				cvc5::Solver qf_solver(cvc5_term_manager);
 				config_cvc5_solver_quantifier_free(qf_solver);
-				auto qf_expr = bv_eval_node<node>(tt(matrix), vars, free_vars);
-				// TODO (HIGH) dropped error: bv_eval_node's report -- bv_formula_sat_status returns a bare optional, so a failure folds into the translation-failure branch as a decline.
+				auto qf_expr = rep.merge_take(bv_eval_node<node>(tt(matrix), vars, free_vars));
+				if (rep.has_error()) return rep;
 				if (!qf_expr.has_value()) {
 					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
@@ -809,8 +813,8 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// here (see cvc5_option_set::decision_no_models).
 	config_cvc5_solver(solver, true);
 
-	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	// TODO (HIGH) dropped error: bv_eval_node's report -- bv_formula_sat_status returns a bare optional, so a failure folds into the translation-failure branch as a decline.
+	auto expr = rep.merge_take(bv_eval_node<node>(tt(form), vars, free_vars));
+	if (rep.has_error()) return rep;
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
@@ -851,13 +855,15 @@ bool is_bv_formula_sat(tref form) {
 	// Callers that would otherwise assert the formula is definitely false
 	// on a false return here must use bv_formula_sat_status instead and
 	// treat unknown/nullopt as "cannot decide".
-	return bv_formula_sat_status<node>(form) == bv_sat_status::sat;
+	return bv_formula_sat_status<node>(form).value_or(std::nullopt)
+		== bv_sat_status::sat;
 }
 
 /** @internal @copydoc is_bv_formula_unsat @endinternal */
 template <NodeType node>
 bool is_bv_formula_unsat(tref form) {
-	return bv_formula_sat_status<node>(form) == bv_sat_status::unsat;
+	return bv_formula_sat_status<node>(form).value_or(std::nullopt)
+		== bv_sat_status::unsat;
 }
 
 /** @internal @copydoc is_bv_formula_valid @endinternal */

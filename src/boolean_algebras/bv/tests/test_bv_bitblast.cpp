@@ -240,19 +240,19 @@ TEST_SUITE("bounded bitvector decision") {
 			"all z:bv[16] ex u:bv[16] (y * x != z * u && z - u < z + y "
 			"&& x * z != y * u + {3}:bv[16])");
 		REQUIRE( hard );
-		auto s = bv_formula_sat_status<node_t>(hard);
+		auto s = bv_formula_sat_status<node_t>(hard).value();
 		const std::string noted = take_time_budget_exhausted();
 		// cvc5 does not decide it in a second
 		CHECK( s == bv_sat_status::unknown );
 		CHECK( noted.find("bv-solve-timeout, 1 s") != std::string::npos );
 		// asked again, the budget is noted again
-		bv_formula_sat_status<node_t>(hard);
+		bv_formula_sat_status<node_t>(hard).value();
 		CHECK( !take_time_budget_exhausted().empty() );
 		// once a budget ran out, the unit of work asks nothing more
 		note_time_budget_exhausted("earlier");
 		tref easy = wff("ex x:bv[8] x = {3}:bv[8]");
 		REQUIRE( easy );
-		CHECK( bv_formula_sat_status<node_t>(easy) == bv_sat_status::unknown );
+		CHECK( bv_formula_sat_status<node_t>(easy).value() == bv_sat_status::unknown );
 		take_time_budget_exhausted();
 		tau::clear_caches();
 		bv_solve_timeout = timeout;
@@ -266,7 +266,7 @@ TEST_SUITE("bounded bitvector decision") {
 		tref f = tau::get("all x:bv[8] ex y:bv[8] x * y = x",
 			wff_opts).value_or(nullptr);
 		REQUIRE( f );
-		CHECK( bv_formula_sat_status<node_t>(f) == bv_sat_status::sat );
+		CHECK( bv_formula_sat_status<node_t>(f).value() == bv_sat_status::sat );
 		CHECK( take_time_budget_exhausted().empty() );
 		bv_bitblast_max_nodes = nodes;
 	}

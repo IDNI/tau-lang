@@ -346,10 +346,11 @@ enum class bv_sat_status { sat, unsat, unknown };
  * `bv_solve_timeout`; a query killed at the timeout answers unknown.
  *
  * @param form The bit-vector formula to be checked for satisfiability.
- * @return The tri-state result, or nullopt if translation to cvc5 failed.
+ * @return The tri-state result; a value-less optional if translation to cvc5
+ * declined; the error of the translation when it failed.
  */
 template <NodeType node>
-std::optional<bv_sat_status> bv_formula_sat_status(tref form);
+result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form);
 
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
