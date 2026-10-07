@@ -416,7 +416,12 @@ inline std::optional<std::vector<cell>> cells_of(
 // Smaller denominators first, then smaller magnitudes, a positive before its
 // negative: the order in which a model prefers its values.
 inline bool simpler(const qlt_rational& a, const qlt_rational& b) {
-	const long long ma = a.p < 0 ? -a.p : a.p, mb = b.p < 0 ? -b.p : b.p;
+	// unsigned, since the magnitude of LLONG_MIN does not fit long long
+	auto magnitude = [](long long p) {
+		const auto u = static_cast<unsigned long long>(p);
+		return p < 0 ? 0ULL - u : u;
+	};
+	const unsigned long long ma = magnitude(a.p), mb = magnitude(b.p);
 	if (a.q != b.q) return a.q < b.q;
 	if (ma != mb) return ma < mb;
 	return a.p > b.p;

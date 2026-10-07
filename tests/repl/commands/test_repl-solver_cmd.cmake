@@ -147,6 +147,11 @@ add_repl_test(solver_cmd-qlt-solve-budget_spent
 	FLAGS --qlt-cells-budget 1)
 add_repl_test(solver_cmd-qlt-solve-budget_enough
 	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "no solution")
+# The model prefers the smaller magnitude, also against a numerator of
+# -9223372036854775808, whose magnitude does not fit a long long.
+add_repl_test(solver_cmd-qlt-solve-simplest_past_least_numerator
+	"solve (x:qlt & {[-9223372036854775808/3,-9223372036854775808/3] | [1/3,1/3]}:qlt) != 0."
+	"x := \\{ 1/3 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-equals_point
 	"solve x:qlt = {1/2}:qlt." "x := \\{ 1/2 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-membership_and_order

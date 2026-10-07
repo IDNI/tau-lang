@@ -190,6 +190,21 @@ TEST_SUITE("omcat: parse_rat_literal") {
 		REQUIRE(r.has_value());
 		CHECK(omcat::cmp(r.value(), omcat::rational(9, 20)) == 0);
 	}
+	TEST_CASE("negative decimals") {
+		auto half = omcat::parse_rat_literal("-0.5");
+		REQUIRE(half.has_value());
+		CHECK(omcat::cmp(half.value(), omcat::rational(-1, 2)) == 0);
+		auto r = omcat::parse_rat_literal("-1.5");
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(-3, 2)) == 0);
+	}
+	TEST_CASE("decimal at the least long long") {
+		auto r = omcat::parse_rat_literal("-9223372036854775808.");
+		REQUIRE(r.has_value());
+		CHECK(omcat::cmp(r.value(), omcat::rational(LLONG_MIN, 1)) == 0);
+		CHECK_FALSE(omcat::parse_rat_literal("-9223372036854775808.1")
+			.has_value());
+	}
 	TEST_CASE("invalid is an invalid argument") {
 		auto r = omcat::parse_rat_literal("not-a-rational");
 		CHECK(!r.has_value());

@@ -72,25 +72,26 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 			long long fval = fpart.empty() ? 0 : std::stoll(fpart);
 			long long denom = 1;
 			for (size_t i = 0; i < fpart.size(); ++i) denom *= 10;
-			long long sign = (ipart.size() && ipart[0] == '-') ? -1 : 1;
-			long long scaled = 0, num = 0;
+			// A negative literal's ival carries its sign, so the fraction
+			// is subtracted: |ival| does not fit long long for LLONG_MIN.
+			const bool negative = ipart.size() && ipart[0] == '-';
+			long long num = 0;
 #if defined(_MSC_VER) && !defined(__clang__)
 			// MSVC has no __builtin_*_overflow; widen through 128-bit.
-			omcat_int128_ scaled128 =
-				(omcat_int128_) std::abs(ival) * denom;
-			omcat_int128_ num128 = scaled128 + fval;
-			num128 *= sign;
+			omcat_int128_ num128 = (omcat_int128_) ival * denom;
+			num128 = negative ? num128 - fval : num128 + fval;
 			if (num128 > LLONG_MAX || num128 < LLONG_MIN)
 				return r.with_error(code::invalid_argument,
 					"rational parse: '" + src + "' does not fit an "
 					"exact rational literal",
 					{{label::value, src}});
 			num = (long long) num128;
-			(void)scaled;
 #else
-			if (__builtin_mul_overflow(std::abs(ival), denom, &scaled)
-				|| __builtin_add_overflow(scaled, fval, &num)
-				|| __builtin_mul_overflow(num, sign, &num))
+			long long scaled = 0;
+			if (__builtin_mul_overflow(ival, denom, &scaled)
+				|| (negative
+					? __builtin_sub_overflow(scaled, fval, &num)
+					: __builtin_add_overflow(scaled, fval, &num)))
 			{
 				return r.with_error(code::invalid_argument,
 					"rational parse: '" + src + "' does not fit an "
