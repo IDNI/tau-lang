@@ -383,8 +383,9 @@ onf_wff<node>::onf_wff(tref _var) {
 
 /** @internal @copydoc onf_wff::operator()(tref) const @endinternal */
 template <NodeType node>
-tref onf_wff<node>::operator()(tref n) const {
+result<tref> onf_wff<node>::operator()(tref n) const {
 	using tau = tree<node>;
+	result<tref> r;
 	auto [ _ , nn] = get_inner_quantified_wff<node>(n);
 	// We assume that the formula is in DNF. In particular nn is in DNF
 	// For each disjunct calculate the onf
@@ -395,17 +396,22 @@ tref onf_wff<node>::operator()(tref n) const {
 		no_disjunction = false;
 		const auto& disjunct = tau::get(disjunct_ref);
 		DBG(assert(disjunct.children_size() == 2);)
-		if (!disjunct[0][0].is(tau::wff_or))
-			changes[disjunct[0].first()] =
-					onf_subformula(disjunct[0].first());
-		if (!disjunct[1][0].is(tau::wff_or))
-			changes[disjunct[1].first()] =
-					onf_subformula(disjunct[1].first());
+		if (!disjunct[0][0].is(tau::wff_or)) {
+			TAU_TRY(tref sub, onf_subformula(disjunct[0].first()));
+			changes[disjunct[0].first()] = sub;
+		}
+		if (!disjunct[1][0].is(tau::wff_or)) {
+			TAU_TRY(tref sub, onf_subformula(disjunct[1].first()));
+			changes[disjunct[1].first()] = sub;
+		}
 	}
-	if (no_disjunction) changes[nn] = onf_subformula(nn);
+	if (no_disjunction) {
+		TAU_TRY(tref sub, onf_subformula(nn));
+		changes[nn] = sub;
+	}
 	// nn is the innermost quantifier's body; rewriting must happen inside
 	// the original formula or every binder above nn is silently dropped
-	return rewriter::replace<node>(n, changes);
+	return r.with_value(rewriter::replace<node>(n, changes));
 }
 
 /**
@@ -419,15 +425,15 @@ tref onf_wff<node>::operator()(tref n) const {
  * @endinternal
  */
 template <NodeType node>
-tref onf_wff<node>::onf_subformula(tref n) const {
+result<tref> onf_wff<node>::onf_subformula(tref n) const {
 	using tau = tree<node>;
-	using tt = tau::traverser;
+	result<tref> r;
 	auto invalid = [](tref n) {
 		if (tau::get(n).is_term() && is_non_boolean_term<node>(n))
 			return true;
 		else return false;
 	};
-	if (tau::get(n).find_top(invalid)) return n;
+	if (tau::get(n).find_top(invalid)) return r.with_value(n);
 	auto has_var = [&](const auto& el) {
 		return tau::get(el) == tau::get(var);
 	};
@@ -445,12 +451,12 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		tref norm_eq = norm_trimmed_equation<node>(eq);
 		const auto& eq_v = tau::get(norm_eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
-		tref f_0 = tt(rewriter::replace<node>(
-			eq_v.first(), var, tau::_0(find_ba_type<node>(var))))
-				| bf_reduce_canonical<node>() | tt::ref;
-		tref f_1 = tt(rewriter::replace<node>(
-			tau::build_bf_neg(eq_v.first()), var,tau::_1(find_ba_type<node>(var))))
-				| bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(tref f_0, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(eq_v.first(), var,
+				tau::_0(find_ba_type<node>(var)))));
+		TAU_TRY(tref f_1, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(tau::build_bf_neg(eq_v.first()),
+				var, tau::_1(find_ba_type<node>(var)))));
 
 		changes[eq] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
@@ -461,38 +467,26 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		const auto& neq = tau::get(norm_neq);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
-		tref f_0 = tt(rewriter::replace<node>(
-			neq.first(), var,
-			tau::_0(find_ba_type<node>(var))))
-				| bf_reduce_canonical<node>() | tt::ref;
-		tref f_1 = tt(rewriter::replace<node>(
-			tau::build_bf_neg(neq.first()), var,
-			tau::_1(find_ba_type<node>(var))))
-				| bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(tref f_0, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(neq.first(), var,
+				tau::_0(find_ba_type<node>(var)))));
+		TAU_TRY(tref f_1, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(tau::build_bf_neg(neq.first()),
+				var, tau::_1(find_ba_type<node>(var)))));
 		changes[neq_ref] = tau::trim(tau::build_wff_or(
 			tau::build_bf_nlteq(f_0, var),
 			tau::build_bf_nlteq(var, f_1)));
 	}
-	return rewriter::replace<node>(n, changes);
-}
-
-/** @internal @copydoc operator|(const typename tree<node>::traverser&, const onf_wff_t<node>&) @endinternal */
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const onf_wff_t<node>& r)
-{
-	return tt(r(t.value()));
+	return r.with_value(rewriter::replace<node>(n, changes));
 }
 
 /** @internal @copydoc onf @endinternal */
 template <NodeType node>
 result<tref> onf(tref n, tref var) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<tref> r;
 	// FIXME take into account quantifiers
 	TAU_TRY(auto dnf_n, (to_dnf<node, true>(n)));
-	tref onf_n = tt(dnf_n) | tt::f(onf_wff<node>(var)) | tt::ref;
+	TAU_TRY(tref onf_n, onf_wff<node>(var)(dnf_n));
 	TAU_TRY(auto dnf_onf, (to_dnf<node, true>(onf_n)));
 	return r.with_value(dnf_onf);
 }

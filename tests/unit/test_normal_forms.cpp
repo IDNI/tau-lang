@@ -107,9 +107,9 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = uninterp_constants_sample;
-		tref fm = tt(tau::get(sample).value())
-			| tau::spec | tau::main | tau::wff
-			| bf_reduce_canonical<node_t>() | tt::ref;
+		tref fm = bf_reduce_canonical<node_t>()(
+			tt(tau::get(sample).value())
+			| tau::spec | tau::main | tau::wff | tt::ref).value();
 		CHECK( tau::get(fm) == tau::get_T() );
 	}
 
@@ -1512,7 +1512,7 @@ TEST_SUITE("normal form passes over hook-free trees") {
 
 	TEST_CASE("bf_reduce_canonical reduces the arguments of a reference") {
 		tref t = raw_bf("f(ab|ab')");
-		tref res = tt(t) | bf_reduce_canonical<node_t>() | tt::ref;
+		tref res = bf_reduce_canonical<node_t>()(t).value();
 		REQUIRE( res != nullptr );
 		// the argument reduces to `a`, then f(a) expands on a
 		CHECK( str(res) == "f(1)a|f(0)a'" );

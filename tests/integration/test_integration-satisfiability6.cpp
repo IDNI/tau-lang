@@ -1313,28 +1313,29 @@ TEST_SUITE("solver entry points") {
 		tref zero_eq = raw_eq_0(tau::_0(sbf));
 		auto s = find_solution<node_t>(zero_eq);
 		REQUIRE( s.has_value() );
-		CHECK( s.value().empty() );
+		REQUIRE( s.value().has_value() );
+		CHECK( s.value().value().empty() );
 		equation_system<node_t> sys{ zero_eq, {} };
-		CHECK( find_maximal_solution<node_t>(sys).has_value() );
-		CHECK( find_minimal_solution<node_t>(sys).has_value() );
+		CHECK( find_maximal_solution<node_t>(sys).value().has_value() );
+		CHECK( find_minimal_solution<node_t>(sys).value().has_value() );
 		equation_system<node_t> neq_sys{ std::nullopt,
 			{ raw_neq_0(tau::_1(sbf)) } };
-		CHECK( find_maximal_solution<node_t>(neq_sys).has_value() );
-		CHECK( find_minimal_solution<node_t>(neq_sys).has_value() );
+		CHECK( find_maximal_solution<node_t>(neq_sys).value().has_value() );
+		CHECK( find_minimal_solution<node_t>(neq_sys).value().has_value() );
 	}
 
 	TEST_CASE("a variable-free false equality has no solution") {
 		const size_t sbf = sbf_type_id<node_t>();
 		tref one_eq = raw_eq_0(tau::_1(sbf));
 		tref zero_neq = raw_neq_0(tau::_0(sbf));
-		CHECK( !find_solution<node_t>(one_eq).has_value() );
+		CHECK( !find_solution<node_t>(one_eq).value().has_value() );
 		CHECK( !find_maximal_solution<node_t>(
-			equation_system<node_t>{ one_eq, {} }).has_value() );
+			equation_system<node_t>{ one_eq, {} }).value().has_value() );
 		CHECK( !find_minimal_solution<node_t>(
-			equation_system<node_t>{ one_eq, {} }).has_value() );
+			equation_system<node_t>{ one_eq, {} }).value().has_value() );
 		CHECK( !find_maximal_solution<node_t>(
-			equation_system<node_t>{ std::nullopt, { zero_neq } }).has_value() );
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).value().has_value() );
 		CHECK( !find_minimal_solution<node_t>(
-			equation_system<node_t>{ std::nullopt, { zero_neq } }).has_value() );
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).value().has_value() );
 	}
 }

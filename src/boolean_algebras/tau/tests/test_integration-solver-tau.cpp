@@ -238,13 +238,12 @@ TEST_SUITE("solve_inequality_system") {
 	// operator^'s trivial-case shortcut, to exercise the reducer itself.
 	TEST_CASE("reduction: typed zero XOR var reduces to var") {
 		using tau = tree<node_t>;
-		using tt = tau::traverser;
 		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
 		tref x = tau_var_operand("o1[t]:tau");
 		tref zero = tau::_0(type_id);
 		tref raw_xor = tau::build_bf_xor(zero, x);
-		tref reduced = tt(raw_xor) | bf_reduce_canonical<node_t>() | tt::ref;
-		tref expected = tt(x) | bf_reduce_canonical<node_t>() | tt::ref;
+		tref reduced = bf_reduce_canonical<node_t>()(raw_xor).value();
+		tref expected = bf_reduce_canonical<node_t>()(x).value();
 		CHECK( tau::get(reduced) == tau::get(expected) );
 	}
 
@@ -255,7 +254,7 @@ TEST_SUITE("solve_inequality_system") {
 		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
 		fresh_element_ledger ledger;
 		tref committed = tau_var_operand("{o5[t] = o6[t].}:tau");
-		ledger_commit_witness<node_t>(ledger, committed, type_id);
+		REQUIRE( ledger_commit_witness<node_t>(ledger, committed, type_id).has_value() );
 		tref x = tau_var_operand("o1[t]:tau");
 		inequality_system<node_t> sys;
 		sys.insert(tau::build_bf_neq(x, tau::_1(type_id)));
@@ -285,10 +284,10 @@ TEST_SUITE("solve_inequality_system") {
 			"&& <:z> != 0}:tau.").value_or(nullptr)).value().main->get();
 		tref v = tau::get(tau::get(eq).first()).second();
 		fresh_element_ledger ledger;
-		ledger_commit_witness<node_t>(ledger, v, type_id);
+		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
 		REQUIRE( ledger.fresh_region );
 		tref region = ledger.fresh_region->get();
-		ledger_commit_witness<node_t>(ledger, v, type_id);
+		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
 		CHECK( ledger.fresh_region->get() == region );
 	}
 
@@ -298,15 +297,14 @@ TEST_SUITE("solve_inequality_system") {
 	// and absorbed disjuncts.
 	TEST_CASE("ledger: the region of a repeated commit stays small") {
 		using tau = tree<node_t>;
-		using tt = tau::traverser;
 		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
 		tref eq = get_nso_rr<node_t>(tau::get("o9[t]:tau = {<:y> = 0 "
 			"&& <:x> != 0 && <:z> != 0 || <:y> != 0 && <:x> != 0 || <:x> = 0 "
 			"&& <:z> != 0}:tau.").value_or(nullptr)).value().main->get();
 		tref v = tau::get(tau::get(eq).first()).second();
 		auto exclude = [&](tref region) {
-			return tt(tau::get(region) & ~tau::get(v))
-				| bf_reduce_canonical<node_t>() | tt::ref;
+			return bf_reduce_canonical<node_t>()(
+				(tau::get(region) & ~tau::get(v)).get()).value();
 		};
 		tref once = exclude(tau::_1(type_id));
 		REQUIRE( generated_constant_size<node_t>(once) < 60 );
@@ -340,7 +338,7 @@ TEST_SUITE("solve_inequality_system") {
 		REQUIRE( sol1->size() == 1 );
 		tref w1 = sol1->begin()->second;
 		CHECK( check_atomless_solution(sys1, sol1.value()) );
-		ledger_commit_witness<node_t>(ledger, w1, type_id);
+		REQUIRE( ledger_commit_witness<node_t>(ledger, w1, type_id).has_value() );
 
 		tref x2 = tau_var_operand("o2[t]:tau");
 		inequality_system<node_t> sys2;
@@ -353,7 +351,7 @@ TEST_SUITE("solve_inequality_system") {
 		REQUIRE( sol2.has_value() );
 		tref w2 = sol2->begin()->second;
 		CHECK( check_atomless_solution(sys2, sol2.value()) );
-		ledger_commit_witness<node_t>(ledger, w2, type_id);
+		REQUIRE( ledger_commit_witness<node_t>(ledger, w2, type_id).has_value() );
 
 		tref x3 = tau_var_operand("o3[t]:tau");
 		inequality_system<node_t> sys3;
@@ -374,7 +372,6 @@ TEST_SUITE("solve_inequality_system") {
 	TEST_CASE("ledger: external exclusions verified; region collapse falls "
 	          "back") {
 		using tau = tree<node_t>;
-		using tt = tau::traverser;
 		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
 		fresh_element_ledger ledger;
 		solver_options options = {
@@ -396,7 +393,7 @@ TEST_SUITE("solve_inequality_system") {
 		REQUIRE( sol.has_value() );
 		CHECK( check_atomless_solution(sys, sol.value()) );
 
-		tref not_a = tt(~tau::get(a)) | bf_reduce_canonical<node_t>() | tt::ref;
+		tref not_a = bf_reduce_canonical<node_t>()((~tau::get(a)).get()).value();
 		tref y = tau_var_operand("o2[t]:tau");
 		inequality_system<node_t> sys2;
 		sys2.insert(tau::build_bf_neq(y, tau::_1(type_id)));

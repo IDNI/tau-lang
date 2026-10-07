@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 
 // Forward declaration: defined in normal_forms.tmpl.h, included after this file.
 template <NodeType node>
-tref syntactic_atomic_formula_simplification(tref atomic_formula);
+result<tref> syntactic_atomic_formula_simplification(tref atomic_formula);
 
 // ── Internal helpers ────────────────────────────────────────────────────────
 
@@ -457,8 +457,9 @@ result<tref> simplify_using_equality(tref fm) {
 	uf_stack.emplace_back(std::move(uf));
 	subtree_unordered_set<node> mark;
 	bool uf_stack_imbalance = false;
-	auto f = [&uf_stack, &mark](tref n, tref parent) {
-		if (!is<node>(n, tau::wff)) return n;
+	bool simplification_failed = false;
+	auto f = [&](tref n, tref parent) {
+		if (simplification_failed || !is<node>(n, tau::wff)) return n;
 		const tau& cn = tau::get(n)[0];
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			if (!cn.is(tau::wff_or))
@@ -466,7 +467,10 @@ result<tref> simplify_using_equality(tref fm) {
 			else mark.insert(parent);
 		}
 		if (cn.is(tau::bf_eq)) {
-			n = syntactic_atomic_formula_simplification<node>(n);
+			auto simplified = r.merge_take(
+				syntactic_atomic_formula_simplification<node>(n));
+			if (!simplified) return simplification_failed = true, n;
+			n = *simplified;
 			n = simplify_using_equality_direct_atm<node>(n);
 			tref s = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
 			// Union-find substitution rewrites operands in place, so the
@@ -481,7 +485,10 @@ result<tref> simplify_using_equality(tref fm) {
 			if (simplify_using_equality_add_equality<node>(uf_stack.back(), s)) return s;
 			else return _F<node>();
 		} else if (is_atomic_fm<node>(n)) {
-			n = syntactic_atomic_formula_simplification<node>(n);
+			auto simplified = r.merge_take(
+				syntactic_atomic_formula_simplification<node>(n));
+			if (!simplified) return simplification_failed = true, n;
+			n = *simplified;
 			n = simplify_using_equality_direct_atm<node>(n);
 			n = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
 			return simplify_using_equality_direct_atm<node>(n);
@@ -547,6 +554,7 @@ result<tref> simplify_using_equality(tref fm) {
 		return true;
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
+	if (simplification_failed) return r;
 	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)
 	if (uf_stack_imbalance || uf_stack.size() != 1)
 		return r.with_error(code::internal_error,

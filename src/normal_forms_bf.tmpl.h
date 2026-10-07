@@ -106,12 +106,13 @@ bf_dependence bf_var_dependence(tref term, tref var) {
  * @tparam node Type of tree node
  * @param atomic_fm The atomic formula, ie an equation, to simplify
  * @param var The variable to base the simplifications on
- * @return The simplified atomic formula
+ * @return The simplified atomic formula, or the report of a failed
+ * `bf_reduce_canonical`.
  */
 template<NodeType node>
-tref syntactic_variable_simplification(tref atomic_fm, tref var) {
+result<tref> syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
+	result<tref> r;
 	DBG(assert(tau::get(var).is(tau::variable));)
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
@@ -123,18 +124,21 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	// can never hit its own entry.
 	const std::pair<tref, tref> key { tau::trim_right_sibling(atomic_fm),
 		tau::trim_right_sibling(var) };
-	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	if (auto it = cache.find(key); it != end(cache))
+		return r.with_value(it->second);
 	// Every non-trivial exit stores through this, in particular the func2 == 0
 	// early return below: norm_equation brings every bf_eq/bf_neq to `f (!)= 0`,
 	// so that return is the path taken by the vast majority of the calls, and
 	// storing only at the end left the cache write-never for them.
-	auto memo = [&key](tref r) { return cache.emplace(key, r).first->second; };
+	auto memo = [&key, &r](tref v) {
+		return r.with_value(cache.emplace(key, v).first->second);
+	};
 #else
-	auto memo = [](tref r) { return r; };
+	auto memo = [&r](tref v) { return r.with_value(v); };
 #endif // TAU_CACHE
 	// Return early if atomic_fm is either T or F
 	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F())
-		return atomic_fm;
+		return r.with_value(atomic_fm);
 	DBG(LOG_TRACE << "Syntactic_variable_simplification on " << LOG_FM(atomic_fm) << "\n";)
 	DBG(LOG_TRACE << "with var: " << LOG_FM(var) << "\n";)
 	var = tau::get(tau::bf, var);
@@ -157,10 +161,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		// Make sure that it works only on Boolean parts by using replace_if
 		tref func1_v_0 = rewriter::replace_if<node>(func1, var,
 			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(func1_v_0, bf_reduce_canonical<node>()(func1_v_0));
 		tref func1_v_1 = rewriter::replace_if<node>(func1, var,
 			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(func1_v_1, bf_reduce_canonical<node>()(func1_v_1));
 		// Is func syntactically identically 0
 		if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
 			func1 = tau::_0(find_ba_type<node>(func1));
@@ -185,10 +189,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	else if (dep2 == bf_dependence::unknown) {
 		tref func2_v_0 = rewriter::replace_if<node>(func2, var,
 			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(func2_v_0, bf_reduce_canonical<node>()(func2_v_0));
 		tref func2_v_1 = rewriter::replace_if<node>(func2, var,
 			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(func2_v_1, bf_reduce_canonical<node>()(func2_v_1));
 		// Is func syntactically identically 0
 		if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
 			func2 = tau::_0(find_ba_type<node>(func2));
@@ -506,18 +510,21 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
  * @brief Applies syntactic simplifications to an atomic formula, ie an equation.
  * @tparam node Tree node type
  * @param atomic_formula Formula to simplify
- * @return Simplified formula
+ * @return Simplified formula, or the report of a failed
+ * `syntactic_variable_simplification`.
  */
 template<NodeType node>
-tref syntactic_atomic_formula_simplification(tref atomic_formula) {
+result<tref> syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
+	result<tref> r;
 	DBG(LOG_TRACE << "Start syntactic_atomic_formula_simplification: "
 		<< tau::get(atomic_formula) << "\n";)
 	size_t atm_type = tau::get(atomic_formula)[0].value.get_nt();
 	// Bring an equation to !(=) 0
 	atomic_formula = norm_equation<node>(atomic_formula);
 	if (tau::get(atomic_formula).equals_T() ||
-		tau::get(atomic_formula).equals_F()) return atomic_formula;
+		tau::get(atomic_formula).equals_F())
+		return r.with_value(atomic_formula);
 	tref func1 = syntactic_path_simplification<node>(
 		tau::get(atomic_formula)[0].first());
 	tref func2 = syntactic_path_simplification<node>(
@@ -530,12 +537,12 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	// Apply syntactic variable simplification for each found free variable
 	auto& free_vars = get_free_vars<node>(atomic_formula);
 	for (tref v : free_vars) {
-		atomic_formula =
-			syntactic_variable_simplification<node>(atomic_formula, v);
+		TAU_TRY(atomic_formula,
+			syntactic_variable_simplification<node>(atomic_formula, v));
 	}
 	DBG(LOG_TRACE << "End syntactic_atomic_formula_simplification: "
 		<< tau::get(atomic_formula) << "\n";)
-	return atomic_formula;
+	return r.with_value(atomic_formula);
 }
 
 /**

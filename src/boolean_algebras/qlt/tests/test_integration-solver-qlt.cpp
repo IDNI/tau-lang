@@ -281,8 +281,8 @@ TEST_SUITE("relational qlt ordering systems") {
 	bool satisfies(const std::string& system, const solution<node_t>& sol) {
 		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
 		for (tref atom : get_cnf_wff_clauses<node_t>(form)) {
-			tref v = tau::traverser(rewriter::replace<node_t>(atom, sol))
-				| bf_reduce_canonical<node_t>() | tau::traverser::ref;
+			tref v = bf_reduce_canonical<node_t>()(
+				rewriter::replace<node_t>(atom, sol)).value();
 			if (!tau::get(v).equals_T()) return false;
 		}
 		return true;

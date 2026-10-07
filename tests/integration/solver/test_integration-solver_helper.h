@@ -27,7 +27,8 @@ inline bool test_find_solution(const char* src) {
 	equation = norm_all_equations<node_t>(equation);
 	equation = apply_all_xor_def<node_t>(equation);
 	auto solution = find_solution<node_t>(equation);
-	return check_solution<node_t>(equation, solution.value());
+	return solution.has_value() && solution.value().has_value()
+		&& check_solution<node_t>(equation, solution.value().value());
 }
 
 // Builds the inequality_system the same way solve_general_system does:

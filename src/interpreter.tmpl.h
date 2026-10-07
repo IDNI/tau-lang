@@ -1597,7 +1597,8 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 	if (n.has_value()) r.merge(std::move(n));
 	if (!is_t) return r.with_value(std::nullopt);
 	for (const auto& [_, v] : sol) {
-		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+		TAU_TRY_VOID(ledger_commit_witness<node>(ledger, v,
+			tau::get(v).get_ba_type()));
 		ledger.pin(tree<node>::geth(v));
 		if (std::none_of(found.begin(), found.end(), [&](const htref& h) {
 			return tau::subtree_equals(h->get(), v); }))
@@ -1908,8 +1909,10 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_missing(
 		if (!v) continue;
 		sol[sol_key] = v;
 	}
-	for (const auto& [key, v] : sol)
-		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+	for (const auto& [key, v] : sol) {
+		TAU_TRY_VOID(ledger_commit_witness<node>(ledger, v,
+			tau::get(v).get_ba_type()));
+	}
 	return r.with_value(std::move(sol));
 }
 

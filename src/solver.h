@@ -45,10 +45,11 @@ inline size_t constant_size_hits = 0;
  * @tparam node Tree node type.
  * @param eq The equality `f = 0` to solve.
  * @return A constant for every variable of @p eq; an empty solution for a
- * variable-free equality that holds; nullopt when @p eq has no zero.
+ * variable-free equality that holds; nullopt when @p eq has no zero; the
+ * report of a failed reduction otherwise.
  */
 template <NodeType node>
-std::optional<solution<node>> find_solution(equality eq);
+result<std::optional<solution<node>>> find_solution(equality eq);
 
 /**
  * @brief Löwenheim's general reproductive solution of the given equality.

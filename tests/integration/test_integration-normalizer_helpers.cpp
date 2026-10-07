@@ -78,16 +78,16 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 	TEST_CASE("T and F are returned unchanged") {
 		tref v = tau::build_variable("x", 0);
 		CHECK( tau::get(syntactic_variable_simplification<node_t>(
-			tau::_T(), v)).equals_T() );
+			tau::_T(), v).value()).equals_T() );
 		CHECK( tau::get(syntactic_variable_simplification<node_t>(
-			tau::_F(), v)).equals_F() );
+			tau::_F(), v).value()).equals_F() );
 	}
 
 	// A variable that does not occur in the atom cannot change it.
 	TEST_CASE("variable absent from the atom leaves it equivalent") {
 		tref atom = wff("x y = 0");
 		tref z = tau::build_variable("z", 0);
-		tref res = syntactic_variable_simplification<node_t>(atom, z);
+		tref res = syntactic_variable_simplification<node_t>(atom, z).value();
 		CHECK( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, atom) );
 	}
@@ -96,7 +96,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 	TEST_CASE("variable present in the atom: result stays equivalent") {
 		tref atom = wff("x y = 0");
 		tref x = tau::build_variable("x", 0);
-		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		CHECK( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, atom) );
 	}
@@ -106,7 +106,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 					"x y | x z = 0" }) {
 			tref atom = wff(s);
 			tref res = syntactic_atomic_formula_simplification<node_t>(
-				atom);
+				atom).value();
 			CAPTURE(s);
 			CHECK( res != nullptr );
 			CHECK( are_nso_equivalent<node_t>(res, atom) );
@@ -116,7 +116,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 	// A contradictory atom must collapse; a tautological one likewise.
 	TEST_CASE("atomic formula simplification detects a tautology") {
 		tref atom = wff("x x' = 0");
-		tref res = syntactic_atomic_formula_simplification<node_t>(atom);
+		tref res = syntactic_atomic_formula_simplification<node_t>(atom).value();
 		CHECK( tau::get(res).equals_T() );
 	}
 }
@@ -378,8 +378,8 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 	TEST_CASE("repeated calls agree, canonical input") {
 		tref atom = wff("x y = 0");
 		tref x = tau::build_variable("x", 0);
-		tref first = syntactic_variable_simplification<node_t>(atom, x);
-		tref again = syntactic_variable_simplification<node_t>(atom, x);
+		tref first = syntactic_variable_simplification<node_t>(atom, x).value();
+		tref again = syntactic_variable_simplification<node_t>(atom, x).value();
 		CHECK( tau::get(first) == tau::get(again) );
 	}
 
@@ -392,9 +392,9 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 		for (const char* s : { "x = y", "x y != 0", "x | y = 0" }) {
 			tref atom = wff(s);
 			tref first = syntactic_variable_simplification<node_t>(
-				atom, x);
+				atom, x).value();
 			tref again = syntactic_variable_simplification<node_t>(
-				atom, x);
+				atom, x).value();
 			CAPTURE(s);
 			CHECK( tau::get(first) == tau::get(again) );
 			CHECK( are_nso_equivalent<node_t>(first, atom) );
@@ -405,9 +405,9 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 	TEST_CASE("the variable is part of the key") {
 		tref atom = wff("x y = 0");
 		tref rx = syntactic_variable_simplification<node_t>(
-			atom, tau::build_variable("x", 0));
+			atom, tau::build_variable("x", 0)).value();
 		tref ry = syntactic_variable_simplification<node_t>(
-			atom, tau::build_variable("y", 0));
+			atom, tau::build_variable("y", 0)).value();
 		CHECK( are_nso_equivalent<node_t>(rx, atom) );
 		CHECK( are_nso_equivalent<node_t>(ry, atom) );
 	}
@@ -461,7 +461,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		REQUIRE( x != nullptr );
 		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].first(),
 			tau::get(tau::bf, x)) == bf_dependence::unknown );
-		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		REQUIRE( res != nullptr );
 		CHECK( !contains<node_t>(res, x) );
 		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
@@ -478,7 +478,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		REQUIRE( atom != nullptr );
 		tref x = var_in(atom, "x");
 		REQUIRE( x != nullptr );
-		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		REQUIRE( res != nullptr );
 		CHECK( !contains<node_t>(res, x) );
 		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
@@ -492,7 +492,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		REQUIRE( x != nullptr );
 		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].second(),
 			tau::get(tau::bf, x)) == bf_dependence::unknown );
-		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		REQUIRE( res != nullptr );
 		CHECK( !contains<node_t>(res, x) );
 		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
@@ -506,7 +506,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		REQUIRE( x != nullptr );
 		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].second(),
 			tau::get(tau::bf, x)) == bf_dependence::unknown );
-		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		REQUIRE( res != nullptr );
 		CHECK( !contains<node_t>(res, x) );
 		CHECK( are_nso_equivalent<node_t>(res,

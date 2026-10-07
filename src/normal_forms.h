@@ -196,27 +196,20 @@ struct onf_wff {
 	/// @brief Construct with the variable to order with respect to; a node
 	/// that is not a `bf` is wrapped in one.
 	explicit onf_wff(tref _var);
-	/// @brief Apply ONF conversion to formula `n`.
-	tref operator()(tref n) const;
+	/// @brief Apply ONF conversion to formula `n`; the report of a failed
+	/// `bf_reduce_canonical` when a bound cannot be reduced.
+	result<tref> operator()(tref n) const;
 private:
 	/// @brief Interval-rewrite step for a single DNF conjunct: applies the
 	/// `f = 0` / `f != 0` rewrite described above w.r.t. `var`, leaving a
 	/// conjunct that contains a non-Boolean term unchanged.
-	tref onf_subformula(tref n) const;
+	result<tref> onf_subformula(tref n) const;
 	tref var = nullptr;
 };
 
 /// @brief Type alias for `onf_wff<node>`.
 template <NodeType node>
 using onf_wff_t = onf_wff<node>;
-
-/**
- * @brief Pipe operator: apply `onf_wff` to the tree @p t holds.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const onf_wff_t<node>& r);
 
 /**
  * @brief Convert formula `n` to Ordered Normal Form with respect to `var`.
@@ -227,7 +220,7 @@ typename tree<node>::traverser operator|(
  * @param n Formula to convert.
  * @param var The variable that defines the ordering dimension.
  * @return Formula in ONF with respect to `var`, or the error of a DNF
- * conversion.
+ * conversion or of the reduction of a bound.
  *
  * @par Example
  * @code{.cpp}
@@ -306,40 +299,29 @@ template <NodeType node>
 result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
 
 /**
- * @brief Functor adapter that applies `bf_reduced_dnf` to every `bf` sub-tree.
- *
- * Allows `bf_reduce_canonical` to be used in the tree traversal pipeline via
- * `operator|`.
+ * @brief Functor that applies `bf_reduced_dnf` to every top-level `bf` of a tree.
  * @tparam node Tree node type.
  */
 template <NodeType node>
 struct bf_reduce_canonical {
 	/// @brief Apply canonical DNF reduction to every top-level `bf` of `fm`.
 	///
-	/// An error of `bf_reduced_dnf` is not reported: the functor returns a
-	/// plain `tref` for the `operator|` pipeline.
+	/// @return The reduced tree, or the report of the first failed
+	/// `bf_reduced_dnf` (normalization of a BA constant, a corrupt
+	/// coefficient map).
 	///
 	/// @par Example
 	/// @code{.cpp}
 	/// // A tautology over uninterpreted constants <:a>, <:b>, <:c> reduces to T
 	/// // (see the test suite "normal forms: bf_reduce_canonical" in
 	/// // tests/unit/test_normal_forms.cpp).
-	/// tref fm = tt(tau::get(uninterp_constants_sample))
-	///     | tau::spec | tau::main | tau::wff
-	///     | bf_reduce_canonical<node_t>() | tt::ref;
+	/// tref fm = bf_reduce_canonical<node_t>()(
+	///     tt(tau::get(uninterp_constants_sample))
+	///     | tau::spec | tau::main | tau::wff | tt::ref).value();
 	/// CHECK( tau::get(fm) == tau::get_T() );
 	/// @endcode
-	tref operator()(tref fm) const;
+	result<tref> operator()(tref fm) const;
 };
-
-/**
- * @brief Pipe operator: apply `bf_reduce_canonical` to the tree @p t holds.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t,
-	const bf_reduce_canonical<node>& r);
 
 /**
  * @brief Convert a formula to Disjunctive Normal Form (DNF).

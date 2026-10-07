@@ -29,14 +29,16 @@ namespace idni::tau_lang {
  * @param mode maximum assigns g'(Z) per variable, any other mode h(Z).
  * @return nullopt when @p eq has no bf_eq child, when the variable-free
  * residual g & h is non-zero (the equality is unsatisfiable), or when f
- * itself has no variables (callers handle constant equalities upfront).
+ * itself has no variables (callers handle constant equalities upfront);
+ * the report of a failed `bf_reduce_canonical` otherwise.
  */
 template <NodeType node>
-std::optional<solution<node>> find_solution(equality eq,
+result<std::optional<solution<node>>> find_solution(equality eq,
 	solution<node>& substitution, solver_mode mode)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<std::optional<solution<node>>> r;
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
@@ -50,7 +52,7 @@ std::optional<solution<node>> find_solution(equality eq,
 
 	if (!(tt(eq) | tau::bf_eq).has_value()) {
 		DBG(LOG_TRACE << "find_solution/solution[no_eq]: {}";)
-		return {};
+		return r.with_value(std::nullopt);
 	}
 
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
@@ -65,8 +67,8 @@ std::optional<solution<node>> find_solution(equality eq,
 		// with x <- h(Z)
 		tref g = rewriter::replace<node>(f, vars[0], tau::_1(find_ba_type<node>(vars[0])));
 		tref h = rewriter::replace<node>(f, vars[0], tau::_0(find_ba_type<node>(vars[0])));
-		tref gh = tt(tau::get(g) & tau::get(h))
-			| bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(tref gh, bf_reduce_canonical<node>()(
+			(tau::get(g) & tau::get(h)).get()));
 #ifdef DEBUG
 		LOG_TRACE << "find_solution/var[0]: " << LOG_FM(vars[0]);
 		LOG_TRACE << "find_solution/g: "      << LOG_FM(g);
@@ -78,17 +80,17 @@ std::optional<solution<node>> find_solution(equality eq,
 			if (!tau::get(gh).equals_0()) {
 				DBG(LOG_TRACE << "find_solution"
 					<< "/solution[gh_no_var,gh_!=_0]: {}";)
-				return {};
+				return r.with_value(std::nullopt);
 			}
 			else {
-				substitution[vars[0]] = tt(mode
+				TAU_TRY(substitution[vars[0]],
+					bf_reduce_canonical<node>()(mode
 						== solver_mode::maximum
 					? rewriter::replace<node>(
 						(~tau::get(g)).get(),
 								substitution)
 					: rewriter::replace<node>(h,
-								substitution))
-					| bf_reduce_canonical<node>() | tt::ref;
+								substitution)));
 
 #ifdef DEBUG
 				LOG_TRACE << "find_solution"
@@ -97,21 +99,21 @@ std::optional<solution<node>> find_solution(equality eq,
 					LOG_TRACE<<LOG_FM(k)<<" := "<<LOG_FM(v);
 #endif // DEBUG
 
-				return substitution;
+				return r.with_value(substitution);
 			}
 		}
-		if (auto restricted = find_solution<node>(build_bf_eq_0<node>(gh),
-						substitution, mode); restricted)
-		{
+		TAU_TRY(auto restricted, find_solution<node>(
+			build_bf_eq_0<node>(gh), substitution, mode));
+		if (restricted) {
 			//solution.insert(restricted.value().begin(), restricted.value().end());
-			substitution[vars[0]] =
-				tt(mode == solver_mode::maximum
+			TAU_TRY(substitution[vars[0]],
+				bf_reduce_canonical<node>()(
+				mode == solver_mode::maximum
 					? rewriter::replace<node>(
 						(~tau::get(g)).get(),
 							restricted.value())
 					: rewriter::replace<node>(h,
-							restricted.value()))
-				| bf_reduce_canonical<node>() | tt::ref;
+							restricted.value())));
 
 #ifdef DEBUG
 			LOG_TRACE << "find_solution/substitution[general]: ";
@@ -119,12 +121,12 @@ std::optional<solution<node>> find_solution(equality eq,
 				LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
 #endif // DEBUG
 
-			return substitution;
+			return r.with_value(substitution);
 		}
 	}
 
 	DBG(LOG_TRACE << "find_solution/substitution[no_var]: {}";)
-	return {};
+	return r.with_value(std::nullopt);
 }
 
 /**
@@ -158,12 +160,13 @@ trefs get_variables(const equation_system<node>& system) {
 // Whether the variable-free equation or inequality eq holds: it is not
 // automatically satisfied, so it is reduced and rejected on F (e.g. {c} = 0).
 // Reducing leaves a comparison whose sides are constants already as it is,
-// so it is rebuilt with the hooks on, which decide it.
+// so it is rebuilt with the hooks on, which decide it. The report of a failed
+// reduction is the error.
 template <NodeType node>
-bool var_free_holds(tref eq) {
+result<bool> var_free_holds(tref eq) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
-	tref v = tt(eq) | bf_reduce_canonical<node>() | tt::ref;
+	result<bool> r;
+	TAU_TRY(tref v, bf_reduce_canonical<node>()(eq));
 	if (const auto& w = tau::get(v); w.is(tau::wff)
 		&& (w.child_is(tau::bf_eq) || w.child_is(tau::bf_neq)))
 	{
@@ -173,7 +176,7 @@ bool var_free_holds(tref eq) {
 			? tau::build_bf_eq(c.first(), c.second())
 			: tau::build_bf_neq(c.first(), c.second());
 	}
-	return !tau::get(v).equals_F();
+	return r.with_value(!tau::get(v).equals_F());
 }
 
 /**
@@ -186,22 +189,28 @@ bool var_free_holds(tref eq) {
  * when there is no equality, nullopt when the equality is unsatisfiable.
  */
 template <NodeType node>
-std::optional<solution<node>> find_maximal_solution(const equation_system<node>& system) {
+result<std::optional<solution<node>>> find_maximal_solution(
+	const equation_system<node>& system)
+{
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	trefs vars = get_variables<node>(system);
 	if (vars.empty()) {
-		if (system.first && !var_free_holds<node>(system.first.value()))
-			return {};
-		for (tref neq : system.second)
-			if (!var_free_holds<node>(neq)) return {};
-		return solution<node>();
+		if (system.first) {
+			TAU_TRY(bool holds, var_free_holds<node>(system.first.value()));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		for (tref neq : system.second) {
+			TAU_TRY(bool holds, var_free_holds<node>(neq));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		return r.with_value(solution<node>());
 	}
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
-	return (system.first)
-		? find_solution<node>(system.first.value(), substitution,
-							solver_mode::maximum)
-		: substitution;
+	if (!system.first) return r.with_value(std::move(substitution));
+	return find_solution<node>(system.first.value(), substitution,
+							solver_mode::maximum);
 }
 
 /**
@@ -214,35 +223,42 @@ std::optional<solution<node>> find_maximal_solution(const equation_system<node>&
  * when there is no equality, nullopt when the equality is unsatisfiable.
  */
 template <NodeType node>
-std::optional<solution<node>> find_minimal_solution(
+result<std::optional<solution<node>>> find_minimal_solution(
 	const equation_system<node>& system)
 {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	trefs vars = get_variables<node>(system);
 	if (vars.empty()) {
-		if (system.first && !var_free_holds<node>(system.first.value()))
-			return {};
-		for (tref neq : system.second)
-			if (!var_free_holds<node>(neq)) return {};
-		return solution<node>();
+		if (system.first) {
+			TAU_TRY(bool holds, var_free_holds<node>(system.first.value()));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		for (tref neq : system.second) {
+			TAU_TRY(bool holds, var_free_holds<node>(neq));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		return r.with_value(solution<node>());
 	}
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_0(find_ba_type<node>(var));
-	return (system.first)
-		? find_solution<node>(system.first.value(), substitution,
-							solver_mode::minimum)
-		: substitution;
+	if (!system.first) return r.with_value(std::move(substitution));
+	return find_solution<node>(system.first.value(), substitution,
+							solver_mode::minimum);
 }
 
 /** @internal @copydoc find_solution(equality) @endinternal */
 template <NodeType node>
-std::optional<solution<node>> find_solution(equality eq) {
+result<std::optional<solution<node>>> find_solution(equality eq) {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 	trefs vars = get_variables<node>(eq);
-	if (vars.empty())
-		return var_free_holds<node>(eq)
+	if (vars.empty()) {
+		TAU_TRY(bool holds, var_free_holds<node>(eq));
+		return r.with_value(holds
 			? std::optional<solution<node>>{ solution<node>() }
-			: std::nullopt;
+			: std::nullopt);
+	}
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
@@ -272,17 +288,18 @@ result<solution<node>> lgrs(equality eq) {
 
 	DBG(LOG_TRACE << "lgrs/eq: " << LOG_FM(eq) << "\n";)
 
-	auto s = find_solution<node>(eq);
+	TAU_TRY(auto s, find_solution<node>(eq));
 	if (!s.has_value()) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
 		return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
-	for (auto [x_i, z_i] : s.value())
-		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
-			+ (tau::get(x_i) & ~tau::get(f)))
-				| bf_reduce_canonical<node>() | tt::ref;
+	for (auto [x_i, z_i] : s.value()) {
+		TAU_TRY(phi[x_i], bf_reduce_canonical<node>()(
+			((tau::get(z_i) & tau::get(f))
+				+ (tau::get(x_i) & ~tau::get(f))).get()));
+	}
 
 #ifdef DEBUG
 	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
@@ -762,8 +779,8 @@ result<std::optional<minterm_system<node>>> add_minterm_to_disjoint(
 			// case 3
 			} else if ((~d_cte & new_m_cte) != false) {
 				new_disjoint.insert(d);
-				new_m = tt(~d_cte & tau::get(new_m))
-					| bf_reduce_canonical<node>() | tt::ref;
+				TAU_TRY(new_m, bf_reduce_canonical<node>()(
+					(~d_cte & tau::get(new_m)).get()));
 
 				DBG(LOG_TRACE
 					<< " add_minterm_to_disjoint/[case3]"
@@ -803,8 +820,8 @@ result<std::optional<minterm_system<node>>> add_minterm_to_disjoint(
 
 				const auto& st = tau::get(s);
 				new_disjoint.insert((st & tau::get(d)).get());
-				new_m = tt(~st & tau::get(new_m))
-					| bf_reduce_canonical<node>() | tt::ref;
+				TAU_TRY(new_m, bf_reduce_canonical<node>()(
+					(~st & tau::get(new_m)).get()));
 
 				DBG(LOG_TRACE << "add_minterm_to_disjoint"
 					<< "/[case4]/new_disjoint: "
@@ -885,8 +902,8 @@ result<std::optional<solution<node>>> solve_minterm_system(
 
 		DBG(LOG_TRACE << "solve_minterm_system/neq: " << LOG_FM(neq);)
 
-		tref nf = tt(neq) | tau::bf_neq | tau::bf
-			| bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(tref nf, bf_reduce_canonical<node>()(
+			tt(neq) | tau::bf_neq | tau::bf | tt::ref));
 
 		DBG(LOG_TRACE << "solve_minterm_system/nf: " << LOG_FM(nf);)
 
@@ -909,7 +926,7 @@ result<std::optional<solution<node>>> solve_minterm_system(
 	DBG(LOG_TRACE << "solve_minterm_system/eq[final]: " << LOG_FM(eq);)
 
 	eq = build_bf_eq_0<node>(eq);
-	return r.with_value(find_solution<node>(eq));
+	return find_solution<node>(eq);
 }
 
 // Splitter for a ba_constant coefficient, matching add_minterm_to_disjoint's
@@ -921,7 +938,7 @@ result<tref> atomless_coefficient_splitter(tref cte, const solver_options& optio
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	result<tref> r;
-	cte = tt(cte) | bf_reduce_canonical<node>() | tt::ref;
+	TAU_TRY(cte, bf_reduce_canonical<node>()(cte));
 	if (tau::get(cte).equals_1()) return r.with_value(options.splitter_one);
 	TAU_TRY(tref sr, tau_splitter(tau::get(tt(cte) | tau::ba_constant | tt::ref)));
 	return r.with_value(sr);
@@ -938,7 +955,7 @@ result<tref> atomless_bad_splitter(tref cte) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	result<tref> r;
-	cte = tt(cte) | bf_reduce_canonical<node>() | tt::ref;
+	TAU_TRY(cte, bf_reduce_canonical<node>()(cte));
 	TAU_TRY(tref sr, tau_splitter(tau::get(tt(cte) | tau::ba_constant | tt::ref), splitter_type::bad));
 	return r.with_value(sr);
 }
@@ -989,22 +1006,22 @@ result<std::optional<tref>> atomless_choose_value_ledger(
 	const solver_options& options)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<std::optional<tref>> r;
 	if (!options.ledger || options.ledger->exhausted || cofactors.empty())
 		return r.with_value(std::nullopt);
 
 	auto red_and = [&](tref a, tref b) {
-		return tt(tau::get(a) & tau::get(b))
-			| bf_reduce_canonical<node>() | tt::ref;
+		return bf_reduce_canonical<node>()(
+			(tau::get(a) & tau::get(b)).get());
 	};
 	auto red_not = [&](tref a) {
-		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
+		return bf_reduce_canonical<node>()((~tau::get(a)).get());
 	};
 
 	trefs external; // category (b): non-ledger, nonzero, non-one targets
 	for (const auto& [c0, c1] : cofactors) {
-		if (!tau::subtree_equals(red_not(c0), c1))
+		TAU_TRY(tref not_c0, red_not(c0));
+		if (!tau::subtree_equals(not_c0, c1))
 			return r.with_value(std::nullopt); // not exclusion-shaped
 		if (tau::get(c0).equals_0() || tau::get(c0).equals_1())
 			continue; // var!=0 / var!=1 are free (nonzero+proper mint below)
@@ -1030,7 +1047,8 @@ result<std::optional<tref>> atomless_choose_value_ledger(
 	for (tref v : external) {
 		if (exceeds_constant_size<node>(region, v))
 			return r.with_value(std::nullopt);
-		region = red_and(region, red_not(v));
+		TAU_TRY(tref not_v, red_not(v));
+		TAU_TRY(region, red_and(region, not_v));
 	}
 	if (tau::get(region).equals_0())
 		return r.with_value(std::nullopt); // real check
@@ -1044,12 +1062,16 @@ result<std::optional<tref>> atomless_choose_value_ledger(
 	else { TAU_TRY(x, atomless_bad_splitter<node>(region)); }
 	if (!x || tau::get(x).equals_0())
 		return r.with_value(std::nullopt); // real check
-	if (tau::get(red_and(region, red_not(x))).equals_0())
+	TAU_TRY(tref not_x, red_not(x));
+	TAU_TRY(tref rest, red_and(region, not_x));
+	if (tau::get(rest).equals_0())
 		return r.with_value(std::nullopt); // not a proper split (see atomless_bad_splitter)
 
-	for (tref v : external) // real checks, category (b) only
-		if (!tau::get(red_and(x, v)).equals_0())
+	for (tref v : external) { // real checks, category (b) only
+		TAU_TRY(tref common, red_and(x, v));
+		if (!tau::get(common).equals_0())
 			return r.with_value(std::nullopt);
+	}
 
 	return r.with_value(x);
 }
@@ -1066,20 +1088,22 @@ result<std::optional<solution<node>>> atomless_exclusion_system_ledger(
 	const trefs& gs, tref var, const solver_options& options)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<std::optional<solution<node>>> r;
 	size_t type = find_ba_type<node>(var);
 
 	auto cofactor = [&](tref g, bool value) {
 		tref v = value ? tau::_1(type) : tau::_0(type);
-		tref r = rewriter::replace<node>(g, var, v);
-		return tt(r) | bf_reduce_canonical<node>() | tt::ref;
+		return bf_reduce_canonical<node>()(
+			rewriter::replace<node>(g, var, v));
 	};
 
 	std::vector<std::pair<tref, tref>> cofactors;
 	cofactors.reserve(gs.size());
-	for (tref g : gs)
-		cofactors.emplace_back(cofactor(g, false), cofactor(g, true));
+	for (tref g : gs) {
+		TAU_TRY(tref c0, cofactor(g, false));
+		TAU_TRY(tref c1, cofactor(g, true));
+		cofactors.emplace_back(c0, c1);
+	}
 
 	TAU_TRY(auto x, atomless_choose_value_ledger<node>(cofactors, type, options));
 	if (!x) return r.with_value(std::nullopt);
@@ -1101,26 +1125,27 @@ result<std::optional<solution<node>>> atomless_exclusion_system_ledger(
 // interpreter::collect_live_refs's `keep` set, so a plain tref would
 // dangle once a sweep runs.
 template <NodeType node>
-void ledger_commit_witness(fresh_element_ledger& ledger, tref value,
+result<void> ledger_commit_witness(fresh_element_ledger& ledger, tref value,
 	size_t type)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
+	result<void> r;
 	// the region already excludes a value committed before
-	if (ledger.is_committed(value)) return;
+	if (ledger.is_committed(value)) return r.with_value();
 	ledger.register_committed(value);
-	if (ledger.exhausted) return;
+	if (ledger.exhausted) return r.with_value();
 	tref region = ledger.fresh_region
 		? ledger.fresh_region->get() : nullptr;
 	if (!region) region = tau::_1(type);
 	if (exceeds_constant_size<node>(region, value)) {
 		ledger.exhausted = true;
 		ledger.fresh_region = nullptr;
-		return;
+		return r.with_value();
 	}
-	tref next = tt(tau::get(region) & ~tau::get(value))
-		| bf_reduce_canonical<node>() | tt::ref;
+	TAU_TRY(tref next, bf_reduce_canonical<node>()(
+		(tau::get(region) & ~tau::get(value)).get()));
 	ledger.fresh_region = tau::geth(next);
+	return r.with_value();
 }
 
 // Choose a value for `var` making every g_i(var, s') != 0, given ground
@@ -1136,31 +1161,37 @@ result<std::optional<tref>> atomless_choose_value(
 	const solver_options& options)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<std::optional<tref>> r;
 	size_t type = find_ba_type<node>(var);
 
 	// Past `max_constant_size` an operation is not built: `oversized` is
 	// set, the operand stands in for the result, and the call answers no
 	// value at the next check, so a stand-in never reaches the caller.
+	// A failed reduction works the same way: its report goes into `r`,
+	// `failed` is set, and the call returns `r` at the next check.
 	bool oversized = false;
+	bool failed = false;
 	auto too_big = [&](tref a, tref b = nullptr) {
 		return oversized = oversized
 			|| exceeds_constant_size<node>(a, b);
 	};
+	auto reduce = [&](tref t) -> tref {
+		if (failed) return t;
+		auto reduced = r.merge_take(bf_reduce_canonical<node>()(t));
+		if (!reduced) return failed = true, t;
+		return *reduced;
+	};
 	auto red_and = [&](tref a, tref b) {
 		if (too_big(a, b)) return a;
-		return tt(tau::get(a) & tau::get(b))
-			| bf_reduce_canonical<node>() | tt::ref;
+		return reduce((tau::get(a) & tau::get(b)).get());
 	};
 	auto red_or = [&](tref a, tref b) {
 		if (too_big(a, b)) return a;
-		return tt(tau::get(a) | tau::get(b))
-			| bf_reduce_canonical<node>() | tt::ref;
+		return reduce((tau::get(a) | tau::get(b)).get());
 	};
 	auto red_not = [&](tref a) {
 		if (too_big(a)) return a;
-		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
+		return reduce((~tau::get(a)).get());
 	};
 
 	// Per-call memo for red_and(a,b)==0 (containment/overlap): equals_0() is
@@ -1212,6 +1243,7 @@ result<std::optional<tref>> atomless_choose_value(
 	};
 
 	for (const auto& [c0, c1] : cofactors) {
+		if (failed) return r;
 		if (oversized) { ++constant_size_hits; return r.with_value(std::nullopt); }
 		bool c1_side = !tau::get(c1).equals_0();
 		tref b = c1_side ? c1 : c0;
@@ -1297,14 +1329,17 @@ result<std::optional<tref>> atomless_choose_value(
 			TAU_TRY(tref s_bad, atomless_bad_splitter<node>(c));
 			if (try_split(s_bad)) break;
 		}
+		if (failed) return r;
 		if (!split_done)
 			return r.with_value(std::nullopt); // splitter machinery failure
 	}
 
+	if (failed) return r;
 	if (oversized) { ++constant_size_hits; return r.with_value(std::nullopt); }
 	tref x = tau::_0(type);
 	for (size_t i = 0; i < reps.size(); ++i)
 		if (is_c1_side[i]) x = red_or(x, reps[i]);
+	if (failed) return r;
 
 	// Defensive re-check: every row must be satisfied by construction above.
 	for (const auto& [c0, c1] : cofactors) {
@@ -1312,6 +1347,7 @@ result<std::optional<tref>> atomless_choose_value(
 		if (is_and_zero(red_not(x), c0))
 			return r.with_value(std::nullopt);
 	}
+	if (failed) return r;
 	if (oversized) { ++constant_size_hits; return r.with_value(std::nullopt); }
 	return r.with_value(x);
 }
@@ -1326,7 +1362,6 @@ result<std::optional<solution<node>>> atomless_witness(const trefs& gs,
 	const trefs& vars, const solver_options& options)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<std::optional<solution<node>>> r;
 
 	if (vars.empty()) return r.with_value(solution<node>{});
@@ -1337,17 +1372,19 @@ result<std::optional<solution<node>>> atomless_witness(const trefs& gs,
 
 	auto cofactor = [&](tref g, bool value) {
 		tref v = value ? tau::_1(type) : tau::_0(type);
-		tref r = rewriter::replace<node>(g, var, v);
-		return tt(r) | bf_reduce_canonical<node>() | tt::ref;
+		return bf_reduce_canonical<node>()(
+			rewriter::replace<node>(g, var, v));
 	};
 
 	trefs c0s, c1s, gs_elim;
 	c0s.reserve(gs.size()); c1s.reserve(gs.size()); gs_elim.reserve(gs.size());
 	for (tref g : gs) {
-		tref c0 = cofactor(g, false), c1 = cofactor(g, true);
+		TAU_TRY(tref c0, cofactor(g, false));
+		TAU_TRY(tref c1, cofactor(g, true));
 		c0s.push_back(c0); c1s.push_back(c1);
-		gs_elim.push_back(tt(tau::get(c0) | tau::get(c1))
-			| bf_reduce_canonical<node>() | tt::ref);
+		TAU_TRY(tref elim, bf_reduce_canonical<node>()(
+			(tau::get(c0) | tau::get(c1)).get()));
+		gs_elim.push_back(elim);
 	}
 
 	TAU_TRY(auto rest, atomless_witness<node>(gs_elim, rest_vars, options));
@@ -1356,10 +1393,10 @@ result<std::optional<solution<node>>> atomless_witness(const trefs& gs,
 	std::vector<std::pair<tref, tref>> cofactors;
 	cofactors.reserve(gs.size());
 	for (size_t i = 0; i < gs.size(); ++i) {
-		tref c0 = rewriter::replace<node>(c0s[i], rest.value());
-		c0 = tt(c0) | bf_reduce_canonical<node>() | tt::ref;
-		tref c1 = rewriter::replace<node>(c1s[i], rest.value());
-		c1 = tt(c1) | bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(tref c0, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(c0s[i], rest.value())));
+		TAU_TRY(tref c1, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(c1s[i], rest.value())));
 		cofactors.emplace_back(c0, c1);
 	}
 
@@ -1412,10 +1449,11 @@ result<std::optional<solution<node>>> solve_inequality_system_atomless(
 		// `g != 0`: fold to g = l + r (XOR) unless r is already 0.
 		tref bf_neq_node = tt(neq) | tau::bf_neq | tt::ref;
 		tref l = tau::get(bf_neq_node).first();
-		tref r = tau::get(bf_neq_node).second();
-		gs.push_back(tau::get(r).equals_0() ? l
-			: tt(tau::get(l) + tau::get(r))
-				| bf_reduce_canonical<node>() | tt::ref);
+		tref rhs = tau::get(bf_neq_node).second();
+		if (tau::get(rhs).equals_0()) { gs.push_back(l); continue; }
+		TAU_TRY(tref g, bf_reduce_canonical<node>()(
+			(tau::get(l) + tau::get(rhs)).get()));
+		gs.push_back(g);
 	}
 	// Row order feeds atomless_witness's cofactor order and hence
 	// atomless_choose_value's greedy assignment order: re-sort to a
@@ -1552,7 +1590,6 @@ result<std::optional<solution<node>>> solve_general_system(
 	// they are true, return empty solution otherwise
 
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
 #ifdef DEBUG
 	if (system.first.has_value())
@@ -1566,14 +1603,17 @@ result<std::optional<solution<node>>> solve_general_system(
 	if (!system.first)
 		return solve_inequality_system<node>(system.second, options);
 	if (system.second.empty())
-		return r.with_value(find_solution<node>(system.first.value()));
+		return find_solution<node>(system.first.value());
 
-	auto phi = lgrs<node>(system.first.value());
-	if (!phi.has_value()) return r.with_value(std::nullopt);
+	auto phi_r = lgrs<node>(system.first.value());
+	if (!phi_r.has_value()
+		&& report_has_code(phi_r.report(), code::unsat))
+			return r.with_value(std::nullopt);
+	TAU_TRY(auto phi, std::move(phi_r));
 
 #ifdef DEBUG
 	LOG_TRACE << "solve_system/phi: ";
-	for (const auto& [k, v]: phi.value())
+	for (const auto& [k, v]: phi)
 		LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
 #endif // DEBUG
 
@@ -1581,9 +1621,9 @@ result<std::optional<solution<node>>> solve_general_system(
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
 	for (tref g_i : system.second) {
-		auto nphi = phi.value();
-		auto ng_i = tt(rewriter::replace<node>(g_i, nphi))
-				| bf_reduce_canonical<node>() | tt::ref;
+		auto nphi = phi;
+		TAU_TRY(tref ng_i, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(g_i, nphi)));
 		if (tau::get(ng_i).equals_F()) {
 			DBG(LOG_TRACE<<" solve_system/inequality_solution: {}";)
 
@@ -1622,15 +1662,15 @@ result<std::optional<solution<node>>> solve_general_system(
 	solution<node> solution = inequality_solution.value();
 
 	// Now we need to add solutions for variables in the lgrs
-	for (auto [var, func]: phi.value()) {
+	for (auto [var, func]: phi) {
 		tref func_with_neq_assgm = rewriter::replace<node>(func,
 						inequality_solution.value());
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
-		solution[var] =	tt(replace_free_vars_by<node>(
-					func_with_neq_assgm, tau::_0_trimmed(
-						find_ba_type<node>(func_with_neq_assgm))))
-				| bf_reduce_canonical<node>() | tt::ref;
+		TAU_TRY(solution[var], bf_reduce_canonical<node>()(
+			replace_free_vars_by<node>(func_with_neq_assgm,
+				tau::_0_trimmed(
+					find_ba_type<node>(func_with_neq_assgm)))));
 	}
 
 #ifdef DEBUG
@@ -1649,11 +1689,11 @@ result<std::optional<solution<node>>> solve_general_system(
  * construction.
  */
 template <NodeType node>
-bool check_extreme_solution(const equation_system<node>& system,
+result<bool> check_extreme_solution(const equation_system<node>& system,
 	const solution<node>& substitution)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
+	result<bool> r;
 #ifdef DEBUG
 	if (system.first) LOG_TRACE <<" check_extreme_solution/eq: "
 		<< LOG_FM(system.first.value());
@@ -1665,11 +1705,11 @@ bool check_extreme_solution(const equation_system<node>& system,
 #endif // DEBUG
 	// We check if the solution satisfies the inequalities of the system
 	for (inequality t : system.second) {
-		tref value = tt(rewriter::replace<node>(t, substitution))
-			| bf_reduce_canonical<node>() | tt::ref;
-		if (tau::get(value).equals_F()) return false;
+		TAU_TRY(tref value, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(t, substitution)));
+		if (tau::get(value).equals_F()) return r.with_value(false);
 	}
-	return true;
+	return r.with_value(true);
 }
 
 /**
@@ -1678,13 +1718,15 @@ bool check_extreme_solution(const equation_system<node>& system,
  * letting solve_system fall back to other strategies.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_maximum_system(
+result<std::optional<solution<node>>> solve_maximum_system(
 	const equation_system<node>& system)
 {
-	if (auto s = find_maximal_solution<node>(system); s)
-		return check_extreme_solution<node>(system, s.value()) ? s
-					: std::optional<solution<node>>();
-	else return {};
+	result<std::optional<solution<node>>> r;
+	TAU_TRY(auto s, find_maximal_solution<node>(system));
+	if (!s) return r.with_value(std::nullopt);
+	TAU_TRY(bool ok, check_extreme_solution<node>(system, *s));
+	return r.with_value(ok ? std::move(s)
+		: std::optional<solution<node>>());
 }
 
 /**
@@ -1693,13 +1735,15 @@ std::optional<solution<node>> solve_maximum_system(
  * letting solve_system fall back to other strategies.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_minimum_system(
+result<std::optional<solution<node>>> solve_minimum_system(
 	const equation_system<node>& system)
 {
-	if(auto s = find_minimal_solution<node>(system); s)
-		return check_extreme_solution<node>(system, s.value()) ? s
-					: std::optional<solution<node>>();
-	else return {};
+	result<std::optional<solution<node>>> r;
+	TAU_TRY(auto s, find_minimal_solution<node>(system));
+	if (!s) return r.with_value(std::nullopt);
+	TAU_TRY(bool ok, check_extreme_solution<node>(system, *s));
+	return r.with_value(ok ? std::move(s)
+		: std::optional<solution<node>>());
 }
 
 /** @internal @copydoc solve_system @endinternal */
@@ -1710,16 +1754,18 @@ result<std::optional<solution<node>>> solve_system(const equation_system<node>& 
 	result<std::optional<solution<node>>> r;
 	// we try to find a maximal solution
 	if (options.mode != solver_mode::minimum) {
-		if (auto solution = solve_maximum_system<node>(system); solution)
-			return r.with_value(std::move(solution));
+		TAU_TRY(auto solution, solve_maximum_system<node>(system));
+		if (solution) return r.with_value(std::move(solution));
 		else if (options.mode == solver_mode::maximum)
 			return r.with_value(std::nullopt);
 	}
 	// if it fails, we try a minimum solution
-	if (auto solution = solve_minimum_system<node>(system); solution)
-		return r.with_value(std::move(solution));
-	else if (options.mode == solver_mode::minimum)
-		return r.with_value(std::nullopt);
+	{
+		TAU_TRY(auto solution, solve_minimum_system<node>(system));
+		if (solution) return r.with_value(std::move(solution));
+		else if (options.mode == solver_mode::minimum)
+			return r.with_value(std::nullopt);
+	}
 	// if we have no equality we try to solve the inequalities
 	if (!system.first.has_value())
 		return solve_inequality_system<node>(system.second, options);
@@ -1771,18 +1817,19 @@ static result<std::optional<solution<node>>> omcat_solve_verified(
 	const inequality_system<node>& sys, const solver_options& options)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	result<std::optional<solution<node>>> r;
 	TAU_TRY(auto s, pack_omcat_solve<node>(options.type_id, sys, options));
 	if (!s) return r.with_value(std::nullopt);
-	for (tref atom : sys)
-		if (!tau::get(tt(rewriter::replace<node>(atom, s.value()))
-			| bf_reduce_canonical<node>() | tt::ref).equals_T())
+	for (tref atom : sys) {
+		TAU_TRY(tref value, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(atom, s.value())));
+		if (!tau::get(value).equals_T())
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the point solver's model does not "
 				"satisfy an atom",
 				{{label::value, truncate_for_message(
 					TAU_TO_STR(atom))}});
+	}
 	return r.with_value(std::move(s));
 }
 
@@ -1846,9 +1893,8 @@ result<std::optional<solution<node>>> solve(const equations<node>& eqs,
 		TAU_TRY(auto sol, solve_system<node>(rest, options));
 		if (!sol) return r.with_value(std::nullopt);
 		for (tref ord : ords) {
-			tref value = tt(rewriter::replace<node>(ord,
-					sol.value()))
-				| bf_reduce_canonical<node>() | tt::ref;
+			TAU_TRY(tref value, bf_reduce_canonical<node>()(
+				rewriter::replace<node>(ord, sol.value())));
 			if (!tau::get(value).equals_T())
 				return r.with_value(std::nullopt);
 		}
@@ -1994,31 +2040,38 @@ bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
  *
  * A variable one of the two leaves unassigned is unconstrained there, so it
  * takes the value the mode gives such a variable: 0 in minimum mode, 1 in
- * maximum mode. A comparison the canonical reduction cannot settle counts as
- * not below.
+ * maximum mode. A comparison the canonical reduction does not settle to T
+ * counts as not below; a failed reduction is the error.
  */
 template <NodeType node>
-bool solution_below(const solution<node>& a, const solution<node>& b,
+result<bool> solution_below(const solution<node>& a, const solution<node>& b,
 	solver_mode mode)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
+	result<bool> r;
 	auto value = [mode](const solution<node>& s, tref var) {
 		if (auto it = s.find(var); it != s.end()) return it->second;
 		const size_t type = find_ba_type<node>(var);
 		return mode == solver_mode::minimum ? tau::_0(type)
 			: tau::_1(type);
 	};
-	auto below = [&](tref var) {
+	auto below = [&](tref var) -> result<bool> {
+		result<bool> r;
 		tref eq = tau::build_bf_eq_0(tau::build_bf_and(value(a, var),
 			tau::build_bf_neg(value(b, var))));
-		return tau::get(tt(eq) | bf_reduce_canonical<node>()
-			| tt::ref).equals_T();
+		TAU_TRY(tref reduced, bf_reduce_canonical<node>()(eq));
+		return r.with_value(tau::get(reduced).equals_T());
 	};
-	for (const auto& [var, _] : a) if (!below(var)) return false;
-	for (const auto& [var, _] : b)
-		if (!a.contains(var) && !below(var)) return false;
-	return true;
+	for (const auto& [var, _] : a) {
+		TAU_TRY(bool is_below, below(var));
+		if (!is_below) return r.with_value(false);
+	}
+	for (const auto& [var, _] : b) {
+		if (a.contains(var)) continue;
+		TAU_TRY(bool is_below, below(var));
+		if (!is_below) return r.with_value(false);
+	}
+	return r.with_value(true);
 }
 
 // entry point for the solver
@@ -2084,14 +2137,17 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 	// solution has no strictly better one among those seen: any that was
 	// better than it would also have been better than every solution it
 	// replaced.
-	auto keep_extreme = [&](solution<node>&& cand) {
-		if (!extreme) { extreme = std::move(cand); return; }
+	auto keep_extreme = [&](solution<node>&& cand) -> result<void> {
+		result<void> r;
+		if (!extreme) { extreme = std::move(cand); return r.with_value(); }
 		const auto& [lo, hi] = options.mode == solver_mode::minimum
 			? std::pair{ &cand, &extreme.value() }
 			: std::pair{ &extreme.value(), &cand };
-		if (solution_below<node>(*lo, *hi, options.mode)
-			&& !solution_below<node>(*hi, *lo, options.mode))
-			extreme = std::move(cand);
+		TAU_TRY(bool lo_below, solution_below<node>(*lo, *hi, options.mode));
+		if (!lo_below) return r.with_value();
+		TAU_TRY(bool hi_below, solution_below<node>(*hi, *lo, options.mode));
+		if (!hi_below) extreme = std::move(cand);
+		return r.with_value();
 	};
 	auto _s = r.open("expression_paths");
 	for (tref path : expression_paths<node>(form)) {
@@ -2304,10 +2360,10 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					// system has no inequalities.
 					for (const auto& [_, squeezed] : squeezed_by_width) {
 						DBG(assert(squeezed.has_value());)
-						auto zero = options.mode == solver_mode::minimum
+						TAU_TRY(auto zero, options.mode == solver_mode::minimum
 							? find_minimal_solution<node>(
 								equation_system<node>{ squeezed, {} })
-							: find_solution<node>(squeezed.value());
+							: find_solution<node>(squeezed.value()));
 						if (zero.has_value()) {
 							for (const auto& [var, value] : zero.value())
 								clause_solution[var] = value;
@@ -2388,7 +2444,7 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 			if (options.mode == solver_mode::general)
 				return r.with_assert_check_value(
 					std::move(clause_solution));
-			keep_extreme(std::move(clause_solution));
+			TAU_TRY_VOID(keep_extreme(std::move(clause_solution)));
 		}
 	}
 	if (extreme) return r.with_assert_check_value(std::move(extreme.value()));

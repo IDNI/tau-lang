@@ -294,3 +294,53 @@ TEST_SUITE("qlt order chains are decided (issue #141)") {
 	}
 }
 #endif // TAU_PACK_HAS_BA_QLT
+
+// A tau constant whose recurrence relations need more rewrite rounds than
+// allowed makes the canonical reduction of a term holding it fail. The failure
+// reaches the caller of the reduction and of the solver entry points built on
+// it, as an error; it is not a null tree.
+TEST_SUITE("canonical reduction of a tau constant that does not normalize") {
+
+	// The constant is built with the construction hooks off, which would
+	// otherwise decide it (and fold the failed decision to a verdict)
+	// before the reduction sees it.
+	struct failing_constant {
+		using tau = tree<node_t>;
+		size_t type = get_ba_type_id<node_t>(tau_type<node_t>());
+		size_t old_rounds = max_rewrite_rounds;
+		use_hooks_guard<node_t> hooks_off{false};
+		tref constant_bf = nullptr;
+		tref bf = nullptr;
+		failing_constant() {
+			max_rewrite_rounds = 1;
+			auto spec = get_nso_rr("f(x) := g(x). g(x) := h(x). "
+				"h(x) := x & x'. f(1) = 0.");
+			REQUIRE(spec.has_value());
+			node_t::constant c = tau_ba<TAU_PACK_BASE_BAS>(
+				spec.value().rec_relations, spec.value().main);
+			constant_bf = tau::get(tau::bf,
+				tau::get_ba_constant(c, type));
+			bf = tau::build_bf_and(constant_bf,
+				tau::get(tau::bf, tau::build_variable("a", type)));
+		}
+		~failing_constant() { max_rewrite_rounds = old_rounds; }
+	};
+
+	TEST_CASE("bf_reduce_canonical reports the failure") {
+		failing_constant k;
+		auto r = bf_reduce_canonical<node_t>()(k.bf);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::internal_error));
+	}
+
+	TEST_CASE("find_solution and var_free_holds report the failure") {
+		failing_constant k;
+		tref eq = tree<node_t>::build_bf_eq_0(k.bf);
+		auto s = find_solution<node_t>(eq);
+		CHECK(!s.has_value());
+		CHECK(report_has_code(s.report(), code::internal_error));
+		auto h = var_free_holds<node_t>(eq);
+		CHECK(!h.has_value());
+		CHECK(report_has_code(h.report(), code::internal_error));
+	}
+}

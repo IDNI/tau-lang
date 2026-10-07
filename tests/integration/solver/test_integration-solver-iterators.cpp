@@ -291,8 +291,8 @@ TEST_SUITE("solver guards") {
 	TEST_CASE("var_free_holds on constant equations") {
 		tref t = get_nso_rr<node_t>(tau::get("1 = 1.").value_or(nullptr)).value().main->get();
 		tref f = get_nso_rr<node_t>(tau::get("1 = 0.").value_or(nullptr)).value().main->get();
-		CHECK( var_free_holds<node_t>(t) );
-		CHECK_FALSE( var_free_holds<node_t>(f) );
+		CHECK( var_free_holds<node_t>(t).value() );
+		CHECK_FALSE( var_free_holds<node_t>(f).value() );
 	}
 	TEST_CASE("solve refuses a formula with a full-LTL operator") {
 		tref fm = get_nso_rr<node_t>(

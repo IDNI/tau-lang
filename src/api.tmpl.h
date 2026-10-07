@@ -1368,8 +1368,8 @@ result<tref> api<node>::mnf(tref expr) {
 		// Dispatch to wff-level or bf-level MNF depending on root type
 		switch (tau::get(a).get_type()) {
 		case tau::wff: {
-			TAU_TRY(auto dn, to_dnf<node>(
-				bf_reduce_canonical<node>()(a)));
+			TAU_TRY(tref canonical, bf_reduce_canonical<node>()(a));
+			TAU_TRY(auto dn, to_dnf<node>(canonical));
 			TAU_TRY(auto red, reduce<node>(dn));
 			m = unequal_to_not_equal<node>(red);
 			break;

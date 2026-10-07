@@ -175,8 +175,10 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 	// Commit every coordinate this edge decided, once, only now that the
 	// whole edge succeeded -- v is registered exactly as the solver
 	// produced it. A discarded decode (nullopt above) commits nothing.
-	for (const auto& [key, v] : sol)
-		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+	for (const auto& [key, v] : sol) {
+		TAU_TRY_VOID(ledger_commit_witness<node>(ledger, v,
+			tau::get(v).get_ba_type()));
+	}
 	return r.with_value(std::move(sol));
 }
 

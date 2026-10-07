@@ -384,14 +384,11 @@ result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	return r.with_value(trace(reduced_dnf));
 }
 
-// The needed class in order to make bf_reduced_dnf work with rule applying process.
-// Returns nullptr when a reduction fails.
 /** @internal @copydoc bf_reduce_canonical::operator() @endinternal */
 template <NodeType node>
-tref bf_reduce_canonical<node>::operator() (tref fm) const {
+result<tref> bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
-	// TODO (HIGH) dropped error: bf_reduced_dnf's report -- this traverser
-	// functor is fixed to tref by the operator| pipeline.
+	result<tref> r;
 	const auto& t = tau::get(fm);
 	LOG_TRACE << "bf reduce canonical: " << LOG_FM(fm);
 	subtree_map<node, tref> changes = {};
@@ -402,35 +399,18 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 			// when the input is the bf itself.
 			for (tref arg : tau::get(bf)[0]
 					.select_top(is<node, tau::bf>)) {
-				auto dnf_r = bf_reduced_dnf<node>(arg);
-				if (!dnf_r.has_value()) return nullptr;
-				tref dnf = dnf_r.value();
+				TAU_TRY(tref dnf, bf_reduced_dnf<node>(arg));
 				if (tau::get(dnf) != tau::get(arg))
 					changes.emplace(arg, dnf);
 			}
 		}
-		auto dnf_r = bf_reduced_dnf<node>(bf);
-		if (!dnf_r.has_value()) return nullptr;
-		tref dnf = dnf_r.value();
+		TAU_TRY(tref dnf, bf_reduced_dnf<node>(bf));
 		if (tau::get(dnf) != tau::get(bf)) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
 	LOG_TRACE << "bf reduce canonical result: " << LOG_FM(x);
-	return x;
+	return r.with_value(x);
 }
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t,
-	const bf_reduce_canonical<node>& r)
-{
-	return typename tree<node>::traverser(r(t.value()));
-}
-
-// template<typename... BAs>
-// std::optional<tref> operator|(const std::optional<tref>& fm, const bf_reduce_canonical<BAs...>& r) {
-// 	return fm.has_value() ? r(fm.value()) : std::optional<tref>{};
-// }
 
 // The path vector of one DNF (or CNF) clause over the variable positions
 // `var_pos`, and whether the clause is decided: constantly F in DNF / T in
