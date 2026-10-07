@@ -1576,6 +1576,14 @@ TEST_SUITE("tree printers") {
 		CHECK( ss.str().find("{ INVALID }") != std::string::npos );
 	}
 
+	// Two such nodes hash alike, as a default constant, and stay distinct.
+	TEST_CASE("ba_constant nodes with ids outside the pool hash and compare") {
+		auto a = node_t::ba_constant(size_t(1) << 30, tau_type_id<node_t>());
+		auto b = node_t::ba_constant((size_t(1) << 30) + 1, tau_type_id<node_t>());
+		CHECK( a.hash == b.hash );
+		CHECK( a != b );
+	}
+
 	TEST_CASE("io_context lists remapped streams") {
 		io_context<node_t> ctx;
 		ctx.input_remaps.emplace("i1", nullptr);

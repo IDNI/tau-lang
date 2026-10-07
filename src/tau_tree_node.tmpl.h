@@ -291,7 +291,10 @@ void hash_ba_constant_data(std::uint64_t& seed, size_t data) {
 	using constant_t = typename node_t::constant;
 	static constexpr auto table = ba_constant_hasher_table<node_t>(
 		std::make_index_sequence<std::variant_size_v<constant_t>>{});
-	// TODO (HIGH) dropped error: ba_constants::get's report -- the node constructor is noexcept, so a miss folds to alternative 0.
+	// node::ba_constant accepts any id, and an id outside the pool is a
+	// node the printer shows as `{ INVALID }`. Such a node hashes as a
+	// default constant: equal hashes only cost a collision, since equality
+	// compares the id itself.
 	const auto c = tau_lang::ba_constants<node_t>::get(data)
 		.value_or(constant_t{});
 	hash_combine(seed, table[c.index()](c));
