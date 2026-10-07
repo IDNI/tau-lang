@@ -175,6 +175,17 @@ add_repl_test(normalize_cmd-cast_of_tau_stream_rejected
 add_repl_test(normalize_cmd-cast_result_meets_sbf_rejected
 	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information" NO_FAIL_REGEX)
 
+# A constant that does not parse under its type: inference names the
+# constant and the type, and the BA parser says why -- inside a cast's
+# operand too, where the failure used to read as an untyped operand.
+add_repl_test(normalize_cmd-unparsable_constant_named
+	"n o1[t]:sbf = {x = 0}:sbf" "Unable to parse [{] x = 0 [}]" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-unparsable_constant_gives_reason
+	"n o1[t]:sbf = {x = 0}:sbf" "Unexpected '=' at 1:3" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-unparsable_cast_operand_gives_reason
+	"n (bv[16]) {300}:bv[8] = y:bv[16]"
+	"the value does not fit in the width" NO_FAIL_REGEX)
+
 # An arithmetic operator over a type without arithmetic operations is
 # rejected by type inference, and the rejection names the type.
 add_repl_test(normalize_cmd-arith_on_type_without_arith_ops_rejected

@@ -23,7 +23,15 @@ struct parse_error {
 	tref element;
 	/// The type it failed to parse under.
 	size_t type_id;
+	/// What the BA parser reported, when it reported anything.
+	std::shared_ptr<report> detail = nullptr;
 };
+
+// The parse report of a failed get_ba_constant_from_source, kept for the
+// parse_error it turns into.
+inline std::shared_ptr<report> parse_detail(result<tref>&& parsed) {
+	return std::make_shared<report>(std::move(parsed).report());
+}
 
 // A type that names a parameterized family but never acquires the
 // parameter: neither its own annotation, nor a cast's operand, supplies one.
@@ -592,8 +600,9 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 			auto parsed = tau::get_ba_constant_from_source(
 				tau::get(n).first_tree().get_string_id(), type.value());
 			tau::use_hooks = saved_hooks;
-			// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- parse_error carries only the element and type id.
-			if (!parsed.has_value() || parsed.value() == nullptr) return parse_error{canonized, type.value()};
+			if (!parsed.has_value() || parsed.value() == nullptr)
+				return parse_error{canonized, type.value(),
+					parse_detail(std::move(parsed))};
 			n = parsed.value();
 		}
 		return update_tref<node>(n, type.value());
@@ -857,11 +866,13 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 // Type variables, constants, and bf nodes in a bf_cast operand subtree
 // purely from their explicit type annotations, without consulting the resolver.
 // This avoids conflicts when the same numeric constant appears with different
-// types inside and outside a bf_cast boundary.
+// types inside and outside a bf_cast boundary. A parse_error for an
+// annotated constant that does not parse under its own annotation.
 template<NodeType node>
-tref type_annotated_operands(tref n) {
+std::variant<tref, parse_error> type_annotated_operands(tref n) {
 	using tau = tree<node>;
 	subtree_map<node, tref> changes;
+	std::optional<parse_error> failed;
 
 	auto f = [&](tref x) -> bool {
 		size_t nt = tau::get(x).get_type();
@@ -891,8 +902,12 @@ tref type_annotated_operands(tref n) {
 					if (tau::get(typed).data() == 0) {
 						auto parsed = tau::get_ba_constant_from_source(
 							tau::get(typed).first_tree().get_string_id(), type);
-						// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the local typed tref cannot carry it.
-						typed = parsed.has_value() ? parsed.value() : nullptr;
+						if (!parsed.has_value() || parsed.value() == nullptr) {
+							failed = parse_error{ canonize<node>(x), type,
+								parse_detail(std::move(parsed)) };
+							return false;
+						}
+						typed = parsed.value();
 					}
 					if (typed)
 						if (auto retyped = update_tref<node>(typed, type); retyped != x)
@@ -910,6 +925,7 @@ tref type_annotated_operands(tref n) {
 	};
 
 	post_order<node>(n).search(f);
+	if (failed) return failed.value();
 	return changes.contains(n) ? changes[n] : n;
 }
 
@@ -1154,13 +1170,16 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 	return untyped_type_id<node>();
 }
 
-// Logs @p error at ERROR level: parse_error as an unparsable constant,
-// scope_error as an improperly closed scope, incomplete_type_error as a
-// family with no parameter, inference_error as an expected/found mismatch.
+// Reports @p error: parse_error as an unparsable constant, with the BA
+// parser's own report, into @p diagnostics when given and at ERROR level
+// otherwise; scope_error as an improperly closed scope, incomplete_type_error
+// as a family with no parameter, inference_error as an expected/found
+// mismatch, at ERROR level.
 template <NodeType node>
 void inference_error_message(
 		const std::variant<inference_error, parse_error, incomplete_type_error,
-		typename type_scoped_resolver<node>::scope_error>& error) {
+		typename type_scoped_resolver<node>::scope_error>& error,
+		report* diagnostics = nullptr) {
 	using tau = tree<node>;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
 
@@ -1168,9 +1187,18 @@ void inference_error_message(
 		auto parse_err = std::get<parse_error>(error);
 		auto nm = ba_types<node>::name(parse_err.type_id);
 		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
-		LOG_ERROR << "Unable to parse  " << tau::get(parse_err.element) << " with type "
-			<< (nm.has_value() ? nm.value() : std::string("INVALID")) << " (valid: "
-			<< node::ba::types_joined() << ")\n";
+		const std::string msg = "Unable to parse "
+			+ TAU_TO_STR(parse_err.element) + " with type "
+			+ (nm.has_value() ? nm.value() : std::string("INVALID"))
+			+ " (valid: " + std::string(node::ba::types_joined()) + ")";
+		if (diagnostics) {
+			diagnostics->error(code::parse_error, msg);
+			if (parse_err.detail) diagnostics->append(*parse_err.detail);
+		} else {
+			LOG_ERROR << msg << "\n";
+			if (parse_err.detail && parse_err.detail->has_error())
+				LOG_ERROR << *parse_err.detail;
+		}
 	} else if (std::holds_alternative<scope_error>(error)) {
 		auto scope_err = std::get<scope_error>(error);
 		LOG_ERROR << "Improper closed scope in "
@@ -1737,7 +1765,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			break;
 		}
 
-		if (error) inference_error_message<node>(error.value());
+		if (error) inference_error_message<node>(error.value(), options.diagnostics);
 
 		DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) << "/resolver:\n"
 			<< resolver.dump_to_str();)
@@ -1949,7 +1977,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// bf_cast operand: type directly from annotations,
 						// not via the resolver, to avoid conflicts with the
 						// surrounding context's type scope.
-						tref updated = type_annotated_operands<node>(new_n);
+						auto annotated = type_annotated_operands<node>(new_n);
+						if (auto pe = std::get_if<parse_error>(&annotated)) {
+							error = *pe;
+							break;
+						}
+						tref updated = std::get<tref>(annotated);
 						// A variable the annotations left untyped may still
 						// be declared by an enclosing binder
 						// (`ex x:bv[8] ((bv[16]) x = c)`): take its type from
@@ -2007,8 +2040,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									if (tau::get(typed).data() == 0) {
 										auto parsed = tau::get_ba_constant_from_source(
 											tau::get(typed).first_tree().get_string_id(), cast_type);
-										// TODO (HIGH) dropped error: get_ba_constant_from_source's parse report -- the on_leave callback returns a fixed shape.
-										typed = parsed.has_value() ? parsed.value() : nullptr;
+										if (!parsed.has_value() || parsed.value() == nullptr) {
+											error = parse_error{ canonize<node>(x),
+												cast_type, parse_detail(std::move(parsed)) };
+											break;
+										}
+										typed = parsed.value();
 									}
 									if (typed) {
 										retyped.insert_or_assign(x,
@@ -2019,15 +2056,22 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 							}
 							untyped_leaf = x; break;
 						}
+						if (error) break;
 						if (untyped_leaf) {
 							error = inference_error{untyped_leaf,
 								tau::get(parent).get_ba_type(),
 								untyped_type_id<node>()};
 							break;
 						}
-						if (!retyped.empty())
-							updated = type_annotated_operands<node>(
+						if (!retyped.empty()) {
+							auto reannotated = type_annotated_operands<node>(
 								rewriter::replace<node>(updated, retyped));
+							if (auto pe = std::get_if<parse_error>(&reannotated)) {
+								error = *pe;
+								break;
+							}
+							updated = std::get<tref>(reannotated);
+						}
 						// A cast's operand must belong to the same pack
 						// family as the cast's own type (e.g. `(bv[8])
 						// x:sbf`, `:tau`, or an uninterpreted constant is a
@@ -2118,7 +2162,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			}
 		}
 
-		if (error) inference_error_message<node>(error.value());
+		if (error) inference_error_message<node>(error.value(), options.diagnostics);
 
 #ifdef DEBUG
 		if (!error)
@@ -2161,7 +2205,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					{{label::value, truncate_for_message(
 						TAU_TO_STR(err->element))}});
 			else LOG_ERROR << msg << ", in " << tau::get(err->element) << ".\n";
-		} else inference_error_message<node>(std::get<parse_error>(updated));
+		} else inference_error_message<node>(std::get<parse_error>(updated),
+			options.diagnostics);
 		return tau::use_hooks = using_hooks,
 			std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	}
