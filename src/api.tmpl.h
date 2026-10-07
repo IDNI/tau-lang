@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <limits>
+
 #include "api.h"
 
 #include "tau_tree_builders.h"
@@ -36,6 +38,13 @@ void tau_init() {
 
 // Helper functions
 // ------------------------------------------------------------
+
+// The long parameters keep -1 for "not set": a count above LONG_MAX
+// saturates rather than wrapping into it or below it.
+inline long api_count_param(size_t n) {
+	constexpr size_t max = (size_t) std::numeric_limits<long>::max();
+	return n > max ? std::numeric_limits<long>::max() : (long) n;
+}
 
 // Extracts the spec update carried by the step's outputs: the tau
 // constant assigned to the `u` output stream at the just-finished time
@@ -249,12 +258,12 @@ void api<node>::set_gc_growth_factor(double f) {
 
 template <NodeType node>
 void api<node>::set_tref_budget(size_t n) {
-	tref_budget_param = (long) n;
+	tref_budget_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_tref_budget_soft_percent(size_t pct) {
-	tref_budget_soft_param = (long) pct;
+	tref_budget_soft_param = api_count_param(pct);
 }
 
 template <NodeType node>
@@ -276,7 +285,7 @@ void api<node>::set_max_revision_alts(size_t n) {
 template <NodeType node>
 void api<node>::set_max_consistency_subsets(size_t n) {
 	option_change_guard<node> guard;
-	max_consistency_subsets_param = (long) n;
+	max_consistency_subsets_param = api_count_param(n);
 }
 
 template <NodeType node>
@@ -287,7 +296,7 @@ void api<node>::set_cache_bound(size_t n) {
 template <NodeType node>
 void api<node>::set_max_cover_products(size_t n) {
 	option_change_guard<node> guard;
-	max_cover_products_param = (long) n;
+	max_cover_products_param = api_count_param(n);
 }
 
 template <NodeType node>
@@ -318,55 +327,55 @@ void api<node>::set_ltl_qe_max_vars(size_t n) {
 template <NodeType node>
 void api<node>::set_ltl_hoa_max_states(size_t n) {
 	option_change_guard<node> guard;
-	ltl_hoa_max_states_param = (long) n;
+	ltl_hoa_max_states_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_guard_max_cubes(size_t n) {
 	option_change_guard<node> guard;
-	ltl_guard_max_cubes_param = (long) n;
+	ltl_guard_max_cubes_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_max_refinement_rounds(size_t n) {
 	option_change_guard<node> guard;
-	ltl_max_refinement_rounds_param = (long) n;
+	ltl_max_refinement_rounds_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_window_max_paths(size_t n) {
 	option_change_guard<node> guard;
-	ltl_window_max_paths_param = (long) n;
+	ltl_window_max_paths_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_closed_regions_timeout(size_t seconds) {
 	option_change_guard<node> guard;
-	ltl_closed_regions_timeout_param = (long) seconds;
+	ltl_closed_regions_timeout_param = api_count_param(seconds);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_data_game_max_nodes(size_t n) {
 	option_change_guard<node> guard;
-	ltl_data_game_max_nodes_param = (long) n;
+	ltl_data_game_max_nodes_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_data_game_max_memo(size_t n) {
 	option_change_guard<node> guard;
-	ltl_data_game_max_memo_param = (long) n;
+	ltl_data_game_max_memo_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_data_game_max_combinations(size_t n) {
 	option_change_guard<node> guard;
-	ltl_data_game_max_combinations_param = (long) n;
+	ltl_data_game_max_combinations_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_ltl_max_observations(size_t n) {
 	option_change_guard<node> guard;
-	ltl_max_observations_param = (long) n;
+	ltl_max_observations_param = api_count_param(n);
 }
 
 template <NodeType node>

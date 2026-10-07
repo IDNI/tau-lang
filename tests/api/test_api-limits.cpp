@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include <set>
 #include <string>
 
@@ -787,5 +788,43 @@ TEST_SUITE("Tau API - runtime limits") {
 		for (const char* v : { "TAU_TEST_ENV_LIMIT_C",
 			"TAU_TEST_ENV_LIMIT_D", "TAU_TEST_ENV_LIMIT_E" })
 				unsetenv(v);
+	}
+	// The long parameters read -1 as "not set": a count past LONG_MAX
+	// saturates instead of wrapping into it or below it.
+	TEST_CASE("count setters saturate a value above LONG_MAX") {
+		struct row { void (*set)(size_t); long* param; };
+		const row rows[] = {
+			{ &tau_api::set_tref_budget,           &tref_budget_param },
+			{ &tau_api::set_tref_budget_soft_percent,
+				&tref_budget_soft_param },
+			{ &tau_api::set_max_consistency_subsets,
+				&max_consistency_subsets_param },
+			{ &tau_api::set_max_cover_products,    &max_cover_products_param },
+			{ &tau_api::set_ltl_hoa_max_states,    &ltl_hoa_max_states_param },
+			{ &tau_api::set_ltl_guard_max_cubes,   &ltl_guard_max_cubes_param },
+			{ &tau_api::set_ltl_max_refinement_rounds,
+				&ltl_max_refinement_rounds_param },
+			{ &tau_api::set_ltl_window_max_paths,  &ltl_window_max_paths_param },
+			{ &tau_api::set_ltl_closed_regions_timeout,
+				&ltl_closed_regions_timeout_param },
+			{ &tau_api::set_ltl_data_game_max_nodes,
+				&ltl_data_game_max_nodes_param },
+			{ &tau_api::set_ltl_data_game_max_memo,
+				&ltl_data_game_max_memo_param },
+			{ &tau_api::set_ltl_data_game_max_combinations,
+				&ltl_data_game_max_combinations_param },
+			{ &tau_api::set_ltl_max_observations,  &ltl_max_observations_param },
+		};
+		constexpr long lmax = std::numeric_limits<long>::max();
+		for (const row& r : rows) {
+			const long saved = *r.param;
+			r.set(std::numeric_limits<size_t>::max());
+			CHECK( *r.param == lmax );
+			r.set((size_t) lmax + 1);
+			CHECK( *r.param == lmax );
+			r.set(42);
+			CHECK( *r.param == 42 );
+			*r.param = saved;
+		}
 	}
 }
