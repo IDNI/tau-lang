@@ -190,7 +190,7 @@ need solver or LTL types, which sit beside their single consumer:
 
 | member | what core asks it for | resolution |
 |---|---|---|
-| `solve(fm)` | your own decision procedure for a whole formula of your types; its answer must convert to the caller's `optional<solution>` | owner of the formula's type |
+| `solve(fm)` | your own decision procedure for a whole formula of your types. Returns a `result` whose value converts to the caller's `optional<solution>`: nullopt when you find no solution, an error when you could not try (an error is never read as "no solution") | owner of the formula's type |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch. A failure reports the reason (see [Preprocessing](#preprocessing)) | every declarer, chained in pack order, stopping at the first failure |
 | `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |
@@ -239,8 +239,8 @@ several solving algebras can share a pack.
 
 Every fold's empty case is deliberate. `pack_zero_constant` and
 `pack_value_constant` return `nullptr`, `pack_type_has_arith_ops` returns
-`false`, and `pack_solve` returns `nullopt` (no owner, or an owner without
-`solve`), because "no BA owns this type" is an ordinary runtime outcome;
+`false`, and `pack_solve` returns the value `nullopt` (no owner, or an owner
+without `solve`), because "no BA owns this type" is an ordinary runtime outcome;
 `pack_bool_carrier_type` `static_assert`s, because a pack with nothing to carry
 a bit cannot build core at all. When writing one, test the capability's concept with
 `if constexpr` inside `pack_visit_all` or `pack_owner_apply`: a `?:` in a fold

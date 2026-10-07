@@ -2315,7 +2315,9 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 							theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto theory_solution = pack_solve<node, solution<node>>(type, tau::build_wff_and(remaining)); theory_solution.has_value()) {
+					TAU_TRY(auto theory_solution, (pack_solve<node, solution<node>>(
+						type, tau::build_wff_and(remaining))));
+					if (theory_solution.has_value()) {
 						theory_sat = true;
 						for (const auto& [var, value] : read_off)
 							clause_solution[var] = value;

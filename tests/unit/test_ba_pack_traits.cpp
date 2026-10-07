@@ -40,13 +40,17 @@ struct ba_descriptor<two_solvers::solver_a, two_solvers::fake_node> {
 	static bool owns_type(size_t t) {
 		return t == two_solvers::a_8 || t == two_solvers::a_16;
 	}
-	static std::optional<std::string> solve(tref) { return "solver_a"; }
+	static result<std::optional<std::string>> solve(tref) {
+		return result<std::optional<std::string>>{
+			std::optional<std::string>("solver_a") }; }
 };
 template <>
 struct ba_descriptor<two_solvers::solver_b, two_solvers::fake_node> {
 	static constexpr const char* type_name = "solver_b";
 	static bool owns_type(size_t t) { return t == two_solvers::b_id; }
-	static std::optional<std::string> solve(tref) { return "solver_b"; }
+	static result<std::optional<std::string>> solve(tref) {
+		return result<std::optional<std::string>>{
+			std::optional<std::string>("solver_b") }; }
 };
 template <>
 struct ba_descriptor<two_solvers::no_solver, two_solvers::fake_node> {
@@ -62,21 +66,21 @@ TEST_SUITE("pack_solve routes by the owner of the type") {
 		static_assert(ba_has_solve<fake_node, solver_a>);
 		static_assert(ba_has_solve<fake_node, solver_b>);
 		static_assert(!ba_has_solve<fake_node, no_solver>);
-		CHECK(pack_solve<fake_node, std::string>(a_8, nullptr)
+		CHECK(pack_solve<fake_node, std::string>(a_8, nullptr).value()
 			== std::optional<std::string>("solver_a"));
-		CHECK(pack_solve<fake_node, std::string>(a_16, nullptr)
+		CHECK(pack_solve<fake_node, std::string>(a_16, nullptr).value()
 			== std::optional<std::string>("solver_a"));
-		CHECK(pack_solve<fake_node, std::string>(b_id, nullptr)
+		CHECK(pack_solve<fake_node, std::string>(b_id, nullptr).value()
 			== std::optional<std::string>("solver_b"));
 	}
 
 	TEST_CASE("an owner without solve and an unowned type answer nullopt") {
 		CHECK_FALSE(pack_solve<fake_node, std::string>(none_id, nullptr)
-			.has_value());
+			.value().has_value());
 		CHECK_FALSE(pack_solve<fake_node, std::string>(nobody, nullptr)
-			.has_value());
+			.value().has_value());
 		CHECK_FALSE(pack_solve<fake_node, std::string>(size_t{0}, nullptr)
-			.has_value());
+			.value().has_value());
 	}
 
 	TEST_CASE("pack_owner_index groups a BA's types and separates the BAs") {
@@ -369,17 +373,38 @@ TEST_SUITE("accumulating folds") {
 		CHECK(pack_sat_status<node_t>(unsat) == std::optional<bool>(false));
 	}
 
+	TEST_CASE("pack_solve reports a failed bv widening, never no solution") {
+		// satisfiable (x = 0); its exact width is 17
+		tref fm = wff("x:bv[8] * y:bv[8] + z:bv[8] < { 200 }:bv[8]");
+		REQUIRE(fm != nullptr);
+		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
+		const bool widening = bv_widening;
+		const size_t max_width = bv_max_width;
+		bv_widening = true;
+		bv_max_width = 16;
+		auto capped = pack_solve<node_t, solution<node_t>>(bv8, fm);
+		bv_max_width = 17;
+		auto fits = pack_solve<node_t, solution<node_t>>(bv8, fm);
+		bv_widening = widening;
+		bv_max_width = max_width;
+		CHECK(capped.has_error());
+		CHECK_FALSE(capped.has_value());
+		REQUIRE(fits.has_value());
+		CHECK(fits.value().has_value());
+	}
+
 	TEST_CASE("pack_solve hands a bv formula to bv by its type") {
 		tref fm = wff("x = { 1 }:bv[8]");
 		REQUIRE(fm != nullptr);
 		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
 		auto sol = pack_solve<node_t, solution<node_t>>(bv8, fm);
 		REQUIRE(sol.has_value());
-		CHECK(sol->size() == 1);
+		REQUIRE(sol.value().has_value());
+		CHECK(sol.value()->size() == 1);
 #ifdef TAU_PACK_HAS_BA_SBF
 		const size_t sbf_id = tid(ba_descriptor<sbf_ba, node_t>::type_tree());
 		CHECK_FALSE(pack_solve<node_t, solution<node_t>>(sbf_id, fm)
-			.has_value());
+			.value().has_value());
 #endif
 	}
 #endif

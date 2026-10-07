@@ -428,7 +428,7 @@ TEST_SUITE("fold empty cases without bv") {
 			static_assert(!ba_has_solve<node_t, BA>);
 			const size_t id = ba_types<node_t>::id(
 				ba_descriptor<BA, node_t>::type_tree());
-			CHECK_FALSE(pack_solve<node_t, tref>(id, fm).has_value());
+			CHECK_FALSE(pack_solve<node_t, tref>(id, fm).value().has_value());
 			CHECK_FALSE(pack_type_has_arith_ops<node_t>(id));
 			CHECK_FALSE(pack_term_is_blasteable<node_t>(id, nullptr));
 		});

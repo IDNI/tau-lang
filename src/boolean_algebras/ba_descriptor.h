@@ -140,7 +140,9 @@ constexpr bool ba_has_options_v = requires {
  * so a declared `false` is honoured rather than taken as "present".
  * docs/adding_base_bas.md lists each member with its resolution rule.
  */
-/// @brief @p BA decides a whole formula of its types with its own `solve(f)`.
+/// @brief @p BA decides a whole formula of its types with its own `solve(f)`,
+/// a `result` whose value is the solution or nullopt when there is none, and
+/// whose error is why it could not try.
 template <typename Node, typename BA>
 concept ba_has_solve = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) { ba_descriptor<BA, Node>::solve(f); };

@@ -175,29 +175,35 @@ std::optional<size_t> pack_owner_index(size_t ba_type) {
  * @brief Solve @p form, whose atoms are of the type @p ba_type, with the
  *        solver of the BA owning that type.
  *
- * nullopt when no BA owns @p ba_type, when its owner declares no `solve`, or
- * when the owner's solver finds no solution: the caller treats all three as
- * "not solved here". @p Solution is the caller's solution type, so these
- * traits need no solver header; the owner's answer must convert to
- * `std::optional<Solution>`.
+ * The value is nullopt when no BA owns @p ba_type, when its owner declares
+ * no `solve`, or when the owner's solver finds no solution: the caller
+ * treats all three as "not solved here". An error is the owner's report of
+ * why it could not try, never "no solution". @p Solution is the caller's
+ * solution type, so these traits need no solver header; the value of the
+ * owner's answer must convert to `std::optional<Solution>`.
  * @param ba_type Type id of the atoms of @p form.
  * @param form The formula to solve, passed to the owner's `solve`.
  */
 template <typename Node, typename Solution, typename Form>
-std::optional<Solution> pack_solve(size_t ba_type, Form form) {
-	return pack_owner_apply<Node>(ba_type,
-		[&]<typename BA>() -> std::optional<Solution> {
+result<std::optional<Solution>> pack_solve(size_t ba_type, Form form) {
+	using answer_t = result<std::optional<Solution>>;
+	auto out = pack_owner_apply<Node>(ba_type,
+		[&]<typename BA>() -> std::optional<answer_t> {
 			if constexpr (ba_has_solve<Node, BA>) {
-				using answer_t = decltype(
-					ba_descriptor<BA, Node>::solve(form));
-				static_assert(std::is_convertible_v<answer_t,
+				using owner_t = typename decltype(
+					ba_descriptor<BA, Node>::solve(form))::value_type;
+				static_assert(std::is_convertible_v<owner_t,
 						std::optional<Solution>>,
 					"pack_solve: the owner's solve() answer does not "
 					"convert to the caller's solution type");
-				return ba_descriptor<BA, Node>::solve(form);
+				return ba_descriptor<BA, Node>::solve(form).transform(
+					[](owner_t&& v) -> std::optional<Solution> {
+						return std::move(v); });
 			}
 			return std::nullopt;
 		});
+	if (!out) return answer_t{ std::optional<Solution>{} };
+	return std::move(*out);
 }
 
 /** @brief `true` when some BA in the pack can solve @p form at all. */

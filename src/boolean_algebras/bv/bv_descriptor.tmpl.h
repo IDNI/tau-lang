@@ -184,21 +184,18 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	// Optional capabilities: bv brings its own decision procedure, so generic
 	// code asks the pack for one rather than naming solve_bv/is_bv_formula_sat.
-	// `auto` return keeps the solution type out of the generic fold.
 
 	/**
 	 * @brief Solve @p form with bv's own solver.
-	 * @return A satisfying assignment, or nullopt when there is none, or
-	 *         when widening (if on) fails.
+	 * @return A satisfying assignment, or nullopt when the solver finds
+	 *         none; the error of widening (if on) when it fails, since that
+	 *         failure says nothing about the satisfiability of @p form.
 	 */
-	// Exact arithmetic must see the widened atoms before cvc5 does. solve()
-	// stays a plain tref consumer (its own contract, unlike widen_arithmetic
-	// itself, is not result-carrying), so a widening failure collapses here.
-	static auto solve(tref form) -> decltype(solve_bv<node_t>(form)) {
-		// TODO (HIGH) dropped error: widen_arithmetic's report -- solve returns a plain solver value, which cannot carry it.
-		form = widen_arithmetic(form).value_or(nullptr);
-		if (!form) return std::nullopt;
-		return solve_bv<node_t>(form);
+	// Exact arithmetic must see the widened atoms before cvc5 does.
+	static result<std::optional<solution<node_t>>> solve(tref form) {
+		result<std::optional<solution<node_t>>> r;
+		TAU_TRY(form, widen_arithmetic(form));
+		return r.with_value(solve_bv<node_t>(form));
 	}
 
 	/**
