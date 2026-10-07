@@ -188,14 +188,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/**
 	 * @brief Solve @p form with bv's own solver.
 	 * @return A satisfying assignment, or nullopt when the solver finds
-	 *         none; the error of widening (if on) when it fails, since that
-	 *         failure says nothing about the satisfiability of @p form.
+	 *         none; the error of widening (if on) or of translating @p form
+	 *         when it fails, since a failure says nothing about the
+	 *         satisfiability of @p form.
 	 */
 	// Exact arithmetic must see the widened atoms before cvc5 does.
 	static result<std::optional<solution<node_t>>> solve(tref form) {
 		result<std::optional<solution<node_t>>> r;
 		TAU_TRY(form, widen_arithmetic(form));
-		return r.with_value(solve_bv<node_t>(form));
+		TAU_TRY(auto sol, solve_bv<node_t>(form));
+		return r.with_value(std::move(sol));
 	}
 
 	/**

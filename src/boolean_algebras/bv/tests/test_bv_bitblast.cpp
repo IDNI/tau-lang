@@ -281,7 +281,7 @@ TEST_SUITE("bounded bitvector decision") {
 			"&& x * z != y * u + {3}:bv[16])", wff_opts).value_or(nullptr);
 		REQUIRE( hard );
 		const auto start = std::chrono::steady_clock::now();
-		CHECK( !solve_bv<node_t>(hard).has_value() );
+		CHECK( !solve_bv<node_t>(hard).value().has_value() );
 		CHECK( std::chrono::steady_clock::now() - start
 			< std::chrono::seconds(30) );
 		CHECK( take_time_budget_exhausted().find("bv-solve-timeout, 1 s")
@@ -291,9 +291,9 @@ TEST_SUITE("bounded bitvector decision") {
 		tref easy = tau::get("x:bv[8] = {3}:bv[8]", wff_opts)
 			.value_or(nullptr);
 		REQUIRE( easy );
-		CHECK( !solve_bv<node_t>(easy).has_value() );
+		CHECK( !solve_bv<node_t>(easy).value().has_value() );
 		take_time_budget_exhausted();
-		CHECK( solve_bv<node_t>(easy).has_value() );
+		CHECK( solve_bv<node_t>(easy).value().has_value() );
 		bv_solve_timeout = timeout;
 	}
 
@@ -302,7 +302,7 @@ TEST_SUITE("bounded bitvector decision") {
 		tref f = tau::get("ex y:bv[8] z:bv[8] * y = {6}:bv[8]",
 			wff_opts).value_or(nullptr);
 		REQUIRE( f );
-		auto s = solve_bv<node_t>(f);
+		auto s = solve_bv<node_t>(f).value();
 		REQUIRE( s.has_value() );
 		CHECK( s->size() == 1 );
 		CHECK( take_time_budget_exhausted().empty() );

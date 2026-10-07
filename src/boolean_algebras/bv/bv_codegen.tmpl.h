@@ -90,8 +90,10 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	if (auto value = bv_single_equality_constant<node>(var, conj,
 		width); value)
 		return bv_witness_expr<node>(*value, width);
-	auto sol = solve_bv<node>(conj);
-	if (!sol) return std::nullopt;
+	// TODO (HIGH) dropped error: solve_bv's report -- ba_has_codegen_witness fixes this member to std::optional<std::string>.
+	auto sol_r = solve_bv<node>(conj);
+	if (!sol_r.has_value() || !sol_r.value()) return std::nullopt;
+	auto& sol = sol_r.value();
 	auto it = sol->find(tau::get(tau::bf, var));
 	if (it == sol->end()) return std::nullopt;
 	tref cst = tau::trim(it->second);

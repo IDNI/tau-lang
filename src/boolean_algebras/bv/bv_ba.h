@@ -495,12 +495,12 @@ bool is_bv_formula_unsat(tref form);
  * (`time_budget_exhausted`), nothing is solved.
  *
  * @param form The term reference representing the formula to solve.
- * @return The value of every free variable when cvc5 answers sat; nullopt
- * when it answers unsat or unknown, when the budget runs out, or when
- * @p form cannot be translated.
+ * @return The value of every free variable when cvc5 answers sat; a value-less
+ * optional when it answers unsat or unknown, when the budget runs out, or when
+ * @p form cannot be translated; the error of the translation when it fails.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(tref form);
+result<std::optional<solution<node>>> solve_bv(tref form);
 
 /**
  * @brief Solves a Boolean algebra problem over bit-vectors.
@@ -512,7 +512,7 @@ std::optional<solution<node>> solve_bv(tref form);
  * @return As solve_bv(tref) on that conjunction.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(const trefs& form);
+result<std::optional<solution<node>>> solve_bv(const trefs& form);
 
 /**
  * @brief Build a bv constant from a bitvector-grammar parse tree.

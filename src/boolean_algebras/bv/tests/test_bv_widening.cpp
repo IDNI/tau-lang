@@ -1301,7 +1301,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// o:bv[8] = min({16}*{16}, {200}): exact min(256,200)=200 ->
 		// the truncating (bv[8]) cast is lossless and o solves to 200.
 		auto fm = parse_wff("o = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])");
-		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr));
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr)).value();
 		REQUIRE(sol.has_value());
 		// `o` is the sole free variable (every other subterm is a
 		// constant): the same size==1 idiom test_bv_ba-solver2.cpp uses,
@@ -1325,7 +1325,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// below a single, unambiguous code path.)
 		// Same solve+model-check shape as the checked-multiply case.
 		auto fm = parse_wff("o = min({ 200 }:bv[8] + { 90 }:bv[8], { 250 }:bv[8])");
-		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr));
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr)).value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol.value().size() == 1);
 		const tref val = sol.value().begin()->second;

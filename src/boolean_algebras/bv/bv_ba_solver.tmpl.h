@@ -869,12 +869,14 @@ bool is_bv_formula_valid(tref form) {
 
 /** @internal @copydoc solve_bv(tref) @endinternal */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(const tref form) {
+result<std::optional<solution<node>>> solve_bv(const tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	using res = result<std::optional<solution<node>>>;
+	res r;
 
 	// Once a budget ran out, the unit of work asking has no answer to give.
-	if (!time_budget_exhausted().empty()) return std::nullopt;
+	if (!time_budget_exhausted().empty()) return r.with_value(std::nullopt);
 
 	subtree_map<node, bv> vars, free_vars;
 	// Fresh solver per query, same rationale as bv_formula_sat_status above:
@@ -886,12 +888,12 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 
-	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	// TODO (HIGH) dropped error: bv_eval_node's report -- solve_bv returns a bare optional, so a failure folds into the translation-failure branch as a decline.
+	auto expr = r.merge_take(bv_eval_node<node>(tt(form), vars, free_vars));
+	if (r.has_error()) return r;
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
-		return std::nullopt;
+		return r.with_value(std::nullopt);
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 
@@ -915,7 +917,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		{
 			LOG_DEBUG << "Bitvector system is not decided sat within "
 				"its budget.";
-			return {};
+			return r.with_value(std::nullopt);
 		}
 	}
 
@@ -932,7 +934,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 				tau::get(tau::bf, tau::get_ba_constant(cte,
 					bv_type<node>(cte.getSort().getBitVectorSize()))));
 		}
-		return s;
+		return r.with_value(std::move(s));
 	}
 	// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
 	// treat "no solution" uniformly as "skip this clause" regardless of
@@ -943,12 +945,12 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
 	else
 		LOG_DEBUG << "Bitvector system is unsat.";
-	return {};
+	return r.with_value(std::nullopt);
 }
 
 /** @internal @copydoc solve_bv(const trefs&) @endinternal */
 template<NodeType node>
-std::optional<solution<node>> solve_bv(const trefs& lits) {
+result<std::optional<solution<node>>> solve_bv(const trefs& lits) {
 	using tau = tree<node>;
 
 	return solve_bv<node>(tau::build_wff_and(lits));

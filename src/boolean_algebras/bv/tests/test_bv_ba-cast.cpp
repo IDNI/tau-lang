@@ -35,7 +35,7 @@ TEST_SUITE("bv cast - zero extension") {
 	TEST_CASE("zero-extend sat: ((bv[16]) X:bv[8]) = { 5 }:bv[16]") {
 		auto src = parse_wff("((bv[16]) X:bv[8]) = { 5 }:bv[16]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -68,7 +68,7 @@ TEST_SUITE("bv cast - truncation") {
 	TEST_CASE("truncate sat: ((bv[8]) X:bv[16]) = { 5 }:bv[8]") {
 		auto src = parse_wff("((bv[8]) X:bv[16]) = { 5 }:bv[8]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -76,7 +76,7 @@ TEST_SUITE("bv cast - truncation") {
 	TEST_CASE("truncate sat: ((bv[4]) X:bv[8]) = { 15 }:bv[4]") {
 		auto src = parse_wff("((bv[4]) X:bv[8]) = { 15 }:bv[4]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -93,7 +93,7 @@ TEST_SUITE("bv cast - no-op (same width)") {
 	TEST_CASE("same-width cast sat: ((bv[8]) X:bv[8]) = { 42 }:bv[8]") {
 		auto src = parse_wff("((bv[8]) X:bv[8]) = { 42 }:bv[8]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 }
@@ -108,7 +108,7 @@ TEST_SUITE("bv cast - widthless cast") {
 	TEST_CASE("widthless cast solves: (bv) x:bv[8] = 0") {
 		auto src = parse_wff("(bv) x:bv[8] = 0");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -119,7 +119,7 @@ TEST_SUITE("bv cast - widthless cast") {
 	TEST_CASE("widthless cast solves, width on the other side: x:bv = (bv) y:bv[8]") {
 		auto src = parse_wff("x:bv = (bv) y:bv[8]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -138,7 +138,7 @@ TEST_SUITE("bv cast - widthless cast") {
 	TEST_CASE("widthless cast under an arithmetic operand: ((bv) x:bv[8]) + y = 0") {
 		auto src = parse_wff("((bv) x:bv[8]) + y = 0");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -150,7 +150,7 @@ TEST_SUITE("bv cast - widthless cast") {
 	TEST_CASE("widthless cast, bare constant operand, width elsewhere: (bv) { 5 }:bv = x:bv[8]") {
 		auto src = parse_wff("(bv) { 5 }:bv = x:bv[8]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -159,7 +159,7 @@ TEST_SUITE("bv cast - widthless cast") {
 	TEST_CASE("cast with its own width is untouched: (bv[16]) x:bv[8] = 0") {
 		auto src = parse_wff("(bv[16]) x:bv[8] = 0");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -191,7 +191,7 @@ TEST_SUITE("bv cast - nested") {
 	TEST_CASE("nested widen sat: ((bv[16]) ((bv[8]) X:bv[4])) = { 5 }:bv[16]") {
 		auto src = parse_wff("((bv[16]) ((bv[8]) X:bv[4])) = { 5 }:bv[16]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -206,7 +206,7 @@ TEST_SUITE("bv cast - nested") {
 	TEST_CASE("nested widen-trunc sat: ((bv[4]) ((bv[16]) X:bv[8])) = { 5 }:bv[4]") {
 		auto src = parse_wff("((bv[4]) ((bv[16]) X:bv[8])) = { 5 }:bv[4]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -228,7 +228,7 @@ TEST_SUITE("bv cast - nested") {
 	TEST_CASE("nested no parens sat: ((bv[16]) (bv[8]) X:bv[4]) = { 5 }:bv[16]") {
 		auto src = parse_wff("((bv[16]) (bv[8]) X:bv[4]) = { 5 }:bv[16]");
 		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 }

@@ -120,28 +120,28 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X = { 1 }:bv[16]") {
 		const char* sample = "X = { 1 }:bv[16]";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] != X") {
 		const char* sample = "X:bv[16] != X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] + { 0 } > { 0 }") {
 		const char* sample = "X:bv[16] + { 0 } > { 0 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] !> X") {
 		const char* sample = "X:bv[16] !> X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -149,14 +149,14 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X:bv[16] + { 1 } !> X") {
 		const char* sample = "X:bv[16] + { 1 } !> X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] >= X") {
 		const char* sample = "X:bv[16] >= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -164,28 +164,28 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X:bv[16] >= X + { 1 }") {
 		const char* sample = "X:bv[16] >= X + { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] !>= X") {
 		const char* sample = "X:bv[16] !>= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] + { 1 } !>= X") {
 		const char* sample = "X:bv[16] + { 1 } !>= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] <= X") {
 		const char* sample = "X:bv[16] <= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -193,42 +193,42 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X:bv[16] + { 1 } <= X") {
 		const char* sample = "X:bv[16] + { 1 } <= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] !<= X") {
 		const char* sample = "X:bv[16] !<= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] + { 1 } !<= X") {
 		const char* sample = "X:bv[16] + { 1 } !<= X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] < X") {
 		const char* sample = "X:bv[16] < X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] - { 1 } < X") {
 		const char* sample = "X:bv[16] - { 1 } < X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X:bv[16] !< X") {
 		const char* sample = "X:bv[16] !< X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
@@ -236,14 +236,14 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X:bv[16] - { 1 } !< X") {
 		const char* sample = "X:bv[16] - { 1 } !< X";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("variable") {
 		const char* sample = "X:bv[16] = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -251,7 +251,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_neg") {
 		const char* sample = "X:bv[16]' = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -259,7 +259,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_add") {
 		const char* sample = "X:bv[16] + { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -267,7 +267,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_sub") {
 		const char* sample = "X:bv[16] - { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -275,7 +275,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_mul") {
 		const char* sample = "X:bv[16] * { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -283,7 +283,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_div") {
 		const char* sample = "X:bv[16] / { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -291,7 +291,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_mod") {
 		const char* sample = "X:bv[16] % { 2 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -299,7 +299,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_and") {
 		const char* sample = "X:bv[16] & { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -307,7 +307,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_nand") {
 		const char* sample = "{ 2 } !& { 1 } = X:bv[16]";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -315,7 +315,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_or") {
 		const char* sample = "X:bv[16] | { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -323,7 +323,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_nor") {
 		const char* sample = "{ 2 } !| X:bv[16] = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -331,7 +331,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_xor") {
 		const char* sample = "X:bv[16] ^ { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -339,7 +339,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_xnor") {
 		const char* sample = "X:bv[16] !^ { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -347,7 +347,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_left_shift") {
 		const char* sample = "X:bv[16] << { 1 } = { 2 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -355,7 +355,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_right_shift") {
 		const char* sample = "X:bv[16] >> { 1 } = { 1 }";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -404,7 +404,7 @@ TEST_SUITE("cvc5_solve quantifier shadowing") {
 		const char* sample =
 			"ex x (x = { 1 }:bv[16] && (ex x (x = { 2 }:bv[16])) && x = { 1 }:bv[16])";
 		auto src = tau::get(sample, parse_opts_wff_no_hooks).value_or(nullptr);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src).value();
 		REQUIRE( solution.has_value() );
 		CHECK( solution->empty() );
 	}

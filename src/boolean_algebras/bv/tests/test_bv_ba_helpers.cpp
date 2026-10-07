@@ -174,8 +174,11 @@ TEST_SUITE("bv solver budgets and declines") {
 	// The translator has no case for a reference, so both entry points
 	// decline instead of answering.
 	TEST_CASE("solve_bv declines a formula it cannot translate") {
-		CHECK( !solve_bv<node_t>(closed_form(
-			"ex x:bv[8] (x + { 1 }:bv[8] = { 0 }:bv[8] && q(x)).")) );
+		auto sol = solve_bv<node_t>(closed_form(
+			"ex x:bv[8] (x + { 1 }:bv[8] = { 0 }:bv[8] && q(x))."));
+		CHECK( !sol.has_error() );
+		REQUIRE( sol.has_value() );
+		CHECK( !sol.value().has_value() );
 	}
 
 	TEST_CASE("the quantifier-free decision declines an untranslatable matrix") {
