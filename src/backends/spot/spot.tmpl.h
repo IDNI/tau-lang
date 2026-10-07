@@ -275,15 +275,16 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	CloseHandle(pi.hThread);
 
 	std::atomic<bool> done{false};
+	std::atomic<bool> watchdog_fired{false};
 	std::thread killer;
 	if (timeout_sec > 0) {
 		HANDLE proc = pi.hProcess;
-		killer = std::thread([proc, timeout_sec, &done]() {
+		killer = std::thread([proc, timeout_sec, &done, &watchdog_fired]() {
 			const long long polls = 10LL * timeout_sec;
 			for (long long i = 0; i < polls && !done.load(); ++i)
 				Sleep(100);
-			if (!done.load())
-				TerminateProcess(proc, 128 + 15);
+			if (!done.load() && TerminateProcess(proc, 128 + 15))
+				watchdog_fired.store(true);
 		});
 	}
 
@@ -308,8 +309,9 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << ec
 		<< ", stdout=" << out;
 
+	// the flag, not the code: a child may exit 143 on its own
 	int exit_code = (int)ec;
-	if (exit_code == 143)
+	if (watchdog_fired.load())
 		return r.with_error(code::runtime_error,
 			"the command was killed by the timeout watchdog",
 			{{label::exit_code, exit_code},
