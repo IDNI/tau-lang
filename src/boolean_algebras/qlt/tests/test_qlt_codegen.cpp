@@ -48,6 +48,23 @@ bool extract_qlt_rational(const std::string& s, long long& p, long long& q) {
 	return q != 0;
 }
 
+// Parse a raw wff string.
+tref wff(const char* s) {
+	tree<node_t>::get_options opts;
+	opts.parse.start = tree<node_t>::wff;
+	return tree<node_t>::get(s, opts).value_or(nullptr);
+}
+
+// The witness the pack spells for the only variable of @p atom.
+std::optional<std::string> witness_of(const char* atom) {
+	tref fm = wff(atom);
+	REQUIRE(fm != nullptr);
+	const auto& fv = get_free_vars<node_t>(fm);
+	REQUIRE(fv.size() == 1);
+	return pack_codegen_witness<node_t>(
+		tree<node_t>::get(fv[0]).get_ba_type(), fv[0], fm);
+}
+
 } // namespace
 
 TEST_SUITE("qlt_codegen") {
@@ -84,6 +101,37 @@ TEST_SUITE("qlt_codegen") {
 		// exact integer cross-multiplication -- no floating point at all.
 		CHECK(p * 2000000 > 1000001LL * q);
 		CHECK(p * 2000000 < 1000003LL * q);
+	}
+
+	TEST_CASE("a ray with a representable point yields it") {
+		auto w = witness_of("o1[t]:qlt < {-9223372036854775806}:qlt");
+		REQUIRE(w.has_value());
+		CHECK(has(*w, "qlt_rational(-9223372036854775807, 1)"));
+	}
+
+	// No rational the representation fits lies below the least long long,
+	// nor strictly between these two reciprocals, whose midpoint has a
+	// denominator past long long: the witness is declined, never a value
+	// outside the constraint.
+	TEST_CASE("an open ray below the least long long has no witness") {
+		auto w = witness_of("o1[t]:qlt < {-9223372036854775808}:qlt");
+		CHECK_MESSAGE(!w.has_value(), w.value_or(""));
+	}
+
+	TEST_CASE("a gap whose midpoint does not fit has no witness") {
+		auto w = witness_of("o1[t]:qlt > {1/4000000009}:qlt "
+			"&& o1[t]:qlt < {1/4000000007}:qlt");
+		CHECK_MESSAGE(!w.has_value(), w.value_or(""));
+	}
+
+	TEST_CASE("an output with no witness is unsupported, not a wrong value"
+		* doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:qlt > {1/4000000009}:qlt "
+			"&& o1[t]:qlt < {1/4000000007}:qlt)");
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol);
+		CHECK_FALSE(d.has_value());
+		CHECK(report_has_code(d.report(), code::unsupported_operation));
 	}
 }
 

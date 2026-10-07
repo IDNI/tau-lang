@@ -49,18 +49,17 @@ inline std::string qlt_witness_expr(const qlt_rational& r) {
 }
 
 // The codegen_witness capability: a self-contained C++ expression of type
-// tref satisfying the conjunction of ordering atoms on var. An interval the
-// elimination cannot determine still yields a value, since the ABA oracle has
-// already found the edge feasible.
+// tref satisfying the conjunction of ordering atoms on var; nullopt when the
+// elimination cannot determine the interval or none of its pieces holds a
+// rational the representation fits, which the emitter reports as
+// unsupported.
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj) {
-	if (auto interval = qlt_dlo_qe_interval<node>(var, conj); interval)
-		if (auto witness = qlt_pick_witness<node>(*interval); witness)
-			return qlt_witness_expr<node>(*witness);
-	// No determined interval, or none of its pieces yields a witness. The ABA
-	// oracle has already found the edge feasible, so emit the value 1 rather
-	// than refusing.
-	return qlt_witness_expr<node>(qlt_rational(1, 1));
+	auto interval = qlt_dlo_qe_interval<node>(var, conj);
+	if (!interval) return std::nullopt;
+	auto witness = qlt_pick_witness<node>(*interval);
+	if (!witness) return std::nullopt;
+	return qlt_witness_expr<node>(*witness);
 }
 
 // The codegen_constant_expr capability: spells the rational of @p cst when it
