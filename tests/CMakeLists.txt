@@ -76,7 +76,6 @@ set(TAU_SKIP_TESTS
 	test_integration-satisfiability-qlt
 	test_integration-satisfiability-tau_ba
 	test_integration-satisfiability-mixed
-	test_integration-satisfiability-bv
 	test_ltl_benchmarks
 	test_by_grammar
 	test_integration-solver-qint
