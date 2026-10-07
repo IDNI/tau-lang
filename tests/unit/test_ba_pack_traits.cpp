@@ -124,10 +124,16 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
 		CHECK(pack_zero_constant<node_t>(bv8) != nullptr);
 		CHECK(pack_value_constant<node_t>(bv8, 1) != nullptr);
+		CHECK(pack_value_constant<node_t>(bv8, 255) != nullptr);
+		// a value wider than the type is refused, not truncated to 0
+		CHECK(pack_value_constant<node_t>(bv8, 256) == nullptr);
+		const size_t bv64 = ba_descriptor<bv, node_t>::type_id_for(64);
+		CHECK(pack_value_constant<node_t>(bv64, SIZE_MAX) != nullptr);
 #endif
 #ifdef TAU_PACK_HAS_BA_SBF
 		const size_t sbf_id = tid(ba_descriptor<sbf_ba, node_t>::type_tree());
 		CHECK(pack_value_constant<node_t>(sbf_id, 0) != nullptr);
+		CHECK(pack_value_constant<node_t>(sbf_id, 2) == nullptr);
 		CHECK(pack_zero_constant<node_t>(sbf_id) == nullptr);
 #endif
 	}

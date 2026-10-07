@@ -271,7 +271,7 @@ concept ba_has_zero_constant = ba_has_descriptor_v<Node, BA>
 			-> std::convertible_to<tref>; };
 
 /// @brief @p BA builds a constant of type @p t holding the integer @p v:
-/// `value_constant(t, v)`.
+/// `value_constant(t, v)`, nullptr when @p v is not a value of @p t.
 template <typename Node, typename BA>
 concept ba_has_value_constant = ba_has_descriptor_v<Node, BA>
 	&& requires(size_t t, size_t v) {

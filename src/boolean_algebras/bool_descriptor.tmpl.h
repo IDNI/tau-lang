@@ -80,11 +80,11 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 	static std::string literal_zero(tref) { return "0"; }
 
 	/**
-	 * @brief The constant of this type holding @p value's truth, as a bf.
-	 * @param value 0 gives the constant 0, any other value 1; the first
-	 * argument is ignored.
+	 * @brief The constant of this type holding @p value (0 or 1), as a bf.
+	 * @return nullptr for any other value; the first argument is ignored.
 	 */
 	static tref value_constant(size_t, size_t value) {
+		if (value > 1) return nullptr;
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(Bool(value != 0)), type_tree()));
 	}

@@ -89,8 +89,9 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	/// The spelling of the sbf zero, `0`.
 	static std::string literal_zero(tref) { return "0"; }
 
-	/** @brief The sbf constant holding @p value (0 or 1), wrapped as a bf constant. */
+	/** @brief The sbf constant holding @p value (0 or 1), wrapped as a bf constant; nullptr for any other value. */
 	static tref value_constant(size_t, size_t value) {
+		if (value > 1) return nullptr;
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(value ? bdd_handle<Bool>::htrue
 			                              : bdd_handle<Bool>::hfalse),

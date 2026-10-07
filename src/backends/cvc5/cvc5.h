@@ -190,7 +190,10 @@ inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 inline cvc5::Term make_bitvector_bottom_elem(size_t size);
 /// All-ones value of width `size` (the algebra's top).
 inline cvc5::Term make_bitvector_top_elem(size_t size);
-/// Constant `value` of width `size`.
+/// True iff `value` fits `size` bits, the condition under which the
+/// integer builder below keeps the value whole.
+inline bool bitvector_value_fits(const size_t size, const uint64_t value);
+/// Constant `value` of width `size`; `value` must fit the width.
 inline cvc5::Term make_bitvector_value(size_t size, uint64_t value);
 /// Constant of width `size` parsed from `value` in `base`.
 inline cvc5::Term make_bitvector_value(size_t size, const std::string& value, const size_t base = 2);

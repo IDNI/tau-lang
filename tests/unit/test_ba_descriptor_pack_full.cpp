@@ -191,6 +191,7 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		REQUIRE(one != nullptr);
 		REQUIRE(zero != nullptr);
 		CHECK(one != zero);
+		CHECK(pack_value_constant<N>(bid, 2) == nullptr);
 	}
 
 	TEST_CASE("the arithmetic pipeline is on exactly when a BA has arith_ops and solve") {

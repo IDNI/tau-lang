@@ -585,12 +585,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * @brief The bitvector of @p ba_type holding @p value, as a bf constant.
 	 *
 	 * The width comes from the type, so callers name a value and a type and
-	 * never a bitwidth.
+	 * never a bitwidth. nullptr when @p value does not fit the width.
 	 */
 	static tref value_constant(size_t ba_type, size_t value) {
 		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
 		// TODO (HIGH) dropped error: get_bv_size's report -- ba_has_value_constant fixes this member to tref.
 		if (!width.has_value()) return nullptr;
+		if (!bitvector_value_fits(width.value(), value)) return nullptr;
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			make_bitvector_value(width.value(), value),
 			ba_type) });

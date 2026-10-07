@@ -219,7 +219,15 @@ inline cvc5::Term make_bitvector_top_elem(const size_t size) {
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), std::string(size, '1'), 2);
 }
 
+inline bool bitvector_value_fits(const size_t size, const uint64_t value) {
+	if (size == 0 || size > UINT32_MAX) return false;
+	return size >= 64 || (value >> size) == 0;
+}
+
+// cvc5 keeps the low `size` bits of a wider value: callers check
+// bitvector_value_fits first.
 inline cvc5::Term make_bitvector_value(const size_t size, const uint64_t value) {
+	DBG(assert(bitvector_value_fits(size, value));)
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value);
 }
 
