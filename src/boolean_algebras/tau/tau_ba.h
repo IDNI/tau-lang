@@ -198,8 +198,8 @@ private:
  * @tparam BAs Variadic template parameters.
  * @param other Reference to tau_ba.
  * @param b `true` asks `is_one()`, `false` asks `is_zero()`.
- * @return The decision; an undecided `is_one()` gives false and an
- * undecided `is_zero()` gives true (the decision report is dropped).
+ * @return True only when the decision says so: an undecided element equals
+ * neither truth value. `is_one()` and `is_zero()` carry the report.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>

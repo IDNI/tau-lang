@@ -168,6 +168,44 @@ TEST_CASE("bool != tau_ba: true != F") {
 // A constant that carries recurrence relations is decided through
 // the uncached branch of cached_tau_ba_predicate (its key would be the
 // main formula alone, which does not identify the constant).
+// One fixpoint step does not decide this element, so is_zero() fails.
+struct undecided_zero {
+	const size_t saved = max_fixpoint_steps;
+	undecided_zero() { max_fixpoint_steps = 1; }
+	~undecided_zero() { max_fixpoint_steps = saved; }
+	test_ba element() const {
+		return from_spec("always o1[t]:sbf = o1[t-1]:sbf'"
+			" && o2[t]:sbf = o1[t-2]:sbf.");
+	}
+};
+
+TEST_CASE("an undecided element equals neither truth value") {
+	undecided_zero budget;
+	const test_ba x = budget.element();
+	REQUIRE(x.is_zero().has_error());
+	CHECK_FALSE(x == false);
+	CHECK_FALSE(false == x);
+	CHECK(x != false);
+	CHECK(false != x);
+	CHECK_FALSE(x == true);
+	CHECK(x != true);
+}
+
+TEST_CASE("a tree of an undecided constant reports the failed decision") {
+	undecided_zero budget;
+	// built raw: the constant hook is not what this case is about
+	tref leaf = tau::get_ba_constant(
+		typename tau::constant(budget.element()), tau_type<node_t>());
+	const auto& t = tau::get(tau::get_raw(node_t(tau::bf), &leaf, 1));
+	CHECK(decide_zero(t).has_error());
+	CHECK_FALSE(is_zero(t));
+	CHECK_FALSE(t == false);
+	// the syntactic constants are decided without asking the algebra
+	CHECK(decide_zero(tau::get(tau::_F())).value());
+	CHECK(decide_one(tau::get(tau::_T())).value());
+	CHECK_FALSE(decide_one(tau::get(tau::_F())).value());
+}
+
 TEST_CASE("a constant with recurrence relations is decided uncached") {
 	auto nso_rr = get_nso_rr("f[0](x) := T. f[n](x) := f[n-1](x). f(y).");
 	REQUIRE(nso_rr.has_value());

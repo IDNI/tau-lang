@@ -79,7 +79,11 @@ variant:
 
 - **equality** — core compares constants directly;
 - **comparison with `bool`** — `your_ba == true` must compile, since core
-  compares constants against plain truth values;
+  compares constants against plain truth values. It answers true only when
+  that is decided: a value you cannot decide equals neither `true` nor
+  `false`, so `!=` is true for both. The operator has no way to say why;
+  the descriptor's `is_one` and `is_zero` return a `result` and carry the
+  report;
 - **`operator<<`** — the tree printer streams whichever alternative a constant
   holds;
 - **`std::hash`** — constants live in a hashed variant.

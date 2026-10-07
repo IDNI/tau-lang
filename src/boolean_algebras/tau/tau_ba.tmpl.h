@@ -514,12 +514,11 @@ result<bool> tau_ba<BAs...>::is_one() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	// An undecidable is_one()/is_zero() falls to the side that never
-	// misreports a witness: not one, and (unless proven otherwise) zero.
-	// TODO (HIGH) dropped error: is_one's decision report -- operator== returns bool, which cannot carry it.
-	// TODO (HIGH) dropped error: is_zero's decision report -- operator== returns bool, which cannot carry it.
+	// The contract of `x == b` (ba_descriptor_complete): true only when it
+	// is decided, so an undecided element equals neither truth value. The
+	// report of the decision is that of is_one() / is_zero().
 	return b ? other.is_one().value_or(false)
-		 : other.is_zero().value_or(true);
+		 : other.is_zero().value_or(false);
 }
 
 template <typename... BAs>

@@ -507,7 +507,8 @@ concept ba_descriptor_complete =
         { std::hash<BA>{}(x) } -> std::convertible_to<size_t>;       }
 	// an optional hash_constant is the 64-bit, platform-independent hash
  && ba_hash_constant_well_typed_v<Node, BA>
-	// core compares constants against plain truth values
+	// core compares constants against plain truth values; `x == b` is true
+	// only when it is decided, and is_one / is_zero carry the report
  && requires(const BA& x, bool b) {
         { x == b } -> std::convertible_to<bool>;                     }
 	// binary/unary operators core dispatches directly on a BA's value type
