@@ -17,8 +17,8 @@
 
 namespace idni::tau_lang {
 
-// Pick a concrete witness rational from the first non-empty, non-symbolic piece.
-// Returns nullopt if none found.
+// Pick a concrete witness rational from the first non-empty, non-symbolic piece
+// that holds one the representation fits. Returns nullopt if none found.
 template <NodeType node>
 std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
 	for (const auto& p : interval.pieces) {
@@ -26,10 +26,18 @@ std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
 		const auto& hi = p.hi.val;
 		if (lo.is_sym() || hi.is_sym()) continue;
 		if (lo.is_neg_inf() && hi.is_pos_inf()) return qlt_rational(0, 1);
-		if (lo.is_neg_inf() && hi.is_finite())
-			return qlt_rational(hi.p - hi.q, hi.q); // hi - 1
-		if (lo.is_finite() && hi.is_pos_inf())
-			return qlt_rational(lo.p + lo.q, lo.q); // lo + 1
+		// A ray takes the point one past its endpoint, or the endpoint
+		// itself when that point does not fit and the endpoint is closed.
+		if (lo.is_neg_inf() && hi.is_finite()) {
+			if (auto w = hi.add(qlt_rational(-1, 1)); w) return w;
+			if (p.hi.bound == qlt_bound::CLOSED) return hi;
+			continue;
+		}
+		if (lo.is_finite() && hi.is_pos_inf()) {
+			if (auto w = lo.add(qlt_rational(1, 1)); w) return w;
+			if (p.lo.bound == qlt_bound::CLOSED) return lo;
+			continue;
+		}
 		// both finite
 		if (lo == hi) {
 			if (p.lo.bound == qlt_bound::CLOSED && p.hi.bound == qlt_bound::CLOSED)

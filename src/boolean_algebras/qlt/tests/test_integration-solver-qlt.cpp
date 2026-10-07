@@ -710,3 +710,51 @@ TEST_SUITE("qlt interval collector") {
 			is<node_t, tau::bf_eq>) != nullptr );
 	}
 }
+
+// qlt_pick_witness answers a point of the interval, or none when no point the
+// representation fits can be named.
+TEST_SUITE("pick witness") {
+
+	qlt interval(const qlt_rational& lo, qlt_bound lb,
+		const qlt_rational& hi, qlt_bound hb)
+	{
+		qlt_piece p;
+		p.lo = qlt_endpoint{ lo, lb };
+		p.hi = qlt_endpoint{ hi, hb };
+		return qlt{{ p }};
+	}
+
+	bool inside(const qlt& q, const qlt_rational& w) {
+		const auto& p = q.pieces[0];
+		const bool above = p.lo.val.is_neg_inf() || p.lo.val < w
+			|| (p.lo.bound == qlt_bound::CLOSED && p.lo.val == w);
+		const bool below = p.hi.val.is_pos_inf() || w < p.hi.val
+			|| (p.hi.bound == qlt_bound::CLOSED && p.hi.val == w);
+		return above && below;
+	}
+
+	const qlt_rational least(std::numeric_limits<long long>::min(), 1);
+	const qlt_rational greatest(std::numeric_limits<long long>::max(), 1);
+	const qlt_rational neg_inf = qlt_rational::make_neg_inf();
+	const qlt_rational pos_inf = qlt_rational::make_pos_inf();
+
+	TEST_CASE("below the least long long") {
+		auto op = interval(neg_inf, qlt_bound::OPEN, least, qlt_bound::OPEN);
+		CHECK(!qlt_pick_witness<node_t>(op));
+		auto closed = interval(neg_inf, qlt_bound::OPEN,
+			least, qlt_bound::CLOSED);
+		auto w = qlt_pick_witness<node_t>(closed);
+		REQUIRE(w);
+		CHECK(inside(closed, *w));
+	}
+
+	TEST_CASE("above the greatest long long") {
+		auto op = interval(greatest, qlt_bound::OPEN, pos_inf, qlt_bound::OPEN);
+		CHECK(!qlt_pick_witness<node_t>(op));
+		auto closed = interval(greatest, qlt_bound::CLOSED,
+			pos_inf, qlt_bound::OPEN);
+		auto w = qlt_pick_witness<node_t>(closed);
+		REQUIRE(w);
+		CHECK(inside(closed, *w));
+	}
+}
