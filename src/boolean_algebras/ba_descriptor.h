@@ -364,13 +364,15 @@ concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::codegen_witness(v, c) }
 			-> std::convertible_to<std::optional<std::string>>; };
 
-/// @brief @p BA spells a constant in generated C++, nullopt when it cannot:
+/// @brief @p BA spells a constant in generated C++, nullopt when it has no
+/// spelling for it and an error when building one failed:
 /// `codegen_constant_expr(c)`.
 template <typename Node, typename BA>
 concept ba_has_codegen_constant_expr = ba_has_descriptor_v<Node, BA>
 	&& requires(tref c) {
 		{ ba_descriptor<BA, Node>::codegen_constant_expr(c) }
-			-> std::convertible_to<std::optional<std::string>>; };
+			-> std::convertible_to<
+				result<std::optional<std::string>>>; };
 
 /// @brief @p BA tells whether a partly typed literal is truncated rather
 /// than malformed, so the REPL keeps reading: `literal_incomplete(src)`.

@@ -66,16 +66,17 @@ static std::optional<std::string> qlt_codegen_witness(tref var, tref conj) {
 // is a trimmed qlt constant holding one closed, finite point; nullopt
 // otherwise.
 template <NodeType node>
-static std::optional<std::string> qlt_codegen_constant_expr(tref cst) {
+static result<std::optional<std::string>> qlt_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
-	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
+	result<std::optional<std::string>> r;
+	if (!tau::get(cst).is_ba_constant()) return r.with_value(std::nullopt);
 	qlt v = std::get<qlt>(tau::get(cst).get_ba_constant());
-	if (v.pieces.size() != 1) return std::nullopt;
+	if (v.pieces.size() != 1) return r.with_value(std::nullopt);
 	const auto& p = v.pieces[0];
 	if (p.lo.bound != qlt_bound::CLOSED || p.hi.bound != qlt_bound::CLOSED
 	    || p.lo.val != p.hi.val || !p.lo.val.is_finite())
-		return std::nullopt;
-	return qlt_witness_expr<node>(p.lo.val);
+		return r.with_value(std::nullopt);
+	return r.with_value(qlt_witness_expr<node>(p.lo.val));
 }
 
 } // namespace idni::tau_lang

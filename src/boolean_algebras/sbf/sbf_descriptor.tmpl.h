@@ -18,7 +18,7 @@ namespace idni::tau_lang {
 // Defined in sbf_codegen.tmpl.h, included at this file's end; declared here
 // so the descriptor's own definition context can name it.
 template <NodeType node>
-static std::optional<std::string> sbf_codegen_constant_expr(tref cst);
+static result<std::optional<std::string>> sbf_codegen_constant_expr(tref cst);
 
 /// The descriptor of the BDD-backed simple Boolean formula algebra (`sbf`).
 template <typename... PackBAs>
@@ -139,7 +139,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	}
 
 	/** @brief @p cst's own sbf BDD value, spelled for generated C++. */
-	static std::optional<std::string> codegen_constant_expr(tref cst) {
+	static result<std::optional<std::string>> codegen_constant_expr(tref cst) {
 		return sbf_codegen_constant_expr<node_t>(cst);
 	}
 };

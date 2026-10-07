@@ -46,7 +46,7 @@ template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
 
 template <NodeType node>
-static std::optional<std::string> qlt_codegen_constant_expr(tref cst);
+static result<std::optional<std::string>> qlt_codegen_constant_expr(tref cst);
 
 template <NodeType node>
 static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
@@ -376,7 +376,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 	/** @brief @p cst's own rational, spelled for generated C++; nullopt when
 	 * @p cst is not a finite point. */
-	static std::optional<std::string> codegen_constant_expr(tref cst) {
+	static result<std::optional<std::string>> codegen_constant_expr(tref cst) {
 		return qlt_codegen_constant_expr<node_t>(cst);
 	}
 

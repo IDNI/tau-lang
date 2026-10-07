@@ -398,8 +398,9 @@ result<std::string> build_atom_term_expr(tref term, size_t sibling_type = 0) {
 	tref trimmed = tau::trim(term);
 	if (tau::get(trimmed).is_ba_constant()) {
 		size_t bt = tau::get(trimmed).get_ba_type();
-		if (auto e = pack_codegen_constant_expr<node>(bt, trimmed); e)
-			return r.with_value(*e);
+		TAU_TRY(std::optional<std::string> e,
+			pack_codegen_constant_expr<node>(bt, trimmed));
+		if (e) return r.with_value(*e);
 		// is_one/is_zero are mandatory descriptor members (unlike
 		// codegen_constant_expr), so a carrier-typed constant that is
 		// trivially one or zero has a BA-agnostic C++ spelling -- a truth

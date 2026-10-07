@@ -32,6 +32,13 @@ tref sbf_constant_tref(const sbf_ba& v) {
 		typename tree<node_t>::constant(v), sbf_type<node_t>());
 }
 
+// The spelling of @p cst; building it must not fail.
+std::optional<std::string> constant_expr(tref cst) {
+	auto e = sbf_codegen_constant_expr<node_t>(cst);
+	REQUIRE(e.has_value());
+	return e.value();
+}
+
 bool has(const std::string& s, const std::string& pat) {
 	return s.find(pat) != std::string::npos;
 }
@@ -49,19 +56,19 @@ std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 TEST_SUITE("sbf_codegen") {
 
 	TEST_CASE("codegen_constant_expr: the constants 1 and 0 spell htrue/hfalse") {
-		auto et = sbf_codegen_constant_expr<node_t>(
+		auto et = constant_expr(
 			sbf_constant_tref(parse_sbf_value("1")));
 		REQUIRE(et.has_value());
 		CHECK(has(*et, "bdd_handle<::idni::tau_lang::Bool>::htrue"));
 
-		auto ef = sbf_codegen_constant_expr<node_t>(
+		auto ef = constant_expr(
 			sbf_constant_tref(parse_sbf_value("0")));
 		REQUIRE(ef.has_value());
 		CHECK(has(*ef, "bdd_handle<::idni::tau_lang::Bool>::hfalse"));
 	}
 
 	TEST_CASE("codegen_constant_expr: a single variable interns its name, not a numeric id") {
-		auto ex = sbf_codegen_constant_expr<node_t>(
+		auto ex = constant_expr(
 			sbf_constant_tref(parse_sbf_value("X")));
 		REQUIRE(ex.has_value());
 		CHECK(has(*ex, "var_dict(std::string(\"X\"))"));
@@ -70,7 +77,7 @@ TEST_SUITE("sbf_codegen") {
 	}
 
 	TEST_CASE("codegen_constant_expr: negation flips the literal's sign, not its name") {
-		auto e = sbf_codegen_constant_expr<node_t>(
+		auto e = constant_expr(
 			sbf_constant_tref(parse_sbf_value("X'")));
 		REQUIRE(e.has_value());
 		CHECK(has(*e, "var_dict(std::string(\"X\"))"));
@@ -78,7 +85,7 @@ TEST_SUITE("sbf_codegen") {
 	}
 
 	TEST_CASE("codegen_constant_expr: a conjunction is one clause over both literals") {
-		auto e = sbf_codegen_constant_expr<node_t>(
+		auto e = constant_expr(
 			sbf_constant_tref(parse_sbf_value("X & Y")));
 		REQUIRE(e.has_value());
 		CHECK(has(*e, "var_dict(std::string(\"X\"))"));
@@ -88,7 +95,7 @@ TEST_SUITE("sbf_codegen") {
 	}
 
 	TEST_CASE("codegen_constant_expr: an xor-shaped constant emits two clauses") {
-		auto e = sbf_codegen_constant_expr<node_t>(
+		auto e = constant_expr(
 			sbf_constant_tref(parse_sbf_value("X ^ Y")));
 		REQUIRE(e.has_value());
 		CHECK(has(*e, " | "));
@@ -101,13 +108,22 @@ TEST_SUITE("sbf_codegen") {
 	// same logical constant always emits the same text.
 	TEST_CASE("codegen_constant_expr: the emitted expression is deterministic") {
 		const char* src = "z' | x b (1'^(a b) | 0+c | a) ^ d | d^e&1";
-		auto e1 = sbf_codegen_constant_expr<node_t>(
+		auto e1 = constant_expr(
 			sbf_constant_tref(parse_sbf_value(src)));
-		auto e2 = sbf_codegen_constant_expr<node_t>(
+		auto e2 = constant_expr(
 			sbf_constant_tref(parse_sbf_value(src)));
 		REQUIRE(e1.has_value());
 		REQUIRE(e2.has_value());
 		CHECK(*e1 == *e2);
+	}
+
+	// bit() takes any id, so a BDD can hold a variable var_dict has no name
+	// for; the spelling goes by name and cannot be built.
+	TEST_CASE("codegen_constant_expr: a variable without a name is an error") {
+		const sbf_ba unnamed = bdd_handle<Bool>::bit(true, 4000);
+		auto e = sbf_codegen_constant_expr<node_t>(
+			sbf_constant_tref(unnamed));
+		CHECK(e.has_error());
 	}
 
 	// The bug this closes: an sbf atom's ground constant reached

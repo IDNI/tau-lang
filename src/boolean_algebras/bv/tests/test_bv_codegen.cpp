@@ -59,6 +59,24 @@ captured_run run_capture(const std::string& exe_path) {
 
 TEST_SUITE("bv_codegen") {
 
+	TEST_CASE("codegen_constant_expr: a constant spells its value at the width of its type") {
+		tref cst = tree<node_t>::get_ba_constant(
+			typename tree<node_t>::constant(make_bitvector_value(8, 5)),
+			bv_type<node_t>(8));
+		auto e = bv_codegen_constant_expr<node_t>(cst);
+		REQUIRE(e.has_value());
+		REQUIRE(e.value().has_value());
+		CHECK(has(*e.value(), "make_bitvector_value(8, \"5\""));
+	}
+
+	// The width comes from the type, and sbf's type has none.
+	TEST_CASE("codegen_constant_expr: a type without a width is an error") {
+		tref cst = tree<node_t>::get_ba_constant(
+			typename tree<node_t>::constant(make_bitvector_value(8, 5)),
+			sbf_type<node_t>());
+		CHECK(bv_codegen_constant_expr<node_t>(cst).has_error());
+	}
+
 	TEST_CASE("G(o1:bv[8] = 1): emits tref o1 with a bv factory expression, not a bool flag"
 	          * doctest::skip(!ltlsynt_available())) {
 		auto sol = synth("G(o1[t]:bv = { 1 }:bv[8])");

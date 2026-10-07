@@ -273,7 +273,9 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 	}
 	TEST_CASE("pack_codegen_witness / pack_codegen_constant_expr are empty without an owner") {
 		CHECK_FALSE(pack_codegen_witness<node_t>(size_t{0}, nullptr, nullptr).has_value());
-		CHECK_FALSE(pack_codegen_constant_expr<node_t>(size_t{0}, nullptr).has_value());
+		auto e = pack_codegen_constant_expr<node_t>(size_t{0}, nullptr);
+		REQUIRE(e.has_value());
+		CHECK_FALSE(e.value().has_value());
 	}
 	TEST_CASE("pack_literal_incomplete: nullopt without an owner, an answer from one") {
 		CHECK_FALSE(pack_literal_incomplete<node_t>(nullptr, "1").has_value());

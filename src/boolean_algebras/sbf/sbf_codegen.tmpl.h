@@ -111,16 +111,15 @@ inline result<std::string> sbf_constant_expr(const sbf_ba& v) {
 
 // The codegen_constant_expr capability: @p cst is already a trimmed, known
 // sbf BDD value, so this only extracts and spells it. Returns nullopt when
-// @p cst is not a BA constant or its expression cannot be built.
+// @p cst is not a BA constant, and the error of sbf_constant_expr.
 template <NodeType node>
-static std::optional<std::string> sbf_codegen_constant_expr(tref cst) {
+static result<std::optional<std::string>> sbf_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
-	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
-	auto expr = sbf_constant_expr<node>(
-		std::get<sbf_ba>(tau::get(cst).get_ba_constant()));
-	// TODO (HIGH) dropped error: sbf_constant_expr's report -- codegen_constant_expr is fixed to std::optional<std::string> by ba_has_codegen_constant_expr.
-	if (!expr.has_value()) return std::nullopt;
-	return expr.value();
+	result<std::optional<std::string>> r;
+	if (!tau::get(cst).is_ba_constant()) return r.with_value(std::nullopt);
+	TAU_TRY(std::string expr, sbf_constant_expr<node>(
+		std::get<sbf_ba>(tau::get(cst).get_ba_constant())));
+	return r.with_value(std::move(expr));
 }
 
 } // namespace idni::tau_lang

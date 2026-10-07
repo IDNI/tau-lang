@@ -962,16 +962,21 @@ bool pack_type_has_codegen_witness(size_t ba_type_id) {
 		}).value_or(false);
 }
 
-/** @brief A self-contained C++ expression of type `tref` rebuilding the already-trimmed constant @p cst, from the BA owning @p ba_type_id; `nullopt` means no owner contributes one (a build-time error, never a lossy re-parsed fallback). */
+/** @brief A self-contained C++ expression of type `tref` rebuilding the already-trimmed constant @p cst, from the BA owning @p ba_type_id; `nullopt` means no owner contributes one (a build-time error, never a lossy re-parsed fallback). An error is the owner's report of a spelling it could not build. */
 template <typename Node>
-std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cst) {
-	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
-		-> std::optional<std::string> {
+result<std::optional<std::string>> pack_codegen_constant_expr(
+	size_t ba_type_id, tref cst)
+{
+	using answer_t = result<std::optional<std::string>>;
+	auto out = pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
+		-> std::optional<answer_t> {
 			if constexpr (ba_has_codegen_constant_expr<Node, BA>)
 				return ba_descriptor<BA, Node>
 					::codegen_constant_expr(cst);
 			return std::nullopt;
 		});
+	if (!out) return answer_t{ std::optional<std::string>{} };
+	return std::move(*out);
 }
 
 /**

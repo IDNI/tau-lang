@@ -31,7 +31,7 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj);
 
 /// C++ spelling of a bv constant; defined in bv_codegen.tmpl.h.
 template <NodeType node>
-static std::optional<std::string> bv_codegen_constant_expr(tref cst);
+static result<std::optional<std::string>> bv_codegen_constant_expr(tref cst);
 
 /**
  * @brief The descriptor of bv in any pack that holds it: the mandatory
@@ -642,7 +642,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/** @brief @p cst's own bitvector value, spelled for generated C++. */
-	static std::optional<std::string> codegen_constant_expr(tref cst) {
+	static result<std::optional<std::string>> codegen_constant_expr(tref cst) {
 		return bv_codegen_constant_expr<node_t>(cst);
 	}
 };

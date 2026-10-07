@@ -100,17 +100,17 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 }
 
 // The codegen_constant_expr capability: spells the trimmed bitvector constant
-// @p cst; nullopt when @p cst is not a BA constant or its width is unknown.
+// @p cst; nullopt when @p cst is not a BA constant, and an error when its
+// type gives no width.
 template <NodeType node>
-static std::optional<std::string> bv_codegen_constant_expr(tref cst) {
+static result<std::optional<std::string>> bv_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
-	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
-	// TODO (HIGH) dropped error: get_ba_type_tree's report -- ba_has_codegen_constant_expr fixes this member to std::optional<std::string>.
-	auto type_tree_r = tau::get(cst).get_ba_type_tree();
-	if (!type_tree_r.has_value()) return std::nullopt;
-	auto width_r = get_bv_size<node>(type_tree_r.value());
-	if (!width_r.has_value()) return std::nullopt;
-	return bv_witness_expr<node>(std::get<bv>(tau::get(cst).get_ba_constant()), width_r.value());
+	result<std::optional<std::string>> r;
+	if (!tau::get(cst).is_ba_constant()) return r.with_value(std::nullopt);
+	TAU_TRY(tref type_tree, tau::get(cst).get_ba_type_tree());
+	TAU_TRY(size_t width, get_bv_size<node>(type_tree));
+	return r.with_value(bv_witness_expr<node>(
+		std::get<bv>(tau::get(cst).get_ba_constant()), width));
 }
 
 } // namespace idni::tau_lang
