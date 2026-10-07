@@ -766,9 +766,20 @@ result<std::optional<minterm_system<node>>> add_minterm_to_disjoint(
 			continue;
 		}
 		const auto& d_cte = tau::get(get_constant<node>(d, options.type_id));
-		if ((d_cte & new_m_cte) != false) {
+		// Each comparison is decided only where the cases below read it.
+		TAU_TRY(bool disjoint_ctes, decide_zero(d_cte & new_m_cte));
+		bool d_within_m = false, m_within_d = false;
+		if (!disjoint_ctes) {
+			TAU_TRY(bool within, decide_zero(d_cte & ~new_m_cte));
+			d_within_m = within;
+		}
+		if (d_within_m) {
+			TAU_TRY(bool within, decide_zero(~d_cte & new_m_cte));
+			m_within_d = within;
+		}
+		if (!disjoint_ctes) {
 			// case 2
-			if ((d_cte & ~new_m_cte) != false) {
+			if (!d_within_m) {
 				const auto& x = ~new_m_cte & tau::get(d);
 				new_disjoint.insert(x.get());
 
@@ -777,7 +788,7 @@ result<std::optional<minterm_system<node>>> add_minterm_to_disjoint(
 					<< LOG_FM(x.get()) << "\n";)
 
 			// case 3
-			} else if ((~d_cte & new_m_cte) != false) {
+			} else if (!m_within_d) {
 				new_disjoint.insert(d);
 				TAU_TRY(new_m, bf_reduce_canonical<node>()(
 					(~d_cte & tau::get(new_m)).get()));

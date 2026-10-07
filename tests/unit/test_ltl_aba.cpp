@@ -442,12 +442,19 @@ TEST_SUITE("ABA oracle correctness") {
 // confirm the closed form's sigma=rho=all-false instantiation is unsound
 // against the solver on the simplest possible case a consistency-pruning
 // caller would actually pass.
+// The match of @p fm; deciding it must not fail.
+static std::optional<ocltl_swap_match> swap_match(tref fm) {
+	auto matched = match_ocltl_swap_shape<node_t>(fm);
+	REQUIRE(matched.has_value());
+	return matched.value();
+}
+
 TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))") {
 
 	TEST_CASE("match_ocltl_swap_shape recognizes a same-side coordinate equality") {
 		tref atom = wff("o1[t]:tau = o1[t-1]:tau");
 		REQUIRE(atom != nullptr);
-		auto match = match_ocltl_swap_shape<node_t>(atom);
+		auto match = swap_match(atom);
 		REQUIRE(match.has_value());
 		CHECK(match->atoms.size() == 1);
 		CHECK(match->D == 1); // the atom is asserted (not negated)
@@ -456,13 +463,13 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 	TEST_CASE("match_ocltl_swap_shape refuses a non-atomless (bv) atom") {
 		tref atom = wff("o1[t]:bv[8] = i1[t]:bv[8]");
 		REQUIRE(atom != nullptr);
-		CHECK_FALSE(match_ocltl_swap_shape<node_t>(atom).has_value());
+		CHECK_FALSE(swap_match(atom).has_value());
 	}
 
 	TEST_CASE("match_ocltl_swap_shape refuses a disjunction") {
 		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) || (o1[t]:tau = {T.}:tau)");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(match_ocltl_swap_shape<node_t>(fm).has_value());
+		CHECK_FALSE(swap_match(fm).has_value());
 	}
 
 	TEST_CASE("known disagreement: phi_delta(sigma=rho=all-false) vs the "
@@ -477,7 +484,7 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 		bool solver_answer = aba_feasible(atom);
 		CHECK(solver_answer == true);
 
-		auto match = match_ocltl_swap_shape<node_t>(atom);
+		auto match = swap_match(atom);
 		REQUIRE(match.has_value());
 		size_t k_sigma = match->dims.d_m + match->dims.d_x;
 		std::vector<bool> sigma(size_t{1} << k_sigma, false);
@@ -6348,7 +6355,7 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 	TEST_CASE("a conjunction of two literals gives two asserted atoms") {
 		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) && (o2[t]:tau = {F.}:tau)");
 		REQUIRE(fm != nullptr);
-		auto m = match_ocltl_swap_shape<node_t>(fm);
+		auto m = swap_match(fm);
 		REQUIRE(m.has_value());
 		CHECK(m->atoms.size() == 2);
 		CHECK(m->D == 3);
@@ -6359,18 +6366,18 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 	{
 		tref taut = wff("(o1[t]:tau = o1[t]:tau) && (o2[t]:tau = {T.}:tau)");
 		REQUIRE(taut != nullptr);
-		auto m = match_ocltl_swap_shape<node_t>(taut);
+		auto m = swap_match(taut);
 		REQUIRE(m.has_value());
 		CHECK(m->atoms.size() == 1);
 		tref contra = wff("o1[t]:tau != o1[t]:tau");
 		REQUIRE(contra != nullptr);
-		CHECK_FALSE(match_ocltl_swap_shape<node_t>(contra).has_value());
+		CHECK_FALSE(swap_match(contra).has_value());
 	}
 
 	TEST_CASE("a constant that is neither zero nor one is not this shape") {
 		tref fm = wff("o1[t]:tau = {o5[t] = 0.}:tau");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(match_ocltl_swap_shape<node_t>(fm).has_value());
+		CHECK_FALSE(swap_match(fm).has_value());
 	}
 }
 

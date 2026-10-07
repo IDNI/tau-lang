@@ -180,18 +180,24 @@ inline ocltl_swap_counters& ocltl_swap_stats() {
 // Env-gated (TAU_PHI_DELTA_CROSSCHECK=1): on a shape match, compares the
 // closed form against the solver's result and logs any disagreement (LOG
 // channel, never stdout, see AGENTS.md) -- never changes the returned value.
+// A match that could not be decided counts as ineligible; its report is
+// returned as warnings, since the shadow check is not the answer.
 template <NodeType node>
-static void ocltl_swap_crosscheck(tref fm, bool solver_result) {
+static report ocltl_swap_crosscheck(tref fm, bool solver_result) {
 	static const bool enabled = [] {
 		const char* v = std::getenv("TAU_PHI_DELTA_CROSSCHECK");
 		return v && *v && v[0] != '0';
 	}();
-	if (!enabled) return;
-	auto match = match_ocltl_swap_shape<node>(fm);
-	if (!match) {
+	if (!enabled) return {};
+	auto matched = match_ocltl_swap_shape<node>(fm);
+	if (!matched.has_value() || !matched.value()) {
 		ocltl_swap_stats().ineligible.fetch_add(1, std::memory_order_relaxed);
-		return;
+		report undecided = std::move(matched).report();
+		undecided.demote_errors_to_warnings();
+		return undecided;
 	}
+	report rep = matched.report();
+	const std::optional<ocltl_swap_match>& match = matched.value();
 	ocltl_swap_stats().eligible.fetch_add(1, std::memory_order_relaxed);
 	size_t k_sigma = match->dims.d_m + match->dims.d_x;
 	std::vector<bool> sigma(size_t{1} << k_sigma, false);
@@ -208,6 +214,7 @@ static void ocltl_swap_crosscheck(tref fm, bool solver_result) {
 			<< " |atoms|=" << match->atoms.size() << " D=" << match->D
 			<< " fm=" << LOG_FM(fm);
 	}
+	return rep;
 }
 
 // ── LT-4: joint satisfiability of a conjunction of qlt order atoms ───────────
@@ -485,7 +492,8 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	std::optional<bool> result = compute();
 	// an undecided check may be decided by a later, larger budget
 	if (!result) return r.with_value(std::nullopt);
-	ocltl_swap_crosscheck<node>(fm, *result); // shadow-only, see the note above
+	// shadow-only, see the note above
+	r.append(ocltl_swap_crosscheck<node>(fm, *result));
 #ifdef TAU_CACHE
 	cache.emplace(fm, *result);
 #endif // TAU_CACHE

@@ -77,11 +77,33 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
 /**
+ * @brief Decides whether the tau tree is zero: syntactically 0 or F, or a BA
+ * constant its algebra decides to be zero.
+ * @param l Operand.
+ * @return True if zero, false if not, or the report of the algebra that
+ * could not decide its constant.
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> decide_zero(const tree<node<BAs...>>& l);
+
+/**
+ * @brief Decides whether the tau tree is one: syntactically 1 or T, or a BA
+ * constant its algebra decides to be one.
+ * @param l Operand.
+ * @return True if one, false if not, or the report of the algebra that
+ * could not decide its constant.
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> decide_one(const tree<node<BAs...>>& l);
+
+/**
  * @brief Checks if the tau tree is zero: syntactically 0 or F, or a BA
  * constant its algebra decides to be zero.
  * @param l Operand.
  * @return True if zero; false otherwise, including when the algebra cannot
- * decide a constant.
+ * decide a constant. Code that must tell the two apart asks @ref decide_zero.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -92,7 +114,7 @@ bool is_zero(const tree<node<BAs...>>& l);
  * constant its algebra decides to be one.
  * @param l Operand.
  * @return True if one; false otherwise, including when the algebra cannot
- * decide a constant.
+ * decide a constant. Code that must tell the two apart asks @ref decide_one.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -175,7 +197,8 @@ bool operator>=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @brief Compares a tau tree with a Boolean value.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
- * @return `is_one(l)` when @p r is true, `is_zero(l)` otherwise.
+ * @return `is_one(l)` when @p r is true, `is_zero(l)` otherwise: true only
+ * when it is decided, so an undecided constant equals neither truth value.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>

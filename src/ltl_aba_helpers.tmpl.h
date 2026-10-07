@@ -881,17 +881,21 @@ static bool collect_conjunction_literals(tref fm,
 
 // Classifies a ground BA-constant operand as its algebra's unit (true) or
 // zero (false); nullopt for anything else (a variable, or a constant that is
-// neither -- phi_delta's coordinate==constant atom only models {0,1}).
+// neither -- phi_delta's coordinate==constant atom only models {0,1}). An
+// error is the report of an algebra that could not decide its constant.
 template <NodeType node>
-static std::optional<bool> ocltl_swap_classify_constant(tref n) {
+static result<std::optional<bool>> ocltl_swap_classify_constant(tref n) {
 	using tau = tree<node>;
+	result<std::optional<bool>> r;
 	const auto& t = tau::get(n);
-	// Reuses nso_ba.tmpl.h's is_zero/is_one (handles every constant
+	// Reuses nso_ba.tmpl.h's decide_zero/decide_one (handles every constant
 	// representation, e.g. {T.}/{F.} collapsing to bf_1/bf_0); takes `n`
 	// at the un-unwrapped `bf` level those expect, not the io_var unwrap.
-	if (idni::tau_lang::is_zero(t)) return false;
-	if (idni::tau_lang::is_one(t)) return true;
-	return std::nullopt;
+	TAU_TRY(bool zero, decide_zero(t));
+	if (zero) return r.with_value(false);
+	TAU_TRY(bool one, decide_one(t));
+	if (one) return r.with_value(true);
+	return r.with_value(std::nullopt);
 }
 
 // The translated match: a phi_delta-ready (dims, atoms, D) triple deciding
@@ -905,12 +909,15 @@ struct ocltl_swap_match {
 // Attempts to view fm as a conjunction of structured data atoms over one
 // atomless BA (see collect_conjunction_literals); nullopt if it doesn't
 // match this shape (wrong operator, mixed/non-atomless BA types, etc.).
+// An error is the report of an algebra that could not decide a constant of
+// the formula.
 template <NodeType node>
-static std::optional<ocltl_swap_match> match_ocltl_swap_shape(tref fm) {
+static result<std::optional<ocltl_swap_match>> match_ocltl_swap_shape(tref fm) {
 	using tau = tree<node>;
+	result<std::optional<ocltl_swap_match>> r;
 	std::vector<std::pair<tref, bool>> literals;
-	if (!collect_conjunction_literals<node>(fm, literals)) return std::nullopt;
-	if (literals.empty()) return std::nullopt; // vacuous -- nothing to decide via this path
+	if (!collect_conjunction_literals<node>(fm, literals)) return r.with_value(std::nullopt);
+	if (literals.empty()) return r.with_value(std::nullopt); // vacuous -- nothing to decide via this path
 
 	std::optional<size_t> ba_type;
 	std::vector<ocltl_swap_coord_key> sigma_keys, rho_keys;
@@ -936,16 +943,16 @@ static std::optional<ocltl_swap_match> match_ocltl_swap_shape(tref fm) {
 
 	for (auto& [atom, asserted] : literals) {
 		const auto& t = tau::get(atom);
-		if (!t.has_child()) return std::nullopt;
+		if (!t.has_child()) return r.with_value(std::nullopt);
 		auto op = t[0].value.nt;
 		bool flip = false;
 		if (op == tau::bf_neq) flip = true;
-		else if (op != tau::bf_eq) return std::nullopt; // lt/gt/interval/... -- not this shape
+		else if (op != tau::bf_eq) return r.with_value(std::nullopt); // lt/gt/interval/... -- not this shape
 		bool lit_asserted = asserted != flip;
 
 		size_t ty = find_ba_type<node>(atom);
-		if (!pack_type_is_atomless<node>(ty)) return std::nullopt;
-		if (ba_type && *ba_type != ty) return std::nullopt; // mixed BA types -- not this shape
+		if (!pack_type_is_atomless<node>(ty)) return r.with_value(std::nullopt);
+		if (ba_type && *ba_type != ty) return r.with_value(std::nullopt); // mixed BA types -- not this shape
 		ba_type = ty;
 
 		// A comparison operand is a `bf` wrapping its content one level down:
@@ -969,7 +976,7 @@ static std::optional<ocltl_swap_match> match_ocltl_swap_shape(tref fm) {
 			auto [lk, lrho] = var_key(lhs);
 			auto [rk, rrho] = var_key(rhs);
 			if (lk == rk && lrho == rrho) {
-				if (!lit_asserted) return std::nullopt; // p != p required -- let the solver see it
+				if (!lit_asserted) return r.with_value(std::nullopt); // p != p required -- let the solver see it
 				continue; // p == p required -- tautology, contributes nothing
 			}
 			size_t p = coord_index(lk, lrho), q = coord_index(rk, rrho);
@@ -977,18 +984,19 @@ static std::optional<ocltl_swap_match> match_ocltl_swap_shape(tref fm) {
 		} else if (lhs_var || rhs_var) {
 			tref var = lhs_var ? lhs : rhs;
 			tref cst = lhs_var ? raw_rhs : raw_lhs;
-			auto c = ocltl_swap_classify_constant<node>(cst);
-			if (!c) return std::nullopt;
+			TAU_TRY(std::optional<bool> c,
+				ocltl_swap_classify_constant<node>(cst));
+			if (!c) return r.with_value(std::nullopt);
 			auto [vk, vrho] = var_key(var);
 			size_t p = coord_index(vk, vrho);
 			pending.push_back({ false, p, vrho, 0, false, *c, lit_asserted });
-		} else return std::nullopt; // neither side is a bare io_var -- not this shape
+		} else return r.with_value(std::nullopt); // neither side is a bare io_var -- not this shape
 	}
-	if (!ba_type) return std::nullopt; // every literal was a same-coordinate tautology
+	if (!ba_type) return r.with_value(std::nullopt); // every literal was a same-coordinate tautology
 
 	// Second pass: sigma coords get [0, d_m); rho coords get [d_m, d_m+d_y).
 	size_t d_m = sigma_keys.size(), d_y = rho_keys.size();
-	if (d_m + d_y == 0 || d_m + d_y > 30) return std::nullopt; // degenerate, or too wide to be worth it here
+	if (d_m + d_y == 0 || d_m + d_y > 30) return r.with_value(std::nullopt); // degenerate, or too wide to be worth it here
 	ocltl_swap_match m;
 	m.dims = { d_m, 0, d_y };
 	for (auto& pa : pending) {
@@ -1000,7 +1008,7 @@ static std::optional<ocltl_swap_match> match_ocltl_swap_shape(tref fm) {
 		m.atoms.push_back(std::move(da));
 		if (pa.asserted) m.D |= (size_t{1} << i);
 	}
-	return m;
+	return r.with_value(std::move(m));
 }
 
 } // namespace idni::tau_lang
