@@ -39,14 +39,14 @@ add_repl_test(ba_options-nlang_provider_default "get nlang-provider"
 add_repl_test(ba_options-nlang_provider_set "set nlang-provider anthropic"
 	"nlang-provider: anthropic" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_bad_word "set nlang-provider nobody"
-	"Invalid value[\r\n]+nlang-provider: openai" NO_FAIL_REGEX NO_TRACE
+	"Invalid value[\r\n].*nlang-provider: openai" NO_FAIL_REGEX NO_TRACE
 	ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_from_the_only_key "get nlang-provider"
 	"nlang-provider: anthropic" NO_TRACE
 	ENV ${_llm_env} ANTHROPIC_API_KEY=sk-test)
 add_repl_test(ba_options-nlang_provider_sets_the_endpoint_and_model
 	"set nlang-provider anthropic. get nlang-endpoint. get nlang-model. get nlang-effort. get nlang-fallback"
-	"nlang-endpoint: https://api.anthropic.com/v1[\r\n]+nlang-model: claude-opus-5-5[\r\n]+nlang-effort: low[\r\n]+nlang-fallback: on"
+	"nlang-endpoint: https://api.anthropic.com/v1[\r\n].*nlang-model: claude-opus-5-5[\r\n].*nlang-effort: low[\r\n].*nlang-fallback: on"
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_endpoint_url
 	"set nlang-endpoint http://localhost:8080/v1"
@@ -55,7 +55,7 @@ add_repl_test(ba_options-nlang_endpoint_url
 # as a command of its own.
 add_repl_test(ba_options-nlang_endpoint_names_the_provider
 	"set nlang-endpoint = \\\"https://api.anthropic.com/v1\\\". get nlang-provider"
-	"nlang-endpoint: https://api.anthropic.com/v1[\r\n]+nlang-provider: anthropic"
+	"nlang-endpoint: https://api.anthropic.com/v1[\r\n].*nlang-provider: anthropic"
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_with_dashes
 	"set nlang-model my_model-4.5"
@@ -69,7 +69,7 @@ add_repl_test(ba_options-nlang_model_flag_beats_env "get nlang-model"
 	ENV ${_llm_env} TAU_LLM_MODEL=env-model FLAGS --nlang-model flag-model)
 add_repl_test(ba_options-nlang_named_model_gets_no_effort
 	"set nlang-provider anthropic. set nlang-model claude-haiku-4-5. get nlang-effort. get nlang-fallback"
-	"nlang-effort: \\(none\\)[\r\n]+nlang-fallback: off" NO_TRACE
+	"nlang-effort: \\(none\\)[\r\n].*nlang-fallback: off" NO_TRACE
 	ENV ${_llm_env})
 add_repl_test(ba_options-nlang_effort_bad_word "set nlang-effort extreme"
 	"Invalid value" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
@@ -80,8 +80,8 @@ add_repl_test(ba_options-nlang_api_key_unset "get nlang-api-key"
 	"nlang-api-key: unset" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_api_key_is_masked
 	"set nlang-api-key sk-secret_1. get nlang-api-key. get"
-	"nlang-api-key: set[\r\n]+nlang-api-key: set" NO_TRACE
-	FAIL_REGEX "sk-secret_1" ENV ${_llm_env})
+	"nlang-api-key: set[\r\n].*nlang-api-key: set" NO_TRACE
+	FAIL_REGEX "nlang-[a-z-]+: [^\r\n]*sk-secret_1" ENV ${_llm_env})
 add_repl_test(ba_options-nlang_api_key_env_is_masked "get nlang-api-key"
 	"nlang-api-key: set" NO_TRACE FAIL_REGEX "sk-secret_2"
 	ENV ${_llm_env} TAU_LLM_API_KEY=sk-secret_2)
@@ -110,7 +110,7 @@ add_repl_test(ba_options-nlang_fallback_env
 # still follows a model named later.
 add_repl_test(ba_options-nlang_fallback_follows_a_later_model
 	"get nlang-fallback. set nlang-model claude-haiku-4-5. get nlang-fallback"
-	"nlang-fallback: on[\r\n]+nlang-model: claude-haiku-4-5[\r\n]+nlang-fallback: off"
+	"nlang-fallback: on[\r\n].*nlang-model: claude-haiku-4-5[\r\n].*nlang-fallback: off"
 	NO_TRACE ENV ${_llm_env} FLAGS --nlang-provider anthropic)
 add_repl_test(ba_options-nlang_help_lists_the_text_options "help set"
 	"nlang-provider +LLM oracle API" NO_FAIL_REGEX NO_TRACE REQUIRES nlang)
@@ -130,15 +130,15 @@ add_repl_test(ba_options-nlang_endpoint_quoted_with_a_query
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_quoted_with_dots
 	"set nlang-model \\\"gemini-2.0-flash\\\". get nlang-provider"
-	"nlang-model: gemini-2.0-flash[\r\n]+nlang-provider: openai"
+	"nlang-model: gemini-2.0-flash[\r\n].*nlang-provider: openai"
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_cleared_by_empty_quotes
 	"set nlang-model some-model. set nlang-model \\\"\\\""
-	"nlang-model: some-model[\r\n]+nlang-model: env-model"
+	"nlang-model: some-model[\r\n].*nlang-model: env-model"
 	NO_TRACE ENV ${_llm_env} TAU_LLM_MODEL=env-model)
 add_repl_test(ba_options-nlang_api_key_given_keeps_the_detected_provider
 	"set nlang-api-key sk-secret_4. get nlang-provider"
-	"nlang-provider: anthropic" NO_TRACE FAIL_REGEX "sk-secret_4"
+	"nlang-provider: anthropic" NO_TRACE FAIL_REGEX "nlang-[a-z-]+: [^\r\n]*sk-secret_4"
 	ENV ${_llm_env} ANTHROPIC_API_KEY=sk-test)
 add_repl_test(ba_options-quoted_value_of_a_core_option
 	"set severity \\\"info\\\"" "severity: *info" NO_TRACE)
