@@ -113,6 +113,13 @@ const char* tau_lang_get_ltl_algorithm(void);
 int tau_lang_set_ba_option(const char* name, uint64_t value,
 	uint64_t* now);
 int tau_lang_get_ba_option(const char* name, uint64_t* value);
+// A BA-declared text option (nlang-provider, nlang-model, ...): the text it
+// now reads, valid until the next call, or null when the name is not a text
+// option of this build or the option refuses the value (tau_lang_last_error()
+// says why). The empty string clears the option; nlang-api-key reads "set" or
+// "unset".
+const char* tau_lang_set_ba_text_option(const char* name, const char* value);
+const char* tau_lang_get_ba_text_option(const char* name);
 // JSON array of the BA-declared option names. Valid until the next call.
 const char* tau_lang_ba_option_names(void);
 

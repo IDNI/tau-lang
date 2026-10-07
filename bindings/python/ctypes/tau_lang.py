@@ -163,6 +163,10 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_set_ba_option.restype = c_int
     _LIB.tau_lang_get_ba_option.argtypes = [c_char_p, ctypes.POINTER(c_uint64)]
     _LIB.tau_lang_get_ba_option.restype = c_int
+    _LIB.tau_lang_set_ba_text_option.argtypes = [c_char_p, c_char_p]
+    _LIB.tau_lang_set_ba_text_option.restype = c_char_p
+    _LIB.tau_lang_get_ba_text_option.argtypes = [c_char_p]
+    _LIB.tau_lang_get_ba_text_option.restype = c_char_p
     _LIB.tau_lang_ba_option_names.argtypes = []
     _LIB.tau_lang_ba_option_names.restype = c_char_p
     return _LIB
@@ -377,6 +381,23 @@ def get_ba_option(name: str) -> int:
             name.encode("utf-8"), ctypes.byref(v)) != 0:
         raise KeyError(last_error())
     return v.value
+
+
+def set_ba_text_option(name: str, value: str) -> str:
+    """Set a BA-declared text option; returns the text it now reads."""
+    r = _load().tau_lang_set_ba_text_option(
+        name.encode("utf-8"), value.encode("utf-8"))
+    if r is None:
+        raise KeyError(last_error())
+    return r.decode("utf-8")
+
+
+def get_ba_text_option(name: str) -> str:
+    """The text a BA-declared text option reads."""
+    r = _load().tau_lang_get_ba_text_option(name.encode("utf-8"))
+    if r is None:
+        raise KeyError(last_error())
+    return r.decode("utf-8")
 
 
 def __getattr__(attr: str):

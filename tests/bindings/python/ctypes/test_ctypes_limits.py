@@ -53,8 +53,26 @@ def test_ba_options():
 	names = tau.ba_option_names()
 	assert all("-" in n for n in names), names
 	for name in names:
-		v = tau.get_ba_option(name)
+		try:
+			v = tau.get_ba_option(name)
+		except KeyError:
+			# a text option refuses the numeric call and reads as text
+			t = tau.get_ba_text_option(name)
+			assert isinstance(t, str), name
+			continue
 		assert tau.set_ba_option(name, v) == v, name
+	if "nlang-model" in names:
+		assert tau.set_ba_text_option("nlang-model", "my-model-1") \
+			== "my-model-1"
+		assert tau.get_ba_text_option("nlang-model") == "my-model-1"
+		assert tau.set_ba_text_option("nlang-api-key", "sk-secret") == "set"
+		assert tau.set_ba_text_option("nlang-model", "") == ""
+		try:
+			tau.set_ba_text_option("nlang-provider", "nobody")
+		except KeyError:
+			pass
+		else:
+			raise AssertionError("an invalid provider was accepted")
 	try:
 		tau.get_ba_option("nope-nothing")
 	except KeyError:

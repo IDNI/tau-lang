@@ -452,6 +452,7 @@ const tau_api::count_limit* find_limit(const char* name) {
 }
 
 std::string g_names_result;
+std::string g_text_result;
 std::string g_algorithm_result;
 
 // Writes the value of a BA-option result and returns 0, or keeps the reason
@@ -548,6 +549,35 @@ extern "C" int tau_lang_get_ba_option(const char* name, uint64_t* value) {
 	std::lock_guard<std::mutex> lg(g_mtx);
 	g_last_error.clear();
 	return ba_option_value(tau_api::get_ba_option(name ? name : ""), value);
+}
+
+// The text a text-option result reads, kept until the next call, or null with
+// the reason kept for tau_lang_last_error().
+static const char* ba_text_option_value(const result<std::string>& r) {
+	if (r.has_value()) {
+		g_text_result = r.value();
+		return g_text_result.c_str();
+	}
+	std::ostringstream oss;
+	oss << r.report();
+	g_last_error = oss.str();
+	return nullptr;
+}
+
+extern "C" const char* tau_lang_set_ba_text_option(const char* name,
+	const char* value)
+{
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	return ba_text_option_value(tau_api::set_ba_text_option(
+		name ? name : "", value ? value : ""));
+}
+
+extern "C" const char* tau_lang_get_ba_text_option(const char* name) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	return ba_text_option_value(tau_api::get_ba_text_option(
+		name ? name : ""));
 }
 
 extern "C" const char* tau_lang_ba_option_names(void) {
