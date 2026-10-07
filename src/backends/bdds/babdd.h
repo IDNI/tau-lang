@@ -534,7 +534,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -543,7 +543,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 			} else return false;
 		}
 		if constexpr (o.has_varshift()) {
-			uint_t d = min(x.shift, y.shift);
+			uint_t d = std::min(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
 						  bdd_ref::to_shift_node(y, d)});
 				it != cache.end()) {
@@ -614,13 +614,13 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_cache_node(x, d),
 					      bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
 		} else if constexpr (o.has_varshift()) {
-			uint_t d = min(x.shift, y.shift);
+			uint_t d = std::min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
 					      bdd_ref::to_shift_node(y, d)},
@@ -634,8 +634,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// id, then shift) so both argument orders hit one cache entry
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
 		if constexpr (o.has_varshift())
-			if (x.id == y.id && x.shift > y.shift) swap(x, y);
-		if(x.id > y.id) swap(x,y);
+			if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
+		if(x.id > y.id) std::swap(x,y);
 	}
 
 	// True iff y is x with the output inverter toggled, i.e. its
@@ -678,7 +678,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		bool in = false, out = false;
         	if constexpr (o.has_inv_in())
 			if(h.id < l.id)
-				swap(h, l), in = true;
+				std::swap(h, l), in = true;
 		if constexpr (o.has_inv_out())
 			if (l.out) {
 				h = bdd_ref::flip_out(h);
@@ -1013,8 +1013,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// Given x with at least one zero, fill m with a constant of B per
 	// variable such that x evaluates to zero under m -- a witness
 	// zero, as used by the LGRS construction (see bdd_handle::lgrs).
-	// x == F succeeds with the empty map; x == T has no zero witness
-	// and is an error.
+	// x == F succeeds with the empty map; an x with no zero is an
+	// error.
 	static result<bool> get_one_zero(bdd_ref, std::map<int_t, B>&);
 
 	// Simultaneously substitute the mapped functions for the mapped
@@ -1023,7 +1023,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if (leaf(x)) return x;
 		const bdd_node_t& n = get_node(x);
 		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
-		if (auto it = m.find(n.v); it == m.end())
+		if (auto it = m.find((int_t) n.v); it == m.end())
 			return ite(add(n.v, T, F), a, b);
 		else return ite(it->second, a, b);
 	}
@@ -1034,7 +1034,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if (leaf(x)) return get_elem(x);
 		const bdd_node_t& n = get_node(x);
 		B a = eval(n.h, m), b = eval(n.l, m);
-		auto it = m.find(n.v);
+		auto it = m.find((int_t) n.v);
 		assert(it != m.end());
 		return (it->second & a) | (~it->second & b);
 	}
@@ -1072,7 +1072,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		const bdd& xx = get(x);
 		if (xx.leaf()) return 0;
 		const bdd_node_t& n = std::get<bdd_node_t>(xx);
-		return max(n.v, max(highest_var(n.h), highest_var(n.l)));
+		return std::max(n.v, std::max(highest_var(n.h), highest_var(n.l)));
 	}
 
 	// Conjoin x with the positive literal of a variable not present in
@@ -1095,23 +1095,20 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 template<typename B, bdd_options o>
 result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	result<bool> r;
-	if (x == T)
-		return r.with_assert_check_error(code::invalid_argument,
-			"a constantly-one function has no zero witness");
-	if (x == F) return m.clear(), r.with_assert_check_value(true);
-	const bdd_node_t& n = get_node(x);
-	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
-	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
-	else if (!leaf(n.l)) {
-		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.l, n.h), m));
-		m.emplace(n.v, eval(n.l, m));
+	if (leaf(x)) {
+		if (!(get_elem(x) == false))
+			return r.with_assert_check_error(code::invalid_argument,
+				"a function that is zero nowhere has no zero witness");
+		return m.clear(), r.with_assert_check_value(true);
 	}
-	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
-	else {
-		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.h, get_elem(n.l)), m));
-		m.emplace(n.v, compose(bdd_not(n.h), m));
-	}
-	DBG(assert(compose(x, m) == false);)
+	const bdd_node_t n = get_node(x);
+	// Boole: v h | v' l is zero at v = l wherever h l is zero.
+	TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.h, n.l), m));
+	// h l may not mention a variable of l; any value does for it.
+	std::set<int_t> vars;
+	get_vars(n.l, vars);
+	for (int_t v : vars) m.emplace(v, B::zero());
+	m.emplace((int_t) n.v, eval(n.l, m));
 	return r.with_assert_check_value(true);
 }
 

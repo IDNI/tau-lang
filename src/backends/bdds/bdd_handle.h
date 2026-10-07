@@ -267,17 +267,17 @@ struct bdd_handle {
 	/// Substitute the function x for variable v
 	hbdd<B, o>
 	subst(size_t v, const hbdd<B, o>& x) const {
-		return get(bdd<B, o>::subst(b, v, x->b));
+		return get(bdd<B, o>::subst(b, (uint_t) v, x->b));
 	}
 
 	/// Restrict v := 0 (low cofactor)
 	hbdd<B, o> sub0(size_t v) const {
-		return get(bdd<B, o>::sub0(b, v));
+		return get(bdd<B, o>::sub0(b, (uint_t) v));
 	}
 
 	/// Restrict v := 1 (high cofactor)
 	hbdd<B, o> sub1(size_t v) const {
-		return get(bdd<B, o>::sub1(b, v));
+		return get(bdd<B, o>::sub1(b, (uint_t) v));
 	}
 
 	/// Computes exactly
@@ -356,7 +356,7 @@ struct bdd_handle {
 		TAU_TRY(auto z, get_one_zero());
 		for (const auto& kv : z)
 			m.emplace(kv.first,	((*this) & get(kv.second)) |
-						(bit(true, kv.first) & ~*this));
+						(bit(true, (uint_t) kv.first) & ~*this));
 		return r.with_assert_check_value(std::move(m));
 	}
 
@@ -640,6 +640,11 @@ template<typename B> B get_one() requires is_sp<B> {
 template<typename B> B get_zero() requires is_sp<B> {
 	return B::element_type::zero();
 }
+
+// Declared before bdd_init: for a B outside this namespace the call there
+// is not found by argument-dependent lookup.
+template<typename B, bdd_options o> void create_universe(B);
+template<typename B, bdd_options o> void create_universe(Bool);
 
 /// Idempotent per-(B, o) engine setup, run at static-init time via
 /// bdd<B, o>::initializer: fixes the T/F references (with output

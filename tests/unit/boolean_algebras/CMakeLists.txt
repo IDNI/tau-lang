@@ -1,6 +1,7 @@
 set(TESTS
 	bool
 	hbdd
+	bdd_generic
 	tau_ba
 )
 
