@@ -390,7 +390,7 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		}
 	}
 
-	// IN-M7 / PW-RT4: can_extend is update()'s own plan, so the two agree
+	// can_extend is update()'s own plan, so the two agree
 	// in both directions -- including on the stream-collection and
 	// partition checks the old dry-run skipped.
 	TEST_CASE("[IAX-PWR-06] can_extend agrees with update in both directions") {

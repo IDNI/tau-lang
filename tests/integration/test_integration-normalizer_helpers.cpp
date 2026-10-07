@@ -295,8 +295,7 @@ TEST_SUITE("push_negation_one_in double negation") {
 
 // --- is_valid / is_well_founded / calculate_fixed_point ----------------------
 // All three are recurrence-relation gates with no direct test (report 4.1).
-// The formulas below are the ones argued in their own doc comments
-// (src/normalizer.tmpl.h:1026-1035, 1106-1116, 1188-1201).
+// The formulas below are the ones argued in their own doc comments.
 
 TEST_SUITE("recurrence relation validity") {
 
@@ -310,7 +309,7 @@ TEST_SUITE("recurrence relation validity") {
 
 	TEST_CASE("is_valid rejects a relative offset in main") {
 		// A capture offset in the main formula is explicitly rejected
-		// (normalizer.tmpl.h:1042-1050).
+		// by is_valid.
 		auto nso_rr = get_bf_nso_rr(
 			"h[n](X):tau := h[n - 1](X)'."
 			"h[0](X):tau := X.", "h[n](Y)").value();
@@ -329,7 +328,7 @@ TEST_SUITE("recurrence relation validity") {
 	TEST_CASE("is_well_founded rejects initial conditions only") {
 		// With no capture-offset rule there is no relative rule, which the
 		// implementation reports as "no rules other than initial
-		// conditions" (normalizer.tmpl.h:1159-1163).
+		// conditions".
 		auto nso_rr = get_bf_nso_rr(
 			"h[0](X):tau := X.", "h[0](Y)").value();
 		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);

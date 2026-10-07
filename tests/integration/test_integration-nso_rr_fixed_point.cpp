@@ -117,7 +117,7 @@ TEST_SUITE("rec relations fixed point") {
 	// Regression: nt disagreeing with the relation's own (bf) type used to
 	// go undetected, so `current` (built/compared at nt) could never
 	// structurally match any rule -- calculate_fixed_point spun silently
-	// until MAX_FP_STEPS instead of failing fast. Same relation as above,
+	// until max_enum_steps instead of failing fast. Same relation as above,
 	// just asked for at the wrong nt.
 	TEST_CASE("postfix negation (bf) rejected when call site type disagrees") {
 		auto nso_rr = get_bf_nso_rr(
