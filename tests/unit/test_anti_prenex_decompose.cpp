@@ -238,10 +238,11 @@ TEST_CASE("C2: a one-signed atom is no candidate") {
 	CHECK(!decomposed(f).has_value());
 }
 
-TEST_CASE("C3: an ∧-member's conjuncts are no member tops") {
-	// `a = 0` is negated at a member top of the second disjunct, but its
-	// positive occurrence sits inside the ∧-member `a = 0 ∧ x·y = 0`,
-	// which the census does not open: one sign only.
+TEST_CASE("C3: an ∧-member's literal conjuncts count, one level deep") {
+	// `a = 0` is negated at a member top of the second disjunct, and its
+	// positive occurrence sits inside the ∧-member `a = 0 ∧ x·y = 0`: both
+	// signs, the only such atom. Licensed 6 against 9; the arms push to
+	// `a = 0` and `¬(a = 0)`, whose ∨-join is `T`.
 	fixture f = make("ex x (((a = 0 && xy = 0) || xw = 0) "
 		"&& (a != 0 || xz = 0)).");
 	const tref a = negated_top(f);
@@ -250,7 +251,10 @@ TEST_CASE("C3: an ∧-member's conjuncts are no member tops") {
 		return std::ranges::any_of(ap::members<node_t>(s), [a](tref m) {
 			return is_child<node_t>(m, tau::wff_and)
 				&& has_member(m, a); }); }));
-	CHECK(!decomposed(f).has_value());
+	const std::optional<tref> got = decomposed(f);
+	REQUIRE(got.has_value());
+	CHECK(tau::get(*got).equals_T());
+	check_against_source(*got, f);
 }
 
 TEST_CASE("C4: a constant-false candidate is folded, not decomposed") {

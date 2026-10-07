@@ -44,10 +44,11 @@ namespace idni::tau_lang::anti_prenexing {
  * when no candidate is licensed.
  *
  * THE CENSUS reads MEMBER TOPS only: a literal member of an ∨-conjunct of
- * `ψ`, a negative tree's included, counts one occurrence of its atom in its
- * sign. An ∧-member, a unit and a reference are no member tops. A candidate
- * occurs in both signs; the candidates are ranked by total coverage, then
- * by the weaker side, then content order, and the first three are tried.
+ * `ψ`, a negative tree's included, or a literal conjunct of an ∧-member of
+ * one, one level deep, counts one occurrence of its atom in its sign. A unit
+ * and a reference are no member tops. A candidate occurs in both signs; the
+ * candidates are ranked by total coverage, then by the weaker side, then
+ * content order, and the first three are tried.
  *
  * PROBE FIRST: a candidate `FOLD_DECIDED` proves `F` is folded — `ψ[a ↦ F]`
  * pushed, no guard, no arm — and the smaller body re-enters the ladder

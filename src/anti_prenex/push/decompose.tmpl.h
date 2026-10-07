@@ -53,14 +53,19 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 	const trefs cs = members<node>(psi);
 
 	// THE CENSUS, one pass over the member tops of the disjunctive
-	// conjuncts. An ∧-member's conjuncts are not opened.
+	// conjuncts; an ∧-member's literal conjuncts count, one level deep, as a
+	// disjunct that is a conjunction holds its case atoms there.
 	subtree_map<node, coverage> census;
+	auto count = [&census](tref l) {
+		if (!is_literal<node>(l)) return;
+		coverage& k = census[atom_of<node>(l)];
+		++(is_negated_atom<node>(l) ? k.neg : k.pos);
+	};
 	for (tref s : cs) {
 		if (!is_child<node>(s, tau::wff_or)) continue;
 		for (tref m : members<node>(s)) {
-			if (!is_literal<node>(m)) continue;
-			coverage& k = census[atom_of<node>(m)];
-			++(is_negated_atom<node>(m) ? k.neg : k.pos);
+			if (!is_child<node>(m, tau::wff_and)) count(m);
+			else for (tref l : members<node>(m)) count(l);
 		}
 	}
 	std::vector<std::pair<tref, coverage>> ranked;
