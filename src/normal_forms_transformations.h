@@ -25,7 +25,8 @@ namespace idni::tau_lang {
  * already-visited sub-trees within a single traversal pass.
  */
 enum MemorySlotPre {
-	normalize_ba_m,          ///< Cache slot for normalize_ba traversals.
+	// Slot 0 means "no memoization" to the traversals; keep it unused.
+	normalize_ba_m = 1,      ///< Cache slot for normalize_ba traversals.
 	push_negation_in_m,      ///< Cache slot for push_negation_in traversals.
 	to_dnf_m,                ///< Cache slot for to_dnf traversals.
 	to_cnf_m,                ///< Cache slot for to_cnf traversals.

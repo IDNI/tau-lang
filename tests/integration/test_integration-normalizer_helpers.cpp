@@ -36,6 +36,22 @@ tref var_in(tref fm, const std::string& name) {
 
 } // namespace
 
+// --- memo slots ---------------------------------------------------------------
+
+TEST_SUITE("pre-order memo slots") {
+
+	// The traversals read slot 0 as "do not memoize", so a transformation
+	// named by slot 0 silently loses its cache across calls.
+	TEST_CASE("no transformation is given the slot that disables the memo") {
+		static_assert(normalize_ba_m != 0);
+		static_assert(push_negation_in_m != 0);
+		static_assert(to_dnf_m != 0);
+		static_assert(to_cnf_m != 0);
+		static_assert(synt_path_simp_m != 0);
+		CHECK(true);
+	}
+}
+
 // --- denorm_equation (report 4.1: no direct test) -----------------------------
 
 TEST_SUITE("denorm_equation") {
