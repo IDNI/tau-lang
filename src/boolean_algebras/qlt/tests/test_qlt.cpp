@@ -200,19 +200,32 @@ TEST_CASE("ordering: reflexive <=") {
 TEST_CASE("midpoint of 0 and 1 is 1/2") {
 	qlt_rational a(0, 1), b(1, 1);
 	auto m = a.midpoint(b);
-	CHECK(m == qlt_rational(1, 2));
+	REQUIRE(m);
+	CHECK(*m == qlt_rational(1, 2));
 }
 
 TEST_CASE("midpoint of -1 and 1 is 0") {
 	qlt_rational a(-1, 1), b(1, 1);
 	auto m = a.midpoint(b);
-	CHECK(m == qlt_rational(0, 1));
+	REQUIRE(m);
+	CHECK(*m == qlt_rational(0, 1));
 }
 
 TEST_CASE("midpoint of 1/3 and 2/3 is 1/2") {
 	qlt_rational a(1, 3), b(2, 3);
 	auto m = a.midpoint(b);
-	CHECK(m == qlt_rational(1, 2));
+	REQUIRE(m);
+	CHECK(*m == qlt_rational(1, 2));
+}
+
+TEST_CASE("midpoint: a reduced denominator outside long long is nullopt") {
+	constexpr long long max = std::numeric_limits<long long>::max();
+	constexpr long long min = std::numeric_limits<long long>::min();
+	CHECK_FALSE(qlt_rational(1, 4000000009).midpoint(
+		qlt_rational(1, 4000000007)));
+	auto m = qlt_rational(min, 1).midpoint(qlt_rational(max, 1));
+	REQUIRE(m);
+	CHECK(*m == qlt_rational(-1, 2));
 }
 
 TEST_CASE("add: 1/3 + 1/6 = 1/2") {

@@ -222,9 +222,9 @@ struct qlt_rational {
 	bool operator>=(const qlt_rational& o) const { return !(*this < o); }
 
 	/// Midpoint between two finite rationals: (p1/q1 + p2/q2) / 2, computed
-	/// in 128 bits and reduced; a reduced result outside `long long` is
-	/// truncated.
-	qlt_rational midpoint(const qlt_rational& o) const;
+	/// in 128 bits and reduced; nullopt when the reduced result does not fit
+	/// `long long`.
+	std::optional<qlt_rational> midpoint(const qlt_rational& o) const;
 	/// Sum of two finite rationals, computed in 128 bits and reduced;
 	/// nullopt when the sum does not fit `long long`.
 	std::optional<qlt_rational> add(const qlt_rational& o) const;

@@ -44,7 +44,7 @@ std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
 				return lo;
 			continue; // empty degenerate interval
 		}
-		return lo.midpoint(hi);
+		if (auto m = lo.midpoint(hi); m) return m;
 	}
 	return {};
 }
@@ -82,8 +82,8 @@ inline qlt_rational floor_int(const qlt_rational& r) {
 
 // A rational strictly inside (lo, hi) -- either side optional (unbounded) --
 // not contained in `used`. Integers are preferred for readable models.
-// nullopt when an unbounded side has no free rational the representation
-// fits.
+// nullopt when no free rational the representation fits is found: past an
+// unbounded side, or at a midpoint whose reduced form does not fit.
 inline std::optional<qlt_rational> pick_between(
 	const std::optional<qlt_rational>& lo,
 	const std::optional<qlt_rational>& hi,
@@ -106,8 +106,8 @@ inline std::optional<qlt_rational> pick_between(
 	// An unbounded side yields a free integer unless it runs past the
 	// representation; bounded on both sides, bisect towards lo.
 	if (!lo || !hi) return std::nullopt;
-	qlt_rational m = lo->midpoint(*hi);
-	while (is_used(m)) m = lo->midpoint(m);
+	auto m = lo->midpoint(*hi);
+	while (m && is_used(*m)) m = lo->midpoint(*m);
 	return m;
 }
 

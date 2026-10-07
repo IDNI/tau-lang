@@ -362,7 +362,8 @@ inline qlt_rational ceil_of(const qlt_rational& r) {
 
 // A point strictly between lo and hi, either of which may be missing: 0 when
 // it lies there, else the integer nearest to 0, else the midpoint; nullopt
-// when an unbounded side holds no rational the representation fits.
+// when an unbounded side holds no rational the representation fits, or the
+// midpoint does not fit.
 inline std::optional<qlt_rational> between(
 	const std::optional<qlt_rational>& lo,
 	const std::optional<qlt_rational>& hi)

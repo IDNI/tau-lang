@@ -71,14 +71,15 @@ static void qlt_reduce_wide(int128_t_& num, int128_t_& den) {
 	if (a > 1) num /= a, den /= a;
 }
 
-qlt_rational qlt_rational::midpoint(const qlt_rational& o) const {
+std::optional<qlt_rational> qlt_rational::midpoint(const qlt_rational& o) const {
 	// Compute wide, then reduce by gcd before narrowing -- the
 	// unreduced cross products overflow long long for large operands.
 	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
 	int128_t_ den = (int128_t_) 2 * q * o.q;
 	qlt_reduce_wide(num, den);
-	// A gcd-irreducible result outside long long is truncated (extreme
-	// parse-level literals only).
+	const int128_t_ lo = std::numeric_limits<long long>::min(),
+		hi = std::numeric_limits<long long>::max();
+	if (num < lo || num > hi || den > hi) return std::nullopt;
 	return qlt_rational((long long) num, (long long) den);
 }
 
@@ -771,13 +772,13 @@ qlt qlt_splitter(const qlt& x, splitter_type /*st*/) {
 		                  qlt_endpoint{*mid, qlt_bound::OPEN} } }};
 	}
 
-	// Both finite: use midpoint
-	qlt_rational mid = lo_val.midpoint(hi_val);
+	// Both finite: use midpoint; the piece when it does not fit
+	auto mid = lo_val.midpoint(hi_val);
 	// If lo == mid or mid == hi (degenerate), just return the piece
-	if (mid <= lo_val || mid >= hi_val)
+	if (!mid || *mid <= lo_val || *mid >= hi_val)
 		return qlt{{ p }};
 
-	return qlt{{ { p.lo, qlt_endpoint{mid, qlt_bound::OPEN} } }};
+	return qlt{{ { p.lo, qlt_endpoint{*mid, qlt_bound::OPEN} } }};
 }
 
 qlt qlt_splitter_one() {

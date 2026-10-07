@@ -757,4 +757,12 @@ TEST_SUITE("pick witness") {
 		REQUIRE(w);
 		CHECK(inside(closed, *w));
 	}
+
+	TEST_CASE("between two close reciprocals") {
+		// The midpoint's reduced denominator exceeds long long.
+		auto q = interval(qlt_rational(1, 4000000009), qlt_bound::OPEN,
+			qlt_rational(1, 4000000007), qlt_bound::OPEN);
+		if (auto w = qlt_pick_witness<node_t>(q); w)
+			CHECK(inside(q, *w));
+	}
 }
