@@ -8,6 +8,9 @@
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 
+#include <filesystem>
+#include <fstream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -103,10 +106,42 @@ TEST_SUITE("qlt_codegen") {
 		CHECK(p * 2000000 < 1000003LL * q);
 	}
 
+	TEST_CASE("the least long long is spelled without an out-of-range literal") {
+		CHECK(qlt_ll_literal(std::numeric_limits<long long>::min())
+			== "(-9223372036854775807LL - 1)");
+		CHECK(qlt_ll_literal(-5) == "-5LL");
+		CHECK(qlt_ll_literal(7) == "7LL");
+		std::string s = qlt_witness_expr<node_t>(qlt_rational(
+			std::numeric_limits<long long>::min(), 1));
+		CHECK(has(s, "qlt_rational((-9223372036854775807LL - 1), 1LL)"));
+		CHECK_FALSE(has(s, "-9223372036854775808"));
+	}
+
+	TEST_CASE("the emitted literals compile warning-free under -Werror"
+		* doctest::skip(!tau_test_cxx_available(tau_test_cxx())
+			|| tau_test_cxx_is_msvc(tau_test_cxx()))) {
+		namespace fs = std::filesystem;
+		auto dir = tau_test_tmp("qlt_literal");
+		auto src = dir / "lit.cpp";
+		{
+			std::ofstream f(src);
+			f << "#include <climits>\n"
+			  << "static_assert(" << qlt_ll_literal(LLONG_MIN)
+			  << " == LLONG_MIN);\n"
+			  << "static_assert(" << qlt_ll_literal(LLONG_MAX)
+			  << " == LLONG_MAX);\n"
+			  << "static_assert(" << qlt_ll_literal(-3)
+			  << " == -3);\nint main() {}\n";
+		}
+		auto run = tau_test_run({ tau_test_cxx(), "-std=c++17", "-Wall",
+			"-Wextra", "-Werror", "-fsyntax-only", src.string() });
+		CHECK_MESSAGE(run.exit_code == 0, run.out << run.err);
+	}
+
 	TEST_CASE("a ray with a representable point yields it") {
 		auto w = witness_of("o1[t]:qlt < {-9223372036854775806}:qlt");
 		REQUIRE(w.has_value());
-		CHECK(has(*w, "qlt_rational(-9223372036854775807, 1)"));
+		CHECK(has(*w, "qlt_rational(-9223372036854775807LL, 1LL)"));
 	}
 
 	// No rational the representation fits lies below the least long long,

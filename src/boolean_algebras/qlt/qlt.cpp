@@ -742,6 +742,10 @@ tref simplify_qlt_term(tref t) { return t; }
 
 qlt qlt_splitter(const qlt& x, splitter_type /*st*/) {
 	if (x.is_empty()) return qlt::bottom();
+	// An over-approximation holds points outside its value, so no cut of
+	// it is known to lie inside that value: x is the only element known
+	// to be below itself.
+	if (x.inexact) return x;
 	const auto& p = x.pieces[0];
 
 	auto lo_val = p.lo.val;

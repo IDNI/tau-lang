@@ -20,7 +20,18 @@
 #include "boolean_algebras/qlt/qlt_qe.tmpl.h"
 #include "boolean_algebras/qlt/qlt_solver.tmpl.h"
 
+#include <limits>
+#include <string>
+
 namespace idni::tau_lang {
+
+// A long long spelled as a C++ constant expression that compiles without a
+// warning: the least value has no literal, since its magnitude does not fit.
+inline std::string qlt_ll_literal(long long v) {
+	if (v == std::numeric_limits<long long>::min())
+		return "(-9223372036854775807LL - 1)";
+	return std::to_string(v) + "LL";
+}
 
 // A self-contained C++ expression of type tref: an IIFE that builds the exact
 // rational r as a qlt singleton and registers it through the BA's own
@@ -32,7 +43,8 @@ inline std::string qlt_witness_expr(const qlt_rational& r) {
 	ss << "[]() -> ::idni::tref {\n"
 	   << "\t\t\t\t::idni::tau_lang::qlt_piece p;\n"
 	   << "\t\t\t\tp.lo = ::idni::tau_lang::qlt_endpoint{"
-	   << "::idni::tau_lang::qlt_rational(" << r.p << ", " << r.q << "), "
+	   << "::idni::tau_lang::qlt_rational("
+	   << qlt_ll_literal(r.p) << ", " << qlt_ll_literal(r.q) << "), "
 	   << "::idni::tau_lang::qlt_bound::CLOSED};\n"
 	   << "\t\t\t\tp.hi = p.lo;\n"
 	   << "\t\t\t\t::idni::tau_lang::qlt singleton{{p}};\n"

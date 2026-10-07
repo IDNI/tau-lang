@@ -1175,7 +1175,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// ── (h) program_desc::atoms (atom_desc) emission ──────────────────────
 
 	// ground_expr reconstructs a single-variable equality atom via build_bf_eq
-	// and the literal's own codegen_constant_expr rendering (qlt_rational(1, 2),
+	// and the literal's own codegen_constant_expr rendering (qlt_rational(1LL, 2LL),
 	// not a re-parsed string).
 	TEST_CASE("build_program_desc: atom_desc captures a ground-equality atom "
 	          "over a real BA type" * doctest::skip(!ltlsynt_available())) {
@@ -1187,7 +1187,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(d->atoms[0].prop == sol->atoms[0].second);
 		CHECK(has(d->atoms[0].ground_expr, "build_bf_eq<"));
 		CHECK(has(d->atoms[0].ground_expr, "build_out_var_at_t<"));
-		CHECK(has(d->atoms[0].ground_expr, "qlt_rational(1, 2)"));
+		CHECK(has(d->atoms[0].ground_expr, "qlt_rational(1LL, 2LL)"));
 
 		std::ostringstream os;
 		emit_program(*d, os);

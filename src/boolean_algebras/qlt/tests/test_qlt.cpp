@@ -1250,6 +1250,14 @@ TEST_CASE("splitter of (0,1) is a strict sub-element") {
 	CHECK((s & a) == s);
 }
 
+TEST_CASE("splitter of an inexact value is the value itself") {
+	auto a = oo(0, 1);
+	a.inexact = true;
+	auto s = qlt_splitter(a, splitter_type::upper);
+	CHECK(s == a);
+	CHECK(s.inexact);
+}
+
 TEST_CASE("splitter of closed singleton [5,5] is non-empty") {
 	auto a = cc(5, 5);
 	auto s = qlt_splitter(a, splitter_type::upper);
