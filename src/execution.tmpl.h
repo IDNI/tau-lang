@@ -46,8 +46,17 @@ template <NodeType node, typename step_t>
 repeat_each<node, step_t>::repeat_each(step_t s)
 					: s(steps<node, step_t>(s)) {}
 
+// The error both repeat_each and repeat_all report on reaching the cap.
+inline std::string rewrite_rounds_message() {
+	return "Rewriting did not reach a fixpoint after "
+		+ std::to_string(max_rewrite_rounds.get())
+		+ " rounds (max-rewrite-rounds) and is still growing; the "
+		"definitions in use are most likely non-terminating for this "
+		"argument";
+}
+
 template <NodeType node, typename step_t>
-tref repeat_each<node, step_t>::operator()(tref n) const {
+result<tref> repeat_each<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	for (auto& l: s.libraries) {
 		// `visited` catches a fixpoint or a cycle; max_rewrite_rounds
@@ -61,15 +70,11 @@ tref repeat_each<node, step_t>::operator()(tref n) const {
 			if (visited.contains(nn)) { settled = true; break; }
 			visited.insert(nn);
 		}
-		if (!settled) {
-			LOG_ERROR << "Rewriting did not reach a fixpoint after "
-				<< max_rewrite_rounds << " rounds (max-rewrite-rounds)"
-				" and is still growing; the definitions in use are "
-				"most likely non-terminating for this argument";
-			return nullptr;
-		}
+		if (!settled)
+			return error<tref>(code::runtime_error,
+				rewrite_rounds_message());
 	}
-	return nn;
+	return result<tref>(nn);
 }
 
 // -----------------------------------------------------------------------------
@@ -83,7 +88,7 @@ repeat_all<node, step_t>::repeat_all(step_t s)
 					: s(steps<node, step_t>(s)) {}
 
 template <NodeType node, typename step_t>
-tref repeat_all<node, step_t>::operator()(tref n) const {
+result<tref> repeat_all<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	std::unordered_set<tref> visited;
 	// Apply the whole sequence once per round; stop on a fixpoint or,
@@ -93,17 +98,12 @@ tref repeat_all<node, step_t>::operator()(tref n) const {
 	for (size_t round = 0;
 		!max_rewrite_rounds || round < max_rewrite_rounds; ++round) {
 		nn = s(nn);
-		if (visited.contains(nn)) return nn;
+		if (visited.contains(nn)) return result<tref>(nn);
 		visited.insert(nn);
 	}
-	// Returning the partially rewritten formula would hand the caller a
-	// half-expanded term indistinguishable from a real result; a rewrite
-	// that never settles has no result, so report the failure instead.
-	LOG_ERROR << "Rewriting did not reach a fixpoint after "
-		<< max_rewrite_rounds << " rounds (max-rewrite-rounds) and is "
-		"still growing; the definitions in use are most likely "
-		"non-terminating for this argument";
-	return nullptr;
+	// A partially rewritten formula would read as a real result; a
+	// rewrite that never settles has none.
+	return error<tref>(code::runtime_error, rewrite_rounds_message());
 }
 
 // -----------------------------------------------------------------------------
@@ -163,22 +163,6 @@ typename tree<node>::traverser operator|(
 	return n | tt::f(r);
 }
 
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_all<node, step_t>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(r);
-}
 
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_each<node, step_t>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(r);
-}
 
 } // namespace idni::tau_lang

@@ -330,7 +330,7 @@ TEST_SUITE("canonical reduction of a tau constant that does not normalize") {
 		failing_constant k;
 		auto r = bf_reduce_canonical<node_t>()(k.bf);
 		CHECK(!r.has_value());
-		CHECK(report_has_code(r.report(), code::internal_error));
+		CHECK(report_has_code(r.report(), code::runtime_error));
 	}
 
 	TEST_CASE("find_solution and var_free_holds report the failure") {
@@ -338,10 +338,10 @@ TEST_SUITE("canonical reduction of a tau constant that does not normalize") {
 		tref eq = tree<node_t>::build_bf_eq_0(k.bf);
 		auto s = find_solution<node_t>(eq);
 		CHECK(!s.has_value());
-		CHECK(report_has_code(s.report(), code::internal_error));
+		CHECK(report_has_code(s.report(), code::runtime_error));
 		auto h = var_free_holds<node_t>(eq);
 		CHECK(!h.has_value());
-		CHECK(report_has_code(h.report(), code::internal_error));
+		CHECK(report_has_code(h.report(), code::runtime_error));
 	}
 
 	// An undecided constant is neither zero nor one: the atoms the

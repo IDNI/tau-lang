@@ -8,8 +8,9 @@
  *
  * Provides the `step`, `steps`, `repeat_each`, `repeat_all`, and `repeat_once`
  * functors for applying rewriting libraries to formulas, together with pipe
- * `operator|` overloads that integrate them into the `tree<node>::traverser`
- * pipeline.
+ * `operator|` overloads that integrate a library and `repeat_once` into the
+ * `tree<node>::traverser` pipeline. `repeat_each` and `repeat_all` can fail
+ * on the round cap, so they return a `result` and are called directly.
  */
 
 #ifndef __IDNI__TAU__EXECUTION_H__
@@ -82,14 +83,12 @@ struct repeat_each {
 
 	/**
 	 * @brief Run each step to its fixpoint or cycle, in order.
-	 *
-	 * On hitting `max_rewrite_rounds` for a step, logs an error.
 	 * @param n Formula to rewrite.
-	 * @return The formula after the last step settled, or `nullptr` if
-	 *         `max_rewrite_rounds` is set and a step's result did not
-	 *         repeat within that many rounds.
+	 * @return The formula after the last step settled, or a
+	 *         `code::runtime_error` if `max_rewrite_rounds` is set and a
+	 *         step's result did not repeat within that many rounds.
 	 */
-	tref operator()(tref n) const;
+	result<tref> operator()(tref n) const;
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };
@@ -125,14 +124,12 @@ struct repeat_all {
 
 	/**
 	 * @brief Apply the sequence round by round until a result repeats.
-	 *
-	 * Bounded by `max_rewrite_rounds`; on hitting it, logs an error.
 	 * @param n Formula to rewrite.
 	 * @return The first repeated formula (the fixpoint, or a member of the
-	 *         cycle), or `nullptr` if `max_rewrite_rounds` is set and no
-	 *         result repeated within that many rounds.
+	 *         cycle), or a `code::runtime_error` if `max_rewrite_rounds` is
+	 *         set and no result repeated within that many rounds.
 	 */
-	tref operator()(tref n) const;
+	result<tref> operator()(tref n) const;
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };
@@ -183,17 +180,7 @@ typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n,
 	const repeat_once<node, step_t>& r);
 
-/** @brief Apply a `repeat_all` to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_all<node, step_t>& r);
 
-/** @brief Apply a `repeat_each` to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_each<node, step_t>& r);
 
 } // namespace idni::tau_lang
 

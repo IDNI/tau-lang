@@ -395,17 +395,10 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	TAU_TRY(tref main, r.measure("calculate_fixed_points", [&] {
 		return calculate_all_fixed_points<node>(rr_);
 	}));
-	// Substitute function and recurrence relation definitions. Called
-	// directly rather than through the traverser pipe so that the
-	// non-termination signal (nullptr) is checked instead of being fed to
-	// `tt::ref`.
-	tref new_main = r.measure("apply_rec_relations", [&] {
+	// Substitute function and recurrence relation definitions.
+	TAU_TRY(tref new_main, r.measure("apply_rec_relations", [&] {
 		return repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
-	});
-	if (!new_main) {
-		return r.with_assert_check_error(code::internal_error,
-			"recurrence relation rewriting did not reach a fixed point");
-	}
+	}));
 	// The expanded bodies came in with their ids shifted out of the way
 	// (alpha_shift_rule_body). Renumber so the formula leaves with the
 	// canonical numbering every other pass assumes: within a scope the
