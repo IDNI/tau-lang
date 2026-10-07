@@ -31,8 +31,8 @@ namespace idni::tau_lang::omcat {
  * @brief Parses a rational literal ("1/4", "-3/7", "0.25" or an integer).
  * @param src The literal's source text.
  * @return The exact rational, or an `invalid_argument` error when @p src is
- * not a literal of those forms, has a zero denominator, has more than 18
- * fractional digits, or does not fit `long long`.
+ * not a literal of those forms, has a denominator that is not positive, has
+ * more than 18 fractional digits, or does not fit `long long`.
  */
 inline result<rational> parse_rat_literal(const std::string& src) {
 	result<rational> r;
@@ -42,7 +42,10 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 		try {
 			long long p = std::stoll(src.substr(0, slash));
 			long long q = std::stoll(src.substr(slash + 1));
-			if (q == 0)
+			// A negative q would be negated by rational(), which
+			// overflows for the least long long; qlt literals take a
+			// positive denominator only.
+			if (q <= 0)
 				return r.with_error(code::invalid_argument,
 					"rational parse failed for 'p/q'",
 					{{label::value, src}});
