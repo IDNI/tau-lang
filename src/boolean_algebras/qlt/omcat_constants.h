@@ -39,84 +39,79 @@ inline result<rational> parse_rat_literal(const std::string& src) {
 	// Try "p/q" first.
 	auto slash = src.find('/');
 	if (slash != std::string::npos) {
-		try {
-			long long p = std::stoll(src.substr(0, slash));
-			long long q = std::stoll(src.substr(slash + 1));
-			// A negative q would be negated by rational(), which
-			// overflows for the least long long; qlt literals take a
-			// positive denominator only.
-			if (q <= 0)
-				return r.with_error(code::invalid_argument,
-					"rational parse failed for 'p/q'",
-					{{label::value, src}});
-			return r.with_value(rational(p, q));
-		} catch (...) {
+		const auto p = parse_whole_integer<long long>(src.substr(0, slash));
+		const auto q = parse_whole_integer<long long>(src.substr(slash + 1));
+		// A negative q would be negated by rational(), which
+		// overflows for the least long long; qlt literals take a
+		// positive denominator only.
+		if (!p || !q || *q <= 0)
 			return r.with_error(code::invalid_argument,
 				"rational parse failed for 'p/q'",
 				{{label::value, src}});
-		}
+		return r.with_value(rational(*p, *q));
 	}
 	// Try decimal "<int>.<frac>".
 	auto dot = src.find('.');
 	if (dot != std::string::npos) {
-		try {
-			std::string ipart = src.substr(0, dot);
-			std::string fpart = src.substr(dot + 1);
-			// 10^k must stay within long long: 19 or more fractional
-			// digits would overflow `denom` silently (signed overflow,
-			// no exception) and yield a garbage rational.
-			if (fpart.size() > 18)
-				return r.with_error(code::invalid_argument,
-					"rational parse: '" + src + "' has "
-					+ std::to_string(fpart.size()) + " fractional digits, "
-					"more than the 18 an exact rational literal supports",
-					{{label::value, src}});
-			long long ival = ipart.empty() ? 0 : std::stoll(ipart);
-			long long fval = fpart.empty() ? 0 : std::stoll(fpart);
-			long long denom = 1;
-			for (size_t i = 0; i < fpart.size(); ++i) denom *= 10;
-			// A negative literal's ival carries its sign, so the fraction
-			// is subtracted: |ival| does not fit long long for LLONG_MIN.
-			const bool negative = ipart.size() && ipart[0] == '-';
-			long long num = 0;
-#if defined(_MSC_VER) && !defined(__clang__)
-			// MSVC has no __builtin_*_overflow; widen through 128-bit.
-			omcat_int128_ num128 = (omcat_int128_) ival * denom;
-			num128 = negative ? num128 - fval : num128 + fval;
-			if (num128 > LLONG_MAX || num128 < LLONG_MIN)
-				return r.with_error(code::invalid_argument,
-					"rational parse: '" + src + "' does not fit an "
-					"exact rational literal",
-					{{label::value, src}});
-			num = (long long) num128;
-#else
-			long long scaled = 0;
-			if (__builtin_mul_overflow(ival, denom, &scaled)
-				|| (negative
-					? __builtin_sub_overflow(scaled, fval, &num)
-					: __builtin_add_overflow(scaled, fval, &num)))
-			{
-				return r.with_error(code::invalid_argument,
-					"rational parse: '" + src + "' does not fit an "
-					"exact rational literal",
-					{{label::value, src}});
-			}
-#endif
-			return r.with_value(rational(num, denom));
-		} catch (...) {
+		std::string ipart = src.substr(0, dot);
+		std::string fpart = src.substr(dot + 1);
+		// 10^k must stay within long long: 19 or more fractional
+		// digits would overflow `denom` silently (signed overflow,
+		// no exception) and yield a garbage rational.
+		if (fpart.size() > 18)
+			return r.with_error(code::invalid_argument,
+				"rational parse: '" + src + "' has "
+				+ std::to_string(fpart.size()) + " fractional digits, "
+				"more than the 18 an exact rational literal supports",
+				{{label::value, src}});
+		const auto ival_p = ipart.empty()
+			? std::optional<long long>(0)
+			: parse_whole_integer<long long>(ipart);
+		const auto fval_p = fpart.empty()
+			? std::optional<long long>(0)
+			: parse_whole_integer<long long>(fpart);
+		if (!ival_p || !fval_p)
 			return r.with_error(code::invalid_argument,
 				"rational parse failed for decimal",
 				{{label::value, src}});
+		const long long ival = *ival_p, fval = *fval_p;
+		long long denom = 1;
+		for (size_t i = 0; i < fpart.size(); ++i) denom *= 10;
+		// A negative literal's ival carries its sign, so the fraction
+		// is subtracted: |ival| does not fit long long for LLONG_MIN.
+		const bool negative = ipart.size() && ipart[0] == '-';
+		long long num = 0;
+#if defined(_MSC_VER) && !defined(__clang__)
+		// MSVC has no __builtin_*_overflow; widen through 128-bit.
+		omcat_int128_ num128 = (omcat_int128_) ival * denom;
+		num128 = negative ? num128 - fval : num128 + fval;
+		if (num128 > LLONG_MAX || num128 < LLONG_MIN)
+			return r.with_error(code::invalid_argument,
+				"rational parse: '" + src + "' does not fit an "
+				"exact rational literal",
+				{{label::value, src}});
+		num = (long long) num128;
+#else
+		long long scaled = 0;
+		if (__builtin_mul_overflow(ival, denom, &scaled)
+			|| (negative
+				? __builtin_sub_overflow(scaled, fval, &num)
+				: __builtin_add_overflow(scaled, fval, &num)))
+		{
+			return r.with_error(code::invalid_argument,
+				"rational parse: '" + src + "' does not fit an "
+				"exact rational literal",
+				{{label::value, src}});
 		}
+#endif
+		return r.with_value(rational(num, denom));
 	}
 	// Plain integer.
-	try {
-		return r.with_value(rational(std::stoll(src), 1));
-	} catch (...) {
-		return r.with_error(code::invalid_argument,
-			"rational parse failed for integer",
-			{{label::value, src}});
-	}
+	if (const auto v = parse_whole_integer<long long>(src))
+		return r.with_value(rational(*v, 1));
+	return r.with_error(code::invalid_argument,
+		"rational parse failed for integer",
+		{{label::value, src}});
 }
 
 /**

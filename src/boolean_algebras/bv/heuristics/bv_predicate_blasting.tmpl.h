@@ -448,9 +448,9 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 			// 9999999999 must not throw out of the blasting pass;
 			// skip anything that does not fit.
 			if (const auto& name = get_var_name<node>(n);
-				is_number(name)) try {
-				id = std::max(id, (int_t)std::stoll(name));
-			} catch (const std::out_of_range&) { /* skip */ }
+				is_number(name))
+				if (auto v = parse_whole_integer<int_t>(name))
+					id = std::max(id, *v);
 		}
 		return true;
 	};

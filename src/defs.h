@@ -12,7 +12,14 @@
 #ifndef __IDNI__TAU__DEFS_H__
 #define __IDNI__TAU__DEFS_H__
 
+#include <cerrno>
+#include <charconv>
+#include <concepts>
 #include <cstddef>
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <variant>
 #ifdef DEBUG
 #	if !defined(_MSC_VER)
@@ -48,6 +55,27 @@
 #else
 #include TAU_PARSER_DEFS_INCLUDE
 #endif
+
+/// @brief The integer written by the whole of @p s, or nullopt when @p s is
+/// empty, has a character that is not part of the number or does not fit @p T.
+template <std::integral T>
+std::optional<T> parse_whole_integer(std::string_view s) {
+	T v{};
+	const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+	if (ec != std::errc{} || end != s.data() + s.size()) return std::nullopt;
+	return v;
+}
+
+/// @brief The double written by the whole of @p s, or nullopt when @p s is
+/// empty, has trailing characters or is out of the double range.
+inline std::optional<double> parse_whole_double(const std::string& s) {
+	if (s.empty()) return std::nullopt;
+	char* end = nullptr;
+	errno = 0;
+	const double d = std::strtod(s.c_str(), &end);
+	if (end != s.c_str() + s.size() || errno == ERANGE) return std::nullopt;
+	return d;
+}
 
 // Macros to ease searching and sorting
 /// @brief Binary search of @p y in the sorted range @p x.

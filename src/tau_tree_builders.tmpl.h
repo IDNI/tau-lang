@@ -314,12 +314,10 @@ int_t find_biggest_quant_id(tref fm) {
 		if (is_quantifier<node>(n)) {
 			if (auto name = get_var_name<node>(tau::trim(n));
 				is_number(name)) {
-				try {
-					id = std::max(id, static_cast<int_t>(std::stoll(name)));
-				} catch (const std::out_of_range&) {
-					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1
-				}
+				if (auto v = parse_whole_integer<int_t>(name))
+					id = std::max(id, *v);
+				else // name exceeds int_t: -1 as callers compute id + 1
+					id = std::numeric_limits<int_t>::max() - 1;
 				return false;
 			}
 		}
@@ -351,11 +349,9 @@ int_t max_bound_var_id(tref fm) {
 		if (!tau::get(n).is(tau::variable)) return;
 		const std::string& name = get_var_name<node>(n);
 		if (!is_bound_var_name(name)) return;
-		try {
-			id = std::max(id, static_cast<int_t>(std::stoll(name)));
-		} catch (const std::out_of_range&) {
-			id = std::numeric_limits<int_t>::max();
-		}
+		if (auto v = parse_whole_integer<int_t>(name))
+			id = std::max(id, *v);
+		else id = std::numeric_limits<int_t>::max();
 	};
 	pre_order<node>(fm).visit_unique(f);
 	return id;
@@ -373,10 +369,9 @@ tref shift_bound_var_ids(tref fm, int_t off) {
 		if (!tau::get(n).is(tau::variable)) return;
 		const std::string& name = get_var_name<node>(n);
 		if (!is_bound_var_name(name)) return;
-		int_t id;
-		try {
-			id = static_cast<int_t>(std::stoll(name));
-		} catch (const std::out_of_range&) { return; }
+		const auto parsed = parse_whole_integer<int_t>(name);
+		if (!parsed) return;
+		const int_t id = *parsed;
 		if (id > std::numeric_limits<int_t>::max() - off) return;
 		changes.emplace(n, tau::build_variable(
 			std::to_string(id + off),

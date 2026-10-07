@@ -8,6 +8,30 @@
 
 // ── tree::build_shift(const std::string&, size_t) (TT-1) ────────────────────
 
+TEST_SUITE("parse_whole_integer and parse_whole_double") {
+	TEST_CASE("integers") {
+		CHECK(parse_whole_integer<int>("0") == 0);
+		CHECK(parse_whole_integer<int>("2147483647") == 2147483647);
+		CHECK(parse_whole_integer<int>("-5") == -5);
+		CHECK_FALSE(parse_whole_integer<int>("2147483648").has_value());
+		CHECK_FALSE(parse_whole_integer<int>("").has_value());
+		CHECK_FALSE(parse_whole_integer<int>("12x").has_value());
+		CHECK_FALSE(parse_whole_integer<int>(" 1").has_value());
+		CHECK_FALSE(parse_whole_integer<uint64_t>("18446744073709551616")
+			.has_value());
+		CHECK(parse_whole_integer<uint64_t>("18446744073709551615")
+			== UINT64_MAX);
+	}
+	TEST_CASE("doubles") {
+		CHECK(parse_whole_double("2.5") == 2.5);
+		CHECK(parse_whole_double("3") == 3.0);
+		CHECK_FALSE(parse_whole_double("").has_value());
+		CHECK_FALSE(parse_whole_double("1..5").has_value());
+		CHECK_FALSE(parse_whole_double("2.5x").has_value());
+		CHECK_FALSE(parse_whole_double(std::string(400, '9')).has_value());
+	}
+}
+
 TEST_SUITE("tree::build_shift") {
 
 	TEST_CASE("string overload builds a shift over a fresh variable") {

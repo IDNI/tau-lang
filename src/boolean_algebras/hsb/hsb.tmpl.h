@@ -462,18 +462,14 @@ struct linexpr_result {
 // every non-finite coefficient, so the literal fails to parse instead of
 // producing an unbounded half-space. Compare qint's checked parser.
 inline double parse_unum(const std::string& s) {
-	try {
-		auto slash = s.find('/');
-		if (slash != std::string::npos) {
-			const double q = std::stod(s.substr(slash + 1));
-			if (std::fpclassify(q) == FP_ZERO)
-				return std::numeric_limits<double>::quiet_NaN();
-			return std::stod(s.substr(0, slash)) / q;
-		}
-		return std::stod(s);
-	} catch (const std::exception&) {
-		return std::numeric_limits<double>::quiet_NaN();
-	}
+	constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+	const auto slash = s.find('/');
+	if (slash == std::string::npos)
+		return parse_whole_double(s).value_or(nan);
+	const auto q = parse_whole_double(s.substr(slash + 1));
+	const auto p = parse_whole_double(s.substr(0, slash));
+	if (!p || !q || std::fpclassify(*q) == FP_ZERO) return nan;
+	return *p / *q;
 }
 
 // The index n of a variable node `x[n]`.

@@ -642,11 +642,9 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 			|| tmp.compare(0, prefix.size(), prefix) != 0) continue;
 		std::string id = tmp.substr(prefix.size());
 		// An over-long user-written digit suffix (e.g.
-		// :split99999999999999) must not throw out of the splitter;
-		// skip anything that does not fit.
-		if (is_number(id)) try {
-			ids.insert(std::stoi(id));
-		} catch (const std::out_of_range&) { /* skip */ }
+		// :split99999999999999) does not fit int and is skipped.
+		if (is_number(id))
+			if (auto v = parse_whole_integer<int>(id)) ids.insert(*v);
 	}
 	// Process-wide floor per name family, combined with the per-fm scan
 	// above: two calls minting from different formulas can never land on

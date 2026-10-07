@@ -205,6 +205,18 @@ TEST_SUITE("omcat: parse_rat_literal") {
 		CHECK_FALSE(omcat::parse_rat_literal("-9223372036854775808.1")
 			.has_value());
 	}
+	TEST_CASE("an out-of-range or malformed numeral is an invalid argument") {
+		for (const char* src : { "9223372036854775808",
+			"99999999999999999999/3", "3/99999999999999999999",
+			"99999999999999999999.5", "0.1234567890123456789", "x", "1/x",
+			"-", "1.x" })
+		{
+			CAPTURE(src);
+			auto r = omcat::parse_rat_literal(src);
+			CHECK(!r.has_value());
+			CHECK(report_has_code(r.report(), code::invalid_argument));
+		}
+	}
 	TEST_CASE("a negative denominator is an invalid argument") {
 		for (const char* src : { "3/-4", "1/-9223372036854775808",
 			"-9223372036854775808/-1" })

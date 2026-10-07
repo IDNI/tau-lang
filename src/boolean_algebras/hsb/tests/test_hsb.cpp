@@ -1304,6 +1304,14 @@ TEST_SUITE("hsb — parser") {
 		CHECK(ok.has_value());
 	}
 
+	TEST_CASE("a literal outside the double range does not parse") {
+		const std::string big(400, '9');
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] + " + big + " < 0")
+			.has_value());
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] + 1/" + big + "0 < 0")
+			.has_value());
+	}
+
 	TEST_CASE("parse single constraint: x[0] < 0") {
 		auto r = parse_hsb<bas_pack>("x[0] < 0");
 		REQUIRE(r.has_value());

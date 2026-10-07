@@ -1993,18 +1993,9 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	};
 	// A decimal number (gcgrowth); the grammar admits digits and '.'.
 	auto str2double = [&v, this](void) -> std::optional<double> {
-		try {
-			size_t pos = 0;
-			double d = std::stod(v, &pos);
-			if (pos != v.size()) {
-				err << "Invalid value: expected a number\n";
-				return {};
-			}
-			return d;
-		} catch (const std::exception&) {
-			err << "Invalid value: expected a number\n";
-			return {};
-		}
+		auto d = parse_whole_double(v);
+		if (!d) err << "Invalid value: expected a number\n";
+		return d;
 	};
 	auto update_bool_value = [&v, this](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"

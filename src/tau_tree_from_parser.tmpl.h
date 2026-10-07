@@ -177,9 +177,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				// failing. Maybe only if --ext_nodes is used?
 				//
 				// Two ways a literal can go wrong here:
-				//  - above 2^64-1 std::stoul throws
-				//    std::out_of_range, and nothing on the parse
-				//    path catches it;
+				//  - above 2^64-1 the digits do not
+				//    parse at 64 bits;
 				//  - node::data is a bitfield narrower than 64
 				//    bits, so the node constructor would truncate
 				//    anything above node::data_mask.
@@ -189,12 +188,9 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 				// on wasm32 size_t has 32 bits.
 				const std::string ds = ptr.get_terminals();
 				uint64_t value = 0;
-				bool fits = true;
-				try {
-					size_t pos = 0;
-					value = std::stoull(ds, &pos);
-					fits = pos == ds.size();
-				} catch (const std::exception&) { fits = false; }
+				bool fits = false;
+				if (auto v = parse_whole_integer<uint64_t>(ds))
+					value = *v, fits = true;
 				if (!fits || value > node::data_mask
 					|| value > std::numeric_limits<size_t>::max())
 				{

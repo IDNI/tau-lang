@@ -401,12 +401,11 @@ int_t get_max_var_name_b_id(tref fm) {
 			auto name = get_var_name<node>(n);
 			if (!name.empty() && name[0] == 'b') {
 				// Check if of form bn
-				if (is_number(name.substr(1))) try {
-					id = std::max(id, static_cast<int_t>(
-						std::stoll(name.substr(1))));
-				} catch (const std::out_of_range&) {
-					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1
+				if (is_number(name.substr(1))) {
+					if (auto v = parse_whole_integer<int_t>(
+						name.substr(1))) id = std::max(id, *v);
+					else // name exceeds int_t: -1 as callers compute id + 1
+						id = std::numeric_limits<int_t>::max() - 1;
 				}
 			}
 		}
