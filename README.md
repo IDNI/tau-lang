@@ -2362,7 +2362,9 @@ Elements are written as interval expressions inside `{...}:qlt`:
 Endpoints are exact rationals.  The special symbols `-inf` and `+inf`
 represent the extended line endpoints.  Parentheses `(`, `)` exclude the
 endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
-(`0.d…`) literal syntaxes are accepted.
+(`0.d…`) literal syntaxes are accepted.  A literal whose reduced value does
+not fit a 64-bit numerator over a positive 64-bit denominator is a parse
+error.
 
 A `qlt` variable or stream stands for one point of the order, while a
 constant `{...}:qlt` stands for a set of points.  Where a term combines a

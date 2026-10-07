@@ -161,7 +161,9 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 		if (int_str.empty() && frac_str.empty()) return false;
 		if (!int_str.empty() && !is_digits(int_str)) return false;
 		if (!frac_str.empty() && !is_digits(frac_str)) return false;
-		long long ipart = 0;
+		// The integer part is read unsigned so that the least long long,
+		// whose magnitude long long cannot hold, still parses.
+		unsigned long long ipart = 0;
 		if (!int_str.empty()) {
 			auto [ip, ie] = std::from_chars(int_str.data(),
 			                  int_str.data() + int_str.size(), ipart);
@@ -178,10 +180,16 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 				scale *= 10;
 			}
 		}
-		// ipart + fpart/scale = (ipart*scale + fpart)/scale
-		long long num = ipart * scale + fpart;
+		// ipart + fpart/scale = (ipart*scale + fpart)/scale, in 128 bits
+		// (ipart < 2^64, scale <= 10^18) and reduced before narrowing; a
+		// value whose reduced numerator does not fit long long fails.
+		int128_t_ num = (int128_t_) ipart * scale + fpart, den = scale;
 		if (negative) num = -num;
-		out = qlt_rational(num, scale);
+		qlt_reduce_wide(num, den);
+		const int128_t_ lo = std::numeric_limits<long long>::min(),
+			hi = std::numeric_limits<long long>::max();
+		if (num < lo || num > hi) return false;
+		out = qlt_rational((long long) num, (long long) den);
 		return true;
 	}
 

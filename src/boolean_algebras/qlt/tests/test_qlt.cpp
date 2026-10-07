@@ -336,6 +336,27 @@ TEST_CASE("parse: invalid string returns false") {
 	CHECK(!qlt_rational::parse("3.1.4", r));
 }
 
+TEST_CASE("parse: a decimal outside long long fails") {
+	qlt_rational r;
+	CHECK(!qlt_rational::parse("9223372036854775807.5", r));
+	CHECK(!qlt_rational::parse("-9223372036854775807.5", r));
+	CHECK(!qlt_rational::parse("9223372036854775808.", r));
+	CHECK(!qlt_rational::parse("-9223372036854775808.1", r));
+}
+
+TEST_CASE("parse: a decimal at the ends of long long") {
+	constexpr long long max = std::numeric_limits<long long>::max();
+	constexpr long long min = std::numeric_limits<long long>::min();
+	qlt_rational r;
+	CHECK(qlt_rational::parse("9223372036854775807.0", r));
+	CHECK(r == qlt_rational(max, 1));
+	CHECK(qlt_rational::parse("-9223372036854775808.", r));
+	CHECK(r == qlt_rational(min, 1));
+	// The unreduced numerator 2^63 does not fit; 2^62/5 does.
+	CHECK(qlt_rational::parse("922337203685477580.8", r));
+	CHECK(r == qlt_rational(max / 2 + 1, 5));
+}
+
 } // TEST_SUITE qlt_rational
 
 // ─── piece helpers ────────────────────────────────────────────────────────────
