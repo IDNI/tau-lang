@@ -357,4 +357,14 @@ TEST_SUITE("canonical reduction of a tau constant that does not normalize") {
 		CHECK(!tau::get(neq).equals_T());
 		CHECK(!tau::get(neq).equals_F());
 	}
+
+	// The construction of a typed constant folds only a literal zero or one.
+	TEST_CASE("an undecided constant keeps its typed node on construction") {
+		using tau = tree<node_t>;
+		failing_constant k;
+		use_hooks_guard<node_t> hooks_on(true);
+		tref c = tau::get(tau::bf, tau::get(k.constant_bf).first());
+		CHECK(!tau::get(c).equals_0());
+		CHECK(!tau::get(c).equals_1());
+	}
 }

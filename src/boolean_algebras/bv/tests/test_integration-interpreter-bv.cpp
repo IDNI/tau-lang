@@ -150,14 +150,14 @@ TEST_SUITE("with inputs and outputs (bv)") {
 		CHECK( o1->get_values().empty() );
 	}
 
-	// An update proposal whose widened arithmetic would exceed the cap is
-	// rejected ("No update performed") and the running spec stays as it
-	// was: o7 keeps echoing i9 after the rejected step exactly as before
-	// it, and the run itself does not fail. The stream names are fresh
+	// An update proposal whose widened arithmetic would exceed the cap
+	// cannot be decided: the step that reads it has no solvable
+	// alternative and the run stops with the cap in its report, as a spec
+	// exceeding the cap does. The stream names are fresh
 	// (o7/i8/i9): the tau-typed o1/i1 of the update cases above linger in
 	// the process-wide stream type registry and make a bv-typed o1 update
 	// proposal unparseable when the suite runs in file order.
-	TEST_CASE("update exceeding the widening cap is rejected, spec kept") {
+	TEST_CASE("update exceeding the widening cap stops the run with the cap error") {
 		bdd_init<Bool>();
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
@@ -176,8 +176,11 @@ TEST_SUITE("with inputs and outputs (bv)") {
 		ctx.add_output("o7", bv_type_id<node_t>(8), o1);
 		ctx.add_output("u",  tau_type_id<node_t>(), u);
 		auto maybe_i = run<node_t>(spec, ctx, 3);
-		CHECK( maybe_i.has_value() );
-		CHECK( o1->get_values() == strings{ "1", "2", "3" } );
+		REQUIRE( !maybe_i.has_value() );
+		std::stringstream ss;
+		ss << maybe_i.report();
+		CHECK( ss.str().find("exceeds bv-max-width") != std::string::npos );
+		CHECK( o1->get_values() == strings{ "1" } );
 	}
 
 	// bv widening: prove the widened semantics through a live

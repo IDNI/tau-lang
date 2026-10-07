@@ -53,18 +53,14 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	}
 
 
-	// Runs the full validity decision of is_one(); an undecided or failed
-	// decision falls to false here (never a witness of validity).
+	// Purely syntactic: the main formula is literally T; no decision runs.
 	static bool is_syntactic_one(const ba_t& x) {
-		// TODO (HIGH) dropped error: is_one's decision report -- is_syntactic_one returns bool, which cannot carry it.
-		return x.is_one().value_or(false);
+		return is_tau_syntactic_one(x);
 	}
 
-	// Runs the full satisfiability decision of is_zero(); an undecided or
-	// failed decision falls to true here.
+	// Purely syntactic: the main formula is literally F; no decision runs.
 	static bool is_syntactic_zero(const ba_t& x) {
-		// TODO (HIGH) dropped error: is_zero's decision report -- is_syntactic_zero returns bool, which cannot carry it.
-		return x.is_zero().value_or(true);
+		return is_tau_syntactic_zero(x);
 	}
 
 	/// Whether @p x is valid; an error when the decision fails.
