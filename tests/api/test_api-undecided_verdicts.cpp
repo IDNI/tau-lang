@@ -343,4 +343,18 @@ TEST_SUITE("canonical reduction of a tau constant that does not normalize") {
 		CHECK(!h.has_value());
 		CHECK(report_has_code(h.report(), code::internal_error));
 	}
+
+	// An undecided constant is neither zero nor one: the atoms the
+	// construction hooks fold from a constant stay as they are.
+	TEST_CASE("an undecided constant is not folded to zero by the hooks") {
+		using tau = tree<node_t>;
+		failing_constant k;
+		use_hooks_guard<node_t> hooks_on(true);
+		tref eq = tau::build_bf_eq_0(k.constant_bf);
+		CHECK(!tau::get(eq).equals_T());
+		CHECK(!tau::get(eq).equals_F());
+		tref neq = tau::build_bf_neq_0(k.constant_bf);
+		CHECK(!tau::get(neq).equals_T());
+		CHECK(!tau::get(neq).equals_F());
+	}
 }

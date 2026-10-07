@@ -452,9 +452,12 @@ tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref 
 			arg1(ch).get_ba_type())) return *h;
 		return tau::get_raw(v, ch, len, r);
 	}
-	if (l && (l | tt::ba_constant) == false) return bare_wff_T<node>(r);
-	else if (l) return bare_wff_F<node>(r);
-	return tau::get_raw(v, ch, len, r);
+	if (!l) return tau::get_raw(v, ch, len, r);
+	// An undecided constant leaves the atom: it is decided, and the failure
+	// reported, by the normalization that reaches it.
+	auto is_zero = node::ba::is_zero(l | tt::ba_constant);
+	if (!is_zero.has_value()) return tau::get_raw(v, ch, len, r);
+	return is_zero.value() ? bare_wff_T<node>(r) : bare_wff_F<node>(r);
 }
 
 /** @internal @copydoc get_hook::wff_neq @endinternal */
@@ -555,10 +558,12 @@ tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref
 			arg1(ch).get_ba_type())) return *h;
 		return tau::get_raw(v, ch, len, r);
 	}
-	if (l.has_value() && (l | tt::ba_constant) == false)
-		return bare_wff_F<node>(r);
-	else if (l.has_value()) return bare_wff_T<node>(r);
-	return tau::get_raw(v, ch, len, r);
+	if (!l.has_value()) return tau::get_raw(v, ch, len, r);
+	// An undecided constant leaves the atom: it is decided, and the failure
+	// reported, by the normalization that reaches it.
+	auto is_zero = node::ba::is_zero(l | tt::ba_constant);
+	if (!is_zero.has_value()) return tau::get_raw(v, ch, len, r);
+	return is_zero.value() ? bare_wff_F<node>(r) : bare_wff_T<node>(r);
 }
 
 } // namespace idni::tau_lang
