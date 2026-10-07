@@ -238,6 +238,21 @@ TEST_SUITE("hsb — halfspace pool") {
 		CHECK(i1 == i2);
 	}
 
+	TEST_CASE("a NaN halfspace is not interned onto a finite one") {
+		const double nan = std::numeric_limits<double>::quiet_NaN();
+		size_t f1 = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, 3.0));
+		size_t f2 = hsb_halfspace_pool::insert(raw_hs({7.0, 2.0}, 3.0));
+		size_t fb = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, 4.0));
+		size_t n1 = hsb_halfspace_pool::insert(raw_hs({nan, 2.0}, 3.0));
+		size_t nb = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, nan));
+		CHECK(n1 != f1);
+		CHECK(n1 != f2);
+		CHECK(nb != f1);
+		CHECK(nb != fb);
+		CHECK(n1 != nb);
+		CHECK(hsb_halfspace_pool::insert(raw_hs({nan, 2.0}, 3.0)) == n1);
+	}
+
 	TEST_CASE("size counts interned halfspaces, excluding the sentinel") {
 		size_t before = hsb_halfspace_pool::size();
 		auto h = raw_hs({9.0, -6.5}, 4.25);

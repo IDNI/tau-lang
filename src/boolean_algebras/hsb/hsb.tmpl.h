@@ -82,15 +82,24 @@ inline hsb_halfspace hsb_halfspace::normalize() const {
 }
 
 inline bool hsb_halfspace::operator<(const hsb_halfspace& o) const noexcept {
+	// A NaN sorts after every number and equals another NaN, so the order
+	// stays a strict weak one and the pool never merges a NaN halfspace
+	// with a finite one.
+	auto less = [](double a, double c) {
+		if (std::isnan(a)) return false;
+		return std::isnan(c) || a < c;
+	};
+	auto same = [](double a, double c) {
+		return (std::isnan(a) && std::isnan(c)) || hsb_detail::feq(a, c);
+	};
 	size_t n = std::max(w.size(), o.w.size());
 	for (size_t k = 0; k < n; ++k) {
 		double lv = k < w.size()   ? w[k]   : 0.0;
 		double rv = k < o.w.size() ? o.w[k] : 0.0;
-		if (hsb_detail::feq(lv, rv)) continue;
-		return lv < rv;
+		if (same(lv, rv)) continue;
+		return less(lv, rv);
 	}
-	if (hsb_detail::feq(b, o.b)) return false;
-	return b < o.b;
+	return !same(b, o.b) && less(b, o.b);
 }
 
 inline std::string hsb_halfspace::to_string() const {
