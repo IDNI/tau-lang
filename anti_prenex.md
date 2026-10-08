@@ -115,22 +115,42 @@ discharge (both valid in ANY BA — thm:boole-const):
     ≠ is NOTATION ONLY from phase 3 on: an emitted `h ≠ 0` denotes the
     formula-level ¬(h = 0) (invariant 4) — no fused ≠ atom is ever built.
 
-term representation, per component (PREPARE_TERMS):
-    A term is a BDD whose DECISION VARIABLES are exactly the block's variables
-    and whose LEAVES hold everything else: free variables, constants, references,
-    foreign-typed sub-terms, and functional quantifiers over block-free bodies.
-    This is thm:mnf over X only,
-    f(x⃗,y⃗) = ⋃_{a ∈ 2^|X|} f(a,y⃗) · x⃗^a, with arbitrary BA coefficients.
+term representation, phase 4 (PREPARE_TERMS … FINISH_TERMS):
+    In phase 4 every side of an EQUATION is ONE canonical BDD for the whole
+    phase: converted once, at the push's start, and spelled once, at its end
+    (§4) — a component's setup converts nothing, its close spells nothing.
+    Every DECISION VARIABLE is a formula variable, free or bound; the LEAVES
+    (terminals) hold everything else: BA constants, references,
+    functional-quantifier chains, foreign-typed and arithmetic subterms.
+    This is thm:mnf over every variable,
+    f(x⃗) = ⋃_{a ∈ 2^|x⃗|} f(a) · x⃗^a, the leaves its BA coefficients.
+    THE ORDER is ONE GLOBAL COMPARATOR, the same for every call: the free
+    variables by name, then the binder variables by canonical binder id,
+    outermost first. Phase 0's ids decrease strictly inward (§3), so the
+    innermost land at the BOTTOM; sibling scopes sharing an id share the
+    variable — harmless, they never meet in one term. A call's ORDER LIST is
+    its variables sorted by the comparator, built at phase 4's entry (§4);
+    the comparator places any variable, a later one included. The BDD
+    library holds one order at a time — a chain's own at entry
+    (`RESOLVE_FUNCTIONAL_PLAIN`, §3), then the global one — and its tables
+    are never cleared within phase 4.
     Only the sides of EQUATIONS are backed: an order atom is never cofactored
     (cof_memo keys are TERM_OF of equations) and the solver path consumes it
-    as written, so it stays plain whatever it touches. BDD-backed means "has
-    a decision variable": a term that stops touching the block — a cofactor,
-    a quantification over all of it — is plain again, and a block-free term
-    never carries a BDD. One BDD is one term node (interned), so the D2 round
-    trip through a component boundary returns the node it started from.
+    as written, so it stays plain whatever it touches; reference arguments,
+    inside leaves, stay plain too. A variable-free side is its terminal. One
+    BDD is one term node (interned), never reordered; a term of the formula
+    is spelled at the push's end alone.
     Consequences:
-      - cofactoring on x ∈ X is CHILD SELECTION; nothing else is ever cofactored on
-      - ∀_X f = meet of the leaves,  ∃_X f = join of the leaves — one traversal
+      - cofactoring on a variable is a RESTRICT over the levels above it —
+        linear, memoised by the library: on x ∈ X for COF (§6), on a free y
+        for SIMPLIFY's propagation (§3)
+      - the block being eliminated sits at the BOTTOM of every term it
+        touches — inner blocks are processed first (§4), and a variable of
+        one survives only inside a unit or a leaf — so a sub-BDD hanging at
+        X's levels holds X and leaves alone: ∀_X f replaces it by the MEET OF
+        ITS LEAVES, ∃_X f by their join, read from below — one linear
+        traversal. A settled sub-block (§6) with block variables still
+        pending below it is quantified through their levels
       - substitution (TRY_WITNESS, at every call site) is a BDD compose
         PLUS rewriting x inside the leaves (r(x) ↦ r(t)) — sound for any term,
         reaches every occurrence, needs no leaf guard. Every reference argument
@@ -140,40 +160,41 @@ term representation, per component (PREPARE_TERMS):
         reference (§4). Needed because references are
         leaves: a dead occurrence like x·x′ ∪ a inside an argument would keep
         the FV guards (X ∩ FV, `usable`) conservative
-      - depth is bounded by |X|, not by the formula's variable count
       - FUNCTIONAL QUANTIFIERS ARE TRANSPARENT — term operators binding their
         subscript: Y is excluded from FV and alpha-renamed with the formula
-        binders. Cofactoring on x ∉ Y commutes with them, so PREPARE_TERMS
-        backs the BODY over P and slides the quantifier onto the body's
-        leaves — ∀_Y(x·b₁ ∪ x′·b₀) = x·∀_Y b₁ ∪ x′·∀_Y b₀, dually for ∃_Y: a
+        binders. Cofactoring on x ∉ Y commutes with them —
+        ∀_Y(x·b₁ ∪ x′·b₀) = x·∀_Y b₁ ∪ x′·∀_Y b₀, dually for ∃_Y: a
         Y-substitution is a homomorphism fixing x, and meet/join distribute
-        over an orthogonal decomposition. Linear in the body's BDD; nesting
-        recurses innermost-first. The slide lives in the BDD library's term
-        construction and fires at PREPARE_TERMS and at the entry pass alone,
-        over PLAIN bodies: a chain is collected whole, its body built under
-        the order and the chain wrapped onto every leaf; a chain touching no
+        over an orthogonal decomposition — so a chain SLIDES down its body to
+        its subscripts' levels. The slide lives in the BDD library's term
+        construction. At ENTRY (`RESOLVE_FUNCTIONAL_PLAIN`, §3), over PLAIN
+        bodies: a chain is collected whole, its body built under the chain's
+        own order and the chain wrapped onto every leaf; a chain touching no
         decision variable is one canonical leaf, put through the
-        constructor. No later term construction slides: a chain met by
-        SIMPLIFY_TERM, TERM_OF or any BDD operation of the push is ONE LEAF,
-        as it stands — in particular a keep-mode emission of a settled
-        sub-block (§7 DISCHARGE), whose body still carries block variables;
-        those are HIDDEN from then on (leaf hazard, below). A stored BDD is
-        never spelled out before the component's close, and never
-        reordered. One order is alive at a time, the component's; a chain's
-        own order exists at entry alone (`RESOLVE_FUNCTIONAL_PLAIN`, §3),
-        before any order is live. Under keep_functional, deep block nesting stacks
+        constructor. Linear in the body's BDD; nesting recurses
+        innermost-first. In PHASE 4, on every chain kept or stuck at entry,
+        met by the conversion (`PREPARE_TERMS`, §3), and on every chain
+        `DISCHARGE` keeps (§7): with ids canonical from phase 4's entry
+        (§4), the chain's subscripts are the lowest levels of its body, so
+        the slide is one linear walk. The variables above
+        stay decision structure; below each path through them the piece over
+        the subscripts' levels becomes ONE LEAF, the chain over that piece,
+        put through the constructor, which drops the chain from a piece
+        holding no subscript and folds a closed piece to its constant:
+        ∃_y(x·y ∪ x′·b), x outer, comes out x ∪ x′·b, as ∃_y y folds to 1.
+        Such a leaf adds no hazard — its subscripts are bound by the chain,
+        and whatever else it holds sat in a leaf already — so no chain hides
+        a block variable. Under keep_functional, deep block nesting stacks
         quantifier chains at the leaves — linear per level, amortised by
         hash-consing, inherent to symbolic mode.
-      - LEAF HAZARD: a block variable may occur inside a leaf (a reference
-        argument), where cofactoring does not reach — a leaf is opaque, its
-        Shannon expansion may not be assumed — so a leaf-x makes f₀/f₁ not
-        cofactors at all. A functional quantifier slid at PREPARE_TERMS
-        hides no block variable — a reference or foreign subterm does,
-        including one inside a quantifier's body — and so does a keep-mode
-        emission of a settled sub-block, a chain over a stored BDD whose
-        body still carries block variables (§7 DISCHARGE): the push never
-        looks into it again. The test is LEAF_FV(t) ∩ X ≠ ∅ (§3),
-        read behind `usable` (COF) and the methods' `opaque?` (§7)
+      - LEAF HAZARD: a block variable may occur inside a leaf — a reference
+        argument, a foreign-typed or arithmetic subterm — where cofactoring
+        does not reach: a leaf is opaque, its Shannon expansion may not be
+        assumed, so a leaf-x makes f₀/f₁ not cofactors at all. A stuck
+        chain's subscript hiding in such a leaf stays hidden there, the same
+        hazard met by the chain's own quantification (§3, the stuck rule).
+        The test is LEAF_FV(t) ∩ X ≠ ∅ (§3), read behind `usable` (COF) and
+        the methods' `opaque?` (§7)
 ```
 
 `ctx` carries:
@@ -181,7 +202,7 @@ term representation, per component (PREPARE_TERMS):
 | field | meaning |
 |---|---|
 | `type` | the block's BA type `τ`. Single, by invariant 2 |
-| `order` | BDD variable order. inner → **lower** rank |
+| `order` | the call's ORDER LIST of the global order (§1): built at phase 4's entry (§4) and shared by every component — free variables on top, the innermost block at the **bottom** |
 | `prio` | variable priority. inner → **higher** rank — read by `EXPAND`'s disjunct key, `DECOMPOSE_ARMS`'s choice among a pin atom's pinned variables, and `FOLD_DECIDED`'s probe variable |
 | `subsume_max` | threshold on a clause's negative count, above which `SUBSUME_NEGATIVES` (finite method only) skips its O3 scan. `K = 32`. Free to tune: subsumption costs no precision, so neither taint nor flush attaches (cache scope, below) |
 | `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁰` |
@@ -192,31 +213,35 @@ term representation, per component (PREPARE_TERMS):
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
 | `time_limit` | `ANTI_PRENEX`'s parameter, set through the API, `∞` by default: the one cutoff on a call's total work. Past it the call ABORTS WHOLE and returns `⊥` (§3). Termination does not rest on it (§8). In no key: an aborted computation writes no entry (cache scope, below) |
-| `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a component's close, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. Two components of one block may be answered differently; every key carries its component's flag, so the tables stay exact |
+| `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it, held as `ctx.kf`: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body: every chain present at entry (`RESOLVE_FUNCTIONAL_PLAIN`, §3), and ONCE per chain `DISCHARGE` emits in keep mode (§7), a chain not kept quantified at once. A yes ALLOWS keeping, never forces it: a closed piece of the slid chain folds (§1 transparency), and a settled sub-block with block variables still pending below its levels is quantified at once (§7). It sees each emission as built, never a later merged or rewritten chain. It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. CONTRACT: the callback never changes once set — every call passes the same one. Two components of one block may be answered differently; every key carries its component's flag, and by the contract the flag alone, so the tables stay exact (cache scope, below) |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
 | `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`, and by `SIMPLIFY`'s equality propagation (§3), whose plain match records its substitution cofactors under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, a key no `COF` call forms, `COF` asking about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
 | `atoms_memo` | `formula node → the atoms reachable in it through ∧, ∨ and ¬ alone` — units, references and temporal operators are opaque (§4), so a reference's formula argument contributes none — GLOBAL, purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
-| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query built on plain (converted) terms — a BDD-backed term is a node of one order (§3 `PREPARE_TERMS`). GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
+| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query's terms in the push's end spelling (§3 `FINISH_TERMS`), so its keys are canonical. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
 
 Every constant above (`K`, `K′`, `K″`, `γ`, the floor, the propagation
 factor and the occurrence limit) is provisional pending benchmarks.
 
-COMPONENT STATE — `type`, `order`, `prio`, the five component knobs and
+COMPONENT STATE — `type`, `prio`, the five component knobs and
 `keep_functional` — is set at component setup (§5) and
-lives for that component alone. GLOBAL — `taint_count` and the seven tables —
-outlives the call (cache scope, below). The component knobs are read from the
-process-wide defaults at setup, so a changed one applies from the next
-component on; `propagate_growth` and `absorb_occ_max` belong to `SIMPLIFY` and
-the joins, which run in every phase without a ctx, and are read bare at every
-use.
+lives for that component alone. PHASE STATE — `order` and the callback `kf` —
+is the same for every component of phase 4: the call's order list, built at
+the phase's entry (§4), and the caller's callback. GLOBAL — `taint_count` and
+the seven tables — outlives the call (cache scope, below). The component
+knobs are read from the process-wide defaults at setup, so a changed one
+applies from the next component on; `propagate_growth` and `absorb_occ_max`
+belong to `SIMPLIFY` and the joins, which run in every phase without a ctx,
+and are read bare at every use.
 
-The two rank conventions are opposite and cannot be merged: `order` is consumed
-innermost-first by BDD quantification; `prio` is read by `EXPAND`'s disjunct
-key, which expands the disjunct whose latest variable is outermost first, by
-`DECOMPOSE_ARMS`, which substitutes the innermost pinned variable of a pin
-atom, and by `FOLD_DECIDED`, which probes on the innermost variable of an atom.
+The two conventions are distinct and cannot be merged: `order` is the global
+order over every variable, the innermost block at the bottom, where BDD
+quantification consumes it (§1); `prio` ranks one component's variables and
+is read by `EXPAND`'s disjunct key, which expands the disjunct whose latest
+variable is outermost first, by `DECOMPOSE_ARMS`, which substitutes the
+innermost pinned variable of a pin atom, and by `FOLD_DECIDED`, which probes
+on the innermost variable of an atom.
 
 **Cache scope** follows one rule: a table is GLOBAL — outliving the call,
 shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its key
@@ -226,9 +251,13 @@ subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
 carries its `x`; `atoms_memo` is purely structural; `solver_memo` and
 `qbf_memo` involve none. `keep_functional` joins `push_memo`'s and
 `elim_memo`'s keys alone — their entries embed `DISCHARGE`'s output, which
-the flag switches — while `cof_memo`'s key is the term as it arrives, a kept
-chain included. Every tie-break is the content order (§1), so no entry embeds
-construction history. Five knobs sit in no key — the solver configuration,
+the flag switches, with `kf`'s answer on each chain it emits (§7), a pure
+function of the chain because the callback never changes once set (§1 ctx
+table) — while `cof_memo`'s key is the term as it arrives, a kept chain
+included. Every tie-break is the content order (§1), so no entry embeds
+construction history, and every BDD is built under the one global order
+(§1), so a BDD-valued entry — `push_memo`, `elim_memo`, `cof_memo` — holds
+in every call. Five knobs sit in no key — the solver configuration,
 `qbf_node_max`, `accept_growth`, `accept_floor` and the call's `time_limit`
 — and are handled four ways. TAINT: a computation that hit a budget — a
 `qbf_node_max` sweep abandoned to `ASK` that ended
@@ -351,7 +380,8 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞):
                                                   //   CALLBACK on a NODE, pure:
                                                   //   a block's binder node
                                                   //   (§5) or a canonical
-                                                  //   chain's term node (§3)
+                                                  //   chain's term node (§3,
+                                                  //   §7 DISCHARGE)
                                                   //   → bool (§1 ctx table)
     if φ carries no quantifier: return φ
  0. φ ← CANONICALISE_BINDER_IDS(φ)     // formula binders AND functional-
@@ -376,7 +406,13 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞):
                                        //   phase 1 simplified it
  3. φ ← NORMALIZE_OPERATORS(φ)
  4. φ ← PROCESS_ALL_BLOCKS(φ, keep_functional)
+                                       // the one BDD-backed phase: binder
+                                       //   ids re-canonicalised and one
+                                       //   conversion at its start, one
+                                       //   spelling at its end (§4)
  5. φ ← SIMPLIFY(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
+                                       // SIMPLIFY: the first reader of the
+                                       //   spelled terms
     return CANONICALISE_BINDER_IDS(φ)
 ```
 
@@ -630,11 +666,12 @@ construction hooks. Neither pass re-spells an atom (inv. 4). Absorption and
 canonical assembly are NOT `SIMPLIFY`'s: they belong to the result joins at the
 construction sites; `SIMPLIFY` rewrites in place, and a chain keeps its nesting
 minus, or with, its rewritten members. One IMPLICIT parameter, the block `X`
-in scope — bound through the live order — and one flag, `ref_args = false`,
-set by phase 1 alone, which ESTABLISHES invariant 6: with it every atom goes
-through `SIMPLIFY_ATOM`, and the traversal also descends into reference
-arguments, recursively, running each through `SIMPLIFY_TERM` — a reference's
-arguments are always terms, only the reference itself can be a formula.
+in scope — bound by the caller (orientation, below) — and one flag,
+`ref_args = false`, set by phase 1 alone, which ESTABLISHES invariant 6: with
+it every atom goes through `SIMPLIFY_ATOM`, and the traversal also descends
+into reference arguments, recursively, running each through `SIMPLIFY_TERM`
+— a reference's arguments are always terms, only the reference itself can be
+a formula.
 Elsewhere only the atoms propagation rewrote are re-simplified, and an argument
 is touched only by a pin's substitution, which re-simplifies what it changed
 (§1)), `FOLD_DEGENERATE_BINDERS` (drop a binder over a
@@ -644,8 +681,8 @@ symbolic `∀_Y f`/`∃_Y f` term is formed: a subscript not free in `f` is
 dropped, a repeated subscript is kept at its innermost occurrence, each
 same-kind run sits in content order outermost first — one node per SET per
 kind — an adjoining same-kind run of `f` is merged into it, and a chain
-binding every free variable of a PLAIN `f` is folded to its constant unless a
-subscript hides in a leaf), `NORM_EQUATION(atom, order)`
+binding every free variable of `f`, plain or BDD-backed, is folded to its
+constant unless a subscript hides in a leaf), `NORM_EQUATION(atom, order)`
 (`l = r ↦ l + r = 0`, descending through one `¬`), `TERM_OF(atom, order)` (for
 an atom `l = r` — or `l ≠ r`, which phase 1 meets before
 `NORMALIZE_OPERATORS` — the term `l + r`, read through one `¬`) and
@@ -680,10 +717,11 @@ So are the two aggressive normalisers of invariant 6:
 - `SIMPLIFY_ATOM(a, order = ∅)` — one recipe in both regimes. `SIMPLIFY_TERM`
   on both sides, the atom rebuilt through the construction hooks, which fold
   a constant-only atom and equal sides. For a (¬)equation the joint ring sum
-  `l + r` — `TERM_OF`'s, a BDD operation once a side is BDD-backed — then
-  goes through `SIMPLIFY_TERM` as a DECISION alone: `0` decides `=` as `T`, a
+  `l + r` — `TERM_OF`'s, a BDD operation in phase 4 — then goes through
+  `SIMPLIFY_TERM` as a DECISION alone: `0` decides `=` as `T`, a
   nonzero constant as `F`, dually for `≠` (phase 1 meets it before
   `NORMALIZE_OPERATORS`); anything else leaves the atom as its sides stand.
+  In phase 4 the decision is a NODE TEST on the canonical sum (below).
   A side that is `0` skips the decision: the sum is then the other side,
   simplified already, and a constant there was folded by the hooks.
   Never reshaped, and `NORM_EQUATION` (`SQUEEZE`) stays the one rewrite of
@@ -692,9 +730,14 @@ So are the two aggressive normalisers of invariant 6:
   again; keys do not drift because an atom is simplified ONCE, at
   construction, and again only when a substitution rewrote it.
 
-The `order` these four carry is the LIVE order of §1's term representation:
-the EMPTY order is the plain regime — phases 1, 2 and 5 — and a term touching
-no variable of `P` is plain whatever the order says.
+The `order` these four carry is phase 4's one list (§1); the EMPTY order is
+the plain regime — phases 1, 2 and 5. Inside phase 4 every variable is a
+variable of the order, so on a backed term the sweep and the cofactor check
+find nothing the reduced BDD has not decided: `SIMPLIFY_TERM` is the IDENTITY
+on the BDD and simplifies its leaves alone, syntactically, as the plain
+regime does — a term holding references is canonical only up to leaf
+spelling (below) — and `SIMPLIFY_ATOM`'s decision is a node test, the sum the
+terminal `0` or a nonzero constant.
 
 The remaining primitives are defined by their contracts alone:
 
@@ -703,13 +746,16 @@ The remaining primitives are defined by their contracts alone:
   binder's id is `1 +` the maximum binder depth below it, in one id space
   shared by formula binders and functional quantifiers. Alpha-variants are
   then one node: phase 0's normaliser and the key of `ASK` and
-  `DECIDE_FINITE` (§7). An outer binder's id strictly exceeds every id below
-  it — siblings may share one — and that strict decrease is what makes
-  `[x ← t]` capture-safe.
+  `DECIDE_FINITE` (§7). It runs at phase 0, again at phase 4's entry (§4),
+  before any term is BDD-backed, undoing phase 2's renames apart
+  (`[x ← t]`), and at the end. An outer binder's id strictly exceeds every
+  id below it — siblings may share one — and that strict decrease is what
+  makes `[x ← t]` capture-safe and puts the innermost block at the bottom of
+  phase 4's order (§1).
 - `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)` — resolves every functional-quantifier
   chain PRESENT in `φ` that the callback `kf` does not keep: the input's own
-  chains, at entry (phase 1), before any order is live. No term of `φ` is
-  BDD-backed.
+  chains, at entry (phase 1), before phase 4's order exists. No term of `φ`
+  is BDD-backed.
 
   The unit of work is the MAXIMAL chain at its top, any mix of `∀`/`∃`,
   found anywhere — under binders, in reference arguments, in chain bodies.
@@ -721,32 +767,14 @@ The remaining primitives are defined by their contracts alone:
   NODE — prefix outermost first with kinds, the body below it, for the
   callback to read. Kept ⇒ the whole chain stays. Else the body is built as
   a BDD over the CHAIN'S OWN order, innermost subscript lowest, and handed to
-  the chain step (below) with that order as the live one; what comes back
-  is spelled PLAIN before the pass moves on — a node minted under a chain's
-  order belongs to no live order — and a chain nothing of which resolved is
-  the node as written. Chain orders re-rank a subscript from chain to chain,
-  so the library's tables clear between chains; nothing is cached yet, which
-  is why the chain's own order lives here alone.
-
-  After this pass a chain in `φ` is a kept one or a stuck one, and both
-  stay: no later step resolves a chain it finds in a leaf.
-
-- `RESOLVE_FUNCTIONAL_BDD(φ, order, kf)` — the component's close (§5):
-  resolves every functional-quantifier chain in the TREE of `φ` that `kf`
-  does not keep. `order` is the live order; every BDD-backed term of `φ`
-  belongs to it, and every chain met sits over a BDD-backed body with its
-  subscripts among the decision variables — keep mode's whole-block emission
-  `Q_X (bf(BDD_ID))`, `X ⊆ P` (§7 `DISCHARGE`). A chain over a plain body is
-  one whose BDD did not branch — its subscripts occur in leaves alone — and
-  it stays as it is. Leaves are never entered: a chain in a leaf is an inner
-  block's kept emission or a stuck one, both decided.
-
-  Same unit of work, same canonicalise-then-ask as above; kept ⇒ the whole
-  chain stays. Else THE CHAIN STEP: ONE quantification of the stored BDD
-  under the live order — `bdd_ex`/`bdd_all` for a prefix of one kind,
-  `bdd_quant` for a mixed one, nested by the ranks it runs under (an
-  emission is one kind; an entry chain's order nests by construction) —
-  emitted under the live order, plain when nothing branches.
+  THE CHAIN STEP with that order as the live one: ONE quantification of the
+  body's BDD — `bdd_ex`/`bdd_all` for a prefix of one kind, `bdd_quant` for
+  a mixed one, nested by the chain's order, which nests by construction.
+  What comes back is spelled PLAIN before the pass moves on — a node minted
+  under a chain's order belongs to no later order — and a chain nothing of
+  which resolved is the node as written. Chain orders re-rank a subscript
+  from chain to chain, so the library's tables clear between chains; nothing
+  is cached yet, which is why the chain's own order lives here alone.
 
   LEAF HAZARD: a subscript hiding in a leaf — a reference argument, a
   foreign-typed subterm — is reached by no quantification and STAYS. The
@@ -761,8 +789,9 @@ The remaining primitives are defined by their contracts alone:
   slid onto the leaves by the build (§1 transparency), where an outer
   subscript's quantification crosses it.
 
-  Neither resolver has a memo of its own: the entry pass runs once, and the
-  close's quantifications are covered by the library's memos.
+  After this pass a chain in `φ` is a kept one or a stuck one, and both
+  stay: no later step resolves a chain it finds in a leaf. The pass has no
+  memo of its own: it runs once.
 - `φ[x ← t]` and `φ[atm ↦ T/F]` — capture-aware substitution, each returning
   an untouched subtree by one cached test, `FV` and `atoms_memo` (§10);
   `[x ← t]` descends into units (§4) and re-simplifies what it touches
@@ -771,38 +800,45 @@ The remaining primitives are defined by their contracts alone:
   in its vocabulary — and erases every occurrence it reaches.
 
   `[x ← t]` is ONE substitution primitive, shared with the rest of the system.
-  It prepares `t` itself: a backed `t` is spelled out once, and when `t`
+  It prepares `t` itself: a backed `t` is spelled out once, in
+  `FINISH_TERMS`' spelling (below), for the plain leaves, and when `t`
   carries a binder — formula binder or functional quantifier — the bound
   variables of `t` are RENAMED APART, to fresh ids above the largest id in
   `φ` and in `t`, the ids inside backed terms included, so no binder on any
   path of `φ` equals a subscript inside `t`. Ids are never renumbered there;
-  phase 5 restores depth-canonical ids. The substitution is simultaneous and
-  the key is matched by content; a node is entered only if `x` is free in it
-  (one cached `FV` test), so a rebound `x` is left alone; a backed term is
-  rewritten leaves first and then by one compose; a reference argument is
-  rewritten and re-simplified once per changed argument; temporal operators
-  are entered.
+  phase 4's entry and phase 5 restore depth-canonical ids. The substitution
+  is simultaneous and the key is matched by content; a node is entered only
+  if `x` is free in it (one cached `FV` test), so a rebound `x` is left
+  alone; a backed term is rewritten leaves first and then by one compose; a
+  reference argument is rewritten and re-simplified once per changed
+  argument; temporal operators are entered. In phase 4 a renamed-apart
+  subscript stays inside its chain's leaf, slid already (§1), never a
+  decision variable of the term, and the global order places it like any
+  variable.
 - `COLLECT_RUN(h)` — the maximal same-kind quantifier run from `h`, with its
   matrix (§4).
 - `CONNECTED_COMPONENTS(X, body)` — the partition of `X` by atom
   connectivity, descending into nested binders, references connecting
   nothing (§5); each component in `X`'s order.
-- `PREPARE_TERMS(body, P, order)` — §1's term representation over `P`:
-  both sides of every EQUATION touching `P` backed by a BDD whose decision
-  variables are `P` in the given order, everything else in the leaves,
-  functional quantifiers slid onto the leaves; order atoms left plain;
-  binder units, references and temporal operators transported opaque. The
-  caller owns `order` and passes it to every later term operation. A SOLVER
-  QUERY is built on converted terms, since a backed term is a node of one
-  order and a `solver_memo` key holding one would never hit across
-  components.
-- `FINISH_TERMS(φ)` — `PREPARE_TERMS`' inverse, run at the component's close
-  (§5): every BDD-backed term of `φ` converted back to a plain term wherever
-  it sits — under a REWRAPped binder, inside a symbolic functional
-  quantifier's body, inside a reference argument, under a temporal operator.
-  One memoised walk. Each spelled term goes once through `SIMPLIFY_TERM` in
-  the plain regime, the spelling phase 1 gives every atom; the inverse of
-  `PREPARE_TERMS` up to term normal form.
+- `PREPARE_TERMS(φ, order)` — phase 4's ONE conversion, at its start (§4):
+  both sides of every EQUATION of `φ`, wherever it sits — under binders,
+  under temporal operators — built as a BDD over `order` (§1), everything
+  else in the leaves, every chain kept or stuck at entry SLID to its
+  subscripts' levels (§1 transparency); order atoms and reference arguments
+  left plain. No binder unit exists yet: units are
+  phase 4's own re-wraps. One memoised walk. The caller owns `order` and
+  passes it to every later term operation of the phase.
+- `FINISH_TERMS(φ)` — phase 4's ONE spelling, at its end (§4): every
+  BDD-backed term of `φ` spelled plain wherever it sits — under a binder,
+  a re-wrap's included, under a temporal operator, inside a leaf. SHANNON
+  SPELLING per BDD node, `x` its variable:
+      x·f₁ ∪ x′·f₀,   or the RING SUM  x + f₀  wherever f₁ = f₀′
+  memoised per node, so shared nodes stay shared and the output is linear in
+  the BDD; constants fold through the construction hooks. No `SIMPLIFY_TERM`
+  follows: a reduced BDD's spelling leaves the path sweep and the cofactor
+  check nothing to do, and phase 5's `SIMPLIFY` is the next reader. A SOLVER
+  QUERY is built in the same spelling (§7 `ASK`), so `solver_memo` keys are
+  canonical.
 - `LEAF_FV(t)` — the free variables the LEAVES of `t` contribute: for a
   BDD-backed term the union over its leaves, for a plain term its whole `FV`.
   The leaf-hazard test (§1) is `LEAF_FV(t) ∩ X ≠ ∅`, read behind `usable`
@@ -869,22 +905,23 @@ contradiction works inside a single term). It is what lets the syntactic tests
 fire in cases like `f = xy ∪ x′a`, `x ∈ X`: `f₀ = a` and `f₁ = y` compare
 unequal until `y := a` turns `f` into `a`.
 
-- **The pin is `TRY_WITNESS`'s, on plain terms.** A POSITIVE equation
-  conjunct `c` — an equation under `¬` pins nothing — that is `X`-free, hence
-  plain (§1), pins a free `y` of `f = TERM_OF(c)` iff `usable ∧ f₀ ∪ f₁ = 1`
-  on the cofactors `f₀ = SIMPLIFY_TERM(f[y←0])`, `f₁ = SIMPLIFY_TERM(f[y←1])`,
-  the record memoised in `cof_memo` under `(f, y)` (§1) — `f` is `X`-free, so
-  no order enters it and the entry is a pure function of its key, and the
-  same conjunct is matched again at every construction site of a push;
+- **The pin is `TRY_WITNESS`'s, on `X`-free terms.** A POSITIVE equation
+  conjunct `c` — an equation under `¬` pins nothing — that is `X`-free pins
+  a free `y` of `f = TERM_OF(c)` iff `usable ∧ f₀ ∪ f₁ = 1` on the cofactors
+  `f₀ = SIMPLIFY_TERM(f[y←0])`, `f₁ = SIMPLIFY_TERM(f[y←1])`, restricts in
+  phase 4 (§1), the record memoised in `cof_memo` under `(f, y)` (§1) — a
+  pure function of its key, and the same conjunct is matched again at every
+  construction site of a push;
   the witness is `f₁′`, STRICT when `p = f₀f₁` folds to `0` — the spelled
   shape `y + t = 0`, `y ∉ FV(t)`, is exactly the strict case, `t = f₁′` — else
   WEAK, with the residual `p = 0` kept by the conjunct itself. Several pins in
   one conjunct: a strict one first, else the smallest `‖f₁′‖`. One match, ONE
-  implementation, shared with `TRY_WITNESS`'s spelled mode (§3).
+  implementation, shared with `TRY_WITNESS` (§3): its spelled mode in the
+  plain regime, `COF`'s recipe in phase 4.
 - **Orientation.** If either side pins a block variable, `TRY_WITNESS`
   eliminates that variable instead. A free `y` is propagated only when
-  `FV(t) ∩ X = ∅` — pushing a block variable into a leaf breaks the
-  child-is-cofactor identity (§1) — which an `X`-free conjunct guarantees.
+  `FV(t) ∩ X = ∅` — substituting into a leaf would hide a block variable
+  there (§1 leaf hazard) — which an `X`-free conjunct guarantees.
   "The block in scope" is `SIMPLIFY`'s implicit parameter: calls inside
   `PUSH_BLOCK` or an elimination method bind it to the component's `X`;
   phases 1–2 and 5 bind it to `∅` (nothing is BDD-backed there), making the
@@ -956,10 +993,19 @@ it occurs in the formula.
 
 ```
 PROCESS_ALL_BLOCKS(φ, kf):                    // kf: the caller's callback
+    φ ← CANONICALISE_BINDER_IDS(φ)            // undoes phase 2's renames
+                                              //   apart: every chain's
+                                              //   subscripts the lowest
+                                              //   levels of its body (§1)
+    order ← φ's variables sorted by the global
+            order (§1)                        // the call's ORDER LIST: every
+                                              //   component's ctx.order (§5)
+    φ ← PREPARE_TERMS(φ, order)               // the ONE conversion (§3)
     memo ← ∅                                  // node → formula, whole pass;
                                               //   exact because kf is a pure
                                               //   function of the block
-    return PROCESS_NODE(φ, kf, memo)
+    φ ← PROCESS_NODE(φ, kf, memo)
+    return FINISH_TERMS(φ)                    // the ONE spelling (§3)
 
 PROCESS_NODE(n, kf, memo):                    // 2k: every quantifier, exactly once
     if memo[n] exists: return memo[n]         // asm. 1: a shared subtree is
@@ -1048,8 +1094,9 @@ PUSH_EX_BLOCK(body, X, kf):
     // nothing: a block variable inside one is frozen by every method (§7),
     // never resolved, so a reference mentioning two components straddles
     // them harmlessly. Components then share no atom, push sequentially
-    // without interference, may reuse ranks 1..|P|, and are TYPE-HOMOGENEOUS
-    // (inv. 2), which gives ELIMINATE_BLOCK one type to dispatch on.
+    // without interference, may reuse prio ranks 1..|P|, and are
+    // TYPE-HOMOGENEOUS (inv. 2), which gives ELIMINATE_BLOCK one type to
+    // dispatch on.
     // Connectivity only decays during the push — PUSH_OVER_CONJUNCTION
     // narrows scopes on the way.
     X ← X ∩ FV(body), keeping X's order           // a variable the body does not
@@ -1058,8 +1105,10 @@ PUSH_EX_BLOCK(body, X, kf):
     for P in CONNECTED_COMPONENTS(X, body):       // each keeps X's order;
                                                   //   0-based: P[0] outermost
         ctx.type  ← the BA type of P
-        ctx.order ← { P[i] ↦ |P|-i }              // inner → LOWER,  ranks 1..|P|
+        ctx.order ← the call's order list         // PHASE state (§1, §4): one
+                                                  //   list for every component
         ctx.prio  ← { P[i] ↦ i+1 }                // inner → HIGHER, ranks 1..|P|
+        ctx.kf ← kf                               // asked per emitted chain (§7)
         ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per component,
                                                   //   on ∃X over the body as it
                                                   //   stands (§1)
@@ -1071,15 +1120,6 @@ PUSH_EX_BLOCK(body, X, kf):
             ctx.solver_memo, ctx.qbf_memo
             ← the global tables                   // cross-run, never reset (§1)
         ctx.taint_count ← the global counter      // likewise (§1, cache scope)
-        body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
-                                                  //   EQUATION touching P (§1). A
-                                                  //   FORMULA-level binder unit
-                                                  //   is transported opaque (§7
-                                                  //   translates it at query
-                                                  //   time); a TERM-level
-                                                  //   functional quantifier
-                                                  //   slides onto its body's
-                                                  //   leaves (§1 transparency)
         prev ← body
         body ← PUSH_BLOCK(body, P, ctx)
         if |body| > max(ctx.accept_growth · |prev|, ctx.accept_floor):
@@ -1090,13 +1130,9 @@ PUSH_EX_BLOCK(body, X, kf):
             dep  ← ⋀ { c ∈ conjuncts of prev : FV(c) ∩ P ≠ ∅ }
             body ← SIMPLIFIED_AND_JOIN(REWRAP(dep, P ∩ FV(dep)),
                                        the conjuncts of prev not in dep)
-        // The component's close: RESOLVE_FUNCTIONAL_BDD first, while the
-        //   terms are still BDDs — a whole-block chain over P's own BDD
-        //   resolves by one quantification of the stored BDD, a subscript
-        //   hidden in a leaf stays (§3) — then FINISH_TERMS, which spells
-        //   every remaining backed term, chains intact
-        body ← RESOLVE_FUNCTIONAL_BDD(body, ctx.order, kf)
-        body ← FINISH_TERMS(body)                 // PREPARE_TERMS' inverse (§3)
+        // The component's close does nothing to terms: every chain was
+        //   decided at its emission (§7 DISCHARGE), and the spelling waits
+        //   for the push's end (§4)
     return body
 ```
 
@@ -1317,10 +1353,10 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
         A ← ⋀ { c ∈ conjuncts of ψ : FV(c) ∩ Xs ≠ ∅ }   // plain conjuncts and
                                                         //   negative trees, by
                                                         //   Xs's definition
-        r ← ELIMINATE_BLOCK(A, Xs, ctx)     // a SUB-block: under keep_functional
-        if r = F: return F                  //   its emission hides the variables
-                                            //   of X ∖ Xs it carries (§7
-                                            //   DISCHARGE, §1 leaf hazard)
+        r ← ELIMINATE_BLOCK(A, Xs, ctx)     // a SUB-block: an emission over
+        if r = F: return F                  //   variables of X ∖ Xs pending
+                                            //   below its levels is quantified
+                                            //   at once (§7 DISCHARGE)
         if Xs = X: return r                                      // pushed home
         return PUSH_BLOCK(SIMPLIFIED_AND_JOIN(r, the conjuncts of ψ not in A),
                           X ∖ Xs, ctx)
@@ -1419,6 +1455,7 @@ sharing.
 COF(f, x, ctx) → (f₀, f₁, p, usable, pin):       // the cof_memo recipe — 2f's
     on a ctx.cof_memo[(f, x)] miss, compute and record:        //   test
         f₀ ← SIMPLIFY_TERM(f[x←0]) ; f₁ ← SIMPLIFY_TERM(f[x←1])
+                                                 // restricts (§1)
         usable ← (x ∉ FV(f₀) ∪ FV(f₁))           // §1 leaf hazard
         p ← usable ? SIMPLIFY_TERM(f₀·f₁) : ⊥    // f has a zero iff p = 0
         pin ← usable ∧ SIMPLIFY_TERM(f₀ ∪ f₁) = 1   // the zeros of f fix x:
@@ -1823,7 +1860,8 @@ NEGATIVE_CONDITION(g, comps, X, ctx) → formula:
                                      //   X-free g lands here with X_g = ∅ and
                                      //   emits g ≠ 0 itself: under §1's term
                                      //   representation a BDD-backed g is
-                                     //   canonical over P, so "g independent
+                                     //   canonical over its decision
+                                     //   variables, so "g independent
                                      //   of X" IS FV(g) ∩ X = ∅, and no
                                      //   cofactor test is needed for it
     return DISCHARGE(∃(X_K ∪ X_g). F_K′·g ≠ 0, ctx)      // ⇒ ∃_{X_K ∪ X_g} F_K′g ≠ 0
@@ -1843,7 +1881,8 @@ TREE_CONDITION(t, comps, X, ctx) → formula:
     // condition exact modulo pos stays exact inside the joins. The
     // tree is never flattened: the DNF is the proof, not the computation.
     // The result is a negative tree over the free variables — conditions
-    // are negated equations — plain for the enclosing block.
+    // are negated equations — a conjunct like any other for the enclosing
+    // block.
     return t[¬(g = 0) ↦ NEGATIVE_CONDITION(g, comps, X, ctx)]
 ```
 
@@ -1882,24 +1921,32 @@ ELIMINATE_ATOMLESS_CLAUSE(clause, X, ctx):
 ```
 DISCHARGE(∃X.atom, ctx):
     // ∃X. f = 0  ⇒  ∀_X f = 0            ∃X. h ≠ 0  ⇒  ∃_X h ≠ 0
-    // No memo of its own (§1, ctx table): keep mode emits the chain, non-keep
-    // mode is one BDD quantification covered by the library's memos.
-    if ctx.keep_functional:
-        emit SIMPLIFY_ATOM of the functional-quantifier atom — the chain
-        built by the term constructor (§1: absent subscripts dropped,
-        same-kind segments merged, a chain with no free variable but its
-        own folded to its constant). A WHOLE-BLOCK emission is X-free and
-        keeps its BDD body until the component's close, where
-        RESOLVE_FUNCTIONAL_BDD is one quantification of the stored BDD and
-        the finish spells what is kept; a settled SUB-block's emission (§6)
-        keeps its BDD body the same way, and the block variables that body
-        still carries are HIDDEN from the rest of the push (§1 leaf hazard):
-        the atom is opaque to the methods and unusable to COF, and re-wraps
-        with its component. No slide, no reorder: the push-in stops at that
-        atom, by choice.
-    else: one BDD quantification over ctx.order; emit SIMPLIFY_ATOM of the
-          result. For |X| = 1: two substitutions and a meet/join (lem:xelim),
-          no traversal.
+    // No memo of its own (§1, ctx table): kf is asked once per emitted
+    // chain, and a quantification is covered by the library's memos.
+    // Every chain phase 4 emits is decided HERE, at its emission: kept, or
+    // quantified at once — a component's close does nothing to terms (§5).
+    if ctx.keep_functional and X's levels are the lowest of the term:
+                                 // a settled SUB-block (§6) with block
+                                 //   variables still pending below its
+                                 //   levels is quantified at once, whatever
+                                 //   kf would answer: no chain hides a block
+                                 //   variable (§1 transparency)
+        c ← ∀_X f, or ∃_X h, built by the term constructor (§1: absent
+            subscripts dropped, same-kind segments merged, a chain with no
+            free variable but its own folded to its constant)
+        if c is no chain, or ctx.kf(c):   // kf asked ONCE per emission, on
+                                          //   the chain as built (§1 ctx
+                                          //   table); a yes ALLOWS keeping
+            if c is a chain: c ← c SLID to X's levels (§1 transparency)
+                // one linear walk: the outer variables above stay decision
+                //   structure, each piece over X's levels becomes one leaf,
+                //   the chain over it — a closed piece folds to its constant
+            emit SIMPLIFY_ATOM of the functional-quantifier atom over c ;
+            return
+    one BDD quantification under ctx.order; emit SIMPLIFY_ATOM of the result
+    // keep mode off, a pending sub-block, or a chain kf does not keep. With
+    //   X at the term's bottom (§1) it is the meet (join) of the leaves, read
+    //   from below — one linear traversal.
 ```
 
 ### Bitvector — the router
@@ -1920,13 +1967,15 @@ through the type's atoms as constants: bit i of `u` is the pure atom
 carry the move (internals deferred, §9): `IS_LINEAR_ARITHMETIC(c)`, a
 syntactic guard, and `LINEAR_ARITHMETIC_TO_BA(c)`, defined on guard-positive
 conjuncts, emitting an equivalent ¬/∧/∨ combination of pure (¬)equations over
-the SAME free variables. An emission is a non-literal, non-unit conjunct the
-push never builds (the negative tree, §1, is the other such shape, read by
-§7's tree rules), so downstream recognises it by shape alone: PURE for the
-split, riding through the squeeze untouched, forcing tier 2 — carries couple
-bits, so an emission IS the k ≥ 2 competition. The price: an undecided
-clause re-wraps in converted form — still pure, decidable by sweep once
-enclosing blocks close it (§4), but the word-level original is gone (§9).
+the SAME free variables, their sides BDDs over the global order like every
+equation side of phase 4 (§1). An emission is a non-literal, non-unit
+conjunct the push never builds (the negative tree, §1, is the other such
+shape, read by §7's tree rules), so downstream recognises it by shape alone:
+PURE for the split, riding through the squeeze untouched, forcing tier 2 —
+carries couple bits, so an emission IS the k ≥ 2 competition. The price: an
+undecided clause re-wraps in converted form — still pure, decidable by sweep
+once enclosing blocks close it (§4), but the word-level original is gone
+(§9).
 
 Functional quantifiers cut the other way: over same-type pure content they are
 BA polynomials (lem:xelim; §1 transparency), hence PURE — the finite side
@@ -2001,12 +2050,13 @@ SOLVE_ARITHMETIC(clause, X, ctx):                     // the solver path
 
 ```
 ASK(q, ctx) → sat | unsat | unknown:
-    // Key = CANONICALISE_BINDER_IDS(q): alpha-variants collide across
-    // components, blocks, runs, and the two closings. `unknown` is cached too —
+    // Key = q in the push's end spelling (FINISH_TERMS, §3), its binder ids
+    // canonicalised: alpha-variants collide across components, blocks, runs,
+    // and the two closings. `unknown` is cached too —
     // the table is valid per solver configuration, flushed when it changes
     // (§1, cache scope). elim_memo cannot subsume this: different (clause, X)
     // can normalise to the same query after freezing.
-    k ← CANONICALISE_BINDER_IDS(q)
+    k ← CANONICALISE_BINDER_IDS(FINISH_TERMS(q))
     if ctx.solver_memo[k] exists: return ctx.solver_memo[k]
     r ← the solver's verdict on k
     ctx.solver_memo[k] ← r ; return r
@@ -2203,7 +2253,7 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
     // the honest exponential (inv. 8) behind ctx.qbf_node_max. Past the
     // budget, ASK: sweep and solver blow up on different instances — a
     // complementary fallback.
-    k ← CANONICALISE_BINDER_IDS(q)
+    k ← CANONICALISE_BINDER_IDS(FINISH_TERMS(q))      // ASK's key
     if ctx.qbf_memo[k] exists: return ctx.qbf_memo[k]
     if ctx.solver_memo[k] = sat:   return T   // constant before exponential
     if ctx.solver_memo[k] = unsat: return F   //   (inv. 8): a verdict from an
@@ -2282,8 +2332,10 @@ how long a caller waits.
 - **`IS_LINEAR_ARITHMETIC` / `LINEAR_ARITHMETIC_TO_BA` are black boxes.** The
   router leans only on their contract (router intro). Deferred: the carry
   encoding (fresh ∃-bound definition variables would put a binder unit into
-  the emission); the operator list defining "linear" and the mod-2ⁿ wrap
-  convention, which must match the solver's; the bit-significance order,
+  the emission, and their ids, which place them in the global order (§1) and
+  must stay below every enclosing binder's for `[x ← t]`'s capture safety);
+  the operator list defining "linear" and the mod-2ⁿ wrap convention, which
+  must match the solver's; the bit-significance order,
   which must read against `BIT_BLAST`'s atom enumeration; whether re-wraps
   and `ASK` fallbacks should use the word-level original instead of the
   converted form; and whether conversion may reach inside a translatable
