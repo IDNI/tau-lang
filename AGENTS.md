@@ -106,7 +106,8 @@ under [WebAssembly](#webassembly) below.
 
 Notes:
 - Arguments may appear in any order: preset name, `run`, `-D…`, `-v`,
-  `--target NAME`, `--keep-cache` (no `--fresh`: the cache of the build
+  `--target NAME[,NAME…]` (a comma-separated list of targets),
+  `--keep-cache` (no `--fresh`: the cache of the build
   directory stays), `-G GENERATOR`, and `--` (args after `--` go to `tau`).
 - Appending `run` runs ctest for `*-tests`/`*-all` presets, otherwise runs `tau`.
 - Always use the explicit form `./dev preset <name>` — bare `./dev <preset-name>`

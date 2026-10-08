@@ -27,7 +27,7 @@ All of the following may appear **in any order** on the command line:
 | `-D…` | CMake definition (passed to configure/build via `DEV_CMAKE`) |
 | `Debug` / `Release` / `RelWithDebInfo` / `Coverage` | legacy build type |
 | `-v` | verbose build |
-| `--target NAME` | build only this target |
+| `--target NAME[,NAME…]` | build only these targets, a comma-separated list |
 | `--keep-cache` | preset only: keep the CMake cache of the build directory instead of a fresh configure |
 | `-G NAME` | sets `GENERATOR` (not `DEV_CMAKE`); legacy build defaults to Ninja; preset uses preset generator unless `-G` is passed |
 | preset name (e.g. `release-tests`) | preset to configure |
@@ -84,7 +84,7 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 
 ## Building
 
-- `build [<BUILD_TYPE>] [-v] [--target NAME] [-G GENERATOR] [<CMAKE_OPTIONS>]`
+- `build [<BUILD_TYPE>] [-v] [--target NAME[,NAME…]] [-G GENERATOR] [<CMAKE_OPTIONS>]`
 - `debug`, `release`, `relwithdebinfo`, `coverage` — shorthand for `build`
 - `w64-debug`, `w64-release` — Windows cross-build (MinGW toolchain from parser)
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
@@ -129,7 +129,7 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   reach the emitted project configure, and a `-D` value wins over the preset.
   `TAU_SDK_DIR` names the SDK in both cases.
 
-Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME`, `-G GENERATOR`.
+Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME[,NAME…]`, `-G GENERATOR`.
 
 ### CMake presets
 
