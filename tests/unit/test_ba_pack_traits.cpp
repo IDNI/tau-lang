@@ -426,72 +426,49 @@ TEST_SUITE("accumulating folds") {
 }
 
 TEST_SUITE("options") {
-	TEST_CASE("pack_find_ba_option distinguishes its three outcomes") {
-		auto r = pack_find_ba_option<node_t>("no_such_family", "blasting");
-		CHECK(r.status == ba_option_lookup_status::no_such_family);
-		CHECK(r.option == nullptr);
+	TEST_CASE("pack_find_ba_option finds a declared name only") {
+		CHECK(pack_find_ba_option<node_t>("no_such_family-blasting")
+			== nullptr);
+		CHECK(pack_has_option_prefix<node_t>("ba"));
+		CHECK_FALSE(pack_has_option_prefix<node_t>("no_such_family"));
 #ifdef TAU_PACK_HAS_BA_BV
-		auto f = pack_find_ba_option<node_t>("bv", "blasting");
-		CHECK(f.status == ba_option_lookup_status::found);
-		REQUIRE(f.option != nullptr);
-		CHECK(f.option->kind == ba_option_kind::flag);
-		auto n = pack_find_ba_option<node_t>("bv", "no_such_option");
-		CHECK(n.status == ba_option_lookup_status::no_such_option);
-		CHECK(n.option == nullptr);
+		const option_spec* f = pack_find_ba_option<node_t>("bv-blasting");
+		REQUIRE(f != nullptr);
+		CHECK(std::holds_alternative<bool>(f->fallback));
+		CHECK(pack_find_ba_option<node_t>("bv-no_such_option") == nullptr);
+		CHECK(pack_has_option_prefix<node_t>("bv"));
 #endif
 #ifdef TAU_PACK_HAS_BA_SBF
-		CHECK(pack_find_ba_option<node_t>("sbf", "anything").status
-			== ba_option_lookup_status::no_such_option);
+		CHECK(pack_has_option_prefix<node_t>("sbf"));
 #endif
 	}
-	TEST_CASE("every option carries the accessors of its kind") {
-		for (const auto& e : pack_ba_options<node_t>()) {
-			CAPTURE(e.family);
-			CAPTURE(e.option.name);
-			const ba_option& o = e.option;
-			CHECK((o.get_flag && o.set_flag)
-				== (o.kind == ba_option_kind::flag));
-			CHECK((o.get_count && o.set_count)
-				== (o.kind == ba_option_kind::count));
-			CHECK((o.get_text && o.set_text)
-				== (o.kind == ba_option_kind::text));
-		}
+	TEST_CASE("a write of a BA option moves the options generation") {
+		const option_spec* f = pack_find_ba_option<node_t>(
+			"ba-decision-pins");
+		REQUIRE(f != nullptr);
+		const size_t before = ba_options_generation.load();
+		const option_value v = idni::options().value(f->name);
+		REQUIRE(idni::options().set(f->name, v).has_value());
+		CHECK(ba_options_generation.load() != before);
 	}
 #ifdef TAU_PACK_HAS_BA_NLANG
-	TEST_CASE("a text option is part of the options fingerprint") {
-		auto f = pack_find_ba_option<node_t>("nlang", "model");
-		REQUIRE(f.option != nullptr);
-		CHECK(f.option->kind == ba_option_kind::text);
+	TEST_CASE("a text option refuses a word outside its set, and the key reads masked") {
 		const llm_options saved = nlang_llm_options();
-		const size_t base = pack_ba_options_fingerprint<node_t>();
-		REQUIRE(f.option->set_text("some-other-model"));
-		CHECK(f.option->get_text() == "some-other-model");
-		CHECK(pack_ba_options_fingerprint<node_t>() != base);
-		nlang_llm_options() = saved;
-		CHECK(pack_ba_options_fingerprint<node_t>() == base);
-	}
-	TEST_CASE("a text setter refuses a word outside its set, and the key reads masked") {
-		const llm_options saved = nlang_llm_options();
-		auto opt = [](const char* n) {
-			return pack_find_ba_option<node_t>("nlang", n).option; };
-		nlang_llm_options() = {};
-		REQUIRE(opt("provider")->set_text("openai"));
-		CHECK_FALSE(opt("provider")->set_text("nobody"));
-		CHECK(opt("provider")->get_text() == "openai");
-		REQUIRE(opt("api-key")->set_text("sk-x"));
-		CHECK(opt("api-key")->get_text() == "set");
+		auto& repo = idni::options();
+		REQUIRE(repo.set_text("nlang-provider", "openai").has_value());
+		CHECK_FALSE(repo.set_text("nlang-provider", "nobody").has_value());
+		CHECK(repo.get_text("nlang-provider").value() == "openai");
+		REQUIRE(repo.set_text("nlang-api-key", "sk-x").has_value());
+		CHECK(repo.get_text("nlang-api-key").value() == "set");
+		CHECK(nlang_llm_options().api_key == "sk-x");
 		nlang_llm_options() = saved;
 	}
 #endif
-	TEST_CASE("pack_ba_options is de-duplicated per (family, name)") {
-		const auto& opts = pack_ba_options<node_t>();
-		for (size_t i = 0; i < opts.size(); ++i)
-			for (size_t j = i + 1; j < opts.size(); ++j) {
-				const bool dup = opts[i].family == opts[j].family
-					&& std::string(opts[i].option.name)
-						== opts[j].option.name;
-				CHECK_FALSE(dup);
-			}
+	TEST_CASE("pack_ba_option_specs names each option once") {
+		const auto& specs = pack_ba_option_specs<node_t>();
+		for (size_t i = 0; i < specs.size(); ++i)
+			for (size_t j = i + 1; j < specs.size(); ++j)
+				CHECK(specs[i].name != specs[j].name);
 	}
 }
 

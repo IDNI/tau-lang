@@ -221,8 +221,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading | owner, by type tree |
 | `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id). `hash_constant` must return `std::uint64_t`, the same value on every platform, because `std::hash` returns `size_t`. Another return type fails `ba_descriptor_complete` and a `static_assert` in `node::hashit`. On x86_64 Linux `size_t` is `std::uint64_t`, so there a `size_t` result still passes | the constant's own alternative, at the point of use |
 | `constant_size(x)` | how many tree nodes a constant carries when operations on constants build ever larger ones (the wrapper embeds a whole spec); `max_constant_size` bounds the values the solver builds by it | the constant's own alternative, at the point of use |
-| `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
-| `declared_options()`, `bind_options(repo)` | your `option_set`, which the pack declares in the repository, and the binding of each option to its field, so the command line, the REPL and `TAU_<TYPE>_<NAME>` write the field. Each option is named `<type_name>-<name>`: the pack checks this in `tau_init()` and stops the program on a wrong name. The tau algebra alone uses the prefix `ba` instead | every declarer, in pack order, stopping at the first failure |
+| `declared_options()`, `bind_options(repo)` | your `option_set`, which the pack declares in the repository, and the binding of each option to its field, so the command line, the REPL, the API and `TAU_<TYPE>_<NAME>` write the field (see below). Each option is named `<type_name>-<name>`: the pack checks this in `tau_init()` and stops the program on a wrong name. The tau algebra alone uses the prefix `ba` instead | every declarer, in pack order, stopping at the first failure |
 | `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
 | `set_ba_decision_pins(size_t)`, `ba_decision_pins()` | your own cap on the decided rows kept alive across a sweep; today only the wrapper declares one | every declarer / the declarer's, 0 when none |
@@ -263,39 +262,34 @@ nested in the fold's lambda crashes gcc 13.
 
 ### Options
 
-`options()` returns a range of `ba_option` (`ba_descriptor.h`): a bare `name`,
-a `kind` -- `flag`, which the REPL's `set` also accepts as enable/disable/toggle,
-`count`, which takes a number, or `text`, which takes a word -- a getter and a
-setter, and a help string.
-The REPL and CLI address it as `<family>-<name>` (`bv-blasting`), `<family>`
-being your `type_name`, so every width of a parameterised family shares one
-option set; `pack_find_ba_option` tells "no such family" from "no such option"
-so each gets its own message. The getter and setter are function pointers to
-process-wide storage of your own, so every pack in one process shares the
-value. A switch that gates a preprocessing pass also needs core's master
-`preprocessing` switch on: `bv-blasting` is the example.
+A BA declares its options as an `option_set` (`utility/options.h` of the
+parser) and gives it from `declared_options()`. Each spec has a name, the
+owner (your `type_name`), a default, of which the kind follows, and a help
+string. The kind is a flag, a count (`size_t`) or a text. Name each option
+`<type_name>-<name>` (`bv-blasting`), so every width of a parameterised type
+shares one option set. The pack checks the prefix in `tau_init()`, and the
+conformance test checks it again.
 
-A `text` option fills `get_text` and `set_text`, which follow `help` in the
-struct, and leaves the four numeric accessors null. Its setter returns `false`
-for a word it does not take, and the REPL, the CLI and the API then report an
-invalid value; let an empty text clear the option. A getter returns what a
-reader may see: an option that holds a secret answers `set` or `unset`
-(`nlang-api-key`). The REPL grammar gives a value letters, digits and
-`. - _ : /`, optionally in double quotes (a host name needs them, since a
-`.` also separates commands). The API reaches every option by name through
-`idni::options()`, and a write of an option moves `ba_options_fingerprint`.
+`bind_options(repo)` binds each option to a field of your own, for example
+`inline size_t my_limit = 20;`. The engine reads the field, and every write
+goes through the binding: the command line, the REPL `set` command, the API
+(`idni::options()`, by name) and the environment, which
+`load_env("TAU_")` reads as `TAU_<TYPE>_<NAME>` with dashes as underscores.
+The last write wins. Bind each option with `ba_option_hook()`
+(`option_codecs.h`), which moves the fingerprint the verdict memos are keyed
+on. Give it your own hook when a write must also empty a cache of yours.
 
-A `flag` is written back from the command line only when the given value
-differs from the one in force, and a `count` or `text` option only when its flag is actually given on the
-command line, so a getter is free to resolve an environment fallback of its
-own and the CLI will not shadow it with the option's default. Every count
-option has one, named `TAU_<FAMILY>_<NAME>` with dashes as underscores
-(`bv-defelim-max-atoms` reads `TAU_BV_DEFELIM_MAX_ATOMS`). Store the option
-in a plain field and bind it in `bind_options()`: `load_env("TAU_")` writes
-the field once at start, and the getter and the setter read and write the
-same field (`bv_defelim_max_atoms` is the example). Name the variable and the default
-in the help string: the CLI registers the option with an empty default, so
-`--help` shows the help string alone.
+A field of another type than the option binds with a codec: a `to_value`
+and a `from_value` that reports a bad value. `zero_is_unlimited_codec` keeps
+`SIZE_MAX` in a field whose option reads 0 for unlimited. A text option that
+takes only some words checks them in its codec, and one that holds a secret
+reads back as `set` or `unset` (`nlang-api-key`). The REPL grammar gives a
+value letters, digits and `. - _ : /`, optionally in double quotes (a host
+name needs them, since a `.` also separates commands).
+
+A switch that gates a preprocessing pass also needs core's master
+`preprocessing` switch on: `bv-blasting` is the example. `bv_options.h`,
+`qlt_options.h` and `nlang_options.h` show the whole pattern.
 
 ### Rewrite hooks
 

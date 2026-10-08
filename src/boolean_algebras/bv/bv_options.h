@@ -118,7 +118,7 @@ result<void> bv_bind_options(options_repository& repo) {
 		hook));
 	TAU_TRY_VOID(repo.bind("bv-solve-timeout", bv_solve_timeout, hook));
 	TAU_TRY_VOID(repo.bind("bv-widening", bv_widening, hook));
-	// 0 restores the default, as the table setter keeps the cap on 0.
+	// 0 restores the default.
 	TAU_TRY_VOID(repo.bind("bv-max-width", bv_max_width, ba_option_hook([] {
 		if (!bv_max_width) bv_max_width = bv_max_width_default;
 		bv_clear_caches<node>();

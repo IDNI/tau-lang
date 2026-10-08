@@ -90,54 +90,6 @@ constexpr bool ba_hash_constant_well_typed_v = [] {
 	else return true;
 }();
 
-/**
- * @brief Kind of a BA-declared CLI/REPL option.
- *
- * `flag` also accepts enable/disable/toggle; `count` takes a number only;
- * `text` takes a word (a name, a URL, a model id) that its setter may reject.
- */
-enum class ba_option_kind { flag, count, text };
-
-/**
- * @brief One CLI/REPL option a BA declares about itself.
- *
- * `name` is the bare option name; the REPL and CLI address it as
- * `<family>-<name>` (e.g. `bv-blasting`), `<family>` being the owning
- * descriptor's `type_name` (see @ref pack_ba_options in ba_pack_traits.h).
- * The getter and setter are the only access path to the value.
- *
- * A text getter returns what a reader may see, which need not be the value
- * written: an option that holds a secret answers `set` or `unset`. A text
- * setter returns `false`, and changes nothing, for a word it does not take.
- */
-struct ba_option {
-	/// bare option name, without the family prefix
-	const char* name;
-	/// selects the getter/setter pair in use
-	ba_option_kind kind;
-	bool   (*get_flag)()        = nullptr; ///< set iff kind == flag
-	void   (*set_flag)(bool)    = nullptr; ///< set iff kind == flag
-	size_t (*get_count)()       = nullptr; ///< set iff kind == count
-	void   (*set_count)(size_t) = nullptr; ///< set iff kind == count
-	/// one-line help text
-	const char* help            = "";
-	std::string (*get_text)()             = nullptr; ///< set iff kind == text
-	bool (*set_text)(const std::string&)  = nullptr; ///< set iff kind == text
-};
-
-/**
- * @brief `true` when @p BA's descriptor declares its own CLI/REPL options.
- *
- * Optional capability: a BA declaring no `options()` has none of its own, and
- * @ref pack_ba_options skips it.
- */
-template <typename Node, typename BA>
-constexpr bool ba_has_options_v = requires {
-	{ *(ba_descriptor<BA, Node>::options().begin()) }
-		-> std::convertible_to<ba_option>;
-	{ ba_descriptor<BA, Node>::options().end() };
-};
-
 /*
  * One concept per optional capability, all `<Node, BA>`.
  *

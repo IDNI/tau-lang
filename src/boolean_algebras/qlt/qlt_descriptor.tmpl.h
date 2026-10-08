@@ -10,7 +10,6 @@
 
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
-#include <array>
 #include "ba_types.h"
 // Reaches nothing beyond the standard library itself, unlike normalizer.h,
 // so it is safe here; needed for `result<...>` before ltl_aba_result.h.
@@ -95,71 +94,6 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/// Binds qlt's options, declared by the pack, to qlt's fields.
 	static result<void> bind_options(options_repository& repo) {
 		return qlt_bind_options<node_t>(repo);
-	}
-
-	/// @name qlt-declared CLI/REPL options
-	/// Backing getter/setter for @ref options; plain free functions so they
-	/// decay to the function pointers `ba_option` holds.
-	/// @{
-	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap; }
-	static void set_t3_cap_option(size_t n) { qlt_t3_encoding_cap = n; }
-	static size_t get_const_output_max_option() {
-		return qlt_const_output_max;
-	}
-	static void set_const_output_max_option(size_t n) {
-		qlt_const_output_max = n;
-	}
-	static size_t get_cells_budget_option() { return qlt_cells_budget; }
-	static void set_cells_budget_option(size_t n) { qlt_cells_budget = n; }
-	static size_t get_cells_max_params_option() {
-		return qlt_cells_max_params;
-	}
-	static void set_cells_max_params_option(size_t n) {
-		qlt_cells_max_params = n;
-	}
-	/// @}
-
-	/**
-	 * @brief The options qlt declares about itself: `qlt-t3-cap`, the
-	 * data-atom cap of the T3 encodings (Algorithms A/B/D and the semantic
-	 * PWR); above it the default ABA-oracle path decides. Clamped to 30
-	 * (the encodings shift `1 << K`); 0 = that bound. Then
-	 * `qlt-const-output-max`, `qlt-cells-budget` and
-	 * `qlt-cells-max-params` (see qlt.h).
-	 */
-	static std::array<ba_option, 4> options() {
-		return {{
-			{ "t3-cap", ba_option_kind::count,
-				nullptr, nullptr,
-				get_t3_cap_option, set_t3_cap_option,
-				"cap the data atoms the qlt T3 synthesis encodings "
-				"accept before the ABA-oracle path decides instead "
-				"(default: TAU_QLT_T3_CAP or 20, at most 30; "
-				"0 = 30)" },
-			{ "const-output-max", ba_option_kind::count,
-				nullptr, nullptr,
-				get_const_output_max_option,
-				set_const_output_max_option,
-				"cap the constant-output assignments the fast path "
-				"in front of Algorithm B enumerates (default: "
-				"TAU_QLT_CONST_OUTPUT_MAX or 100; "
-				"0 = unlimited)" },
-			{ "cells-budget", ba_option_kind::count,
-				nullptr, nullptr,
-				get_cells_budget_option, set_cells_budget_option,
-				"cap the formula instances one qlt decision by "
-				"cells evaluates before it is left open "
-				"(default: TAU_QLT_CELLS_BUDGET or 65536; "
-				"0 = unlimited)" },
-			{ "cells-max-params", ba_option_kind::count,
-				nullptr, nullptr,
-				get_cells_max_params_option,
-				set_cells_max_params_option,
-				"cap the other free variables, and the named "
-				"endpoints, a qlt decision by cells ranges over "
-				"(default: TAU_QLT_CELLS_MAX_PARAMS or 2; "
-				"0 = unlimited)" },
-		}};
 	}
 
 	/// @brief The type tree of `qlt`.
