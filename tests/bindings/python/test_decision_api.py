@@ -15,7 +15,7 @@ INPUT_DEPENDENT = "always o1[t]:bv[8] = i1[t]:bv[8] && o1[t] != {0}:bv[8]."
 CONTRADICTION = "always o2[t] = 1 && o2[t] = 0."
 
 # The binding has no type query, and each option name starts with its family.
-HAS_BV = any(n.startswith("bv-") for n in tau.ba_option_names())
+HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
 
 def untyped(core):
 	return [re.sub(r":[a-z]+(\[[0-9]+\])?", "", c) for c in core]

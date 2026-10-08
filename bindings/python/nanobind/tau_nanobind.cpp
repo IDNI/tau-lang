@@ -409,46 +409,6 @@ NB_MODULE(tau, m) {
 	m.def("tref_count", &tau_api::tref_count,
 		"Live interned tree node count, what set_tref_budget caps.");
 
-	// Options an algebra of the pack declares about itself, named
-	// <family>-<option> as on the command line (bv-widening, qlt-t3-cap).
-	m.def("ba_option_names", &tau_api::ba_option_names,
-		"Names of the options the algebras of this build declare.");
-	m.def("set_ba_option",
-		[](const std::string& name, size_t value) {
-			raise_if_init_failed();
-			return to_py_result(tau_api::set_ba_option(name, value));
-		}, "name"_a, "value"_a,
-		"Set a BA-declared option: a flag takes 0 or 1, a count its "
-		"number. Returns a result carrying the value now in force; no "
-		"value, and the reason in the report, when no algebra of this "
-		"build declares the name.");
-	m.def("get_ba_option",
-		[](const std::string& name) {
-			raise_if_init_failed();
-			return to_py_result(tau_api::get_ba_option(name));
-		}, "name"_a,
-		"The value of a BA-declared option (a flag reads 0 or 1), or no "
-		"value when no algebra of this build declares the name.");
-	m.def("set_ba_text_option",
-		[](const std::string& name, const std::string& value) {
-			raise_if_init_failed();
-			return to_py_result(
-				tau_api::set_ba_text_option(name, value));
-		}, "name"_a, "value"_a,
-		"Set a BA-declared text option (nlang-provider, nlang-model, "
-		"nlang-endpoint, nlang-api-key, nlang-effort); the empty string "
-		"clears it. Returns a result carrying the text the option now "
-		"reads (nlang-api-key reads 'set' or 'unset'); no value, and "
-		"the reason in the report, when the name is not a text option "
-		"of this build or the option does not take the value.");
-	m.def("get_ba_text_option",
-		[](const std::string& name) {
-			raise_if_init_failed();
-			return to_py_result(tau_api::get_ba_text_option(name));
-		}, "name"_a,
-		"The text a BA-declared text option reads, or no value when "
-		"the name is not a text option of this build.");
-
 	// Every option of the options repository, core and BA, by the name
 	// it has on the command line (max-fixpoint-steps, bv-widening).
 	m.def("option_names", []() { return idni::options().names(); },

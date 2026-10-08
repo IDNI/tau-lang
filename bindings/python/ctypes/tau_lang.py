@@ -139,7 +139,7 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_mealy_free.restype = None
     _LIB.tau_lang_reset.argtypes = []
     _LIB.tau_lang_reset.restype = c_int64
-    # Runtime limits and BA-declared options
+    # Runtime limits
     _LIB.tau_lang_set_limit.argtypes = [c_char_p, c_uint64]
     _LIB.tau_lang_set_limit.restype = c_int
     _LIB.tau_lang_get_limit.argtypes = [c_char_p, ctypes.POINTER(c_uint64)]
@@ -158,17 +158,6 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_set_ltl_algorithm.restype = None
     _LIB.tau_lang_get_ltl_algorithm.argtypes = []
     _LIB.tau_lang_get_ltl_algorithm.restype = c_char_p
-    _LIB.tau_lang_set_ba_option.argtypes = [
-        c_char_p, c_uint64, ctypes.POINTER(c_uint64)]
-    _LIB.tau_lang_set_ba_option.restype = c_int
-    _LIB.tau_lang_get_ba_option.argtypes = [c_char_p, ctypes.POINTER(c_uint64)]
-    _LIB.tau_lang_get_ba_option.restype = c_int
-    _LIB.tau_lang_set_ba_text_option.argtypes = [c_char_p, c_char_p]
-    _LIB.tau_lang_set_ba_text_option.restype = c_char_p
-    _LIB.tau_lang_get_ba_text_option.argtypes = [c_char_p]
-    _LIB.tau_lang_get_ba_text_option.restype = c_char_p
-    _LIB.tau_lang_ba_option_names.argtypes = []
-    _LIB.tau_lang_ba_option_names.restype = c_char_p
     return _LIB
 
 
@@ -301,7 +290,7 @@ def reset() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Runtime limits and BA-declared options
+# Runtime limits
 # ---------------------------------------------------------------------------
 #
 # Every numeric limit of the C++ api is reachable by name, and as
@@ -356,48 +345,6 @@ def set_ltl_algorithm(algorithm: str) -> None:
 
 def get_ltl_algorithm() -> str:
     return _load().tau_lang_get_ltl_algorithm().decode("utf-8")
-
-
-def ba_option_names() -> list:
-    """Names of the options the algebras of this build declare."""
-    return json.loads(_load().tau_lang_ba_option_names().decode("utf-8"))
-
-
-def set_ba_option(name: str, value: int) -> int:
-    """Set a BA-declared option; returns the value now in force."""
-    if value < 0:
-        raise ValueError(f"{name}: an option value is a non-negative number")
-    v = c_uint64()
-    if _load().tau_lang_set_ba_option(
-            name.encode("utf-8"), value, ctypes.byref(v)) != 0:
-        raise KeyError(last_error())
-    return v.value
-
-
-def get_ba_option(name: str) -> int:
-    """The value of a BA-declared option (a flag reads 0 or 1)."""
-    v = c_uint64()
-    if _load().tau_lang_get_ba_option(
-            name.encode("utf-8"), ctypes.byref(v)) != 0:
-        raise KeyError(last_error())
-    return v.value
-
-
-def set_ba_text_option(name: str, value: str) -> str:
-    """Set a BA-declared text option; returns the text it now reads."""
-    r = _load().tau_lang_set_ba_text_option(
-        name.encode("utf-8"), value.encode("utf-8"))
-    if r is None:
-        raise KeyError(last_error())
-    return r.decode("utf-8")
-
-
-def get_ba_text_option(name: str) -> str:
-    """The text a BA-declared text option reads."""
-    r = _load().tau_lang_get_ba_text_option(name.encode("utf-8"))
-    if r is None:
-        raise KeyError(last_error())
-    return r.decode("utf-8")
 
 
 def __getattr__(attr: str):

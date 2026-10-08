@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-The runtime limits and BA-declared options of the ctypes binding: every
-limit the library names reads back what was set, an unknown name is
-refused, and the limits that are not a count round-trip too.
+The runtime limits of the ctypes binding: every limit the library names
+reads back what was set, an unknown name is refused, and the limits that
+are not a count round-trip too.
 
 Needs TAU_LTL_LIB naming libtau_ctypes and tau_lang.py on PYTHONPATH.
 """
@@ -49,42 +49,10 @@ def test_other_limits_round_trip():
 	tau.set_ltl_algorithm("")
 	assert tau.get_ltl_algorithm() == "auto"
 
-def test_ba_options():
-	names = tau.ba_option_names()
-	assert all("-" in n for n in names), names
-	for name in names:
-		try:
-			v = tau.get_ba_option(name)
-		except KeyError:
-			# a text option refuses the numeric call and reads as text
-			t = tau.get_ba_text_option(name)
-			assert isinstance(t, str), name
-			continue
-		assert tau.set_ba_option(name, v) == v, name
-	if "nlang-model" in names:
-		assert tau.set_ba_text_option("nlang-model", "my-model-1") \
-			== "my-model-1"
-		assert tau.get_ba_text_option("nlang-model") == "my-model-1"
-		assert tau.set_ba_text_option("nlang-api-key", "sk-secret") == "set"
-		assert tau.set_ba_text_option("nlang-model", "") == ""
-		try:
-			tau.set_ba_text_option("nlang-provider", "nobody")
-		except KeyError:
-			pass
-		else:
-			raise AssertionError("an invalid provider was accepted")
-	try:
-		tau.get_ba_option("nope-nothing")
-	except KeyError:
-		pass
-	else:
-		raise AssertionError("an undeclared BA option was accepted")
-
 def main():
 	test_count_limits_round_trip()
 	test_unknown_limit_is_refused()
 	test_other_limits_round_trip()
-	test_ba_options()
 	print("Test passed!")
 
 if __name__ == "__main__":

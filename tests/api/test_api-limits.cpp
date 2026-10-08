@@ -381,20 +381,14 @@ TEST_SUITE("Tau API - runtime limits") {
 	// An algebra's options steer how its formulas are decided, and the
 	// memos are keyed on the formula alone, so each write moves it.
 	TEST_CASE("BA options and preprocessing are part of the budget fingerprint") {
-		for (const std::string& name : tau_api::ba_option_names()) {
-			CAPTURE(name);
+		auto& repo = idni::options();
+		for (const option_spec& spec : pack_ba_option_specs<node_t>()) {
+			CAPTURE(spec.name);
+			// the key reads back as set or unset, not as itself
+			if (spec.name == "nlang-api-key") continue;
 			const size_t before = verdict_budget_fingerprint<node_t>();
-			if (auto got = tau_api::get_ba_option(name); got.has_value())
-				REQUIRE( tau_api::set_ba_option(name, got.value())
-					.has_value() );
-			else {
-				// the key reads back as set or unset, not as itself
-				if (name == "nlang-api-key") continue;
-				auto was = tau_api::get_ba_text_option(name);
-				REQUIRE( was.has_value() );
-				REQUIRE( tau_api::set_ba_text_option(name, was.value())
-					.has_value() );
-			}
+			REQUIRE( repo.set(spec.name, repo.value(spec.name))
+				.has_value() );
 			CHECK( verdict_budget_fingerprint<node_t>() != before );
 		}
 		const size_t base = verdict_budget_fingerprint<node_t>();
@@ -405,166 +399,128 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 
-	TEST_CASE("BA options answer an error for a name no algebra declares") {
+	TEST_CASE("the repository refuses a name no option has") {
+		auto& repo = idni::options();
 		for (const char* name : { "nope-nothing", "nothing", "-x", "bv-" })
 		{
 			CAPTURE(name);
-			auto set = tau_api::set_ba_option(name, 1);
+			auto set = repo.set_text(name, "1");
 			CHECK_FALSE( set.has_value() );
 			CHECK( set.report().has_error() );
-			CHECK_FALSE( tau_api::get_ba_option(name).has_value() );
-		}
-		for (const std::string& name : tau_api::ba_option_names()) {
-			CAPTURE(name);
-			// every option is a number or a text, never both
-			CHECK( tau_api::get_ba_option(name).has_value()
-				!= tau_api::get_ba_text_option(name).has_value() );
-		}
-		for (const char* name : { "nope-nothing", "nothing", "-x" }) {
-			CAPTURE(name);
-			CHECK_FALSE( tau_api::set_ba_text_option(name, "x")
-				.has_value() );
-			CHECK_FALSE( tau_api::get_ba_text_option(name)
-				.has_value() );
+			CHECK_FALSE( repo.get_text(name).has_value() );
 		}
 	}
 
 #ifdef TAU_PACK_HAS_BA_NLANG
-	TEST_CASE("BA text options round-trip through the api") {
-		const auto names = tau_api::ba_option_names();
+	TEST_CASE("nlang text options round-trip by name") {
+		auto& repo = idni::options();
 		for (const char* name : { "nlang-provider", "nlang-endpoint",
 			"nlang-model", "nlang-api-key", "nlang-effort",
 			"nlang-max-tokens", "nlang-fallback", "nlang-http-timeout" })
-				CHECK( std::ranges::find(names, name) != names.end() );
+				CHECK( repo.find(name) != nullptr );
 		const llm_options saved = nlang_llm_options();
 		nlang_llm_options() = {};
 
-		auto model = tau_api::set_ba_text_option("nlang-model", "my-model-1");
-		REQUIRE( model.has_value() );
-		CHECK( model.value() == "my-model-1" );
-		CHECK( tau_api::get_ba_text_option("nlang-model").value()
-			== "my-model-1" );
+		REQUIRE( repo.set_text("nlang-model", "my-model-1").has_value() );
+		CHECK( repo.get_text("nlang-model").value() == "my-model-1" );
 		CHECK( nlang_llm_options().model == "my-model-1" );
 
-		auto url = tau_api::set_ba_text_option("nlang-endpoint",
-			"http://localhost:8080/v1");
-		REQUIRE( url.has_value() );
-		CHECK( url.value() == "http://localhost:8080/v1" );
+		REQUIRE( repo.set_text("nlang-endpoint", "http://localhost:8080/v1")
+			.has_value() );
+		CHECK( repo.get_text("nlang-endpoint").value()
+			== "http://localhost:8080/v1" );
 
 		// a closed set of words: another one is refused and changes nothing
-		REQUIRE( tau_api::set_ba_text_option("nlang-provider", "anthropic")
-			.has_value() );
-		auto bad = tau_api::set_ba_text_option("nlang-provider", "nobody");
+		REQUIRE( repo.set_text("nlang-provider", "anthropic").has_value() );
+		auto bad = repo.set_text("nlang-provider", "nobody");
 		CHECK_FALSE( bad.has_value() );
 		CHECK( report_has_code(bad.report(), code::invalid_argument) );
-		CHECK( tau_api::get_ba_text_option("nlang-provider").value()
-			== "anthropic" );
-		CHECK_FALSE( tau_api::set_ba_text_option("nlang-effort", "extreme")
-			.has_value() );
-		CHECK( tau_api::set_ba_text_option("nlang-effort", "high").value()
-			== "high" );
+		CHECK( repo.get_text("nlang-provider").value() == "anthropic" );
+		CHECK_FALSE( repo.set_text("nlang-effort", "extreme").has_value() );
+		REQUIRE( repo.set_text("nlang-effort", "high").has_value() );
+		CHECK( repo.get_text("nlang-effort").value() == "high" );
 
 		// the empty text clears the option
-		CHECK( tau_api::set_ba_text_option("nlang-model", "").has_value() );
+		CHECK( repo.set_text("nlang-model", "").has_value() );
 		CHECK( nlang_llm_options().model.empty() );
 
 		nlang_llm_options() = saved;
 	}
 
-	TEST_CASE("the api never reads the nlang key back") {
+	TEST_CASE("the nlang key never reads back") {
+		auto& repo = idni::options();
 		const llm_options saved = nlang_llm_options();
-		auto set = tau_api::set_ba_text_option("nlang-api-key", "sk-secret");
-		REQUIRE( set.has_value() );
-		CHECK( set.value() == "set" );
-		CHECK( tau_api::get_ba_text_option("nlang-api-key").value() == "set" );
+		REQUIRE( repo.set_text("nlang-api-key", "sk-secret").has_value() );
+		CHECK( repo.get_text("nlang-api-key").value() == "set" );
 		CHECK( nlang_llm_options().api_key == "sk-secret" );
 		nlang_llm_options() = saved;
 	}
 
-	TEST_CASE("a text option and a numeric one refuse each other's call") {
+	TEST_CASE("a text option and a numeric one refuse a value of the other kind") {
+		auto& repo = idni::options();
 		for (const char* name : { "nlang-model", "nlang-api-key" }) {
 			CAPTURE(name);
-			auto set = tau_api::set_ba_option(name, 1);
-			CHECK_FALSE( set.has_value() );
-			CHECK( report_has_code(set.report(), code::invalid_argument) );
-			CHECK_FALSE( tau_api::get_ba_option(name).has_value() );
+			CHECK_FALSE( repo.set(name, option_value{ std::size_t{ 1 } })
+				.has_value() );
 		}
 		for (const char* name : { "nlang-max-tokens", "nlang-fallback" }) {
 			CAPTURE(name);
-			auto set = tau_api::set_ba_text_option(name, "x");
-			CHECK_FALSE( set.has_value() );
-			CHECK( report_has_code(set.report(), code::invalid_argument) );
-			CHECK_FALSE( tau_api::get_ba_text_option(name).has_value() );
+			CHECK_FALSE( repo.set_text(name, "x").has_value() );
 		}
 	}
 
-	TEST_CASE("nlang-max-tokens and nlang-fallback round-trip through the api") {
+	TEST_CASE("nlang-max-tokens and nlang-fallback round-trip by name") {
+		auto& repo = idni::options();
 		const llm_options saved = nlang_llm_options();
-		CHECK( tau_api::set_ba_option("nlang-max-tokens", 512).value() == 512 );
+		REQUIRE( repo.set_text("nlang-max-tokens", "512").has_value() );
 		CHECK( nlang_llm_options().max_tokens == 512 );
 		// 0 is kept, and a request then asks for the default
-		CHECK( tau_api::set_ba_option("nlang-max-tokens", 0).value() == 0 );
+		REQUIRE( repo.set_text("nlang-max-tokens", "0").has_value() );
+		CHECK( repo.get_text("nlang-max-tokens").value() == "0" );
 		CHECK( llm_config_from_env().max_tokens == llm_default_max_tokens );
-		REQUIRE( tau_api::set_ba_text_option("nlang-provider", "anthropic")
-			.has_value() );
-		CHECK( tau_api::set_ba_option("nlang-fallback", 0).value() == 0 );
-		CHECK( tau_api::set_ba_option("nlang-fallback", 1).value() == 1 );
+		REQUIRE( repo.set_text("nlang-fallback", "off").has_value() );
+		CHECK_FALSE( nlang_llm_options().fallback );
+		REQUIRE( repo.set_text("nlang-fallback", "on").has_value() );
+		CHECK( nlang_llm_options().fallback );
 		nlang_llm_options() = saved;
 	}
 #endif
 
-	// An unknown option of a type the pack owns and an option of a type
-	// the pack lacks are both not_found.
-	TEST_CASE("BA options answer not_found for an unknown name") {
-		const auto names = tau_api::ba_option_names();
-		if (names.empty()) return;
-		const std::string family = names.front().substr(0,
-			names.front().find('-'));
-		auto no_option = tau_api::get_ba_option(family + "-no-such-option");
-		CHECK_FALSE( no_option.has_value() );
-		CHECK( report_has_code(no_option.report(), code::not_found) );
-		auto no_family = tau_api::get_ba_option("nosuchfamily-x");
-		CHECK_FALSE( no_family.has_value() );
-		CHECK( report_has_code(no_family.report(), code::not_found) );
-	}
-
 #ifdef TAU_PACK_HAS_BA_BV
-	TEST_CASE("BA options round-trip through the api") {
-		const auto names = tau_api::ba_option_names();
-		CHECK( std::ranges::find(names, "bv-widening") != names.end() );
+	TEST_CASE("bv options round-trip by name") {
+		auto& repo = idni::options();
+		CHECK( repo.find("bv-widening") != nullptr );
 		const bool saved_elim = bv_definitional_elimination;
-		auto off = tau_api::set_ba_option("bv-definitional-elimination", 0);
-		REQUIRE( off.has_value() );
-		CHECK( off.value() == 0 );
+		REQUIRE( repo.set_text("bv-definitional-elimination", "off")
+			.has_value() );
 		CHECK_FALSE( bv_definitional_elimination );
-		CHECK( tau_api::get_ba_option("bv-definitional-elimination")
-			.value() == 0 );
-		CHECK( tau_api::set_ba_option("bv-definitional-elimination", 7)
-			.value() == 1 );
+		CHECK( repo.get_text("bv-definitional-elimination").value()
+			== "false" );
+		REQUIRE( repo.set_text("bv-definitional-elimination", "on")
+			.has_value() );
 		CHECK( bv_definitional_elimination );
 		bv_definitional_elimination = saved_elim;
 
 		const size_t saved_atoms = bv_defelim_max_atoms;
-		CHECK( tau_api::set_ba_option("bv-defelim-max-atoms", 5)
-			.value() == 5 );
+		REQUIRE( repo.set_text("bv-defelim-max-atoms", "5").has_value() );
 		CHECK( bv_defelim_max_atoms == 5 );
 		bv_defelim_max_atoms = saved_atoms;
 
-		// bv-max-width takes 0 as its default, and reports it back.
+		// bv-max-width takes 0 as its default
 		const size_t saved_width = bv_max_width;
-		CHECK( tau_api::set_ba_option("bv-max-width", 0).value()
-			== bv_max_width_default );
+		REQUIRE( repo.set_text("bv-max-width", "0").has_value() );
+		CHECK( bv_max_width == bv_max_width_default );
 		bv_max_width = saved_width;
 	}
 
 	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
 	TEST_CASE("bv case split cap maps 0 to SIZE_MAX") {
+		auto& repo = idni::options();
 		const size_t saved = bv_case_split_max_tests;
-		CHECK( tau_api::set_ba_option("bv-case-split-max-tests", 3)
-			.value() == 3 );
+		REQUIRE( repo.set_text("bv-case-split-max-tests", "3").has_value() );
 		CHECK( bv_case_split_max_tests == 3 );
-		CHECK( tau_api::set_ba_option("bv-case-split-max-tests", 0)
-			.value() == 0 );
+		REQUIRE( repo.set_text("bv-case-split-max-tests", "0").has_value() );
+		CHECK( repo.get_text("bv-case-split-max-tests").value() == "0" );
 		CHECK( bv_case_split_max_tests
 			== std::numeric_limits<size_t>::max() );
 		bv_case_split_max_tests = saved;
@@ -671,16 +627,13 @@ TEST_SUITE("Tau API - runtime limits") {
 		tau_api::set_max_fixpoint_steps(saved_fp);
 
 		fill();
-		const auto names = tau_api::ba_option_names();
-		if (!names.empty()) {
-			auto before = tau_api::get_ba_option(names.front());
-			REQUIRE( before.has_value() );
-			const size_t v = before.value();
-			CHECK( tau_api::set_ba_option(names.front(),
-				v == 0 ? 1 : 0).has_value() );
-			CHECK_FALSE( cache.contains(key) );
-			CHECK( tau_api::set_ba_option(names.front(), v).has_value() );
-		}
+		auto& repo = idni::options();
+		const bool factoring = ba_component_factoring;
+		CHECK( repo.set("ba-component-factoring", option_value{ !factoring })
+			.has_value() );
+		CHECK_FALSE( cache.contains(key) );
+		CHECK( repo.set("ba-component-factoring", option_value{ factoring })
+			.has_value() );
 
 		// a display option is not semantic
 		fill();

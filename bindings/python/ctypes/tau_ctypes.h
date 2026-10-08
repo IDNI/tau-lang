@@ -78,7 +78,7 @@ void tau_lang_mealy_free(int64_t handle);
 int64_t tau_lang_reset(void);
 
 // ---------------------------------------------------------------------------
-// Runtime limits and BA-declared options
+// Runtime limits
 // ---------------------------------------------------------------------------
 
 // A numeric runtime limit, named as the C++ api setter and getter without
@@ -104,24 +104,6 @@ int64_t tau_lang_get_ltl_timeout_sec(void);
 void tau_lang_set_ltl_algorithm(const char* algorithm);
 // Valid until the next call.
 const char* tau_lang_get_ltl_algorithm(void);
-
-// An option an algebra of the build declares about itself, named
-// <family>-<option> (bv-defelim-max-atoms, qlt-cells-budget): a flag takes
-// 0 or 1, a count its number. Each writes the value now in force to *value
-// and returns 0, or returns -1 when no algebra declares the name
-// (tau_lang_last_error() says why). An unlimited cap may read as 2^64 - 1.
-int tau_lang_set_ba_option(const char* name, uint64_t value,
-	uint64_t* now);
-int tau_lang_get_ba_option(const char* name, uint64_t* value);
-// A BA-declared text option (nlang-provider, nlang-model, ...): the text it
-// now reads, valid until the next call, or null when the name is not a text
-// option of this build or the option refuses the value (tau_lang_last_error()
-// says why). The empty string clears the option; nlang-api-key reads "set" or
-// "unset".
-const char* tau_lang_set_ba_text_option(const char* name, const char* value);
-const char* tau_lang_get_ba_text_option(const char* name);
-// JSON array of the BA-declared option names. Valid until the next call.
-const char* tau_lang_ba_option_names(void);
 
 #ifdef __cplusplus
 } // extern "C"

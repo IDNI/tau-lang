@@ -208,66 +208,6 @@ void js_interpreter_free(int handle) {
 	g_interpreters.erase(handle);
 }
 
-// The value a BA-declared option holds after the call, or null with the
-// reason in getLastError() when no algebra of the pack declares the name.
-val js_ba_option_value(const result<size_t>& r) {
-	if (r.has_value()) return val(static_cast<double>(r.value()));
-	set_last_error(r);
-	return val::null();
-}
-
-val js_set_ba_option(const std::string& name, double value) {
-	if (!begin_engine_call()) return val::null();
-	if (!(value >= 0)) {
-		g_last_error = "set_ba_option: the value must be a "
-			"non-negative number";
-		return val::null();
-	}
-	try {
-		return js_ba_option_value(tau_api::set_ba_option(name,
-			static_cast<size_t>(value)));
-	} catch (const std::exception&) { return val::null(); }
-}
-
-val js_get_ba_option(const std::string& name) {
-	if (!begin_engine_call()) return val::null();
-	try {
-		return js_ba_option_value(tau_api::get_ba_option(name));
-	} catch (const std::exception&) { return val::null(); }
-}
-
-// The text a BA-declared text option reads after the call, or null with the
-// reason in getLastError().
-val js_ba_text_option_value(const result<std::string>& r) {
-	if (r.has_value()) return val(r.value());
-	set_last_error(r);
-	return val::null();
-}
-
-val js_set_ba_text_option(const std::string& name, const std::string& value) {
-	if (!begin_engine_call()) return val::null();
-	try {
-		return js_ba_text_option_value(
-			tau_api::set_ba_text_option(name, value));
-	} catch (const std::exception&) { return val::null(); }
-}
-
-val js_get_ba_text_option(const std::string& name) {
-	if (!begin_engine_call()) return val::null();
-	try {
-		return js_ba_text_option_value(
-			tau_api::get_ba_text_option(name));
-	} catch (const std::exception&) { return val::null(); }
-}
-
-val js_ba_option_names() {
-	val out = val::array();
-	size_t i = 0;
-	for (const std::string& name : tau_api::ba_option_names())
-		out.set(i++, name);
-	return out;
-}
-
 // The text of option @p name, or null with the reason in getLastError()
 // when the repository declares no such option.
 val js_get_option(const std::string& name) {
@@ -422,11 +362,6 @@ EMSCRIPTEN_BINDINGS(tau) {
 		&tau_api::get_gc_growth_factor);
 	emscripten::function("trefCount", optional_override(
 		[]() { return static_cast<double>(tau_api::tref_count()); }));
-	emscripten::function("baOptionNames", &js_ba_option_names);
-	emscripten::function("setBaOption", &js_set_ba_option);
-	emscripten::function("getBaOption", &js_get_ba_option);
-	emscripten::function("setBaTextOption", &js_set_ba_text_option);
-	emscripten::function("getBaTextOption", &js_get_ba_text_option);
 	emscripten::function("optionNames", &js_option_names);
 	emscripten::function("setOption", &js_set_option);
 	emscripten::function("getOption", &js_get_option);

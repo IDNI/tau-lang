@@ -2559,10 +2559,10 @@ and `anthropic`, the Anthropic Messages API (`<endpoint>/messages`).
 
 Every setting is an option of `nlang`, with the same name on each surface:
 the command line (`--nlang-model claude-opus-5-5`), the REPL
-(`set nlang-model claude-opus-5-5`, `get nlang-model`), the C++ API and the
-Python and JavaScript bindings (`set_ba_text_option("nlang-model", ...)` for
-a text and `set_ba_option("nlang-max-tokens", ...)` for a count or a flag;
-`setBaTextOption` and `setBaOption` in JavaScript). An
+(`set nlang-model claude-opus-5-5`, `get nlang-model`), the options
+repository of the C++ API (`idni::options().set_text("nlang-model", ...)`)
+and the Python and JavaScript bindings (`set_option("nlang-model", ...)`,
+`setOption` in JavaScript). An
 option takes its environment variable at start, and an empty text option
 takes its default:
 
@@ -2583,7 +2583,7 @@ takes its default:
   `openai`. A value other than `openai` or `anthropic` is an error, also in
   the variable.
 - **The key is never read back.** `nlang-api-key` is accepted on every
-  surface, and every read (`get nlang-api-key`, `get_ba_text_option`) answers
+  surface, and every read (`get nlang-api-key`, `get_option`) answers
   `set` or `unset`. A key given on the command line is visible in the
   process list and in the shell history, and one typed in the REPL is saved
   in its history file (`.tau_history`): prefer the environment variable.
@@ -4073,18 +4073,14 @@ setter of the same name as its option (`set_block_max_splits`,
 (`get_max_fixpoint_steps()`, ...) that reads back the value in force: the one
 set, else the limit's `TAU_*` environment variable, else its default, with a
 cap read as 0 when unlimited. `count_limits()` lists every numeric limit as a
-name, a setter and a getter, which is what the bindings enumerate. An option a Boolean
-algebra declares about itself is set by the name it has on the command line,
-without the dashes in front: `set_ba_option("bv-widening", 1)` or
-`set_ba_option("bv-defelim-max-atoms", 5)` (a flag takes 0 or 1) returns the
-value now in force, `get_ba_option(name)` reads it back, both answer an error
-when no algebra of the build declares the name, and `ba_option_names()` lists
-the names the build has. A text option has its own pair:
-`set_ba_text_option("nlang-model", "claude-opus-5-5")` returns the text the
-option now reads and `get_ba_text_option(name)` reads it back. An empty text
-clears the option to its default, `nlang-api-key` reads `set` or `unset`, and
-each pair
-answers an error for an option of the other kind.
+name, a setter and a getter, which is what the bindings enumerate. Every
+option, of core and of each Boolean algebra, is in the options repository
+`idni::options()` under the name it has on the command line, without the
+dashes in front: `set_text("bv-widening", "on")` or
+`set_text("bv-defelim-max-atoms", "5")` writes it, `get_text(name)` reads it
+back, both answer an error for a name the build does not declare, and
+`names()` lists the names the build has. An empty text clears a text option
+to its default, and `nlang-api-key` reads `set` or `unset`.
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and
@@ -4128,11 +4124,10 @@ The module also carries the api's runtime budgets and engine switches under
 the same names (`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
 `tau.set_ltl_timeout_sec(120)`, `tau.set_preprocessing(False)`, ...), a
 getter for each budget (`tau.get_max_fixpoint_steps()`,
-`tau.get_ltl_timeout_sec()`, `tau.get_gc_growth_factor()`, ...) and the
-options the algebras declare (`tau.ba_option_names()`,
-`tau.set_ba_option("bv-widening", 1)`, `tau.get_ba_option(name)`, and for a
-text option `tau.set_ba_text_option("nlang-provider", "anthropic")`,
-`tau.get_ba_text_option(name)`, all returning a `tau.result`).
+`tau.get_ltl_timeout_sec()`, `tau.get_gc_growth_factor()`, ...) and every
+option by name (`tau.option_names()`, `tau.set_option("bv-widening", "on")`,
+`tau.set_option("nlang-provider", "anthropic")`, `tau.get_option(name)`,
+each returning a `tau.result` that carries the text the option reads).
 
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
 
@@ -4140,11 +4135,11 @@ The ctypes binding ([`bindings/python/ctypes`](bindings/python/ctypes), built
 with `-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`) reaches the same budgets by name
 through its C ABI (`tau_lang_set_limit`, `tau_lang_get_limit`,
 `tau_lang_limit_names`, and the `tau_lang_set_*` / `tau_lang_get_*` pairs of
-the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm) and
-the options the algebras declare (`tau_lang_set_ba_option`,
-`tau_lang_get_ba_option`, `tau_lang_ba_option_names`). Its `tau_lang.py`
-spells them like the nanobind module (`tau_lang.set_max_fixpoint_steps(1000)`,
-`tau_lang.get_limit("ltl_hoa_max_states")`, `tau_lang.set_ba_option(name, v)`).
+the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm). Its
+`tau_lang.py` spells them like the nanobind module
+(`tau_lang.set_max_fixpoint_steps(1000)`,
+`tau_lang.get_limit("ltl_hoa_max_states")`). It has no access to the options
+the algebras declare.
 
 The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
 carries the same budgets and switches under the camelCase form of those names
@@ -4153,13 +4148,10 @@ carries the same budgets and switches under the camelCase form of those names
 `tau.setBfDependenceMaxNodes(n)`, `tau.trefCount()`, ...), reads each budget
 back with the getter of the same name (`tau.getMaxConstantSize()`,
 `tau.getMaxFixpointSteps()`, `tau.getGcGrowthFactor()`, ...), and
-carries the options the algebras declare (`tau.baOptionNames()`, `tau.setBaOption("qlt-t3-cap", 5)`,
-`tau.setBaOption("qlt-cells-budget", 0)`,
-`tau.getBaOption(name)`, which return the value now in force, or `null` with
-the reason in `tau.getLastError()` when the build declares no such option;
-`tau.setBaTextOption(name, text)` and `tau.getBaTextOption(name)` do the same
-for a text option. The WebAssembly build has no `nlang`, which needs curl, so
-it declares no text option today).
+carries every option by name (`tau.optionNames()`,
+`tau.setOption("qlt-t3-cap", "5")`, `tau.setOption("qlt-cells-budget", "0")`,
+`tau.getOption(name)`, which return the text the option reads, or `null`
+with the reason in `tau.getLastError()` for an unknown name or a bad text).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`, `set_ltl_guard_max_cubes`,

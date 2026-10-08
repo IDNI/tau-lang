@@ -452,22 +452,7 @@ const tau_api::count_limit* find_limit(const char* name) {
 }
 
 std::string g_names_result;
-std::string g_text_result;
 std::string g_algorithm_result;
-
-// Writes the value of a BA-option result and returns 0, or keeps the reason
-// and returns -1.
-template <typename R>
-int ba_option_value(const R& r, uint64_t* out) {
-	if (r.has_value()) {
-		if (out) *out = static_cast<uint64_t>(r.value());
-		return 0;
-	}
-	std::ostringstream oss;
-	oss << r.report();
-	g_last_error = oss.str();
-	return -1;
-}
 
 } // namespace
 
@@ -534,54 +519,4 @@ extern "C" const char* tau_lang_get_ltl_algorithm(void) {
 	std::lock_guard<std::mutex> lg(g_mtx);
 	g_algorithm_result = tau_api::get_ltl_algorithm();
 	return g_algorithm_result.c_str();
-}
-
-extern "C" int tau_lang_set_ba_option(const char* name, uint64_t value,
-	uint64_t* now)
-{
-	std::lock_guard<std::mutex> lg(g_mtx);
-	g_last_error.clear();
-	return ba_option_value(tau_api::set_ba_option(name ? name : "",
-		static_cast<size_t>(value)), now);
-}
-
-extern "C" int tau_lang_get_ba_option(const char* name, uint64_t* value) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	g_last_error.clear();
-	return ba_option_value(tau_api::get_ba_option(name ? name : ""), value);
-}
-
-// The text a text-option result reads, kept until the next call, or null with
-// the reason kept for tau_lang_last_error().
-static const char* ba_text_option_value(const result<std::string>& r) {
-	if (r.has_value()) {
-		g_text_result = r.value();
-		return g_text_result.c_str();
-	}
-	std::ostringstream oss;
-	oss << r.report();
-	g_last_error = oss.str();
-	return nullptr;
-}
-
-extern "C" const char* tau_lang_set_ba_text_option(const char* name,
-	const char* value)
-{
-	std::lock_guard<std::mutex> lg(g_mtx);
-	g_last_error.clear();
-	return ba_text_option_value(tau_api::set_ba_text_option(
-		name ? name : "", value ? value : ""));
-}
-
-extern "C" const char* tau_lang_get_ba_text_option(const char* name) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	g_last_error.clear();
-	return ba_text_option_value(tau_api::get_ba_text_option(
-		name ? name : ""));
-}
-
-extern "C" const char* tau_lang_ba_option_names(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	g_names_result = build_json_array(tau_api::ba_option_names());
-	return g_names_result.c_str();
 }

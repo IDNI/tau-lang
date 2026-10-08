@@ -282,9 +282,8 @@ invalid value; let an empty text clear the option. A getter returns what a
 reader may see: an option that holds a secret answers `set` or `unset`
 (`nlang-api-key`). The REPL grammar gives a value letters, digits and
 `. - _ : /`, optionally in double quotes (a host name needs them, since a
-`.` also separates commands). The API reaches a text option through `set_ba_text_option` and
-`get_ba_text_option`, and the numeric pair refuses it. The value joins
-`pack_ba_options_fingerprint` like a flag or a count does.
+`.` also separates commands). The API reaches every option by name through
+`idni::options()`, and a write of an option moves `ba_options_fingerprint`.
 
 A `flag` is written back from the command line only when the given value
 differs from the one in force, and a `count` or `text` option only when its flag is actually given on the

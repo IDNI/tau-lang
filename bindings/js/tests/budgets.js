@@ -180,62 +180,6 @@ function runMaxConstantSize(tau) {
 	check(tau.getMaxConstantSize() === 2000, 'getMaxConstantSize() restored');
 }
 
-function runBaOptions(tau) {
-	const names = tau.baOptionNames();
-	check(Array.isArray(names) && names.length > 0,
-		`baOptionNames() -> ${JSON.stringify(names)}`);
-	check(names.every((n) => n.includes('-')),
-		'every BA option is named <family>-<option>');
-	for (const name of names) {
-		const v = tau.getBaOption(name);
-		const t = tau.getBaTextOption(name);
-		check((v === null) !== (t === null),
-			`${name} is a number or a text: ${v} / ${t}`);
-		if (v === null) {
-			check(typeof t === 'string', `getBaTextOption(${name}) -> ${t}`);
-			continue;
-		}
-		check(typeof v === 'number', `getBaOption(${name}) -> ${v}`);
-		check(tau.setBaOption(name, v) === v,
-			`setBaOption(${name}, ${v}) keeps it`);
-	}
-	check(tau.setBaTextOption('nope-nothing', 'x') === null
-		&& tau.getLastError().length > 0,
-		'setBaTextOption refuses an undeclared name');
-	check(tau.getBaTextOption('nope-nothing') === null
-		&& tau.getLastError().length > 0,
-		'getBaTextOption refuses an undeclared name');
-	if (names.includes('qlt-t3-cap'))
-		check(tau.setBaTextOption('qlt-t3-cap', 'x') === null
-			&& tau.getBaTextOption('qlt-t3-cap') === null,
-			'a count option refuses the text calls');
-	check(tau.setBaOption('nope-nothing', 1) === null
-		&& tau.getLastError().length > 0,
-		'setBaOption refuses an undeclared name');
-	check(tau.getBaOption('nope-nothing') === null
-		&& tau.getLastError().length > 0,
-		'getBaOption refuses an undeclared name');
-	check(tau.setBaOption('nope-nothing', -1) === null,
-		'setBaOption refuses a negative value');
-
-	// 0 is a valid value of the cell budgets: it lifts the bound.
-	for (const [count, v] of [['qlt-t3-cap', 5], ['qlt-cells-budget', 0],
-		['qlt-cells-max-params', 3]]) {
-		check(names.includes(count),
-			`${count} is declared (qlt is in the pack)`);
-		if (!names.includes(count)) continue;
-		const saved = tau.getBaOption(count);
-		check(tau.setBaOption(count, v) === v,
-			`setBaOption(${count}, ${v}) -> ${v}`);
-		check(tau.getBaOption(count) === v,
-			`getBaOption(${count}) reads ${v}`);
-		check(tau.setBaOption(count, saved) === saved,
-			`setBaOption(${count}, ${saved}) restores it`);
-		check(tau.getBaOption(count) === saved,
-			`getBaOption(${count}) reads ${saved} again`);
-	}
-}
-
 function runOptions(tau) {
 	const names = tau.optionNames();
 	check(Array.isArray(names) && names.includes('max-fixpoint-steps'),
@@ -283,7 +227,6 @@ tauModule().then((tau) => {
 		runColors(tau);
 		runFixpointSteps(tau);
 		runMaxConstantSize(tau);
-		runBaOptions(tau);
 		runOptions(tau);
 	} catch (e) {
 		console.error('EXCEPTION: ' + e.stack);
