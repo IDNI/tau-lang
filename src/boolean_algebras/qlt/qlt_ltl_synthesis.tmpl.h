@@ -451,7 +451,7 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 	// Runtime parameter qlt_const_output_max (qlt.h; option
 	// qlt-const-output-max); 0 = unlimited, bounded here only by the
 	// arithmetic itself.
-	const size_t const_output_max = qlt_const_output_max();
+	const size_t const_output_max = qlt_const_output_max;
 	const unsigned long long CAP = const_output_max
 		? (unsigned long long) const_output_max
 		: std::numeric_limits<unsigned long long>::max() / 2;

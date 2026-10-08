@@ -375,11 +375,11 @@ TEST_SUITE("qlt: until with an input") {
 	}
 
 	struct qlt_caps_guard {
-		long t3 = qlt_t3_encoding_cap_param;
-		long out = qlt_const_output_max_param;
+		size_t t3 = qlt_t3_encoding_cap;
+		size_t out = qlt_const_output_max;
 		~qlt_caps_guard() {
-			qlt_t3_encoding_cap_param = t3;
-			qlt_const_output_max_param = out;
+			qlt_t3_encoding_cap = t3;
+			qlt_const_output_max = out;
 		}
 	};
 
@@ -424,14 +424,14 @@ TEST_SUITE("qlt: until with an input") {
 		const char* no = "(i1[t]:qlt > {0}:qlt) until "
 			"({0}:qlt < o1[t]:qlt && {0}:qlt > o1[t]:qlt).";
 		// Above the T_3 atom cap the default ABA-oracle path decides.
-		qlt_t3_encoding_cap_param = 1;
+		qlt_t3_encoding_cap = 1;
 		CHECK(decided_realizable(yes));
 		CHECK(!decided_realizable(no));
-		qlt_t3_encoding_cap_param = guard.t3;
+		qlt_t3_encoding_cap = guard.t3;
 		// Unlimited constant-output candidates, then too few for one output.
-		for (long cap : { 0L, 1L }) {
+		for (size_t cap : { size_t{ 0 }, size_t{ 1 } }) {
 			CAPTURE(cap);
-			qlt_const_output_max_param = cap;
+			qlt_const_output_max = cap;
 			CHECK(decided_realizable(yes));
 			CHECK(!decided_realizable(no));
 		}

@@ -195,9 +195,8 @@ add_repl_test(ltl_env-qlt_t3_cap_env_is_the_fallback
 add_repl_test(ltl_env-qlt_t3_cap_flag_beats_env
 	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_QLT_T3_CAP=14 FLAGS --qlt-t3-cap 12)
-add_repl_test(ltl_env-qlt_t3_cap_garbage_warns
-	"get qlt-t3-cap" "TAU_QLT_T3_CAP='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_QLT_T3_CAP=abc)
+add_env_error_test(ltl_env-qlt_t3_cap_garbage_is_an_error
+	TAU_QLT_T3_CAP=abc REQUIRES qlt)
 add_repl_test(ltl_env-qlt_const_output_max_env_is_the_fallback
 	"get qlt-const-output-max" "qlt-const-output-max: *4" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_QLT_CONST_OUTPUT_MAX=4)

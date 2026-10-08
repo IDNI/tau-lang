@@ -17,6 +17,7 @@
 #include "tau_diagnostics.h"
 #include "ltl_aba_result.h"
 #include "solver_types.h"
+#include "boolean_algebras/qlt/qlt_options.h"
 
 namespace idni::tau_lang {
 
@@ -89,29 +90,32 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 			type_tree, type_name);
 	}
 
+	/// qlt's options, each named `qlt-<name>`.
+	static const option_set& declared_options() { return qlt_option_set; }
+	/// Binds qlt's options, declared by the pack, to qlt's fields.
+	static result<void> bind_options(options_repository& repo) {
+		return qlt_bind_options<node_t>(repo);
+	}
+
 	/// @name qlt-declared CLI/REPL options
 	/// Backing getter/setter for @ref options; plain free functions so they
 	/// decay to the function pointers `ba_option` holds.
 	/// @{
-	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap(); }
-	static void set_t3_cap_option(size_t n) {
-		qlt_t3_encoding_cap_param = (long) n;
-	}
+	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap; }
+	static void set_t3_cap_option(size_t n) { qlt_t3_encoding_cap = n; }
 	static size_t get_const_output_max_option() {
-		return qlt_const_output_max();
+		return qlt_const_output_max;
 	}
 	static void set_const_output_max_option(size_t n) {
-		qlt_const_output_max_param = (long) n;
+		qlt_const_output_max = n;
 	}
-	static size_t get_cells_budget_option() { return qlt_cells_budget(); }
-	static void set_cells_budget_option(size_t n) {
-		qlt_cells_budget_param = (long) n;
-	}
+	static size_t get_cells_budget_option() { return qlt_cells_budget; }
+	static void set_cells_budget_option(size_t n) { qlt_cells_budget = n; }
 	static size_t get_cells_max_params_option() {
-		return qlt_cells_max_params();
+		return qlt_cells_max_params;
 	}
 	static void set_cells_max_params_option(size_t n) {
-		qlt_cells_max_params_param = (long) n;
+		qlt_cells_max_params = n;
 	}
 	/// @}
 

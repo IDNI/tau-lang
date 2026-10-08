@@ -342,7 +342,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 
 // True when n parameters exceed the qlt-cells-max-params option.
 inline bool qlt_cells_too_many(size_t n) {
-	const size_t cap = qlt_cells_max_params();
+	const size_t cap = qlt_cells_max_params;
 	return cap && n > cap;
 }
 
@@ -509,7 +509,7 @@ public:
 	}
 
 	/// @brief Evaluate over the finite endpoints @p ends (sorted, without
-	/// repeats), with a budget of `qlt_cells_budget()` cell visits (0 =
+	/// repeats), with a budget of `qlt_cells_budget` cell visits (0 =
 	/// unbounded).
 	explicit qlt_point_eval(std::vector<qlt_rational> ends)
 		: ends(std::move(ends)) {}
@@ -684,7 +684,7 @@ public:
 private:
 	std::vector<qlt_rational> ends;
 	bool beyond = false;
-	size_t budget = qlt_cells_budget() ? qlt_cells_budget()
+	size_t budget = qlt_cells_budget ? qlt_cells_budget
 		: std::numeric_limits<size_t>::max();
 
 	// The innermost value bound to var in env, nullopt when unbound.

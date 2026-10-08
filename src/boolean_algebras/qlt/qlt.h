@@ -20,7 +20,6 @@
 
 #include "tau_tree.h"
 #include "ba_constants.h"
-#include "env_limits.h"
 #include "splitter_types.h"
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 
@@ -30,90 +29,40 @@ namespace idni::tau_lang {
  * @brief Cap on the data atoms the omcat (qlt) T3 encodings accept: the
  * A/B/D skeletons and the semantic PWR compute `1 << K` and enumerate 2^K
  * masks, so K is bounded here. Above the cap the default
- * ABA-oracle path decides instead. Runtime parameter by policy (qlt's own
- * `qlt-t3-cap` CLI/REPL option); clamped to 30 (a signed shift is
- * undefined at 31); 0 = unlimited within that bound.
- *
- * The sentinel -1 means "not set", in which case `TAU_QLT_T3_CAP` is
- * consulted and 20 applies when that is absent too; the option always wins
- * over the variable. Read through @ref qlt_t3_encoding_cap.
+ * ABA-oracle path decides instead. Bound to the option `qlt-t3-cap`;
+ * clamped to 30 (a signed shift is undefined at 31); 0 = unlimited within
+ * that bound.
  */
-inline long qlt_t3_encoding_cap_param = -1;
+inline size_t qlt_t3_encoding_cap = 20;
 
 /**
  * @brief Cap on the output-position combinations the constant-output fast
  * path in front of Algorithm B enumerates (LA-10): |T1|^outputs candidate
  * constant assignments, each checked with `ltlfilt`. Above it the fast
- * path declines and Algorithm B decides. Runtime parameter by policy
- * (qlt's own `qlt-const-output-max` CLI/REPL option); 0 = unlimited.
- *
- * The sentinel -1 means "not set", in which case `TAU_QLT_CONST_OUTPUT_MAX`
- * is consulted and 100 applies when that is absent too. Read through
- * @ref qlt_const_output_max.
+ * path declines and Algorithm B decides. Bound to the option
+ * `qlt-const-output-max`; 0 = unlimited.
  */
-inline long qlt_const_output_max_param = -1;
-
-/**
- * @brief Effective data-atom cap of the T3 encodings before the 30 bound.
- *
- * Precedence: @ref qlt_t3_encoding_cap_param when set (>= 0), else
- * `TAU_QLT_T3_CAP`, else 20.
- */
-inline size_t qlt_t3_encoding_cap() {
-	if (qlt_t3_encoding_cap_param >= 0)
-		return (size_t) qlt_t3_encoding_cap_param;
-	return env_limit_count("TAU_QLT_T3_CAP", 20);
-}
-
-/**
- * @brief Effective cap on the constant-output assignments the fast path in
- * front of Algorithm B enumerates (0 = unlimited).
- *
- * Precedence: @ref qlt_const_output_max_param when set (>= 0), else
- * `TAU_QLT_CONST_OUTPUT_MAX`, else 100.
- */
-inline size_t qlt_const_output_max() {
-	if (qlt_const_output_max_param >= 0)
-		return (size_t) qlt_const_output_max_param;
-	return env_limit_count("TAU_QLT_CONST_OUTPUT_MAX", 100);
-}
+inline size_t qlt_const_output_max = 100;
 
 /**
  * @brief Cap on the formula instances one decision by cells evaluates (the
  * quantifier elimination, the comparisons over named endpoints and the point
- * solver); past it the decision is left open. Runtime parameter by policy
- * (qlt's own `qlt-cells-budget` option). The sentinel -1 means "not set":
- * `TAU_QLT_CELLS_BUDGET` is consulted, and 65536 applies when that is absent
- * too. 0 = unlimited.
+ * solver); past it the decision is left open. Bound to the option
+ * `qlt-cells-budget`; 0 = unlimited.
  */
-inline long qlt_cells_budget_param = -1;
+inline size_t qlt_cells_budget = 1 << 16;
 
 /**
  * @brief Cap on the other free variables, and on the named endpoints, a
- * decision by cells ranges over; above it the decision is left open. Runtime
- * parameter by policy (qlt's own `qlt-cells-max-params` option). The
- * sentinel -1 means "not set": `TAU_QLT_CELLS_MAX_PARAMS` is consulted, and 2
- * applies when that is absent too. 0 = unlimited.
+ * decision by cells ranges over; above it the decision is left open. Bound
+ * to the option `qlt-cells-max-params`; 0 = unlimited.
  */
-inline long qlt_cells_max_params_param = -1;
+inline size_t qlt_cells_max_params = 2;
 
-/// Effective cell budget (0 = unlimited).
-inline size_t qlt_cells_budget() {
-	if (qlt_cells_budget_param >= 0) return (size_t) qlt_cells_budget_param;
-	return env_limit_count("TAU_QLT_CELLS_BUDGET", 1 << 16);
-}
-
-/// Effective cap on the parameters of a decision by cells (0 = unlimited).
-inline size_t qlt_cells_max_params() {
-	if (qlt_cells_max_params_param >= 0)
-		return (size_t) qlt_cells_max_params_param;
-	return env_limit_count("TAU_QLT_CELLS_MAX_PARAMS", 2);
-}
-
-/// Effective T3 atom cap: `qlt_t3_encoding_cap()` bounded by 30.
+/// Effective T3 atom cap: `qlt_t3_encoding_cap` bounded by 30.
 inline int qlt_t3_encoding_cap_effective() {
 	const size_t hard = 30;
-	const size_t cap = qlt_t3_encoding_cap();
+	const size_t cap = qlt_t3_encoding_cap;
 	if (cap == 0 || cap > hard) return (int) hard;
 	return (int) cap;
 }
