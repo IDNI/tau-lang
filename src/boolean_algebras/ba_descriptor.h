@@ -24,6 +24,7 @@
 
 #include "splitter_types.h"
 #include "tau_diagnostics.h"
+#include "utility/options.h"
 #include "utility/tree_types.h"
 
 namespace idni::tau_lang {
@@ -261,6 +262,17 @@ concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 		ba_descriptor<BA, Node>::set_ba_decision_pins(n);
 		{ ba_descriptor<BA, Node>::ba_decision_pins() }
 			-> std::convertible_to<size_t>; };
+
+/// @brief @p BA has options. `declared_options()` gives the set, each name
+/// `<type_name>-<name>`. `bind_options(repo)` binds each option to its
+/// field after the pack declares the set.
+template <typename Node, typename BA>
+concept ba_has_options = ba_has_descriptor_v<Node, BA>
+	&& requires(options_repository& repo) {
+		{ ba_descriptor<BA, Node>::declared_options() }
+			-> std::same_as<const option_set&>;
+		{ ba_descriptor<BA, Node>::bind_options(repo) }
+			-> std::same_as<result<void>>; };
 
 /// @brief @p BA gives the default zero of its type @p t when it is not `bf_f`:
 /// `zero_constant(t)`.

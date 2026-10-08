@@ -476,6 +476,40 @@ size_t pack_ba_decision_pins() {
 }
 
 /**
+ * @brief Declare the options of every BA that has some and bind them, in
+ * pack order.
+ *
+ * Each option must be named `<type_name>-<name>`, so one algebra cannot
+ * take a name of another or of core.
+ * Stops at the first BA that fails and carries its report.
+ */
+template <typename Node>
+result<void> pack_bind_options(options_repository& repo) {
+	result<void> r;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_options<Node, BA>) {
+			using desc = ba_descriptor<BA, Node>;
+			if (!r.has_value()) return;
+			const std::string type = desc::type_name;
+			const option_set& set = desc::declared_options();
+			for (const auto& spec : set.options)
+				if (!spec.name.starts_with(type + "-")) {
+					r.error(code::invalid_argument,
+						messages::ba_option_without_type_prefix,
+						{ { label::name, spec.name },
+							{ label::type_name, type },
+							{ label::expected,
+								type + "-" + spec.name } });
+					return;
+				}
+			if (r.merge_ok(repo.declare(set)))
+				r.merge(desc::bind_options(repo));
+		}
+	});
+	return r;
+}
+
+/**
  * @brief Read tau's OWN component-factoring switch, owned by tau_ba.h.
  *
  * Optional: a pack without tau declares nothing, so `false` is the answer --

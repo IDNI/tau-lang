@@ -102,6 +102,8 @@ struct messages {
 		  "guard) has no sound LTL encoding here";
 	static constexpr sv invalid_ba_type_id
 		= "the Boolean-algebra type id is invalid";
+	static constexpr sv ba_option_without_type_prefix
+		= "The option of the algebra does not carry its type prefix";
 };
 
 /// @brief Gates per-rule application/hit accounting in nso_rr_apply(rule, tref),

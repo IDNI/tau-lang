@@ -40,6 +40,7 @@ result<void> tau_init() {
 	auto& repo = idni::options();
 	TAU_TRY_VOID(repo.declare(tau_core_option_set));
 	TAU_TRY_VOID(bind_core_options<node>(repo));
+	TAU_TRY_VOID(pack_bind_options<node>(repo));
 	return r;
 }
 

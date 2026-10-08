@@ -518,3 +518,87 @@ TEST_SUITE("carrier ranking") {
 		CHECK(owned_by_a_host);
 	}
 }
+
+// Two algebras with options, built only to route through pack_bind_options:
+// `aa` names its option with its type prefix, `bb` does not.
+namespace option_packs {
+struct aa {};
+struct bb {};
+struct good_node { using bas_tuple = std::tuple<aa>; };
+struct bad_node { using bas_tuple = std::tuple<aa, bb>; };
+inline size_t aa_field = 1;
+inline bool bb_bound = false;
+inline const idni::option_set aa_set{ {
+	{ "aa-limit", "aa", std::size_t{ 1 }, "a limit of aa" } } };
+inline const idni::option_set bb_set{ {
+	{ "width-max", "bb", std::size_t{ 1 }, "a limit of bb" } } };
+
+// The first node of @p rep that carries the text attr @p lbl.
+inline std::optional<std::string> attr_text(const report& rep,
+	idni::int_t lbl)
+{
+	for (const auto& n : rep.nodes())
+		if (auto t = node_attr_text(rep, n, lbl)) return t;
+	return std::nullopt;
+}
+}
+
+namespace idni::tau_lang {
+template <typename Node>
+struct ba_descriptor<option_packs::aa, Node> {
+	static constexpr const char* type_name = "aa";
+	static const option_set& declared_options() {
+		return option_packs::aa_set;
+	}
+	static result<void> bind_options(options_repository& repo) {
+		return repo.bind("aa-limit", option_packs::aa_field);
+	}
+};
+template <typename Node>
+struct ba_descriptor<option_packs::bb, Node> {
+	static constexpr const char* type_name = "bb";
+	static const option_set& declared_options() {
+		return option_packs::bb_set;
+	}
+	static result<void> bind_options(options_repository&) {
+		option_packs::bb_bound = true;
+		return result<void>{};
+	}
+};
+}
+
+TEST_SUITE("pack_bind_options") {
+	using namespace option_packs;
+	using idni::options_repository;
+
+	TEST_CASE("the configured pack binds on a fresh repository") {
+		options_repository repo;
+		CHECK(pack_bind_options<node_t>(repo).has_value());
+	}
+
+	TEST_CASE("an option with its type prefix is declared and bound") {
+		options_repository repo;
+		REQUIRE(pack_bind_options<good_node>(repo).has_value());
+		REQUIRE(repo.find("aa-limit"));
+		const size_t saved = aa_field;
+		CHECK(repo.set_text("aa-limit", "7").has_value());
+		CHECK(aa_field == 7);
+		aa_field = saved;
+	}
+
+	TEST_CASE("an option without its type prefix stops the fold") {
+		options_repository repo;
+		bb_bound = false;
+		auto r = pack_bind_options<bad_node>(repo);
+		REQUIRE_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+		CHECK(attr_text(r.report(), label::name) == "width-max");
+		CHECK(attr_text(r.report(), label::type_name) == "bb");
+		CHECK(attr_text(r.report(), label::expected) == "bb-width-max");
+		// aa comes first in the pack and is bound; bb is neither
+		// declared nor bound
+		CHECK(repo.find("aa-limit"));
+		CHECK_FALSE(repo.find("width-max"));
+		CHECK_FALSE(bb_bound);
+	}
+}

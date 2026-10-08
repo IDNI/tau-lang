@@ -351,6 +351,20 @@ void check_rendering() {
 	}
 }
 
+// Each option of an algebra is named `<type_name>-<name>`, the rule
+// pack_bind_options enforces at start.
+template <typename BA>
+void check_options() {
+	using desc = ba_descriptor<BA, node_t>;
+	if constexpr (ba_has_options<node_t, BA>) {
+		const std::string type = desc::type_name;
+		for (const auto& spec : desc::declared_options().options) {
+			INFO(std::string{ "option " }, spec.name);
+			CHECK(spec.name.starts_with(type + "-"));
+		}
+	}
+}
+
 template <typename BA>
 void check_ba() {
 	using desc = ba_descriptor<BA, node_t>;
@@ -360,6 +374,7 @@ void check_ba() {
 		check_classification<BA>();
 		check_constant_builders<BA>();
 		check_rendering<BA>();
+		check_options<BA>();
 		if constexpr (!ba_uses_oracle_v<node_t, BA>) {
 			check_boolean_laws<BA>();
 			check_splitter<BA>();
