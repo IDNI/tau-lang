@@ -16,6 +16,7 @@
 #include <cstddef>
 
 #include "utility/options.h"
+#include "option_codecs.h"
 #include "tau_diagnostics.h"
 #include "tau_tree.h"
 #include "boolean_algebras/qlt/qlt.h"
@@ -44,7 +45,8 @@ inline const option_set qlt_option_set{ {
 template <NodeType node>
 result<void> qlt_bind_options(options_repository& repo) {
 	result<void> r;
-	const option_hook hook = [] { tree<node>::clear_caches(); };
+	const option_hook hook = ba_option_hook([] {
+		tree<node>::clear_caches(); });
 	TAU_TRY_VOID(repo.bind("qlt-t3-cap", qlt_t3_encoding_cap, hook));
 	TAU_TRY_VOID(repo.bind("qlt-const-output-max", qlt_const_output_max,
 		hook));

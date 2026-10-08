@@ -92,7 +92,7 @@ void bv_clear_caches() { tree<node>::clear_caches(); }
 template <NodeType node>
 result<void> bv_bind_options(options_repository& repo) {
 	result<void> r;
-	const option_hook hook = bv_clear_caches<node>;
+	const option_hook hook = ba_option_hook(bv_clear_caches<node>);
 	TAU_TRY_VOID(repo.bind("bv-blasting", bv_blasting, hook));
 	TAU_TRY_VOID(repo.bind("bv-blastdepth", max_blast_reentry_depth, hook));
 	TAU_TRY_VOID(repo.bind("bv-case-split", bv_case_split, hook));
@@ -119,10 +119,10 @@ result<void> bv_bind_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("bv-solve-timeout", bv_solve_timeout, hook));
 	TAU_TRY_VOID(repo.bind("bv-widening", bv_widening, hook));
 	// 0 restores the default, as the table setter keeps the cap on 0.
-	TAU_TRY_VOID(repo.bind("bv-max-width", bv_max_width, [] {
+	TAU_TRY_VOID(repo.bind("bv-max-width", bv_max_width, ba_option_hook([] {
 		if (!bv_max_width) bv_max_width = bv_max_width_default;
 		bv_clear_caches<node>();
-	}));
+	})));
 	return r;
 }
 

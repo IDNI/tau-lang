@@ -18,6 +18,7 @@
 #include <string_view>
 
 #include "utility/options.h"
+#include "option_codecs.h"
 #include "tau_diagnostics.h"
 #include "boolean_algebras/nlang/nlang_ba.h"
 
@@ -95,17 +96,19 @@ inline const option_set nlang_option_set{ {
 inline result<void> nlang_bind_options(options_repository& repo) {
 	result<void> r;
 	llm_options& o = nlang_llm_options();
-	const option_hook answers = llm_clear_cache;
-	TAU_TRY_VOID(repo.bind("nlang-http-timeout", nlang_http_timeout_sec));
-	TAU_TRY_VOID(repo.bind("nlang-max-tokens", o.max_tokens));
-	TAU_TRY_VOID(repo.bind("nlang-fallback", o.fallback));
+	const option_hook hook = ba_option_hook();
+	const option_hook answers = ba_option_hook(llm_clear_cache);
+	TAU_TRY_VOID(repo.bind("nlang-http-timeout", nlang_http_timeout_sec,
+		hook));
+	TAU_TRY_VOID(repo.bind("nlang-max-tokens", o.max_tokens, hook));
+	TAU_TRY_VOID(repo.bind("nlang-fallback", o.fallback, hook));
 	TAU_TRY_VOID(repo.bind("nlang-provider", o.provider,
 		nlang_word_codec<nlang_provider_is_valid>{ "nlang-provider" },
 		answers));
 	TAU_TRY_VOID(repo.bind("nlang-endpoint", o.endpoint, answers));
 	TAU_TRY_VOID(repo.bind("nlang-model", o.model, answers));
 	TAU_TRY_VOID(repo.bind("nlang-api-key", o.api_key,
-		nlang_secret_codec{}));
+		nlang_secret_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("nlang-effort", o.effort,
 		nlang_word_codec<llm_effort_is_valid>{ "nlang-effort" }, answers));
 	return r;

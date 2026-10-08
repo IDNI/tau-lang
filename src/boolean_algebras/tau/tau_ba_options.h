@@ -16,6 +16,7 @@
 #include <cstddef>
 
 #include "utility/options.h"
+#include "option_codecs.h"
 #include "tau_diagnostics.h"
 #include "tau_tree.h"
 #include "boolean_algebras/tau/tau_ba.h"
@@ -39,8 +40,9 @@ result<void> tau_ba_bind_options(options_repository& repo) {
 	result<void> r;
 	// The factoring decides which verdicts the tree caches hold.
 	TAU_TRY_VOID(repo.bind("ba-component-factoring", ba_component_factoring,
-		[] { tree<node>::clear_caches(); }));
-	TAU_TRY_VOID(repo.bind("ba-decision-pins", ba_decision_pins));
+		ba_option_hook([] { tree<node>::clear_caches(); })));
+	TAU_TRY_VOID(repo.bind("ba-decision-pins", ba_decision_pins,
+		ba_option_hook()));
 	return r;
 }
 
