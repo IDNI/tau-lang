@@ -1032,20 +1032,18 @@ default.
 The table of the [`nlang` section](#nlang--natural-language-boolean-algebra-experimental)
 lists each with its environment variable and its default.
 
-**Other environment variables.** Three Boolean switches keep an environment
-fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
+**Other environment variables.** One Boolean switch keeps an environment
+fallback beside its option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
 value other than `0` enables, `0` disables; read once, then it overrides
 `--ba-component-factoring` / `set factoring`; the decision by components
 is taken on a formula of `always` clauses that read their streams at the
 current step and at steps back, and declined where a unit refers to
 absolute time, through a `sometimes` clause, a stream read at a fixed time
 point or a constraint on the time point, and where an `always` clause holds
-a temporal operator of its own, so that the whole formula decides),
-`TAU_BV_CASE_SPLIT` (`0`
-disables, any other value enables; overrides `bv-case-split` in both
-directions) and `TAU_BV_QF_DECISION` (a value other than `0` enables the
-quantifier-free bitvector decision; `bv-quantifier-free-decision` enables it
-too). The nlang oracle reads `TAU_LLM_PROVIDER`, `TAU_LLM_API_KEY` (or the
+a temporal operator of its own, so that the whole formula decides).
+`TAU_BV_CASE_SPLIT` and `TAU_BV_QUANTIFIER_FREE_DECISION` set `bv-case-split`
+and `bv-quantifier-free-decision` at start, and the flag or `set` writes them
+later. The nlang oracle reads `TAU_LLM_PROVIDER`, `TAU_LLM_API_KEY` (or the
 provider's own `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`), `TAU_LLM_ENDPOINT`,
 `TAU_LLM_MODEL`, `TAU_LLM_EFFORT`, `TAU_LLM_MAX_TOKENS` and
 `TAU_LLM_FALLBACK`, each the fallback of its `nlang-*` option. Two diagnostic gates change logging

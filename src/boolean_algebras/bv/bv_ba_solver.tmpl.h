@@ -723,7 +723,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	// that has no alternation to instantiate. Anything else -- both kinds,
 	// a binder under a negation, a variable bound twice -- takes the path
 	// below unchanged.
-	if (bv_quantifier_free_decision_enabled()) {
+	if (bv_quantifier_free_decision) {
 		const bool has_ex = tau::get(form).find_top(is<node, tau::wff_ex>) != nullptr;
 		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
 		if (has_ex != has_all) {

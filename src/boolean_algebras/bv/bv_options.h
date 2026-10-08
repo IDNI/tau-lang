@@ -58,9 +58,24 @@ inline const option_set bv_option_set{ {
 		zero_is_unlimited_codec{}.to_value(bv_defelim_max_rounds),
 		"cap the definitional-elimination rounds per existential block "
 		"(0 = unlimited)" },
+	{ "bv-quantifier-free-decision", "bv",
+		bool{ bv_quantifier_free_decision },
+		"decide a closed bitvector formula whose binders are all of one "
+		"kind quantifier-free" },
 	{ "bv-blasting-max-nodes", "bv", std::size_t{ bv_blasting_max_nodes },
 		"cap the BDD nodes one bv predicate blasting may build before it "
 		"declines (0 = unlimited)" },
+	{ "bv-bitblast-max-width", "bv", std::size_t{ bv_bitblast_max_width },
+		"widest bit-vector a formula may hold to be decided on its bits "
+		"instead of by cvc5 (0 = always cvc5)" },
+	{ "bv-bitblast-max-nodes", "bv", std::size_t{ bv_bitblast_max_nodes },
+		"cap the BDD nodes in use at once when a bitvector formula of at "
+		"most bv-bitblast-max-width bits is decided on its bits, before "
+		"cvc5 takes it (0 = always cvc5)" },
+	{ "bv-solve-timeout", "bv", std::size_t{ bv_solve_timeout },
+		"cap in seconds each quantified bitvector question cvc5 decides, "
+		"run in a separate process; past it the answer is unknown "
+		"(0 = unbounded, in the process)" },
 	{ "bv-widening", "bv", bool{ bv_widening },
 		"exact (widened) bitvector arithmetic instead of modular "
 		"wraparound" },
@@ -93,8 +108,15 @@ result<void> bv_bind_options(options_repository& repo) {
 		zero_is_unlimited_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("bv-defelim-max-rounds", bv_defelim_max_rounds,
 		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("bv-quantifier-free-decision",
+		bv_quantifier_free_decision, hook));
 	TAU_TRY_VOID(repo.bind("bv-blasting-max-nodes", bv_blasting_max_nodes,
 		hook));
+	TAU_TRY_VOID(repo.bind("bv-bitblast-max-width", bv_bitblast_max_width,
+		hook));
+	TAU_TRY_VOID(repo.bind("bv-bitblast-max-nodes", bv_bitblast_max_nodes,
+		hook));
+	TAU_TRY_VOID(repo.bind("bv-solve-timeout", bv_solve_timeout, hook));
 	TAU_TRY_VOID(repo.bind("bv-widening", bv_widening, hook));
 	// 0 restores the default, as the table setter keeps the cap on 0.
 	TAU_TRY_VOID(repo.bind("bv-max-width", bv_max_width, [] {
