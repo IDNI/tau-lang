@@ -1048,9 +1048,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool (*var_cmp)(int, int);
-	// Coarse reference order for bdd_and_many operand lists: by id,
-	// with the out-inverted twin first, so duplicates and complement
-	// pairs end up adjacent after sorting (see am_sort)
+	// Strict reference order for bdd_and_many operand lists, agreeing
+	// with ==; the out-inverted twin sorts first, so duplicates and
+	// complement pairs end up adjacent after sorting (see am_sort)
 	static bool (*am_cmp)(const bdd_ref&, const bdd_ref&);
 
 	// Caches for bdd operations
@@ -1666,8 +1666,13 @@ bool
 (*bdd<Bool, o>::am_cmp)(const bdd_ref &, const bdd_ref &) = [](const bdd_ref &x,
 							       const bdd_ref &y)
 {
-	bool s = x.out && !y.out;
-	return x.id < y.id || (x.id == y.id && s);
+	// A strict order that agrees with ==, or set_intersection merges distinct
+	// references.
+	if (x.id != y.id) return x.id < y.id;
+	if constexpr (o.has_varshift())
+		if (x.shift != y.shift) return x.shift < y.shift;
+	if (x.in != y.in) return x.in < y.in;
+	return x.out && !y.out;
 };
 
 } // namespace idni::tau_lang

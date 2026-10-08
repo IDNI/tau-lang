@@ -192,4 +192,30 @@ TEST_CASE("B9: an order atom is FAIL, never a verdict") {
 	CHECK_THROWS_AS(ap::decide_finite<node_t>(q, c), std::logic_error);
 }
 
+// An equation's slices are shifted copies of one node, conjoined by the
+// engine's and_many; B10 and B11 guard verdicts that hinge on it.
+
+TEST_CASE("B10: six nonempty pairwise disjoint elements do not fit in bv[5]") {
+	const std::string v = "abcdef";
+	auto var = [](char x) { return std::string(1, x) + ":bv[5]"; };
+	std::string q = "ex a, b, c, d, e, f (";
+	for (char x : v) q += "!(" + var(x) + " = { 0 }:bv[5]) && ";
+	for (size_t i = 0; i < v.size(); ++i)
+		for (size_t j = i + 1; j < v.size(); ++j)
+			q += var(v[i]) + " & " + var(v[j]) + " = { 0 }:bv[5] && ";
+	q.replace(q.size() - 4, 4, ").");
+	CHECK(decide(parse(q.c_str())) == false);
+}
+
+TEST_CASE("B11: two atoms of bv[8], each distinct from its predecessor") {
+	// `x ≤ v → x = 0 ∨ x = v` makes v an atom; bv[8] has eight.
+	CHECK(decide(parse("ex u, v, w (!(v:bv[8] = { 0 }:bv[8]) "
+		"&& all x (!(x:bv[8] & v:bv[8]' = { 0 }:bv[8]) "
+		"|| x:bv[8] = { 0 }:bv[8] || x:bv[8] = v:bv[8]) "
+		"&& !(v:bv[8] = u:bv[8]) && !(w:bv[8] = { 0 }:bv[8]) "
+		"&& all y (!(y:bv[8] & w:bv[8]' = { 0 }:bv[8]) "
+		"|| y:bv[8] = { 0 }:bv[8] || y:bv[8] = w:bv[8]) "
+		"&& !(w:bv[8] = v:bv[8])).")) == true);
+}
+
 } // TEST_SUITE

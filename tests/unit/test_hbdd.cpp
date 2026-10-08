@@ -132,3 +132,24 @@ TEST_SUITE("BDD_Splitter") {
 		CHECK(((a1 & a2) & ~bad) != false);
 	}
 }
+
+TEST_SUITE("and_many") {
+	TEST_CASE("and_many of shifted copies of one node equals the binary fold") {
+		// The slices x_i = y_i are shifted copies of one node, so their
+		// cofactors share an id and differ in shift or input inverter alone.
+		bdd_init<Bool>();
+		std::vector<hbdd<Bool>> eqs;
+		for (uint_t i = 0; i < 8; ++i) {
+			// bit() takes new variables in sequence.
+			const hbdd<Bool> x = bdd_handle<Bool>::bit(true, 2 * i + 1);
+			const hbdd<Bool> y = bdd_handle<Bool>::bit(true, 2 * i + 2);
+			eqs.push_back(~(x ^ y));
+		}
+		// and_many runs after the fold's first step, with that pair of
+		// slices already in and_memo.
+		hbdd<Bool> fold = eqs[0] & eqs[1];
+		const hbdd<Bool> many = bdd_handle<Bool>::and_many(eqs);
+		for (size_t i = 2; i < eqs.size(); ++i) fold = fold & eqs[i];
+		CHECK((many == fold));
+	}
+}
