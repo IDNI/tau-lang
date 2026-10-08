@@ -71,99 +71,6 @@
 
 namespace idni::tau_lang {
 
-/**
- * @brief Identifiers for the REPL options of `get`, `set`, `enable`,
- * `disable` and `toggle`.
- *
- * The flags (`status_opt` to `debug_opt`, `pwr_semantic_opt` and
- * `step_prop_opt`) take on/off; `severity_opt` takes error/info/debug/trace.
- * Every other option is a runtime limit: it takes a count (`gcgrowth` a
- * decimal, `ltlalg` a word), so enable/disable/toggle do not apply to it.
- * A limit option writes the library value through its `api<node>::set_*`
- * setter, the same one the CLI flag uses, and `get` reads the effective
- * value back: the value set, else the TAU_* environment variable, else the
- * default.
- *
- * | option (REPL name)       | default | 0 means | environment variable |
- * |--------------------------|---------|---------|----------------------|
- * | block_max_splits (`maxsplits`) | unlimited | unlimited | `TAU_BLOCK_MAX_SPLITS` |
- * | block_max_rounds (`maxrounds`) | unlimited | unlimited | `TAU_BLOCK_MAX_ROUNDS` |
- * | cqe_max_clauses (`maxclauses`) | unlimited | unlimited | `TAU_CQE_MAX_CLAUSES` |
- * | decision_pins (`decisionpins`) | 4096 | none kept | `TAU_BA_DECISION_PINS` |
- * | fixpoint_steps (`fixpointsteps`) | 500 | unlimited | `TAU_MAX_FIXPOINT_STEPS` |
- * | flag_search_steps (`flagsteps`) | 500 | unlimited | `TAU_MAX_FLAG_SEARCH_STEPS` |
- * | squeeze_cap (`squeezecap`) | 0 | unlimited | `TAU_BLOCK_SQUEEZE_CAP` |
- * | simplify_rounds (`simplifyrounds`) | 0 | unlimited | `TAU_MAX_SIMPLIFY_ROUNDS` |
- * | def_passes (`defpasses`) | 0 | unlimited | `TAU_MAX_DEF_PASSES` |
- * | probe_steps (`probesteps`) | 10000 | unlimited | `TAU_MAX_PROBE_STEPS` |
- * | enum_steps (`enumsteps`) | 0 | unlimited | `TAU_MAX_ENUM_STEPS` |
- * | rewrite_rounds (`rewriterounds`) | 0 | unlimited | `TAU_MAX_REWRITE_ROUNDS` |
- * | gc_min_size (`gcminsize`) | 256 | no floor | `TAU_GC_MIN_SIZE` |
- * | gc_growth (`gcgrowth`) | 1.5 | <= 0 disables gc | `TAU_GC_GROWTH_FACTOR` |
- * | tref_budget (`trefbudget`) | 0 | unlimited | `TAU_TREF_BUDGET` |
- * | tref_budget_soft (`trefbudgetsoft`) | 75 (%) | warns, reads 75 | `TAU_TREF_BUDGET_SOFT` |
- * | spec_size_warn (`specsizewarn`) | 0 | off | `TAU_SPEC_SIZE_WARN` |
- * | revision_alts (`revisionalts`) | 0 | unlimited | `TAU_MAX_REVISION_ALTS` |
- * | consistency_subsets (`maxsubsets`) | 4096 | unlimited | `TAU_MAX_CONSISTENCY_SUBSETS` |
- * | cache_bound (`cachebound`) | 4096 | unbounded | `TAU_CACHE_BOUND` |
- * | cover_products (`maxcoverproducts`) | 256 | unlimited | `TAU_MAX_COVER_PRODUCTS` |
- * | constant_size (`maxconstantsize`) | 2000 | unlimited | `TAU_MAX_CONSTANT_SIZE` |
- * | ltl_timeout (`ltltimeout`, seconds) | 60 | no watchdog | `TAU_LTL_TIMEOUT` |
- * | ltl_alg (`ltlalg`, A/B/D/auto) | auto | -- | `TAU_LTL_ALG` |
- * | ltl_qe_max_vars (`ltlqemaxvars`) | 2 | no fast path | `TAU_LTL_QE_MAX_VARS` |
- * | ltl_hoa_max_states (`ltlhoamaxstates`) | 2^22 | unlimited | `TAU_LTL_HOA_MAX_STATES` |
- * | ltl_guard_max_cubes (`ltlguardmaxcubes`) | 512 | unlimited | `TAU_LTL_GUARD_MAX_CUBES` |
- * | ltl_refinement_rounds (`ltlrefinementrounds`) | 64 | unlimited | `TAU_LTL_REFINEMENT_ROUNDS` |
- * | ltl_window_max_paths (`ltlwindowmaxpaths`) | 4096 | unlimited | `TAU_LTL_WINDOW_MAX_PATHS` |
- * | ltl_closed_regions_timeout (`ltlclosedregionstimeout`, seconds) | 20 | no attempt | `TAU_LTL_CLOSED_REGIONS_TIMEOUT` |
- * | ltl_data_game_max_nodes (`ltldatagamemaxnodes`) | 2^23 | unlimited | `TAU_LTL_DATA_GAME_MAX_NODES` |
- * | ltl_data_game_max_memo (`ltldatagamemaxmemo`) | 2^25 | unlimited | `TAU_LTL_DATA_GAME_MAX_MEMO` |
- * | ltl_data_game_max_combinations (`ltldatagamemaxcombinations`) | 4096 | unlimited | `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` |
- * | ltl_max_observations (`ltlmaxobservations`, at most 30) | 8 | 30 | `TAU_LTL_MAX_OBSERVATIONS` |
- * | ltl_mealy_max_states (`ltlmealymaxstates`) | 4096 | no Mealy view | `TAU_LTL_MEALY_MAX_STATES` |
- * | ltl_mealy_max_edges (`ltlmealymaxedges`) | 65536 | no Mealy view | `TAU_LTL_MEALY_MAX_EDGES` |
- * | compile_max_table_edges (`compilemaxtableedges`) | 400 | no table | `TAU_COMPILE_MAX_TABLE_EDGES` |
- * | compile_build_timeout (`compilebuildtimeout`, seconds) | 3600 | no timeout | `TAU_COMPILE_BUILD_TIMEOUT` |
- * | bf_dependence_max_nodes (`bfdependencemaxnodes`) | 65536 | unlimited | `TAU_BF_DEPENDENCE_MAX_NODES` |
- * | lgrs_max_vars (`lgrsmaxvars`) | 8 | unlimited | `TAU_LGRS_MAX_VARS` |
- *
- * `ltltimeout` clamps a value above `ltl_timeout_sec_max`. The option names
- * and their aliases are resolved by get_opt (repl_evaluator.tmpl.h).
- */
-enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, preprocessing_opt, factoring_opt,
-	highlighting_opt, indenting_opt,
-	print_benchmarks_opt, debug_opt,
-	// Numeric options, named by their full spelling only: the single
-	// letters that fit are taken ("b" is benchmarks and "B" is
-	// preprocessing; see get_opt).
-	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
-	decision_pins_opt,
-	fixpoint_steps_opt,
-	flag_search_steps_opt, squeeze_cap_opt,
-	simplify_rounds_opt, def_passes_opt, probe_steps_opt, enum_steps_opt,
-	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
-	tref_budget_opt, tref_budget_soft_opt,
-	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
-	cache_bound_opt, cover_products_opt, constant_size_opt,
-	// LTL(ABA) synthesis knobs (ltl_aba.h); ltl_alg_opt takes a word
-	// (A/B/D/auto), the others a count.
-	ltl_timeout_opt, ltl_alg_opt, ltl_qe_max_vars_opt,
-	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt,
-	ltl_refinement_rounds_opt, ltl_window_max_paths_opt,
-	ltl_closed_regions_timeout_opt,
-	ltl_data_game_max_nodes_opt, ltl_data_game_max_memo_opt,
-	ltl_data_game_max_combinations_opt, ltl_max_observations_opt,
-	ltl_mealy_max_states_opt, ltl_mealy_max_edges_opt,
-	compile_max_table_edges_opt, compile_build_timeout_opt,
-	bf_dependence_max_nodes_opt,
-	// The solver's lgrs-route variable cap (`-g --lgrs-max-vars`).
-	lgrs_max_vars_opt,
-	// Boolean, like the first group: the semantic (winning-region) fallback
-	// of the temporal pointwise revision (`-Z --pwr-semantic`) and the
-	// step's definitional propagation (`-t --step-definitional-propagation`).
-	pwr_semantic_opt, step_prop_opt };
-
 /// Logic fragment of a REPL session: which temporal operators a command
 /// accepts. `fragment_ltl` (the default) rejects the CTL* operators A, E
 /// and -; `fragment_ctl_star` accepts them.
@@ -326,17 +233,9 @@ private:
 	/// @brief Execute the `get` command @p n: print the option it names, or
 	/// every session option, sorted by name, when it names none.
 	void get_cmd(const tt& n);
-	/// @brief Print the value of option @p opt; every core and BA-declared
-	/// option for `none_opt`, nothing for `invalid_opt`. A limit prints its
-	/// effective value (set, else environment, else default).
-	void get_cmd(repl_option opt);
 	/// @brief Execute the `set` command @p n: write the value text through
 	/// the option's codec and hook, then print the option's new value.
 	void set_cmd(const tt& n);
-	/// @brief Set option @p o to the text @p v: on/off spellings for a flag,
-	/// a decimal count for a limit (a number for gcgrowth, A/B/D/auto for
-	/// ltlalg). An invalid value is reported and changes nothing.
-	void set_cmd(repl_option o, const std::string& v);
 	/// @brief Execute the `enable`/`disable`/`toggle` command @p n with
 	/// @p update_fn, then print the option's new value. An option that is
 	/// no flag is an error.
@@ -345,28 +244,6 @@ private:
 	/// @brief Print `<name>: <value>` for the option @p name.
 	/// @return False, with the error printed, when no option has the name.
 	bool print_option(const std::string& name);
-	/// @brief Apply @p update_fn to the flag option @p o; a numeric option
-	/// is an error, since it takes a count.
-	void update_bool_opt_cmd(repl_option o,
-		const std::function<bool(bool&)>& update_fn);
-
-	// BA-declared options, addressed by their name in the options repository
-	// (e.g. "bv-blasting"), rather than through get_opt()/repl_option.
-	/// @brief Print the BA-declared option named @p dotted; a count prints
-	/// "unlimited" for 0.
-	void get_cmd_ba_option(const std::string& dotted);
-	/// @brief Set the BA-declared option named @p dotted to the text @p v;
-	/// an invalid value is reported and changes nothing.
-	void set_cmd_ba_option(const std::string& dotted, const std::string& v);
-	/// @brief Toggle the BA-declared flag option named @p dotted using
-	/// @p update_fn (enable/disable/toggle).
-	void update_bool_opt_cmd_ba_option(const std::string& dotted,
-		const std::function<bool(bool&)>& update_fn);
-	/// @brief Find @p dotted among the pack's BA-declared options,
-	/// reporting "no such algebra" and "no such option" distinctly.
-	/// @return The spec, or nullptr (with the error printed) on failure.
-	const option_spec* resolve_ba_option(const std::string& dotted);
-
 	// substitution and instantiation of formulas
 	/// @brief Execute the `subst` command @p n: each bracket group of
 	/// match/replace pairs applies simultaneously to the previous group's
@@ -512,10 +389,6 @@ private:
 	/// The names that bind_repl_options() bound.
 	std::vector<std::string_view> bound_options;
 
-	/// @brief Set the library's preprocessing to @p value.
-	/// @return @p value.
-	bool update_preprocessing(bool value);
-
 	/// @brief CTL* fragment gate: print an error when @p fm holds a CTL*
 	/// operator and the session is not in the ctl_star fragment.
 	/// @return True when @p fm is rejected; false for a null @p fm.
@@ -523,10 +396,6 @@ private:
 
 	/// @brief Execute `fragment ltl|ctl_star` from @p n.
 	void fragment_cmd(const tt& n);
-
-	/// @brief Set the library's component factoring to @p value.
-	/// @return @p value.
-	bool update_factoring(bool value);
 
 	// history
 	/// @brief Retrieve the history entry @p n references.

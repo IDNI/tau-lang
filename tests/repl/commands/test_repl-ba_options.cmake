@@ -1,9 +1,8 @@
 include(add_repl_test)
 
-# A name no BA declares: an unknown algebra and an unknown option of a known
-# algebra each have their own message (repl_evaluator.tmpl.h
-# resolve_ba_option). A case naming an algebra outside the configured pack
-# is skipped by add_repl_test itself.
+# A name that no option has, of an unknown algebra or of a known one, is an
+# unknown option. A case naming an algebra outside the configured pack is
+# skipped by add_repl_test itself.
 add_repl_test(ba_options-no_such_family "set nope-blasting on"
 	"Unknown option.*name=nope-blasting" NO_FAIL_REGEX)
 add_repl_test(ba_options-no_such_option "set bv-nosuch on"
