@@ -44,7 +44,7 @@ inline size_t max_flag_search_steps = 500;
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
  * caps above, the master preprocessing switch, `max_constant_size`, the
- * options the algebras of the pack declare (`pack_ba_options_fingerprint`)
+ * options the algebras of the pack declare (`ba_options_fingerprint`)
  * and the LTL(ABA) knobs (`ltl_verdict_budget_fingerprint`). The verdict
  * memos in this file are keyed on the formula only and drop their entries
  * when it changes. (The semantic PWR fallback lives in
@@ -64,7 +64,7 @@ size_t verdict_budget_fingerprint() {
 	mix(preprocessing);
 	mix(max_constant_size);
 	return ltl_verdict_budget_fingerprint(
-		pack_ba_options_fingerprint<node>(seed));
+		ba_options_fingerprint(seed));
 }
 
 /**

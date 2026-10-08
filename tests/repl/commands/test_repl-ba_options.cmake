@@ -1,8 +1,9 @@
 include(add_repl_test)
 
-# family/option resolution through pack_find_ba_option: each outcome has its
-# own message (repl_evaluator.tmpl.h resolve_ba_option). A case naming an
-# algebra outside the configured pack is skipped by add_repl_test itself.
+# A name no BA declares: an unknown algebra and an unknown option of a known
+# algebra each have their own message (repl_evaluator.tmpl.h
+# resolve_ba_option). A case naming an algebra outside the configured pack
+# is skipped by add_repl_test itself.
 add_repl_test(ba_options-no_such_family "set nope-blasting on"
 	"No BA named in this pack.*name=nope" NO_FAIL_REGEX)
 add_repl_test(ba_options-no_such_option "set bv-nosuch on"
@@ -30,32 +31,25 @@ add_repl_test(ba_options-change_drops_verdict_memo
 	"reached fixpoint.*: F.*reached fixpoint.*: F")
 
 # nlang's LLM options. The environment writes each one at start, so every
-# case blanks the text variables a developer's shell may export.
+# case blanks the text variables a developer's shell may export. `get` shows
+# the option as set; nlang_llm.cpp resolves an empty one when it asks.
 set(_llm_env TAU_NLANG_PROVIDER= TAU_NLANG_ENDPOINT= TAU_NLANG_MODEL=
 	TAU_NLANG_API_KEY= OPENAI_API_KEY= ANTHROPIC_API_KEY= TAU_NLANG_EFFORT=)
 add_repl_test(ba_options-nlang_provider_default "get nlang-provider"
-	"nlang-provider: openai" NO_TRACE ENV ${_llm_env})
+	"nlang-provider: \\(none\\)" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_set "set nlang-provider anthropic"
 	"nlang-provider: anthropic" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_bad_word "set nlang-provider nobody"
-	"Invalid value[\r\n].*nlang-provider: openai" NO_FAIL_REGEX NO_TRACE
-	ENV ${_llm_env})
-add_repl_test(ba_options-nlang_provider_from_the_only_key "get nlang-provider"
-	"nlang-provider: anthropic" NO_TRACE
-	ENV ${_llm_env} ANTHROPIC_API_KEY=sk-test)
-add_repl_test(ba_options-nlang_provider_sets_the_endpoint_and_model
-	"set nlang-provider anthropic. get nlang-endpoint. get nlang-model. get nlang-effort. get nlang-fallback"
-	"nlang-endpoint: https://api.anthropic.com/v1[\r\n].*nlang-model: claude-opus-5-5[\r\n].*nlang-effort: low[\r\n].*nlang-fallback: on"
+	"does not take the value.*nlang-provider: \\(none\\)" NO_FAIL_REGEX
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_endpoint_url
 	"set nlang-endpoint http://localhost:8080/v1"
 	"nlang-endpoint: http://localhost:8080/v1" NO_TRACE ENV ${_llm_env})
 # A host name needs the quotes: bare, the text after its first '.' reads
 # as a command of its own.
-add_repl_test(ba_options-nlang_endpoint_names_the_provider
-	"set nlang-endpoint = \\\"https://api.anthropic.com/v1\\\". get nlang-provider"
-	"nlang-endpoint: https://api.anthropic.com/v1[\r\n].*nlang-provider: anthropic"
-	NO_TRACE ENV ${_llm_env})
+add_repl_test(ba_options-nlang_endpoint_with_dots
+	"set nlang-endpoint = \\\"https://api.anthropic.com/v1\\\""
+	"nlang-endpoint: https://api.anthropic.com/v1" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_with_dashes
 	"set nlang-model my_model-4.5"
 	"nlang-model: my_model-4.5" NO_TRACE ENV ${_llm_env})
@@ -71,7 +65,7 @@ add_repl_test(ba_options-nlang_named_model_gets_no_effort
 	"nlang-effort: \\(none\\)[\r\n].*nlang-fallback: on" NO_TRACE
 	ENV ${_llm_env})
 add_repl_test(ba_options-nlang_effort_bad_word "set nlang-effort extreme"
-	"Invalid value" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
+	"does not take the value" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_effort_set "set nlang-effort xhigh"
 	"nlang-effort: xhigh" NO_TRACE ENV ${_llm_env})
 # The key is never printed: neither by the set that takes it nor by a get.
@@ -88,7 +82,7 @@ add_repl_test(ba_options-nlang_api_key_flag "get nlang-api-key"
 	"nlang-api-key: set" NO_TRACE FAIL_REGEX "sk-secret_3"
 	ENV ${_llm_env} FLAGS --nlang-api-key sk-secret_3)
 add_repl_test(ba_options-nlang_provider_flag_bad_word "get nlang-provider"
-	"Invalid value for --nlang-provider: nobody" NO_FAIL_REGEX NO_TRACE
+	"does not take the value.*name=nlang-provider" NO_FAIL_REGEX NO_TRACE
 	ENV ${_llm_env} FLAGS --nlang-provider nobody)
 add_repl_test(ba_options-nlang_text_is_not_a_flag "enable nlang-model"
 	"takes a text, not a flag" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
@@ -131,15 +125,11 @@ add_repl_test(ba_options-nlang_endpoint_quoted_with_a_query
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_quoted_with_dots
 	"set nlang-model \\\"gemini-2.0-flash\\\". get nlang-provider"
-	"nlang-model: gemini-2.0-flash[\r\n].*nlang-provider: openai"
+	"nlang-model: gemini-2.0-flash[\r\n].*nlang-provider: \\(none\\)"
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_cleared_by_empty_quotes
 	"set nlang-model some-model. set nlang-model \\\"\\\""
 	"nlang-model: some-model[\r\n].*nlang-model: \\(none\\)"
 	NO_TRACE ENV ${_llm_env} TAU_NLANG_MODEL=env-model)
-add_repl_test(ba_options-nlang_api_key_given_keeps_the_detected_provider
-	"set nlang-api-key sk-secret_4. get nlang-provider"
-	"nlang-provider: anthropic" NO_TRACE FAIL_REGEX "nlang-[a-z-]+: [^\r\n]*sk-secret_4"
-	ENV ${_llm_env} ANTHROPIC_API_KEY=sk-test)
 add_repl_test(ba_options-quoted_value_of_a_core_option
 	"set severity \\\"info\\\"" "severity: *info" NO_TRACE)

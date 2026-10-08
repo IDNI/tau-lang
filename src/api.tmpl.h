@@ -442,44 +442,29 @@ void api<node>::set_ba_decision_pins(size_t n) {
 
 namespace api_detail {
 
-// The pack option named `<family>-<option>`; an invalid_argument error for a
-// name without that shape, not_found when no BA of the pack declares it.
+// The BA option @p name when it is, or is not, a text option as @p text asks:
+// not_found when no BA of the pack declares it.
 template <NodeType node>
-result<const ba_option*> find_ba_option(const std::string& name) {
-	result<const ba_option*> r;
-	const auto dash = name.find('-');
-	if (dash == std::string::npos || dash == 0 || dash + 1 == name.size())
-		return r.with_error(code::invalid_argument, "A BA option is "
-			"named <family>-<option>", {{ label::value, name }});
-	const auto found = pack_find_ba_option<node>(name.substr(0, dash),
-		name.substr(dash + 1));
-	switch (found.status) {
-	case ba_option_lookup_status::found: return r.with_value(found.option);
-	case ba_option_lookup_status::no_such_family:
-		return r.with_error(code::not_found, "No BA of this family in "
-			"the pack", {{ label::value, name }});
-	case ba_option_lookup_status::no_such_option: break;
-	}
-	return r.with_error(code::not_found, "The BA declares no such option",
+result<const option_spec*> find_ba_option_of(const std::string& name,
+	bool text)
+{
+	result<const option_spec*> r;
+	const option_spec* spec = pack_find_ba_option<node>(name);
+	if (!spec) return r.with_error(code::not_found,
+		"No BA of the pack declares this option",
 		{{ label::value, name }});
-}
-
-// The value of @p o as the option surface reads it: 0 or 1 for a flag.
-inline size_t ba_option_value(const ba_option& o) {
-	return o.kind == ba_option_kind::flag ? (size_t) o.get_flag()
-		: o.get_count();
-}
-
-/// The option @p name when it is, or is not, a text option as @p text asks.
-template <NodeType node>
-result<const ba_option*> find_ba_option_of(const std::string& name, bool text) {
-	result<const ba_option*> r;
-	TAU_TRY(const ba_option* o, find_ba_option<node>(name));
-	if ((o->kind == ba_option_kind::text) != text)
+	const bool is_text = std::holds_alternative<std::string>(spec->fallback);
+	if (is_text != text)
 		return r.with_error(code::invalid_argument, text
 			? "The BA option takes a flag or a count, not a text"
 			: "The BA option takes a text", {{ label::value, name }});
-	return r.with_value(o);
+	return r.with_value(spec);
+}
+
+// A flag or a count option as one number: 0 or 1 for a flag.
+inline size_t ba_option_number(const option_value& v) {
+	if (const bool* b = std::get_if<bool>(&v)) return *b;
+	return std::get<size_t>(v);
 }
 
 } // namespace api_detail
@@ -490,19 +475,22 @@ result<size_t> api<node>::set_ba_option(const std::string& name,
 {
 	option_change_guard<node> guard;
 	result<size_t> r;
-	TAU_TRY(const ba_option* o,
+	TAU_TRY(const option_spec* spec,
 		api_detail::find_ba_option_of<node>(name, false));
-	if (o->kind == ba_option_kind::flag) o->set_flag(value != 0);
-	else o->set_count(value);
-	return r.with_value(api_detail::ba_option_value(*o));
+	const option_value v = std::holds_alternative<bool>(spec->fallback)
+		? option_value{ value != 0 } : option_value{ value };
+	TAU_TRY_VOID(idni::options().set(name, v));
+	return r.with_value(api_detail::ba_option_number(
+		idni::options().value(name)));
 }
 
 template <NodeType node>
 result<size_t> api<node>::get_ba_option(const std::string& name) {
 	result<size_t> r;
-	TAU_TRY(const ba_option* o,
+	TAU_TRY([[maybe_unused]] const option_spec* spec,
 		api_detail::find_ba_option_of<node>(name, false));
-	return r.with_value(api_detail::ba_option_value(*o));
+	return r.with_value(api_detail::ba_option_number(
+		idni::options().value(name)));
 }
 
 template <NodeType node>
@@ -511,28 +499,25 @@ result<std::string> api<node>::set_ba_text_option(const std::string& name,
 {
 	option_change_guard<node> guard;
 	result<std::string> r;
-	TAU_TRY(const ba_option* o,
+	TAU_TRY([[maybe_unused]] const option_spec* spec,
 		api_detail::find_ba_option_of<node>(name, true));
-	if (!o->set_text(value))
-		return r.with_error(code::invalid_argument, "The BA option "
-			"does not take this value", {{ label::name, name },
-				{ label::value, value }});
-	return r.with_value(o->get_text());
+	TAU_TRY_VOID(idni::options().set(name, option_value{ value }));
+	return r.with_value(std::get<std::string>(idni::options().value(name)));
 }
 
 template <NodeType node>
 result<std::string> api<node>::get_ba_text_option(const std::string& name) {
 	result<std::string> r;
-	TAU_TRY(const ba_option* o,
+	TAU_TRY([[maybe_unused]] const option_spec* spec,
 		api_detail::find_ba_option_of<node>(name, true));
-	return r.with_value(o->get_text());
+	return r.with_value(std::get<std::string>(idni::options().value(name)));
 }
 
 template <NodeType node>
 std::vector<std::string> api<node>::ba_option_names() {
 	std::vector<std::string> names;
-	for (const auto& e : pack_ba_options<node>())
-		names.push_back(e.family + "-" + e.option.name);
+	for (const option_spec& spec : pack_ba_option_specs<node>())
+		names.push_back(spec.name);
 	return names;
 }
 

@@ -12,7 +12,6 @@
 #ifndef __IDNI__TAU__TESTS__EXTERNAL_BA__EXT_BA_H__
 #define __IDNI__TAU__TESTS__EXTERNAL_BA__EXT_BA_H__
 
-#include <array>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -22,6 +21,7 @@
 #include "tau_diagnostics.h"
 #include "ba_types.h"
 #include "boolean_algebras/ba_descriptor.h"
+#include "option_codecs.h"
 
 namespace idni::tau_lang {
 
@@ -174,14 +174,15 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	static void set_preprocessing(bool) {}
 	static inline bool fail_preprocess_ = false;
 
-	/** @brief Declared: an option of its own, addressed as `ext-probe`. */
-	static bool get_probe() { return probe_; }
-	static void set_probe(bool b) { probe_ = b; }
-	static std::array<ba_option, 1> options() {
-		return {{ { "probe", ba_option_kind::flag, get_probe, set_probe,
-			nullptr, nullptr,
+	/** @brief Declared: an option of its own, named `ext-probe`. */
+	static const option_set& declared_options() {
+		static const option_set set{ { { "ext-probe", "ext", false,
 			"a switch with no effect, proving options cross the plugin "
-			"boundary" } }};
+			"boundary" } } };
+		return set;
+	}
+	static result<void> bind_options(options_repository& repo) {
+		return repo.bind("ext-probe", probe_, ba_option_hook());
 	}
 	static inline bool probe_ = false;
 };

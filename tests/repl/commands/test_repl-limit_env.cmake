@@ -68,14 +68,17 @@ foreach(row IN LISTS TAU_ENV_LIMIT_ROWS)
 	add_repl_test(limit_env-${nm}-set_beats_env
 		"set ${opt} ${fval}. get ${opt}" "${opt}: *${fval}" NO_FAIL_REGEX
 		NO_TRACE ENV ${var}=${val})
-	# --help names no algebra, so a BA-declared row says which it needs
-	set(need "")
+	# --help names no algebra, so a BA-declared row says which it needs.
+	# The help of a BA option names the option, not its variable.
 	if(nm MATCHES "^bv_")
-		set(need REQUIRES bv)
+		add_raw_repl_test(limit_env-${nm}-help_names_the_option
+			"${TAU_RUN} --help"
+			"--${flag}" NO_FAIL_REGEX REQUIRES bv)
+	else()
+		add_raw_repl_test(limit_env-${nm}-help_names_the_variable
+			"${TAU_RUN} --help"
+			"${var}" NO_FAIL_REGEX)
 	endif()
-	add_raw_repl_test(limit_env-${nm}-help_names_the_variable
-		"${TAU_RUN} --help"
-		"${var}" NO_FAIL_REGEX ${need})
 endforeach()
 
 # Garbage in a core or a bv variable is an error.

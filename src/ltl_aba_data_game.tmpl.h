@@ -578,7 +578,7 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 	static std::mutex known_mutex;
 	static std::map<std::pair<std::string, size_t>, size_t> known;
 	static size_t known_budget = ltl_verdict_budget_fingerprint(
-		pack_ba_options_fingerprint<node>());
+		ba_options_fingerprint());
 	static const bool reset_registered = (on_reset([] {
 		std::lock_guard lock(known_mutex);
 		known.clear();
@@ -600,7 +600,7 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 	{
 		std::lock_guard lock(known_mutex);
 		if (const size_t fp = ltl_verdict_budget_fingerprint(
-				pack_ba_options_fingerprint<node>());
+				ba_options_fingerprint());
 			fp != known_budget) { known.clear(); known_budget = fp; }
 		if (auto it = known.find({ name, max }); it != known.end()) {
 			if (!it->second) return std::nullopt;

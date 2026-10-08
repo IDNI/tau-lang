@@ -12,12 +12,14 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "boolean_algebras/ba_descriptor.h"
+#include "option_codecs.h"
 #include "utility/tree_types.h"
 
 namespace idni::tau_lang {
@@ -1268,6 +1270,56 @@ ba_option_lookup_result pack_find_ba_option(const std::string& family,
 		if (f == family) { in_pack = true; break; }
 	return { in_pack ? ba_option_lookup_status::no_such_option
 		: ba_option_lookup_status::no_such_family, nullptr };
+}
+
+/**
+ * @brief The spec of every option the BAs of @p Node's pack declare, in pack
+ * order.
+ *
+ * Several widths of one parameterized type declare one set, so each name
+ * appears once.
+ */
+template <typename Node>
+const std::vector<option_spec>& pack_ba_option_specs() {
+	static const std::vector<option_spec> specs = [] {
+		std::vector<option_spec> out;
+		pack_visit_all<Node>([&]<typename BA>() {
+			if constexpr (ba_has_options<Node, BA>) {
+				const option_set& set =
+					ba_descriptor<BA, Node>::declared_options();
+				for (const option_spec& spec : set.options) {
+					bool seen = false;
+					for (const option_spec& o : out)
+						if (o.name == spec.name) {
+							seen = true;
+							break;
+						}
+					if (!seen) out.push_back(spec);
+				}
+			}
+		});
+		return out;
+	}();
+	return specs;
+}
+
+/// The spec of the BA option @p name of @p Node's pack, or null.
+template <typename Node>
+const option_spec* pack_find_ba_option(std::string_view name) {
+	for (const option_spec& spec : pack_ba_option_specs<Node>())
+		if (spec.name == name) return &spec;
+	return nullptr;
+}
+
+/// `true` when a BA of @p Node's pack names its options `<prefix>-<name>`.
+template <typename Node>
+bool pack_has_option_prefix(const std::string& prefix) {
+	bool found = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_descriptor_v<Node, BA>)
+			if (ba_option_prefix<Node, BA>() == prefix) found = true;
+	});
+	return found;
 }
 
 } // namespace idni::tau_lang

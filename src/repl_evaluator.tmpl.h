@@ -1539,19 +1539,6 @@ result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	return r.with_value(bound);
 }
 
-/**
- * @brief Split a qualified BA-option name `family-option` on its first '-'.
- *
- * Called only once the caller has already confirmed @p x contains a '-', so
- * `substr(pos + 1)` is always in range.
- */
-inline std::pair<std::string, std::string> split_ba_option_name(
-	const std::string& x)
-{
-	auto pos = x.find('-');
-	return { x.substr(0, pos), x.substr(pos + 1) };
-}
-
 /// Largest count `set` accepts: the CLI's bound (`strtol`), so a value the
 /// CLI refuses is refused here too, and every count fits the `long`
 /// parameters whose -1 means "not set".
@@ -1593,16 +1580,13 @@ inline std::string option_value_text(const std::string& v) {
 }
 
 /**
- * @brief The value of @p o as `get` prints it: on/off, a count with 0 as
- * its limit reads, or the text, `(none)` standing for an empty one.
+ * @brief The value @p v of a BA option as `get` prints it: on/off, a count
+ * with 0 as its limit reads, or the text, `(none)` standing for an empty one.
  */
-inline std::string ba_option_str(const ba_option& o) {
-	switch (o.kind) {
-	case ba_option_kind::flag:  return o.get_flag() ? "on" : "off";
-	case ba_option_kind::count: return count_limit_str(o.get_count());
-	case ba_option_kind::text:  break;
-	}
-	const std::string t = o.get_text();
+inline std::string ba_option_str(const option_value& v) {
+	if (const bool* b = std::get_if<bool>(&v)) return *b ? "on" : "off";
+	if (const size_t* n = std::get_if<size_t>(&v)) return count_limit_str(*n);
+	const std::string& t = std::get<std::string>(v);
 	return t.empty() ? "(none)" : t;
 }
 
@@ -1931,19 +1915,15 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	if (o == none_opt) {
 		for (auto& [_, v] : printers) v();
 		// Bare `get` also lists the pack's BA-declared options, after the
-		// core ones, sorted by family then option name -- a deterministic
-		// order independent of pack configuration order, so REPL-output
-		// tests never become pack-order-sensitive.
-		auto ba_opts = pack_ba_options<node>();
-		std::ranges::sort(ba_opts, [](const auto& a, const auto& b) {
-			return a.family != b.family ? a.family < b.family
-				: std::string(a.option.name)
-					< std::string(b.option.name);
-		});
-		for (const auto& e : ba_opts) {
-			out << e.family << "-" << e.option.name << ": ";
-			out << ba_option_str(e.option) << "\n";
-		}
+		// core ones, sorted by name -- an order independent of the pack
+		// order, so REPL-output tests never become pack-order-sensitive.
+		std::vector<std::string> names;
+		for (const option_spec& spec : pack_ba_option_specs<node>())
+			names.push_back(spec.name);
+		std::ranges::sort(names);
+		for (const auto& name : names)
+			out << name << ": "
+				<< ba_option_str(idni::options().value(name)) << "\n";
 		return;
 	}
 	printers[o]();
@@ -2209,36 +2189,30 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 /** @internal @copydoc repl_evaluator::resolve_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
-	const std::string& family, const std::string& name)
+const option_spec* repl_evaluator<BAs...>::resolve_ba_option(
+	const std::string& dotted)
 {
-	auto res = pack_find_ba_option<node>(family, name);
-	switch (res.status) {
-	case ba_option_lookup_status::no_such_family:
+	if (const option_spec* spec = pack_find_ba_option<node>(dotted))
+		return spec;
+	const auto dash = dotted.find('-');
+	const std::string family = dotted.substr(0, dash);
+	if (!pack_has_option_prefix<node>(family))
 		print_error(code::invalid_argument,
 			"No BA named in this pack ("
 				+ std::string(node::ba::types_joined()) + ")",
 			{{label::name, family}});
-		return nullptr;
-	case ba_option_lookup_status::no_such_option:
-		print_error(code::invalid_argument, "BA has no option",
-			{{label::name, family}, {label::value, name}});
-		return nullptr;
-	case ba_option_lookup_status::found: return res.option;
-	}
-	return nullptr; // unreachable: switch above is exhaustive
+	else print_error(code::invalid_argument, "BA has no option",
+		{{label::name, family}, {label::value, dotted.substr(dash + 1)}});
+	return nullptr;
 }
 
 /** @internal @copydoc repl_evaluator::get_cmd_ba_option @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
-	auto [family, name] = split_ba_option_name(dotted);
-	const ba_option* o = resolve_ba_option(family, name);
-	if (!o) return;
-	// read before printing: a first read may warn about its variable
-	const std::string v = ba_option_str(*o);
-	out << family << "-" << name << ": " << v << "\n";
+	if (!resolve_ba_option(dotted)) return;
+	out << dotted << ": "
+		<< ba_option_str(idni::options().value(dotted)) << "\n";
 }
 
 /** @internal @copydoc repl_evaluator::set_cmd_ba_option @endinternal */
@@ -2247,17 +2221,21 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
 	const std::string& v)
 {
-	auto [family, name] = split_ba_option_name(dotted);
-	const ba_option* o = resolve_ba_option(family, name);
-	if (!o) return;
+	const option_spec* spec = resolve_ba_option(dotted);
+	if (!spec) return;
 	option_change_guard<node> guard;
-	if (o->kind == ba_option_kind::flag) {
-		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
-		else err << "Invalid value\n";
-	} else if (o->kind == ba_option_kind::text) {
-		if (!o->set_text(v)) err << "Invalid value\n";
-	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
-	else err << count_value_error(v);
+	option_value value;
+	if (std::holds_alternative<bool>(spec->fallback)) {
+		auto b = ba_option_str2bool(v);
+		if (!b) { err << "Invalid value\n"; return; }
+		value = *b;
+	} else if (std::holds_alternative<size_t>(spec->fallback)) {
+		auto n = ba_option_str2count(v);
+		if (!n) { err << count_value_error(v); return; }
+		value = *n;
+	} else value = v;
+	auto set = idni::options().set(dotted, std::move(value));
+	if (!set.has_value()) set.print(err);
 }
 
 /** @internal @copydoc repl_evaluator::update_bool_opt_cmd_ba_option @endinternal */
@@ -2266,15 +2244,14 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 	const std::string& dotted, const std::function<bool(bool&)>& update_fn)
 {
-	auto [family, name] = split_ba_option_name(dotted);
-	const ba_option* o = resolve_ba_option(family, name);
-	if (!o) return;
-	if (o->kind != ba_option_kind::flag) {
+	const option_spec* spec = resolve_ba_option(dotted);
+	if (!spec) return;
+	if (!std::holds_alternative<bool>(spec->fallback)) {
 		// Same "wrong command shape" error as the core numeric options
 		// (block_max_splits_opt and friends, above), just addressed with
 		// this option's qualified name instead of a bare one.
 		print_error(code::invalid_argument,
-			o->kind == ba_option_kind::text
+			std::holds_alternative<std::string>(spec->fallback)
 				? "This option takes a text, not a flag"
 				: "This option takes a count, not a flag",
 			{{label::name, dotted}});
@@ -2282,9 +2259,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
 		return;
 	}
 	option_change_guard<node> guard;
-	bool v = o->get_flag();
+	bool v = std::get<bool>(idni::options().value(dotted));
 	update_fn(v);
-	o->set_flag(v);
+	auto set = idni::options().set(dotted, option_value{ v });
+	if (!set.has_value()) set.print(err);
 }
 
 /** @internal @copydoc repl_evaluator::update_charvar @endinternal */
@@ -2684,33 +2662,31 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  compilemaxtableedges   edges compiled as a table (0 = none) 400\n"
 		"  compilebuildtimeout    compile's cmake build in seconds (0 = off) 3600\n"
 		"  bfdependencemaxnodes   bf variable-dependence BDD nodes     65536\n";
-	// BA-declared options ("family-option"), sorted by family then option
-	// name for a deterministic listing independent of pack configuration
-	// order. Flags join the enable/disable/toggle-eligible list; counts
+	// BA-declared options, sorted by name for a listing independent of the
+	// pack order. Flags join the enable/disable/toggle-eligible list; counts
 	// (no enable/disable/toggle, same as core's numeric limit options) and
 	// texts join only the get/set list. All are empty in a pack where no BA
 	// declares any option.
-	auto sorted_ba_options = [](ba_option_kind kind) {
-		auto opts = pack_ba_options<node>();
-		std::vector<ba_named_option> out;
-		for (auto& e : opts) if (e.option.kind == kind) out.push_back(e);
-		std::ranges::sort(out, [](const auto& a, const auto& b) {
-			return a.family != b.family ? a.family < b.family
-				: std::string(a.option.name)
-					< std::string(b.option.name);
+	auto sorted_ba_options = [](option_kind kind) {
+		std::vector<const option_spec*> out;
+		for (const option_spec& spec : pack_ba_option_specs<node>())
+			if (kind_of(spec) == kind)
+				out.push_back(&spec);
+		std::ranges::sort(out, [](const auto* a, const auto* b) {
+			return a->name < b->name;
 		});
 		std::string s;
-		for (auto& e : out) {
-			std::string label = "  " + e.family + "-" + e.option.name;
+		for (const option_spec* spec : out) {
+			std::string label = "  " + spec->name;
 			s += label + std::string(label.size() < 24
-				? 24 - label.size() : 1, ' ') + e.option.help
-				+ (kind == ba_option_kind::flag ? "   on/off\n" : "\n");
+				? 24 - label.size() : 1, ' ') + spec->help
+				+ (kind == option_kind::flag ? "   on/off\n" : "\n");
 		}
 		return s;
 	};
-	const std::string ba_flag_options = sorted_ba_options(ba_option_kind::flag);
-	const std::string ba_count_options = sorted_ba_options(ba_option_kind::count);
-	const std::string ba_text_options = sorted_ba_options(ba_option_kind::text);
+	const std::string ba_flag_options = sorted_ba_options(option_kind::flag);
+	const std::string ba_count_options = sorted_ba_options(option_kind::numeric);
+	const std::string ba_text_options = sorted_ba_options(option_kind::text);
 	const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options + ba_flag_options +
 		"  severity               severity                             error/info/debug/trace\n"

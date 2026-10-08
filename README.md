@@ -974,9 +974,9 @@ and named endpoints, such a decision ranges over, default 2,
 `TAU_QLT_CELLS_MAX_PARAMS`); `nlang` declares `--nlang-http-timeout`
 (seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`) and
 `--nlang-max-tokens` (tokens per reply of an Anthropic model, default 16000,
-`TAU_NLANG_MAX_TOKENS`). Every other count
-option `<ba>-<option>` falls back to `TAU_<BA>_<OPTION>` (dashes as
-underscores), so `bv`'s caps read `TAU_BV_BLASTDEPTH`,
+`TAU_NLANG_MAX_TOKENS`). Every option `<ba>-<option>` takes
+`TAU_<BA>_<OPTION>` (dashes as underscores) at start, and a flag or `set`
+writes it later, so `bv`'s caps read `TAU_BV_BLASTDEPTH`,
 `TAU_BV_CASE_SPLIT_MAX_TESTS`, `TAU_BV_DEFELIM_MAX_CLAUSES`,
 `TAU_BV_DEFELIM_MAX_ATOMS`, `TAU_BV_DEFELIM_MAX_SUBSET`,
 `TAU_BV_DEFELIM_MAX_ROUNDS`, `TAU_BV_BLASTING_MAX_NODES`,
@@ -4082,7 +4082,8 @@ when no algebra of the build declares the name, and `ba_option_names()` lists
 the names the build has. A text option has its own pair:
 `set_ba_text_option("nlang-model", "claude-opus-5-5")` returns the text the
 option now reads and `get_ba_text_option(name)` reads it back. An empty text
-clears the option, `nlang-api-key` reads `set` or `unset`, and each pair
+clears the option to its default, `nlang-api-key` reads `set` or `unset`, and
+each pair
 answers an error for an option of the other kind.
 
 The underlying tree representation is documented in

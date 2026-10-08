@@ -337,23 +337,22 @@ private:
 	void update_bool_opt_cmd(repl_option o,
 		const std::function<bool(bool&)>& update_fn);
 
-	// BA-declared options, addressed as "family-option" (e.g. "bv-blasting"),
-	// resolved against the pack rather than through get_opt()/repl_option.
-	/// @brief Print the BA-declared option named @p dotted
-	/// (`family-name`); a count prints "unlimited" for 0 or SIZE_MAX.
+	// BA-declared options, addressed by their name in the options repository
+	// (e.g. "bv-blasting"), rather than through get_opt()/repl_option.
+	/// @brief Print the BA-declared option named @p dotted; a count prints
+	/// "unlimited" for 0.
 	void get_cmd_ba_option(const std::string& dotted);
-	/// @brief Set the BA-declared option named @p dotted (`family-name`) to
-	/// the text @p v; an invalid value is reported and changes nothing.
+	/// @brief Set the BA-declared option named @p dotted to the text @p v;
+	/// an invalid value is reported and changes nothing.
 	void set_cmd_ba_option(const std::string& dotted, const std::string& v);
-	/// @brief Toggle the BA-declared flag option named `family-name` using
+	/// @brief Toggle the BA-declared flag option named @p dotted using
 	/// @p update_fn (enable/disable/toggle).
 	void update_bool_opt_cmd_ba_option(const std::string& dotted,
 		const std::function<bool(bool&)>& update_fn);
-	/// @brief Resolve @p family and @p name against the pack's BA-declared
-	/// options, reporting "no such family" and "no such option" distinctly.
-	/// @return The option, or nullptr (with the error printed) on failure.
-	const ba_option* resolve_ba_option(const std::string& family,
-		const std::string& name);
+	/// @brief Find @p dotted among the pack's BA-declared options,
+	/// reporting "no such algebra" and "no such option" distinctly.
+	/// @return The spec, or nullptr (with the error printed) on failure.
+	const option_spec* resolve_ba_option(const std::string& dotted);
 
 	// substitution and instantiation of formulas
 	/// @brief Execute the `subst` command @p n: each bracket group of

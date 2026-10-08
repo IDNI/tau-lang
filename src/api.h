@@ -478,9 +478,9 @@ struct api {
 	static void set_ba_decision_pins(size_t n);
 	/**
 	 * @brief Set an option an algebra of the pack declares about itself,
-	 * named `<family>-<option>` as on the command line without its dashes
-	 * (`bv-widening`, `bv-defelim-max-atoms`, `qlt-t3-cap`) and as in the
-	 * REPL `set` command.
+	 * by its name in the options repository (`bv-widening`,
+	 * `bv-defelim-max-atoms`, `qlt-t3-cap`), the name of the command line
+	 * and of the REPL `set` command.
 	 *
 	 * A flag is switched on by a non-zero @p value; a count takes @p value.
 	 * The value is the option's value afterwards, which differs from
@@ -500,9 +500,8 @@ struct api {
 	 * @ref set_ba_option.
 	 *
 	 * The value is what the option reads afterwards. That is not always
-	 * @p value: an empty @p value clears the option, which then reads its
-	 * environment fallback or default, and an option holding a secret
-	 * (`nlang-api-key`) reads `set` or `unset`. An error, and nothing
+	 * @p value: an option holding a secret (`nlang-api-key`) reads `set`
+	 * or `unset`. An error, and nothing
 	 * changes, when no algebra of the pack declares @p name, when
 	 * @p name is a flag or a count, or when the option does not take
 	 * @p value.
@@ -513,8 +512,7 @@ struct api {
 	/// error when no algebra of the pack declares @p name or when @p name
 	/// is a flag or a count.
 	static result<std::string> get_ba_text_option(const std::string& name);
-	/// The `<family>-<option>` names of every BA-declared option of the
-	/// pack.
+	/// The names of every BA-declared option of the pack.
 	static std::vector<std::string> ba_option_names();
 
 	// -----------------------------------------------------------------------

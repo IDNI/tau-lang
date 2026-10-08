@@ -379,35 +379,25 @@ TEST_SUITE("Tau API - runtime limits") {
 	}
 
 	// An algebra's options steer how its formulas are decided, and the
-	// memos are keyed on the formula alone.
+	// memos are keyed on the formula alone, so each write moves it.
 	TEST_CASE("BA options and preprocessing are part of the budget fingerprint") {
-		const size_t base = verdict_budget_fingerprint<node_t>();
 		for (const std::string& name : tau_api::ba_option_names()) {
 			CAPTURE(name);
-			auto got = tau_api::get_ba_option(name);
-			if (!got.has_value()) {
-				// a text option: nothing but nlang-provider is
-				// sure to take a word that moves it
-				if (name != "nlang-provider") continue;
+			const size_t before = verdict_budget_fingerprint<node_t>();
+			if (auto got = tau_api::get_ba_option(name); got.has_value())
+				REQUIRE( tau_api::set_ba_option(name, got.value())
+					.has_value() );
+			else {
+				// the key reads back as set or unset, not as itself
+				if (name == "nlang-api-key") continue;
 				auto was = tau_api::get_ba_text_option(name);
 				REQUIRE( was.has_value() );
-				REQUIRE( tau_api::set_ba_text_option(name,
-					was.value() == "openai" ? "anthropic"
-						: "openai").has_value() );
-				CHECK( verdict_budget_fingerprint<node_t>() != base );
-				REQUIRE( tau_api::set_ba_text_option(name, "")
+				REQUIRE( tau_api::set_ba_text_option(name, was.value())
 					.has_value() );
-				CHECK( verdict_budget_fingerprint<node_t>() == base );
-				continue;
 			}
-			const size_t v = got.value();
-			auto moved = tau_api::set_ba_option(name, v == 1 ? 2 : 1);
-			REQUIRE( moved.has_value() );
-			if (moved.value() != v)
-				CHECK( verdict_budget_fingerprint<node_t>() != base );
-			REQUIRE( tau_api::set_ba_option(name, v).has_value() );
-			CHECK( verdict_budget_fingerprint<node_t>() == base );
+			CHECK( verdict_budget_fingerprint<node_t>() != before );
 		}
+		const size_t base = verdict_budget_fingerprint<node_t>();
 		const bool saved = preprocessing;
 		tau_api::set_preprocessing(!saved);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -512,9 +502,9 @@ TEST_SUITE("Tau API - runtime limits") {
 		const llm_options saved = nlang_llm_options();
 		CHECK( tau_api::set_ba_option("nlang-max-tokens", 512).value() == 512 );
 		CHECK( nlang_llm_options().max_tokens == 512 );
-		// 0 is the default, and the value in force is reported back
-		CHECK( tau_api::set_ba_option("nlang-max-tokens", 0).value()
-			== llm_default_max_tokens );
+		// 0 is kept, and a request then asks for the default
+		CHECK( tau_api::set_ba_option("nlang-max-tokens", 0).value() == 0 );
+		CHECK( llm_config_from_env().max_tokens == llm_default_max_tokens );
 		REQUIRE( tau_api::set_ba_text_option("nlang-provider", "anthropic")
 			.has_value() );
 		CHECK( tau_api::set_ba_option("nlang-fallback", 0).value() == 0 );
@@ -523,9 +513,9 @@ TEST_SUITE("Tau API - runtime limits") {
 	}
 #endif
 
-	// A family the pack owns, asked for an option it does not declare,
-	// is a different miss from a family the pack lacks; both are not_found.
-	TEST_CASE("BA options tell an unknown option from an unknown family") {
+	// An unknown option of a type the pack owns and an option of a type
+	// the pack lacks are both not_found.
+	TEST_CASE("BA options answer not_found for an unknown name") {
 		const auto names = tau_api::ba_option_names();
 		if (names.empty()) return;
 		const std::string family = names.front().substr(0,
@@ -560,23 +550,21 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( bv_defelim_max_atoms == 5 );
 		bv_defelim_max_atoms = saved_atoms;
 
-		// bv-max-width ignores 0: the value in force is reported back.
+		// bv-max-width takes 0 as its default, and reports it back.
 		const size_t saved_width = bv_max_width;
 		CHECK( tau_api::set_ba_option("bv-max-width", 0).value()
-			== saved_width );
+			== bv_max_width_default );
 		bv_max_width = saved_width;
 	}
 
 	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
-	// Driven through bv's own `case-split-max-tests` option, not an api
-	// setter: only bv's own case-split pass can ever make progress against
-	// it, so the option lives on bv's descriptor (bv_descriptor.tmpl.h).
 	TEST_CASE("bv case split cap maps 0 to SIZE_MAX") {
-		using bv_descriptor = ba_descriptor<bv, node_t>;
 		const size_t saved = bv_case_split_max_tests;
-		bv_descriptor::set_case_split_max_tests_option(3);
+		CHECK( tau_api::set_ba_option("bv-case-split-max-tests", 3)
+			.value() == 3 );
 		CHECK( bv_case_split_max_tests == 3 );
-		bv_descriptor::set_case_split_max_tests_option(0);
+		CHECK( tau_api::set_ba_option("bv-case-split-max-tests", 0)
+			.value() == 0 );
 		CHECK( bv_case_split_max_tests
 			== std::numeric_limits<size_t>::max() );
 		bv_case_split_max_tests = saved;
@@ -660,7 +648,8 @@ TEST_SUITE("Tau API - runtime limits") {
 	}
 	// The normalizer and tree caches are keyed on the formula alone: a
 	// setter that changes a semantic option empties them, one that leaves
-	// the options as they were keeps them.
+	// the options as they were keeps them. A write of a BA option always
+	// empties them.
 	TEST_CASE("a semantic option change empties the tree caches") {
 		using cache_t = subtree_unordered_map<node_t, tref>;
 		static cache_t& cache = tau::template create_cache<cache_t>();
@@ -687,8 +676,6 @@ TEST_SUITE("Tau API - runtime limits") {
 			auto before = tau_api::get_ba_option(names.front());
 			REQUIRE( before.has_value() );
 			const size_t v = before.value();
-			CHECK( tau_api::set_ba_option(names.front(), v).has_value() );
-			CHECK( cache.contains(key) );
 			CHECK( tau_api::set_ba_option(names.front(),
 				v == 0 ? 1 : 0).has_value() );
 			CHECK_FALSE( cache.contains(key) );

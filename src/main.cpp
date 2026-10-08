@@ -251,21 +251,19 @@ cli::options tau_options() {
 			"factor since last sweep (default: TAU_GC_GROWTH_FACTOR or "
 			"1.5; <= 0 disables gc)");
 	// BA-declared options: one CLI flag per option a BA in the configured
-	// pack declares about itself, registered as --<family>-<option> (e.g.
-	// --bv-blasting), with default and description taken from the BA's own
-	// descriptor.
-	for (const auto& e : pack_ba_options<node_t>()) {
-		std::string cli_name = e.family + "-" + e.option.name;
+	// pack declares about itself, named as in the options repository (e.g.
+	// --bv-blasting). An option core already registers keeps its entry.
+	for (const option_spec& spec : pack_ba_option_specs<node_t>()) {
+		if (opts.find(spec.name) != opts.end()) continue;
 		// A count or text option is registered with an empty default
-		// on purpose: writing the descriptor's own value back would
-		// shadow whatever environment fallback the algebra resolves
-		// for itself, and the option's own help text names its default.
-		if (e.option.kind == ba_option_kind::flag)
-			opts[cli_name] = cli::option(cli_name, '\0',
-				e.option.get_flag())
-				.set_description(e.option.help);
-		else opts[cli_name] = cli::option(cli_name, '\0', "")
-			.set_description(e.option.help);
+		// on purpose: writing a default back would shadow the value the
+		// environment gave the option.
+		if (std::holds_alternative<bool>(spec.fallback))
+			opts[spec.name] = cli::option(spec.name, '\0',
+				std::get<bool>(idni::options().value(spec.name)))
+				.set_description(spec.help);
+		else opts[spec.name] = cli::option(spec.name, '\0', "")
+			.set_description(spec.help);
 	}
 	return opts;
 }
@@ -619,30 +617,29 @@ int main(int argc, char** argv) {
 				+ g + "'");
 		tau_api::set_gc_growth_factor(f);
 	}
-	// Apply each BA-declared CLI option through its own getter/setter pair
-	// -- the same "two views of the same knob" wiring every option above
-	// already uses, just addressed by family-option instead of a bare name.
-	for (const auto& e : pack_ba_options<node_t>()) {
-		std::string cli_name = e.family + "-" + e.option.name;
-		if (e.option.kind == ba_option_kind::flag) {
-			// Written only when given: a flag left alone keeps
-			// whatever its algebra resolves for it.
-			if (std::ranges::find(args, "--" + cli_name) != args.end())
-				e.option.set_flag(opts[cli_name].get<bool>());
-			continue;
+	// Write each BA-declared option the command line gave, by its name.
+	for (const option_spec& spec : pack_ba_option_specs<node_t>()) {
+		const string& name = spec.name;
+		option_value value;
+		if (std::holds_alternative<bool>(spec.fallback)) {
+			// Written only when given: a flag left alone keeps the
+			// value its environment variable or its default gave it.
+			if (std::ranges::find(args, "--" + name) == args.end())
+				continue;
+			value = opts[name].get<bool>();
+		} else if (std::holds_alternative<string>(spec.fallback)) {
+			const string v = opts[name].get<string>();
+			if (v.empty()) continue;
+			value = v;
+		} else {
+			auto n = given_count(name.c_str());
+			if (!bad_option.empty()) return error(bad_option);
+			if (!n) continue;
+			value = *n;
 		}
-		// Not given: the option keeps the value its environment variable
-		// or its default gave it.
-		if (e.option.kind == ba_option_kind::text) {
-			const string v = opts[cli_name].get<string>();
-			if (!v.empty() && !e.option.set_text(v))
-				return error("Invalid value for --" + cli_name
-					+ ": " + v);
-			continue;
-		}
-		auto n = given_count(cli_name.c_str());
-		if (!bad_option.empty()) return error(bad_option);
-		if (n) e.option.set_count(*n);
+		auto set = idni::options().set(name, std::move(value));
+		set.print_pending(std::cerr);
+		if (!set.has_value()) return 1;
 	}
 
 	// After the options, so a budget given with the verb (--ltl-timeout,
