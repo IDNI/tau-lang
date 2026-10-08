@@ -68,16 +68,16 @@ foreach(row IN LISTS TAU_ENV_LIMIT_ROWS)
 	add_repl_test(limit_env-${nm}-set_beats_env
 		"set ${opt} ${fval}. get ${opt}" "${opt}: *${fval}" NO_FAIL_REGEX
 		NO_TRACE ENV ${var}=${val})
-	# --help names no algebra, so a BA-declared row says which it needs.
-	# The help of a BA option names the option, not its variable.
+	# The help names the option, not its variable. --help names no
+	# algebra, so a BA-declared row says which it needs.
 	if(nm MATCHES "^bv_")
 		add_raw_repl_test(limit_env-${nm}-help_names_the_option
 			"${TAU_RUN} --help"
 			"--${flag}" NO_FAIL_REGEX REQUIRES bv)
 	else()
-		add_raw_repl_test(limit_env-${nm}-help_names_the_variable
+		add_raw_repl_test(limit_env-${nm}-help_names_the_option
 			"${TAU_RUN} --help"
-			"${var}" NO_FAIL_REGEX)
+			"--${flag}" NO_FAIL_REGEX)
 	endif()
 endforeach()
 
@@ -109,11 +109,11 @@ add_repl_test(limit_env-zero_observations_is_the_hard_bound
 # A flag that is not given leaves the variable in force; a garbage flag is an
 # error rather than atoll's 0, which would mean unlimited.
 add_repl_test(limit_env-flag_rejects_garbage
-	"get fixpointsteps" "--max-fixpoint-steps expects a non-negative number"
+	"get fixpointsteps" "does not take the value.*name=max-fixpoint-steps"
 	NO_FAIL_REGEX NO_TRACE FLAGS --max-fixpoint-steps abc)
 add_repl_test(limit_env-real_flag_rejects_garbage
-	"get gcgrowth" "--gc-growth-factor expects a number"
+	"get gcgrowth" "does not take the value.*name=gc-growth-factor"
 	NO_FAIL_REGEX NO_TRACE FLAGS --gc-growth-factor abc)
 add_repl_test(limit_env-new_flag_rejects_garbage
-	"get ltlmealymaxstates" "--ltl-mealy-max-states expects a non-negative number"
+	"get ltlmealymaxstates" "does not take the value.*name=ltl-mealy-max-states"
 	NO_FAIL_REGEX NO_TRACE FLAGS --ltl-mealy-max-states -1)

@@ -1,12 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// cli_options.h is the shared option table the tau CLI and a compiled
-// artifact's own main both build on: main.cpp's tau_options() starts from
-// tau_cli_options(cli_option_set::full) and adds the BA preprocessing flags
-// and the runtime limits; tau_compile.tmpl.h's emit_main() emits a call to
-// tau_cli_options(cli_option_set::artifact). Plain (non-template) functions
-// in namespace idni::tau_lang, so no NodeType/BA setup is needed here, just
-// the header itself.
+// cli_options.h holds the options of the tau executable, which main.cpp
+// declares with declare_tau_cli() and parses with parse_args(), and the old
+// option table that a compiled artifact's own main builds with
+// tau_cli_options(cli_option_set::artifact). Plain functions in namespace
+// idni::tau_lang, so no NodeType/BA setup is needed here, just the header.
+
+#include <sstream>
 
 #include "test_init.h"
 #include "cli_options.h"
@@ -18,6 +18,37 @@ namespace {
 bool has(const idni::cli::options& opts, const std::string& name) {
 	return opts.find(name) != opts.end();
 }
+
+idni::diagnostics::result<idni::parsed_args> parse(
+	idni::options_repository& repo, std::vector<std::string> args)
+{
+	std::vector<char*> argv;
+	for (auto& a : args) argv.push_back(a.data());
+	return repo.parse_args(static_cast<int>(argv.size()), argv.data(),
+		tau_args_config);
+}
+
+// print() marks what it prints, so one call checks every text.
+template <typename... Texts>
+bool has_text(const idni::diagnostics::report& rep, Texts... texts) {
+	std::ostringstream os;
+	rep.print(os);
+	const std::string out = os.str();
+	return ((out.find(std::string_view(texts)) != std::string::npos) && ...);
+}
+
+char short_letter(const std::string& name, const std::string& command) {
+	for (const auto& [n, sf] : tau_surfaces)
+		if (n == name && sf.command == command) return sf.short_name;
+	return '\0';
+}
+
+// One core option with a short letter and one without, as tau_init()
+// would declare them.
+const idni::option_set core_sample{ {
+	{ "max-fixpoint-steps", "solver", std::size_t{ 500 }, "fixpoint cap" },
+	{ "ltl-max-observations", "ltl", std::size_t{ 8 }, "observation cap" },
+} };
 
 }
 
@@ -105,5 +136,116 @@ TEST_SUITE("cli_options") {
 		// unset defaults are preserved
 		CHECK(opts["benchmarks"].get<bool>() == true);
 		CHECK(opts["json"].get<bool>() == false);
+	}
+
+	TEST_CASE("the artifact options are the first seven of the cli set") {
+		auto art = tau_cli_options(cli_option_set::artifact);
+		REQUIRE(tau_cli_option_set.options.size() > art.size());
+		for (size_t i = 0; i < art.size(); ++i) {
+			const auto& spec = tau_cli_option_set.options[i];
+			CAPTURE(spec.name);
+			REQUIRE(has(art, spec.name));
+			CHECK(art.at(spec.name).description() == spec.help);
+			CHECK(art.at(spec.name).short_name()
+				== short_letter(spec.name, ""));
+		}
+	}
+
+	TEST_CASE("severity words map to their level, any other word is an error") {
+		using sev = boost::log::trivial::severity_level;
+		severity_codec c;
+		CHECK(c.from_value(std::string("trace")).value() == sev::trace);
+		CHECK(c.from_value(std::string("debug")).value() == sev::debug);
+		CHECK(c.from_value(std::string("info")).value() == sev::info);
+		CHECK(c.from_value(std::string("error")).value() == sev::error);
+		CHECK_FALSE(c.from_value(std::string("bogus")).has_value());
+		CHECK_FALSE(c.from_value(std::string("")).has_value());
+		CHECK_FALSE(c.from_value(std::size_t{ 1 }).has_value());
+		CHECK(std::get<std::string>(c.to_value(sev::trace)) == "trace");
+	}
+
+	TEST_CASE("parse_args writes the cli options and the bound severity") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(declare_tau_cli(repo).has_value());
+		auto r = parse(repo, { "tau", "-S", "trace", "-q" });
+		REQUIRE(r.has_value());
+		CHECK(tau_cli_severity == boost::log::trivial::trace);
+		CHECK(repo.get<bool>("quit"));
+		CHECK(repo.get<bool>("benchmarks"));
+		CHECK_FALSE(repo.get<bool>("json"));
+		tau_cli_severity = boost::log::trivial::info;
+	}
+
+	TEST_CASE("an unknown flag and a bad severity are errors") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(declare_tau_cli(repo).has_value());
+		auto unknown = parse(repo, { "tau", "--nope" });
+		CHECK_FALSE(unknown.has_value());
+		CHECK(has_text(unknown.report(), "Unknown option"));
+		auto bad = parse(repo, { "tau", "-S", "bogus" });
+		CHECK_FALSE(bad.has_value());
+		CHECK(has_text(bad.report(), "does not take the value"));
+		CHECK(tau_cli_severity == boost::log::trivial::info);
+	}
+
+	TEST_CASE("compile takes its options after the command, define repeats") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(declare_tau_cli(repo).has_value());
+		auto r = parse(repo, { "tau", "compile", "-D", "A=1",
+			"--define", "B=2", "-G", "Ninja", "-o", "out", "-c", "cc" });
+		REQUIRE(r.has_value());
+		CHECK(r.value().command == "compile");
+		CHECK(repo.get<idni::option_list>("define")
+			== idni::option_list{ "A=1", "B=2" });
+		CHECK(repo.get<std::string>("generator") == "Ninja");
+		CHECK(repo.get<std::string>("output") == "out");
+		CHECK(repo.get<std::string>("cxx") == "cc");
+		// -c is color before the command and cxx after it
+		CHECK(repo.get<bool>("color"));
+		// a global option is no option of a command
+		CHECK_FALSE(parse(repo, { "tau", "gen", "-q" }).has_value());
+	}
+
+	TEST_CASE("-o is the output directory of gen and codegen") {
+		for (const char* verb : { "gen", "codegen" }) {
+			CAPTURE(verb);
+			idni::options_repository repo;
+			idni::options_scope scope(repo);
+			REQUIRE(declare_tau_cli(repo).has_value());
+			REQUIRE(parse(repo, { "tau", verb, "-o", "dir" }).has_value());
+			CHECK(repo.get<std::string>("output-dir") == "dir");
+			CHECK(repo.get<std::string>("output").empty());
+		}
+	}
+
+	TEST_CASE("a core option gets its long form and its short letter") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(repo.declare(core_sample).has_value());
+		REQUIRE(declare_tau_cli(repo).has_value());
+		REQUIRE(parse(repo, { "tau", "-f", "9" }).has_value());
+		CHECK(repo.get<std::size_t>("max-fixpoint-steps") == 9);
+		REQUIRE(parse(repo, { "tau", "--ltl-max-observations", "5" })
+			.has_value());
+		CHECK(repo.get<std::size_t>("ltl-max-observations") == 5);
+		auto bad = parse(repo, { "tau", "--max-fixpoint-steps", "abc" });
+		CHECK_FALSE(bad.has_value());
+		CHECK(has_text(bad.report(), "does not take the value",
+			"max-fixpoint-steps"));
+	}
+
+	TEST_CASE("every short letter is used once per command") {
+		for (const auto& [name, sf] : tau_surfaces) {
+			if (!sf.short_name) continue;
+			CAPTURE(name);
+			size_t uses = 0;
+			for (const auto& [n2, sf2] : tau_surfaces)
+				if (sf2.command == sf.command
+					&& sf2.short_name == sf.short_name) ++uses;
+			CHECK(uses == 1);
+		}
 	}
 }

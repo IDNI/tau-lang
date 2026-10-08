@@ -59,10 +59,10 @@ add_raw_repl_test(cli-empty_spec_from_stdin
 # PARSER, before main() ever calls run_tau_spec. main.cpp:88's own
 # "Cannot open file" branch is therefore unreachable for a plainly missing path
 # (it would need a file that vanishes or becomes unreadable between
-# process_args() and the open), so it stays uncovered by design.
+# parse_args() and the open), so it stays uncovered by design.
 add_raw_repl_test(cli-missing_spec_file
 	"${TAU_RUN} definitely_absent_spec.tau"
-	"Invalid command or file not exists" NO_FAIL_REGEX)
+	"Invalid command, or no such file or URL" NO_FAIL_REGEX)
 
 # --- a real specification file ----------------------------------------------
 # Runs run_tau_spec() end to end: read the file, build an interpreter, step, and

@@ -59,7 +59,7 @@ add_repl_test(ltl_env-timeout_flag_beats_env
 	"get ltltimeout" "ltltimeout: *9s" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-timeout 9 ENV TAU_LTL_TIMEOUT=5)
 add_repl_test(ltl_env-timeout_flag_rejects_garbage
-	"get ltltimeout" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	"get ltltimeout" "does not take the value.*name=ltl-timeout" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-timeout abc)
 add_repl_test(ltl_env-alg_env_is_the_fallback
 	"get ltlalg" "ltlalg: *D" NO_FAIL_REGEX NO_TRACE
@@ -130,7 +130,7 @@ add_repl_test(ltl_env-hoa_max_states_flag_beats_env
 add_env_error_test(ltl_env-hoa_max_states_garbage_is_an_error
 	TAU_LTL_HOA_MAX_STATES=abc)
 add_repl_test(ltl_env-hoa_max_states_flag_rejects_garbage
-	"get ltlhoamaxstates" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	"get ltlhoamaxstates" "does not take the value.*name=ltl-hoa-max-states" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-hoa-max-states abc)
 add_repl_test(ltl_env-guard_max_cubes_env_is_the_fallback
 	"get ltlguardmaxcubes" "ltlguardmaxcubes: *6" NO_FAIL_REGEX NO_TRACE
@@ -158,7 +158,7 @@ add_repl_test(ltl_env-data_game_max_nodes_flag_beats_env
 	"get ltldatagamemaxnodes" "ltldatagamemaxnodes: *12" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_DATA_GAME_MAX_NODES=4096 FLAGS --ltl-data-game-max-nodes 12)
 add_repl_test(ltl_env-data_game_max_nodes_flag_rejects_garbage
-	"get ltldatagamemaxnodes" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	"get ltldatagamemaxnodes" "does not take the value.*name=ltl-data-game-max-nodes" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-data-game-max-nodes abc)
 add_repl_test(ltl_env-data_game_max_memo_flag
 	"get ltldatagamemaxmemo" "ltldatagamemaxmemo: *unlimited" NO_FAIL_REGEX NO_TRACE
@@ -179,7 +179,7 @@ add_repl_test(ltl_env-consistency_subsets_flag_beats_env
 	"get maxsubsets" "maxsubsets: *9" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_MAX_CONSISTENCY_SUBSETS=7 FLAGS --max-consistency-subsets 9)
 add_repl_test(ltl_env-consistency_subsets_flag_rejects_garbage
-	"get maxsubsets" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
+	"get maxsubsets" "does not take the value.*name=max-consistency-subsets" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets abc)
 add_repl_test(ltl_env-cover_products_env_is_the_fallback
 	"get maxcoverproducts" "maxcoverproducts: *unlimited" NO_FAIL_REGEX NO_TRACE
