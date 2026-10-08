@@ -19,7 +19,6 @@
 #define __IDNI__TAU__SIMPLIFY_OPTIONS_H__
 
 #include <cstddef>
-#include "env_limits.h"
 
 namespace idni::tau_lang {
 
@@ -29,8 +28,7 @@ namespace idni::tau_lang {
 /// Runtime parameter by policy: set via `--max-simplify-rounds`, REPL
 /// `simplifyrounds`, or `api<node>::set_max_simplify_rounds`. Like `preprocessing`,
 /// NOT thread-safe: the tau library assumes single-threaded access.
-/// Environment fallback `TAU_MAX_SIMPLIFY_ROUNDS`.
-inline env_limit<size_t> max_simplify_rounds{ "TAU_MAX_SIMPLIFY_ROUNDS", 0 };
+inline std::size_t max_simplify_rounds = 0;
 
 } // namespace idni::tau_lang
 

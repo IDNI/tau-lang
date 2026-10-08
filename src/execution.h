@@ -17,7 +17,6 @@
 #define __IDNI__TAU__EXECUTION_H__
 
 #include "tau_tree.h"
-#include "env_limits.h"
 
 namespace idni::tau_lang {
 
@@ -105,8 +104,7 @@ struct repeat_each {
 /// a member would be one knob per instantiation. Set via
 /// `--max-rewrite-rounds`, REPL `rewriterounds`, or
 /// `api::set_max_rewrite_rounds`.
-/// Environment fallback `TAU_MAX_REWRITE_ROUNDS`.
-inline env_limit<size_t> max_rewrite_rounds{ "TAU_MAX_REWRITE_ROUNDS", 0 };
+inline size_t max_rewrite_rounds = 0;
 
 /**
  * @brief Repeatedly apply the whole sequence of steps to a formula, one

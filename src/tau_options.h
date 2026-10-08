@@ -4,11 +4,12 @@
  * @file tau_options.h
  * @brief The core option set of the tau library: one spec per engine limit
  * and flag that an api setter owns, the codecs of the fields whose type is
- * no option kind, and the hook that runs after a write by name.
+ * no option kind, the hook that runs after a write by name, and the
+ * binding of each option to its field.
  *
  * api.tmpl.h includes this file after every limit is declared, and
- * `tau_init()` declares the set. A program then loads the environment with
- * `options().load_env("TAU_")`.
+ * `tau_init()` declares the set and binds it. A program then loads the
+ * environment with `options().load_env("TAU_")`.
  */
 
 #ifndef __IDNI__TAU__TAU_OPTIONS_H__
@@ -18,6 +19,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -71,47 +73,64 @@ struct ltl_algorithm_codec {
 	}
 };
 
+/// A budget whose loops count down from SIZE_MAX: the option reads and
+/// writes 0 for it, as its api setter does.
+struct zero_is_unlimited_codec {
+	option_value to_value(std::size_t n) const {
+		return n == std::numeric_limits<std::size_t>::max()
+			? std::size_t{ 0 } : n;
+	}
+	result<std::size_t> from_value(const option_value& v) const {
+		result<std::size_t> r;
+		const auto* n = std::get_if<std::size_t>(&v);
+		if (!n) return r.with_error(code::type_error,
+			parser_strings::messages::option_value_kind);
+		return r.with_value(*n ? *n
+			: std::numeric_limits<std::size_t>::max());
+	}
+};
+
 /// The engine limits and flags of the library, with the default of each.
 inline const option_set tau_core_option_set{ {
 	// solver
 	{ "block-max-splits", "solver",
-		std::size_t{ 0 },
+		zero_is_unlimited_codec{}.to_value(block_boole_max_splits),
 		"cap per-block Boole-decomposition splits in anti-prenexing "
 		"(0 = unlimited)" },
 	{ "block-max-rounds", "solver",
-		std::size_t{ 0 },
+		zero_is_unlimited_codec{}.to_value(block_max_rounds),
 		"cap anti-prenexing quantifier-block driver rounds "
 		"(0 = unlimited)" },
 	{ "cqe-max-clauses", "solver",
-		std::size_t{ 0 },
+		zero_is_unlimited_codec{}.to_value(cqe_max_clauses),
 		"cap the DNF clauses complete quantifier elimination may "
 		"distribute one scope into (0 = unlimited)" },
 	{ "lgrs-max-vars", "solver",
-		std::size_t{ 8 },
+		zero_is_unlimited_codec{}.to_value(lgrs_max_vars),
 		"hand a pure-equality bitvector system with more distinct "
 		"variables than this to the solver instead of solving it "
 		"algebraically per width (0 = unlimited)" },
-	{ "max-fixpoint-steps", "solver", std::size_t{ 500 },
+	{ "max-fixpoint-steps", "solver", std::size_t{ max_fixpoint_steps },
 		"cap temporal-normalization fixpoint steps (0 = unlimited)" },
 	{ "max-flag-search-steps", "solver",
-		std::size_t{ 500 },
+		std::size_t{ max_flag_search_steps },
 		"cap the eventual-flag search past the flag boundary; a "
 		"give-up reports an error, not a verdict (0 = unlimited)" },
-	{ "block-squeeze-cap", "solver", std::size_t{ 0 },
+	{ "block-squeeze-cap", "solver", std::size_t{ block_squeeze_cap },
 		"skip block squeezing above this operand-set size "
 		"(0 = unlimited)" },
-	{ "max-simplify-rounds", "solver", std::size_t{ 0 },
+	{ "max-simplify-rounds", "solver", std::size_t{ max_simplify_rounds },
 		"cap bitvector simplification rewrite rounds (0 = unlimited)" },
-	{ "max-def-passes", "solver", std::size_t{ 0 },
+	{ "max-def-passes", "solver", std::size_t{ max_def_passes },
 		"cap definition-expansion passes (0 = unlimited)" },
-	{ "max-probe-steps", "solver", std::size_t{ 10000 },
+	{ "max-probe-steps", "solver", std::size_t{ max_probe_steps },
 		"cap the untyped saturation probe over a residual recurrence "
 		"reference (0 = unlimited)" },
-	{ "max-enum-steps", "solver", std::size_t{ 0 },
+	{ "max-enum-steps", "solver", std::size_t{ max_enum_steps },
 		"cap recurrence-relation enumeration steps (0 = unlimited)" },
-	{ "max-rewrite-rounds", "solver", std::size_t{ 0 },
+	{ "max-rewrite-rounds", "solver", std::size_t{ max_rewrite_rounds },
 		"cap rewrite-to-fixpoint rounds (0 = unlimited)" },
-	{ "max-constant-size", "solver", std::size_t{ 2000 },
+	{ "max-constant-size", "solver", std::size_t{ max_constant_size },
 		"largest region of fresh values, in tree nodes, a run keeps "
 		"across steps (0 = unlimited)" },
 	// ltl
@@ -194,7 +213,7 @@ inline const option_set tau_core_option_set{ {
 	{ "max-revision-alts", "run", std::size_t{ 0 },
 		"cap the revision alternatives kept per specification part, "
 		"dropping middle preference tiers (0 = unlimited)" },
-	{ "cache-bound", "run", std::size_t{ 4096 },
+	{ "cache-bound", "run", std::size_t{ cache_bound },
 		"bound the string-keyed synthesis caches, FIFO eviction "
 		"(0 = unbounded)" },
 	{ "tref-budget", "run", std::size_t{ 0 },
@@ -212,7 +231,7 @@ inline const option_set tau_core_option_set{ {
 		"seconds the cmake build of compile may take before it is "
 		"stopped (0 = no timeout)" },
 	{ "bf-dependence-max-nodes", "run",
-		std::size_t{ 1 } << 16,
+		std::size_t{ bf_dependence_max_nodes },
 		"cap the BDD nodes built to tell whether a Boolean function "
 		"depends on a variable (0 = unlimited)" },
 } };
@@ -233,6 +252,39 @@ void clear_caches_on_semantic_change() {
 	const size_t now = api_detail::semantic_options_fingerprint<node>();
 	if (now != semantic_options_seen<node>) tree<node>::clear_caches();
 	semantic_options_seen<node> = now;
+}
+
+/// Binds the options whose field is a plain global to that field. An option
+/// of a limit that still reads its own variable stays unbound.
+template <NodeType node>
+result<void> bind_core_options(options_repository& repo) {
+	result<void> r;
+	const option_hook hook = clear_caches_on_semantic_change<node>;
+	semantic_options_seen<node> =
+		api_detail::semantic_options_fingerprint<node>();
+	TAU_TRY_VOID(repo.bind("block-max-splits", block_boole_max_splits,
+		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("block-max-rounds", block_max_rounds,
+		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("cqe-max-clauses", cqe_max_clauses,
+		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("lgrs-max-vars", lgrs_max_vars,
+		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("max-fixpoint-steps", max_fixpoint_steps, hook));
+	TAU_TRY_VOID(repo.bind("max-flag-search-steps", max_flag_search_steps,
+		hook));
+	TAU_TRY_VOID(repo.bind("block-squeeze-cap", block_squeeze_cap, hook));
+	TAU_TRY_VOID(repo.bind("max-simplify-rounds", max_simplify_rounds,
+		hook));
+	TAU_TRY_VOID(repo.bind("max-def-passes", max_def_passes, hook));
+	TAU_TRY_VOID(repo.bind("max-probe-steps", max_probe_steps, hook));
+	TAU_TRY_VOID(repo.bind("max-enum-steps", max_enum_steps, hook));
+	TAU_TRY_VOID(repo.bind("max-rewrite-rounds", max_rewrite_rounds, hook));
+	TAU_TRY_VOID(repo.bind("max-constant-size", max_constant_size, hook));
+	TAU_TRY_VOID(repo.bind("cache-bound", cache_bound, hook));
+	TAU_TRY_VOID(repo.bind("bf-dependence-max-nodes",
+		bf_dependence_max_nodes, hook));
+	return r;
 }
 
 } // namespace idni::tau_lang

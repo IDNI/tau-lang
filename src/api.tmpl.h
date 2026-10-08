@@ -36,7 +36,9 @@ result<void> tau_init() {
 					in.get_terminals(from, to));
 		},
 		{ { tau_parser::type_def, tau_parser::new_type_name } });
-	TAU_TRY_VOID(idni::options().declare(tau_core_option_set));
+	auto& repo = idni::options();
+	TAU_TRY_VOID(repo.declare(tau_core_option_set));
+	TAU_TRY_VOID(bind_core_options<node>(repo));
 	return r;
 }
 

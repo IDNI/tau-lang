@@ -23,7 +23,7 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	// Raw-stored size_t caps: 0 means unlimited and is stored as 0.
 	TEST_CASE("plain caps write their globals verbatim") {
-		struct row { void (*set)(size_t); env_limit<size_t>* global; };
+		struct row { void (*set)(size_t); size_t* global; };
 		const row rows[] = {
 			{ &tau_api::set_block_squeeze_cap,   &block_squeeze_cap },
 			{ &tau_api::set_max_fixpoint_steps,  &max_fixpoint_steps },
@@ -34,16 +34,21 @@ TEST_SUITE("Tau API - runtime limits") {
 			{ &tau_api::set_max_probe_steps,     &max_probe_steps },
 			{ &tau_api::set_max_rewrite_rounds,  &max_rewrite_rounds },
 			{ &tau_api::set_max_simplify_rounds, &max_simplify_rounds },
-			{ &tau_api::set_ba_decision_pins,    &ba_decision_pins },
 		};
 		for (const row& r : rows) {
 			const size_t saved = *r.global;
 			r.set(77);
-			CHECK( r.global->get() == 77 );
+			CHECK( *r.global == 77 );
 			r.set(0);
-			CHECK( r.global->get() == 0 );
+			CHECK( *r.global == 0 );
 			*r.global = saved;
 		}
+		const size_t saved_pins = ba_decision_pins;
+		tau_api::set_ba_decision_pins(77);
+		CHECK( ba_decision_pins.get() == 77 );
+		tau_api::set_ba_decision_pins(0);
+		CHECK( ba_decision_pins.get() == 0 );
+		ba_decision_pins = saved_pins;
 	}
 
 	// max_blast_reentry_depth (antiprenexing/antiprenexing.h) is bv's
@@ -62,19 +67,34 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t s1 = block_boole_max_splits;
 		const size_t s2 = block_max_rounds;
 		tau_api::set_block_max_splits(512);
-		CHECK( block_boole_max_splits.get() == 512 );
+		CHECK( block_boole_max_splits == 512 );
 		tau_api::set_block_max_splits(0);
-		CHECK( block_boole_max_splits.get()
+		CHECK( block_boole_max_splits
 			== std::numeric_limits<size_t>::max() );
 		CHECK( tau_api::get_block_max_splits() == 0 );
 		tau_api::set_block_max_rounds(33);
-		CHECK( block_max_rounds.get() == 33 );
+		CHECK( block_max_rounds == 33 );
 		tau_api::set_block_max_rounds(0);
-		CHECK( block_max_rounds.get()
+		CHECK( block_max_rounds
 			== std::numeric_limits<size_t>::max() );
 		CHECK( tau_api::get_block_max_rounds() == 0 );
 		block_boole_max_splits = s1;
 		block_max_rounds = s2;
+	}
+
+	// The block budgets read and write 0 by name too, as their setters do.
+	TEST_CASE("block budgets map 0 to SIZE_MAX by name") {
+		const size_t saved = block_boole_max_splits;
+		CHECK( idni::options().set_text("block-max-splits", "0")
+			.has_value() );
+		CHECK( block_boole_max_splits
+			== std::numeric_limits<size_t>::max() );
+		CHECK( idni::options().get_text("block-max-splits").value()
+			== "0" );
+		CHECK( idni::options().set_text("block-max-splits", "9")
+			.has_value() );
+		CHECK( block_boole_max_splits == 9 );
+		block_boole_max_splits = saved;
 	}
 
 	// The LTL(ABA) knobs promoted from environment variables / header

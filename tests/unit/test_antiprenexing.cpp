@@ -1141,9 +1141,9 @@ TEST_SUITE("BlockLimits") {
 	}
 
 	TEST_CASE("the limits are at their documented defaults") {
-		CHECK( block_boole_max_splits.get()
+		CHECK( block_boole_max_splits
 			== std::numeric_limits<size_t>::max() );
-		CHECK( block_max_rounds.get() == std::numeric_limits<size_t>::max() );
+		CHECK( block_max_rounds == std::numeric_limits<size_t>::max() );
 	}
 }
 

@@ -26,11 +26,9 @@ namespace idni::tau_lang {
 /// `find_minimal_solution`, whose Boole expansion is exponential in the
 /// variables (GitHub #121). `var = constant` conjuncts
 /// are read off before the count. Default 8; SIZE_MAX = unlimited (0
-/// through the setter); set via `api::set_lgrs_max_vars`, `--lgrs-max-vars` or the REPL
-/// option `lgrsmaxvars`.
-/// Environment fallback `TAU_LGRS_MAX_VARS` (0 = unlimited there too).
-inline env_limit<size_t> lgrs_max_vars{ "TAU_LGRS_MAX_VARS", 8,
-	env_zero::unlimited };
+/// through the setter and the option); set via `api::set_lgrs_max_vars`,
+/// `--lgrs-max-vars` or the REPL option `lgrsmaxvars`.
+inline size_t lgrs_max_vars = 8;
 
 /// How many times a solver call gave up on a value because building it
 /// passed `max_constant_size`; `solve` reads it to tell that apart from a

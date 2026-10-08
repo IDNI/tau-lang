@@ -6,7 +6,6 @@
 #include <optional>
 
 #include "tau_tree.h"
-#include "env_limits.h"
 
 namespace idni::tau_lang {
 
@@ -42,8 +41,7 @@ tref distribute_block_over_atoms(tref formula, const trefs& block);
 /// it via `--block-squeeze-cap`, REPL `squeezecap`, or
 /// `api<node>::set_block_squeeze_cap`. Runtime-tunable per the runtime-parameter
 /// policy; NOT thread-safe, like every knob in this pass.
-/// Environment fallback `TAU_BLOCK_SQUEEZE_CAP`.
-inline env_limit<size_t> block_squeeze_cap{ "TAU_BLOCK_SQUEEZE_CAP", 0 };
+inline size_t block_squeeze_cap = 0;
 
 /**
  * @internal

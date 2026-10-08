@@ -49,7 +49,7 @@ repeat_each<node, step_t>::repeat_each(step_t s)
 // The error both repeat_each and repeat_all report on reaching the cap.
 inline std::string rewrite_rounds_message() {
 	return "Rewriting did not reach a fixpoint after "
-		+ std::to_string(max_rewrite_rounds.get())
+		+ std::to_string(max_rewrite_rounds)
 		+ " rounds (max-rewrite-rounds) and is still growing; the "
 		"definitions in use are most likely non-terminating for this "
 		"argument";

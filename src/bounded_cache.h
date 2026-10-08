@@ -58,7 +58,6 @@
 
 #include <cstddef>
 #include <list>
-#include "env_limits.h"
 #include <map>
 #include <utility>
 
@@ -71,9 +70,9 @@ namespace idni::tau_lang {
  * Read by the cache of `call_ltlsynt_game`. A cache constructed with
  * `&cache_bound` reads the current value on every insert, so
  * `--cache-bound` / REPL `set cachebound` / `api::set_cache_bound` take
- * effect immediately. Default 4096; environment fallback `TAU_CACHE_BOUND`.
+ * effect immediately. Default 4096.
  */
-inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
+inline std::size_t cache_bound = 4096;
 
 /**
  * @brief std::map with a configurable max-size bound and FIFO eviction
@@ -81,8 +80,7 @@ inline env_limit<std::size_t> cache_bound{ "TAU_CACHE_BOUND", 4096 };
  *
  * Two bounding modes. Default construction uses the compile-time `Max`
  * template parameter. Constructing with a pointer to a runtime bound
- * (or to an env_limit) switches to runtime mode: the pointee is read on
- * every insert, so
+ * switches to runtime mode: the pointee is read on every insert, so
  * a `set cachebound N` tightens or loosens a live cache. In both
  * modes a bound of 0 means unbounded; in runtime mode the FIFO
  * queue is maintained even while the bound is 0, so a later
@@ -112,12 +110,6 @@ struct bounded_cache {
 	/// pointer selects compile-time mode.
 	explicit bounded_cache(const std::size_t* runtime_bound)
 		: runtime_bound_(runtime_bound) {}
-	/// @brief Runtime mode over a limit with an environment fallback: the
-	/// limit's effective value (see env_limit) is read on every insert.
-	/// @param runtime_limit Limit to read; must outlive the cache. A null
-	/// pointer selects compile-time mode.
-	explicit bounded_cache(const env_limit<std::size_t>* runtime_limit)
-		: runtime_limit_(runtime_limit) {}
 
 	// --- queries ----------------------------------------------------
 
@@ -129,8 +121,7 @@ struct bounded_cache {
 	static constexpr std::size_t max_size() noexcept { return Max; }
 	/// @brief The bound in effect: the runtime pointee, else `Max`.
 	std::size_t bound() const noexcept {
-		return runtime_limit_ ? runtime_limit_->get()
-			: runtime_bound_ ? *runtime_bound_ : Max;
+		return runtime_bound_ ? *runtime_bound_ : Max;
 	}
 
 	/// @brief Lookup by key, as std::map::find.
@@ -229,8 +220,7 @@ private:
 	// Whether the FIFO queue is maintained at all: always in runtime
 	// mode (the bound can become non-zero later), only for Max != 0 in
 	// compile-time mode.
-	bool tracked() const noexcept { return Max != 0 || runtime_bound_
-		|| runtime_limit_; }
+	bool tracked() const noexcept { return Max != 0 || runtime_bound_; }
 
 	// Enqueue the new entry @p it and evict the oldest entries while the
 	// size exceeds a non-zero bound.
@@ -255,7 +245,6 @@ private:
 	std::list<iterator> order_;
 
 	const std::size_t* runtime_bound_ = nullptr;
-	const env_limit<std::size_t>* runtime_limit_ = nullptr;
 
 	std::size_t evictions_ = 0;
 };

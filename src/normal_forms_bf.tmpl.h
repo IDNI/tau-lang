@@ -3,8 +3,6 @@
 // normal_forms_bf.tmpl.h - BF simplification: syntactic simplification, squeeze_absorb
 // Split from normal_forms.tmpl.h for readability.
 
-#include "env_limits.h"
-
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME
@@ -13,10 +11,9 @@ namespace idni::tau_lang {
 /// Cap on the BDD nodes `bf_var_dependence` builds before it answers
 /// `unknown`, which leaves the variable to the slower simplifications;
 /// 0 = unlimited. Set via `--bf-dependence-max-nodes`, REPL
-/// `bfdependencemaxnodes`, `api::set_bf_dependence_max_nodes`, or the
-/// environment variable `TAU_BF_DEPENDENCE_MAX_NODES` (default 65536).
-inline env_limit<size_t> bf_dependence_max_nodes{
-	"TAU_BF_DEPENDENCE_MAX_NODES", size_t{1} << 16 };
+/// `bfdependencemaxnodes` or `api::set_bf_dependence_max_nodes` (default
+/// 65536).
+inline size_t bf_dependence_max_nodes = size_t{1} << 16;
 
 /// What bf_var_dependence could establish about a term and a variable.
 enum class bf_dependence { unknown, depends, zero, one };

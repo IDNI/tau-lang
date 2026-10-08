@@ -4,7 +4,6 @@
 #include <functional>
 #include <iostream>
 #include <map>
-#include "env_limits.h"
 #include <mutex>
 #include <optional>
 #include <set>
@@ -24,8 +23,7 @@ namespace idni::tau_lang {
 /// caught by a visited set regardless, so only an ever-growing expansion is
 /// unbounded when unlimited. Runtime parameter by policy: set via
 /// `--max-def-passes`, REPL `defpasses`, or `api::set_max_def_passes`.
-/// Environment fallback `TAU_MAX_DEF_PASSES`.
-inline env_limit<size_t> max_def_passes{ "TAU_MAX_DEF_PASSES", 0 };
+inline size_t max_def_passes = 0;
 
 /// Cap on recurrence-relation enumeration steps; 0 = unlimited (the default).
 /// A recurrence whose normalized steps are all distinct (e.g. one that keeps
@@ -33,8 +31,7 @@ inline env_limit<size_t> max_def_passes{ "TAU_MAX_DEF_PASSES", 0 };
 /// normalization plus up to `previous.size()` equivalence proofs; real
 /// recurrences settle in single-digit steps. Set via `--max-enum-steps`,
 /// REPL `enumsteps`, or `api::set_max_enum_steps`.
-/// Environment fallback `TAU_MAX_ENUM_STEPS`.
-inline env_limit<size_t> max_enum_steps{ "TAU_MAX_ENUM_STEPS", 0 };
+inline size_t max_enum_steps = 0;
 
 /// Cap on the untyped saturation probe `calculate_fixed_point` runs over a
 /// residual recurrence reference to tell a type-blocked rule from a
@@ -44,8 +41,7 @@ inline env_limit<size_t> max_enum_steps{ "TAU_MAX_ENUM_STEPS", 0 };
 /// smaller of this and a finite `max_enum_steps`. Runtime parameter by
 /// policy: set via `--max-probe-steps`, REPL `probesteps`, or
 /// `api::set_max_probe_steps`.
-/// Environment fallback `TAU_MAX_PROBE_STEPS`.
-inline env_limit<size_t> max_probe_steps{ "TAU_MAX_PROBE_STEPS", 10000 };
+inline size_t max_probe_steps = 10000;
 
 /**
  * @internal
