@@ -236,6 +236,45 @@ function runBaOptions(tau) {
 	}
 }
 
+function runOptions(tau) {
+	const names = tau.optionNames();
+	check(Array.isArray(names) && names.includes('max-fixpoint-steps'),
+		`optionNames() -> ${JSON.stringify(names)}`);
+	for (const name of names) {
+		const t = tau.getOption(name);
+		check(typeof t === 'string', `getOption(${name}) -> ${t}`);
+		// the key reads back as set or unset, not as itself
+		if (name === 'nlang-api-key') continue;
+		check(tau.setOption(name, t) === t,
+			`setOption(${name}, ${t}) keeps it`);
+	}
+	check(tau.setOption('nope-nothing', 'x') === null
+		&& tau.getLastError().length > 0,
+		'setOption refuses an undeclared name');
+	check(tau.getOption('nope-nothing') === null
+		&& tau.getLastError().length > 0,
+		'getOption refuses an undeclared name');
+	check(tau.setOption('max-fixpoint-steps', 'x') === null
+		&& tau.getLastError().length > 0,
+		'setOption refuses a text that is no count');
+
+	// 0 is a valid value of the cell budgets: it lifts the bound.
+	for (const [count, v] of [['qlt-t3-cap', '5'], ['qlt-cells-budget', '0'],
+		['qlt-cells-max-params', '3']]) {
+		check(names.includes(count),
+			`${count} is declared (qlt is in the pack)`);
+		if (!names.includes(count)) continue;
+		const saved = tau.getOption(count);
+		check(tau.setOption(count, v) === v,
+			`setOption(${count}, ${v}) -> ${v}`);
+		check(tau.getOption(count) === v, `getOption(${count}) reads ${v}`);
+		check(tau.setOption(count, saved) === saved,
+			`setOption(${count}, ${saved}) restores it`);
+		check(tau.getOption(count) === saved,
+			`getOption(${count}) reads ${saved} again`);
+	}
+}
+
 const tauModule = require(WASM_JS);
 tauModule().then((tau) => {
 	try {
@@ -245,6 +284,7 @@ tauModule().then((tau) => {
 		runFixpointSteps(tau);
 		runMaxConstantSize(tau);
 		runBaOptions(tau);
+		runOptions(tau);
 	} catch (e) {
 		console.error('EXCEPTION: ' + e.stack);
 		failed = true;

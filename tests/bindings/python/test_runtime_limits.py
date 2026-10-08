@@ -149,10 +149,53 @@ def test_ba_options():
 	assert verdict(tau.set_ba_option("bv-defelim-max-atoms", 5)) == 5
 	assert verdict(tau.set_ba_option("bv-defelim-max-atoms", saved)) == saved
 
+def test_nlang_text_options(names):
+	if "nlang-model" not in names:
+		return
+	assert verdict(tau.set_option("nlang-model", "my-model-1")) \
+		== "my-model-1"
+	assert verdict(tau.get_option("nlang-model")) == "my-model-1"
+	assert verdict(tau.set_option("nlang-endpoint",
+		"http://localhost:8080/v1")) == "http://localhost:8080/v1"
+	assert verdict(tau.set_option("nlang-provider", "anthropic")) \
+		== "anthropic"
+	refused = tau.set_option("nlang-provider", "nobody")
+	assert not refused and refused.report.has_error, repr(refused)
+	assert verdict(tau.get_option("nlang-provider")) == "anthropic"
+	# the key is never read back
+	assert verdict(tau.set_option("nlang-api-key", "sk-secret")) == "set"
+	assert verdict(tau.get_option("nlang-api-key")) == "set"
+	assert not tau.set_option("nlang-max-tokens", "x")
+	assert verdict(tau.set_option("nlang-max-tokens", "512")) == "512"
+	for name in ("nlang-model", "nlang-endpoint", "nlang-provider",
+			"nlang-api-key"):
+		assert tau.set_option(name, "")
+
+def test_options():
+	names = tau.option_names()
+	assert "max-fixpoint-steps" in names, names
+	for name in names:
+		t = tau.get_option(name)
+		assert isinstance(verdict(t), str), f"{name}: {t!r}"
+	unknown = tau.set_option("nope-nothing", "x")
+	assert not unknown and unknown.report.has_error, repr(unknown)
+	assert not tau.get_option("nope-nothing")
+	test_nlang_text_options(names)
+	if "bv-definitional-elimination" not in names:
+		return
+	assert verdict(tau.set_option("bv-definitional-elimination", "off")) \
+		== "false"
+	assert verdict(tau.set_option("bv-definitional-elimination", "on")) \
+		== "true"
+	saved = verdict(tau.get_option("bv-defelim-max-atoms"))
+	assert verdict(tau.set_option("bv-defelim-max-atoms", "5")) == "5"
+	assert verdict(tau.set_option("bv-defelim-max-atoms", saved)) == saved
+
 def main():
 	test_every_setter_takes_a_value()
 	test_tref_budget_refuses_a_call()
 	test_ba_options()
+	test_options()
 	print("Test passed!")
 
 if __name__ == "__main__":

@@ -120,6 +120,16 @@ static py_result to_py_result(idni::tau_lang::result<T>&& r) {
 	return out;
 }
 
+// Writes option @p name from @p text and reads its text back.
+static idni::tau_lang::result<std::string> set_option_text(
+	const std::string& name, const std::string& text)
+{
+	idni::tau_lang::result<std::string> r;
+	TAU_TRY_VOID(idni::options().set_text(name, text));
+	TAU_TRY(std::string read, idni::options().get_text(name));
+	return r.with_value(std::move(read));
+}
+
 // The report of tau_init() and of the environment at module init. The
 // module loads either way, so a failed init raises from each engine call
 // instead of from the import.
@@ -438,6 +448,26 @@ NB_MODULE(tau, m) {
 		}, "name"_a,
 		"The text a BA-declared text option reads, or no value when "
 		"the name is not a text option of this build.");
+
+	// Every option of the options repository, core and BA, by the name
+	// it has on the command line (max-fixpoint-steps, bv-widening).
+	m.def("option_names", []() { return idni::options().names(); },
+		"Names of every option this build declares.");
+	m.def("set_option",
+		[](const std::string& name, const std::string& text) {
+			raise_if_init_failed();
+			return to_py_result(set_option_text(name, text));
+		}, "name"_a, "text"_a,
+		"Set an option from its text, as on the command line. Returns "
+		"a result carrying the text the option reads afterwards "
+		"(nlang-api-key reads 'set' or 'unset'); no value, and the "
+		"reason in the report, for an unknown name or a bad text.");
+	m.def("get_option",
+		[](const std::string& name) {
+			raise_if_init_failed();
+			return to_py_result(idni::options().get_text(name));
+		}, "name"_a,
+		"The text an option reads, or no value for an unknown name.");
 
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")

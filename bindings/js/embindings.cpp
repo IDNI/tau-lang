@@ -268,6 +268,32 @@ val js_ba_option_names() {
 	return out;
 }
 
+// The text of option @p name, or null with the reason in getLastError()
+// when the repository declares no such option.
+val js_get_option(const std::string& name) {
+	if (!begin_engine_call()) return val::null();
+	auto r = idni::options().get_text(name);
+	if (!r.has_value()) { set_last_error(r); return val::null(); }
+	return val(r.value());
+}
+
+// Writes option @p name from @p text and gives the text it reads after the
+// write, or null with the reason in getLastError().
+val js_set_option(const std::string& name, const std::string& text) {
+	if (!begin_engine_call()) return val::null();
+	auto r = idni::options().set_text(name, text);
+	if (!r.has_value()) { set_last_error(r); return val::null(); }
+	return js_get_option(name);
+}
+
+val js_option_names() {
+	val out = val::array();
+	size_t i = 0;
+	for (const std::string& name : idni::options().names())
+		out.set(i++, name);
+	return out;
+}
+
 // Runtime budgets and engine switches, under the camelCase form of the
 // Python binding's names. Each forwards to the api setter the CLI option
 // and the REPL `set` option of the same meaning write, and each count has
@@ -401,6 +427,9 @@ EMSCRIPTEN_BINDINGS(tau) {
 	emscripten::function("getBaOption", &js_get_ba_option);
 	emscripten::function("setBaTextOption", &js_set_ba_text_option);
 	emscripten::function("getBaTextOption", &js_get_ba_text_option);
+	emscripten::function("optionNames", &js_option_names);
+	emscripten::function("setOption", &js_set_option);
+	emscripten::function("getOption", &js_get_option);
 
 	emscripten::function("interpreterCreate", &js_interpreter_create);
 	emscripten::function("interpreterStep", &js_interpreter_step);
