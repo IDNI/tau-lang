@@ -13,12 +13,9 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_CASE_SPLIT_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_CASE_SPLIT_H__
 
-#include <cstdlib>
 #include <functional>
 #include <limits>
-#include <optional>
 #include <unordered_set>
-#include "env_limits.h"
 
 #include "nso_rr.h"
 
@@ -29,21 +26,8 @@ namespace idni::tau_lang {
 /// boolean_algebras/bv/heuristics/bv_case_split.tmpl.h). On by default: it is
 /// an identity on the formula, and it is what keeps a conditional controller
 /// over a bitvector command independent of the Boole split budget (GitHub
-/// #107). Disabled via `--bv-case-split=false`, the REPL option
-/// `bv-case-split`, or the environment variable TAU_BV_CASE_SPLIT=0 (any
-/// other value enables; the variable overrides the flag in both directions).
+/// #107). Disabled via the option `bv-case-split`.
 inline bool bv_case_split = true;
-
-/// Whether the case split runs: TAU_BV_CASE_SPLIT when set and non-empty
-/// (read once per process), else `bv_case_split`.
-inline bool bv_case_split_enabled() {
-	static const std::optional<bool> env = []() -> std::optional<bool> {
-		const char* v = std::getenv("TAU_BV_CASE_SPLIT");
-		if (!v || !*v) return std::nullopt;
-		return !(v[0] == '0' && v[1] == '\0');
-	}();
-	return env ? *env : bv_case_split;
-}
 
 /// Cap on the number of distinct constants a quantified bitvector variable
 /// may be tested against for the case split to apply; above it the binder is
@@ -52,11 +36,7 @@ inline bool bv_case_split_enabled() {
 /// instance count. SIZE_MAX = unlimited (the default; 0 through the option
 /// setter); set via --bv-case-split-max-tests or the REPL option
 /// bv-case-split-max-tests.
-/// Environment fallback `TAU_BV_CASE_SPLIT_MAX_TESTS` (0 = unlimited there
-/// too).
-inline env_limit<size_t> bv_case_split_max_tests{
-	"TAU_BV_CASE_SPLIT_MAX_TESTS", std::numeric_limits<size_t>::max(),
-	env_zero::unlimited };
+inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
 
 // Test-point elimination of a quantified bitvector variable v that occurs
 // only in comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`, possibly negated)
@@ -103,7 +83,7 @@ inline env_limit<size_t> bv_case_split_max_tests{
  * @brief Replaces every eligible quantifier of a bitvector variable in
  * @p formula by its finite case split, as described above.
  *
- * Does not consult bv_case_split_enabled(); the caller does. A quantifier
+ * Does not consult bv_case_split; the caller does. A quantifier
  * tested against more than bv_case_split_max_tests distinct constants, or
  * whose variable width cannot be read, is left untouched.
  * @param formula The formula to rewrite.

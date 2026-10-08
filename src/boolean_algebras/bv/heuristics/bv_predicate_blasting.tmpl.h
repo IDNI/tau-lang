@@ -733,8 +733,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	// ceiling. Exceeding it aborts to the same fallback a decline uses --
 	// the path must be structurally unable to hang, not just fast in the
 	// common case.
-	const size_t node_budget = bv_blasting_max_nodes.get()
-		? bv_blasting_max_nodes.get() : std::numeric_limits<size_t>::max();
+	const size_t node_budget = bv_blasting_max_nodes
+		? bv_blasting_max_nodes : std::numeric_limits<size_t>::max();
 	std::unordered_set<typename tbdd::ref> size_scratch;
 	auto node_count_of = [&](typename tbdd::ref x) {
 		size_scratch.clear();

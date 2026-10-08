@@ -21,6 +21,7 @@
 // set_blastdepth_option() below read/write directly; see its declaration
 // comment for why the storage stays in core.
 #include "antiprenexing/antiprenexing.h"
+#include "boolean_algebras/bv/bv_options.h"
 
 namespace idni::tau_lang {
 
@@ -259,7 +260,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * constants; returns @p n unchanged when `bv_case_split` is disabled.
 	 */
 	static tref case_split_quantifiers(tref n) {
-		return bv_case_split_enabled()
+		return bv_case_split
 			? bv_case_split_quantifiers<node_t>(n) : n;
 	}
 
@@ -299,6 +300,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * by `api::set_preprocessing`.
 	 */
 	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
+
+	/// bv's options, each named `bv-<name>`.
+	static const option_set& declared_options() { return bv_option_set; }
+	/// Binds bv's options, declared by the pack, to bv's fields.
+	static result<void> bind_options(options_repository& repo) {
+		return bv_bind_options<node_t>(repo);
+	}
 
 	/// @name bv-declared CLI/REPL options
 	/// Backing getters/setters for @ref options; plain free functions so
@@ -395,8 +403,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
 	 * `bv-blasting-max-nodes`, `bv-bitblast-max-nodes`,
 	 * `bv-bitblast-max-width`, `bv-solve-timeout`, `bv-widening` and
-	 * `bv-max-width`. Each count option `bv-<name>` falls back to the
-	 * environment variable `TAU_BV_<NAME>` until it is set.
+	 * `bv-max-width`. @ref bind_options binds the same fields by name, and
+	 * `TAU_BV_<NAME>` writes each one when the environment is loaded.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).

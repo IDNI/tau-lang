@@ -631,8 +631,8 @@ int main(int argc, char** argv) {
 				e.option.set_flag(opts[cli_name].get<bool>());
 			continue;
 		}
-		// Not given: the algebra keeps whatever it resolves itself --
-		// its own environment fallback, else its default.
+		// Not given: the option keeps the value its environment variable
+		// or its default gave it.
 		if (e.option.kind == ba_option_kind::text) {
 			const string v = opts[cli_name].get<string>();
 			if (!v.empty() && !e.option.set_text(v))

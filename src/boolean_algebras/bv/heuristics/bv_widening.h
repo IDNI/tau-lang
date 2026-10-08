@@ -47,7 +47,6 @@
 #include <cstddef>
 
 #include "tau_tree.h"
-#include "env_limits.h"
 #include "ba_types.h"
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 
@@ -61,10 +60,11 @@ inline bool bv_widening = false;
 
 /// Cap on the computed width W (inclusive), default 1024; exceeding it is an
 /// elaboration error. The option `bv-max-width`; 0 passed to the setter
-/// leaves the current cap unchanged.
-/// Environment fallback `TAU_BV_MAX_WIDTH`, where 0 keeps the default too.
-inline env_limit<size_t> bv_max_width{ "TAU_BV_MAX_WIDTH", 1024,
-	env_zero::keep_default };
+/// leaves the current cap unchanged, and 0 given to the option restores the
+/// default.
+inline constexpr size_t bv_max_width_default = 1024;
+/// @copydoc bv_max_width_default
+inline size_t bv_max_width = bv_max_width_default;
 
 /**
  * @brief Compute the exact-result bitwidth needed to evaluate a `bf` subtree

@@ -557,7 +557,7 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t saved_atoms = bv_defelim_max_atoms;
 		CHECK( tau_api::set_ba_option("bv-defelim-max-atoms", 5)
 			.value() == 5 );
-		CHECK( bv_defelim_max_atoms.get() == 5 );
+		CHECK( bv_defelim_max_atoms == 5 );
 		bv_defelim_max_atoms = saved_atoms;
 
 		// bv-max-width ignores 0: the value in force is reported back.
@@ -575,9 +575,9 @@ TEST_SUITE("Tau API - runtime limits") {
 		using bv_descriptor = ba_descriptor<bv, node_t>;
 		const size_t saved = bv_case_split_max_tests;
 		bv_descriptor::set_case_split_max_tests_option(3);
-		CHECK( bv_case_split_max_tests.get() == 3 );
+		CHECK( bv_case_split_max_tests == 3 );
 		bv_descriptor::set_case_split_max_tests_option(0);
-		CHECK( bv_case_split_max_tests.get()
+		CHECK( bv_case_split_max_tests
 			== std::numeric_limits<size_t>::max() );
 		bv_case_split_max_tests = saved;
 	}

@@ -78,16 +78,13 @@ foreach(row IN LISTS TAU_ENV_LIMIT_ROWS)
 		"${var}" NO_FAIL_REGEX ${need})
 endforeach()
 
-# Garbage in a core variable is an error.
+# Garbage in a core or a bv variable is an error.
 add_env_error_test(limit_env-garbage_count_is_an_error
 	TAU_MAX_FIXPOINT_STEPS=abc)
 add_env_error_test(limit_env-garbage_real_is_an_error
 	TAU_GC_GROWTH_FACTOR=abc)
-# An algebra's variable keeps the default and says so.
-add_repl_test(limit_env-garbage_bv_option_warns
-	"get bv-defelim-max-atoms"
-	"TAU_BV_DEFELIM_MAX_ATOMS='-3' is not a non-negative number"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_BV_DEFELIM_MAX_ATOMS=-3)
+add_env_error_test(limit_env-garbage_bv_option_is_an_error
+	TAU_BV_DEFELIM_MAX_ATOMS=-3 REQUIRES bv)
 
 # 0 in a variable means what 0 means to the setter.
 add_repl_test(limit_env-zero_is_unlimited_for_a_decrementing_budget
