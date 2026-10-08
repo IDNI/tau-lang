@@ -1743,14 +1743,59 @@ inline std::optional<boost::log::trivial::severity_level>
 	return {};
 }
 
+/// @brief Whether @p spec is an option of a REPL session: an option of the
+/// owners solver, ltl, gc, run and ui, or of a BA of the pack. The options of
+/// the command line alone (global, cli) are not.
+template <NodeType node>
+bool is_session_option(const option_spec& spec) {
+	for (std::string_view owner : { "solver", "ltl", "gc", "run", "ui" })
+		if (spec.owner == owner) return true;
+	return std::ranges::any_of(pack_ba_option_specs<node>(),
+		[&](const option_spec& ba) { return ba.owner == spec.owner; });
+}
+
+/// @brief The names of the session options, sorted; only the options of
+/// @p kind when it is given.
+template <NodeType node>
+std::vector<std::string> session_option_names(
+	std::optional<option_kind> kind = std::nullopt)
+{
+	auto& repo = idni::options();
+	std::vector<std::string> names;
+	for (const std::string& name : repo.names()) {
+		const auto spec = repo.find(name);
+		if (is_session_option<node>(*spec)
+			&& (!kind || kind_of(*spec) == *kind))
+				names.push_back(name);
+	}
+	std::ranges::sort(names);
+	return names;
+}
+
+/** @internal @copydoc repl_evaluator::print_option @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::print_option(const std::string& name) {
+	auto text = idni::options().get_text(name);
+	if (!text.has_value()) {
+		text.report().print(err);
+		error = true;
+		return false;
+	}
+	out << name << ": " << text.value() << "\n";
+	return true;
+}
+
 /** @internal @copydoc repl_evaluator::get_cmd(const tt&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd(const tt& n) {
-	if (auto raw = option_name_str<node>(n);
-		raw && raw->find('-') != std::string::npos)
-			return get_cmd_ba_option(*raw);
-	return get_cmd(get_opt<node>(n, err));
+	if (auto name = option_name_str<node>(n)) {
+		print_option(*name);
+		return;
+	}
+	for (const auto& name : session_option_names<node>())
+		print_option(name);
 }
 
 /** @internal @copydoc repl_evaluator::get_cmd(repl_option) @endinternal */
@@ -1933,20 +1978,17 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
-	if (auto raw = option_name_str<node>(n);
-		raw && raw->find('-') != std::string::npos)
-	{
-		auto ov = n | tau::option_value;
-		if (!ov) { err << "Invalid value\n"; return; }
-		set_cmd_ba_option(*raw, option_value_text(ov | tt::string));
-		get_cmd_ba_option(*raw);
+	auto name = option_name_str<node>(n);
+	auto ov = n | tau::option_value;
+	if (!name || !ov) { err << "Invalid value\n"; return; }
+	// the quotes stay, so set_text() reads a quoted text as a TGF string
+	auto set = idni::options().set_text(*name, ov | tt::string);
+	if (!set.has_value()) {
+		set.report().print(err);
+		error = true;
 		return;
 	}
-	repl_option o = get_opt<node>(n, err);
-	auto ov = n | tau::option_value;
-	if (!ov) { err << "Invalid value\n"; return; }
-	set_cmd(o, option_value_text(ov | tt::string));
-	get_cmd(n);
+	print_option(*name);
 }
 
 /** @internal @copydoc repl_evaluator::set_cmd(repl_option, const std::string&) @endinternal */
@@ -2124,16 +2166,37 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 	const std::function<bool(bool&)>& update_fn)
 {
-	if (auto raw = option_name_str<node>(n);
-		raw && raw->find('-') != std::string::npos)
-	{
-		update_bool_opt_cmd_ba_option(*raw, update_fn);
-		if (!error) get_cmd_ba_option(*raw);
+	auto name = option_name_str<node>(n);
+	if (!name) return;
+	auto& repo = idni::options();
+	const auto spec = repo.find(*name);
+	if (!spec) {
+		print_error(code::not_found,
+			parser_strings::messages::option_not_found,
+			{{label::name, *name}});
+		error = true;
 		return;
 	}
-	auto o = get_opt<node>(n, err);
-	update_bool_opt_cmd(o, update_fn);
-	if (!error) get_cmd(n);
+	if (kind_of(*spec) != option_kind::flag) {
+		print_error(code::invalid_argument,
+			kind_of(*spec) == option_kind::numeric
+				? "This option takes a count, not a flag: use "
+					"`set <option> <n>`"
+				: "This option takes a value, not a flag: use "
+					"`set <option> <value>`",
+			{{label::name, *name}});
+		error = true;
+		return;
+	}
+	bool v = std::get<bool>(repo.value(*name));
+	update_fn(v);
+	auto set = repo.set_text(*name, v ? "true" : "false");
+	if (!set.has_value()) {
+		set.report().print(err);
+		error = true;
+		return;
+	}
+	print_option(*name);
 }
 
 /** @internal @copydoc repl_evaluator::update_bool_opt_cmd(repl_option, const std::function<bool(bool&)>&) @endinternal */
@@ -2515,6 +2578,12 @@ void repl_evaluator<BAs...>::bind_repl_options() {
 			severity_codec{},
 			[this] { logging::set_filter(opt.severity); }));
 		bind("experimental", repo.bind("experimental", opt.experimental));
+		// library fields that main() sets for a spec file, so `set` by
+		// name reaches them in a session
+		bind("highlighting", repo.bind("highlighting",
+			pretty_printer_highlighting));
+		bind("indenting", repo.bind("indenting", pretty_printer_indenting));
+		bind("json", repo.bind("json", print_json));
 	}
 	res.report().print_pending(err);
 }
@@ -2643,102 +2712,22 @@ void repl_evaluator<BAs...>::help_cmd(const tt& n) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::help(size_t nt) const {
-	static const std::string bool_options =
-		"  <option>               <description>                        <value>\n"
-#ifdef DEBUG
-		"  debug-repl             show REPL commands                   on/off\n"
-#endif // DEBUG
-		"  status                 show status                          on/off\n"
-		"  colors                 use term colors                      on/off\n"
-		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
-		"  indenting              indenting of Tau formulas            on/off\n"
-		"  charvar (V)            character-variable notation          on/off\n"
-		"  preprocessing (B)      BA preprocessing (e.g. bv blasting)  on/off\n"
-		"  factoring              tau-algebra component factoring      on/off\n"
-		"  pwrsemantic (Z)        semantic pointwise-revision fallback on/off\n"
-		"  stepprop               step definitional propagation        on/off\n"
-		"  benchmarks (b)         print timing benchmarks              on/off\n";
-	static const std::string numeric_options =
-		"and the numeric limit options, set with `set <option> <n>`. 0 "
-		"means unlimited, except:\nspecsizewarn and "
-		"ltlclosedregionstimeout 0 = off; decisionpins 0 = none;\n"
-		"gcminsize 0 = no floor; ltlqemaxvars 0 = off; "
-		"trefbudgetsoft 0 = 75;\nltlmaxobservations 0 = 30; gcgrowth <= 0 "
-		"disables gc; and the rows that say so.\nEach mirrors the CLI "
-		"option of the same meaning, and starts at the value of\nthe TAU_* "
-		"variable `tau --help` names for it:\n"
-		"  <option>               <description>                        <default>\n"
-		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
-		"  maxrounds              anti-prenex driver rounds            unlimited\n"
-		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
-		"  lgrsmaxvars            pure-equality vars solved algebraically 8\n"
-		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
-		"  fixpointsteps          temporal-normalization fixpoint steps 500\n"
-		"  flagsteps              eventual-flag search steps           500\n"
-		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
-		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
-		"  defpasses              definition-expansion passes          unlimited\n"
-		"  enumsteps              recurrence enumeration steps         unlimited\n"
-		"  probesteps             untyped recurrence probe steps       10000\n"
-		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
-		"  gcminsize              gc trigger floor (tree nodes)        256\n"
-		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
-		"  trefbudget             live interned tree nodes allowed     unlimited\n"
-		"  trefbudgetsoft         % of trefbudget that forces a sweep  75\n"
-		"  specsizewarn           updated-spec size warning (chars)    off\n"
-		"  revisionalts           revision alternatives kept per part  unlimited\n"
-		"  maxsubsets             k-ary consistency subset checks      4096\n"
-		"  cachebound             string-keyed synthesis cache bound   4096\n"
-		"  maxcoverproducts       oracle mixed-type coverage products  256\n"
-		"  maxconstantsize        fresh-value region kept (tree nodes) 2000\n"
-		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
-		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
-		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
-		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
-		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"
-		"  ltlrefinementrounds    ABA-oracle refinement rounds         64\n"
-		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n"
-		"  ltlclosedregionstimeout data game on closed regions (s)     20\n"
-		"  ltldatagamemaxnodes    data-game BDD live nodes             8388608\n"
-		"  ltldatagamemaxmemo     data-game BDD memo entries           33554432\n"
-		"  ltldatagamemaxcombinations data-game tabulated values       4096\n"
-		"  ltlmaxobservations     observations assumed consistent (<=30) 8\n"
-		"  ltlmealymaxstates      Mealy view states (0 = no view)      4096\n"
-		"  ltlmealymaxedges       Mealy view edges (0 = no view)       65536\n"
-		"  compilemaxtableedges   edges compiled as a table (0 = none) 400\n"
-		"  compilebuildtimeout    compile's cmake build in seconds (0 = off) 3600\n"
-		"  bfdependencemaxnodes   bf variable-dependence BDD nodes     65536\n";
-	// BA-declared options, sorted by name for a listing independent of the
-	// pack order. Flags join the enable/disable/toggle-eligible list; counts
-	// (no enable/disable/toggle, same as core's numeric limit options) and
-	// texts join only the get/set list. All are empty in a pack where no BA
-	// declares any option.
-	auto sorted_ba_options = [](option_kind kind) {
-		std::vector<const option_spec*> out;
-		for (const option_spec& spec : pack_ba_option_specs<node>())
-			if (kind_of(spec) == kind)
-				out.push_back(&spec);
-		std::ranges::sort(out, [](const auto* a, const auto* b) {
-			return a->name < b->name;
-		});
-		std::string s;
-		for (const option_spec* spec : out) {
-			std::string label = "  " + spec->name;
-			s += label + std::string(label.size() < 24
-				? 24 - label.size() : 1, ' ') + spec->help
-				+ (kind == option_kind::flag ? "   on/off\n" : "\n");
+	// The session options of the repository, sorted by name, with their
+	// help text; only the flags for enable, disable and toggle.
+	auto option_rows = [](std::optional<option_kind> kind) {
+		auto& repo = idni::options();
+		std::string rows = "Available options:\n";
+		for (const auto& name : session_option_names<node>(kind)) {
+			std::string label = "  " + name;
+			rows += label + std::string(label.size() < 32
+				? 32 - label.size() : 1, ' ')
+				+ repo.find(name)->help + "\n";
 		}
-		return s;
+		return rows;
 	};
-	const std::string ba_flag_options = sorted_ba_options(option_kind::flag);
-	const std::string ba_count_options = sorted_ba_options(option_kind::numeric);
-	const std::string ba_text_options = sorted_ba_options(option_kind::text);
-	const std::string all_available_options = std::string{} +
-		"Available options and values:\n" + bool_options + ba_flag_options +
-		"  severity               severity                             error/info/debug/trace\n"
-		+ numeric_options + ba_count_options + ba_text_options;
-	const std::string bool_available_options = std::string{} +
-		"Available options and values:\n" + bool_options + ba_flag_options;
+	const std::string all_available_options = option_rows(std::nullopt);
+	const std::string bool_available_options =
+		option_rows(option_kind::flag);
 	switch (nt) {
 	case tau::help_sym: out
 		<< "General commands:\n"

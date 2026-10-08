@@ -891,7 +891,7 @@ add_repl_test(realizable_cmd-data_game_sat_ltl_spelling
 # stops a game over formulas: o2 and o3 repeat o1 two steps later, and o3
 # is o1 two steps back, so o3[t-1] = 1 && o2[t] = o3[t-1] never holds.
 add_repl_test(realizable_cmd-data_game_equalities_over_default_type
-	"set ltlrefinementrounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F" REQUIRES ltlsynt)
+	"set ltl-refinement-rounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F" REQUIRES ltlsynt)
 
 # An abstraction over the atoms without a winning strategy is no proof: its
 # consistency constraints quantify the inputs universally, so they forbid

@@ -115,7 +115,7 @@ add_repl_test(ltl_decisions-per_literal_guard_realizable
 # a consistency cap that gives up leaves the abstraction open; the input
 # tautology is decided on the data
 add_repl_test(ltl_decisions-consistency_cap_is_unknown
-	"set maxsubsets 1. realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))"
+	"set max-consistency-subsets 1. realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))"
 	": T" REQUIRES ltlsynt)
 
 # a binary temporal or negated operand of U is wrapped, so the print

@@ -5,21 +5,21 @@ include(add_repl_test)
 # resolve_ba_option). A case naming an algebra outside the configured pack
 # is skipped by add_repl_test itself.
 add_repl_test(ba_options-no_such_family "set nope-blasting on"
-	"No BA named in this pack.*name=nope" NO_FAIL_REGEX)
+	"Unknown option.*name=nope-blasting" NO_FAIL_REGEX)
 add_repl_test(ba_options-no_such_option "set bv-nosuch on"
-	"BA has no option.*name=bv.*value=nosuch" NO_FAIL_REGEX)
+	"Unknown option.*name=bv-nosuch" NO_FAIL_REGEX)
 add_repl_test(ba_options-found "set bv-blasting off. get bv-blasting"
-	"bv-blasting: off")
+	"bv-blasting: false")
 
 # GitHub #124: the definitional elimination and its caps are bv-declared.
 add_repl_test(ba_options-defelim_flag "get bv-definitional-elimination"
-	"bv-definitional-elimination: on")
+	"bv-definitional-elimination: true")
 add_repl_test(ba_options-defelim_flag_off "set bv-definitional-elimination off. get bv-definitional-elimination"
-	"bv-definitional-elimination: off")
+	"bv-definitional-elimination: false")
 add_repl_test(ba_options-defelim_count "set bv-defelim-max-atoms 5. get bv-defelim-max-atoms"
 	"bv-defelim-max-atoms: *5")
 add_repl_test(ba_options-defelim_rounds_unlimited "set bv-defelim-max-rounds 0. get bv-defelim-max-rounds"
-	"bv-defelim-max-rounds: *unlimited")
+	"bv-defelim-max-rounds: *0")
 
 # 0 decision pins keep no rows, so the option reads and takes `none`.
 add_repl_test(ba_options-decision_pins_none "set ba-decision-pins 0. set ba-decision-pins 7. set ba-decision-pins none"
@@ -40,11 +40,11 @@ add_repl_test(ba_options-change_drops_verdict_memo
 set(_llm_env TAU_NLANG_PROVIDER= TAU_NLANG_ENDPOINT= TAU_NLANG_MODEL=
 	TAU_NLANG_API_KEY= OPENAI_API_KEY= ANTHROPIC_API_KEY= TAU_NLANG_EFFORT=)
 add_repl_test(ba_options-nlang_provider_default "get nlang-provider"
-	"nlang-provider: \\(none\\)" NO_TRACE ENV ${_llm_env})
+	"nlang-provider: [\r\n]" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_set "set nlang-provider anthropic"
 	"nlang-provider: anthropic" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_bad_word "set nlang-provider nobody"
-	"does not take the value.*nlang-provider: \\(none\\)" NO_FAIL_REGEX
+	"does not take the value.*name=nlang-provider" NO_FAIL_REGEX
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_endpoint_url
 	"set nlang-endpoint http://localhost:8080/v1"
@@ -58,7 +58,7 @@ add_repl_test(ba_options-nlang_model_with_dashes
 	"set nlang-model my_model-4.5"
 	"nlang-model: my_model-4.5" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_default_is_none "get nlang-model"
-	"nlang-model: \\(none\\)" NO_TRACE ENV ${_llm_env})
+	"nlang-model: [\r\n]" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_env_is_the_fallback "get nlang-model"
 	"nlang-model: env-model" NO_TRACE ENV ${_llm_env} TAU_NLANG_MODEL=env-model)
 add_repl_test(ba_options-nlang_model_flag_beats_env "get nlang-model"
@@ -66,7 +66,7 @@ add_repl_test(ba_options-nlang_model_flag_beats_env "get nlang-model"
 	ENV ${_llm_env} TAU_NLANG_MODEL=env-model FLAGS --nlang-model flag-model)
 add_repl_test(ba_options-nlang_named_model_gets_no_effort
 	"set nlang-provider anthropic. set nlang-model claude-haiku-4-5. get nlang-effort. get nlang-fallback"
-	"nlang-effort: \\(none\\)[\r\n].*nlang-fallback: on" NO_TRACE
+	"nlang-effort: [\r\n].*nlang-fallback: true" NO_TRACE
 	ENV ${_llm_env})
 add_repl_test(ba_options-nlang_effort_bad_word "set nlang-effort extreme"
 	"does not take the value" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
@@ -89,7 +89,7 @@ add_repl_test(ba_options-nlang_provider_flag_bad_word "get nlang-provider"
 	"does not take the value.*name=nlang-provider" NO_FAIL_REGEX NO_TRACE
 	ENV ${_llm_env} FLAGS --nlang-provider nobody)
 add_repl_test(ba_options-nlang_text_is_not_a_flag "enable nlang-model"
-	"takes a text, not a flag" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
+	"takes a value, not a flag" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_max_tokens "set nlang-max-tokens 512"
 	"nlang-max-tokens: *512" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_max_tokens_default "get nlang-max-tokens"
@@ -99,14 +99,14 @@ add_repl_test(ba_options-nlang_max_tokens_env_is_the_fallback
 	ENV ${_llm_env} TAU_NLANG_MAX_TOKENS=2048)
 add_repl_test(ba_options-nlang_fallback_disable
 	"set nlang-provider anthropic. disable nlang-fallback"
-	"nlang-fallback: off" NO_TRACE ENV ${_llm_env})
+	"nlang-fallback: false" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_fallback_env
 	"set nlang-provider anthropic. get nlang-fallback"
-	"nlang-fallback: off" NO_TRACE ENV ${_llm_env} TAU_NLANG_FALLBACK=off)
+	"nlang-fallback: false" NO_TRACE ENV ${_llm_env} TAU_NLANG_FALLBACK=off)
 # The fallback is on by default, also for a model named later.
 add_repl_test(ba_options-nlang_fallback_on_for_a_named_model
 	"get nlang-fallback. set nlang-model claude-haiku-4-5. get nlang-fallback"
-	"nlang-fallback: on[\r\n].*nlang-model: claude-haiku-4-5[\r\n].*nlang-fallback: on"
+	"nlang-fallback: true[\r\n].*nlang-model: claude-haiku-4-5[\r\n].*nlang-fallback: true"
 	NO_TRACE ENV ${_llm_env} FLAGS --nlang-provider anthropic)
 # A provider the variable names must exist.
 add_env_error_test(ba_options-nlang_provider_env_bad_word
@@ -116,10 +116,10 @@ add_repl_test(ba_options-nlang_help_lists_the_text_options "help set"
 # A flag given on the command line is written even when it repeats the value
 # in force before the options that follow it apply.
 add_repl_test(ba_options-nlang_fallback_flag_given_off "get nlang-fallback"
-	"nlang-fallback: off" NO_TRACE ENV ${_llm_env}
+	"nlang-fallback: false" NO_TRACE ENV ${_llm_env}
 	FLAGS --nlang-provider anthropic --nlang-fallback false)
 add_repl_test(ba_options-nlang_fallback_flag_given_on "get nlang-fallback"
-	"nlang-fallback: on" NO_TRACE ENV ${_llm_env}
+	"nlang-fallback: true" NO_TRACE ENV ${_llm_env}
 	FLAGS --nlang-provider anthropic --nlang-model claude-haiku-4-5
 		--nlang-fallback)
 # Quotes hold any text; empty quotes clear the option.
@@ -129,11 +129,11 @@ add_repl_test(ba_options-nlang_endpoint_quoted_with_a_query
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_quoted_with_dots
 	"set nlang-model \\\"gemini-2.0-flash\\\". get nlang-provider"
-	"nlang-model: gemini-2.0-flash[\r\n].*nlang-provider: \\(none\\)"
+	"nlang-model: gemini-2.0-flash[\r\n].*nlang-provider: [\r\n]"
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_cleared_by_empty_quotes
 	"set nlang-model some-model. set nlang-model \\\"\\\""
-	"nlang-model: some-model[\r\n].*nlang-model: \\(none\\)"
+	"nlang-model: some-model[\r\n].*nlang-model: [\r\n]"
 	NO_TRACE ENV ${_llm_env} TAU_NLANG_MODEL=env-model)
 add_repl_test(ba_options-quoted_value_of_a_core_option
 	"set severity \\\"info\\\"" "severity: *info" NO_TRACE)

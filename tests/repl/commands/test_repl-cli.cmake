@@ -98,18 +98,18 @@ add_raw_repl_test(cli-spec_file_no_quit
 # value), and one of the pre-existing interpreter options now readable from
 # the REPL cover the three distinct code paths in main.cpp's apply block.
 add_repl_test(cli-max_fixpoint_steps_flag
-	"get fixpointsteps" "fixpointsteps: *9" NO_TRACE
+	"get max-fixpoint-steps" "max-fixpoint-steps: *9" NO_TRACE
 	FLAGS --max-fixpoint-steps 9)
 
 # Without the flag the library's own default (or its TAU_* variable) applies.
 add_repl_test(cli-max_fixpoint_steps_default
-	"get fixpointsteps" "fixpointsteps: *500" NO_FAIL_REGEX NO_TRACE)
+	"get max-fixpoint-steps" "max-fixpoint-steps: *500" NO_FAIL_REGEX NO_TRACE)
 add_repl_test(cli-gc_growth_factor_flag
-	"get gcgrowth" "gcgrowth: *2.5" NO_TRACE
+	"get gc-growth-factor" "gc-growth-factor: *2.5" NO_TRACE
 	FLAGS --gc-growth-factor 2.5)
 
 add_repl_test(cli-max_revision_alts_flag
-	"get revisionalts" "revisionalts: *4" NO_TRACE
+	"get max-revision-alts" "max-revision-alts: *4" NO_TRACE
 	FLAGS --max-revision-alts 4)
 
 # -K is --ba-component-factoring alone; the closed-regions timeout has no
@@ -136,36 +136,36 @@ add_raw_repl_test(cli-help_flag_search_giveup_is_no_verdict
 # Values are distinct from the defaults so a silently-ignored flag fails.
 # An empty shortflag field means the option has no short form.
 set(TAU_CLI_LIMIT_ROWS
-	"spec_size_warn|spec-size-warn|w|4096|specsizewarn|4096"
-	"max_revision_alts|max-revision-alts|a|4|revisionalts|4"
-	"block_max_splits|block-max-splits|p|512|maxsplits|512"
-	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
-	"ba_decision_pins|ba-decision-pins|N|77|decisionpins|77"
-	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
-	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
-	"block_squeeze_cap|block-squeeze-cap|z|64|squeezecap|64"
-	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
-	"max_def_passes|max-def-passes|P|40|defpasses|40"
-	"max_enum_steps|max-enum-steps|E|33|enumsteps|33"
-	"max_probe_steps|max-probe-steps|M|44|probesteps|44"
-	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
-	"gc_min_size|gc-min-size|G|512|gcminsize|512"
-	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
-	"max_consistency_subsets|max-consistency-subsets|j|9|maxsubsets|9"
-	"cache_bound|cache-bound|A|123|cachebound|123"
-	"max_cover_products|max-cover-products|n|9|maxcoverproducts|9"
-	"max_constant_size|max-constant-size|u|300|maxconstantsize|300"
-	"tref_budget|tref-budget|y|4096|trefbudget|4096"
-	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
-	"ltl_data_game_max_nodes|ltl-data-game-max-nodes||4096|ltldatagamemaxnodes|4096"
-	"ltl_data_game_max_memo|ltl-data-game-max-memo||4096|ltldatagamemaxmemo|4096"
-	"ltl_data_game_max_combinations|ltl-data-game-max-combinations||77|ltldatagamemaxcombinations|77"
-	"ltl_max_observations|ltl-max-observations||5|ltlmaxobservations|5"
-	"ltl_mealy_max_states|ltl-mealy-max-states||77|ltlmealymaxstates|77"
-	"ltl_mealy_max_edges|ltl-mealy-max-edges||99|ltlmealymaxedges|99"
-	"compile_max_table_edges|compile-max-table-edges||50|compilemaxtableedges|50"
-	"compile_build_timeout|compile-build-timeout||50|compilebuildtimeout|50 s"
-	"bf_dependence_max_nodes|bf-dependence-max-nodes||1000|bfdependencemaxnodes|1000"
+	"spec_size_warn|spec-size-warn|w|4096|spec-size-warn|4096"
+	"max_revision_alts|max-revision-alts|a|4|max-revision-alts|4"
+	"block_max_splits|block-max-splits|p|512|block-max-splits|512"
+	"block_max_rounds|block-max-rounds|r|33|block-max-rounds|33"
+	"ba_decision_pins|ba-decision-pins|N|77|ba-decision-pins|77"
+	"max_fixpoint_steps|max-fixpoint-steps|f|9|max-fixpoint-steps|9"
+	"max_flag_search_steps|max-flag-search-steps|F|12|max-flag-search-steps|12"
+	"block_squeeze_cap|block-squeeze-cap|z|64|block-squeeze-cap|64"
+	"max_simplify_rounds|max-simplify-rounds|m|1000|max-simplify-rounds|1000"
+	"max_def_passes|max-def-passes|P|40|max-def-passes|40"
+	"max_enum_steps|max-enum-steps|E|33|max-enum-steps|33"
+	"max_probe_steps|max-probe-steps|M|44|max-probe-steps|44"
+	"max_rewrite_rounds|max-rewrite-rounds|R|21|max-rewrite-rounds|21"
+	"gc_min_size|gc-min-size|G|512|gc-min-size|512"
+	"gc_growth_factor|gc-growth-factor|W|2.5|gc-growth-factor|2.5"
+	"max_consistency_subsets|max-consistency-subsets|j|9|max-consistency-subsets|9"
+	"cache_bound|cache-bound|A|123|cache-bound|123"
+	"max_cover_products|max-cover-products|n|9|max-cover-products|9"
+	"max_constant_size|max-constant-size|u|300|max-constant-size|300"
+	"tref_budget|tref-budget|y|4096|tref-budget|4096"
+	"tref_budget_soft|tref-budget-soft|C|50|tref-budget-soft|50"
+	"ltl_data_game_max_nodes|ltl-data-game-max-nodes||4096|ltl-data-game-max-nodes|4096"
+	"ltl_data_game_max_memo|ltl-data-game-max-memo||4096|ltl-data-game-max-memo|4096"
+	"ltl_data_game_max_combinations|ltl-data-game-max-combinations||77|ltl-data-game-max-combinations|77"
+	"ltl_max_observations|ltl-max-observations||5|ltl-max-observations|5"
+	"ltl_mealy_max_states|ltl-mealy-max-states||77|ltl-mealy-max-states|77"
+	"ltl_mealy_max_edges|ltl-mealy-max-edges||99|ltl-mealy-max-edges|99"
+	"compile_max_table_edges|compile-max-table-edges||50|compile-max-table-edges|50"
+	"compile_build_timeout|compile-build-timeout||50|compile-build-timeout|50"
+	"bf_dependence_max_nodes|bf-dependence-max-nodes||1000|bf-dependence-max-nodes|1000"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")
@@ -220,7 +220,7 @@ add_repl_test(cli-bv_solve_timeout_flag
 # prompt answers `q` with a parse Error (that is how the run is ended
 # without a tty), so no FAIL regex here.
 add_repl_test(cli-blasting_default_off
-	"get preprocessing" "preprocessing: *off" NO_TRACE)
+	"get preprocessing" "preprocessing: *false" NO_TRACE)
 
 add_multiline_repl_test(cli-issue74_bv_accumulator_default_flags
 	"o0s\\[2\\] := 8"
@@ -232,10 +232,10 @@ add_multiline_repl_test(cli-issue74_bv_accumulator_default_flags
 # applies them unconditionally, unlike -B. Each command text names bv, so the
 # helper pack gate covers them.
 add_repl_test(cli-bv_widening_flag
-	"get bv-widening" "bv-widening: *on" NO_TRACE
+	"get bv-widening" "bv-widening: *true" NO_TRACE
 	FLAGS --bv-widening)
 add_repl_test(cli-bv_widening_long_flag
-	"get bv-widening" "bv-widening: *on" NO_TRACE
+	"get bv-widening" "bv-widening: *true" NO_TRACE
 	FLAGS --bv-widening)
 add_repl_test(cli-bv_max_width_flag
 	"get bv-max-width" "bv-max-width: *64" NO_TRACE
@@ -270,8 +270,8 @@ add_repl_test(cli-no_charvar_prints_conjunction
 add_multiline_repl_test(cli-ctrl_v_is_dropped "%1[^:]*: F"
 	NO_FAIL_REGEX STDIN "sat x = 0 &\\026& x != 0\\nq\\n")
 # --ltl-guard-max-cubes lands in the global `get ltlguardmaxcubes` reads
-add_repl_test(cli-ltl_guard_max_cubes_flag "get ltlguardmaxcubes"
-	"ltlguardmaxcubes: *3" FLAGS --ltl-guard-max-cubes 3)
+add_repl_test(cli-ltl_guard_max_cubes_flag "get ltl-guard-max-cubes"
+	"ltl-guard-max-cubes: *3" FLAGS --ltl-guard-max-cubes 3)
 # a spec file that does not parse is reported and the run ends
 add_raw_repl_test(cli-spec_file_parse_error
 	"printf 'o1[t] = = 1.\\n' > cli_bad_spec_fixture.tau && ${TAU_RUN} cli_bad_spec_fixture.tau -q < /dev/null; r=$?; rm -f cli_bad_spec_fixture.tau; exit $r"

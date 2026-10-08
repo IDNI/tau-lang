@@ -32,7 +32,7 @@ add_repl_test(limit_effect-fixpointsteps_giveup_is_an_error
 # spec, asked again in the same session, must be decided (`: T`) instead
 # of answered from the first query's give-up.
 add_repl_test(limit_effect-fixpointsteps_memo_dropped_on_change
-	"set fixpointsteps 1. sat always o1[t] = o1[t-2]. set fixpointsteps 0. sat always o1[t] = o1[t-2]"
+	"set max-fixpoint-steps 1. sat always o1[t] = o1[t-2]. set max-fixpoint-steps 0. sat always o1[t] = o1[t-2]"
 	": T" NO_FAIL_REGEX NO_TRACE)
 
 # This workload needs a handful of steps, so it completes under the
@@ -41,13 +41,13 @@ add_repl_test(limit_effect-fixpointsteps_default_completes
 	"sat always o1[t] = o1[t-2]"
 	": T" NO_TRACE FAIL_REGEX "exceeded")
 add_repl_test(limit_effect-fixpointsteps_cli_zero_unlimited
-	"get fixpointsteps"
-	"fixpointsteps: *unlimited" NO_FAIL_REGEX NO_TRACE
+	"get max-fixpoint-steps"
+	"max-fixpoint-steps: *0" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-fixpoint-steps 0)
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
 add_repl_test(limit_effect-fixpointsteps_via_set
-	"set fixpointsteps 1. sat always o1[t] = o1[t-2]"
+	"set max-fixpoint-steps 1. sat always o1[t] = o1[t-2]"
 	"find_fixpoint_phi: exceeded 1 steps" NO_FAIL_REGEX NO_TRACE)
 
 # Definition expansion: g needs one pass per nesting level forever.
@@ -123,6 +123,6 @@ add_repl_test(limit_effect-maxsubsets_default_completes
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
 add_repl_test(limit_effect-maxsubsets_via_set
-	"set maxsubsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
+	"set max-consistency-subsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
 	REQUIRES ltlsynt)

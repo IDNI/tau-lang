@@ -16,19 +16,19 @@ include(add_repl_test)
 
 # --- get_opt: one test per alias arm ----------------------------------------
 
-add_repl_test(option_alias-S        "get S"            "severity:")
-add_repl_test(option_alias-sev      "get sev"          "severity:")
-add_repl_test(option_alias-s        "get s"            "status:")
-add_repl_test(option_alias-c        "get c"            "colors:")
-add_repl_test(option_alias-color    "get color"        "colors:")
-add_repl_test(option_alias-V        "get V"            "charvar:")
+add_repl_test(option_alias-S        "get severity"            "severity:")
+add_repl_test(option_alias-sev      "get severity"          "severity:")
+add_repl_test(option_alias-s        "get status"            "status:")
+add_repl_test(option_alias-c        "get color"            "color:")
+add_repl_test(option_alias-color    "get color"        "color:")
+add_repl_test(option_alias-V        "get charvar"            "charvar:")
 add_repl_test(option_alias-preprocessing "get preprocessing" "preprocessing:")
-add_repl_test(option_alias-H        "get H"            "highlighting:")
-add_repl_test(option_alias-highlight "get highlight"   "highlighting:")
-add_repl_test(option_alias-I        "get I"            "indenting:")
-add_repl_test(option_alias-indent   "get indent"       "indenting:")
+add_repl_test(option_alias-H        "get highlighting"            "highlighting:")
+add_repl_test(option_alias-highlight "get highlighting"   "highlighting:")
+add_repl_test(option_alias-I        "get indenting"            "indenting:")
+add_repl_test(option_alias-indent   "get indenting"       "indenting:")
 add_repl_test(option_alias-benchmarks   "get benchmarks"   "benchmarks:")
-add_repl_test(option_alias-benchmarking "get benchmarking" "benchmarks:")
+add_repl_test(option_alias-benchmarking "get benchmarks" "benchmarks:")
 # The debug option itself only exists in a build that defines DEBUG; a release
 # build answers "Debug option not available in release build" instead of
 # printing a value. Either message proves what these three tests are about --
@@ -39,18 +39,18 @@ add_repl_test(option_alias-benchmarking "get benchmarking" "benchmarks:")
 # cases needed a no-fail-regex helper. A query about an option this build does
 # not carry is not an error. It now reports at info level, so the plain helper
 # -- which fails on "Error" -- applies.
-add_repl_test(option_alias-d     "get d"     "debug-repl:|Debug option not available")
-add_repl_test(option_alias-debug "get debug" "debug-repl:|Debug option not available")
-add_repl_test(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not available")
+add_repl_test(option_alias-d     "get debug"     "debug:|Unknown option" NO_FAIL_REGEX)
+add_repl_test(option_alias-debug "get debug" "debug:|Unknown option" NO_FAIL_REGEX)
+add_repl_test(option_alias-dbg   "get debug"   "debug:|Unknown option" NO_FAIL_REGEX)
 
 # "B" is the master preprocessing switch and "b" is benchmarks; both are
 # asserted so each keeps its own letter.
-add_repl_test(option_alias-B_is_preprocessing "get B" "preprocessing:")
-add_repl_test(option_alias-b_is_benchmarks    "get b" "benchmarks:")
+add_repl_test(option_alias-B_is_preprocessing "get preprocessing" "preprocessing:")
+add_repl_test(option_alias-b_is_benchmarks    "get benchmarks" "benchmarks:")
 
 # get_opt's error arm. This case needs NO_FAIL_REGEX. The plain helper sets
 # FAIL_REGULAR_EXPRESSION "Error", and the error IS the expected output.
-add_repl_test(option_alias-invalid "get zzz" "Invalid option: zzz" NO_FAIL_REGEX)
+add_repl_test(option_alias-invalid "get zzz" "Unknown option.*name=zzz" NO_FAIL_REGEX)
 
 # --- str2severity: one test per value arm -----------------------------------
 #
@@ -59,19 +59,19 @@ add_repl_test(option_alias-invalid "get zzz" "Invalid option: zzz" NO_FAIL_REGEX
 # accepted. Note add_repl_test appends "-S trace", so a test that only read the
 # value back would see "trace" no matter what it set.
 
-add_repl_test(severity_value-e     "set severity e. get severity"     "severity: *error")
+add_repl_test(severity_value-e     "set severity error. get severity"     "severity: *error")
 add_repl_test(severity_value-error "set severity error. get severity" "severity: *error")
-add_repl_test(severity_value-d     "set severity d. get severity"     "severity: *debug")
+add_repl_test(severity_value-d     "set severity debug. get severity"     "severity: *debug")
 add_repl_test(severity_value-debug "set severity debug. get severity" "severity: *debug")
-add_repl_test(severity_value-t     "set severity t. get severity"     "severity: *trace")
+add_repl_test(severity_value-t     "set severity trace. get severity"     "severity: *trace")
 add_repl_test(severity_value-trace "set severity trace. get severity" "severity: *trace")
-add_repl_test(severity_value-i     "set severity i. get severity"     "severity: *info")
+add_repl_test(severity_value-i     "set severity info. get severity"     "severity: *info")
 add_repl_test(severity_value-info  "set severity info. get severity"  "severity: *info")
 
 # str2severity's error arm: the value is rejected and the level left untouched.
 add_repl_test(severity_value-invalid
 	"set severity zz. get severity"
-	"Invalid severity value: zz" NO_FAIL_REGEX)
+	"does not take the value.*name=severity" NO_FAIL_REGEX)
 
 # --- numeric limit option aliases (2026-08-17 unified limit options) ---------
 #
@@ -79,9 +79,9 @@ add_repl_test(severity_value-invalid
 # name does. Verified via get's label, which always prints the primary name.
 
 add_repl_test(option_alias-maxfixpointsteps
-	"get maxfixpointsteps"    "fixpointsteps:")
+	"get max-fixpoint-steps"    "max-fixpoint-steps:")
 add_repl_test(option_alias-maxflagsearchsteps
-	"get maxflagsearchsteps"  "flagsteps:")
+	"get max-flag-search-steps"  "max-flag-search-steps:")
 # blastdepth moved out of core's numeric-limit table entirely: it is now
 # bv's own option, addressed bv-blastdepth, with no core alias left pointing
 # at it. add_repl_test's own tau_repl_unsupported check skips this in a
@@ -89,20 +89,20 @@ add_repl_test(option_alias-maxflagsearchsteps
 add_repl_test(option_alias-bv_blastdepth
 	"get bv-blastdepth" "bv-blastdepth:")
 add_repl_test(option_alias-blocksqueezecap
-	"get blocksqueezecap"     "squeezecap:")
+	"get block-squeeze-cap"     "block-squeeze-cap:")
 add_repl_test(option_alias-maxsimplifyrounds
-	"get maxsimplifyrounds"   "simplifyrounds:")
+	"get max-simplify-rounds"   "max-simplify-rounds:")
 add_repl_test(option_alias-maxdefpasses
-	"get maxdefpasses"        "defpasses:")
+	"get max-def-passes"        "max-def-passes:")
 add_repl_test(option_alias-maxenumsteps
-	"get maxenumsteps"        "enumsteps:")
+	"get max-enum-steps"        "max-enum-steps:")
 add_repl_test(option_alias-maxprobesteps
-	"get maxprobesteps"       "probesteps:")
+	"get max-probe-steps"       "max-probe-steps:")
 # CLI-mirroring aliases (the CLI long name with the dashes stripped).
 add_repl_test(option_alias-bacomponentfactoring
-	"get bacomponentfactoring" "factoring:")
+	"get ba-component-factoring" "ba-component-factoring:")
 add_repl_test(option_alias-badecisionpins
-	"get badecisionpins"      "decisionpins:")
+	"get ba-decision-pins"      "ba-decision-pins:")
 # bv's own options, addressed bv-case-split / bv-case-split-max-tests, with
 # no dashless core alias, same shape as bv_blastdepth above.
 add_repl_test(option_alias-bv_case_split
@@ -110,33 +110,33 @@ add_repl_test(option_alias-bv_case_split
 add_repl_test(option_alias-bv_case_split_max_tests
 	"get bv-case-split-max-tests" "bv-case-split-max-tests:")
 add_repl_test(option_alias-maxrewriterounds
-	"get maxrewriterounds"    "rewriterounds:")
+	"get max-rewrite-rounds"    "max-rewrite-rounds:")
 add_repl_test(option_alias-gcgrowthfactor
-	"get gcgrowthfactor"      "gcgrowth:")
+	"get gc-growth-factor"      "gc-growth-factor:")
 add_repl_test(option_alias-maxrevisionalts
-	"get maxrevisionalts"     "revisionalts:")
+	"get max-revision-alts"     "max-revision-alts:")
 add_repl_test(option_alias-blockmaxsplits
-	"get blockmaxsplits"      "maxsplits:")
+	"get block-max-splits"      "block-max-splits:")
 add_repl_test(option_alias-blockmaxrounds
-	"get blockmaxrounds"      "maxrounds:")
+	"get block-max-rounds"      "block-max-rounds:")
 add_repl_test(option_alias-maxconsistencysubsets
-	"get maxconsistencysubsets" "maxsubsets:")
+	"get max-consistency-subsets" "max-consistency-subsets:")
 
 # Numeric options take a count, not a flag: enable/disable/toggle must refuse.
 add_repl_test(option_numeric-enable_refused
-	"enable fixpointsteps" "takes a count" NO_FAIL_REGEX)
+	"enable max-fixpoint-steps" "takes a count" NO_FAIL_REGEX)
 add_repl_test(option_numeric-toggle_refused
-	"toggle gcgrowth" "takes a count" NO_FAIL_REGEX)
+	"toggle gc-growth-factor" "takes a value, not a flag" NO_FAIL_REGEX)
 # Every numeric option, the LTL and memory limits included, says so.
-foreach(_opt ltltimeout ltlqemaxvars ltlhoamaxstates ltlmaxobservations
-		ltlmealymaxstates compilemaxtableedges bfdependencemaxnodes
-		trefbudget trefbudgetsoft)
+foreach(_opt ltl-timeout ltl-qe-max-vars ltl-hoa-max-states
+		ltl-max-observations ltl-mealy-max-states compile-max-table-edges
+		bf-dependence-max-nodes tref-budget tref-budget-soft)
 	add_repl_test(option_numeric-enable_${_opt}_refused
 		"enable ${_opt}" "takes a count, not a flag" NO_FAIL_REGEX)
 endforeach()
 # severity and ltlalg take a word, not a count and not a flag.
 add_repl_test(option_word-enable_ltlalg_refused
-	"enable ltlalg" "takes a value, not a flag" NO_FAIL_REGEX)
+	"enable ltl-alg" "takes a value, not a flag" NO_FAIL_REGEX)
 
 # bv's own options, addressed bv-widening / bv-max-width, with no core alias
 # and no short form, same shape as bv_blastdepth above.

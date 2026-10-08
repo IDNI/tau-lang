@@ -47,8 +47,8 @@ add_repl_test(help_shortened-history_shortened_m_cmd "h hist" "the history")
 add_repl_test(help-history_shortened_m_cmd "help hist" "the history")
 
 # help set / help get list the numeric limit options (2026-08-17)
-add_repl_test(help_set_lists_numeric_options "help set" "fixpointsteps")
-add_repl_test(help_get_lists_gc_options "help get" "gcgrowth")
+add_repl_test(help_set_lists_numeric_options "help set" "max-fixpoint-steps")
+add_repl_test(help_get_lists_gc_options "help get" "gc-growth-factor")
 # 0 is not unlimited for every numeric option: the help names the exceptions.
 add_repl_test(help_set_names_zero_exceptions "help set"
-	"decisionpins 0 = none.*trefbudgetsoft 0 = 75.*ltlmaxobservations 0 = 30")
+	"ba-decision-pins +[^\n]*none or 0 keeps none.*ltl-max-observations +[^\n]*0 = 30")

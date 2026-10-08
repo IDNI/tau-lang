@@ -71,7 +71,7 @@ inline const option_set tau_cli_option_set{
 		{ "benchmarks", "run", true,
 			"print benchmarks (enabled by default)", {}, false },
 		{ "json", "ui", false, "output in JSON format", {}, false },
-		{ "quit", "run", false, "quit when no input", {}, false },
+		{ "quit", "cli", false, "quit when no input", {}, false },
 		{ "charvar", "run", true, "charvar (enabled by default)", {},
 			false },
 		{ "indenting", "ui", false, "indenting of formulas", {}, false },
@@ -88,7 +88,7 @@ inline const option_set tau_cli_option_set{
 #ifdef DEBUG
 		{ "debug", "run", true, "debug mode", {}, false },
 #endif // DEBUG
-		{ "experimental", "run", false,
+		{ "experimental", "cli", false,
 			"enables transitioning features", {}, false },
 		{ "output-dir", "cli", std::string(),
 			"output directory (default: <spec>.build; only with a "

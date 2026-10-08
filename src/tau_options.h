@@ -56,7 +56,8 @@ struct real_codec {
 };
 
 /// The algorithm word of `ltl-alg`, checked against the words
-/// @ref ltl_algorithm_name accepts and kept as given.
+/// @ref ltl_algorithm_name accepts. A, B and D are stored in upper case,
+/// so `get` shows the word the router reads.
 struct ltl_algorithm_codec {
 	option_value to_value(const std::string& alg) const { return alg; }
 	result<std::string> from_value(const option_value& v) const {
@@ -64,12 +65,27 @@ struct ltl_algorithm_codec {
 		const std::string* text =
 			idni::detail::option_text_of(v, r.report());
 		if (!text) return r;
-		if (!ltl_algorithm_name(*text))
+		auto alg = ltl_algorithm_name(*text);
+		if (!alg)
 			return r.with_error(code::invalid_argument,
 				parser_strings::messages::option_bad_value,
 				{ { label::name, "ltl-alg" },
 				  { label::value, *text } });
-		return r.with_value(*text);
+		return r.with_value(alg->empty() ? std::string("auto") : *alg);
+	}
+};
+
+/// `ltl-max-observations` stores the cap the skeleton reads: 0 and a value
+/// above @ref ltl_max_observations_hard are that bound.
+struct ltl_observations_codec {
+	option_value to_value(std::size_t n) const { return n; }
+	result<std::size_t> from_value(const option_value& v) const {
+		result<std::size_t> r;
+		const auto* n = std::get_if<std::size_t>(&v);
+		if (!n) return r.with_error(code::type_error,
+			parser_strings::messages::option_value_kind);
+		return r.with_value(*n == 0 || *n > ltl_max_observations_hard
+			? ltl_max_observations_hard : *n);
 	}
 };
 
@@ -304,7 +320,7 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("ltl-data-game-max-combinations",
 		ltl_data_game_max_combinations_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-max-observations",
-		ltl_max_observations_param, hook));
+		ltl_max_observations_param, ltl_observations_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("ltl-mealy-max-states",
 		data_game_mealy_max_states, hook));
 	TAU_TRY_VOID(repo.bind("ltl-mealy-max-edges", data_game_mealy_max_edges,

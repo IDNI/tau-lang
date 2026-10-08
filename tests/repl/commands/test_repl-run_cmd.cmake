@@ -666,7 +666,7 @@ add_repl_test(run_cmd-value_past_constant_size_budget
 # values the solver picks depends on the platform, so the budget is set
 # explicitly above the default; the case above checks the default one.
 add_repl_test(run_cmd-values_stay_within_constant_size_budget
-	"set maxconstantsize 4096. i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
+	"set max-constant-size 4096. i1:tau := in file(\\\"${A2J}\\\"). o1:tau := out console. run 10 steps always (o1[t] != o1[t-1] && o1[t] != 0 && o1[t] != 1 && o1[t] != i1[t])."
 	"o1\\[9\\] := " FAIL_REGEX "Error|passed the constant size budget" REQUIRES hostfs)
 
 # a bounded run leaves its session stored: `run N steps` continues it from

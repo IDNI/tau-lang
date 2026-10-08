@@ -323,24 +323,28 @@ private:
 	void history_list_cmd();
 
 	// options
-	/// @brief Execute the `get` command @p n: print the option it names, a
-	/// `family-option` BA option, or every option when it names none.
+	/// @brief Execute the `get` command @p n: print the option it names, or
+	/// every session option, sorted by name, when it names none.
 	void get_cmd(const tt& n);
 	/// @brief Print the value of option @p opt; every core and BA-declared
 	/// option for `none_opt`, nothing for `invalid_opt`. A limit prints its
 	/// effective value (set, else environment, else default).
 	void get_cmd(repl_option opt);
-	/// @brief Execute the `set` command @p n, then print the option's new
-	/// value.
+	/// @brief Execute the `set` command @p n: write the value text through
+	/// the option's codec and hook, then print the option's new value.
 	void set_cmd(const tt& n);
 	/// @brief Set option @p o to the text @p v: on/off spellings for a flag,
 	/// a decimal count for a limit (a number for gcgrowth, A/B/D/auto for
 	/// ltlalg). An invalid value is reported and changes nothing.
 	void set_cmd(repl_option o, const std::string& v);
 	/// @brief Execute the `enable`/`disable`/`toggle` command @p n with
-	/// @p update_fn, then print the option's new value.
+	/// @p update_fn, then print the option's new value. An option that is
+	/// no flag is an error.
 	void update_bool_opt_cmd(const tt& n,
 		const std::function<bool(bool&)>& update_fn);
+	/// @brief Print `<name>: <value>` for the option @p name.
+	/// @return False, with the error printed, when no option has the name.
+	bool print_option(const std::string& name);
 	/// @brief Apply @p update_fn to the flag option @p o; a numeric option
 	/// is an error, since it takes a count.
 	void update_bool_opt_cmd(repl_option o,
