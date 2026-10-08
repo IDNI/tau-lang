@@ -12,7 +12,6 @@ set(TAU_SHARED_HELPER_PROVENANCE
 	"tau-shared-ccache.cmake|cmake/use-ccache.cmake|0e178c553711db49560551f7e123322284824f7124e51a1759e3f912bb71105a|warn"
 	"tau-shared-emscripten.cmake|cmake/use-emscripten.cmake|981a7a80f819a413cc56b88b1b626187851a008f28ec718cae6a52d82e7d52f5|warn"
 	"tau-shared-version-license.cmake|cmake/version_license.cmake|feb5407b9cd874f5ec786145d9c7af3d361f221be6576e77f9e9e03b7fa12ab2|warn"
-	"tau-shared-ctest-build-tree.cmake|cmake/ctest-build-tree.cmake|714a581f7e63588c1626ca05fab4260cb543072a011cceb0fa1ecb8b3b20481e|warn"
 	"cmake/toolchains/mingw-w64-x86_64.cmake|cmake/mingw-w64-x86_64.cmake|a61fe1d3ffbf2d259844da1b5cff716bada0cd1066655b11ee4889bc4168a0af|warn"
 	"cmake/toolchains/aarch64-linux-gnu.cmake|cmake/aarch64-linux-gnu.cmake|d8ce21f137273a24b1a710049c32793148dad3a31bcfafce81a3bbd1c6070e62|warn"
 )

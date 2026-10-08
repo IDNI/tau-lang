@@ -169,6 +169,8 @@ Default preset name is `release` if omitted.
 
 Presets whose name contains **`package`** run `cpack -C Release` after build.
 **`run`** runs `ctest` for test/all presets, otherwise runs `tau` (args after `--`).
+`./dev preset <x> run` builds the preset first and then runs ctest. A direct
+`ctest` runs the built binaries as they are and builds nothing.
 
 ## Building release packages
 

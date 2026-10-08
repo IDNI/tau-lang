@@ -776,8 +776,6 @@ if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_REPL_BROWSER_TESTS)
 	message(STATUS "Building tests")
 	add_subdirectory(tests)
-	include(tau-shared-ctest-build-tree)
-	tau_require_build_tree()
 endif ()
 
 #
