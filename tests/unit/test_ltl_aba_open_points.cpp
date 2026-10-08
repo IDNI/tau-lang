@@ -407,7 +407,8 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 			[](int) { return true; });
 		REQUIRE_FALSE(r.has_value());
 		INFO(report_text(r.report()));
-		CHECK_FALSE(report_has_attr(r.report(), label::timeout));
+		CHECK_FALSE(report_has_attr(r.report(),
+			tau_lang::label::timeout));
 	}
 }
 
