@@ -1,8 +1,8 @@
 #
-# Every runtime limit falls back to a TAU_* environment variable until its
-# flag, its REPL `set` or its api setter gives it a value: the variable shows
-# through `get`, the flag wins over it, and garbage keeps the default and says
-# so. The limits of the LTL(ABA) route and the tree-node budget have their
+# Every runtime limit takes its TAU_* environment variable when tau starts,
+# and its flag, its REPL `set` or its api setter writes over it later: the
+# variable shows through `get`, the flag wins over it, and garbage is an
+# error. The limits of the LTL(ABA) route and the tree-node budget have their
 # own cases in test_repl-ltl_env.cmake.
 #
 
@@ -78,16 +78,12 @@ foreach(row IN LISTS TAU_ENV_LIMIT_ROWS)
 		"${var}" NO_FAIL_REGEX ${need})
 endforeach()
 
-# Garbage in a count variable is an error.
+# Garbage in a core variable is an error.
 add_env_error_test(limit_env-garbage_count_is_an_error
 	TAU_MAX_FIXPOINT_STEPS=abc)
-# Garbage keeps the default and says so once.
-add_repl_test(limit_env-garbage_real_warns
-	"get gcgrowth" "TAU_GC_GROWTH_FACTOR='abc' is not a number"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_GC_GROWTH_FACTOR=abc)
-add_repl_test(limit_env-garbage_real_keeps_default
-	"get gcgrowth" "gcgrowth: *1.5"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_GC_GROWTH_FACTOR=abc)
+add_env_error_test(limit_env-garbage_real_is_an_error
+	TAU_GC_GROWTH_FACTOR=abc)
+# An algebra's variable keeps the default and says so.
 add_repl_test(limit_env-garbage_bv_option_warns
 	"get bv-defelim-max-atoms"
 	"TAU_BV_DEFELIM_MAX_ATOMS='-3' is not a non-negative number"

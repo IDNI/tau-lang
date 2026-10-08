@@ -8,6 +8,7 @@
 #include <limits>
 #include <set>
 #include <string>
+#include <type_traits>
 
 using tau_api = api<node_t>;
 
@@ -591,13 +592,13 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t gm = interpreter<node_t>::gc_min_size;
 		const double gf = interpreter<node_t>::gc_growth_factor;
 		tau_api::set_spec_size_warn(4096);
-		CHECK( interpreter<node_t>::spec_size_warn_threshold.get() == 4096 );
+		CHECK( interpreter<node_t>::spec_size_warn_threshold == 4096 );
 		tau_api::set_max_revision_alts(3);
-		CHECK( interpreter<node_t>::max_revision_alts.get() == 3 );
+		CHECK( interpreter<node_t>::max_revision_alts == 3 );
 		tau_api::set_gc_min_size(512);
-		CHECK( interpreter<node_t>::gc_min_size.get() == 512 );
+		CHECK( interpreter<node_t>::gc_min_size == 512 );
 		tau_api::set_gc_growth_factor(2.5);
-		CHECK( interpreter<node_t>::gc_growth_factor.get()
+		CHECK( interpreter<node_t>::gc_growth_factor
 			== doctest::Approx(2.5) );
 		CHECK( tau_api::get_gc_growth_factor() == doctest::Approx(2.5) );
 		interpreter<node_t>::spec_size_warn_threshold = sw;
@@ -809,42 +810,42 @@ TEST_SUITE("Tau API - runtime limits") {
 			"TAU_TEST_ENV_LIMIT_D", "TAU_TEST_ENV_LIMIT_E" })
 				unsetenv(v);
 	}
-	// The long parameters read -1 as "not set": a count past LONG_MAX
-	// saturates instead of wrapping into it or below it.
+	// A count past LONG_MAX saturates instead of wrapping into the -1 of
+	// "not set" or below it.
 	TEST_CASE("count setters saturate a value above LONG_MAX") {
-		struct row { void (*set)(size_t); long* param; };
-		const row rows[] = {
-			{ &tau_api::set_tref_budget,           &tref_budget_param },
-			{ &tau_api::set_tref_budget_soft_percent,
-				&tref_budget_soft_param },
-			{ &tau_api::set_max_consistency_subsets,
-				&max_consistency_subsets_param },
-			{ &tau_api::set_max_cover_products,    &max_cover_products_param },
-			{ &tau_api::set_ltl_hoa_max_states,    &ltl_hoa_max_states_param },
-			{ &tau_api::set_ltl_guard_max_cubes,   &ltl_guard_max_cubes_param },
-			{ &tau_api::set_ltl_max_refinement_rounds,
-				&ltl_max_refinement_rounds_param },
-			{ &tau_api::set_ltl_window_max_paths,  &ltl_window_max_paths_param },
-			{ &tau_api::set_ltl_closed_regions_timeout,
-				&ltl_closed_regions_timeout_param },
-			{ &tau_api::set_ltl_data_game_max_nodes,
-				&ltl_data_game_max_nodes_param },
-			{ &tau_api::set_ltl_data_game_max_memo,
-				&ltl_data_game_max_memo_param },
-			{ &tau_api::set_ltl_data_game_max_combinations,
-				&ltl_data_game_max_combinations_param },
-			{ &tau_api::set_ltl_max_observations,  &ltl_max_observations_param },
-		};
 		constexpr long lmax = std::numeric_limits<long>::max();
-		for (const row& r : rows) {
-			const long saved = *r.param;
-			r.set(std::numeric_limits<size_t>::max());
-			CHECK( *r.param == lmax );
-			r.set((size_t) lmax + 1);
-			CHECK( *r.param == lmax );
-			r.set(42);
-			CHECK( *r.param == 42 );
-			*r.param = saved;
-		}
+		auto check = [](void (*set)(size_t), auto* param) {
+			using T = std::remove_pointer_t<decltype(param)>;
+			const T saved = *param;
+			set(std::numeric_limits<size_t>::max());
+			CHECK( *param == static_cast<T>(lmax) );
+			set((size_t) lmax + 1);
+			CHECK( *param == static_cast<T>(lmax) );
+			set(42);
+			CHECK( *param == 42 );
+			*param = saved;
+		};
+		check(&tau_api::set_tref_budget, &tref_budget_param);
+		check(&tau_api::set_tref_budget_soft_percent,
+			&tref_budget_soft_param);
+		check(&tau_api::set_max_consistency_subsets,
+			&max_consistency_subsets_param);
+		check(&tau_api::set_max_cover_products, &max_cover_products_param);
+		check(&tau_api::set_ltl_hoa_max_states, &ltl_hoa_max_states_param);
+		check(&tau_api::set_ltl_guard_max_cubes, &ltl_guard_max_cubes_param);
+		check(&tau_api::set_ltl_max_refinement_rounds,
+			&ltl_max_refinement_rounds_param);
+		check(&tau_api::set_ltl_window_max_paths,
+			&ltl_window_max_paths_param);
+		check(&tau_api::set_ltl_closed_regions_timeout,
+			&ltl_closed_regions_timeout_param);
+		check(&tau_api::set_ltl_data_game_max_nodes,
+			&ltl_data_game_max_nodes_param);
+		check(&tau_api::set_ltl_data_game_max_memo,
+			&ltl_data_game_max_memo_param);
+		check(&tau_api::set_ltl_data_game_max_combinations,
+			&ltl_data_game_max_combinations_param);
+		check(&tau_api::set_ltl_max_observations,
+			&ltl_max_observations_param);
 	}
 }

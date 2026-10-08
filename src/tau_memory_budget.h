@@ -29,7 +29,7 @@
  *
  * Runtime parameter by policy, like every limit in `ltl_aba_limits.h`: the CLI
  * flag, the REPL `set` command and the `api::set_*` setter write the
- * parameter, and the accessor resolves parameter > environment > default.
+ * parameter, and the accessor reads it.
  */
 
 #ifndef __IDNI__TAU__TAU_MEMORY_BUDGET_H__
@@ -37,7 +37,7 @@
 
 #include "backends/bdds/babdd.h"
 #include "bounded_call.h"
-#include "env_limits.h"
+#include "logging.h"
 #include "tau_diagnostics.h"
 #include "tau_tree.h"
 
@@ -51,22 +51,19 @@ namespace idni::tau_lang {
  * @brief Cap on live interned tree nodes; 0 = unlimited (the default).
  *
  * Runtime parameter by policy (`--tref-budget`, REPL `set trefbudget`,
- * `api::set_tref_budget`). The sentinel -1 means "not set", in which case
- * `TAU_TREF_BUDGET` is consulted and 0 applies when that is absent too. Read
- * through @ref tref_budget.
+ * `api::set_tref_budget`). Read through @ref tref_budget.
  */
-inline long tref_budget_param = -1;
+inline size_t tref_budget_param = 0;
 
 /**
  * @brief Percentage of @ref tref_budget at which the store counts as
  * "approaching the limit" and a sweep is worth forcing.
  *
  * Runtime parameter by policy (`--tref-budget-soft`, REPL `set
- * trefbudgetsoft`, `api::set_tref_budget_soft_percent`). The sentinel -1 means
- * "not set", in which case `TAU_TREF_BUDGET_SOFT` is consulted and 75 applies
- * when that is absent too. Read through @ref tref_budget_soft_percent.
+ * trefbudgetsoft`, `api::set_tref_budget_soft_percent`). Default 75. Read
+ * through @ref tref_budget_soft_percent.
  */
-inline long tref_budget_soft_param = -1;
+inline size_t tref_budget_soft_param = 75;
 
 /// Live node count when the outermost @ref budget_scope was entered.
 inline size_t tref_budget_last_before = 0;
@@ -74,16 +71,11 @@ inline size_t tref_budget_last_before = 0;
 inline size_t tref_budget_last_after = 0;
 
 /// Effective node cap (0 = unlimited).
-inline size_t tref_budget() {
-	if (tref_budget_param >= 0) return (size_t) tref_budget_param;
-	return env_limit_count("TAU_TREF_BUDGET", 0);
-}
+inline size_t tref_budget() { return tref_budget_param; }
 
 /// Effective soft-mark percentage, clamped to 1..100.
 inline size_t tref_budget_soft_percent() {
-	size_t pct = tref_budget_soft_param >= 0
-		? (size_t) tref_budget_soft_param
-		: env_limit_count("TAU_TREF_BUDGET_SOFT", 75);
+	size_t pct = tref_budget_soft_param;
 	if (pct == 0 || pct > 100) {
 		static thread_local bool warned = false;
 		if (!warned) {

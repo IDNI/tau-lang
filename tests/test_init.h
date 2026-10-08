@@ -71,8 +71,6 @@ inline void apply_tau_experiment_env() {
 		int i = std::atoi(v);
 		return (i >= lo && i <= hi) ? i : fallback;
 	};
-	if (const char* v = std::getenv("TAU_PREPROCESSING"))
-		preprocessing = std::atoi(v) != 0;
 	preprocess_placement = static_cast<preprocess_site>(
 		env_int("TAU_PREPROCESS_PLACEMENT", 0, 2,
 			static_cast<int>(preprocess_placement)));

@@ -172,6 +172,6 @@ endfunction()
 function(add_env_error_test test_name env)
 	add_raw_repl_test(${test_name}
 		"out=$(${TAU_RUN} -e 'get ltltimeout' 2>&1); echo \"exit=$? $out\""
-		"exit=1 .*does not take the value of the environment variable"
+		"exit=1 .*does not take the value"
 		NO_FAIL_REGEX ENV ${env})
 endfunction()

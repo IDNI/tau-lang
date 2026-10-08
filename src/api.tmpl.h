@@ -265,12 +265,12 @@ void api<node>::set_gc_growth_factor(double f) {
 
 template <NodeType node>
 void api<node>::set_tref_budget(size_t n) {
-	tref_budget_param = api_count_param(n);
+	tref_budget_param = static_cast<size_t>(api_count_param(n));
 }
 
 template <NodeType node>
 void api<node>::set_tref_budget_soft_percent(size_t pct) {
-	tref_budget_soft_param = api_count_param(pct);
+	tref_budget_soft_param = static_cast<size_t>(api_count_param(pct));
 }
 
 template <NodeType node>

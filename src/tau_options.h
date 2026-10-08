@@ -90,7 +90,8 @@ struct zero_is_unlimited_codec {
 	}
 };
 
-/// The engine limits and flags of the library, with the default of each.
+/// The engine limits and flags of the library. The defaults of the
+/// interpreter fields are written out: those fields exist per node type.
 inline const option_set tau_core_option_set{ {
 	// solver
 	{ "block-max-splits", "solver",
@@ -199,9 +200,9 @@ inline const option_set tau_core_option_set{ {
 		"gc triggers when node count grows by this factor since last "
 		"sweep (<= 0 disables gc)" },
 	// run
-	{ "preprocessing", "run", false,
+	{ "preprocessing", "run", bool{ preprocessing },
 		"BA preprocessing, e.g. bv predicate blasting" },
-	{ "pwr-semantic", "run", false,
+	{ "pwr-semantic", "run", bool{ pwr_semantic_fallback },
 		"enable the semantic (winning-region) fallback of the temporal "
 		"pointwise revision" },
 	{ "step-definitional-propagation", "run", true,
@@ -216,11 +217,12 @@ inline const option_set tau_core_option_set{ {
 	{ "cache-bound", "run", std::size_t{ cache_bound },
 		"bound the string-keyed synthesis caches, FIFO eviction "
 		"(0 = unbounded)" },
-	{ "tref-budget", "run", std::size_t{ 0 },
+	{ "tref-budget", "run", std::size_t{ tref_budget_param },
 		"cap the live interned tree nodes; an api call that starts "
 		"with the store at or above the cap fails instead of running "
 		"(0 = unlimited)" },
-	{ "tref-budget-soft", "run", std::size_t{ 75 },
+	{ "tref-budget-soft", "run",
+		std::size_t{ tref_budget_soft_param },
 		"percentage of --tref-budget at which a sweep is forced "
 		"regardless of the gc growth trigger" },
 	{ "compile-max-table-edges", "run",
@@ -259,6 +261,7 @@ void clear_caches_on_semantic_change() {
 template <NodeType node>
 result<void> bind_core_options(options_repository& repo) {
 	result<void> r;
+	using interp = interpreter<node>;
 	const option_hook hook = clear_caches_on_semantic_change<node>;
 	semantic_options_seen<node> =
 		api_detail::semantic_options_fingerprint<node>();
@@ -281,7 +284,20 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("max-enum-steps", max_enum_steps, hook));
 	TAU_TRY_VOID(repo.bind("max-rewrite-rounds", max_rewrite_rounds, hook));
 	TAU_TRY_VOID(repo.bind("max-constant-size", max_constant_size, hook));
+	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
+	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
+		real_codec{ "gc-growth-factor" }, hook));
+	TAU_TRY_VOID(repo.bind("preprocessing", preprocessing, hook));
+	TAU_TRY_VOID(repo.bind("pwr-semantic", pwr_semantic_fallback, hook));
+	TAU_TRY_VOID(repo.bind("step-definitional-propagation",
+		interp::definitional_propagation, hook));
+	TAU_TRY_VOID(repo.bind("spec-size-warn", interp::spec_size_warn_threshold,
+		hook));
+	TAU_TRY_VOID(repo.bind("max-revision-alts", interp::max_revision_alts,
+		hook));
 	TAU_TRY_VOID(repo.bind("cache-bound", cache_bound, hook));
+	TAU_TRY_VOID(repo.bind("tref-budget", tref_budget_param, hook));
+	TAU_TRY_VOID(repo.bind("tref-budget-soft", tref_budget_soft_param, hook));
 	TAU_TRY_VOID(repo.bind("bf-dependence-max-nodes",
 		bf_dependence_max_nodes, hook));
 	return r;

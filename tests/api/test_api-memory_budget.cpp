@@ -13,8 +13,8 @@ namespace {
 // suite runs in one process with the rest of the api tests; a leaked budget
 // would make every later api call refuse.
 struct budget_guard {
-	long budget = tref_budget_param;
-	long soft = tref_budget_soft_param;
+	size_t budget = tref_budget_param;
+	size_t soft = tref_budget_soft_param;
 	~budget_guard() {
 		tref_budget_param = budget;
 		tref_budget_soft_param = soft;
@@ -30,27 +30,31 @@ TEST_SUITE("Tau API - memory budget") {
 	// one.
 	TEST_CASE("unlimited by default") {
 		budget_guard g;
-		tref_budget_param = -1;
-		unsetenv("TAU_TREF_BUDGET");
+		auto spec = idni::options().find("tref-budget");
+		REQUIRE( spec );
+		CHECK( std::get<std::size_t>(spec->fallback) == 0 );
+		tref_budget_param = 0;
 		CHECK( tref_budget() == 0 );
 		CHECK( tref_soft_mark() == 0 );
 		CHECK( over_tref_budget<node_t>() == false );
 		CHECK( over_tref_soft_mark<node_t>() == false );
 	}
 
-	TEST_CASE("the setter wins over the environment") {
+	TEST_CASE("the setter writes after the environment") {
 		budget_guard g;
 		setenv("TAU_TREF_BUDGET", "4096", 1);
+		CHECK( idni::options().load_env("TAU_").has_value() );
 		CHECK( tref_budget() == 4096 );
 		tau_api::set_tref_budget(99);
 		CHECK( tref_budget() == 99 );
 		unsetenv("TAU_TREF_BUDGET");
 	}
 
-	TEST_CASE("garbage in the environment keeps the default") {
+	TEST_CASE("garbage in the environment is an error") {
 		budget_guard g;
-		tref_budget_param = -1;
+		tref_budget_param = 0;
 		setenv("TAU_TREF_BUDGET", "not-a-number", 1);
+		CHECK( !idni::options().load_env("TAU_").has_value() );
 		CHECK( tref_budget() == 0 );
 		unsetenv("TAU_TREF_BUDGET");
 	}

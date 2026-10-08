@@ -114,11 +114,9 @@ struct interpreter {
 	 * specification exceeds this many printed characters. 0 disables the
 	 * check (the default). Set via `--spec-size-warn`, REPL
 	 * `specsizewarn` or `api::set_spec_size_warn`; a runtime parameter by
-	 * policy, never a header constant. Environment fallback
-	 * `TAU_SPEC_SIZE_WARN`.
+	 * policy, never a header constant.
 	 */
-	static inline env_limit<size_t> spec_size_warn_threshold{
-		"TAU_SPEC_SIZE_WARN", 0 };
+	static inline size_t spec_size_warn_threshold = 0;
 
 	/**
 	 * @brief Runtime cap on the revision alternatives kept per spec part.
@@ -133,10 +131,9 @@ struct interpreter {
 	 * dropped with a WARNING. 0 disables the cap (the default). Set via
 	 * `--max-revision-alts`, REPL `revisionalts` or
 	 * `api::set_max_revision_alts`; a runtime parameter by policy, never a
-	 * header constant. Environment fallback `TAU_MAX_REVISION_ALTS`.
+	 * header constant.
 	 */
-	static inline env_limit<size_t> max_revision_alts{
-		"TAU_MAX_REVISION_ALTS", 0 };
+	static inline size_t max_revision_alts = 0;
 
 	/**
 	 * @brief Definitional propagation before a step's paths are enumerated.
@@ -166,16 +163,14 @@ struct interpreter {
 	 * `get` printers can read them back: set via
 	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
 	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`. A floor of 0
-	 * leaves the growth factor as the only trigger. Environment fallbacks
-	 * `TAU_GC_MIN_SIZE` and `TAU_GC_GROWTH_FACTOR`. A store past its soft
+	 * leaves the growth factor as the only trigger. A store past its soft
 	 * tref budget sweeps regardless of both.
 	 */
-	static inline env_limit<size_t> gc_min_size{ "TAU_GC_MIN_SIZE", 256 };
+	static inline size_t gc_min_size = 256;
 	/// Growth of bintree<node>::M() since the last sweep that triggers the
 	/// next one (default 1.5); <= 0 disables the growth-triggered sweeps
-	/// (see gc_min_size). Environment fallback `TAU_GC_GROWTH_FACTOR`.
-	static inline env_limit<double> gc_growth_factor{
-		"TAU_GC_GROWTH_FACTOR", 1.5 };
+	/// (see gc_min_size).
+	static inline double gc_growth_factor = 1.5;
 
 	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
