@@ -53,11 +53,14 @@
 #include <iostream>
 #include <memory>
 #include <ostream>
+#include <string_view>
+#include <vector>
 
 #include "boolean_algebras/ba_pack_traits.h"
 #include "boolean_algebras/tau/tau_ba.h"
 #include "api.h"
 #include "io_context.h"
+#include "cli_options.h"
 #include "tau_spec.h"
 #include "utility/diagnostics.h"
 #include "utility/repl.h"
@@ -201,8 +204,6 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool preprocessing       = idni::tau_lang::preprocessing; ///< BA preprocessing passes, e.g. bv predicate blasting; follows the library default.
-		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options have no fields here: `set` writes
@@ -228,15 +229,23 @@ struct repl_evaluator {
 	/**
 	 * @brief Construct the evaluator with the given @p opt configuration.
 	 *
-	 * Applies @p opt's colors, severity, charvar and preprocessing to the
-	 * library, and makes every console input stream of a later `run` a
-	 * non-blocking stream answered through eval().
+	 * Binds the fields of @p opt to their options of
+	 * @ref tau_cli_option_set, so a value that the repository holds, such
+	 * as one of the command line, replaces the field. Applies the colors,
+	 * the severity and charvar to the library, and makes every console
+	 * input stream of a later `run` a non-blocking stream answered through
+	 * eval().
 	 * @param opt REPL options (default-constructed if not provided).
 	 * @param out Sink of the normal output.
 	 * @param err Sink of the errors and warnings.
 	 */
 	repl_evaluator(options opt = options{},
 		std::ostream& out = std::cout, std::ostream& err = std::cerr);
+	/// Unbinds the options and gives each of them its default value.
+	~repl_evaluator();
+	// the repository holds the address of each bound field
+	repl_evaluator(const repl_evaluator&) = delete;
+	repl_evaluator& operator=(const repl_evaluator&) = delete;
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
 	 *
@@ -493,7 +502,13 @@ private:
 	/// @return @p value.
 	bool update_charvar(bool value);
 
-	/// @brief Set the preprocessing option and the library's to @p value.
+	/// @brief Bind the fields of `opt` to their options. A failure goes to
+	/// the error stream.
+	void bind_repl_options();
+	/// The names that bind_repl_options() bound.
+	std::vector<std::string_view> bound_options;
+
+	/// @brief Set the library's preprocessing to @p value.
 	/// @return @p value.
 	bool update_preprocessing(bool value);
 
@@ -505,7 +520,7 @@ private:
 	/// @brief Execute `fragment ltl|ctl_star` from @p n.
 	void fragment_cmd(const tt& n);
 
-	/// @brief Set the factoring option and the library's to @p value.
+	/// @brief Set the library's component factoring to @p value.
 	/// @return @p value.
 	bool update_factoring(bool value);
 

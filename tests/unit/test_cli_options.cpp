@@ -164,17 +164,16 @@ TEST_SUITE("cli_options") {
 		CHECK(std::get<std::string>(c.to_value(sev::trace)) == "trace");
 	}
 
-	TEST_CASE("parse_args writes the cli options and the bound severity") {
+	TEST_CASE("parse_args writes the cli options") {
 		idni::options_repository repo;
 		idni::options_scope scope(repo);
 		REQUIRE(declare_tau_cli(repo).has_value());
 		auto r = parse(repo, { "tau", "-S", "trace", "-q" });
 		REQUIRE(r.has_value());
-		CHECK(tau_cli_severity == boost::log::trivial::trace);
+		CHECK(repo.get<std::string>("severity") == "trace");
 		CHECK(repo.get<bool>("quit"));
 		CHECK(repo.get<bool>("benchmarks"));
 		CHECK_FALSE(repo.get<bool>("json"));
-		tau_cli_severity = boost::log::trivial::info;
 	}
 
 	TEST_CASE("an unknown flag and a bad severity are errors") {
@@ -184,10 +183,19 @@ TEST_SUITE("cli_options") {
 		auto unknown = parse(repo, { "tau", "--nope" });
 		CHECK_FALSE(unknown.has_value());
 		CHECK(has_text(unknown.report(), "Unknown option"));
-		auto bad = parse(repo, { "tau", "-S", "bogus" });
-		CHECK_FALSE(bad.has_value());
-		CHECK(has_text(bad.report(), "does not take the value"));
-		CHECK(tau_cli_severity == boost::log::trivial::info);
+		// a field bound with the codec, as the REPL binds it, refuses it
+		auto level = boost::log::trivial::info;
+		REQUIRE(repo.bind("severity", level, severity_codec{}).has_value());
+		REQUIRE(parse(repo, { "tau", "-S", "error" }).has_value());
+		CHECK(level == boost::log::trivial::error);
+		CHECK_FALSE(parse(repo, { "tau", "-S", "bogus" }).has_value());
+		CHECK(level == boost::log::trivial::error);
+		repo.unbind("severity");
+		// main() reads an unbound severity through the codec
+		REQUIRE(parse(repo, { "tau", "-S", "bogus" }).has_value());
+		auto read = severity_codec{}.from_value(repo.value("severity"));
+		CHECK_FALSE(read.has_value());
+		CHECK(has_text(read.report(), "does not take the value"));
 	}
 
 	TEST_CASE("compile takes its options after the command, define repeats") {

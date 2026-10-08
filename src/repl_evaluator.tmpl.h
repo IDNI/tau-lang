@@ -1773,14 +1773,14 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ charvar_opt,      [this]() {
 		out << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ preprocessing_opt, [this]() {
-		out << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
+		out << "preprocessing:       " << pbool[preprocessing] << "\n"; } },
 	{ pwr_semantic_opt,  [this]() {
 		out << "pwrsemantic:         " << pbool[pwr_semantic_fallback] << "\n"; } },
 	{ step_prop_opt,     [this]() {
 		out << "stepprop:            "
 			<< pbool[interpreter<node>::definitional_propagation] << "\n"; } },
 	{ factoring_opt,     [this]() {
-		out << "factoring:           " << pbool[opt.factoring] << "\n"; } },
+		out << "factoring:           " << pbool[ba_component_factoring] << "\n"; } },
 	{ highlighting_opt, [this]() {
 		out << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    [this]() {
@@ -2002,9 +2002,11 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ charvar_opt,   [&]() {
 		update_charvar(update_bool_value(opt.charvar)); } },
 	{ preprocessing_opt,   [&]() {
-		update_preprocessing(update_bool_value(opt.preprocessing)); } },
+		bool v = preprocessing;
+		update_preprocessing(update_bool_value(v)); } },
 	{ factoring_opt,   [&]() {
-		update_factoring(update_bool_value(opt.factoring)); } },
+		bool v = ba_component_factoring;
+		update_factoring(update_bool_value(v)); } },
 	{ pwr_semantic_opt, [&]() {
 		bool v = pwr_semantic_fallback;
 		api<node>::set_pwr_semantic_fallback(update_bool_value(v)); } },
@@ -2155,8 +2157,14 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 #endif // DEBUG
 	case colors_opt:           TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
-	case preprocessing_opt:    update_preprocessing(update_fn(opt.preprocessing)); break;
-	case factoring_opt:        update_factoring(update_fn(opt.factoring)); break;
+	case preprocessing_opt: {
+		bool v = preprocessing;
+		update_preprocessing(update_fn(v)); break;
+	}
+	case factoring_opt: {
+		bool v = ba_component_factoring;
+		update_factoring(update_fn(v)); break;
+	}
 	case pwr_semantic_opt: {
 		bool v = pwr_semantic_fallback;
 		api<node>::set_pwr_semantic_fallback(update_fn(v)); break;
@@ -2277,7 +2285,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_preprocessing(bool value) {
-	api<node>::set_preprocessing(opt.preprocessing = value);
+	api<node>::set_preprocessing(value);
 	return value;
 }
 
@@ -2324,7 +2332,7 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_factoring(bool value) {
-	api<node>::set_ba_component_factoring(opt.factoring = value);
+	api<node>::set_ba_component_factoring(value);
 	return value;
 }
 
@@ -2457,20 +2465,58 @@ requires BAsPack<BAs...>
 repl_evaluator<BAs...>::repl_evaluator(options opt, std::ostream& out,
 	std::ostream& err): out(out), err(err), opt(opt)
 {
-	TC.set(opt.colors);
-	logging::set_filter(opt.severity);
-	if (opt.experimental) out << "\n!!! Experimental features "
+	bind_repl_options();
+	TC.set(this->opt.colors);
+	logging::set_filter(this->opt.severity);
+	if (this->opt.experimental) out << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
-	// Propagate the CLI-provided charvar/preprocessing values to the api's
-	// global state; main.cpp applies them to the api itself only on its
-	// spec-file path.
-	update_charvar(opt.charvar);
-	update_preprocessing(opt.preprocessing);
+	update_charvar(this->opt.charvar);
 	// console input streams resolve through the REPL cycle, never blocking
 	definitions<node>::instance().get_io_context()->console_input_factory =
 		[](const std::string&) {
 			return std::make_shared<repl_pending_input_stream>();
 		};
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+repl_evaluator<BAs...>::~repl_evaluator() {
+	auto& repo = idni::options();
+	// the unbind leaves the last field value, which the reset clears, so a
+	// later evaluator starts from its own options
+	for (auto name : bound_options) {
+		repo.unbind(name);
+		repo.reset_option(name).report().print_pending(err);
+	}
+}
+
+/** @internal @copydoc repl_evaluator::bind_repl_options @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::bind_repl_options() {
+	auto& repo = idni::options();
+	result<void> res;
+	// a bind that reports a bad stored value still binds the field
+	auto bind = [&](std::string_view name, auto&& bound) {
+		res.merge(std::move(bound));
+		bound_options.push_back(name);
+	};
+	if (res.merge_ok(repo.declare(tau_cli_option_set))) {
+		bind("status", repo.bind("status", opt.status));
+		bind("color", repo.bind("color", opt.colors,
+			[this] { TC.set(opt.colors); }));
+		bind("charvar", repo.bind("charvar", opt.charvar,
+			[this] { api<node>::set_charvar(opt.charvar); }));
+		bind("benchmarks", repo.bind("benchmarks", opt.print_benchmarks));
+#ifdef DEBUG
+		bind("debug", repo.bind("debug", opt.debug_repl));
+#endif // DEBUG
+		bind("severity", repo.bind("severity", opt.severity,
+			severity_codec{},
+			[this] { logging::set_filter(opt.severity); }));
+		bind("experimental", repo.bind("experimental", opt.experimental));
+	}
+	res.report().print_pending(err);
 }
 
 /** @internal @copydoc repl_evaluator::reprompt @endinternal */

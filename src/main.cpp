@@ -196,7 +196,9 @@ int main(int argc, char** argv) {
 			<< "algebras: " << node_t::ba::types_joined() << "\n", 0;
 	if (repo.get<bool>("license")) return std::cout << license, 0;
 
-	const boost::log::trivial::severity_level sev = tau_cli_severity;
+	auto sev = severity_codec{}.from_value(repo.value("severity"));
+	sev.print_pending();
+	if (!sev.has_value()) return 1;
 	tau_api::set_highlighting(repo.get<bool>("highlighting"));
 	tau_api::set_indenting(repo.get<bool>("indenting"));
 	tau_api::set_json(repo.get<bool>("json"));
@@ -308,22 +310,12 @@ int main(int argc, char** argv) {
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
 			<< files.front();)
-		tau_api::set_severity(sev);
+		tau_api::set_severity(sev.value());
 		tau_api::set_charvar(charvar);
 		return run_tau_spec(files.front());
 	}
 
-	repl_evaluator<TAU_PACK_BASE_BAS> re({
-		.status = repo.get<bool>("status"),
-		.colors = repo.get<bool>("color"),
-		.charvar = charvar,
-		.print_benchmarks = repo.get<bool>("benchmarks"),
-#ifdef DEBUG
-		.debug_repl = repo.get<bool>("debug"),
-#endif // DEBUG
-		.severity = sev,
-		.experimental = repo.get<bool>("experimental")
-	});
+	repl_evaluator<TAU_PACK_BASE_BAS> re;
 	const string e = repo.get<string>("evaluate");
 	if (e.size()) {
 		DBG(TAU_LOG_TRACE << "evaluating REPL command: " << e;)

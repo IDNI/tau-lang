@@ -55,13 +55,10 @@ struct severity_codec {
 	}
 };
 
-/// The level that `severity` names. @ref declare_tau_cli binds it.
-inline boost::log::trivial::severity_level tau_cli_severity =
-	boost::log::trivial::info;
-
 /// The options of the tau executable that no library field holds. The first
 /// seven are the options of a compiled artifact. The command line alone
-/// writes them, so none reads the environment.
+/// writes them, so none reads the environment. The REPL evaluator binds
+/// seven of them to its own fields.
 inline const option_set tau_cli_option_set{
 	{
 		{ "help", "global", false, "detailed information about options",
@@ -89,7 +86,7 @@ inline const option_set tau_cli_option_set{
 		{ "color", "ui", true, "use colors (enabled by default)", {},
 			false },
 #ifdef DEBUG
-		{ "debug", "ui", true, "debug mode", {}, false },
+		{ "debug", "run", true, "debug mode", {}, false },
 #endif // DEBUG
 		{ "experimental", "run", false,
 			"enables transitioning features", {}, false },
@@ -175,13 +172,12 @@ inline const args_config tau_args_config{
 		"command.", .default_command = "",
 	.default_command_when_inputs = "", .global_surface = "" };
 
-/// Declares @ref tau_cli_option_set, binds `severity` to
-/// @ref tau_cli_severity and adds the surfaces of the tau executable. Call it
-/// after `tau_init()`, so the core and BA options get their surfaces too.
+/// Declares @ref tau_cli_option_set and adds the surfaces of the tau
+/// executable. Call it after `tau_init()`, so the core and BA options get
+/// their surfaces too.
 inline result<void> declare_tau_cli(options_repository& repo) {
 	result<void> r;
 	TAU_TRY_VOID(repo.declare(tau_cli_option_set));
-	TAU_TRY_VOID(repo.bind("severity", tau_cli_severity, severity_codec{}));
 	for (const auto& [name, surface] : tau_surfaces) {
 		// a BA outside the pack and `debug` outside DEBUG declare nothing
 		if (!repo.find(name)) continue;
