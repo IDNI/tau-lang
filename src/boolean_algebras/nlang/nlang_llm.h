@@ -43,26 +43,26 @@ inline constexpr const char* llm_default_anthropic_endpoint =
 inline constexpr size_t llm_default_max_tokens = 16000;
 
 /**
- * @brief The `nlang-*` LLM options as given: an empty member is "not set",
- * and its environment variable, then its default, applies.
+ * @brief The fields of the `nlang-*` LLM options. An empty text is "not
+ * given", and @ref llm_config_from_env resolves its default.
  *
- * | member       | option             | environment fallback |
- * |--------------|--------------------|----------------------|
- * | `provider`   | `nlang-provider`   | `TAU_LLM_PROVIDER`   |
- * | `endpoint`   | `nlang-endpoint`   | `TAU_LLM_ENDPOINT`   |
- * | `model`      | `nlang-model`      | `TAU_LLM_MODEL`      |
- * | `api_key`    | `nlang-api-key`    | `TAU_LLM_API_KEY`, then the provider's own (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) |
- * | `effort`     | `nlang-effort`     | `TAU_LLM_EFFORT`     |
- * | `max_tokens` | `nlang-max-tokens` | `TAU_LLM_MAX_TOKENS` |
- * | `fallback`   | `nlang-fallback`   | `TAU_LLM_FALLBACK`   |
+ * | member       | option             | environment |
+ * |--------------|--------------------|-------------|
+ * | `provider`   | `nlang-provider`   | `TAU_NLANG_PROVIDER`   |
+ * | `endpoint`   | `nlang-endpoint`   | `TAU_NLANG_ENDPOINT`   |
+ * | `model`      | `nlang-model`      | `TAU_NLANG_MODEL`      |
+ * | `api_key`    | `nlang-api-key`    | `TAU_NLANG_API_KEY`, else the provider's own (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) |
+ * | `effort`     | `nlang-effort`     | `TAU_NLANG_EFFORT`     |
+ * | `max_tokens` | `nlang-max-tokens` | `TAU_NLANG_MAX_TOKENS` |
+ * | `fallback`   | `nlang-fallback`   | `TAU_NLANG_FALLBACK`   |
  */
 struct llm_options {
-	std::optional<std::string> provider, endpoint, model, api_key, effort;
-	std::optional<size_t> max_tokens;
-	std::optional<bool> fallback;
+	std::string provider, endpoint, model, api_key, effort;
+	size_t max_tokens = llm_default_max_tokens;
+	bool fallback = true;
 };
 
-/// The options of this process, written by the `nlang-*` option setters.
+/// The options of this process, bound to the `nlang-*` options.
 llm_options& nlang_llm_options();
 
 /** @brief One resolved configuration: everything a request needs. */
@@ -89,17 +89,15 @@ struct llm_http_request {
 };
 
 /**
- * @brief Resolve a configuration: each option of @p opts when set, else its
- * environment variable, else its default.
+ * @brief Resolve a configuration: each option of @p opts when given, else
+ * its default. The provider's own key variable is the one environment read.
  *
- * The provider, when neither the option nor `TAU_LLM_PROVIDER` names one, is
- * `anthropic` when the endpoint names an anthropic host or when
- * `ANTHROPIC_API_KEY` is the only key configured, and `openai` otherwise. An
- * anthropic request needs a model, so it defaults to
- * @ref llm_default_anthropic_model; that default model alone gets effort
- * `low` and, on the default endpoint, the server-side fallback. A model the
- * user names gets neither unless asked for, since not every model accepts
- * them. A `max_tokens` of 0 is the default.
+ * The provider, when the option names none, is `anthropic` when the endpoint
+ * names an anthropic host or when `ANTHROPIC_API_KEY` is the only provider
+ * key, and `openai` otherwise. An anthropic request needs a model, so it
+ * defaults to @ref llm_default_anthropic_model; that default model alone
+ * gets effort `low`, since not every model accepts it. The server-side
+ * fallback applies to anthropic only. A `max_tokens` of 0 is the default.
  */
 llm_config llm_config_from_env(const llm_options& opts = nlang_llm_options());
 

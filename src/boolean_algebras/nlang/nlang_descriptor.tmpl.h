@@ -12,6 +12,7 @@
 #include "boolean_algebras/ba_descriptor.h"
 #include <array>
 #include "ba_types.h"
+#include "boolean_algebras/nlang/nlang_options.h"
 
 namespace idni::tau_lang {
 
@@ -60,18 +61,21 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 			type_tree, type_name);
 	}
 
+	/// nlang's options, each named `nlang-<name>`.
+	static const option_set& declared_options() { return nlang_option_set; }
+	/// Binds nlang's options, declared by the pack, to nlang's fields.
+	static result<void> bind_options(options_repository& repo) {
+		return nlang_bind_options(repo);
+	}
+
 	/// @name nlang-declared CLI/REPL options
-	/// A getter reads the value in force (option, else environment, else
-	/// default). A text setter given an empty text clears the option.
+	/// A getter reads the value in force: the option, else its default. A
+	/// text setter given an empty text clears the option.
 	/// @{
 	/// @brief Current HTTP timeout of the oracle, in seconds (0 = no cap).
-	static size_t get_http_timeout_option() {
-		return (size_t) nlang_http_timeout_sec();
-	}
+	static size_t get_http_timeout_option() { return nlang_http_timeout_sec; }
 	/// @brief Sets the HTTP timeout of the oracle to @p n seconds (0 = no cap).
-	static void set_http_timeout_option(size_t n) {
-		nlang_http_timeout_sec_param = (long) n;
-	}
+	static void set_http_timeout_option(size_t n) { nlang_http_timeout_sec = n; }
 	static size_t get_max_tokens_option() {
 		return llm_config_from_env().max_tokens;
 	}
@@ -86,10 +90,10 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	}
 	// An answer of one model is not another's, so a setter that can
 	// change who answers drops the cached answers.
-	static bool set_text_option(std::optional<std::string>& slot,
-		const std::string& v, bool changes_answers = true)
+	static bool set_text_option(std::string& slot, const std::string& v,
+		bool changes_answers = true)
 	{
-		if (v.empty()) slot.reset(); else slot = v;
+		slot = v;
 		if (changes_answers) llm_clear_cache();
 		return true;
 	}
@@ -130,18 +134,19 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	/**
 	 * @brief The options nlang declares about itself, all of the LLM
-	 * oracle. Each is read as option, else environment, else default.
+	 * oracle. @ref bind_options binds the same fields by name, and
+	 * `TAU_NLANG_<NAME>` writes each one when the environment is loaded.
 	 *
-	 * | option               | environment              | default |
-	 * |----------------------|--------------------------|---------|
-	 * | `nlang-provider`     | `TAU_LLM_PROVIDER`       | detected, else `openai` |
-	 * | `nlang-endpoint`     | `TAU_LLM_ENDPOINT`       | the provider's |
-	 * | `nlang-model`        | `TAU_LLM_MODEL`          | none (openai), `claude-opus-5-5` (anthropic) |
-	 * | `nlang-api-key`      | `TAU_LLM_API_KEY`, then `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | none |
-	 * | `nlang-effort`       | `TAU_LLM_EFFORT`         | `low` for the default anthropic model |
-	 * | `nlang-max-tokens`   | `TAU_LLM_MAX_TOKENS`     | 16000 |
-	 * | `nlang-http-timeout` | `TAU_NLANG_HTTP_TIMEOUT` | 15 (0 = no cap) |
-	 * | `nlang-fallback`     | `TAU_LLM_FALLBACK`       | on for the default anthropic model on the default endpoint |
+	 * | option               | default |
+	 * |----------------------|---------|
+	 * | `nlang-provider`     | detected, else `openai` |
+	 * | `nlang-endpoint`     | the provider's |
+	 * | `nlang-model`        | none (openai), `claude-opus-5-5` (anthropic) |
+	 * | `nlang-api-key`      | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` by provider |
+	 * | `nlang-effort`       | `low` for the default anthropic model |
+	 * | `nlang-max-tokens`   | 16000 |
+	 * | `nlang-http-timeout` | 15 (0 = no cap) |
+	 * | `nlang-fallback`     | on, anthropic only |
 	 *
 	 * `nlang-api-key` reads back as `set` or `unset`, never as the key.
 	 */
@@ -157,42 +162,41 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 				nullptr, nullptr,
 				get_max_tokens_option, set_max_tokens_option,
 				"cap each LLM oracle reply at this many tokens, "
-				"anthropic only (default: TAU_LLM_MAX_TOKENS or "
+				"anthropic only (default: TAU_NLANG_MAX_TOKENS or "
 				"16000; 0 = the default)" },
 			{ "fallback", ba_option_kind::flag,
 				get_fallback_option, set_fallback_option,
 				nullptr, nullptr,
 				"let the anthropic API answer from another model "
 				"when the named one declines (default: "
-				"TAU_LLM_FALLBACK, else on for the default model "
-				"on the default endpoint)" },
+				"TAU_NLANG_FALLBACK, else on)" },
 			{ "provider", ba_option_kind::text,
 				nullptr, nullptr, nullptr, nullptr,
 				"LLM oracle API, openai or anthropic (default: "
-				"TAU_LLM_PROVIDER, else detected from the "
+				"TAU_NLANG_PROVIDER, else detected from the "
 				"endpoint and the keys, else openai)",
 				get_provider_option, set_provider_option },
 			{ "endpoint", ba_option_kind::text,
 				nullptr, nullptr, nullptr, nullptr,
 				"LLM oracle API base URL (default: "
-				"TAU_LLM_ENDPOINT, else the provider's)",
+				"TAU_NLANG_ENDPOINT, else the provider's)",
 				get_endpoint_option, set_endpoint_option },
 			{ "model", ba_option_kind::text,
 				nullptr, nullptr, nullptr, nullptr,
-				"LLM oracle model (default: TAU_LLM_MODEL, else "
+				"LLM oracle model (default: TAU_NLANG_MODEL, else "
 				"none for openai and claude-opus-5-5 for "
 				"anthropic)",
 				get_model_option, set_model_option },
 			{ "api-key", ba_option_kind::text,
 				nullptr, nullptr, nullptr, nullptr,
 				"LLM oracle API key, read back as set or unset "
-				"(default: TAU_LLM_API_KEY, else OPENAI_API_KEY "
+				"(default: TAU_NLANG_API_KEY, else OPENAI_API_KEY "
 				"or ANTHROPIC_API_KEY by provider)",
 				get_api_key_option, set_api_key_option },
 			{ "effort", ba_option_kind::text,
 				nullptr, nullptr, nullptr, nullptr,
 				"anthropic effort: low, medium, high, xhigh or "
-				"max (default: TAU_LLM_EFFORT, else low for the "
+				"max (default: TAU_NLANG_EFFORT, else low for the "
 				"default model)",
 				get_effort_option, set_effort_option },
 		}};

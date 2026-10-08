@@ -476,7 +476,7 @@ TEST_SUITE("Tau API - runtime limits") {
 
 		// the empty text clears the option
 		CHECK( tau_api::set_ba_text_option("nlang-model", "").has_value() );
-		CHECK_FALSE( nlang_llm_options().model.has_value() );
+		CHECK( nlang_llm_options().model.empty() );
 
 		nlang_llm_options() = saved;
 	}

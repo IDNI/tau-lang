@@ -24,7 +24,7 @@ static void warn_llm_unavailable() {
 	warned = true;
 	fprintf(stderr,
 		"WARNING: nlang oracle requires an API key: the nlang-api-key option,\n"
-		"  TAU_LLM_API_KEY, or the provider's own OPENAI_API_KEY /\n"
+		"  TAU_NLANG_API_KEY, or the provider's own OPENAI_API_KEY /\n"
 		"  ANTHROPIC_API_KEY. The provider, endpoint and model are the\n"
 		"  nlang-provider, nlang-endpoint and nlang-model options.\n"
 		"  Without the API key, all oracle queries return conservative defaults\n"
@@ -40,7 +40,7 @@ static void warn_llm_http_status(long status) {
 	fprintf(stderr,
 		"WARNING: nlang oracle endpoint returned HTTP %ld; the query is treated\n"
 		"  as unanswered and a conservative default is used. If the endpoint\n"
-		"  requires an explicit model, set nlang-model (or TAU_LLM_MODEL).\n",
+		"  requires an explicit model, set nlang-model (or TAU_NLANG_MODEL).\n",
 		status);
 }
 
@@ -212,7 +212,7 @@ std::optional<std::string> llm_query(const std::string& prompt) {
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, nlang_curl_write_cb);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 	// Runtime parameter (nlang-http-timeout); 0 = no cap.
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, nlang_http_timeout_sec());
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long) nlang_http_timeout_sec);
 
 	CURLcode res = curl_easy_perform(curl);
 	long status = 0;

@@ -14,7 +14,6 @@
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
 #include "ba_constants.h"
-#include "env_limits.h"
 #include "splitter_types.h"
 #include "boolean_algebras/nlang/nlang_llm.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
@@ -47,53 +46,32 @@ template <NodeType node> size_t nlang_type_id();
 // propositions p < q there always exists r with p < r < q.
 // -----------------------------------------------------------------------------
 
-// Configuration: the `nlang-*` options of nlang_descriptor.tmpl.h, each with
-// an environment fallback (option > environment > default). nlang_llm.h
-// holds the resolution rules.
-//   nlang-provider / TAU_LLM_PROVIDER  — `openai` (chat completions) or
-//                       `anthropic` (Messages API). Unset: `anthropic` when
-//                       the endpoint names an anthropic host or when
-//                       ANTHROPIC_API_KEY is the only key, else `openai`.
-//   nlang-api-key / TAU_LLM_API_KEY    — required; falls back to the
-//                       provider's own OPENAI_API_KEY / ANTHROPIC_API_KEY.
-//                       Without it every oracle query returns a
-//                       conservative default and a warning is printed once.
-//   nlang-endpoint / TAU_LLM_ENDPOINT  — API base URL (default:
-//                       https://api.openai.com/v1 or
+// Configuration: the `nlang-*` options of nlang_options.h, each loaded from
+// `TAU_NLANG_<NAME>`. nlang_llm.h holds the resolution rules.
+//   nlang-provider   — `openai` (chat completions) or `anthropic` (Messages
+//                       API). Empty: `anthropic` when the endpoint names an
+//                       anthropic host or when ANTHROPIC_API_KEY is the only
+//                       key, else `openai`.
+//   nlang-api-key    — required; falls back to the provider's own
+//                       OPENAI_API_KEY / ANTHROPIC_API_KEY. Without it every
+//                       oracle query returns a conservative default and a
+//                       warning is printed once.
+//   nlang-endpoint   — API base URL (default: https://api.openai.com/v1 or
 //                       https://api.anthropic.com/v1)
-//   nlang-model / TAU_LLM_MODEL        — openai: when unset no model is sent
-//                       and the endpoint picks its own. anthropic:
-//                       claude-opus-5-5.
-//   nlang-effort / TAU_LLM_EFFORT      — anthropic; `low` for the default
-//                       model, none for a model the user names.
-//   nlang-max-tokens / TAU_LLM_MAX_TOKENS — anthropic; default 16000.
-//   nlang-fallback / TAU_LLM_FALLBACK  — anthropic server-side fallback; on
-//                       for the default model on the default endpoint.
-//   nlang-http-timeout / TAU_NLANG_HTTP_TIMEOUT — seconds per request
-//                       (default 15, 0 = no cap).
+//   nlang-model      — openai: when empty no model is sent and the endpoint
+//                       picks its own. anthropic: claude-opus-5-5.
+//   nlang-effort     — anthropic; `low` for the default model, none for a
+//                       model the user names.
+//   nlang-max-tokens — anthropic; default 16000.
+//   nlang-fallback   — anthropic server-side fallback; on by default.
+//   nlang-http-timeout — seconds per request (default 15, 0 = no cap).
 
 /**
  * @brief Wall-clock cap, in seconds, on each LLM HTTP request the nlang
- * oracle makes (curl's CURLOPT_TIMEOUT). Runtime parameter by policy
- * (nlang's own `nlang-http-timeout` CLI/REPL option); 0 = no cap.
- *
- * The sentinel -1 means "not set", in which case `TAU_NLANG_HTTP_TIMEOUT`
- * is consulted and 15 s applies when that is absent too; the option always
- * wins over the variable. Read through @ref nlang_http_timeout_sec.
+ * oracle makes (curl's CURLOPT_TIMEOUT). Bound to the option
+ * `nlang-http-timeout`; 0 = no cap.
  */
-inline long nlang_http_timeout_sec_param = -1;
-
-/**
- * @brief Effective per-request LLM HTTP timeout in seconds (0 = no cap).
- *
- * Precedence: @ref nlang_http_timeout_sec_param when set (>= 0), else
- * `TAU_NLANG_HTTP_TIMEOUT`, else 15.
- */
-inline long nlang_http_timeout_sec() {
-	if (nlang_http_timeout_sec_param >= 0)
-		return nlang_http_timeout_sec_param;
-	return (long) env_limit_count("TAU_NLANG_HTTP_TIMEOUT", 15);
-}
+inline size_t nlang_http_timeout_sec = 15;
 
 // --- LLM API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
 // The oracles answer from a process-wide cache first. Without an API key,
@@ -104,7 +82,7 @@ inline long nlang_http_timeout_sec() {
 /**
  * @brief Send one chat-completion request to the configured endpoint.
  *
- * Blocking; bounded by nlang_http_timeout_sec().
+ * Blocking; bounded by nlang_http_timeout_sec.
  * @param prompt The user message.
  * @return The reply's content, or nullopt when no API key is set, the
  * request fails or the status is not 2xx (the last two warn once on stderr).
@@ -292,7 +270,7 @@ struct nlang_ba {
 	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
 
 	/// Semantic equivalence: structural equality first, then llm_equivalent
-	/// on the printed forms (blocking I/O, bounded by nlang_http_timeout_sec()).
+	/// on the printed forms (blocking I/O, bounded by nlang_http_timeout_sec).
 	/// Never for container keys or pooling identity.
 	bool semantically_equal(const nlang_ba& o) const {
 		if (fm->struct_eq(*o.fm)) return true;

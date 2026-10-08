@@ -25,13 +25,19 @@ struct scoped_env {
 // Points the oracle at a closed local port, so every request fails at once
 // with no network access.
 struct failing_endpoint {
-	scoped_env key{ "TAU_LLM_API_KEY", "test-key" };
-	scoped_env endpoint{ "TAU_LLM_ENDPOINT", "http://127.0.0.1:9" };
 	scoped_env no_proxy_upper{ "NO_PROXY", "*" };
 	scoped_env no_proxy_lower{ "no_proxy", "*" };
-	long saved_timeout = nlang_http_timeout_sec_param;
-	failing_endpoint() { nlang_http_timeout_sec_param = 2; }
-	~failing_endpoint() { nlang_http_timeout_sec_param = saved_timeout; }
+	llm_options saved = nlang_llm_options();
+	size_t saved_timeout = nlang_http_timeout_sec;
+	failing_endpoint() {
+		nlang_llm_options().api_key = "test-key";
+		nlang_llm_options().endpoint = "http://127.0.0.1:9";
+		nlang_http_timeout_sec = 2;
+	}
+	~failing_endpoint() {
+		nlang_llm_options() = saved;
+		nlang_http_timeout_sec = saved_timeout;
+	}
 };
 
 } // namespace

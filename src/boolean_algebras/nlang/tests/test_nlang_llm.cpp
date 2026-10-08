@@ -11,13 +11,12 @@ namespace json = idni::format::json;
 
 namespace {
 
-// Every variable the resolver reads, cleared for the life of one case and
-// put back afterwards, so a key exported in the shell never reaches a case.
+// The provider key variables the resolver reads, cleared for the life of one
+// case and put back afterwards, so a key exported in the shell never reaches
+// a case.
 struct clean_llm_env {
 	static constexpr const char* vars[] = {
-		"TAU_LLM_PROVIDER", "TAU_LLM_ENDPOINT", "TAU_LLM_MODEL",
-		"TAU_LLM_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
-		"TAU_LLM_EFFORT", "TAU_LLM_MAX_TOKENS", "TAU_LLM_FALLBACK" };
+		"OPENAI_API_KEY", "ANTHROPIC_API_KEY" };
 	std::vector<std::pair<std::string, std::optional<std::string>>> saved;
 	clean_llm_env() {
 		for (const char* v : vars) {
@@ -61,7 +60,7 @@ llm_config anthropic_default() {
 
 TEST_SUITE("nlang llm: configuration") {
 
-TEST_CASE("no variable set: openai, default endpoint, no model, no key") {
+TEST_CASE("nothing given: openai, default endpoint, no model, no key") {
 	clean_llm_env env;
 	const llm_config c = llm_config_from_env(llm_options{});
 	CHECK(c.provider == llm_provider::openai);
@@ -74,17 +73,18 @@ TEST_CASE("no variable set: openai, default endpoint, no model, no key") {
 	CHECK(!c.server_fallback);
 }
 
-TEST_CASE("the openai key is read from TAU_LLM_API_KEY, then OPENAI_API_KEY") {
+TEST_CASE("the openai key is the option, else OPENAI_API_KEY") {
 	clean_llm_env env;
 	setenv("OPENAI_API_KEY", "sk-openai", 1);
 	CHECK(llm_config_from_env(llm_options{}).api_key == "sk-openai");
-	setenv("TAU_LLM_API_KEY", "sk-tau", 1);
-	CHECK(llm_config_from_env(llm_options{}).api_key == "sk-tau");
+	llm_options o;
+	o.api_key = "sk-tau";
+	CHECK(llm_config_from_env(o).api_key == "sk-tau");
 }
 
 TEST_CASE("an empty key variable reads as no key") {
 	clean_llm_env env;
-	setenv("TAU_LLM_API_KEY", "", 1);
+	setenv("OPENAI_API_KEY", "", 1);
 	CHECK(!llm_config_from_env(llm_options{}).has_key());
 }
 
@@ -122,18 +122,20 @@ TEST_CASE("ANTHROPIC_API_KEY beside another key leaves openai") {
 
 TEST_CASE("an anthropic endpoint selects anthropic") {
 	clean_llm_env env;
-	setenv("TAU_LLM_ENDPOINT", "https://api.anthropic.com/v1", 1);
-	setenv("TAU_LLM_API_KEY", "sk-tau", 1);
-	const llm_config c = llm_config_from_env(llm_options{});
+	llm_options o;
+	o.endpoint = "https://api.anthropic.com/v1";
+	o.api_key = "sk-tau";
+	const llm_config c = llm_config_from_env(o);
 	CHECK(c.provider == llm_provider::anthropic);
 	CHECK(c.api_key == "sk-tau");
 }
 
-TEST_CASE("TAU_LLM_PROVIDER wins over detection") {
+TEST_CASE("a provider option wins over detection") {
 	clean_llm_env env;
 	setenv("ANTHROPIC_API_KEY", "sk-ant", 1);
-	setenv("TAU_LLM_PROVIDER", "openai", 1);
-	const llm_config c = llm_config_from_env(llm_options{});
+	llm_options o;
+	o.provider = "openai";
+	const llm_config c = llm_config_from_env(o);
 	CHECK(c.provider == llm_provider::openai);
 	// the key of the other provider is not this provider's key
 	CHECK(!c.has_key());
@@ -141,83 +143,67 @@ TEST_CASE("TAU_LLM_PROVIDER wins over detection") {
 
 TEST_CASE("a provider word that names no provider leaves detection") {
 	clean_llm_env env;
-	setenv("TAU_LLM_PROVIDER", "nobody", 1);
 	setenv("ANTHROPIC_API_KEY", "sk-ant", 1);
-	CHECK(llm_config_from_env(llm_options{}).provider
-		== llm_provider::anthropic);
+	llm_options o;
+	o.provider = "nobody";
+	CHECK(llm_config_from_env(o).provider == llm_provider::anthropic);
 }
 
-TEST_CASE("a model named by the user gets no effort and no fallback") {
+TEST_CASE("a model named by the user gets no effort") {
 	clean_llm_env env;
 	setenv("ANTHROPIC_API_KEY", "sk-ant", 1);
-	setenv("TAU_LLM_MODEL", "claude-haiku-4-5", 1);
-	const llm_config c = llm_config_from_env(llm_options{});
+	llm_options o;
+	o.model = "claude-haiku-4-5";
+	const llm_config c = llm_config_from_env(o);
 	CHECK(c.model == "claude-haiku-4-5");
 	CHECK(c.effort.empty());
-	CHECK(!c.server_fallback);
+	CHECK(c.server_fallback);
 }
 
-TEST_CASE("TAU_LLM_EFFORT and TAU_LLM_FALLBACK apply to a named model") {
+TEST_CASE("an effort applies to a named model") {
 	clean_llm_env env;
 	setenv("ANTHROPIC_API_KEY", "sk-ant", 1);
-	setenv("TAU_LLM_MODEL", "claude-sonnet-5-5", 1);
-	setenv("TAU_LLM_EFFORT", "high", 1);
-	setenv("TAU_LLM_FALLBACK", "on", 1);
-	const llm_config c = llm_config_from_env(llm_options{});
+	llm_options o;
+	o.model = "claude-sonnet-5-5";
+	o.effort = "high";
+	const llm_config c = llm_config_from_env(o);
 	CHECK(c.effort == "high");
 	CHECK(c.server_fallback);
 }
 
-TEST_CASE("TAU_LLM_FALLBACK=off switches the default fallback off") {
+TEST_CASE("the fallback option off switches the fallback off") {
 	clean_llm_env env;
 	setenv("ANTHROPIC_API_KEY", "sk-ant", 1);
-	setenv("TAU_LLM_FALLBACK", "off", 1);
-	CHECK(!llm_config_from_env(llm_options{}).server_fallback);
+	llm_options o;
+	o.fallback = false;
+	CHECK(!llm_config_from_env(o).server_fallback);
 }
 
-TEST_CASE("another endpoint drops the default fallback") {
+TEST_CASE("another endpoint keeps the fallback") {
 	clean_llm_env env;
-	setenv("TAU_LLM_PROVIDER", "anthropic", 1);
-	setenv("TAU_LLM_ENDPOINT", "https://proxy.example/v1", 1);
-	const llm_config c = llm_config_from_env(llm_options{});
-	CHECK(c.provider == llm_provider::anthropic);
-	CHECK(c.effort == "low");
-	CHECK(!c.server_fallback);
-}
-
-TEST_CASE("TAU_LLM_MAX_TOKENS is read, and zero keeps the default") {
-	clean_llm_env env;
-	setenv("TAU_LLM_MAX_TOKENS", "2048", 1);
-	CHECK(llm_config_from_env(llm_options{}).max_tokens == 2048);
-	setenv("TAU_LLM_MAX_TOKENS", "0", 1);
-	CHECK(llm_config_from_env(llm_options{}).max_tokens == 16000);
-}
-
-TEST_CASE("an option wins over its environment variable") {
-	clean_llm_env env;
-	setenv("TAU_LLM_PROVIDER", "openai", 1);
-	setenv("TAU_LLM_ENDPOINT", "https://env.example/v1", 1);
-	setenv("TAU_LLM_MODEL", "env-model", 1);
-	setenv("TAU_LLM_API_KEY", "sk-env", 1);
-	setenv("TAU_LLM_EFFORT", "high", 1);
-	setenv("TAU_LLM_MAX_TOKENS", "100", 1);
-	setenv("TAU_LLM_FALLBACK", "off", 1);
 	llm_options o;
 	o.provider = "anthropic";
-	o.endpoint = "https://opt.example/v1";
-	o.model = "opt-model";
-	o.api_key = "sk-opt";
-	o.effort = "max";
-	o.max_tokens = 200;
-	o.fallback = true;
+	o.endpoint = "https://proxy.example/v1";
 	const llm_config c = llm_config_from_env(o);
 	CHECK(c.provider == llm_provider::anthropic);
-	CHECK(c.endpoint == "https://opt.example/v1");
-	CHECK(c.model == "opt-model");
-	CHECK(c.api_key == "sk-opt");
-	CHECK(c.effort == "max");
-	CHECK(c.max_tokens == 200);
+	CHECK(c.effort == "low");
 	CHECK(c.server_fallback);
+}
+
+TEST_CASE("openai gets no fallback") {
+	clean_llm_env env;
+	llm_options o;
+	o.provider = "openai";
+	CHECK(!llm_config_from_env(o).server_fallback);
+}
+
+TEST_CASE("the max tokens option is read, and zero keeps the default") {
+	clean_llm_env env;
+	llm_options o;
+	o.max_tokens = 2048;
+	CHECK(llm_config_from_env(o).max_tokens == 2048);
+	o.max_tokens = 0;
+	CHECK(llm_config_from_env(o).max_tokens == 16000);
 }
 
 TEST_CASE("a trailing slash of the endpoint is dropped") {
@@ -489,12 +475,12 @@ TEST_SUITE("nlang llm: oracle cache") {
 TEST_CASE("a query that gets no answer is not cached") {
 	clean_llm_env env;
 	const llm_options saved = nlang_llm_options();
-	const long saved_timeout = nlang_http_timeout_sec_param;
+	const size_t saved_timeout = nlang_http_timeout_sec;
 	nlang_llm_options() = {};
 	nlang_llm_options().provider = "openai";
 	nlang_llm_options().endpoint = "http://127.0.0.1:1/v1";
 	nlang_llm_options().api_key = "sk-test";
-	nlang_http_timeout_sec_param = 5;
+	nlang_http_timeout_sec = 5;
 	llm_clear_cache();
 	REQUIRE(llm_cache_size() == 0);
 
@@ -507,7 +493,7 @@ TEST_CASE("a query that gets no answer is not cached") {
 		== "it rains and it pours");
 	CHECK(llm_cache_size() == 0);
 
-	nlang_http_timeout_sec_param = saved_timeout;
+	nlang_http_timeout_sec = saved_timeout;
 	nlang_llm_options() = saved;
 }
 

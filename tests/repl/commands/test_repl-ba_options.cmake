@@ -29,11 +29,10 @@ add_repl_test(ba_options-change_drops_verdict_memo
 	"sat ${_defelim_spec}. set bv-definitional-elimination off. sat ${_defelim_spec}"
 	"reached fixpoint.*: F.*reached fixpoint.*: F")
 
-# nlang's LLM options. Each reads option > environment > default, so every
-# case blanks the variables a developer's shell may export.
-set(_llm_env TAU_LLM_PROVIDER= TAU_LLM_ENDPOINT= TAU_LLM_MODEL=
-	TAU_LLM_API_KEY= OPENAI_API_KEY= ANTHROPIC_API_KEY= TAU_LLM_EFFORT=
-	TAU_LLM_MAX_TOKENS= TAU_LLM_FALLBACK=)
+# nlang's LLM options. The environment writes each one at start, so every
+# case blanks the text variables a developer's shell may export.
+set(_llm_env TAU_NLANG_PROVIDER= TAU_NLANG_ENDPOINT= TAU_NLANG_MODEL=
+	TAU_NLANG_API_KEY= OPENAI_API_KEY= ANTHROPIC_API_KEY= TAU_NLANG_EFFORT=)
 add_repl_test(ba_options-nlang_provider_default "get nlang-provider"
 	"nlang-provider: openai" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_provider_set "set nlang-provider anthropic"
@@ -63,13 +62,13 @@ add_repl_test(ba_options-nlang_model_with_dashes
 add_repl_test(ba_options-nlang_model_default_is_none "get nlang-model"
 	"nlang-model: \\(none\\)" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_env_is_the_fallback "get nlang-model"
-	"nlang-model: env-model" NO_TRACE ENV ${_llm_env} TAU_LLM_MODEL=env-model)
+	"nlang-model: env-model" NO_TRACE ENV ${_llm_env} TAU_NLANG_MODEL=env-model)
 add_repl_test(ba_options-nlang_model_flag_beats_env "get nlang-model"
 	"nlang-model: flag-model" NO_TRACE
-	ENV ${_llm_env} TAU_LLM_MODEL=env-model FLAGS --nlang-model flag-model)
+	ENV ${_llm_env} TAU_NLANG_MODEL=env-model FLAGS --nlang-model flag-model)
 add_repl_test(ba_options-nlang_named_model_gets_no_effort
 	"set nlang-provider anthropic. set nlang-model claude-haiku-4-5. get nlang-effort. get nlang-fallback"
-	"nlang-effort: \\(none\\)[\r\n].*nlang-fallback: off" NO_TRACE
+	"nlang-effort: \\(none\\)[\r\n].*nlang-fallback: on" NO_TRACE
 	ENV ${_llm_env})
 add_repl_test(ba_options-nlang_effort_bad_word "set nlang-effort extreme"
 	"Invalid value" NO_FAIL_REGEX NO_TRACE ENV ${_llm_env})
@@ -84,7 +83,7 @@ add_repl_test(ba_options-nlang_api_key_is_masked
 	FAIL_REGEX "nlang-[a-z-]+: [^\r\n]*sk-secret_1" ENV ${_llm_env})
 add_repl_test(ba_options-nlang_api_key_env_is_masked "get nlang-api-key"
 	"nlang-api-key: set" NO_TRACE FAIL_REGEX "sk-secret_2"
-	ENV ${_llm_env} TAU_LLM_API_KEY=sk-secret_2)
+	ENV ${_llm_env} TAU_NLANG_API_KEY=sk-secret_2)
 add_repl_test(ba_options-nlang_api_key_flag "get nlang-api-key"
 	"nlang-api-key: set" NO_TRACE FAIL_REGEX "sk-secret_3"
 	ENV ${_llm_env} FLAGS --nlang-api-key sk-secret_3)
@@ -99,19 +98,21 @@ add_repl_test(ba_options-nlang_max_tokens_default "get nlang-max-tokens"
 	"nlang-max-tokens: *16000" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_max_tokens_env_is_the_fallback
 	"get nlang-max-tokens" "nlang-max-tokens: *2048" NO_TRACE
-	ENV ${_llm_env} TAU_LLM_MAX_TOKENS=2048)
+	ENV ${_llm_env} TAU_NLANG_MAX_TOKENS=2048)
 add_repl_test(ba_options-nlang_fallback_disable
 	"set nlang-provider anthropic. disable nlang-fallback"
 	"nlang-fallback: off" NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_fallback_env
 	"set nlang-provider anthropic. get nlang-fallback"
-	"nlang-fallback: off" NO_TRACE ENV ${_llm_env} TAU_LLM_FALLBACK=off)
-# A flag the command line leaves alone is not written back, so the default
-# still follows a model named later.
-add_repl_test(ba_options-nlang_fallback_follows_a_later_model
+	"nlang-fallback: off" NO_TRACE ENV ${_llm_env} TAU_NLANG_FALLBACK=off)
+# The fallback is on by default, also for a model named later.
+add_repl_test(ba_options-nlang_fallback_on_for_a_named_model
 	"get nlang-fallback. set nlang-model claude-haiku-4-5. get nlang-fallback"
-	"nlang-fallback: on[\r\n].*nlang-model: claude-haiku-4-5[\r\n].*nlang-fallback: off"
+	"nlang-fallback: on[\r\n].*nlang-model: claude-haiku-4-5[\r\n].*nlang-fallback: on"
 	NO_TRACE ENV ${_llm_env} FLAGS --nlang-provider anthropic)
+# A provider the variable names must exist.
+add_env_error_test(ba_options-nlang_provider_env_bad_word
+	TAU_NLANG_PROVIDER=nobody REQUIRES nlang)
 add_repl_test(ba_options-nlang_help_lists_the_text_options "help set"
 	"nlang-provider +LLM oracle API" NO_FAIL_REGEX NO_TRACE REQUIRES nlang)
 # A flag given on the command line is written even when it repeats the value
@@ -134,8 +135,8 @@ add_repl_test(ba_options-nlang_model_quoted_with_dots
 	NO_TRACE ENV ${_llm_env})
 add_repl_test(ba_options-nlang_model_cleared_by_empty_quotes
 	"set nlang-model some-model. set nlang-model \\\"\\\""
-	"nlang-model: some-model[\r\n].*nlang-model: env-model"
-	NO_TRACE ENV ${_llm_env} TAU_LLM_MODEL=env-model)
+	"nlang-model: some-model[\r\n].*nlang-model: \\(none\\)"
+	NO_TRACE ENV ${_llm_env} TAU_NLANG_MODEL=env-model)
 add_repl_test(ba_options-nlang_api_key_given_keeps_the_detected_provider
 	"set nlang-api-key sk-secret_4. get nlang-provider"
 	"nlang-provider: anthropic" NO_TRACE FAIL_REGEX "nlang-[a-z-]+: [^\r\n]*sk-secret_4"

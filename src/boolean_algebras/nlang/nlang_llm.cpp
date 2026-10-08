@@ -4,7 +4,6 @@
 #include <sstream>
 
 #include "boolean_algebras/nlang/nlang_llm.h"
-#include "env_limits.h"
 #include "format/json/json.h"
 
 namespace idni::tau_lang {
@@ -38,21 +37,6 @@ namespace {
 std::string env_text(const char* var) {
 	const char* v = std::getenv(var);
 	return v ? v : "";
-}
-
-std::string option_or_env(const std::optional<std::string>& opt,
-	const char* var)
-{
-	return opt && !opt->empty() ? *opt : env_text(var);
-}
-
-std::optional<bool> env_switch(const char* var) {
-	const std::string v = env_text(var);
-	for (const char* on : { "1", "on", "true", "yes" })
-		if (v == on) return true;
-	for (const char* off : { "0", "off", "false", "no" })
-		if (v == off) return false;
-	return std::nullopt;
 }
 
 std::string quoted(std::string_view text) {
@@ -146,19 +130,16 @@ std::string extract_anthropic(const json::value& reply, std::string* why) {
 
 llm_config llm_config_from_env(const llm_options& opts) {
 	llm_config c;
-	c.endpoint = option_or_env(opts.endpoint, "TAU_LLM_ENDPOINT");
+	c.endpoint = opts.endpoint;
 	while (!c.endpoint.empty() && c.endpoint.back() == '/')
 		c.endpoint.pop_back();
-	const std::string own_key = opts.api_key ? *opts.api_key : "";
-	const std::string tau_key = env_text("TAU_LLM_API_KEY");
 
-	auto provider = llm_provider_from_name(
-		option_or_env(opts.provider, "TAU_LLM_PROVIDER"));
+	auto provider = llm_provider_from_name(opts.provider);
 	if (!provider) {
 		const bool anthropic_host =
 			c.endpoint.find("anthropic") != std::string::npos;
 		const bool only_anthropic_key =
-			tau_key.empty() && env_text("OPENAI_API_KEY").empty()
+			env_text("OPENAI_API_KEY").empty()
 			&& !env_text("ANTHROPIC_API_KEY").empty();
 		provider = anthropic_host || (c.endpoint.empty()
 				&& only_anthropic_key)
@@ -167,31 +148,24 @@ llm_config llm_config_from_env(const llm_options& opts) {
 	c.provider = *provider;
 	const bool anthropic = c.provider == llm_provider::anthropic;
 
-	c.api_key = !own_key.empty() ? own_key : !tau_key.empty() ? tau_key
+	c.api_key = !opts.api_key.empty() ? opts.api_key
 		: env_text(anthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY");
 
-	const bool default_endpoint = c.endpoint.empty();
-	if (default_endpoint) c.endpoint = anthropic
+	if (c.endpoint.empty()) c.endpoint = anthropic
 		? llm_default_anthropic_endpoint : llm_default_openai_endpoint;
 
-	c.model = option_or_env(opts.model, "TAU_LLM_MODEL");
+	c.model = opts.model;
 	if (c.model.empty() && anthropic) c.model = llm_default_anthropic_model;
 	const bool default_model = anthropic
 		&& c.model == llm_default_anthropic_model;
 
-	c.effort = option_or_env(opts.effort, "TAU_LLM_EFFORT");
+	c.effort = opts.effort;
 	if (!llm_effort_is_valid(c.effort))
 		c.effort = default_model ? "low" : "";
 
-	c.max_tokens = opts.max_tokens ? *opts.max_tokens
-		: env_limit_count("TAU_LLM_MAX_TOKENS", llm_default_max_tokens);
-	if (c.max_tokens == 0) c.max_tokens = llm_default_max_tokens;
-
-	if (opts.fallback) c.server_fallback = *opts.fallback;
-	else if (auto f = env_switch("TAU_LLM_FALLBACK"); f)
-		c.server_fallback = *f;
-	else c.server_fallback = default_model && default_endpoint;
-	if (!anthropic) c.server_fallback = false;
+	c.max_tokens = opts.max_tokens ? opts.max_tokens
+		: llm_default_max_tokens;
+	c.server_fallback = anthropic && opts.fallback;
 	return c;
 }
 
