@@ -11,7 +11,7 @@
 // known-good ground truth.
 //
 // The native binary path comes from TAU_NATIVE_BIN, defaulting to
-// build/native-sbftau/tau (see native.js). It must exist and run --
+// build/release/tau (see native.js). It must exist and run --
 // silently skipping it would recreate the exact blind spot this test
 // exists to close.
 //

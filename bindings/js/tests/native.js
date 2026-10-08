@@ -8,16 +8,15 @@ const fs = require('fs');
 const path = require('path');
 
 const NATIVE_BIN = process.env.TAU_NATIVE_BIN
-	|| path.join(__dirname, '..', '..', '..', 'build', 'native-sbftau', 'tau');
+	|| path.join(__dirname, '..', '..', '..', 'build', 'release', 'tau');
 
 function checkNativeBinary() {
 	if (!fs.existsSync(NATIVE_BIN)) {
 		throw new Error(
 			`native tau binary not found at ${NATIVE_BIN}\n`
-			+ 'Build it with the same pack the wasm module uses:\n'
-			+ '  cmake -S . -B build/native-sbftau -DTAU_BAS=sbf,tau -DTAU_BUILD_EXECUTABLE=ON\n'
-			+ '  cmake --build build/native-sbftau\n'
-			+ 'or point TAU_NATIVE_BIN at an existing sbf,tau build of tau.');
+			+ 'Build it with:\n'
+			+ '  ./dev preset release-tau\n'
+			+ 'or point TAU_NATIVE_BIN at an existing build of tau.');
 	}
 	const probe = spawnSync(NATIVE_BIN, ['--version'], { encoding: 'utf8', timeout: 10000 });
 	if (probe.status !== 0) {
