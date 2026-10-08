@@ -17,7 +17,6 @@ set(TAU_CORE_HEADERS
 	defs.h             # common macro and types definitions
 	tau_string_hash.h  # string hash of names and constants
 	logging.h          # logging and its macros
-	env_limits.h       # environment fallback of a numeric runtime limit
 	reset_hooks.h      # caches api::reset empties
 	tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,

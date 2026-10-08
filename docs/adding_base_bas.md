@@ -291,13 +291,10 @@ differs from the one in force, and a `count` or `text` option only when its flag
 command line, so a getter is free to resolve an environment fallback of its
 own and the CLI will not shadow it with the option's default. Every count
 option has one, named `TAU_<FAMILY>_<NAME>` with dashes as underscores
-(`bv-defelim-max-atoms` reads `TAU_BV_DEFELIM_MAX_ATOMS`). The shortest way is
-to store the option in an `env_limit<size_t>` (`env_limits.h`): the setter
-assigns it, the getter reads it, and it resolves option > environment >
-default like core's own limits do (`bv_defelim_max_atoms` is the example).
-A getter that must re-read the variable on every call reads it with
-`env_limit_count` instead and keeps the setter writing a parameter it prefers
-when set (`qlt-t3-cap`, `TAU_QLT_T3_CAP`). Name the variable and the default
+(`bv-defelim-max-atoms` reads `TAU_BV_DEFELIM_MAX_ATOMS`). Store the option
+in a plain field and bind it in `bind_options()`: `load_env("TAU_")` writes
+the field once at start, and the getter and the setter read and write the
+same field (`bv_defelim_max_atoms` is the example). Name the variable and the default
 in the help string: the CLI registers the option with an empty default, so
 `--help` shows the help string alone.
 

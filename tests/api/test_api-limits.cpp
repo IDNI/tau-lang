@@ -776,37 +776,6 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_data_game_max_combinations_param = s2;
 		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
-
-	TEST_CASE("an env_limit resolves option, environment, default") {
-		setenv("TAU_TEST_ENV_LIMIT_A", "17", 1);
-		env_limit<size_t> a{ "TAU_TEST_ENV_LIMIT_A", 5 };
-		CHECK( a.get() == 17 );
-		a = 3;
-		CHECK( a.get() == 3 );
-		a.unset();
-		CHECK( a.get() == 17 );
-		unsetenv("TAU_TEST_ENV_LIMIT_A");
-		env_limit<size_t> b{ "TAU_TEST_ENV_LIMIT_B", 5 };
-		CHECK( b.get() == 5 );
-		setenv("TAU_TEST_ENV_LIMIT_C", "abc", 1);
-		env_limit<size_t> c{ "TAU_TEST_ENV_LIMIT_C", 5 };
-		CHECK( c.get() == 5 );
-		setenv("TAU_TEST_ENV_LIMIT_D", "0", 1);
-		env_limit<size_t> d{ "TAU_TEST_ENV_LIMIT_D", 5,
-			env_zero::unlimited };
-		CHECK( d.get() == std::numeric_limits<size_t>::max() );
-		env_limit<size_t> e{ "TAU_TEST_ENV_LIMIT_D", 5,
-			env_zero::keep_default };
-		CHECK( e.get() == 5 );
-		env_limit<size_t> f{ "TAU_TEST_ENV_LIMIT_D", 5 };
-		CHECK( f.get() == 0 );
-		setenv("TAU_TEST_ENV_LIMIT_E", "2.5", 1);
-		env_limit<double> g{ "TAU_TEST_ENV_LIMIT_E", 1.5 };
-		CHECK( g.get() == doctest::Approx(2.5) );
-		for (const char* v : { "TAU_TEST_ENV_LIMIT_C",
-			"TAU_TEST_ENV_LIMIT_D", "TAU_TEST_ENV_LIMIT_E" })
-				unsetenv(v);
-	}
 	// Every count setter keeps the count a valid long.
 	TEST_CASE("count setters saturate a value above LONG_MAX") {
 		constexpr long lmax = std::numeric_limits<long>::max();
