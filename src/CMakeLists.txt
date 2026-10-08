@@ -280,6 +280,8 @@ if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
 		"${TAU_SDK_DIR}/cmake/tau-shared-emscripten.cmake" COPYONLY)
 	configure_file("${PROJECT_SOURCE_DIR}/cmake/tau-shared-resolve.cmake"
 		"${TAU_SDK_DIR}/cmake/tau-shared-resolve.cmake" COPYONLY)
+	configure_file("${PROJECT_SOURCE_DIR}/cmake/tau-clang-rt-builtins.cmake"
+		"${TAU_SDK_DIR}/cmake/tau-clang-rt-builtins.cmake" COPYONLY)
 	# The artifact presets, their include and their toolchains travel inside
 	# tau (cmake/tau_bas.cmake), so only the platform map an SDK consumer reads
 	# at compile time is written here.
@@ -399,6 +401,7 @@ if(TAU_BUILD_STATIC_LIBRARY AND TAU_DEPS_FROM_STORE)
 		"${PROJECT_SOURCE_DIR}/cmake/tau-compile.cmake"
 		"${PROJECT_SOURCE_DIR}/cmake/tau-shared-emscripten.cmake"
 		"${PROJECT_SOURCE_DIR}/cmake/tau-shared-resolve.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-clang-rt-builtins.cmake"
 		DESTINATION "${TAU_SDK_CMAKE_DIR}/cmake"
 		COMPONENT "Library")
 	# The platform map a consumer reads at compile time, and the platform and
@@ -463,6 +466,11 @@ add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_BA_LINK_LIBS})
+# The shared library skips target_setup, so it links the builtins itself.
+if(TAU_CLANG_RT_BUILTINS)
+	target_link_libraries(${TAU_SHARED_LIB_NAME}
+		"$<BUILD_INTERFACE:${TAU_CLANG_RT_BUILTINS}>")
+endif()
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
