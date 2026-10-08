@@ -21,6 +21,10 @@ add_repl_test(ba_options-defelim_count "set bv-defelim-max-atoms 5. get bv-defel
 add_repl_test(ba_options-defelim_rounds_unlimited "set bv-defelim-max-rounds 0. get bv-defelim-max-rounds"
 	"bv-defelim-max-rounds: *unlimited")
 
+# 0 decision pins keep no rows, so the option reads and takes `none`.
+add_repl_test(ba_options-decision_pins_none "set ba-decision-pins 0. set ba-decision-pins 7. set ba-decision-pins none"
+	"ba-decision-pins: none[\r\n].*ba-decision-pins: 7[\r\n].*ba-decision-pins: none")
+
 # The verdict memo is keyed on the formula, so changing a BA-declared option
 # between two queries of the same spec must drop it: the second `sat` is
 # decided again (its temporal normalization reports its fixpoint again)
