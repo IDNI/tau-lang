@@ -1032,10 +1032,9 @@ default.
 The table of the [`nlang` section](#nlang--natural-language-boolean-algebra-experimental)
 lists each with its environment variable and its default.
 
-**Other environment variables.** One Boolean switch keeps an environment
-fallback beside its option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
-value other than `0` enables, `0` disables; read once, then it overrides
-`--ba-component-factoring` / `set factoring`; the decision by components
+**Other environment variables.** `TAU_BA_COMPONENT_FACTORING` sets the
+option `ba-component-factoring` at start, and `--ba-component-factoring` /
+`set factoring` write it later (the decision by components
 is taken on a formula of `always` clauses that read their streams at the
 current step and at steps back, and declined where a unit refers to
 absolute time, through a `sometimes` clause, a stream read at a fixed time

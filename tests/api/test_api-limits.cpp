@@ -55,9 +55,9 @@ TEST_SUITE("Tau API - runtime limits") {
 		}
 		const size_t saved_pins = ba_decision_pins;
 		tau_api::set_ba_decision_pins(77);
-		CHECK( ba_decision_pins.get() == 77 );
+		CHECK( ba_decision_pins == 77 );
 		tau_api::set_ba_decision_pins(0);
-		CHECK( ba_decision_pins.get() == 0 );
+		CHECK( ba_decision_pins == 0 );
 		ba_decision_pins = saved_pins;
 	}
 

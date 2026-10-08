@@ -466,14 +466,14 @@ struct api {
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable support-component factoring of the Tau-BA
-	/// constant/valid tests (tau_ba.tmpl.h). On by default. The environment
-	/// variable `TAU_BA_COMPONENT_FACTORING` overrides it in both
-	/// directions (`0` disables, any other value enables). A pack without
-	/// tau ignores it.
+	/// constant/valid tests (tau_ba.tmpl.h). On by default, and the option
+	/// `ba-component-factoring` writes the same field. A pack without tau
+	/// ignores it.
 	static void set_ba_component_factoring(bool state);
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
 	/// interpreter's sweep, oldest released first (0 = no pinning;
-	/// tau_ba.h). Default 4096; environment fallback `TAU_BA_DECISION_PINS`.
+	/// tau_ba.h). Default 4096; the option `ba-decision-pins` writes the
+	/// same field.
 	/// A pack without tau ignores it.
 	static void set_ba_decision_pins(size_t n);
 	/**
@@ -643,7 +643,7 @@ struct api {
 	/// The effective BDD node cap of the variable-dependence test
 	/// (default 65536, 0 = unlimited).
 	static size_t get_bf_dependence_max_nodes();
-	/// The effective Tau-BA decision pin cap (`TAU_BA_DECISION_PINS`; default
+	/// The Tau-BA decision pin cap (`ba-decision-pins`; default
 	/// 4096, 0 = no pinning; 0 in a pack without tau).
 	static size_t get_ba_decision_pins();
 

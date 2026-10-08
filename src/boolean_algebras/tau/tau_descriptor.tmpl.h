@@ -10,6 +10,7 @@
 
 #include "boolean_algebras/ba_descriptor.h"
 #include "boolean_algebras/ba_pack_traits.h"
+#include "boolean_algebras/tau/tau_ba_options.h"
 
 namespace idni::tau_lang {
 
@@ -142,15 +143,22 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		idni::tau_lang::ba_decision_pins = n;
 	}
 
-	/// Read the effective cap on pinned decided rows, owned by tau_ba.h:
-	/// the option, else `TAU_BA_DECISION_PINS`, else 4096; 0 pins nothing.
+	/// Read the cap on pinned decided rows, owned by tau_ba.h; 0 pins
+	/// nothing.
 	static size_t ba_decision_pins() {
 		return idni::tau_lang::ba_decision_pins;
 	}
 
 	/// Read tau's component-factoring switch, owned by tau_ba.h.
 	static bool ba_component_factoring_enabled() {
-		return idni::tau_lang::ba_component_factoring_enabled();
+		return idni::tau_lang::ba_component_factoring;
+	}
+
+	/// The tau algebra's options, each named `ba-<name>`.
+	static const option_set& declared_options() { return tau_ba_option_set; }
+	/// Binds the tau algebra's options, declared by the pack, to its fields.
+	static result<void> bind_options(options_repository& repo) {
+		return tau_ba_bind_options<node_t>(repo);
 	}
 };
 

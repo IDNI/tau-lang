@@ -264,8 +264,8 @@ concept ba_has_decision_pins = ba_has_descriptor_v<Node, BA>
 			-> std::convertible_to<size_t>; };
 
 /// @brief @p BA has options. `declared_options()` gives the set, each name
-/// `<type_name>-<name>`. `bind_options(repo)` binds each option to its
-/// field after the pack declares the set.
+/// `<prefix>-<name>` (see @ref ba_option_prefix). `bind_options(repo)` binds
+/// each option to its field after the pack declares the set.
 template <typename Node, typename BA>
 concept ba_has_options = ba_has_descriptor_v<Node, BA>
 	&& requires(options_repository& repo) {

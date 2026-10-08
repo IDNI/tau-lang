@@ -8,7 +8,6 @@
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
 
-#include <cstdlib>
 #include <deque>
 
 #undef LOG_CHANNEL_NAME
@@ -278,20 +277,6 @@ static int factored_tau_units(tref fm, trefs& units) {
 	return 0;
 }
 
-/// Whether component factoring of is_zero/is_one is on. A non-empty
-/// environment variable TAU_BA_COMPONENT_FACTORING decides alone (off for
-/// exactly "0", on otherwise); unset or empty, the `ba_component_factoring`
-/// flag (tau_ba.h) decides. The environment is read once and latched for the
-/// lifetime of the process; the flag is re-read on every call.
-inline bool ba_component_factoring_enabled() {
-	static const std::optional<bool> env = []() -> std::optional<bool> {
-		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
-		if (!v || !*v) return std::nullopt;
-		return !(v[0] == '0' && v[1] == '\0');
-	}();
-	return env ? *env : ba_component_factoring;
-}
-
 // In the body of an `always` unit: a constraint on the time point, a stream
 // read at a fixed time point, or a temporal operator of its own.
 template <typename node>
@@ -477,7 +462,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 	return cached_tau_ba_predicate(*this, cache,
 		[](tref normalized) -> result<bool> {
 			result<bool> r;
-			if (ba_component_factoring_enabled()) {
+			if (ba_component_factoring) {
 				auto f = r.merge_take(
 					factored_tau_sat<node>(normalized));
 				if (!f) return r;
@@ -498,7 +483,7 @@ result<bool> tau_ba<BAs...>::is_one() const {
 	return cached_tau_ba_predicate(*this, cache,
 		[](tref normalized) -> result<bool> {
 			result<bool> r;
-			if (ba_component_factoring_enabled()) {
+			if (ba_component_factoring) {
 				auto f = r.merge_take(
 					factored_tau_valid<node>(normalized));
 				if (!f) return r;

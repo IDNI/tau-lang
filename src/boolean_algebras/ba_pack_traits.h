@@ -462,8 +462,8 @@ void pack_set_ba_decision_pins(size_t n) {
  * @brief Read the cap on pinned decided rows, owned by tau_ba.h.
  *
  * Optional: a pack without tau pins nothing, so 0 is the answer.
- * @return The cap of the last pack member declaring one (the option, else
- * `TAU_BA_DECISION_PINS`, else 4096 for tau), or 0 when none declares it.
+ * @return The cap of the last pack member declaring one (4096 by default
+ * for tau), or 0 when none declares it.
  */
 template <typename Node>
 size_t pack_ba_decision_pins() {
@@ -475,12 +475,20 @@ size_t pack_ba_decision_pins() {
 	return n;
 }
 
+/// The prefix of every option name of @p BA: its `type_name`, except `ba`
+/// for the tau algebra, whose `tau-*` names give `TAU_TAU_*` variables.
+template <typename Node, typename BA>
+std::string ba_option_prefix() {
+	if constexpr (is_tau_ba_v<BA>) return "ba";
+	else return ba_descriptor<BA, Node>::type_name;
+}
+
 /**
  * @brief Declare the options of every BA that has some and bind them, in
  * pack order.
  *
- * Each option must be named `<type_name>-<name>`, so one algebra cannot
- * take a name of another or of core.
+ * Each option must be named `<prefix>-<name>` (@ref ba_option_prefix), so
+ * one algebra cannot take a name of another or of core.
  * Stops at the first BA that fails and carries its report.
  */
 template <typename Node>
@@ -491,15 +499,16 @@ result<void> pack_bind_options(options_repository& repo) {
 			using desc = ba_descriptor<BA, Node>;
 			if (!r.has_value()) return;
 			const std::string type = desc::type_name;
+			const std::string prefix = ba_option_prefix<Node, BA>();
 			const option_set& set = desc::declared_options();
 			for (const auto& spec : set.options)
-				if (!spec.name.starts_with(type + "-")) {
+				if (!spec.name.starts_with(prefix + "-")) {
 					r.error(code::invalid_argument,
 						messages::ba_option_without_type_prefix,
 						{ { label::name, spec.name },
 							{ label::type_name, type },
 							{ label::expected,
-								type + "-" + spec.name } });
+								prefix + "-" + spec.name } });
 					return;
 				}
 			if (r.merge_ok(repo.declare(set)))
