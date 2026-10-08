@@ -33,6 +33,12 @@ instance_writer::instance_writer(const program& p, unsigned t,
 
 std::string instance_writer::at(stream_id s, unsigned back) {
 	const program::stream& st = p.streams.at(s);
+	if (st.r == program::role::parameter) {
+		if (back != 0) throw std::logic_error("parameter " + st.name
+			+ " read with a step offset");
+		used[s][0] = 1;
+		return st.name + p.type;
+	}
 	if (back > t) throw std::logic_error(st.name + "[t-"
 		+ std::to_string(back) + "] read at step "
 		+ std::to_string(t) + ", before step 0");
@@ -74,34 +80,50 @@ program::program(unsigned width) : type(":bv[" + std::to_string(width) + "]") {
 	if (width == 0) throw std::invalid_argument("bv width must be at least 1");
 }
 
-stream_id program::add(const std::string& name, bool is_input) {
+stream_id program::add(const std::string& name, role r) {
 	check_name(name);
 	for (const stream& st : streams)
 		if (st.name == name) throw std::invalid_argument(
 			"stream '" + name + "' declared twice");
-	streams.push_back({ name, is_input });
+	streams.push_back({ name, r });
 	return streams.size() - 1;
 }
 
-stream_id program::input(const std::string& name) { return add(name, true); }
+stream_id program::input(const std::string& name) {
+	return add(name, role::input);
+}
 
-stream_id program::output(const std::string& name) { return add(name, false); }
+stream_id program::output(const std::string& name) {
+	return add(name, role::output);
+}
+
+stream_id program::parameter(const std::string& name) {
+	return add(name, role::parameter);
+}
 
 void program::always(unsigned lookback, rule_body body) {
-	parts.push_back({ lookback, std::move(body) });
+	parts.push_back({ lookback, std::move(body), std::nullopt });
+}
+
+void program::at_step(unsigned step, rule_body body) {
+	parts.push_back({ 0, std::move(body), step });
 }
 
 std::string program::formula(unsigned T) const {
+	for (const part& r : parts)
+		if (r.step && *r.step > T) throw std::invalid_argument(
+			"a constraint at step " + std::to_string(*r.step)
+			+ " lies beyond step " + std::to_string(T));
 	std::vector<std::vector<char>> used(streams.size(),
 		std::vector<char>(T + 1, 0));
 	std::unordered_map<std::string, unsigned> binders;
 	std::string matrix;
 	for (unsigned t = 0; t <= T; ++t)
 		for (const part& r : parts) {
-			if (r.lookback > t) continue;
+			if (r.step ? *r.step != t : r.lookback > t) continue;
 			instance_writer w(*this, t, used, binders);
 			const std::string instance = r.body(w);
-			if (w.deepest != r.lookback) throw std::logic_error(
+			if (!r.step && w.deepest != r.lookback) throw std::logic_error(
 				"a part declared with lookback "
 				+ std::to_string(r.lookback) + " reads back to t-"
 				+ std::to_string(w.deepest));
@@ -114,22 +136,25 @@ std::string program::formula(unsigned T) const {
 		"no part has an instance up to step " + std::to_string(T));
 
 	std::string prefix;
-	auto block = [&](const char* quantifier, bool inputs, unsigned u) {
+	auto block = [&](const char* quantifier, role r, unsigned u) {
 		bool first = true;
 		for (stream_id s = 0; s < streams.size(); ++s) {
-			if (streams[s].is_input != inputs || !used[s][u]) continue;
+			if (streams[s].r != r || !used[s][u]) continue;
 			prefix += first ? quantifier : ",";
 			prefix += ' ';
 			prefix += streams[s].name;
-			prefix += '_';
-			prefix += std::to_string(u);
+			if (r != role::parameter) {
+				prefix += '_';
+				prefix += std::to_string(u);
+			}
 			first = false;
 		}
 		if (!first) prefix += ' ';
 	};
+	block("all", role::parameter, 0);
 	for (unsigned u = 0; u <= T; ++u) {
-		block("all", true, u);
-		block("ex", false, u);
+		block("all", role::input, u);
+		block("ex", role::output, u);
 	}
 	return prefix + "(" + matrix + ").";
 }

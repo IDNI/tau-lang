@@ -47,6 +47,10 @@ std::vector<instance> family_8(const grid& g);
 std::vector<instance> family_1(const grid& g);
 /// Family 2, pigeonhole; knob `k` (holes).
 std::vector<instance> family_2(const grid& g);
+/// Family 4a, generated decision-tree programs; knobs `config` (a default
+/// grid row), `inputs`, `outputs`, `lookback`, `lags`, `depth`, `params` and
+/// `sabotage`.
+std::vector<instance> family_4a(const grid& g);
 
 } // namespace bv_bench
 

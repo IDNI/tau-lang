@@ -34,6 +34,7 @@ add_executable(bv_no_arith_bench
 	family_8.cpp
 	family_1.cpp
 	family_2.cpp
+	family_4a.cpp
 )
 target_setup(bv_no_arith_bench)
 target_include_directories(bv_no_arith_bench PRIVATE "${TAU_ROOT}/tests")

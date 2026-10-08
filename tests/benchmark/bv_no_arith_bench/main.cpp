@@ -42,7 +42,15 @@ const std::vector<family_entry> families = {
 	{ "1",  "width thresholds",
 		{ { "k", "W1 outputs" }, { "m", "W2 lookback" } }, family_1 },
 	{ "2",  "pigeonhole", { { "k", "holes" } }, family_2 },
-	{ "4a", "sim generator port",  {}, nullptr },
+	{ "4a", "sim generator port",
+		{ { "config", "grid row: 0-3 small; 4-6 medium; 7-9 practical" },
+		  { "inputs", "input streams" }, { "outputs", "output streams" },
+		  { "lookback", "largest lag drawn" },
+		  { "lags", "lags drawn from 1..lookback" },
+		  { "depth", "decision-tree depth" },
+		  { "params", "free parameters" },
+		  { "sabotage", "0 none (T); 1 input (F); 2 conflict (F)" } },
+		family_4a },
 	{ "4b", "templates",           {}, nullptr },
 };
 
