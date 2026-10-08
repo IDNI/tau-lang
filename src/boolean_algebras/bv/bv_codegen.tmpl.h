@@ -81,7 +81,8 @@ static std::optional<bv> bv_single_equality_constant(tref var, tref conj,
 template <NodeType node>
 static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	using tau = tree<node>;
-	// TODO (HIGH) dropped error: get_ba_type_tree's report -- ba_has_codegen_witness fixes this member to std::optional<std::string>.
+	// nullopt is not lost: cpp_codegen turns it into an unsupported_operation
+	// error naming the output. A var reaching here is typed by inference.
 	auto type_tree_r = tau::get(var).get_ba_type_tree();
 	if (!type_tree_r.has_value()) return std::nullopt;
 	auto width_r = get_bv_size<node>(type_tree_r.value());
@@ -90,7 +91,8 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	if (auto value = bv_single_equality_constant<node>(var, conj,
 		width); value)
 		return bv_witness_expr<node>(*value, width);
-	// TODO (HIGH) dropped error: solve_bv's report -- ba_has_codegen_witness fixes this member to std::optional<std::string>.
+	// solve_bv fails only on an internal inconsistency of its translation;
+	// the caller still reports the declined witness as an error.
 	auto sol_r = solve_bv<node>(conj);
 	if (!sol_r.has_value() || !sol_r.value()) return std::nullopt;
 	auto& sol = sol_r.value();

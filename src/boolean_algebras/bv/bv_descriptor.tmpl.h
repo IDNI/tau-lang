@@ -141,20 +141,23 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	/**
 	 * @brief Width-dependent: the all-ones bitvector of this type's width,
-	 * in decimal; empty when @p type_tree carries no width.
+	 * in decimal.
+	 * @pre @p type_tree carries a width; empty otherwise.
 	 */
 	static std::string literal_one(tref type_tree) {
 		auto width = get_bv_size<node_t>(type_tree);
-		// TODO (HIGH) dropped error: get_bv_size's report -- ba_descriptor_complete fixes this member to std::string.
+		// The type carries a width: inference rejects a widthless `bv`, `bv[0]`
+		// and a width past the maximum before any capability sees the type.
+		DBG(assert(width.has_value());)
 		if (!width.has_value()) return {};
 		return make_bitvector_top_elem(width.value()).getBitVectorValue(10);
 	}
 
-	/// The all-zeros bitvector of @p type_tree's width, in decimal; empty
-	/// when the type carries no width.
+	/// The all-zeros bitvector of @p type_tree's width, in decimal; the same
+	/// precondition as literal_one.
 	static std::string literal_zero(tref type_tree) {
 		auto width = get_bv_size<node_t>(type_tree);
-		// TODO (HIGH) dropped error: get_bv_size's report -- ba_descriptor_complete fixes this member to std::string.
+		DBG(assert(width.has_value());)
 		if (!width.has_value()) return {};
 		return make_bitvector_bottom_elem(width.value()).getBitVectorValue(10);
 	}
@@ -217,11 +220,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * answer" -- never "unsatisfiable".
 	 */
 	// Exact arithmetic must see the widened atoms before cvc5 does.
+	// A probe: every caller of pack_sat_status reads nullopt as "decide it
+	// the long way", and that way runs solve(), which reports a widening
+	// refusal (bv-max-width) or a translation error. Answering undecided
+	// here loses no failure the user can see.
 	static std::optional<bool> sat_status(tref form) {
-		// TODO (HIGH) dropped error: widen_arithmetic's report -- sat_status returns a bare optional, which cannot carry it.
 		form = widen_arithmetic(form).value_or(nullptr);
 		if (!form) return std::nullopt;
-		// TODO (HIGH) dropped error: bv_formula_sat_status's report -- sat_status returns a bare optional, which cannot carry it.
 		auto status = bv_formula_sat_status<node_t>(form).value_or(std::nullopt);
 		if (status == bv_sat_status::sat) return true;
 		if (status == bv_sat_status::unsat) return false;
@@ -586,10 +591,11 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 *
 	 * The width comes from the type, so callers name a value and a type and
 	 * never a bitwidth. nullptr when @p value does not fit the width.
+	 * @pre @p ba_type carries a width, as for literal_one.
 	 */
 	static tref value_constant(size_t ba_type, size_t value) {
 		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
-		// TODO (HIGH) dropped error: get_bv_size's report -- ba_has_value_constant fixes this member to tref.
+		DBG(assert(width.has_value());)
 		if (!width.has_value()) return nullptr;
 		if (!bitvector_value_fits(width.value(), value)) return nullptr;
 		return tau::get(tau::bf, { tau::get_ba_constant(
@@ -630,10 +636,13 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return out;
 	}
 
-	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
+	/**
+	 * @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant.
+	 * @pre @p ba_type carries a width, as for literal_one.
+	 */
 	static tref zero_constant(size_t ba_type) {
 		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
-		// TODO (HIGH) dropped error: get_bv_size's report -- ba_has_zero_constant fixes this member to tref.
+		DBG(assert(width.has_value());)
 		if (!width.has_value()) return nullptr;
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			make_bitvector_bottom_elem(width.value()),

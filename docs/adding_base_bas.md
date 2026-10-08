@@ -241,6 +241,15 @@ theory solver hands your `solve` the atoms of a clause whose types you own, all
 of them in one formula (a cast lets one variable span two of your types), so
 several solving algebras can share a pack.
 
+The type a capability receives is one inference has accepted, so a
+parameterised family always carries its parameter: bv never sees a widthless
+`bv`. A member with a plain return type (`literal_one`, `literal_zero`,
+`value_constant`, `zero_constant`) may take that as a precondition rather than
+an error to report; bv asserts it in DEBUG builds and answers its empty value
+otherwise. `sat_status` is a probe: its callers read `nullopt` as "not decided
+here" and leave the formula to the full pipeline, where `solve` reports what
+went wrong.
+
 Every fold's empty case is deliberate. `pack_zero_constant` and
 `pack_value_constant` return `nullptr`, `pack_type_has_arith_ops` returns
 `false`, and `pack_solve` returns the value `nullopt` (no owner, or an owner
