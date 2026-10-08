@@ -28,6 +28,10 @@ const { createCoiServer, loadPuppeteer, resolveChromePath } = require('./browser
 const DEFAULT_BUILD_DIR = path.join(__dirname, '..', '..', '..', 'build', 'release-wasm-repl-browser');
 const TIMEOUT_MS = Number(process.env.TAU_REPL_CHECK_TIMEOUT_MS) || 30000;
 
+// Chrome refuses to start as root without --no-sandbox, which is how the
+// container stages run it. The sandbox stays on everywhere else.
+const CHROME_ARGS = (process.env.TAU_CHROME_ARGS || '').split(' ').filter(Boolean);
+
 
 // Reads the visible rows. The viewport starts at buffer.viewportY (line 0 is
 // the top of the scrollback), so a marker that scrolled off the top is still
@@ -114,7 +118,8 @@ async function main() {
 	let browser;
 	let exitCode = 1;
 	try {
-		browser = await puppeteer.launch({ executablePath: chromePath, headless: true });
+		browser = await puppeteer.launch({ executablePath: chromePath, headless: true,
+			args: CHROME_ARGS });
 		liveBrowser = browser;
 		const page = await browser.newPage();
 		const pageErrors = [];
