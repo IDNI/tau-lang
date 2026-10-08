@@ -58,6 +58,18 @@ std::string instance_writer::typed(const std::string& binder) const {
 	return binder + p.type;
 }
 
+std::string instance_writer::constant(unsigned long long value) const {
+	return "{ " + std::to_string(value) + " }" + p.type;
+}
+
+std::string at_most_one(instance_writer& w, const std::string& h) {
+	const std::string binder = w.fresh("x");
+	const std::string x = w.typed(binder);
+	const std::string zero = w.constant(0);
+	return "(all " + binder + " ((" + x + " & " + h + "' = " + zero
+		+ ") -> ((" + x + " = " + zero + ") || (" + x + " = " + h + "))))";
+}
+
 program::program(unsigned width) : type(":bv[" + std::to_string(width) + "]") {
 	if (width == 0) throw std::invalid_argument("bv width must be at least 1");
 }

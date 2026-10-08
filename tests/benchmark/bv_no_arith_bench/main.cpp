@@ -37,9 +37,11 @@ struct family_entry {
 const std::vector<family_entry> families = {
 	{ "7",  "prediction",
 		{ { "k", "lookback" }, { "m", "streams" } }, family_7 },
-	{ "8",  "round-robin arbiter", {}, nullptr },
-	{ "1",  "width thresholds",    {}, nullptr },
-	{ "2",  "pigeonhole",          {}, nullptr },
+	{ "8",  "round-robin arbiter",
+		{ { "k", "clients" }, { "d", "lookback" } }, family_8 },
+	{ "1",  "width thresholds",
+		{ { "k", "W1 outputs" }, { "m", "W2 lookback" } }, family_1 },
+	{ "2",  "pigeonhole", { { "k", "holes" } }, family_2 },
 	{ "4a", "sim generator port",  {}, nullptr },
 	{ "4b", "templates",           {}, nullptr },
 };

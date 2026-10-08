@@ -41,6 +41,12 @@ struct grid {
 
 /// Family 7, prediction; knobs `k` (lookback) and `m` (streams).
 std::vector<instance> family_7(const grid& g);
+/// Family 8, round-robin arbiter; knobs `k` (clients) and `d` (lookback).
+std::vector<instance> family_8(const grid& g);
+/// Family 1, width thresholds; knobs `k` (W1 outputs) and `m` (W2 lookback).
+std::vector<instance> family_1(const grid& g);
+/// Family 2, pigeonhole; knob `k` (holes).
+std::vector<instance> family_2(const grid& g);
 
 } // namespace bv_bench
 

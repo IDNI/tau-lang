@@ -32,6 +32,8 @@ public:
 	std::string fresh(const std::string& base);
 	/// An occurrence of a binder from fresh(), typed.
 	std::string typed(const std::string& binder) const;
+	/// The constant `value` of the program's type, e.g. `{ 0 }:bv[8]`.
+	std::string constant(unsigned long long value) const;
 
 private:
 	friend class program;
@@ -46,6 +48,10 @@ private:
 };
 
 using rule_body = std::function<std::string(instance_writer&)>;
+
+/// `h` holds at most one element, for a variable `h` from at():
+/// `all x (x & h' = 0 -> (x = 0 || x = h))` with a fresh x.
+std::string at_most_one(instance_writer& w, const std::string& h);
 
 class program {
 public:
