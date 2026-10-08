@@ -14,9 +14,11 @@
 # or nothing, and _dep_cvc5_target_setup, which sets the target arguments. It
 # may define _dep_cvc5_target_fields, which prints extra id fields,
 # _dep_cvc5_target_prebuild <work> <build>, which runs before the configure,
-# _dep_cvc5_target_postinstall <prefix> <work>, which runs after the install, and
-# _dep_cvc5_target_gmp_licenses <dir> <work>, which copies the license of a GMP
-# that cvc5 did not download.
+# _dep_cvc5_target_install <build> <prefix>, which replaces the install of every
+# cvc5 target, _dep_cvc5_target_postinstall <prefix> <work>, which runs after
+# the install, and _dep_cvc5_target_gmp_licenses <dir> <work>, which copies the
+# license of a GMP that cvc5 did not download. _dep_cvc5_target_setup may name
+# the cvc5 targets to build in _DEP_CVC5_BUILD_TARGETS; it builds all otherwise.
 
 set -u
 
@@ -42,6 +44,9 @@ CVC5_EXPECTED_CLOSURE=(
 
 declare -F _dep_cvc5_target_fields > /dev/null || _dep_cvc5_target_fields() { :; }
 declare -F _dep_cvc5_target_prebuild > /dev/null || _dep_cvc5_target_prebuild() { :; }
+declare -F _dep_cvc5_target_install > /dev/null || _dep_cvc5_target_install() {
+	"$DEP_CVC5_CMAKE" --install "$1"
+}
 declare -F _dep_cvc5_target_postinstall > /dev/null || _dep_cvc5_target_postinstall() { :; }
 
 # A system GMP is not in the package. Its license comes from the distro package
@@ -342,14 +347,16 @@ _dep_cvc5_producer() {
 	_dep_cvc5_features "${build}/CMakeCache.txt" | sed 's/^/  /' >&2
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		${_DEP_CVC5_BUILD_ENV[@]+"${_DEP_CVC5_BUILD_ENV[@]}"} \
-		"$DEP_CVC5_CMAKE" --build "$build" -- -j "$CVC5_JOBS" \
+		"$DEP_CVC5_CMAKE" --build "$build" \
+		${_DEP_CVC5_BUILD_TARGETS[@]+--target "${_DEP_CVC5_BUILD_TARGETS[@]}"} \
+		-- -j "$CVC5_JOBS" \
 		|| { echo "dep-cvc5: build failed" >&2; _dep_cvc5_print_logs "$build" >&2
 			rm -rf "$work"; return 1; }
 	_dep_cvc5_print_logs "$build" >&2
 	echo "dep-cvc5: verified closure:"
 	_dep_cvc5_verify_closure "$build" || { rm -rf "$work"; return 1; }
-	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
-		"$DEP_CVC5_CMAKE" --install "$build" \
+	( unset CPPFLAGS CXXFLAGS CFLAGS LDFLAGS
+		_dep_cvc5_target_install "$build" "$staging_prefix" ) \
 		|| { echo "dep-cvc5: install failed" >&2; rm -rf "$work"; return 1; }
 	_dep_cvc5_target_postinstall "$staging_prefix" "$work" \
 		|| { echo "dep-cvc5: post-install step failed" >&2; rm -rf "$work"; return 1; }
@@ -448,6 +455,7 @@ DEP_CVC5_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_CVC5_TARGET_ARGS=()
 _DEP_CVC5_COMPILER_ENV=()
 _DEP_CVC5_BUILD_ENV=()
+_DEP_CVC5_BUILD_TARGETS=()
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
 DEP_CVC5_BUILD_RPATH='${ORIGIN}'
 _dep_cvc5_target_setup

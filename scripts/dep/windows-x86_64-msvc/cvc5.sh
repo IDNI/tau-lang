@@ -11,6 +11,11 @@
 # closure archive with cmake/cvc5-msvc/cadical.cmake, and GMP comes from vcpkg
 # at a pinned commit, because gmpxx must have the MSVC ABI. GMP is a DLL, never
 # a static library in cvc5.dll, and it ships in bin beside cvc5.dll.
+#
+# The package holds the cvc5 library only. The parser library of cvc5 does not
+# link as a DLL of its own here: it reads data and functions of cvc5.dll that
+# cvc5 exports to no other DLL. tau uses neither it nor the cvc5 binary, which
+# needs it, so neither is built or installed.
 
 set -u
 
@@ -87,6 +92,7 @@ _dep_cvc5_target_setup() {
 	DEP_CVC5_GMP_SOURCE="vcpkg"
 	DEP_CVC5_GMP_VERSION="$CVC5_MSVC_GMP_VERSION"
 	DEP_CVC5_GENERATOR="Ninja"
+	_DEP_CVC5_BUILD_TARGETS=(cvc5)
 	# clang-cl takes no flag-encoded path map; the install-time rewrite covers it.
 	DEP_CVC5_PREFIX_MAP=OFF
 	# clang-cl reaches CMake only as CC/CXX: configure.sh splits a -D value at
@@ -115,6 +121,7 @@ _dep_cvc5_target_fields() {
 		"vcpkg_repo=${CVC5_MSVC_VCPKG_REPO}" \
 		"vcpkg_commit=${CVC5_MSVC_VCPKG_COMMIT}" \
 		"gmp_port=${CVC5_MSVC_GMP_PORT}" \
+		"cvc5_targets=cvc5" \
 		"msvc_compat_h_hash=${compat}" \
 		"msvc_unistd_h_hash=${unistd}" \
 		"msvc_getopt_h_hash=${getopt}" \
@@ -270,6 +277,56 @@ _dep_cvc5_target_prebuild() {
 	export CL
 	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
+}
+
+# The install rules of the top folder and of src: the headers, the library and
+# the package files. CMAKE_INSTALL_LOCAL_ONLY leaves out the rules of their
+# subfolders, which install the parser library and the binary.
+_dep_cvc5_target_install() {
+	local build="$1" prefix="$2" dir
+	for dir in "$build" "${build}/src"; do
+		"$DEP_CVC5_CMAKE" -DCMAKE_INSTALL_LOCAL_ONLY=ON \
+			-P "$(cygpath -m "${dir}/cmake_install.cmake")" || return 1
+	done
+	_dep_cvc5_msvc_drop_parser_target "${prefix}/lib/cmake/cvc5"
+}
+
+# The exported target files of <dir> without cvc5::cvc5parser. find_package
+# refuses a package whose target names a library that is not installed.
+_dep_cvc5_msvc_drop_parser_target() {
+	python3 - "$1" <<'PY'
+import glob
+import os
+import re
+import sys
+target = 'cvc5::cvc5parser'
+files = sorted(glob.glob(os.path.join(sys.argv[1], 'cvc5Targets*.cmake')))
+if len(files) < 2:
+	sys.exit('dep-cvc5: no exported target files under ' + sys.argv[1])
+dropped = 0
+for path in files:
+	with open(path, newline='') as fh:
+		text = fh.read()
+	eol = '\r\n' if '\r\n' in text else '\n'
+	# A block of the file is the lines between two empty ones: the parser
+	# target fills whole blocks, and is one name in the list of all targets.
+	blocks = []
+	for block in text.split(eol + eol):
+		block = re.sub(r'(foreach\(_cmake_expected_target IN ITEMS[^)\r\n]*?) '
+			+ target + r'\b', r'\1', block)
+		if target in block:
+			dropped += 1
+			continue
+		blocks.append(block)
+	text = (eol + eol).join(blocks)
+	if 'cvc5parser' in text:
+		sys.exit('dep-cvc5: the parser target is still named in ' + path)
+	with open(path, 'w', newline='') as fh:
+		fh.write(text)
+if dropped < 3:
+	sys.exit('dep-cvc5: expected the parser target in 3 blocks of the '
+		'exported target files, dropped %d' % dropped)
+PY
 }
 
 _dep_cvc5_target_gmp_licenses() {

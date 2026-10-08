@@ -68,6 +68,8 @@ C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
 CI; a producer's `vcvars64.bat` search is only a local fallback. cvc5 does not build
 with cl.exe, so its producer builds it with the Visual Studio clang-cl for both MSVC
 presets, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
+That package holds the cvc5 library only: cvc5's parser library does not link as a DLL
+of its own there, and tau uses neither it nor the cvc5 binary.
 The id records that builder, so the cl and clang-cl presets share one cvc5 package.
 Configure copies `cvc5.dll` into the build root, where the executables are. The suites
 carry no platform skip of their own: `tests/test_helpers.h` gives every
