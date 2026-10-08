@@ -23,8 +23,8 @@ CVC5_MSVC_VCPKG_COMMIT="e06564091c10e0b042900800c9fd48aad7f00643"
 CVC5_MSVC_GMP_PORT="gmp:x64-windows"
 CVC5_MSVC_GMP_VERSION="6.3.0#5"
 # cvc5 keys its Windows code on the MinGW macro __WIN32__. The flags hold no
-# path: the compat header and the unistd.h shim reach clang-cl through CL, and
-# their hashes are id fields.
+# path: the compat header and the unistd.h and getopt.h shims reach clang-cl
+# through CL, and their hashes are id fields.
 CVC5_MSVC_FLAGS="-D__WIN32__"
 
 # No system GMP serves this target: the prebuild step installs the vcpkg one.
@@ -105,9 +105,10 @@ _dep_cvc5_target_setup() {
 # The builder, the vcpkg pin and the files of cmake/cvc5-msvc/ change the
 # package, so each is an id field.
 _dep_cvc5_target_fields() {
-	local compat unistd cadical
+	local compat unistd getopt cadical
 	compat="$(dep_sha256 "${CVC5_MSVC_DIR}/compat.h")" || return 1
 	unistd="$(dep_sha256 "${CVC5_MSVC_DIR}/include/unistd.h")" || return 1
+	getopt="$(dep_sha256 "${CVC5_MSVC_DIR}/include/getopt.h")" || return 1
 	cadical="$(dep_sha256 "${CVC5_MSVC_DIR}/cadical.cmake")" || return 1
 	printf '%s\n' \
 		"builder=clang-cl" \
@@ -116,6 +117,7 @@ _dep_cvc5_target_fields() {
 		"gmp_port=${CVC5_MSVC_GMP_PORT}" \
 		"msvc_compat_h_hash=${compat}" \
 		"msvc_unistd_h_hash=${unistd}" \
+		"msvc_getopt_h_hash=${getopt}" \
 		"msvc_cadical_cmake_hash=${cadical}"
 }
 

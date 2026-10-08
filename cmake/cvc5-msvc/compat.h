@@ -26,6 +26,17 @@
 typedef ptrdiff_t ssize_t;
 #endif
 
+/* The cvc5 driver prints to these from its handlers. */
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
+#ifndef STDERR_FILENO
+#define STDERR_FILENO 2
+#endif
+
 #ifndef R_OK
 #define R_OK 4
 #endif
