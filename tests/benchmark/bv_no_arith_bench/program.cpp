@@ -1,0 +1,125 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// Unrolling a program into its closed formula; see program.h.
+
+#include "program.h"
+
+#include <algorithm>
+#include <cctype>
+#include <stdexcept>
+
+namespace bv_bench {
+
+namespace {
+
+// The parser's multi-letter variable names: no `T` or `F` up front, since
+// those are the formula constants.
+void check_name(const std::string& name) {
+	const bool ok = !name.empty()
+		&& std::isalpha(static_cast<unsigned char>(name[0]))
+		&& name[0] != 'T' && name[0] != 'F'
+		&& std::all_of(name.begin() + 1, name.end(), [](unsigned char c) {
+			return std::isalnum(c) != 0; });
+	if (!ok) throw std::invalid_argument(
+		"not a stream or binder name: '" + name + "'");
+}
+
+} // namespace
+
+instance_writer::instance_writer(const program& p, unsigned t,
+	std::vector<std::vector<char>>& used,
+	std::unordered_map<std::string, unsigned>& binders)
+	: p(p), t(t), used(used), binders(binders) {}
+
+std::string instance_writer::at(stream_id s, unsigned back) {
+	const program::stream& st = p.streams.at(s);
+	if (back > t) throw std::logic_error(st.name + "[t-"
+		+ std::to_string(back) + "] read at step "
+		+ std::to_string(t) + ", before step 0");
+	const unsigned u = t - back;
+	used[s][u] = 1;
+	deepest = std::max(deepest, back);
+	return st.name + "_" + std::to_string(u) + p.type;
+}
+
+std::string instance_writer::fresh(const std::string& base) {
+	check_name(base);
+	for (const program::stream& st : p.streams)
+		if (st.name == base) throw std::invalid_argument(
+			"binder base '" + base + "' is a stream name");
+	// A repeat in the same step gets a second `_`, which no first use has.
+	std::string name = base + "_" + std::to_string(t);
+	if (const unsigned n = ++binders[name]; n > 1)
+		name += "_" + std::to_string(n);
+	return name;
+}
+
+std::string instance_writer::typed(const std::string& binder) const {
+	return binder + p.type;
+}
+
+program::program(unsigned width) : type(":bv[" + std::to_string(width) + "]") {
+	if (width == 0) throw std::invalid_argument("bv width must be at least 1");
+}
+
+stream_id program::add(const std::string& name, bool is_input) {
+	check_name(name);
+	for (const stream& st : streams)
+		if (st.name == name) throw std::invalid_argument(
+			"stream '" + name + "' declared twice");
+	streams.push_back({ name, is_input });
+	return streams.size() - 1;
+}
+
+stream_id program::input(const std::string& name) { return add(name, true); }
+
+stream_id program::output(const std::string& name) { return add(name, false); }
+
+void program::always(unsigned lookback, rule_body body) {
+	parts.push_back({ lookback, std::move(body) });
+}
+
+std::string program::formula(unsigned T) const {
+	std::vector<std::vector<char>> used(streams.size(),
+		std::vector<char>(T + 1, 0));
+	std::unordered_map<std::string, unsigned> binders;
+	std::string matrix;
+	for (unsigned t = 0; t <= T; ++t)
+		for (const part& r : parts) {
+			if (r.lookback > t) continue;
+			instance_writer w(*this, t, used, binders);
+			const std::string instance = r.body(w);
+			if (w.deepest != r.lookback) throw std::logic_error(
+				"a part declared with lookback "
+				+ std::to_string(r.lookback) + " reads back to t-"
+				+ std::to_string(w.deepest));
+			if (!matrix.empty()) matrix += " && ";
+			matrix += '(';
+			matrix += instance;
+			matrix += ')';
+		}
+	if (matrix.empty()) throw std::invalid_argument(
+		"no part has an instance up to step " + std::to_string(T));
+
+	std::string prefix;
+	auto block = [&](const char* quantifier, bool inputs, unsigned u) {
+		bool first = true;
+		for (stream_id s = 0; s < streams.size(); ++s) {
+			if (streams[s].is_input != inputs || !used[s][u]) continue;
+			prefix += first ? quantifier : ",";
+			prefix += ' ';
+			prefix += streams[s].name;
+			prefix += '_';
+			prefix += std::to_string(u);
+			first = false;
+		}
+		if (!first) prefix += ' ';
+	};
+	for (unsigned u = 0; u <= T; ++u) {
+		block("all", true, u);
+		block("ex", false, u);
+	}
+	return prefix + "(" + matrix + ").";
+}
+
+} // namespace bv_bench
