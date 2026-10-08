@@ -75,9 +75,9 @@ add_raw_repl_test(cli-spec_file
 	"No more inputs provided" NO_FAIL_REGEX REQUIRES hostfs)
 
 # --- CLI argument ordering ---------------------------------------------------
-# A boolean option takes an optional value (cli::option(name, short, <bool
-# default>)); a file placed after it must still reach cl.get_files() and run,
-# rather than being consumed as the flag's value and leaving the REPL open.
+# A boolean option takes an optional value such as on or off. A file placed
+# after it must still reach the inputs and run, rather than being consumed as
+# the flag's value and leaving the REPL open.
 add_raw_repl_test(cli-option_before_file_runs_file
 	"printf 'o[t] = i[t].\\n' > cli_order_fixture.tau && echo q | ${TAU_RUN} -q cli_order_fixture.tau; r=$?; rm -f cli_order_fixture.tau; exit $r"
 	"Execution step: 0" FAIL_REGEX "Welcome to the Tau Language Framework"

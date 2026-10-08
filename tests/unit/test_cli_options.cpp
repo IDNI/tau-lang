@@ -1,10 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// cli_options.h holds the options of the tau executable, which main.cpp
-// declares with declare_tau_cli() and parses with parse_args(), and the old
-// option table that a compiled artifact's own main builds with
-// tau_cli_options(cli_option_set::artifact). Plain functions in namespace
-// idni::tau_lang, so no NodeType/BA setup is needed here, just the header.
+// cli_options.h holds the options of the tau executable and of a compiled
+// artifact. Both declare with declare_program_options() and parse with
+// parse_args(). No NodeType/BA setup is needed here, just the header.
 
 #include <sstream>
 
@@ -15,17 +13,13 @@ using namespace idni::tau_lang;
 
 namespace {
 
-bool has(const idni::cli::options& opts, const std::string& name) {
-	return opts.find(name) != opts.end();
-}
-
 idni::diagnostics::result<idni::parsed_args> parse(
-	idni::options_repository& repo, std::vector<std::string> args)
+	idni::options_repository& repo, std::vector<std::string> args,
+	const idni::args_config& cfg = tau_args_config)
 {
 	std::vector<char*> argv;
 	for (auto& a : args) argv.push_back(a.data());
-	return repo.parse_args(static_cast<int>(argv.size()), argv.data(),
-		tau_args_config);
+	return repo.parse_args(static_cast<int>(argv.size()), argv.data(), cfg);
 }
 
 // print() marks what it prints, so one call checks every text.
@@ -54,101 +48,57 @@ const idni::option_set core_sample{ {
 
 TEST_SUITE("cli_options") {
 
-	TEST_CASE("artifact subset is exactly the run-time-meaningful flags") {
-		auto opts = tau_cli_options(cli_option_set::artifact);
-		CHECK(opts.size() == 7);
-		for (const char* n : { "help", "version", "license", "severity",
-				"benchmarks", "json", "quit" })
-			CHECK_MESSAGE(has(opts, n), n << " missing from the artifact subset");
-		// REPL/formatting-only flags: no meaning for a compiled artifact
-		// (no REPL, no formula pretty-printing) -- excluded.
-		for (const char* n : { "color", "status", "debug", "charvar",
-				"blasting", "indenting", "highlighting", "evaluate",
-				"legacy-repl", "experimental" })
-			CHECK_MESSAGE(!has(opts, n), n << " should not be in the artifact subset");
-	}
-
-	TEST_CASE("full subset is a superset of the artifact subset, same shapes") {
-		auto full = tau_cli_options(cli_option_set::full);
-		auto art  = tau_cli_options(cli_option_set::artifact);
-		for (auto& [name, opt] : art) {
-			REQUIRE_MESSAGE(has(full, name),
-				name << " in artifact subset but not full");
-			CHECK(full.at(name).short_name() == opt.short_name());
-			CHECK(full.at(name).description() == opt.description());
-			CHECK(full.at(name).is_bool() == opt.is_bool());
-			CHECK(full.at(name).is_string() == opt.is_string());
-		}
-		CHECK(full.size() > art.size());
-	}
-
-	TEST_CASE("full table leaves main.cpp's own flags and letters free") {
-		auto full = tau_cli_options(cli_option_set::full);
-		// main.cpp adds these, with 'B' and 'K', after the full table.
-		for (const char* n : { "blasting", "preprocessing",
-				"ba-component-factoring" })
-			CHECK_MESSAGE(!has(full, n), n << " should not be in the full table");
-		for (auto& [name, opt] : full) {
-			CAPTURE(name);
-			CHECK(opt.short_name() != 'B');
-			CHECK(opt.short_name() != 'K');
-		}
-		for (const char* n : { "charvar", "indenting", "highlighting",
-				"evaluate", "legacy-repl", "status", "color",
-				"experimental" })
-			CHECK_MESSAGE(has(full, n), n << " missing from the full table");
-		CHECK(full.at("status").description()
-			== "display status (enabled by default)");
-		CHECK(full.at("color").description()
-			== "use colors (enabled by default)");
-	}
-
-	TEST_CASE("severity string maps: trace/debug/error match, anything else is info") {
-		using sev = boost::log::trivial::severity_level;
-		CHECK(tau_cli_parse_severity("trace") == sev::trace);
-		CHECK(tau_cli_parse_severity("debug") == sev::debug);
-		CHECK(tau_cli_parse_severity("error") == sev::error);
-		CHECK(tau_cli_parse_severity("info") == sev::info);
-		CHECK(tau_cli_parse_severity("bogus") == sev::info);
-		CHECK(tau_cli_parse_severity("") == sev::info);
-	}
-
-	TEST_CASE("an unknown flag is rejected the same way for both subsets") {
-		// Mirrors main.cpp's/the emitted artifact's own pattern: the exit
-		// status a caller reports is cl.status() (process_arg's internal 3,
-		// no command table defined), not process_args()'s own return value.
-		for (auto set : { cli_option_set::full, cli_option_set::artifact }) {
-			idni::cli cl("test", std::vector<std::string>{"test", "--nope"},
-				idni::cli::commands{}, "", tau_cli_options(set));
-			CHECK(cl.process_args() != 0);
-			CHECK(cl.status() == 3);
-		}
-	}
-
-	TEST_CASE("a known flag parses to its value in both subsets") {
-		idni::cli cl("test",
-			std::vector<std::string>{"test", "-S", "trace", "-q"},
-			idni::cli::commands{}, "", tau_cli_options(cli_option_set::artifact));
-		REQUIRE(cl.process_args() == 0);
-		auto opts = cl.get_processed_options();
-		CHECK(opts["severity"].get<std::string>() == "trace");
-		CHECK(opts["quit"].get<bool>() == true);
-		// unset defaults are preserved
-		CHECK(opts["benchmarks"].get<bool>() == true);
-		CHECK(opts["json"].get<bool>() == false);
-	}
-
 	TEST_CASE("the artifact options are the first seven of the cli set") {
-		auto art = tau_cli_options(cli_option_set::artifact);
-		REQUIRE(tau_cli_option_set.options.size() > art.size());
-		for (size_t i = 0; i < art.size(); ++i) {
-			const auto& spec = tau_cli_option_set.options[i];
-			CAPTURE(spec.name);
-			REQUIRE(has(art, spec.name));
-			CHECK(art.at(spec.name).description() == spec.help);
-			CHECK(art.at(spec.name).short_name()
-				== short_letter(spec.name, ""));
+		const auto& art = tau_artifact_option_set.options;
+		REQUIRE(art.size() == tau_artifact_shared_options + 1);
+		for (size_t i = 0; i < tau_artifact_shared_options; ++i) {
+			CAPTURE(art[i].name);
+			CHECK(art[i] == tau_cli_option_set.options[i]);
 		}
+		std::vector<std::string> names;
+		for (const auto& spec : art) names.push_back(spec.name);
+		CHECK(names == std::vector<std::string>{ "help", "version",
+			"license", "severity", "benchmarks", "json", "quit",
+			"print-spec" });
+	}
+
+	TEST_CASE("the artifact letters are the letters of the tau executable") {
+		size_t shared = 0;
+		for (const auto& [name, sf] : tau_artifact_surfaces) {
+			CAPTURE(name);
+			CHECK(sf.command.empty());
+			if (name == "print-spec") {
+				CHECK(sf.short_name == '\0');
+				continue;
+			}
+			CHECK(sf.short_name == short_letter(name, ""));
+			++shared;
+		}
+		CHECK(shared == tau_artifact_shared_options);
+	}
+
+	TEST_CASE("an artifact parses its options and a core option by name") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(repo.declare(core_sample).has_value());
+		REQUIRE(declare_program_options(repo, tau_artifact_option_set,
+			tau_artifact_surfaces).has_value());
+		auto r = parse(repo, { "program", "-S", "trace", "-q",
+			"--print-spec", "--max-fixpoint-steps", "9" },
+			artifact_args_config);
+		REQUIRE(r.has_value());
+		CHECK(repo.get<std::string>("severity") == "trace");
+		CHECK(repo.get<bool>("quit"));
+		CHECK(repo.get<bool>("print-spec"));
+		CHECK(repo.get<bool>("benchmarks"));
+		CHECK(repo.get<std::size_t>("max-fixpoint-steps") == 9);
+		// a core option has no short letter on an artifact
+		CHECK_FALSE(parse(repo, { "program", "-f", "9" },
+			artifact_args_config).has_value());
+		auto unknown = parse(repo, { "program", "--color" },
+			artifact_args_config);
+		CHECK_FALSE(unknown.has_value());
+		CHECK(has_text(unknown.report(), "Unknown option"));
 	}
 
 	TEST_CASE("severity words map to their level, any other word is an error") {
@@ -167,7 +117,8 @@ TEST_SUITE("cli_options") {
 	TEST_CASE("parse_args writes the cli options") {
 		idni::options_repository repo;
 		idni::options_scope scope(repo);
-		REQUIRE(declare_tau_cli(repo).has_value());
+		REQUIRE(declare_program_options(repo, tau_cli_option_set,
+			tau_surfaces).has_value());
 		auto r = parse(repo, { "tau", "-S", "trace", "-q" });
 		REQUIRE(r.has_value());
 		CHECK(repo.get<std::string>("severity") == "trace");
@@ -179,7 +130,8 @@ TEST_SUITE("cli_options") {
 	TEST_CASE("an unknown flag and a bad severity are errors") {
 		idni::options_repository repo;
 		idni::options_scope scope(repo);
-		REQUIRE(declare_tau_cli(repo).has_value());
+		REQUIRE(declare_program_options(repo, tau_cli_option_set,
+			tau_surfaces).has_value());
 		auto unknown = parse(repo, { "tau", "--nope" });
 		CHECK_FALSE(unknown.has_value());
 		CHECK(has_text(unknown.report(), "Unknown option"));
@@ -201,7 +153,8 @@ TEST_SUITE("cli_options") {
 	TEST_CASE("compile takes its options after the command, define repeats") {
 		idni::options_repository repo;
 		idni::options_scope scope(repo);
-		REQUIRE(declare_tau_cli(repo).has_value());
+		REQUIRE(declare_program_options(repo, tau_cli_option_set,
+			tau_surfaces).has_value());
 		auto r = parse(repo, { "tau", "compile", "-D", "A=1",
 			"--define", "B=2", "-G", "Ninja", "-o", "out", "-c", "cc" });
 		REQUIRE(r.has_value());
@@ -222,7 +175,8 @@ TEST_SUITE("cli_options") {
 			CAPTURE(verb);
 			idni::options_repository repo;
 			idni::options_scope scope(repo);
-			REQUIRE(declare_tau_cli(repo).has_value());
+			REQUIRE(declare_program_options(repo, tau_cli_option_set,
+				tau_surfaces).has_value());
 			REQUIRE(parse(repo, { "tau", verb, "-o", "dir" }).has_value());
 			CHECK(repo.get<std::string>("output-dir") == "dir");
 			CHECK(repo.get<std::string>("output").empty());
@@ -233,7 +187,8 @@ TEST_SUITE("cli_options") {
 		idni::options_repository repo;
 		idni::options_scope scope(repo);
 		REQUIRE(repo.declare(core_sample).has_value());
-		REQUIRE(declare_tau_cli(repo).has_value());
+		REQUIRE(declare_program_options(repo, tau_cli_option_set,
+			tau_surfaces).has_value());
 		REQUIRE(parse(repo, { "tau", "-f", "9" }).has_value());
 		CHECK(repo.get<std::size_t>("max-fixpoint-steps") == 9);
 		REQUIRE(parse(repo, { "tau", "--ltl-max-observations", "5" })

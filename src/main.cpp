@@ -169,7 +169,8 @@ int main(int argc, char** argv) {
 	auto init = tau_init<node_t>();
 	init.print_pending();
 	if (!init.has_value()) return 1;
-	auto declared = declare_tau_cli(repo);
+	auto declared = declare_program_options(repo, tau_cli_option_set,
+		tau_surfaces);
 	declared.print_pending();
 	if (!declared.has_value()) return 1;
 	auto env = repo.load_env("TAU_");

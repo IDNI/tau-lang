@@ -5,11 +5,11 @@
  * @brief The options of the tau executable and of a compiled artifact's own
  * main.
  *
- * The tau executable declares @ref tau_cli_option_set and its surfaces with
- * @ref declare_tau_cli and parses its command line with
- * `options().parse_args()`. The main that `tau gen` emits
- * (tau_compile.tmpl.h) builds its options with @ref tau_cli_options and the
- * artifact subset.
+ * The tau executable declares @ref tau_cli_option_set and @ref tau_surfaces
+ * with @ref declare_program_options. The main that `tau gen` emits
+ * (tau_compile.tmpl.h) declares @ref tau_artifact_option_set and
+ * @ref tau_artifact_surfaces the same way. Both parse their command line with
+ * `options().parse_args()`.
  */
 
 #ifndef __IDNI__TAU__CLI_OPTIONS_H__
@@ -22,7 +22,6 @@
 #include <vector>
 #include <boost/log/trivial.hpp>
 
-#include "utility/cli.h"
 #include "utility/options.h"
 #include "tau_diagnostics.h"
 
@@ -172,98 +171,71 @@ inline const args_config tau_args_config{
 		"command.", .default_command = "",
 	.default_command_when_inputs = "", .global_surface = "" };
 
-/// Declares @ref tau_cli_option_set and adds the surfaces of the tau
-/// executable. Call it after `tau_init()`, so the core and BA options get
-/// their surfaces too.
-inline result<void> declare_tau_cli(options_repository& repo) {
+/// The number of options at the start of @ref tau_cli_option_set that a
+/// compiled artifact declares too.
+inline constexpr std::size_t tau_artifact_shared_options = 7;
+
+/// The options of a compiled artifact: the first options of
+/// @ref tau_cli_option_set, so the help texts stay equal, and `print-spec`.
+inline const option_set tau_artifact_option_set = [] {
+	option_set set;
+	set.options.assign(tau_cli_option_set.options.begin(),
+		tau_cli_option_set.options.begin() + tau_artifact_shared_options);
+	set.options.push_back({ "print-spec", "global", false,
+		"print the Tau specification of this program", {}, false });
+	return set;
+}();
+
+/// The surfaces of a compiled artifact. The shared options take their
+/// letters from @ref tau_surfaces, so the letters stay equal.
+inline const std::vector<std::pair<std::string, option_surface>>
+	tau_artifact_surfaces = []
+{
+	std::vector<std::pair<std::string, option_surface>> surfaces;
+	auto shared = [](const std::string& name) {
+		return std::ranges::any_of(tau_artifact_option_set.options,
+			[&](const option_spec& s) { return s.name == name; });
+	};
+	for (const auto& [name, surface] : tau_surfaces)
+		if (surface.command.empty() && shared(name))
+			surfaces.emplace_back(name, surface);
+	surfaces.emplace_back("print-spec", option_surface{ "" });
+	return surfaces;
+}();
+
+/// The program data of a compiled artifact for `parse_args()` and `help()`.
+inline const args_config artifact_args_config{
+	.name = "program", .help_header = "",
+	.description = "A program compiled from a Tau specification.",
+	.default_command = "", .default_command_when_inputs = "",
+	.global_surface = "" };
+
+/// Declares @p set and adds @p surfaces. Every other declared option gets
+/// its long form on the global surface. Call it after `tau_init()`, so the
+/// core and BA options get their surfaces too.
+inline result<void> declare_program_options(options_repository& repo,
+	const option_set& set,
+	const std::vector<std::pair<std::string, option_surface>>& surfaces)
+{
 	result<void> r;
-	TAU_TRY_VOID(repo.declare(tau_cli_option_set));
-	for (const auto& [name, surface] : tau_surfaces) {
+	TAU_TRY_VOID(repo.declare(set));
+	for (const auto& [name, surface] : surfaces) {
 		// a BA outside the pack and `debug` outside DEBUG declare nothing
 		if (!repo.find(name)) continue;
 		TAU_TRY_VOID(repo.add_surface(name, surface));
 	}
-	auto is_cli = [](const std::string& name) {
-		return std::ranges::any_of(tau_cli_option_set.options,
+	auto in_set = [&](const std::string& name) {
+		return std::ranges::any_of(set.options,
 			[&](const option_spec& s) { return s.name == name; });
 	};
 	auto is_global = [](const option_surface& s) { return s.command.empty(); };
 	for (const std::string& name : repo.names()) {
-		if (is_cli(name)
+		if (in_set(name)
 			|| std::ranges::any_of(repo.find(name)->surfaces, is_global))
 			continue;
 		TAU_TRY_VOID(repo.add_surface(name, option_surface{ "" }));
 	}
 	return r;
-}
-
-/// Which option table @ref tau_cli_options builds: `full`, the general and
-/// REPL flags of the tau executable (main.cpp adds `--preprocessing`,
-/// `--ba-component-factoring` and the runtime limits), or `artifact`, the
-/// run-time-meaningful subset a compiled artifact's own main parses.
-enum class cli_option_set { full, artifact };
-
-/**
- * @brief Build the option table for @p set.
- *
- * The artifact subset is a prefix of the full table -- same names, short
- * letters, defaults and descriptions -- so both `--help` and an unknown-flag
- * error read identically.
- * @param set The table to build.
- * @return The options, keyed by long name.
- */
-inline idni::cli::options tau_cli_options(cli_option_set set = cli_option_set::full) {
-	idni::cli::options opts;
-	opts["help"] = idni::cli::option("help", 'h', false)
-		.set_description("detailed information about options");
-	opts["version"] = idni::cli::option("version", 'v', false)
-		.set_description("show the current Tau executable version");
-	opts["license"] = idni::cli::option("license", 'l', false)
-		.set_description("show license for Tau");
-	opts["severity"] = idni::cli::option("severity", 'S', "info")
-		.set_description("severity level (trace/debug/info/error)");
-	opts["benchmarks"] = idni::cli::option("benchmarks", 'b', true)
-		.set_description("print benchmarks (enabled by default)");
-	opts["json"] = idni::cli::option("json", 'J', false)
-		.set_description("output in JSON format");
-	opts["quit"] = idni::cli::option("quit", 'q', false)
-		.set_description("quit when no input");
-	if (set == cli_option_set::artifact) return opts;
-	opts["charvar"] = idni::cli::option("charvar", 'V', true)
-		.set_description("charvar (enabled by default)");
-	opts["indenting"] = idni::cli::option("indenting", 'I', false)
-		.set_description("indenting of formulas");
-	opts["highlighting"] = idni::cli::option("highlighting", 'H', false)
-		.set_description("syntax highlighting");
-	// REPL specific options
-	opts["evaluate"] = idni::cli::option("evaluate", 'e', "")
-		.set_description("REPL command to evaluate");
-	opts["legacy-repl"] = idni::cli::option("legacy-repl", 'X', false)
-		.set_description("use legacy terminal REPL instead of FTXUI");
-	opts["status"] = idni::cli::option("status", 's', true)
-		.set_description("display status (enabled by default)");
-	opts["color"] = idni::cli::option("color", 'c', true)
-		.set_description("use colors (enabled by default)");
-	DBG(opts["debug"] = idni::cli::option("debug", 'd', true)
-		.set_description("debug mode");)
-	opts["experimental"] = idni::cli::option("experimental", 'x', false)
-		.set_description("enables transitioning features");
-	return opts;
-}
-
-/**
- * @brief The Boost.Log severity level that `--severity`'s value @p s names.
- * @param s "trace", "debug", "info" or "error".
- * @return The level; anything other than trace/debug/error (including the
- * default "info") is info.
- */
-inline boost::log::trivial::severity_level tau_cli_parse_severity(
-	const std::string& s)
-{
-	return s == "error" ? boost::log::trivial::error :
-	       s == "trace" ? boost::log::trivial::trace :
-	       s == "debug" ? boost::log::trivial::debug :
-	                      boost::log::trivial::info;
 }
 
 } // namespace idni::tau_lang
