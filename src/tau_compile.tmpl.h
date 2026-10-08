@@ -304,7 +304,9 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 		"\tprint_json = opts[\"json\"].get<bool>();\n"
 		"\tbool quit_on_idle = opts[\"quit\"].get<bool>();\n"
 		"\tbool print_benchmarks = opts[\"benchmarks\"].get<bool>();\n"
-		"\ttau_init<node_t>();\n"
+		"\tauto init = tau_init<node_t>();\n"
+		"\tinit.print_pending();\n"
+		"\tif (!init.has_value()) return 1;\n"
 		;
 }
 

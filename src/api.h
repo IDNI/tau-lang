@@ -91,10 +91,11 @@ struct interpreter_options {
  * Registers the core type names (`nat`, `untyped`, `bool`) and every type
  * name of the pack as dynamic `type_name` terminals, and makes a type a
  * spec declares parse as a `type_name` for the rest of that spec. A second
- * call only re-runs `bdd_init<Bool>()`.
+ * call only re-runs `bdd_init<Bool>()`. The result carries the report of
+ * the dynamic type name registration.
  */
 template <NodeType node>
-void tau_init();
+[[nodiscard]] result<void> tau_init();
 
 /// Main public API for the Tau language engine.
 ///

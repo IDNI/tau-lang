@@ -12,17 +12,18 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-void tau_init() {
+result<void> tau_init() {
+	result<void> r;
 	bdd_init<Bool>();
 	// nat/untyped/bool are core-reserved, not a BA -- literals, and
 	// building a tree here would need this function to already exist.
 	static bool registered = false;
-	if (registered) return;
-	registered = true;
+	if (registered) return r;
 	std::vector<std::string> names{ "nat", "untyped", "bool" };
 	for (auto n : node::ba::type_names()) names.emplace_back(n);
 	auto& g = tau_parser::instance().get_grammar();
-	g.add_dynamic("type_name", names);
+	TAU_TRY_VOID(g.add_dynamic("type_name", names));
+	registered = true;
 	// lets a declared type name parse as type_name for the rest of the spec
 	auto type_name_l = g.nt("type_name");
 	tau_parser::instance().set_dynamic_grow(
@@ -34,6 +35,7 @@ void tau_init() {
 					in.get_terminals(from, to));
 		},
 		{ { tau_parser::type_def, tau_parser::new_type_name } });
+	return r;
 }
 
 // Helper functions

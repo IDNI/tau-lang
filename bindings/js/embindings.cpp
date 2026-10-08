@@ -46,6 +46,19 @@ void set_last_error(const Result& r) {
 	g_last_error = oss.str();
 }
 
+// The report text of a failed tau_init(), returned by every engine call so
+// the module still loads and tells a JS caller why it cannot work.
+std::string g_init_error;
+
+// Clears the last error. False, with the init error as the last error, when
+// tau_init() failed.
+bool begin_engine_call() {
+	g_last_error.clear();
+	if (g_init_error.empty()) return true;
+	g_last_error = g_init_error;
+	return false;
+}
+
 std::string js_get_last_error() {
 	return g_last_error;
 }
@@ -66,7 +79,7 @@ boost::log::trivial::severity_level parse_severity(const std::string& lvl) {
 // Parses spec/formula/term and prints it back through the current
 // pretty-printer settings.
 val js_to_str(const std::string& expression) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		if (auto e = tau_api::get_spec_or_term(expression); e.has_value())
 			return val(tau_api::to_str(e.value()));
@@ -77,7 +90,7 @@ val js_to_str(const std::string& expression) {
 
 // Parses a full specification and prints it back, validating the input.
 val js_get_spec(const std::string& spec) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		if (auto s = tau_api::get_spec(spec); s.has_value())
 			return val(tau_api::to_str(s.value()));
@@ -87,7 +100,7 @@ val js_get_spec(const std::string& spec) {
 }
 
 val js_normalize_formula(const std::string& formula) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		if (auto r = tau_api::normalize_formula(formula); r.has_value())
 			return val(*r);
@@ -97,7 +110,7 @@ val js_normalize_formula(const std::string& formula) {
 }
 
 bool js_sat(const std::string& formula) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return false;
 	try {
 		auto r = tau_api::sat(formula);
 		if (r.has_value()) return r.value();
@@ -107,7 +120,7 @@ bool js_sat(const std::string& formula) {
 }
 
 bool js_unsat(const std::string& formula) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return false;
 	try {
 		auto r = tau_api::unsat(formula);
 		if (r.has_value()) return r.value();
@@ -117,7 +130,7 @@ bool js_unsat(const std::string& formula) {
 }
 
 bool js_valid(const std::string& formula) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return false;
 	try {
 		auto r = tau_api::valid(formula);
 		if (r.has_value()) return r.value();
@@ -127,7 +140,7 @@ bool js_valid(const std::string& formula) {
 }
 
 val js_solve(const std::string& formula, const std::string& mode) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		auto r = tau_api::solve(formula, parse_solver_mode(mode));
 		if (!r.has_value()) { set_last_error(r); return val::null(); }
@@ -139,7 +152,7 @@ val js_solve(const std::string& formula, const std::string& mode) {
 }
 
 int js_interpreter_create(const std::string& spec) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return 0;
 	try {
 		auto interp = tau_api::get_interpreter(spec);
 		if (!interp.has_value()) { set_last_error(interp); return 0; }
@@ -153,7 +166,7 @@ int js_interpreter_create(const std::string& spec) {
 // inputs: a plain JS object mapping input stream name to its value string
 // at the interpreter's current time point.
 val js_interpreter_step(int handle, val inputs) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	auto it = g_interpreters.find(handle);
 	if (it == g_interpreters.end()) return val::null();
 	try {
@@ -177,7 +190,7 @@ val js_interpreter_step(int handle, val inputs) {
 }
 
 val js_interpreter_input_vars(int handle) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	auto it = g_interpreters.find(handle);
 	if (it == g_interpreters.end()) return val::null();
 	try {
@@ -203,7 +216,7 @@ val js_ba_option_value(const result<size_t>& r) {
 }
 
 val js_set_ba_option(const std::string& name, double value) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	if (!(value >= 0)) {
 		g_last_error = "set_ba_option: the value must be a "
 			"non-negative number";
@@ -216,7 +229,7 @@ val js_set_ba_option(const std::string& name, double value) {
 }
 
 val js_get_ba_option(const std::string& name) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		return js_ba_option_value(tau_api::get_ba_option(name));
 	} catch (const std::exception&) { return val::null(); }
@@ -231,7 +244,7 @@ val js_ba_text_option_value(const result<std::string>& r) {
 }
 
 val js_set_ba_text_option(const std::string& name, const std::string& value) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		return js_ba_text_option_value(
 			tau_api::set_ba_text_option(name, value));
@@ -239,7 +252,7 @@ val js_set_ba_text_option(const std::string& name, const std::string& value) {
 }
 
 val js_get_ba_text_option(const std::string& name) {
-	g_last_error.clear();
+	if (!begin_engine_call()) return val::null();
 	try {
 		return js_ba_text_option_value(
 			tau_api::get_ba_text_option(name));
@@ -340,6 +353,10 @@ constexpr flag_setter flag_setters[] = {
 
 EMSCRIPTEN_BINDINGS(tau) {
 	disable_logging();
+	// getLastError() after the load shows the warnings of a successful init
+	auto init = tau_init<node_t>();
+	set_last_error(init);
+	if (!init.has_value()) g_init_error = g_last_error;
 
 	emscripten::function("getSpec", &js_get_spec);
 	emscripten::function("normalizeFormula", &js_normalize_formula);

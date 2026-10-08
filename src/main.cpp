@@ -479,7 +479,9 @@ void welcome() {
 /// the REPL's code (0 done, 1 quit or error with error-quits, 2 incomplete
 /// input).
 int main(int argc, char** argv) {
-	tau_init<node_t>();
+	auto init = tau_init<node_t>();
+	init.print_pending();
+	if (!init.has_value()) return 1;
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);

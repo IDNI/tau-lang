@@ -10,6 +10,7 @@
 #include "defs.h"
 #include "logging.h"
 #include "benchmark_listener.h"
+#include "utility/diagnostics.h"
 // Only the preprocessing/solver placement/cvc5-option parameters, not the
 // machinery behind them: this header defines main() and is included before
 // any tau header in every test TU, so it must not pull the tau tree in ahead
@@ -88,7 +89,7 @@ inline void apply_tau_experiment_env() {
 
 // Set by test_helpers.h once node_t is known; stays a bare pointer here
 // so this header, which must not pull in the tau tree, never has to.
-inline void (*test_tau_init_hook)() = nullptr;
+inline idni::diagnostics::result<void> (*test_tau_init_hook)() = nullptr;
 
 // Set by a suite that must re-execute itself as a worker process: main()
 // hands argv over before doctest runs, and the hook returns the worker's
@@ -103,7 +104,11 @@ int main(int argc, char** argv) {
 	std::cout << "Logging severity level set: " << logging::level() << "\n";
 #endif // TAU_LOG_TRACE_TESTS
 
-	if (test_tau_init_hook) test_tau_init_hook();
+	if (test_tau_init_hook) {
+		auto init = test_tau_init_hook();
+		init.print_pending();
+		if (!init.has_value()) return 1;
+	}
 	if (test_child_hook) {
 		if (int rc = test_child_hook(argc, argv); rc >= 0) return rc;
 	}

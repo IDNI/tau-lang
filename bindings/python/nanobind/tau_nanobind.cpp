@@ -120,6 +120,15 @@ static py_result to_py_result(idni::tau_lang::result<T>&& r) {
 	return out;
 }
 
+// The report of tau_init() at module init. The module loads either way, so
+// a failed init raises from each engine call instead of from the import.
+static py_report init_report;
+static bool init_failed = false;
+
+static void raise_if_init_failed() {
+	if (init_failed) throw std::runtime_error(init_report.text);
+}
+
 NB_MAKE_OPAQUE(input_streams_remap);
 NB_MAKE_OPAQUE(output_streams_remap);
 
@@ -131,11 +140,20 @@ bool leak_warnings() {
 }
 
 NB_MODULE(tau, m) {
+	{
+		auto init = idni::tau_lang::tau_init<node_t>();
+		init_report = make_py_report(init.report());
+		init_failed = !init.has_value();
+	}
+
 	m.doc() = "Python bindings for the Tau public api (src/api.h). "
 		"The module binds api methods only. Add a missing "
 		"capability to the api first, and then bind it here.";
 
 	nb::set_leak_warnings(leak_warnings());
+
+	m.def("init_report", []() { return init_report; },
+		"The report of the engine initialization at module import.");
 
 	// The CLI's --color, for embedders. report fields are always plain
 	// (see make_py_report); this governs what the engine writes to stdout.
@@ -384,6 +402,7 @@ NB_MODULE(tau, m) {
 		"Names of the options the algebras of this build declare.");
 	m.def("set_ba_option",
 		[](const std::string& name, size_t value) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::set_ba_option(name, value));
 		}, "name"_a, "value"_a,
 		"Set a BA-declared option: a flag takes 0 or 1, a count its "
@@ -392,12 +411,14 @@ NB_MODULE(tau, m) {
 		"build declares the name.");
 	m.def("get_ba_option",
 		[](const std::string& name) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::get_ba_option(name));
 		}, "name"_a,
 		"The value of a BA-declared option (a flag reads 0 or 1), or no "
 		"value when no algebra of this build declares the name.");
 	m.def("set_ba_text_option",
 		[](const std::string& name, const std::string& value) {
+			raise_if_init_failed();
 			return to_py_result(
 				tau_api::set_ba_text_option(name, value));
 		}, "name"_a, "value"_a,
@@ -409,6 +430,7 @@ NB_MODULE(tau, m) {
 		"of this build or the option does not take the value.");
 	m.def("get_ba_text_option",
 		[](const std::string& name) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::get_ba_text_option(name));
 		}, "name"_a,
 		"The text a BA-declared text option reads, or no value when "
@@ -652,6 +674,7 @@ NB_MODULE(tau, m) {
 	// (code_names: parse_error / invalid_argument for bad input,
 	// solver_error for UNKNOWN).
 	auto decide = [](const std::string& spec_str, auto&& procedure) {
+		raise_if_init_failed();
 		idni::tau_lang::result<bool> r;
 		if (auto fm = r.merge_take(tau_api::get_spec_as_written(spec_str)))
 			if (auto v = r.merge_take(procedure(*fm))) r = *v;
@@ -695,6 +718,7 @@ NB_MODULE(tau, m) {
 
 	m.def("unsat_core",
 		[](const std::string& spec, bool realizability) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::unsat_core(spec, realizability));
 		}, "spec"_a, "realizability"_a = true,
 		"A subset-minimal list of the spec's top-level conjuncts "
@@ -708,6 +732,7 @@ NB_MODULE(tau, m) {
 	// Free function: apply_preferences.
 	m.def("apply_preferences",
 		[](const std::string& spec_str, const PreferenceOrder& po) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::apply_preferences(spec_str, po));
 		}, "spec"_a, "po"_a,
 		"Strengthen a spec with operator preferences (lex-priority). "
@@ -753,6 +778,7 @@ NB_MODULE(tau, m) {
 	// API functions
 	m.def("get_interpreter",
 		[](const std::string& spec) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::get_interpreter(spec));
 		}, "specification"_a,
 		"Create an interpreter from a specification string. "
@@ -760,6 +786,7 @@ NB_MODULE(tau, m) {
 
 	m.def("get_interpreter",
 		[](const std::string& spec, interpreter_options& opts) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::get_interpreter(spec, opts));
 		}, "specification"_a, "options"_a,
 		"Create an interpreter from a specification string with "
@@ -767,6 +794,7 @@ NB_MODULE(tau, m) {
 
 	m.def("get_inputs_for_step",
 		[](interpreter_t& i) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::get_inputs_for_step(i));
 		}, "interpreter"_a,
 		"Get the inputs needed for the next step. "
@@ -776,6 +804,7 @@ NB_MODULE(tau, m) {
 		[](interpreter_t& i,
 			const std::map<stream_at, std::string>& inputs)
 		{
+			raise_if_init_failed();
 			return to_py_result(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
 		"Step the interpreter with given inputs. "
@@ -783,6 +812,7 @@ NB_MODULE(tau, m) {
 
 	m.def("step",
 		[](interpreter_t& i) {
+			raise_if_init_failed();
 			return to_py_result(tau_api::step(i));
 		}, "interpreter"_a,
 		"Step the interpreter without inputs (uses remapped streams). "
