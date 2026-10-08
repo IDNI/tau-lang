@@ -210,12 +210,14 @@ TEST_CASE("P3: no witness fires on the spec's counterexamples") {
 	tref r = anti_prenexed(two);
 	CHECK(tau::get(r).equals_F());
 	// The case-pin counterexample: past the flip the branch CHOICE may not
-	// depend on the inner variable, so the guard is not distributed.
+	// depend on the inner variable, so no witness fires. `y = 0` forces
+	// `x = 0` and `y = 1` forces `x = 1`, so no `x` serves every `y`: `F`.
 	const tref guard = disj(conj(eq0(y), eq0(x)),
 		conj(neg(eq0(y)), eq0(lneg(x))));
 	tref g = anti_prenexed(ex("x", all_("y", guard)));
-	CHECK(holds(g, tau::wff_ex));
-	CHECK(holds(g, tau::wff_all));
+	CHECK(!holds(g, tau::wff_ex));
+	CHECK(!holds(g, tau::wff_all));
+	CHECK(tau::get(g).equals_F());
 }
 
 // --- 3. phase 1 and the callback --------------------------------------------------
