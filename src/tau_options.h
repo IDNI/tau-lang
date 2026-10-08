@@ -19,13 +19,13 @@
 #include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <string>
 #include <string_view>
 #include <system_error>
 
 #include "utility/options.h"
 #include "tau_diagnostics.h"
+#include "option_codecs.h"
 
 namespace idni::tau_lang {
 
@@ -70,23 +70,6 @@ struct ltl_algorithm_codec {
 				{ { label::name, "ltl-alg" },
 				  { label::value, *text } });
 		return r.with_value(*text);
-	}
-};
-
-/// A budget whose loops count down from SIZE_MAX: the option reads and
-/// writes 0 for it, as its api setter does.
-struct zero_is_unlimited_codec {
-	option_value to_value(std::size_t n) const {
-		return n == std::numeric_limits<std::size_t>::max()
-			? std::size_t{ 0 } : n;
-	}
-	result<std::size_t> from_value(const option_value& v) const {
-		result<std::size_t> r;
-		const auto* n = std::get_if<std::size_t>(&v);
-		if (!n) return r.with_error(code::type_error,
-			parser_strings::messages::option_value_kind);
-		return r.with_value(*n ? *n
-			: std::numeric_limits<std::size_t>::max());
 	}
 };
 
