@@ -57,6 +57,8 @@ R"(usage: bv_no_arith_bench [options]
   --mem MB               address-space cap per child (default 4096)
   --check-max-width N    the solver checks the expected answer up to this
                          width (default 4)
+  --check-timeout SECONDS
+                         wall-clock limit for that solver check (default 5)
   --seed S, --count N    seed and programs per point, for generated families
   --print-formula        print each formula as a `#` line before its row
   --smoke                the smoke sweep; also what no option at all runs
@@ -91,6 +93,14 @@ unsigned to_unsigned(const std::string& s, const std::string& flag) {
 	return static_cast<unsigned>(std::stoul(s));
 }
 
+double to_seconds(const std::string& s, const std::string& flag) {
+	char* end = nullptr;
+	const double v = std::strtod(s.c_str(), &end);
+	if (*end || !(v > 0))
+		usage_error(flag + ": not a positive number: '" + s + "'");
+	return v;
+}
+
 std::vector<unsigned> to_list(const std::string& s, const std::string& flag) {
 	std::vector<unsigned> out;
 	std::istringstream is(s);
@@ -105,6 +115,7 @@ struct options {
 	grid g;
 	limits lim{ 60, 4096 };
 	unsigned check_max_width = 4;
+	double check_timeout_s = 5;
 	bool print_formula = false;
 };
 
@@ -128,16 +139,12 @@ options parse_options(int argc, char** argv) {
 				usage_error("--knob wants NAME=LIST, got '" + kv + "'");
 			opt.g.given[kv.substr(0, eq)] = to_list(kv.substr(eq + 1), flag);
 		}
-		else if (flag == "--timeout") {
-			const std::string v = value();
-			char* end = nullptr;
-			opt.lim.timeout_s = std::strtod(v.c_str(), &end);
-			if (*end || !(opt.lim.timeout_s > 0))
-				usage_error("--timeout: not a positive number: '" + v + "'");
-		}
+		else if (flag == "--timeout") opt.lim.timeout_s = to_seconds(value(), flag);
 		else if (flag == "--mem") opt.lim.mem_mb = to_unsigned(value(), flag);
 		else if (flag == "--check-max-width")
 			opt.check_max_width = to_unsigned(value(), flag);
+		else if (flag == "--check-timeout")
+			opt.check_timeout_s = to_seconds(value(), flag);
 		else if (flag == "--seed") opt.g.seed = to_unsigned(value(), flag);
 		else if (flag == "--count") opt.g.count = to_unsigned(value(), flag);
 		else if (flag == "--print-formula") opt.print_formula = true;
@@ -207,7 +214,7 @@ struct row {
 row judge(const instance& in, const options& opt) {
 	row r;
 	if (in.width <= opt.check_max_width)
-		r.oracle = word(run_in_child(opt.lim,
+		r.oracle = word(run_in_child({ opt.check_timeout_s, opt.lim.mem_mb },
 			[&] { return oracle_verdict(in.formula); }));
 	const child_run engine = run_in_child(opt.lim,
 		[&] { return engine_verdict(in.formula); });
