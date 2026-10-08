@@ -137,7 +137,7 @@ static tref spec(const char* s) {
 }
 
 static bool alg_b_realizable(const char* s) {
-	setenv("TAU_LTL_ALG", "B", 1);
+	ltl_algorithm_param = "B";
 	bdd_init<Bool>();
 	tref fm = spec(s);
 	bool result = false;
@@ -146,16 +146,16 @@ static bool alg_b_realizable(const char* s) {
 		REQUIRE(r.has_value());
 		result = r.value();
 	}
-	unsetenv("TAU_LTL_ALG");
+	ltl_algorithm_param = "auto";
 	return result;
 }
 
-// With TAU_LTL_ALG set to `alg`, qlt's propositional synthesis declines a
+// With the algorithm set to `alg`, qlt's propositional synthesis declines a
 // full-LTL formula over an input atom (neither A nor D encodes inputs, and
 // B is not the requested algorithm), and the default ABA-oracle path still
 // decides it REALIZABLE. Returns {declined, realizable}.
 static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
-	setenv("TAU_LTL_ALG", alg, 1);
+	ltl_algorithm_param = alg;
 	bdd_init<Bool>();
 	tref fm = spec("G (F (o1[t]:qlt > i1[t]:qlt)).");
 	bool declined = false, realizable = false;
@@ -166,7 +166,7 @@ static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
 		auto r = is_tau_formula_sat<node_t>(fm);
 		realizable = r.has_value() && r.value();
 	}
-	unsetenv("TAU_LTL_ALG");
+	ltl_algorithm_param = "auto";
 	return { declined, realizable };
 }
 
@@ -225,7 +225,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 	}
 
 	TEST_CASE("[ALG-B-19] input lookback still routes through P-bit encoding") {
-		setenv("TAU_LTL_ALG", "A", 1);
+		ltl_algorithm_param = "A";
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:qlt > i1[t-1]:qlt).");
 		bool result = false;
@@ -234,7 +234,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 			REQUIRE(r.has_value());
 			result = r.value();
 		}
-		unsetenv("TAU_LTL_ALG");
+		ltl_algorithm_param = "auto";
 		CHECK(result);
 	}
 }

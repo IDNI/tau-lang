@@ -47,21 +47,17 @@ add_repl_test(ltl_env-bad_simplification_is_unknown
 	FAIL_REGEX "[^N]REALIZABLE|UNREALIZABLE"
 	ENV TAU_LTL_SIMPLIFICATION=definitely-not-a-level REQUIRES ltlsynt)
 
-# TAU_LTL_TIMEOUT_SEC garbage keeps the default and says so.
-add_repl_test(ltl_env-timeout_garbage_warns
-	"ltl F (o1[t] = 1)"
-	"TAU_LTL_TIMEOUT_SEC='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_TIMEOUT_SEC=abc REQUIRES ltlsynt)
+# TAU_LTL_TIMEOUT garbage is an error.
+add_env_error_test(ltl_env-timeout_garbage_is_an_error TAU_LTL_TIMEOUT=abc)
 
-# The environment variables are fallbacks of the runtime parameters: the
-# variable shows through `get` when the option is unset, and the CLI flag
-# wins when both are given.
+# A variable writes its option when tau starts: the value shows through
+# `get`, and the CLI flag, written after it, wins when both are given.
 add_repl_test(ltl_env-timeout_env_is_the_fallback
 	"get ltltimeout" "ltltimeout: *5s" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_TIMEOUT_SEC=5)
+	ENV TAU_LTL_TIMEOUT=5)
 add_repl_test(ltl_env-timeout_flag_beats_env
 	"get ltltimeout" "ltltimeout: *9s" NO_FAIL_REGEX NO_TRACE
-	FLAGS --ltl-timeout 9 ENV TAU_LTL_TIMEOUT_SEC=5)
+	FLAGS --ltl-timeout 9 ENV TAU_LTL_TIMEOUT=5)
 add_repl_test(ltl_env-timeout_flag_rejects_garbage
 	"get ltltimeout" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-timeout abc)
@@ -71,28 +67,18 @@ add_repl_test(ltl_env-alg_env_is_the_fallback
 add_repl_test(ltl_env-alg_flag_beats_env
 	"get ltlalg" "ltlalg: *A" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-alg A ENV TAU_LTL_ALG=D)
-add_repl_test(ltl_env-alg_garbage_reads_as_auto
-	"get ltlalg" "ltlalg: *auto" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_ALG=C)
-add_repl_test(ltl_env-qe_env_is_validated
-	"get ltlqemaxvars" "keeping the default 2" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)
-# A garbage value is reported once, however often the limit is read.
-add_repl_test(ltl_env-timeout_garbage_warns_once
-	"get ltltimeout. get ltltimeout. get ltltimeout" "ltltimeout: *60s" NO_TRACE
-	FAIL_REGEX "is not a non-negative number[^\n]*\n(.|\n)*is not a non-negative number"
-	ENV TAU_LTL_TIMEOUT_SEC=abc)
-add_repl_test(ltl_env-timeout_clamp_warns_once
-	"get ltltimeout. get ltltimeout" "ltltimeout: *86400s" NO_TRACE
-	FAIL_REGEX "exceeds the maximum[^\n]*\n(.|\n)*exceeds the maximum"
-	ENV TAU_LTL_TIMEOUT_SEC=100000)
-add_repl_test(ltl_env-qe_garbage_warns_once
-	"get ltlqemaxvars. get ltlqemaxvars. get ltlqemaxvars" "ltlqemaxvars: *2" NO_TRACE
-	FAIL_REGEX "is not a positive number[^\n]*\n(.|\n)*is not a positive number"
-	ENV TAU_LTL_OMCAT_QE_MAX_VARS=abc)
+add_env_error_test(ltl_env-alg_garbage_is_an_error TAU_LTL_ALG=C)
+add_env_error_test(ltl_env-qe_garbage_is_an_error TAU_LTL_QE_MAX_VARS=abc)
+# A value above one day clamps.
+add_repl_test(ltl_env-timeout_env_clamps
+	"get ltltimeout" "ltltimeout: *86400s" NO_TRACE
+	ENV TAU_LTL_TIMEOUT=100000)
+add_repl_test(ltl_env-qe_env_is_the_fallback
+	"get ltlqemaxvars" "ltlqemaxvars: *4" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_QE_MAX_VARS=4)
 add_repl_test(ltl_env-qe_flag_beats_env
 	"get ltlqemaxvars" "ltlqemaxvars: *3" NO_FAIL_REGEX NO_TRACE
-	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_OMCAT_QE_MAX_VARS=4)
+	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_QE_MAX_VARS=4)
 # BA-declared knobs promoted from header constants. The option exists only
 # when its algebra is in the pack, so each is gated on its own BA.
 add_repl_test(ltl_env-qlt_t3_cap_option
@@ -132,9 +118,9 @@ add_repl_test(ltl_env-qe_short_flag_is_lowercase_k
 	FLAGS -k 3)
 
 # Every runtime limit of the pipeline carries all three surfaces: a CLI flag,
-# a REPL option and a TAU_* environment fallback. The variable shows through
+# a REPL option and a TAU_* environment variable. The variable shows through
 # `get` when the flag is absent, the flag wins when both are given, and a
-# garbage value of a core limit is an error.
+# garbage value is an error.
 add_repl_test(ltl_env-hoa_max_states_env_is_the_fallback
 	"get ltlhoamaxstates" "ltlhoamaxstates: *7" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_HOA_MAX_STATES=7)
@@ -188,19 +174,19 @@ add_env_error_test(ltl_env-data_game_max_memo_garbage_is_an_error
 # The consistency-subset and coverage-product caps read the environment too.
 add_repl_test(ltl_env-consistency_subsets_env_is_the_fallback
 	"get maxsubsets" "maxsubsets: *7" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_MAX_CONSISTENCY_SUBSETS=7)
+	ENV TAU_MAX_CONSISTENCY_SUBSETS=7)
 add_repl_test(ltl_env-consistency_subsets_flag_beats_env
 	"get maxsubsets" "maxsubsets: *9" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_MAX_CONSISTENCY_SUBSETS=7 FLAGS --max-consistency-subsets 9)
+	ENV TAU_MAX_CONSISTENCY_SUBSETS=7 FLAGS --max-consistency-subsets 9)
 add_repl_test(ltl_env-consistency_subsets_flag_rejects_garbage
 	"get maxsubsets" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets abc)
 add_repl_test(ltl_env-cover_products_env_is_the_fallback
 	"get maxcoverproducts" "maxcoverproducts: *unlimited" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_MAX_COVER_PRODUCTS=0)
+	ENV TAU_MAX_COVER_PRODUCTS=0)
 add_repl_test(ltl_env-cover_products_flag_beats_env
 	"get maxcoverproducts" "maxcoverproducts: *9" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_MAX_COVER_PRODUCTS=0 FLAGS --max-cover-products 9)
+	ENV TAU_MAX_COVER_PRODUCTS=0 FLAGS --max-cover-products 9)
 # The same three surfaces for the caps an algebra declares about itself; each
 # exists only when its algebra is in the pack, so the family gates each one.
 add_repl_test(ltl_env-qlt_t3_cap_env_is_the_fallback

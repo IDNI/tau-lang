@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <algorithm>
 #include <limits>
 
 #include "api.h"
@@ -45,11 +46,10 @@ result<void> tau_init() {
 // Helper functions
 // ------------------------------------------------------------
 
-// The long parameters keep -1 for "not set": a count above LONG_MAX
-// saturates rather than wrapping into it or below it.
-inline long api_count_param(size_t n) {
-	constexpr size_t max = (size_t) std::numeric_limits<long>::max();
-	return n > max ? std::numeric_limits<long>::max() : (long) n;
+// A count stays at or below LONG_MAX, so a reader that takes it as a long
+// never sees a negative value.
+inline size_t api_count_param(size_t n) {
+	return std::min(n, static_cast<size_t>(std::numeric_limits<long>::max()));
 }
 
 // Extracts the spec update carried by the step's outputs: the tau
@@ -265,12 +265,12 @@ void api<node>::set_gc_growth_factor(double f) {
 
 template <NodeType node>
 void api<node>::set_tref_budget(size_t n) {
-	tref_budget_param = static_cast<size_t>(api_count_param(n));
+	tref_budget_param = api_count_param(n);
 }
 
 template <NodeType node>
 void api<node>::set_tref_budget_soft_percent(size_t pct) {
-	tref_budget_soft_param = static_cast<size_t>(api_count_param(pct));
+	tref_budget_soft_param = api_count_param(pct);
 }
 
 template <NodeType node>
@@ -315,8 +315,8 @@ void api<node>::set_max_constant_size(size_t n) {
 template <NodeType node>
 void api<node>::set_ltl_timeout_sec(long seconds) {
 	option_change_guard<node> guard;
-	ltl_timeout_sec_param = seconds < 0 ? -1
-		: std::min(seconds, ltl_timeout_sec_max);
+	ltl_timeout_sec_param = seconds < 0 ? ltl_timeout_sec_default
+		: std::min((size_t) seconds, ltl_timeout_sec_max);
 }
 
 template <NodeType node>

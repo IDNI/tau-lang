@@ -101,13 +101,13 @@ namespace idni::tau_lang {
  * | tref_budget_soft (`trefbudgetsoft`) | 75 (%) | warns, reads 75 | `TAU_TREF_BUDGET_SOFT` |
  * | spec_size_warn (`specsizewarn`) | 0 | off | `TAU_SPEC_SIZE_WARN` |
  * | revision_alts (`revisionalts`) | 0 | unlimited | `TAU_MAX_REVISION_ALTS` |
- * | consistency_subsets (`maxsubsets`) | 4096 | unlimited | `TAU_LTL_MAX_CONSISTENCY_SUBSETS` |
+ * | consistency_subsets (`maxsubsets`) | 4096 | unlimited | `TAU_MAX_CONSISTENCY_SUBSETS` |
  * | cache_bound (`cachebound`) | 4096 | unbounded | `TAU_CACHE_BOUND` |
- * | cover_products (`maxcoverproducts`) | 256 | unlimited | `TAU_LTL_MAX_COVER_PRODUCTS` |
+ * | cover_products (`maxcoverproducts`) | 256 | unlimited | `TAU_MAX_COVER_PRODUCTS` |
  * | constant_size (`maxconstantsize`) | 2000 | unlimited | `TAU_MAX_CONSTANT_SIZE` |
- * | ltl_timeout (`ltltimeout`, seconds) | 60 | no watchdog | `TAU_LTL_TIMEOUT_SEC` |
+ * | ltl_timeout (`ltltimeout`, seconds) | 60 | no watchdog | `TAU_LTL_TIMEOUT` |
  * | ltl_alg (`ltlalg`, A/B/D/auto) | auto | -- | `TAU_LTL_ALG` |
- * | ltl_qe_max_vars (`ltlqemaxvars`) | 2 | unset: variable or default | `TAU_LTL_OMCAT_QE_MAX_VARS` |
+ * | ltl_qe_max_vars (`ltlqemaxvars`) | 2 | no fast path | `TAU_LTL_QE_MAX_VARS` |
  * | ltl_hoa_max_states (`ltlhoamaxstates`) | 2^22 | unlimited | `TAU_LTL_HOA_MAX_STATES` |
  * | ltl_guard_max_cubes (`ltlguardmaxcubes`) | 512 | unlimited | `TAU_LTL_GUARD_MAX_CUBES` |
  * | ltl_refinement_rounds (`ltlrefinementrounds`) | 64 | unlimited | `TAU_LTL_REFINEMENT_ROUNDS` |

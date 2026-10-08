@@ -1861,8 +1861,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "maxcoverproducts:    " << climit(max_cover_products()) << "\n"; } },
 	{ constant_size_opt, [climit, this]() {
 		out << "maxconstantsize:     " << climit(max_constant_size) << "\n"; } },
-	// Effective values, so the environment fallbacks show through when the
-	// parameter itself is unset.
+	// The accessors clamp the timeout and the observation cap, and read an
+	// unknown algorithm as auto.
 	{ ltl_timeout_opt, [this]() {
 		const int t = ltl_timeout_sec();
 		out << "ltltimeout:          "
@@ -1896,15 +1896,15 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	// raw counts: 0 builds no view / carries no table, not unlimited
 	{ ltl_mealy_max_states_opt, [this]() {
 		out << "ltlmealymaxstates:   "
-			<< data_game_mealy_max_states.get() << "\n"; } },
+			<< data_game_mealy_max_states << "\n"; } },
 	{ ltl_mealy_max_edges_opt, [this]() {
 		out << "ltlmealymaxedges:    "
-			<< data_game_mealy_max_edges.get() << "\n"; } },
+			<< data_game_mealy_max_edges << "\n"; } },
 	{ compile_max_table_edges_opt, [this]() {
 		out << "compilemaxtableedges: "
-			<< compile_max_table_edges.get() << "\n"; } },
+			<< compile_max_table_edges << "\n"; } },
 	{ compile_build_timeout_opt, [this]() {
-		const size_t s = compile_build_timeout.get();
+		const size_t s = compile_build_timeout;
 		out << "compilebuildtimeout: ";
 		if (s) out << s << " s\n"; else out << "off\n"; } },
 	{ bf_dependence_max_nodes_opt, [climit, this]() {
@@ -2638,10 +2638,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"and the numeric limit options, set with `set <option> <n>`. 0 "
 		"means unlimited, except:\nspecsizewarn and "
 		"ltlclosedregionstimeout 0 = off; decisionpins 0 = none;\n"
-		"gcminsize 0 = no floor; ltlqemaxvars 0 = the default; "
+		"gcminsize 0 = no floor; ltlqemaxvars 0 = off; "
 		"trefbudgetsoft 0 = 75;\nltlmaxobservations 0 = 30; gcgrowth <= 0 "
 		"disables gc; and the rows that say so.\nEach mirrors the CLI "
-		"option of the same meaning, and until it is set reads\nthe TAU_* "
+		"option of the same meaning, and starts at the value of\nthe TAU_* "
 		"variable `tau --help` names for it:\n"
 		"  <option>               <description>                        <default>\n"
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"

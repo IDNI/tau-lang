@@ -247,7 +247,7 @@ NB_MODULE(tau, m) {
 			&tau_api::set_max_consistency_subsets,
 			"k-ary consistency subset checks per atom group in "
 			"LTL(ABA) synthesis (--max-consistency-subsets); "
-			"default TAU_LTL_MAX_CONSISTENCY_SUBSETS or 4096, "
+			"default TAU_MAX_CONSISTENCY_SUBSETS or 4096, "
 			"0 = unlimited." },
 		{ "set_cache_bound", &tau_api::set_cache_bound,
 			"Bound of the string-keyed synthesis caches "
@@ -255,15 +255,15 @@ NB_MODULE(tau, m) {
 		{ "set_max_cover_products", &tau_api::set_max_cover_products,
 			"The ABA oracle's mixed-type coverage expansion "
 			"(--max-cover-products); default "
-			"TAU_LTL_MAX_COVER_PRODUCTS or 256, 0 = unlimited." },
+			"TAU_MAX_COVER_PRODUCTS or 256, 0 = unlimited." },
 		{ "set_max_constant_size", &tau_api::set_max_constant_size,
 			"Largest region of fresh values, in tree nodes, a run "
 			"keeps across steps (--max-constant-size); default 2000, "
 			"0 = unlimited." },
 		{ "set_ltl_qe_max_vars", &tau_api::set_ltl_qe_max_vars,
 			"Free-variable cap of the omcat QE fast path "
-			"(--ltl-qe-max-vars); above 2 is not sound, 0 falls "
-			"back to TAU_LTL_OMCAT_QE_MAX_VARS or 2." },
+			"(--ltl-qe-max-vars); above 2 is not sound, 0 turns it "
+			"off; default TAU_LTL_QE_MAX_VARS or 2." },
 		{ "set_ltl_hoa_max_states", &tau_api::set_ltl_hoa_max_states,
 			"Largest state count accepted from an ltlsynt HOA "
 			"strategy (--ltl-hoa-max-states); 0 = unlimited." },
@@ -392,10 +392,10 @@ NB_MODULE(tau, m) {
 	m.def("set_ltl_timeout_sec", &tau_api::set_ltl_timeout_sec,
 		"seconds"_a, "Wall-clock cap on each ltlsynt call "
 		"(--ltl-timeout); 0 disables the watchdog, a negative value "
-		"falls back to TAU_LTL_TIMEOUT_SEC or 60.");
+		"restores the default 60.");
 	m.def("set_ltl_algorithm", &tau_api::set_ltl_algorithm,
 		"algorithm"_a, "Omcat synthesis algorithm: A, B, D or auto "
-		"(--ltl-alg); the empty string falls back to TAU_LTL_ALG.");
+		"(--ltl-alg); the empty string reads as auto.");
 	m.def("tref_count", &tau_api::tref_count,
 		"Live interned tree node count, what set_tref_budget caps.");
 

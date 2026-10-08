@@ -41,9 +41,10 @@ using tau_api = api<node_t>;
 /// @brief The option table of the tau executable.
 ///
 /// Every runtime limit flag defaults to the empty string, which means "not
-/// given": main() then leaves the limit to its TAU_* environment fallback and
-/// its default, both named in the flag's description. A BA-declared option
-/// of the configured pack is added as `--<family>-<option>`.
+/// given": main() then leaves the limit at the value its TAU_* environment
+/// variable or its default gave it, both named in the flag's description. A
+/// BA-declared option of the configured pack is added as
+/// `--<family>-<option>`.
 /// @return The options, keyed by long name.
 cli::options tau_options() {
 	cli::options opts = tau_cli_options(cli_option_set::full);
@@ -131,12 +132,12 @@ cli::options tau_options() {
 	opts["max-consistency-subsets"] =
 		cli::option("max-consistency-subsets", 'j', "")
 		.set_description("cap k-ary consistency subset checks per atom "
-			"group (default: TAU_LTL_MAX_CONSISTENCY_SUBSETS or 4096; "
+			"group (default: TAU_MAX_CONSISTENCY_SUBSETS or 4096; "
 			"0 = unlimited)");
 	opts["max-cover-products"] =
 		cli::option("max-cover-products", 'n', "")
 		.set_description("cap the ABA oracle's mixed-type coverage "
-			"expansion (default: TAU_LTL_MAX_COVER_PRODUCTS or 256; "
+			"expansion (default: TAU_MAX_COVER_PRODUCTS or 256; "
 			"0 = unlimited)");
 	opts["max-constant-size"] =
 		cli::option("max-constant-size", 'u', "")
@@ -147,20 +148,18 @@ cli::options tau_options() {
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default: TAU_CACHE_BOUND or 4096; "
 			"0 = unbounded)");
-	// Every LTL(ABA) knob below keeps an environment fallback (TAU_LTL_*)
-	// for scripts that set one; an empty default means "not given", so the
-	// fallback stays in force unless the flag is passed. --ltl-qe-max-vars
-	// is the exception: 0 is its own "not set" sentinel, since a cap of 0
-	// would mean nothing there.
+	// An empty default means "not given", so the value of the environment
+	// variable stays in force unless the flag is passed.
 	opts["ltl-timeout"] = cli::option("ltl-timeout", 'T', "")
 		.set_description("wall-clock cap in seconds on each ltlsynt call "
-			"(0 = no watchdog; default: TAU_LTL_TIMEOUT_SEC or 60)");
+			"(0 = no watchdog; default: TAU_LTL_TIMEOUT or 60)");
 	opts["ltl-alg"] = cli::option("ltl-alg", 'L', "")
 		.set_description("omcat synthesis algorithm: A, B, D or auto "
 			"(default: TAU_LTL_ALG or auto)");
-	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'k', "0")
+	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'k', "")
 		.set_description("free-variable cap of the omcat QE fast path; "
-			"above 2 is not sound (0 = TAU_LTL_OMCAT_QE_MAX_VARS or 2)");
+			"above 2 is not sound (default: TAU_LTL_QE_MAX_VARS or 2; "
+			"0 = off)");
 	opts["ltl-hoa-max-states"] =
 		cli::option("ltl-hoa-max-states", 'Y', "")
 		.set_description("largest state count accepted from an ltlsynt "

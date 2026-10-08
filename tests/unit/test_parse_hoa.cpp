@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 using namespace idni::tau_lang;
 
@@ -244,32 +245,40 @@ TEST_SUITE("spawn_capture") {
 		CHECK(report_has_code(r.report(), code::runtime_error));
 	}
 
-	// SY-RT4 / SY-R5: the TAU_LTL_TIMEOUT_SEC parser.
+	// SY-RT4 / SY-R5: TAU_LTL_TIMEOUT, read as the ltl-timeout option.
+	// The timeout after the environment is loaded with TAU_LTL_TIMEOUT=v,
+	// or nullopt when the option refuses the text.
+	static std::optional<int> timeout_from_env(const char* v) {
+		EnvGuard g("TAU_LTL_TIMEOUT", v);
+		const size_t saved = ltl_timeout_sec_param;
+		auto r = idni::options().load_env("TAU_");
+		std::optional<int> out;
+		if (r.has_value()) out = ltl_timeout_sec();
+		ltl_timeout_sec_param = saved;
+		return out;
+	}
 	TEST_CASE("[TIMEOUT-01] unset keeps the 60s default") {
-		unsetenv("TAU_LTL_TIMEOUT_SEC");
+		unsetenv("TAU_LTL_TIMEOUT");
 		CHECK(ltl_timeout_sec() == 60);
 	}
 	TEST_CASE("[TIMEOUT-02] a number is taken verbatim; 0 disables") {
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "5"); CHECK(ltl_timeout_sec() == 5); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "0"); CHECK(ltl_timeout_sec() == 0); }
+		CHECK(timeout_from_env("5") == 5);
+		CHECK(timeout_from_env("0") == 0);
 	}
-	TEST_CASE("[TIMEOUT-03] text garbage and negatives keep the default") {
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "abc"); CHECK(ltl_timeout_sec() == 60); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "12x"); CHECK(ltl_timeout_sec() == 60); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "-3");  CHECK(ltl_timeout_sec() == 60); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "");    CHECK(ltl_timeout_sec() == 60); }
+	TEST_CASE("[TIMEOUT-03] text garbage and negatives are an error") {
+		CHECK(!timeout_from_env("abc"));
+		CHECK(!timeout_from_env("12x"));
+		CHECK(!timeout_from_env("-3"));
+		CHECK(!timeout_from_env(""));
+		CHECK(ltl_timeout_sec() == 60);
 	}
 	// SY-R5: 2^32 used to truncate to 0 (watchdog silently off) and 2^31
 	// to a negative; both are clamped to the one-day maximum now.
 	TEST_CASE("[TIMEOUT-04] range garbage is clamped, never truncated to 0") {
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "4294967296");
-		  CHECK(ltl_timeout_sec() == (int)ltl_timeout_sec_max); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "2147483648");
-		  CHECK(ltl_timeout_sec() == (int)ltl_timeout_sec_max); }
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "99999999999999999999");
-		  CHECK(ltl_timeout_sec() == 60); }   // strtol ERANGE: not a number
-		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "86400");
-		  CHECK(ltl_timeout_sec() == 86400); }
+		CHECK(timeout_from_env("4294967296") == (int)ltl_timeout_sec_max);
+		CHECK(timeout_from_env("2147483648") == (int)ltl_timeout_sec_max);
+		CHECK(!timeout_from_env("99999999999999999999"));
+		CHECK(timeout_from_env("86400") == 86400);
 	}
 
 } // TEST_SUITE("spawn_capture")

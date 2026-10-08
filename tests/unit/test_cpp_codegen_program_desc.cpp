@@ -197,12 +197,13 @@ TEST_SUITE("run_compile_script") {
 			"execute_process(COMMAND \"${CMAKE_COMMAND}\" -E sleep 60)\n"
 			"file(WRITE \"${TAU_OUTPUT}\" \"exe\")\n");
 		const std::string out = cg_tmp("_tau_fake_slow_prog");
+		const size_t saved = compile_build_timeout;
 		api<node_t>::set_compile_build_timeout(1);
 		const auto start = std::chrono::steady_clock::now();
 		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
 			out, "", "", {}, sdk, true);
 		const auto took = std::chrono::steady_clock::now() - start;
-		compile_build_timeout.unset();
+		compile_build_timeout = saved;
 		CHECK(!r.has_value());
 		CHECK(report_has_attr(r.report(), label::timeout));
 		CHECK(took < std::chrono::seconds(30));

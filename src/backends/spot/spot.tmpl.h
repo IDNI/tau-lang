@@ -530,7 +530,7 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 			return r.with_error(code::solver_error,
 				"ltlsynt produced no verdict, killed by the ltl-timeout "
 				"watchdog (--ltl-timeout / `set ltltimeout` / "
-				"TAU_LTL_TIMEOUT_SEC); the realizability of this "
+				"TAU_LTL_TIMEOUT); the realizability of this "
 				"specification is UNKNOWN");
 		return r.with_error(code::solver_error,
 			"ltlsynt produced no verdict; the realizability of this "
@@ -581,7 +581,7 @@ inline result<std::string> synthesize_game(const std::string& formula,
 			return r.with_error(code::solver_error,
 				"ltlsynt --print-game-hoa produced no game, killed by "
 				"the ltl-timeout watchdog (--ltl-timeout / "
-				"`set ltltimeout` / TAU_LTL_TIMEOUT_SEC)");
+				"`set ltltimeout` / TAU_LTL_TIMEOUT)");
 		return r.with_error(code::solver_error,
 			"ltlsynt --print-game-hoa produced no game");
 	}

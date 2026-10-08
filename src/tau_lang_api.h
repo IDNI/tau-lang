@@ -34,7 +34,7 @@
  *                          polarity-complete pairwise constraint pass in
  *                          normalization (unset only defaults the gate in
  *                          the builders).
- *   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60,
+ *   TAU_LTL_TIMEOUT=N       Synthesis wall-clock timeout in seconds (default 60,
  *                          0 = none, at most 86400)
  *   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
  *   `TAU_LTL_EXPORT_STRATEGY_FILE=<path>`  Write strategy HOA to file

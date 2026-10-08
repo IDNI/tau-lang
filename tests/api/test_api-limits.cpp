@@ -14,6 +14,15 @@ using tau_api = api<node_t>;
 
 TEST_SUITE("Tau API - runtime limits") {
 
+	// Loads the environment with @p var set to @p text, then removes the
+	// variable. True when every option takes its variable.
+	static bool load_env_with(const char* var, const char* text) {
+		setenv(var, text, 1);
+		const bool ok = idni::options().load_env("TAU_").has_value();
+		unsetenv(var);
+		return ok;
+	}
+
 	// IN-M3: the two SO-1-exposed temporal caps ship finite; an unlimited
 	// default turns a non-converging spec into a hang. Keep this case
 	// first so it observes the shipped values, not another case's leftovers.
@@ -98,67 +107,72 @@ TEST_SUITE("Tau API - runtime limits") {
 		block_boole_max_splits = saved;
 	}
 
-	// The LTL(ABA) knobs promoted from environment variables / header
-	// constants: each setter writes its parameter, and the accessors
-	// resolve parameter > environment > default.
-	TEST_CASE("ltl timeout: parameter beats environment, -1 unsets") {
-		const long saved = ltl_timeout_sec_param;
-		tau_api::set_ltl_timeout_sec(-1);
-		setenv("TAU_LTL_TIMEOUT_SEC", "17", 1);
+	// The LTL(ABA) knobs: each setter writes its parameter, and the
+	// environment writes the same parameter once, when it is loaded.
+	TEST_CASE("ltl timeout: environment and setter write one value") {
+		const size_t saved = ltl_timeout_sec_param;
+		CHECK( load_env_with("TAU_LTL_TIMEOUT", "17") );
 		CHECK( ltl_timeout_sec() == 17 );
 		tau_api::set_ltl_timeout_sec(9);
 		CHECK( ltl_timeout_sec() == 9 );
 		tau_api::set_ltl_timeout_sec(0);
 		CHECK( ltl_timeout_sec() == 0 );
-		// Garbage in the environment keeps the default (LS-9).
+		// A negative value restores the default.
 		tau_api::set_ltl_timeout_sec(-1);
-		setenv("TAU_LTL_TIMEOUT_SEC", "abc", 1);
+		CHECK( ltl_timeout_sec() == 60 );
+		// Garbage in the environment is an error and changes nothing.
+		CHECK_FALSE( load_env_with("TAU_LTL_TIMEOUT", "abc") );
 		CHECK( ltl_timeout_sec() == 60 );
 		// Values above one day clamp (SY-R5).
 		tau_api::set_ltl_timeout_sec(1000000);
-		CHECK( ltl_timeout_sec() == ltl_timeout_sec_max );
-		unsetenv("TAU_LTL_TIMEOUT_SEC");
+		CHECK( (size_t) ltl_timeout_sec() == ltl_timeout_sec_max );
+		CHECK( load_env_with("TAU_LTL_TIMEOUT", "1000000") );
+		CHECK( (size_t) ltl_timeout_sec() == ltl_timeout_sec_max );
 		ltl_timeout_sec_param = saved;
 	}
 
-	TEST_CASE("ltl algorithm: parameter beats environment, garbage is auto") {
+	TEST_CASE("ltl algorithm: an unknown word is an error by name") {
 		const std::string saved = ltl_algorithm_param;
 		tau_api::set_ltl_algorithm("");
-		unsetenv("TAU_LTL_ALG");
 		CHECK( ltl_algorithm_choice() == "" );
-		setenv("TAU_LTL_ALG", "D", 1);
+		CHECK( load_env_with("TAU_LTL_ALG", "D") );
 		CHECK( ltl_algorithm_choice() == "D" );
 		tau_api::set_ltl_algorithm("b");
 		CHECK( ltl_algorithm_choice() == "B" );
 		tau_api::set_ltl_algorithm("auto");
 		CHECK( ltl_algorithm_choice() == "" );
+		// The setter takes any word and reads an unknown one as auto; the
+		// option refuses it.
 		tau_api::set_ltl_algorithm("C");
 		CHECK( ltl_algorithm_choice() == "" );
-		unsetenv("TAU_LTL_ALG");
+		CHECK_FALSE( load_env_with("TAU_LTL_ALG", "C") );
+		CHECK_FALSE( idni::options().set_text("ltl-alg", "C")
+			.has_value() );
+		CHECK( ltl_algorithm_param == "C" );
 		ltl_algorithm_param = saved;
 	}
 
-	TEST_CASE("ltl QE cap: parameter beats environment, garbage keeps 2") {
+	TEST_CASE("ltl QE cap: environment and setter write one value") {
 		const size_t saved = ltl_qe_max_vars_param;
-		tau_api::set_ltl_qe_max_vars(0);
-		unsetenv("TAU_LTL_OMCAT_QE_MAX_VARS");
-		CHECK( ltl_qe_max_vars() == 2 );
-		setenv("TAU_LTL_OMCAT_QE_MAX_VARS", "4", 1);
+		CHECK( ltl_qe_max_vars() == saved );
+		CHECK( load_env_with("TAU_LTL_QE_MAX_VARS", "4") );
 		CHECK( ltl_qe_max_vars() == 4 );
-		setenv("TAU_LTL_OMCAT_QE_MAX_VARS", "abc", 1);
-		CHECK( ltl_qe_max_vars() == 2 );
+		CHECK_FALSE( load_env_with("TAU_LTL_QE_MAX_VARS", "abc") );
+		CHECK( ltl_qe_max_vars() == 4 );
 		tau_api::set_ltl_qe_max_vars(3);
 		CHECK( ltl_qe_max_vars() == 3 );
-		unsetenv("TAU_LTL_OMCAT_QE_MAX_VARS");
+		// 0 turns the fast path off.
+		tau_api::set_ltl_qe_max_vars(0);
+		CHECK( ltl_qe_max_vars() == 0 );
 		ltl_qe_max_vars_param = saved;
 	}
 
 	TEST_CASE("ltl game caps write their parameters verbatim") {
-		const long s1 = ltl_hoa_max_states_param;
-		const long s2 = ltl_guard_max_cubes_param;
-		const long s3 = ltl_max_refinement_rounds_param;
-		const long s4 = ltl_window_max_paths_param;
-		const long s5 = ltl_closed_regions_timeout_param;
+		const size_t s1 = ltl_hoa_max_states_param;
+		const size_t s2 = ltl_guard_max_cubes_param;
+		const size_t s3 = ltl_max_refinement_rounds_param;
+		const size_t s4 = ltl_window_max_paths_param;
+		const size_t s5 = ltl_closed_regions_timeout_param;
 		tau_api::set_ltl_hoa_max_states(77);
 		CHECK( ltl_hoa_max_states() == 77 );
 		tau_api::set_ltl_hoa_max_states(0);
@@ -184,10 +198,10 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	TEST_CASE("data game and consistency caps write their parameters "
 	          "verbatim") {
-		const long s1 = ltl_data_game_max_nodes_param;
-		const long s2 = ltl_data_game_max_memo_param;
-		const long s3 = max_consistency_subsets_param;
-		const long s4 = max_cover_products_param;
+		const size_t s1 = ltl_data_game_max_nodes_param;
+		const size_t s2 = ltl_data_game_max_memo_param;
+		const size_t s3 = max_consistency_subsets_param;
+		const size_t s4 = max_cover_products_param;
 		tau_api::set_ltl_data_game_max_nodes(1234);
 		CHECK( ltl_data_game_max_nodes() == 1234 );
 		tau_api::set_ltl_data_game_max_nodes(0);
@@ -210,62 +224,55 @@ TEST_SUITE("Tau API - runtime limits") {
 		max_cover_products_param = s4;
 	}
 
-	// Each of these caps resolves parameter > environment >
-	// default, like the timeout and the QE cap before them, so a script
-	// can set one without a flag and a flag always wins over the script.
-	TEST_CASE("ltl game caps: parameter beats environment, garbage keeps "
-	          "the default") {
+	// Each of these caps takes its environment variable when the
+	// environment is loaded, and a later setter call writes over it.
+	TEST_CASE("ltl game caps: environment and setter write one value") {
 		struct cap {
 			const char* var;
-			long* param;
+			size_t* param;
 			size_t (*effective)();
-			size_t dflt;
 		};
 		const cap caps[] = {
 			{ "TAU_LTL_HOA_MAX_STATES", &ltl_hoa_max_states_param,
-				&ltl_hoa_max_states, size_t(1) << 22 },
+				&ltl_hoa_max_states },
 			{ "TAU_LTL_GUARD_MAX_CUBES", &ltl_guard_max_cubes_param,
-				&ltl_guard_max_cubes, 512 },
+				&ltl_guard_max_cubes },
 			{ "TAU_LTL_REFINEMENT_ROUNDS",
 				&ltl_max_refinement_rounds_param,
-				&ltl_max_refinement_rounds, 64 },
+				&ltl_max_refinement_rounds },
 			{ "TAU_LTL_WINDOW_MAX_PATHS",
 				&ltl_window_max_paths_param,
-				&ltl_window_max_paths, 4096 },
+				&ltl_window_max_paths },
 			{ "TAU_LTL_CLOSED_REGIONS_TIMEOUT",
 				&ltl_closed_regions_timeout_param,
-				&ltl_closed_regions_timeout, 20 },
+				&ltl_closed_regions_timeout },
 			{ "TAU_LTL_DATA_GAME_MAX_NODES",
 				&ltl_data_game_max_nodes_param,
-				&ltl_data_game_max_nodes, size_t(1) << 23 },
+				&ltl_data_game_max_nodes },
 			{ "TAU_LTL_DATA_GAME_MAX_MEMO",
 				&ltl_data_game_max_memo_param,
-				&ltl_data_game_max_memo, size_t(1) << 25 },
-			{ "TAU_LTL_MAX_CONSISTENCY_SUBSETS",
+				&ltl_data_game_max_memo },
+			{ "TAU_MAX_CONSISTENCY_SUBSETS",
 				&max_consistency_subsets_param,
-				&max_consistency_subsets, 4096 },
-			{ "TAU_LTL_MAX_COVER_PRODUCTS",
+				&max_consistency_subsets },
+			{ "TAU_MAX_COVER_PRODUCTS",
 				&max_cover_products_param,
-				&max_cover_products, 256 }
+				&max_cover_products }
 		};
 		for (const auto& c : caps) {
-			const long saved = *c.param;
-			*c.param = -1;
-			unsetenv(c.var);
-			CHECK( c.effective() == c.dflt );
-			setenv(c.var, "7", 1);
+			CAPTURE( c.var );
+			const size_t saved = *c.param;
+			CHECK( load_env_with(c.var, "7") );
 			CHECK( c.effective() == 7 );
-			// 0 is a value, not an absence: it means unlimited (no attempt
-			// for the closed regions).
-			setenv(c.var, "0", 1);
+			// 0 is a value: it means unlimited (no attempt for the
+			// closed regions).
+			CHECK( load_env_with(c.var, "0") );
 			CHECK( c.effective() == 0 );
-			setenv(c.var, "-3", 1);
-			CHECK( c.effective() == c.dflt );
-			setenv(c.var, "abc", 1);
-			CHECK( c.effective() == c.dflt );
+			CHECK_FALSE( load_env_with(c.var, "-3") );
+			CHECK_FALSE( load_env_with(c.var, "abc") );
+			CHECK( c.effective() == 0 );
 			*c.param = 11;
 			CHECK( c.effective() == 11 );
-			unsetenv(c.var);
 			*c.param = saved;
 		}
 	}
@@ -274,8 +281,8 @@ TEST_SUITE("Tau API - runtime limits") {
 	// must see them move.
 	TEST_CASE("refinement and window caps are part of the budget fingerprint") {
 		const size_t base = verdict_budget_fingerprint<node_t>();
-		const long s3 = ltl_max_refinement_rounds_param;
-		const long s4 = ltl_window_max_paths_param;
+		const size_t s3 = ltl_max_refinement_rounds_param;
+		const size_t s4 = ltl_window_max_paths_param;
 		tau_api::set_ltl_max_refinement_rounds(
 			ltl_max_refinement_rounds() + 1);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -291,8 +298,8 @@ TEST_SUITE("Tau API - runtime limits") {
 	// the same game.
 	TEST_CASE("data game caps are part of the budget fingerprint") {
 		const size_t base = verdict_budget_fingerprint<node_t>();
-		const long s1 = ltl_data_game_max_nodes_param;
-		const long s2 = ltl_data_game_max_memo_param;
+		const size_t s1 = ltl_data_game_max_nodes_param;
+		const size_t s2 = ltl_data_game_max_memo_param;
 		tau_api::set_ltl_data_game_max_nodes(
 			ltl_data_game_max_nodes() + 1);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -304,38 +311,28 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 
-	// An environment fallback is part of the same fingerprint: a memo made
-	// under one budget must not answer a query made under another, however
-	// the budget was set.
-	TEST_CASE("an environment fallback moves the budget fingerprint") {
-		const long saved = ltl_window_max_paths_param;
-		ltl_window_max_paths_param = -1;
-		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
-		const size_t base = verdict_budget_fingerprint<node_t>();
-		setenv("TAU_LTL_WINDOW_MAX_PATHS", "13", 1);
-		CHECK( verdict_budget_fingerprint<node_t>() != base );
-		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
-		CHECK( verdict_budget_fingerprint<node_t>() == base );
-		ltl_window_max_paths_param = saved;
-	}
-
-	TEST_CASE("the new environment fallbacks move the budget fingerprint") {
-		const char* vars[] = { "TAU_LTL_DATA_GAME_MAX_NODES",
+	// A value from the environment is part of the same fingerprint: a memo
+	// made under one budget must not answer a query made under another,
+	// however the budget was set.
+	TEST_CASE("a loaded environment moves the budget fingerprint") {
+		const char* vars[] = { "TAU_LTL_WINDOW_MAX_PATHS",
+			"TAU_LTL_DATA_GAME_MAX_NODES",
 			"TAU_LTL_DATA_GAME_MAX_MEMO",
-			"TAU_LTL_MAX_CONSISTENCY_SUBSETS",
-			"TAU_LTL_MAX_COVER_PRODUCTS" };
-		long* params[] = { &ltl_data_game_max_nodes_param,
+			"TAU_MAX_CONSISTENCY_SUBSETS",
+			"TAU_MAX_COVER_PRODUCTS" };
+		size_t* params[] = { &ltl_window_max_paths_param,
+			&ltl_data_game_max_nodes_param,
 			&ltl_data_game_max_memo_param,
 			&max_consistency_subsets_param,
 			&max_cover_products_param };
-		for (size_t i = 0; i < 4; ++i) {
-			const long saved = *params[i];
-			*params[i] = -1;
-			unsetenv(vars[i]);
+		for (size_t i = 0; i < 5; ++i) {
+			CAPTURE( vars[i] );
+			const size_t saved = *params[i];
+			*params[i] = 12;
 			const size_t base = verdict_budget_fingerprint<node_t>();
-			setenv(vars[i], "13", 1);
+			CHECK( load_env_with(vars[i], "13") );
 			CHECK( verdict_budget_fingerprint<node_t>() != base );
-			unsetenv(vars[i]);
+			*params[i] = 12;
 			CHECK( verdict_budget_fingerprint<node_t>() == base );
 			*params[i] = saved;
 		}
@@ -347,8 +344,8 @@ TEST_SUITE("Tau API - runtime limits") {
 		const size_t base = verdict_budget_fingerprint<node_t>();
 		const size_t saved_fp = max_fixpoint_steps;
 		const size_t saved_fl = max_flag_search_steps;
-		const long   saved_cs = max_consistency_subsets_param;
-		const long   saved_to = ltl_timeout_sec_param;
+		const size_t saved_cs = max_consistency_subsets_param;
+		const size_t saved_to = ltl_timeout_sec_param;
 		const std::string saved_alg = ltl_algorithm_param;
 		max_fixpoint_steps = saved_fp + 1;
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -738,7 +735,7 @@ TEST_SUITE("Tau API - runtime limits") {
 	}
 
 	TEST_CASE("the limits that are not a count read back") {
-		const long to = ltl_timeout_sec_param;
+		const size_t to = ltl_timeout_sec_param;
 		const std::string alg = ltl_algorithm_param;
 		tau_api::set_ltl_timeout_sec(30);
 		CHECK( tau_api::get_ltl_timeout_sec() == 30 );
@@ -754,7 +751,7 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	// The observation cap is at most its hard bound, and 0 means that bound.
 	TEST_CASE("ltl observation cap clamps to its hard bound") {
-		const long saved = ltl_max_observations_param;
+		const size_t saved = ltl_max_observations_param;
 		tau_api::set_ltl_max_observations(5);
 		CHECK( tau_api::get_ltl_max_observations() == 5 );
 		tau_api::set_ltl_max_observations(0);
@@ -767,8 +764,8 @@ TEST_SUITE("Tau API - runtime limits") {
 	}
 
 	TEST_CASE("the new verdict caps are part of the budget fingerprint") {
-		const long s1 = ltl_max_observations_param;
-		const long s2 = ltl_data_game_max_combinations_param;
+		const size_t s1 = ltl_max_observations_param;
+		const size_t s2 = ltl_data_game_max_combinations_param;
 		const size_t base = verdict_budget_fingerprint<node_t>();
 		tau_api::set_ltl_max_observations(3);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -810,8 +807,7 @@ TEST_SUITE("Tau API - runtime limits") {
 			"TAU_TEST_ENV_LIMIT_D", "TAU_TEST_ENV_LIMIT_E" })
 				unsetenv(v);
 	}
-	// A count past LONG_MAX saturates instead of wrapping into the -1 of
-	// "not set" or below it.
+	// Every count setter keeps the count a valid long.
 	TEST_CASE("count setters saturate a value above LONG_MAX") {
 		constexpr long lmax = std::numeric_limits<long>::max();
 		auto check = [](void (*set)(size_t), auto* param) {

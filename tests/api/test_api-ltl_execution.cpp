@@ -147,7 +147,7 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	TEST_CASE("a strategy over formulas asks only for the inputs its move reads"
 		* doctest::skip(!ltlsynt_available())) {
 		struct one_node {
-			const long saved = ltl_data_game_max_nodes_param;
+			const size_t saved = ltl_data_game_max_nodes_param;
 			one_node() { tau_api::set_ltl_data_game_max_nodes(1); }
 			~one_node() {
 				option_change_guard<node_t> guard;

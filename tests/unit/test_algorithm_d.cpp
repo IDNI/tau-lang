@@ -25,7 +25,7 @@ static tref spec(const char* s) {
 }
 
 static bool alg_d_realizable(const char* s) {
-	setenv("TAU_LTL_ALG", "D", 1);
+	ltl_algorithm_param = "D";
 	bdd_init<Bool>();
 	tref fm = spec(s);
 	bool result = false;
@@ -37,7 +37,7 @@ static bool alg_d_realizable(const char* s) {
 		::result<bool> r = is_ltl_aba_realizable<node_t>(fm, 0, false);
 		result = r.has_value() && r.value();
 	}
-	unsetenv("TAU_LTL_ALG");
+	ltl_algorithm_param = "auto";
 	return result;
 }
 
@@ -204,7 +204,7 @@ State: 0
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 1\nStart: x" + tail).has_error());
 		// The state cap is the runtime parameter ltl_hoa_max_states.
-		const long saved = ltl_hoa_max_states_param;
+		const size_t saved = ltl_hoa_max_states_param;
 		ltl_hoa_max_states_param = 3;
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 4\nStart: 0" + tail).has_error());
@@ -1006,14 +1006,14 @@ State: 1
 	TEST_CASE("[ALG-D-29] ALG-D-gate falls through for non-qlt formula") {
 		// Non-qlt formula: sbf type — Algorithm D says not applicable, falls through
 		// to default path.  Use a simple formula that the default path handles.
-		setenv("TAU_LTL_ALG", "D", 1);
+		ltl_algorithm_param = "D";
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
 		auto sat_r = is_tau_formula_sat<node_t>(fm);
 		REQUIRE(sat_r.has_value());
 		bool result = sat_r.value();
-		unsetenv("TAU_LTL_ALG");
+		ltl_algorithm_param = "auto";
 		// G(o1:sbf = 0) is satisfiable: always output 0
 		CHECK(result);
 	}

@@ -79,14 +79,14 @@ add_codegen_cli_test(test_codegen_cli-unknown_is_not_unrealizable
 	"test_codegen_cli-unknown_is_not_unrealizable.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	FAIL_REGEX "UNREALIZABLE"
-	ENV "TAU_LTL_TIMEOUT_SEC=1"
+	ENV "TAU_LTL_TIMEOUT=1"
 	STUB_PATH "${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game")
 
 add_codegen_cli_test(test_codegen_cli-unknown_names_the_budget
 	"F (o1[t] = 1 && i1[t] != i1[t-1])"
 	"test_codegen_cli-unknown_names_the_budget.scratch"
 	"killed by the ltl-timeout watchdog"
-	ENV "TAU_LTL_TIMEOUT_SEC=1"
+	ENV "TAU_LTL_TIMEOUT=1"
 	STUB_PATH "${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game")
 
 # The same budget given as the option: the verb reads the global options

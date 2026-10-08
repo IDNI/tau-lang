@@ -217,7 +217,7 @@ bool alg_d_product_wins(const alg_d::synth_game& g, int K,
 TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
 	TEST_CASE("guard DNF with cap 0 is unlimited") {
-		const long saved = ltl_guard_max_cubes_param;
+		const size_t saved = ltl_guard_max_cubes_param;
 		api<node_t>::set_ltl_guard_max_cubes(0);
 		auto conj = alg_d::hoa_guard::to_dnf("0 & 1");
 		auto disj = alg_d::hoa_guard::to_dnf("0 | 1");
@@ -230,7 +230,7 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
 	TEST_CASE("HOA strategy with a state count beyond int is refused")
 	{
-		const long saved = ltl_hoa_max_states_param;
+		const size_t saved = ltl_hoa_max_states_param;
 		api<node_t>::set_ltl_hoa_max_states(0);
 		auto r = parse_hoa(
 			"HOA: v1\nStates: 4294967297\nStart: 0\nAP: 0\n"

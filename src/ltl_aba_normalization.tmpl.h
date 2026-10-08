@@ -416,9 +416,8 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 		//
 		// The cap is a runtime parameter, not a compile-time constant:
 		// `--ltl-qe-max-vars` / `set ltlqemaxvars` /
-		// `api::set_ltl_qe_max_vars`, with TAU_LTL_OMCAT_QE_MAX_VARS as
-		// the environment fallback (default 2; see ltl_qe_max_vars() in
-		// ltl_aba_limits.h).
+		// `api::set_ltl_qe_max_vars` / TAU_LTL_QE_MAX_VARS (default 2;
+		// see ltl_qe_max_vars() in ltl_aba_limits.h).
 
 		// Joint check first: it is the only thing that catches a
 		// transitivity chain, and it is exact when it fires.

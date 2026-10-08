@@ -4130,7 +4130,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
 
 // ── Algorithm A: binary T_3 encoding end-to-end ──────────────────────────────
 //
-// Forces TAU_LTL_ALG=A for each test via RAII guard; env var is restored after.
+// Forces algorithm A for each test via RAII guard; auto is restored after.
 // Algorithm A is applicable iff all atoms are qlt-typed with lookback ≤ 1,
 // single-io_var comparison sides, one output variable, and every atom
 // classifiable in some T_3 type (algorithm_a_skeleton.h: the D_i + R_ρ
@@ -4141,8 +4141,8 @@ TEST_SUITE("[Adversarial: SBF type]") {
 TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
 
     struct alg_a_guard {
-        alg_a_guard()  { setenv("TAU_LTL_ALG", "A", 1); }
-        ~alg_a_guard() { unsetenv("TAU_LTL_ALG"); }
+        alg_a_guard()  { ltl_algorithm_param = "A"; }
+        ~alg_a_guard() { ltl_algorithm_param = "auto"; }
     };
 
     // 0-constant: atom y = m (output equals previous output) — 3 of 13 types satisfy.
@@ -4203,7 +4203,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
 
 // ── Algorithm B: polarity-complete pairwise constraints end-to-end ──────────
 //
-// Forces TAU_LTL_ALG=B via RAII guard. Algorithm B adds mixed-polarity
+// Forces algorithm B via RAII guard. Algorithm B adds mixed-polarity
 // pairwise constraints (¬δ_i∧δ_j, δ_i∧¬δ_j, ¬δ_i∧¬δ_j) for all non-lookback
 // non-input atom pairs, using existential feasibility checks.
 //
@@ -4211,8 +4211,8 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
 TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     struct alg_b_guard {
-        alg_b_guard()  { setenv("TAU_LTL_ALG", "B", 1); }
-        ~alg_b_guard() { unsetenv("TAU_LTL_ALG"); }
+        alg_b_guard()  { ltl_algorithm_param = "B"; }
+        ~alg_b_guard() { ltl_algorithm_param = "auto"; }
     };
 
     TEST_CASE("[ALG-B-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants)") {
@@ -4938,7 +4938,7 @@ TEST_SUITE("Data game strategy") {
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
-		const long saved = ltl_data_game_max_nodes_param;
+		const size_t saved = ltl_data_game_max_nodes_param;
 		ltl_data_game_max_nodes_param = 1;
 		std::shared_ptr<data_game_strategy<node_t>> data;
 		auto r = ltl_to_safety_formula_full<node_t>(fm, &data);
@@ -5093,9 +5093,9 @@ TEST_SUITE("Data game strategy") {
 TEST_SUITE("Data game node collection") {
 
 	struct node_table {
-		const long saved = ltl_data_game_max_nodes_param;
+		const size_t saved = ltl_data_game_max_nodes_param;
 		explicit node_table(size_t n) {
-			ltl_data_game_max_nodes_param = (long) n;
+			ltl_data_game_max_nodes_param = n;
 		}
 		~node_table() { ltl_data_game_max_nodes_param = saved; }
 	};
@@ -5790,7 +5790,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
-		const long saved = max_cover_products_param;
+		const size_t saved = max_cover_products_param;
 		max_cover_products_param = 1;
 		CHECK_FALSE(guard_feasible(
 			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
@@ -6007,7 +6007,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
 	// A failed ltlsynt -- in particular exit 143, which is 128 + SIGTERM,
-	// exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends -- is no
+	// exactly what the TAU_LTL_TIMEOUT watchdog sends -- is no
 	// UNREALIZABLE verdict.
 	//
 	// The exit-code convention lives entirely inside spawn_capture

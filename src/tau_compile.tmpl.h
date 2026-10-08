@@ -205,7 +205,7 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 		.string();
 	spawn_options opts;
 	opts.stderr_path = script_log;
-	const size_t timeout = std::min<size_t>(compile_build_timeout.get(),
+	const size_t timeout = std::min<size_t>(compile_build_timeout,
 		(size_t) std::numeric_limits<int>::max());
 	auto spawned = spawn_capture(argv, (int) timeout,
 		[](int c) { return c == 0; }, opts);
@@ -785,7 +785,7 @@ result<codegen_result> gen_spec(
 		if (run.cached_solution)
 			for (const auto& es : run.cached_solution->aut.edges)
 				edges += es.size();
-		const size_t max_edges = compile_max_table_edges.get();
+		const size_t max_edges = compile_max_table_edges;
 		if (run.plays_data_game() && run.cached_solution && !revises
 			&& max_edges > 0 && edges <= max_edges)
 				sol = run.cached_solution;

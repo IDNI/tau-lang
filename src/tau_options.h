@@ -90,6 +90,18 @@ struct zero_is_unlimited_codec {
 	}
 };
 
+/// `ltl-timeout` clamps at @ref ltl_timeout_sec_max, as its api setter does.
+struct ltl_timeout_codec {
+	option_value to_value(std::size_t s) const { return s; }
+	result<std::size_t> from_value(const option_value& v) const {
+		result<std::size_t> r;
+		const auto* n = std::get_if<std::size_t>(&v);
+		if (!n) return r.with_error(code::type_error,
+			parser_strings::messages::option_value_kind);
+		return r.with_value(std::min(*n, ltl_timeout_sec_max));
+	}
+};
+
 /// The engine limits and flags of the library. The defaults of the
 /// interpreter fields are written out: those fields exist per node type.
 inline const option_set tau_core_option_set{ {
@@ -136,61 +148,61 @@ inline const option_set tau_core_option_set{ {
 		"across steps (0 = unlimited)" },
 	// ltl
 	{ "max-consistency-subsets", "ltl",
-		std::size_t{ 4096 },
+		std::size_t{ max_consistency_subsets_param },
 		"cap k-ary consistency subset checks per atom group "
 		"(0 = unlimited)" },
-	{ "max-cover-products", "ltl", std::size_t{ 256 },
+	{ "max-cover-products", "ltl", std::size_t{ max_cover_products_param },
 		"cap the ABA oracle's mixed-type coverage expansion "
 		"(0 = unlimited)" },
-	{ "ltl-timeout", "ltl", std::size_t{ 60 },
+	{ "ltl-timeout", "ltl", std::size_t{ ltl_timeout_sec_param },
 		"wall-clock cap in seconds on each ltlsynt call "
 		"(0 = no watchdog)" },
 	{ "ltl-alg", "ltl", std::string("auto"),
 		"omcat synthesis algorithm: A, B, D or auto" },
-	{ "ltl-qe-max-vars", "ltl", std::size_t{ 2 },
+	{ "ltl-qe-max-vars", "ltl", std::size_t{ ltl_qe_max_vars_param },
 		"free-variable cap of the omcat QE fast path; above 2 is not "
 		"sound (0 = off)" },
-	{ "ltl-hoa-max-states", "ltl", std::size_t{ 1 } << 22,
+	{ "ltl-hoa-max-states", "ltl", std::size_t{ ltl_hoa_max_states_param },
 		"largest state count accepted from an ltlsynt HOA strategy "
 		"(0 = unlimited)" },
 	{ "ltl-guard-max-cubes", "ltl",
-		std::size_t{ 512 },
+		std::size_t{ ltl_guard_max_cubes_param },
 		"cap the DNF cubes a HOA guard may expand into in the "
 		"Algorithm D game (0 = unlimited)" },
 	{ "ltl-refinement-rounds", "ltl",
-		std::size_t{ 64 },
-		"cap the ABA-oracle refinement rounds of a realizability "
-		"check; the cap answers UNKNOWN (0 = unlimited)" },
+		std::size_t{ ltl_max_refinement_rounds_param },
+		"cap the ABA-oracle refinement rounds of a realizability check; "
+		"the cap answers UNKNOWN (0 = unlimited)" },
 	{ "ltl-window-max-paths", "ltl",
-		std::size_t{ 4096 },
+		std::size_t{ ltl_window_max_paths_param },
 		"cap the strategy paths the multi-step window oracle examines "
 		"per check (0 = unlimited)" },
 	{ "ltl-closed-regions-timeout", "ltl",
-		std::size_t{ 20 },
+		std::size_t{ ltl_closed_regions_timeout_param },
 		"cap in seconds the data game's attempt on regions that keep "
 		"their quantifiers, all its questions together, each at most a "
 		"quarter of it (0 = no such attempt)" },
 	{ "ltl-data-game-max-nodes", "ltl",
-		std::size_t{ 1 } << 23,
-		"cap the live nodes of the BDD of a data game over codes; a "
-		"full table leaves the game undecided (0 = unlimited)" },
+		std::size_t{ ltl_data_game_max_nodes_param },
+		"cap the live nodes of the BDD of a data game over codes; a full "
+		"table leaves the game undecided (0 = unlimited)" },
 	{ "ltl-data-game-max-memo", "ltl",
-		std::size_t{ 1 } << 25,
+		std::size_t{ ltl_data_game_max_memo_param },
 		"cap the operation memo entries of the BDD of a data game over "
 		"codes; a full memo is emptied (0 = unlimited)" },
 	{ "ltl-data-game-max-combinations", "ltl",
-		std::size_t{ 4096 },
+		std::size_t{ ltl_data_game_max_combinations_param },
 		"cap the value combinations the data game tabulates for one "
 		"comparison its circuits do not encode (0 = unlimited)" },
 	{ "ltl-max-observations", "ltl",
-		std::size_t{ 8 },
+		std::size_t{ ltl_max_observations_param },
 		"cap the observation props whose impossible joint values the "
 		"synthesis skeleton assumes away (at most 30, 0 = 30)" },
 	{ "ltl-mealy-max-states", "ltl",
-		std::size_t{ 4096 },
+		std::size_t{ data_game_mealy_max_states },
 		"most states of the Mealy view a data-game strategy is played "
 		"through (0 = no view)" },
-	{ "ltl-mealy-max-edges", "ltl", std::size_t{ 1 } << 16,
+	{ "ltl-mealy-max-edges", "ltl", std::size_t{ data_game_mealy_max_edges },
 		"most edges of the Mealy view a data-game strategy is played "
 		"through (0 = no view)" },
 	// gc
@@ -226,10 +238,10 @@ inline const option_set tau_core_option_set{ {
 		"percentage of --tref-budget at which a sweep is forced "
 		"regardless of the gc growth trigger" },
 	{ "compile-max-table-edges", "run",
-		std::size_t{ 400 },
+		std::size_t{ compile_max_table_edges },
 		"most edges of a Mealy view gen/compile carries as a table "
 		"instead of solving as the program runs (0 = none)" },
-	{ "compile-build-timeout", "run", std::size_t{ 3600 },
+	{ "compile-build-timeout", "run", std::size_t{ compile_build_timeout },
 		"seconds the cmake build of compile may take before it is "
 		"stopped (0 = no timeout)" },
 	{ "bf-dependence-max-nodes", "run",
@@ -256,8 +268,7 @@ void clear_caches_on_semantic_change() {
 	semantic_options_seen<node> = now;
 }
 
-/// Binds the options whose field is a plain global to that field. An option
-/// of a limit that still reads its own variable stays unbound.
+/// Binds every option of @ref tau_core_option_set to its field.
 template <NodeType node>
 result<void> bind_core_options(options_repository& repo) {
 	result<void> r;
@@ -284,6 +295,37 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("max-enum-steps", max_enum_steps, hook));
 	TAU_TRY_VOID(repo.bind("max-rewrite-rounds", max_rewrite_rounds, hook));
 	TAU_TRY_VOID(repo.bind("max-constant-size", max_constant_size, hook));
+	TAU_TRY_VOID(repo.bind("max-consistency-subsets",
+		max_consistency_subsets_param, hook));
+	TAU_TRY_VOID(repo.bind("max-cover-products", max_cover_products_param,
+		hook));
+	TAU_TRY_VOID(repo.bind("ltl-timeout", ltl_timeout_sec_param,
+		ltl_timeout_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("ltl-alg", ltl_algorithm_param,
+		ltl_algorithm_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("ltl-qe-max-vars", ltl_qe_max_vars_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-hoa-max-states", ltl_hoa_max_states_param,
+		hook));
+	TAU_TRY_VOID(repo.bind("ltl-guard-max-cubes", ltl_guard_max_cubes_param,
+		hook));
+	TAU_TRY_VOID(repo.bind("ltl-refinement-rounds",
+		ltl_max_refinement_rounds_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-window-max-paths",
+		ltl_window_max_paths_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-closed-regions-timeout",
+		ltl_closed_regions_timeout_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-data-game-max-nodes",
+		ltl_data_game_max_nodes_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-data-game-max-memo",
+		ltl_data_game_max_memo_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-data-game-max-combinations",
+		ltl_data_game_max_combinations_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-max-observations",
+		ltl_max_observations_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-mealy-max-states",
+		data_game_mealy_max_states, hook));
+	TAU_TRY_VOID(repo.bind("ltl-mealy-max-edges", data_game_mealy_max_edges,
+		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));
@@ -298,6 +340,10 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("cache-bound", cache_bound, hook));
 	TAU_TRY_VOID(repo.bind("tref-budget", tref_budget_param, hook));
 	TAU_TRY_VOID(repo.bind("tref-budget-soft", tref_budget_soft_param, hook));
+	TAU_TRY_VOID(repo.bind("compile-max-table-edges", compile_max_table_edges,
+		hook));
+	TAU_TRY_VOID(repo.bind("compile-build-timeout", compile_build_timeout,
+		hook));
 	TAU_TRY_VOID(repo.bind("bf-dependence-max-nodes",
 		bf_dependence_max_nodes, hook));
 	return r;

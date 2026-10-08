@@ -331,9 +331,7 @@ struct api {
 	 * @brief Cap the ∀∃-synthesis checks the k-ary consistency-subset
 	 * walk may spend per atom group (LT-17); on the cap the remaining
 	 * subsets are skipped with a warning (sound, at worst a false
-	 * UNREALIZABLE). 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_MAX_CONSISTENCY_SUBSETS` environment fallback (default
-	 * 4096).
+	 * UNREALIZABLE). Default 4096, 0 = unlimited.
 	 */
 	static void set_max_consistency_subsets(size_t n);
 	/**
@@ -344,8 +342,7 @@ struct api {
 	/**
 	 * @brief Cap the ABA oracle's mixed-type coverage expansion;
 	 * beyond it the weaker syntactic verdict stands, logged.
-	 * 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_MAX_COVER_PRODUCTS` environment fallback (default 256).
+	 * Default 256, 0 = unlimited.
 	 */
 	static void set_max_cover_products(size_t n);
 	/** @brief Set the largest region of fresh values, in tree nodes, the
@@ -355,100 +352,83 @@ struct api {
 	/**
 	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
 	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
-	 * a negative value unsets the parameter so the `TAU_LTL_TIMEOUT_SEC`
-	 * environment fallback (default 60) applies again. Values above one
-	 * day (86400) clamp.
+	 * a negative value restores the default 60. Values above one day
+	 * (86400) clamp.
 	 */
 	static void set_ltl_timeout_sec(long seconds);
 	/**
 	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
-	 * `"auto"` (`ltl_algorithm_param`); the empty string unsets the
-	 * parameter so the `TAU_LTL_ALG` environment fallback applies again.
-	 * Case-insensitive; an unrecognised value is reported once and read
+	 * `"auto"` (`ltl_algorithm_param`); default `"auto"`, and the empty string
+	 * reads as `auto` too. Case-insensitive; an unrecognised value is reported once and read
 	 * as `auto`.
 	 */
 	static void set_ltl_algorithm(const std::string& alg);
 	/**
 	 * @brief Free-variable cap of the omcat quantifier-elimination fast
 	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
-	 * that is not sound. 0 unsets the parameter so the
-	 * `TAU_LTL_OMCAT_QE_MAX_VARS` environment fallback (default 2) applies;
-	 * that variable set to 0 or garbage keeps the default, with a warning.
+	 * that is not sound. Default 2, and 0 turns the fast path off.
 	 */
 	static void set_ltl_qe_max_vars(size_t n);
 	/**
 	 * @brief Largest state count accepted from an `ltlsynt` HOA strategy
-	 * (`ltl_hoa_max_states_param`); 0 = unlimited. The parameter wins over
-	 * the `TAU_LTL_HOA_MAX_STATES` environment fallback (default 2^22).
+	 * (`ltl_hoa_max_states_param`); Default 2^22, 0 = unlimited.
 	 */
 	static void set_ltl_hoa_max_states(size_t n);
 	/**
 	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
 	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
-	 * 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_GUARD_MAX_CUBES` environment fallback (default 512).
+	 * Default 512, 0 = unlimited.
 	 */
 	static void set_ltl_guard_max_cubes(size_t n);
 	/**
 	 * @brief Cap on the ABA-oracle refinement rounds of a realizability
 	 * check (`ltl_max_refinement_rounds_param`); on the cap the verdict is
-	 * UNKNOWN. 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_REFINEMENT_ROUNDS` environment fallback (default 64).
+	 * UNKNOWN. Default 64, 0 = unlimited.
 	 */
 	static void set_ltl_max_refinement_rounds(size_t n);
 	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
 	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
-	 * UNKNOWN. 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_WINDOW_MAX_PATHS` environment fallback (default 4096).
+	 * UNKNOWN. Default 4096, 0 = unlimited.
 	 */
 	static void set_ltl_window_max_paths(size_t n);
 	/**
 	 * @brief Seconds the data game may spend on regions that keep their
 	 * quantifiers, all their questions together, each taking at most a
 	 * quarter of it (`ltl_closed_regions_timeout_param`); past either that
-	 * attempt is undecided. 0 skips the attempt. The parameter wins over
-	 * the `TAU_LTL_CLOSED_REGIONS_TIMEOUT` environment fallback (default
-	 * 20).
+	 * attempt is undecided. Default 20, and 0 skips the attempt.
 	 */
 	static void set_ltl_closed_regions_timeout(size_t seconds);
 	/**
 	 * @brief Cap on the live nodes of the BDD a data game over codes
 	 * builds (`ltl_data_game_max_nodes_param`); a full table makes the
-	 * game undecided. 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_DATA_GAME_MAX_NODES` environment fallback (default 2^23).
+	 * game undecided. Default 2^23, 0 = unlimited.
 	 */
 	static void set_ltl_data_game_max_nodes(size_t n);
 	/**
 	 * @brief Cap on the operation memo entries of the BDD a data game over
 	 * codes builds (`ltl_data_game_max_memo_param`); the memo is emptied
-	 * when it reaches the cap. 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_DATA_GAME_MAX_MEMO` environment fallback (default 2^25).
+	 * when it reaches the cap. Default 2^25, 0 = unlimited.
 	 */
 	static void set_ltl_data_game_max_memo(size_t n);
 	/**
 	 * @brief Cap on the value combinations the data game tabulates for one
 	 * comparison its circuits do not encode
 	 * (`ltl_data_game_max_combinations_param`); past it the comparison has
-	 * no code. 0 = unlimited. The parameter wins over the
-	 * `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` environment fallback (default
-	 * 4096).
+	 * no code. Default 4096, 0 = unlimited.
 	 */
 	static void set_ltl_data_game_max_combinations(size_t n);
 	/**
 	 * @brief Cap on the observation props whose impossible joint values the
 	 * synthesis skeleton assumes away (`ltl_max_observations_param`); at
-	 * most 30, and 0 means 30. The parameter wins over the
-	 * `TAU_LTL_MAX_OBSERVATIONS` environment fallback (default 8).
+	 * most 30, and 0 means 30. Default 8.
 	 */
 	static void set_ltl_max_observations(size_t n);
 	/**
 	 * @brief Bounds of the Mealy view a data-game strategy is played
 	 * through (`data_game_mealy_max_states` / `data_game_mealy_max_edges`);
 	 * past either the moves are played directly, and 0 builds no view.
-	 * The parameters win over the `TAU_LTL_MEALY_MAX_STATES` (default
-	 * 4096) and `TAU_LTL_MEALY_MAX_EDGES` (default 65536) environment
-	 * fallbacks.
+	 * Defaults 4096 states and 65536 edges.
 	 */
 	static void set_ltl_mealy_max_states(size_t n);
 	/// @copydoc set_ltl_mealy_max_states
@@ -456,15 +436,13 @@ struct api {
 	/**
 	 * @brief Most edges of a Mealy view `tau gen` / `tau compile` carries
 	 * as a table (`compile_max_table_edges`); a larger strategy is solved
-	 * as the program runs. 0 carries none. The parameter wins over the
-	 * `TAU_COMPILE_MAX_TABLE_EDGES` environment fallback (default 400).
+	 * as the program runs. 0 carries none. Default 400.
 	 */
 	static void set_compile_max_table_edges(size_t n);
 	/**
 	 * @brief Seconds the cmake build of `tau compile` may take
 	 * (`compile_build_timeout`); past it the build is stopped and the
-	 * compile fails. 0 waits without bound. The parameter wins over the
-	 * `TAU_COMPILE_BUILD_TIMEOUT` environment fallback (default 3600).
+	 * compile fails. 0 waits without bound. Default 3600.
 	 */
 	static void set_compile_build_timeout(size_t seconds);
 	/**
@@ -603,64 +581,64 @@ struct api {
 	/// (default and 0 = unlimited).
 	static size_t get_max_revision_alts();
 	/// The effective consistency-subset check cap per atom group
-	/// (`TAU_LTL_MAX_CONSISTENCY_SUBSETS`; default 4096, 0 = unlimited).
+	/// (default 4096, 0 = unlimited).
 	static size_t get_max_consistency_subsets();
 	/// The effective bound of the string-keyed synthesis caches
 	/// (default 4096, 0 = unbounded).
 	static size_t get_cache_bound();
 	/// The effective oracle's mixed-type coverage cap
-	/// (`TAU_LTL_MAX_COVER_PRODUCTS`; default 256, 0 = unlimited).
+	/// (default 256, 0 = unlimited).
 	static size_t get_max_cover_products();
 	/// The effective fresh-value region cap, in tree nodes
 	/// (default 2000, 0 = unlimited).
 	static size_t get_max_constant_size();
-	/// The effective ltlsynt watchdog in seconds (`TAU_LTL_TIMEOUT_SEC`;
-	/// default 60, 0 = off, at most 86400).
+	/// The effective ltlsynt watchdog in seconds
+	/// (default 60, 0 = off, at most 86400).
 	static long get_ltl_timeout_sec();
-	/// The effective omcat synthesis algorithm (`TAU_LTL_ALG`; default and an
+	/// The effective omcat synthesis algorithm (default and an
 	/// unrecognised value read `"auto"`): `"A"`, `"B"`, `"D"` or `"auto"`.
 	static std::string get_ltl_algorithm();
 	/// The effective free-variable cap of the omcat QE fast path
-	/// (`TAU_LTL_OMCAT_QE_MAX_VARS`; default 2, never 0).
+	/// (default 2, 0 = off).
 	static size_t get_ltl_qe_max_vars();
 	/// The effective largest accepted HOA state count
-	/// (`TAU_LTL_HOA_MAX_STATES`; default 2^22, 0 = unlimited).
+	/// (default 2^22, 0 = unlimited).
 	static size_t get_ltl_hoa_max_states();
-	/// The effective DNF cube cap of a HOA guard (`TAU_LTL_GUARD_MAX_CUBES`;
-	/// default 512, 0 = unlimited).
+	/// The effective DNF cube cap of a HOA guard
+	/// (default 512, 0 = unlimited).
 	static size_t get_ltl_guard_max_cubes();
 	/// The effective ABA-oracle refinement round cap
-	/// (`TAU_LTL_REFINEMENT_ROUNDS`; default 64, 0 = unlimited).
+	/// (default 64, 0 = unlimited).
 	static size_t get_ltl_max_refinement_rounds();
-	/// The effective window oracle's path cap (`TAU_LTL_WINDOW_MAX_PATHS`;
-	/// default 4096, 0 = unlimited).
+	/// The effective window oracle's path cap
+	/// (default 4096, 0 = unlimited).
 	static size_t get_ltl_window_max_paths();
 	/// The effective data game's closed-regions budget in seconds
-	/// (`TAU_LTL_CLOSED_REGIONS_TIMEOUT`; default 20, 0 = no attempt).
+	/// (default 20, 0 = no attempt).
 	static size_t get_ltl_closed_regions_timeout();
-	/// The effective data game's BDD node cap (`TAU_LTL_DATA_GAME_MAX_NODES`;
-	/// default 2^23, 0 = unlimited).
+	/// The effective data game's BDD node cap
+	/// (default 2^23, 0 = unlimited).
 	static size_t get_ltl_data_game_max_nodes();
-	/// The effective data game's BDD memo cap (`TAU_LTL_DATA_GAME_MAX_MEMO`;
-	/// default 2^25, 0 = unlimited).
+	/// The effective data game's BDD memo cap
+	/// (default 2^25, 0 = unlimited).
 	static size_t get_ltl_data_game_max_memo();
 	/// The effective data game's tabulated-combination cap
-	/// (`TAU_LTL_DATA_GAME_MAX_COMBINATIONS`; default 4096, 0 = unlimited).
+	/// (default 4096, 0 = unlimited).
 	static size_t get_ltl_data_game_max_combinations();
-	/// The effective observation prop cap (`TAU_LTL_MAX_OBSERVATIONS`; default
-	/// 8, always in 1..30: 0 reads as 30).
+	/// The effective observation prop cap (default 8,
+	/// always in 1..30: 0 reads as 30).
 	static size_t get_ltl_max_observations();
-	/// The effective Mealy view state bound (`TAU_LTL_MEALY_MAX_STATES`;
-	/// default 4096, 0 = no view).
+	/// The effective Mealy view state bound
+	/// (default 4096, 0 = no view).
 	static size_t get_ltl_mealy_max_states();
-	/// The effective Mealy view edge bound (`TAU_LTL_MEALY_MAX_EDGES`; default
-	/// 65536, 0 = no view).
+	/// The effective Mealy view edge bound (default 65536,
+	/// 0 = no view).
 	static size_t get_ltl_mealy_max_edges();
 	/// The effective Mealy table edge bound of `tau gen` / `tau compile`
-	/// (`TAU_COMPILE_MAX_TABLE_EDGES`; default 400, 0 = no table).
+	/// (default 400, 0 = no table).
 	static size_t get_compile_max_table_edges();
 	/// The effective build timeout of `tau compile` in seconds
-	/// (`TAU_COMPILE_BUILD_TIMEOUT`; default 3600, 0 = no timeout).
+	/// (default 3600, 0 = no timeout).
 	static size_t get_compile_build_timeout();
 	/// The effective BDD node cap of the variable-dependence test
 	/// (default 65536, 0 = unlimited).

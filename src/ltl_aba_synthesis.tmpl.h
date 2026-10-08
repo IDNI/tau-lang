@@ -16,8 +16,7 @@ namespace idni::tau_lang {
 
 // The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
 // (ltl_aba_limits.h): `--ltl-timeout`, REPL `set ltltimeout`,
-// `api::set_ltl_timeout_sec`, with TAU_LTL_TIMEOUT_SEC as the environment
-// fallback. `ltl_timeout_sec()` there resolves the precedence.
+// `api::set_ltl_timeout_sec`, or the environment variable TAU_LTL_TIMEOUT.
 
 // ltlsynt_available() is declared in ltl_aba.h and used throughout the test
 // suites as a doctest::skip() gate; it delegates to the backend so there is
