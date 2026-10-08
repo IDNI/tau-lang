@@ -12,8 +12,7 @@
  * an ∨-node, and no cheaper step having taken it.
  *
  * THE BUDGET: every case charges `ctx.expand_count` against
- * `ctx.expand_max`. Past it the members not yet expanded re-wrap as ONE
- * pending block, and the hit taints every enclosing memo write (§1, cache
+ * `ctx.expand_max`, and a hit taints every enclosing memo write (§1, cache
  * scope).
  *
  * `push/push_block.h` is the file that includes this one: every case goes
@@ -68,6 +67,7 @@ bool is_conjoinable(tref e);
  * conjunct `D` in exclusive cases, each handed back to `PUSH_BLOCK`; the
  * floor of the conjunction's ladder.
  *
+ * `E` is the plain conjuncts through `FOLD_DECIDED`, whose `F` is the answer.
  * `D` minimises (the prio of its innermost block variable, its member count,
  * content order), so the expansion order is fixed by content and converging
  * states build equal memo keys. Its members are taken smallest first; each

@@ -7,11 +7,10 @@
  *
  * The pieces come from the files below: `members`, `formula_size`,
  * `fv_meets` and `without` (foundations/dag.h) for the member lists, the
- * orders and the smaller blocks,
- * `incidence` (shared/parts.h) for the narrowing, the result joins
- * (normalisers/joins.h) for every assembly, `eliminate_block`
- * (eliminate/eliminate_block.h) for the sub-block and the consistency
- * question, `try_fast_paths` (push/fast_paths.h) for 2a and 2b,
+ * orders and the smaller blocks, `incidence` (shared/parts.h) for the
+ * narrowing, the result joins (normalisers/joins.h) for every assembly,
+ * `eliminate_block` (eliminate/eliminate_block.h) for the sub-block and the
+ * consistency question, `try_fast_paths` (push/fast_paths.h) for 2a and 2b,
  * `try_witness` and `try_case_witness` (witness/witness.h) for the two pin
  * matches, `subst_var` (foundations/subst.h) with `simplify`
  * (normalisers/simplify.h) for a branch's copy, `try_decompose`

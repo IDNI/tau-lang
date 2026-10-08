@@ -3,8 +3,9 @@
 // THE WHOLE PIPELINE with §6's PUSH STEPS in it. Spec: anti_prenex.md §6
 // (PUSH_BLOCK's dispatcher, the two fast paths 2a and 2b,
 // PUSH_OVER_DISJUNCTION, PUSH_OVER_CONJUNCTION with its scope narrowing,
-// consistency check, witness step, case witness and EXPAND at its floor), §7
-// (the leaves), §3 (the phases around the push), invariants 3, 6, 7 and 8.
+// consistency check, witness step, case witness, TRY_DECOMPOSE and EXPAND at
+// its floor), §7 (the leaves), §3 (the phases around the push), invariants
+// 3, 6, 7 and 8.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -20,14 +21,14 @@
 //     the push: a component's close is total, so no `BDD_ID` survives.
 // Then ONE SHAPE CLAIM, the strict criterion: `binder_count == 0` and the
 // value for an input the ladder RESOLVES, the binder count for one that WAITS,
-// re-wrapped over an opaque shape or a spent expansion budget (invariant 3).
-// Each case's comment names the route its input takes.
+// re-wrapped undecided (invariant 3). Each case's comment names the route its
+// input takes.
 //
-// The inputs come, and nothing else does, from the suite of the old module,
-// tests/unit/test_antiprenexing.cpp, at the line each case names; every
-// expectation here is worked out from the spec. Where an input is also a
-// layer-4 case (tests/unit/test_anti_prenex_layer4.cpp) that case pins what
-// the block DRIVER does with it and this one pins the ladder's route.
+// The inputs come, and nothing else does, from the suite of the module in
+// `src/antiprenexing/`, tests/unit/test_antiprenexing.cpp, at the line each
+// case names; every expectation here is worked out from the spec. Where an
+// input is also a case of tests/unit/test_anti_prenex_layer4.cpp, that case
+// pins what the block DRIVER does with it and this one the ladder's route.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -124,9 +125,8 @@ tref anti_prenexed(tref phi, bool equivalent = true) {
 /// THE BLOCK IS RESOLVED: the pipeline left no binder at all.
 void resolved(tref got) { CHECK(binder_count(got) == 0); }
 
-/// WHAT WAITS: the push re-wrapped what it could not decide — an opaque
-/// shape, or a spent expansion budget (invariant 3) — so @p n binders stand in
-/// the answer.
+/// WHAT WAITS: the push re-wrapped what it could not decide (invariant 3), so
+/// @p n binders stand in the answer.
 void waits(tref got, size_t n) { CHECK(binder_count(got) == n); }
 
 } // namespace
@@ -320,14 +320,15 @@ TEST_CASE("L16: a pin under a disjunct is taken by phase 2, not by the push") {
 	CHECK(are_nso_equivalent<node_t>(got, parse("!(w = 0).")));
 }
 
-// --- 6. what the conjunction's floor expands ----------------------------------------
+// --- 6. what the decomposition and the floor take -----------------------------------
 
 TEST_CASE("L17: a clause no cheaper step takes is expanded, and resolves") {
 	// test_antiprenexing.cpp:222 — the floor's shape. `x` sits in a
 	// disjunctive conjunct, so nothing settles and there is one part; the
 	// census refuses 2a (a positive inside the disjunction) and 2b (the
 	// negated conjunct); the positives are consistent; neither disjunct
-	// pins `x`, so there is no pin and no case pin. The floor expands the
+	// pins `x`, so there is no pin and no case pin; no atom is both-signed
+	// at a member top, so the decomposition declines. The floor expands the
 	// disjunction into `x·y = 0 ∧ x·z ≠ 0` and, under `x·y ≠ 0`,
 	// `x·w = 0 ∧ x·z ≠ 0`: clauses of literals, each settled and resolved
 	// by the leaf.
@@ -407,15 +408,19 @@ TEST_CASE("L23: a block of three one-variable components resolves") {
 	resolved(got);
 }
 
-TEST_CASE("L24: a bitvector run under a reference waits, structurally") {
-	// test_antiprenexing.cpp:1556. The decomposition splits on the bitvector
-	// atom; the leaf, which has no method (§7), re-wraps each arm's `∃a`
-	// atom, and `q(y)` stays opaque (§4).
+TEST_CASE("L24: a bitvector run under a reference leaves its two ∀y units") {
+	// test_antiprenexing.cpp:1556. Phase 2 pins `z`. The `∀y` block's dual
+	// is a disjunction, each disjunct re-wrapping its reference literal,
+	// opaque (§4), so the `∃a` block's matrix is `(A ∨ ∀y ¬q(y)) ∧ (¬A ∨
+	// ∀y q(y))` with `A` the atom `a + 1 = 0`. The decomposition splits it
+	// on `A`, and each arm's leaf asks the solver its closed `∃a` query,
+	// `sat` both ways: the arms keep their `∀y` units alone, and the answer
+	// is `∀y q(y) ∨ ∀y ¬q(y)`, up to the joins.
 	const tref got = anti_prenexed(
 		parse("ex a all y ex z "
 			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
 			"&& z = 0)."), false);
-	waits(got, 4);
+	waits(got, 2);
 	CHECK(holds(got, tau::wff_ref));
 	CHECK(!holds_var(got, "z"));
 }

@@ -17,8 +17,7 @@
  * selects the same atom again.
  *
  * THE BUDGET is `EXPAND`'s: every arm pushed charges `ctx.expand_count`
- * against `ctx.expand_max`, and a spent budget re-wraps and taints (§1, cache
- * scope; invariant 3).
+ * against `ctx.expand_max`.
  *
  * `push/push_block.h` is the file that includes this one: every arm goes
  * back through `push_block`.
@@ -50,7 +49,7 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * THE CENSUS reads MEMBER TOPS only: a literal member of an ∨-conjunct of
  * `ψ`, a negative tree's included, counts one occurrence of its atom in its
- * sign. An ∧-member, a unit and a reference are no member tops. A candidate
+ * sign; an ∧-member, a unit and a reference count nothing. A candidate
  * occurs in both signs; the candidates are ranked by total coverage, then
  * by the weaker side, then content order, and the first three are tried.
  *
@@ -77,10 +76,10 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  * the witness `f₁′` under `a`. The T-arm is then `(a ∧ C_T)[x ← f₁′]` under
  * `X ∖ {x}`: the guard becomes its residual `p = 0`, `T` for a strict pin.
  *
- * Arms share `EXPAND`'s budget: the caller exits on a spent budget, so the
- * first arm always fits, and exhaustion re-wraps the second arm and taints
- * (invariant 3). An arm that simplifies to a constant is no case and charges
- * nothing; an arm deciding `T` leaves the other unpushed.
+ * The budget is unspent on entry, so the first arm always fits; exhaustion
+ * re-wraps the second arm and taints (§1, cache scope; invariant 3). An arm
+ * that simplifies to a constant is no case and charges nothing; an arm
+ * deciding `T` leaves the other unpushed.
  */
 template <NodeType node>
 tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c);

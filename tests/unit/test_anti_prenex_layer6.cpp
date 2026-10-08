@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// THE WHOLE PIPELINE with the CONJUNCTION'S FLOOR in it. Spec:
-// anti_prenex.md §6 (TRY_DECOMPOSE with FOLD_DECIDED's probe,
-// DECOMPOSE_ARMS, EXPAND with its exclusive cases and its graceful
-// exhaustion), §7 (the leaves, DISCHARGE under `keep_functional`), §3 (the
-// phases around the push), §1 (`expand_max`, `taint_count`, cache scope),
-// invariants 3 and 5.
+// THE WHOLE PIPELINE with the conjunction's LICENSED DECOMPOSITION and its
+// floor, the EXPANSION, in it. Spec: anti_prenex.md §6 (TRY_DECOMPOSE with
+// FOLD_DECIDED's probe, DECOMPOSE_ARMS, EXPAND with its exclusive cases and
+// its graceful exhaustion), §7 (the leaves, DISCHARGE under
+// `keep_functional`), §3 (the phases around the push), §1 (`expand_max`,
+// `taint_count`, cache scope), invariants 3 and 5.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -27,6 +27,11 @@
 // FOLD_DECIDED proves an atom `F` only in a BA with constants beyond 0 and 1
 // (§6), so this suite is built over the `tau` pack of BAs, the one that
 // carries `sbf`, whose constants parse as `{A}:sbf`.
+//
+// A case naming `L`<n> shares its input with that case of
+// tests/unit/test_anti_prenex_layer5.cpp, one naming `C`<n> with
+// tests/unit/test_anti_prenex_decompose.cpp, and one naming `X`<n> with
+// tests/unit/test_anti_prenex_expand.cpp.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -134,10 +139,10 @@ constexpr const char* l17 = "ex x ((xy = 0 || xw = 0) && xz != 0).";
 TEST_SUITE("anti_prenex/layer6") {
 
 TEST_CASE("M1: the inputs that reach the conjunction's floor resolve") {
-	// L17–L23 and L26 of tests/unit/test_anti_prenex_layer5.cpp, whose
-	// comments give each route: no cheaper step takes the clause and no
-	// atom sits at member tops in both signs, so TRY_DECOMPOSE declines and
-	// EXPAND distributes; every case re-enters the ladder and resolves.
+	// L17–L23 and L26, whose comments give each route: no cheaper step
+	// takes the clause and no atom sits at member tops in both signs, so
+	// TRY_DECOMPOSE declines and EXPAND distributes; every case re-enters
+	// the ladder and resolves.
 	// L21's all-positive first case is `T` at `x := 0` and decides every
 	// ∨-join on the way up.
 	struct row { const char* name; const char* src; bool is_T; };
@@ -180,13 +185,12 @@ TEST_CASE("M2: an exclusive expansion over an X-free member resolves") {
 }
 
 TEST_CASE("M3: a spanning atom is decomposed, and its arms decide T") {
-	// The clause of C1 in tests/unit/test_anti_prenex_decompose.cpp. The
-	// X-free `a = 0` refuses 2b and the negated one 2a, nothing pins `x`,
-	// and neither disjunct is a case pin. `a = 0` sits at a member top of
-	// each disjunctive conjunct, once per sign, and its cofactors weigh 4
-	// against 7, so TRY_DECOMPOSE takes it: the arms `a = 0 ∧ x·z = 0` and
-	// `¬(a = 0) ∧ x·y = 0` push to `a = 0` and `¬(a = 0)`, whose ∨-join is
-	// `T`.
+	// C1's clause. The X-free `a = 0` refuses 2b and the negated one 2a,
+	// nothing pins `x`, and neither disjunct is a case pin. `a = 0` sits at
+	// a member top of each disjunctive conjunct, once per sign, and its
+	// cofactors weigh 4 against 7, so TRY_DECOMPOSE takes it: the arms
+	// `a = 0 ∧ x·z = 0` and `¬(a = 0) ∧ x·y = 0` push to `a = 0` and
+	// `¬(a = 0)`, whose ∨-join is `T`.
 	const tref got = anti_prenexed(
 		parse("ex x ((a = 0 || xy = 0) && (a != 0 || xz = 0))."));
 	resolved(got);
@@ -205,27 +209,28 @@ TEST_CASE("M4: the pin arm deletes its binder") {
 }
 
 TEST_CASE("M5: two disjunctive conjuncts are expanded, and decide T") {
-	// The clause of X5b in tests/unit/test_anti_prenex_expand.cpp. The
-	// negated `x·k = 0` refuses 2b and the positives 2a, nothing pins `x`,
-	// and no atom is both-signed, so the floor expands; the disjunctions
-	// tie on prio and member count, and content order picks one. Either
-	// way the first case re-enters and reaches a clause of positives,
-	// `x·y = 0 ∧ x·z = 0` or 2b's squeeze of `x·z = 0 ∧ (x·y = 0 ∨
-	// x·w = 0)`, which is `T` at `x := 0` and decides the ∨-joins.
+	// X5b's clause. The negated `x·k = 0` refuses 2b and the positives 2a,
+	// nothing pins `x`, and no atom is both-signed, so the floor expands;
+	// the disjunctions tie on prio and member count, and content order
+	// picks one. Either way the first case re-enters and reaches a clause
+	// of positives, `x·y = 0 ∧ x·z = 0` or 2b's squeeze of `x·z = 0 ∧
+	// (x·y = 0 ∨ x·w = 0)`, which is `T` at `x := 0` and decides the
+	// ∨-joins.
 	const tref got = anti_prenexed(
 		parse("ex x ((xy = 0 || xw = 0) && (xz = 0 || xk != 0))."));
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("M6: a constant-false atom is folded at the floor") {
+TEST_CASE("M6: a constant-false census atom is folded, and no arm is "
+	"built") {
 	// C4's clause, `f = x′·A ∪ x·B` over `sbf`. Phase 1's SIMPLIFY keeps
 	// `f = 0`: its sum `f` is no constant, and its cofactors on `x`, `A`
 	// and `B`, differ. The census refuses both fast paths and `f = 0` pins
-	// nothing (`A ∪ B ≠ 1`). At the floor TRY_DECOMPOSE's census selects
-	// `f = 0`, one sign in each disjunctive conjunct, and its PROBE decides
-	// it: `A·B` is a nonzero constant, so `f = 0` is `F`, and
-	// `ψ[f = 0 ↦ F]` is `x·y = 0`, `T` at `x := 0`, with no arm built.
+	// nothing (`A ∪ B ≠ 1`). TRY_DECOMPOSE's census selects `f = 0`, one
+	// sign in each disjunctive conjunct, and its PROBE decides it: `A·B` is
+	// a nonzero constant, so `f = 0` is `F`, and `ψ[f = 0 ↦ F]` is
+	// `x·y = 0`, `T` at `x := 0`, with no arm built.
 	const tref got = anti_prenexed(
 		parse("ex x ((((x' & {A}:sbf) | (x & {B}:sbf)) = 0 "
 			"|| x & y = 0) && (((x' & {A}:sbf) | (x & {B}:sbf)) != 0 "

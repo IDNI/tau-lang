@@ -20,15 +20,17 @@
 // Then its own SHAPE claim: what the block driver does to that input, worked
 // out from the spec and spelled in the case's comment.
 //
-// WHAT RESOLVES: §6's cheap steps are all wired into the dispatcher, so a
+// WHAT RESOLVES: §6's push steps are all wired into the dispatcher, so a
 // block resolves wherever one of them reaches — a literal, a negative tree
 // (§1: an ∨-node all of whose leaves are negated equations) or a binder unit
 // at the leaf, the two fast paths, the push per disjunct, and the
-// conjunction's ladder of scope narrowing, fast paths, consistency check and
-// pin matches. What none of them takes re-wraps, after the strip of its
-// X-free conjuncts: an undecided block comes back wrapped rather than
-// answered (invariant 3). The cases here are the DRIVER's; the ladder's own
-// routes are claimed in tests/unit/test_anti_prenex_layer5.cpp.
+// conjunction's ladder of scope narrowing, fast paths, consistency check, pin
+// matches, licensed decomposition and expansion. What none of them decides
+// re-wraps, after the strip of its X-free conjuncts: an undecided block comes
+// back wrapped rather than answered (invariant 3). The cases here are the
+// DRIVER's; the ladder's own routes are claimed in
+// tests/unit/test_anti_prenex_layer5.cpp and
+// tests/unit/test_anti_prenex_layer6.cpp.
 //
 // Some cases take their INPUT STRING, and nothing else, from
 // tests/unit/test_antiprenexing.cpp; every expectation here is the spec's. A

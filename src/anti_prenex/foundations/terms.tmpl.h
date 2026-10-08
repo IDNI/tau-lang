@@ -761,6 +761,36 @@ bool is_pure_equation(tref literal, ba_type_id type) {
 		&& is_pure_term<node>(tau::trim_right_sibling(eq.second()), type);
 }
 
+template <NodeType node>
+bool is_pure_formula(tref n, ba_type_id type) {
+	using tau = tree<node>;
+	bool pure = true;
+	// Decided at every wrapper: a connective, a `¬` or a binder is
+	// entered, a `¬` over an atom by way of the atom, and anything else
+	// must be a pure equation or ends the walk.
+	auto check = [&pure, type](tref m) {
+		const tau& t = tau::get(m);
+		if (!t.is(tau::wff) || t.equals_T() || t.equals_F()
+			|| t.child_is(tau::wff_and) || t.child_is(tau::wff_or)
+			|| t.child_is(tau::wff_neg)) return true;
+		if (is_child_quantifier<node>(m))
+			return pure = tau::get(binder_var<node>(m)).get_ba_type()
+				== type;
+		return pure = is_pure_equation<node>(m, type);
+	};
+	// The skeleton alone: a binder's variable and an atom's terms are
+	// never entered.
+	auto skeleton = [](tref m) {
+		const tau& t = tau::get(m);
+		return t.is(tau::wff) || t.is(tau::wff_and) || t.is(tau::wff_or)
+			|| t.is(tau::wff_neg) || t.is(tau::wff_ex)
+			|| t.is(tau::wff_all);
+	};
+	auto up = [](tref) {};
+	pre_order<node>(n).search_unique(check, skeleton, up);
+	return pure;
+}
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #endif // __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
