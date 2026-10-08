@@ -122,6 +122,19 @@ _dep_boost_target_build() {
 }
 
 _dep_boost_target_setup() {
+	local _cl
+	# b2 takes clang-cl for clang on Linux, so every MSVC preset builds with cl.
+	_cl="$(command -v cl.exe 2>/dev/null)" || {
+		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2
+		exit 2
+	}
+	DEP_BOOST_CC="$_cl"
+	DEP_BOOST_CXX="$_cl"
+	# The cl release flags, so a clang-cl preset does not fork a second Boost id.
+	DEP_BOOST_CFLAGS="/DWIN32 /D_WINDOWS /O2 /Ob2 /DNDEBUG"
+	DEP_BOOST_CXXFLAGS="/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG"
+	BOOST_TOOLSET="msvc"
+	DEP_BOOST_B2_TOOLSET="msvc"
 	DEP_BOOST_TARGET_OS="windows"
 	DEP_BOOST_B2_PIC=""
 	# --layout=system names the static and the shared library identically,
@@ -129,6 +142,10 @@ _dep_boost_target_setup() {
 	BOOST_LINK_MODE="static"
 	DEP_BOOST_B2_LINK="static"
 	DEP_BOOST_B2_DEFINE="BOOST_LOG_WITHOUT_SYSLOG"
+}
+
+_dep_boost_target_fields() {
+	printf '%s\n' "builder=msvc"
 }
 
 source "$(dirname "${BASH_SOURCE[0]}")/../common/boost.sh"

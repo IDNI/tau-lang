@@ -116,6 +116,8 @@ BOOST_EXPECTED_CLOSURE=(
 # A target file overrides the ones it needs before it sources this file.
 # _dep_boost_target_setup sets the b2 settings of the target.
 declare -F _dep_boost_target_setup > /dev/null || _dep_boost_target_setup() { :; }
+# _dep_boost_target_fields prints extra id fields of the target.
+declare -F _dep_boost_target_fields > /dev/null || _dep_boost_target_fields() { :; }
 
 # _dep_boost_user_config <work> <cxx> writes <work>/user-config.jam.
 if ! declare -F _dep_boost_user_config > /dev/null; then
@@ -201,6 +203,7 @@ _dep_boost_field_block() {
 		"pic=ON" \
 		"lto=OFF" \
 		"sanitizer=OFF"
+	_dep_boost_target_fields
 }
 
 # Verify the work tree's closure against the expected one. Fails on a missing or
