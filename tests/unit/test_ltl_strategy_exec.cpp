@@ -24,13 +24,6 @@
 #endif
 
 #include <fstream>
-#include <sys/stat.h>
-// getpid is POSIX; Windows declares it in process.h instead.
-#ifdef _WIN32
-#  include <process.h>
-#else
-#  include <unistd.h>
-#endif
 
 using namespace idni::tau_lang;
 
@@ -533,9 +526,11 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 	};
 
 	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to TAU_LTL_EXPORT_STRATEGY_FILE" * doctest::skip(!ltlsynt_available())) {
-		std::string tmp = "/tmp/tau_strat_test_" + std::to_string(::getpid()) + ".hoa";
+		const std::filesystem::path tmp =
+			tau_test_tmp("strategy_export") / "strategy.hoa";
 		{
-			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE", tmp.c_str());
+			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE",
+				tmp.string().c_str());
 			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0)).").value_or(nullptr));
 			REQUIRE(fm.has_value());
 			tref f = fm.value().main->get();
@@ -544,15 +539,16 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 			bool result = sat_r.value();
 			CHECK(result);
 		}
-		struct stat st;
-		bool written = (stat(tmp.c_str(), &st) == 0 && st.st_size > 0);
+		std::error_code ec;
+		const std::uintmax_t size = std::filesystem::file_size(tmp, ec);
+		bool written = !ec && size > 0;
 		if (written) {
 			std::ifstream ifs(tmp);
 			std::string content((std::istreambuf_iterator<char>(ifs)),
 			                     std::istreambuf_iterator<char>());
 			CHECK(content.find("HOA:") != std::string::npos);
 			CHECK(content.find("States:") != std::string::npos);
-			std::remove(tmp.c_str());
+			std::filesystem::remove(tmp, ec);
 		}
 		CHECK(written);
 	}
