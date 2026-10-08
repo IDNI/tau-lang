@@ -164,3 +164,14 @@ function(add_raw_repl_test test_name command test_regex)
 	add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${command}")
 	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
 endfunction()
+
+# add_env_error_test(<name> <VAR=value>)
+#
+# A bad value of an option variable is an error: tau prints it and exits
+# with 1 before it runs a command. POSIX only.
+function(add_env_error_test test_name env)
+	add_raw_repl_test(${test_name}
+		"out=$(${TAU_RUN} -e 'get ltltimeout' 2>&1); echo \"exit=$? $out\""
+		"exit=1 .*does not take the value of the environment variable"
+		NO_FAIL_REGEX ENV ${env})
+endfunction()

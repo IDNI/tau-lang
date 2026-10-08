@@ -1009,7 +1009,7 @@ TEST_CASE("with the cap at 0 the row is lost at the sweep") {
 TEST_SUITE("tau_ba — no memo on a full bdd node table") {
 // ============================================================================
 
-using decision_cache = detail::tau_decision_cache<typename test_ba::node>;
+using decision_cache = tau_lang::detail::tau_decision_cache<typename test_ba::node>;
 
 // Unsat (v & w = 0 while both are 1), so its normal form is literally F.
 static test_ba unsat_constant(const char* v, const char* w) {
@@ -1168,7 +1168,7 @@ static tref key_of(const test_ba& a) {
 
 TEST_CASE("a dead splitter normalize row is dropped by a collect") {
 	multi_char_vars vars;
-	auto& memo = detail::tau_decision_cache<node_t>::splitter_normalize_memo();
+	auto& memo = tau_lang::detail::tau_decision_cache<node_t>::splitter_normalize_memo();
 	{
 		tref fm = tau::get("(gm98_dx:sbf = 0) && (gm98_dy:sbf = 1)",
 			parse_wff()).value_or(nullptr);
@@ -1190,7 +1190,7 @@ TEST_CASE("a dead splitter normalize row is dropped by a collect") {
 
 TEST_CASE("a live splitter normalize row survives a collect") {
 	multi_char_vars vars;
-	auto& memo = detail::tau_decision_cache<node_t>::splitter_normalize_memo();
+	auto& memo = tau_lang::detail::tau_decision_cache<node_t>::splitter_normalize_memo();
 	htref hold;
 	tref first = nullptr;
 	{
@@ -1215,7 +1215,7 @@ TEST_CASE("a live splitter normalize row survives a collect") {
 
 TEST_CASE("a dead normalize_tau row is dropped by a collect") {
 	multi_char_vars vars;
-	auto& memo = detail::tau_decision_cache<node_t>::normalize_memo();
+	auto& memo = tau_lang::detail::tau_decision_cache<node_t>::normalize_memo();
 	{
 		tref fm = tau::get("(gm98_nx:sbf = 0) && (gm98_ny:sbf = 1)",
 			parse_wff()).value_or(nullptr);
@@ -1237,7 +1237,7 @@ TEST_CASE("a dead normalize_tau row is dropped by a collect") {
 
 TEST_CASE("a live normalize_tau row survives a collect") {
 	multi_char_vars vars;
-	auto& memo = detail::tau_decision_cache<node_t>::normalize_memo();
+	auto& memo = tau_lang::detail::tau_decision_cache<node_t>::normalize_memo();
 	htref hold;
 	tref first = nullptr;
 	{

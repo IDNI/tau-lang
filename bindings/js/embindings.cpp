@@ -46,12 +46,13 @@ void set_last_error(const Result& r) {
 	g_last_error = oss.str();
 }
 
-// The report text of a failed tau_init(), returned by every engine call so
-// the module still loads and tells a JS caller why it cannot work.
+// The report text of a failed tau_init() or environment load, returned by
+// every engine call so the module still loads and tells a JS caller why it
+// cannot work.
 std::string g_init_error;
 
 // Clears the last error. False, with the init error as the last error, when
-// tau_init() failed.
+// the init failed.
 bool begin_engine_call() {
 	g_last_error.clear();
 	if (g_init_error.empty()) return true;
@@ -355,6 +356,7 @@ EMSCRIPTEN_BINDINGS(tau) {
 	disable_logging();
 	// getLastError() after the load shows the warnings of a successful init
 	auto init = tau_init<node_t>();
+	if (init.has_value()) init.merge(idni::options().load_env("TAU_"));
 	set_last_error(init);
 	if (!init.has_value()) g_init_error = g_last_error;
 

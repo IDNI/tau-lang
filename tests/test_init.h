@@ -11,6 +11,7 @@
 #include "logging.h"
 #include "benchmark_listener.h"
 #include "utility/diagnostics.h"
+#include "utility/options.h"
 // Only the preprocessing/solver placement/cvc5-option parameters, not the
 // machinery behind them: this header defines main() and is included before
 // any tau header in every test TU, so it must not pull the tau tree in ahead
@@ -108,6 +109,9 @@ int main(int argc, char** argv) {
 		auto init = test_tau_init_hook();
 		init.print_pending();
 		if (!init.has_value()) return 1;
+		auto env = idni::options().load_env("TAU_");
+		env.print_pending();
+		if (!env.has_value()) return 1;
 	}
 	if (test_child_hook) {
 		if (int rc = test_child_hook(argc, argv); rc >= 0) return rc;

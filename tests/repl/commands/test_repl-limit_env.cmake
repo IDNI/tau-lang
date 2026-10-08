@@ -78,14 +78,10 @@ foreach(row IN LISTS TAU_ENV_LIMIT_ROWS)
 		"${var}" NO_FAIL_REGEX ${need})
 endforeach()
 
+# Garbage in a count variable is an error.
+add_env_error_test(limit_env-garbage_count_is_an_error
+	TAU_MAX_FIXPOINT_STEPS=abc)
 # Garbage keeps the default and says so once.
-add_repl_test(limit_env-garbage_count_warns
-	"get fixpointsteps"
-	"TAU_MAX_FIXPOINT_STEPS='abc' is not a non-negative number"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_MAX_FIXPOINT_STEPS=abc)
-add_repl_test(limit_env-garbage_count_keeps_default
-	"get fixpointsteps" "fixpointsteps: *500"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_MAX_FIXPOINT_STEPS=abc)
 add_repl_test(limit_env-garbage_real_warns
 	"get gcgrowth" "TAU_GC_GROWTH_FACTOR='abc' is not a number"
 	NO_FAIL_REGEX NO_TRACE ENV TAU_GC_GROWTH_FACTOR=abc)

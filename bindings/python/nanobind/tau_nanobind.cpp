@@ -120,8 +120,9 @@ static py_result to_py_result(idni::tau_lang::result<T>&& r) {
 	return out;
 }
 
-// The report of tau_init() at module init. The module loads either way, so
-// a failed init raises from each engine call instead of from the import.
+// The report of tau_init() and of the environment at module init. The
+// module loads either way, so a failed init raises from each engine call
+// instead of from the import.
 static py_report init_report;
 static bool init_failed = false;
 
@@ -142,6 +143,8 @@ bool leak_warnings() {
 NB_MODULE(tau, m) {
 	{
 		auto init = idni::tau_lang::tau_init<node_t>();
+		if (init.has_value())
+			init.merge(idni::options().load_env("TAU_"));
 		init_report = make_py_report(init.report());
 		init_failed = !init.has_value();
 	}

@@ -5,6 +5,7 @@
 #include "api.h"
 
 #include "tau_tree_builders.h"
+#include "tau_options.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -35,6 +36,7 @@ result<void> tau_init() {
 					in.get_terminals(from, to));
 		},
 		{ { tau_parser::type_def, tau_parser::new_type_name } });
+	TAU_TRY_VOID(idni::options().declare(tau_core_option_set));
 	return r;
 }
 
@@ -115,8 +117,9 @@ option_change_guard<node>::option_change_guard()
 
 template <NodeType node>
 option_change_guard<node>::~option_change_guard() {
-	if (api_detail::semantic_options_fingerprint<node>() != before)
-		tree<node>::clear_caches();
+	const size_t after = api_detail::semantic_options_fingerprint<node>();
+	if (after != before) tree<node>::clear_caches();
+	semantic_options_seen<node> = after;
 }
 
 template <NodeType node>

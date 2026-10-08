@@ -307,6 +307,9 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 		"\tauto init = tau_init<node_t>();\n"
 		"\tinit.print_pending();\n"
 		"\tif (!init.has_value()) return 1;\n"
+		"\tauto env = idni::options().load_env(\"TAU_\");\n"
+		"\tenv.print_pending();\n"
+		"\tif (!env.has_value()) return 1;\n"
 		;
 }
 

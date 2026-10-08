@@ -134,16 +134,15 @@ add_repl_test(ltl_env-qe_short_flag_is_lowercase_k
 # Every runtime limit of the pipeline carries all three surfaces: a CLI flag,
 # a REPL option and a TAU_* environment fallback. The variable shows through
 # `get` when the flag is absent, the flag wins when both are given, and a
-# garbage value keeps the default and says so.
+# garbage value of a core limit is an error.
 add_repl_test(ltl_env-hoa_max_states_env_is_the_fallback
 	"get ltlhoamaxstates" "ltlhoamaxstates: *7" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_HOA_MAX_STATES=7)
 add_repl_test(ltl_env-hoa_max_states_flag_beats_env
 	"get ltlhoamaxstates" "ltlhoamaxstates: *9" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_HOA_MAX_STATES=7 FLAGS --ltl-hoa-max-states 9)
-add_repl_test(ltl_env-hoa_max_states_garbage_warns
-	"get ltlhoamaxstates" "TAU_LTL_HOA_MAX_STATES='abc' is not a non-negative number" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_HOA_MAX_STATES=abc)
+add_env_error_test(ltl_env-hoa_max_states_garbage_is_an_error
+	TAU_LTL_HOA_MAX_STATES=abc)
 add_repl_test(ltl_env-hoa_max_states_flag_rejects_garbage
 	"get ltlhoamaxstates" "expects a non-negative number" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-hoa-max-states abc)
@@ -184,10 +183,8 @@ add_repl_test(ltl_env-data_game_max_memo_env_is_the_fallback
 add_repl_test(ltl_env-data_game_max_memo_flag_beats_env
 	"get ltldatagamemaxmemo" "ltldatagamemaxmemo: *12" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_DATA_GAME_MAX_MEMO=4096 FLAGS --ltl-data-game-max-memo 12)
-add_repl_test(ltl_env-data_game_max_memo_garbage_warns
-	"get ltldatagamemaxmemo"
-	"TAU_LTL_DATA_GAME_MAX_MEMO='abc' is not a non-negative number"
-	NO_FAIL_REGEX NO_TRACE ENV TAU_LTL_DATA_GAME_MAX_MEMO=abc)
+add_env_error_test(ltl_env-data_game_max_memo_garbage_is_an_error
+	TAU_LTL_DATA_GAME_MAX_MEMO=abc)
 # The consistency-subset and coverage-product caps read the environment too.
 add_repl_test(ltl_env-consistency_subsets_env_is_the_fallback
 	"get maxsubsets" "maxsubsets: *7" NO_FAIL_REGEX NO_TRACE

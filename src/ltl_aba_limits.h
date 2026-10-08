@@ -23,6 +23,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdlib>
+#include <optional>
 #include <string>
 
 namespace idni::tau_lang {
@@ -266,6 +267,21 @@ inline int ltl_timeout_sec() {
 }
 
 /**
+ * @brief The synthesis algorithm @p v names, upper-cased: `"A"`, `"B"`,
+ * `"D"`, or `""` for `auto` and the empty string; nullopt for any other
+ * word.
+ *
+ * Case-insensitive. The one list of accepted words: the option reads it to
+ * refuse a typo, and @ref ltl_algorithm_choice to route.
+ */
+inline std::optional<std::string> ltl_algorithm_name(std::string v) {
+	for (auto& c : v) c = (char) std::toupper((unsigned char) c);
+	if (v.empty() || v == "AUTO") return std::string();
+	if (v == "A" || v == "B" || v == "D") return v;
+	return std::nullopt;
+}
+
+/**
  * @brief Effective synthesis algorithm choice: `"A"`, `"B"`, `"D"` or `""`
  * for the default routing.
  *
@@ -280,9 +296,8 @@ inline std::string ltl_algorithm_choice() {
 	std::string v = ltl_algorithm_param;
 	if (v.empty())
 		if (const char* env = std::getenv("TAU_LTL_ALG"); env) v = env;
+	if (auto name = ltl_algorithm_name(v)) return *name;
 	for (auto& c : v) c = (char) std::toupper((unsigned char) c);
-	if (v.empty() || v == "AUTO") return "";
-	if (v == "A" || v == "B" || v == "D") return v;
 	if (env_first_warning("TAU_LTL_ALG=" + v))
 		TAU_LOG_WARNING << "[ltl_aba] synthesis algorithm \"" << v
 			<< "\" is not recognised (only A, B, D and auto are); "

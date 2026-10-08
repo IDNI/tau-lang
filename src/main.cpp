@@ -482,6 +482,9 @@ int main(int argc, char** argv) {
 	auto init = tau_init<node_t>();
 	init.print_pending();
 	if (!init.has_value()) return 1;
+	auto env = idni::options().load_env("TAU_");
+	env.print_pending();
+	if (!env.has_value()) return 1;
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
