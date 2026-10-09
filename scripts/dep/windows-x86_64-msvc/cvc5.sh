@@ -30,7 +30,7 @@ CVC5_MSVC_GMP_VERSION="6.3.0#5"
 # cvc5 keys its Windows code on the MinGW macro __WIN32__. The flags hold no
 # path: the compat header and the unistd.h and getopt.h shims reach clang-cl
 # through CL, and their hashes are id fields.
-CVC5_MSVC_FLAGS="-D__WIN32__"
+CVC5_MSVC_FLAGS="-D__WIN32__ -w"
 
 # No system GMP serves this target: the prebuild step installs the vcpkg one.
 _dep_cvc5_gmp_header() {
@@ -279,9 +279,8 @@ _dep_cvc5_target_prebuild() {
 	CMAKE_PREFIX_PATH="$(cygpath -m "$deps")"
 	# clang-cl reads extra options from CL. The compat header goes into every
 	# file, because ssize_t reaches files that do not include unistd.h.
-	# cvc5's -Wall is -Weverything for clang-cl, so -w drops its warnings.
 	export CL
-	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\" -w"
+	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
 }
 

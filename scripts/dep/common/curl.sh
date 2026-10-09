@@ -200,8 +200,9 @@ if [ -z "$DEP_CURL_CC" ] || [ -z "$DEP_CURL_CXX" ]; then
 	echo "dep-curl: no compiler; pass -DTAU_DEP_CC and -DTAU_DEP_CXX" >&2
 	exit 2
 fi
-DEP_CURL_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
-DEP_CURL_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
+# With -w the package build prints no warning.
+DEP_CURL_CFLAGS="$(dep_var TAU_DEP_CFLAGS "") -w"
+DEP_CURL_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "") -w"
 DEP_CURL_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_CURL_TOOLCHAIN_ARGS=()
 if dep_target_needs_toolchain "$DEP_CURL_TARGET"; then

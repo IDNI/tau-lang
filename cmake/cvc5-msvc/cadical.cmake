@@ -23,7 +23,7 @@ add_library(cadical STATIC ${_cadical_sources})
 target_compile_definitions(cadical PRIVATE
 	__WIN32 QUIET NDEBUG NBUILD NUNLOCKED NCLOSEFROM)
 target_include_directories(cadical PRIVATE "${CVC5_MSVC_DIR}/include")
-target_compile_options(cadical PRIVATE "/FI${CVC5_MSVC_DIR}/compat.h")
+target_compile_options(cadical PRIVATE "/FI${CVC5_MSVC_DIR}/compat.h" -w)
 
 install(TARGETS cadical ARCHIVE DESTINATION lib)
 install(FILES src/cadical.hpp src/tracer.hpp DESTINATION include/cadical)

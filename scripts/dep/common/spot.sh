@@ -38,7 +38,7 @@ if ! declare -F _dep_spot_target_build > /dev/null; then
 		local src="$1" staging_prefix="$2"
 		( cd "$src" && env -u CPPFLAGS -u LDFLAGS \
 			CC="$DEP_SPOT_CC" CXX="$DEP_SPOT_CXX" \
-			${_DEP_SPOT_CROSS_ENV[@]+"${_DEP_SPOT_CROSS_ENV[@]}"} \
+			CFLAGS="$DEP_SPOT_CFLAGS" CXXFLAGS="$DEP_SPOT_CXXFLAGS" \
 			./configure --prefix="$staging_prefix" --disable-python \
 				--disable-shared --disable-devel ) \
 			|| { echo "dep-spot: configure failed" >&2; return 1; }
@@ -78,6 +78,8 @@ _dep_spot_field_block() {
 		"provenance.manifest_writer_hash=${manifest_hash}" \
 		"provenance.store_writer_hash=${store_hash}" \
 		"configure_args=${_DEP_SPOT_CONFIGURE_ARGS[*]}" \
+		"cflags=${DEP_SPOT_CFLAGS}" \
+		"cxxflags=${DEP_SPOT_CXXFLAGS}" \
 		"builder=${DEP_SPOT_BUILDER}" \
 		"compiler_id=$(dep_compiler_id "$DEP_SPOT_BUILDER_CXX")" \
 		"compiler_version=$(dep_compiler_version "$DEP_SPOT_BUILDER_CXX")" \
@@ -213,7 +215,8 @@ if [ -z "$DEP_SPOT_CC" ] || [ -z "$DEP_SPOT_CXX" ]; then
 	echo "dep-spot: no compiler; pass -DTAU_DEP_CC and -DTAU_DEP_CXX" >&2
 	exit 2
 fi
-_DEP_SPOT_CROSS_ENV=()
+DEP_SPOT_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
+DEP_SPOT_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
 DEP_SPOT_BUILDER="preset"
 DEP_SPOT_BUILDER_CXX="$DEP_SPOT_CXX"
 DEP_SPOT_EXE="ltlsynt"
