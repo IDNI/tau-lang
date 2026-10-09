@@ -227,7 +227,7 @@ TEST_SUITE("bounded bitvector decision") {
 	tau::get_options wff_opts{ .parse = { .start = tau::wff } };
 
 	TEST_CASE("a question past its budget is unknown and noted") {
-		if (!bounded_calls_available()) return;
+		if (!bounded_calls_available() && !bounded_children_available()) return;
 		const size_t timeout = bv_solve_timeout;
 		const size_t nodes = bv_bitblast_max_nodes;
 		bv_solve_timeout = 1;
@@ -245,6 +245,9 @@ TEST_SUITE("bounded bitvector decision") {
 		// cvc5 does not decide it in a second
 		CHECK( s == bv_sat_status::unknown );
 		CHECK( noted.find("bv-solve-timeout, 1 s") != std::string::npos );
+		// the killed child says so in the note's report
+		CHECK( report_has_attr(take_time_budget_report(),
+			tau_lang::label::timeout) );
 		// asked again, the budget is noted again
 		bv_formula_sat_status<node_t>(hard).value();
 		CHECK( !take_time_budget_exhausted().empty() );
@@ -272,7 +275,7 @@ TEST_SUITE("bounded bitvector decision") {
 	}
 
 	TEST_CASE("solving a question past its budget gives no solution") {
-		if (!bounded_calls_available()) return;
+		if (!bounded_calls_available() && !bounded_children_available()) return;
 		const size_t timeout = bv_solve_timeout;
 		bv_solve_timeout = 1;
 		take_time_budget_exhausted();

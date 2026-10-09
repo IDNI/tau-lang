@@ -164,7 +164,7 @@ TEST_SUITE("bv solver budgets and declines") {
 		bv_solve_timeout = 60;
 		const auto bounded = bv_question_deadline();
 		bv_solve_timeout = saved;
-		if (bounded_calls_available()) {
+		if (bounded_calls_available() || bounded_children_available()) {
 			CHECK( none == std::chrono::steady_clock::time_point::max() );
 			CHECK( bounded < std::chrono::steady_clock::time_point::max() );
 		} else

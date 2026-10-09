@@ -2,6 +2,8 @@
 
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
+#include "backends/cvc5/cvc5_term_text.h"
+#include "bounded_child.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_solver"
@@ -613,7 +615,7 @@ inline std::string bv_solve_timeout_message() {
 /// shares one, else of `bv_solve_timeout`; never when that budget is 0 or no
 /// child process can bound it.
 inline std::chrono::steady_clock::time_point bv_question_deadline() {
-	if (!bounded_calls_available())
+	if (!bounded_calls_available() && !bounded_children_available())
 		return std::chrono::steady_clock::time_point::max();
 	if (!shared_deadline() && !bv_solve_timeout)
 		return std::chrono::steady_clock::time_point::max();
@@ -621,20 +623,74 @@ inline std::chrono::steady_clock::time_point bv_question_deadline() {
 }
 
 /**
+ * @brief The request of a bounded child that decides @p question as a solver
+ * set up by `config_cvc5_solver(solver, true)` does.
+ * @param question The asserted cvc5 term.
+ * @param alternating Whether the solver also takes
+ * `config_cvc5_solver_alternating_quantifiers`.
+ * @return The request, or nullopt when @p question has no text.
+ */
+inline std::optional<std::string> bv_check_sat_request(
+	const cvc5::Term& question, bool alternating)
+{
+	auto text = cvc5_term_to_text(question);
+	if (!text) return std::nullopt;
+	return std::to_string(static_cast<int>(cvc5_options))
+		+ (alternating ? " 1\n" : " 0\n") + *text;
+}
+
+/**
+ * @brief The job of a bounded child: decides the question of a
+ * bv_check_sat_request.
+ * @param request The request.
+ * @return The verdict as a `bv_sat_status` byte, or nullopt when @p request
+ * is not a valid request.
+ */
+inline std::optional<uint8_t> bv_check_sat_child(const std::string& request) {
+	std::istringstream in(request);
+	int options = -1, alternating = -1;
+	if (!(in >> options >> alternating) || options < 0
+		|| options > static_cast<int>(cvc5_option_set::combined_best)
+		|| (alternating != 0 && alternating != 1)) return std::nullopt;
+	auto question = cvc5_term_from_text(std::string(
+		std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()));
+	if (!question) return std::nullopt;
+	cvc5_options = static_cast<cvc5_option_set>(options);
+	cvc5::Solver solver(cvc5_term_manager);
+	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
+	config_cvc5_solver(solver, true);
+	solver.assertFormula(*question);
+	auto r = solver.checkSat();
+	return static_cast<uint8_t>(r.isSat() ? bv_sat_status::sat
+		: r.isUnknown() ? bv_sat_status::unknown : bv_sat_status::unsat);
+}
+
+inline const bool bv_check_sat_child_registered =
+	(register_bounded_child("bv-check-sat", &bv_check_sat_child), true);
+
+/**
  * @brief The verdict of @p solver's single checkSat; with @p bounded, run in
  * a child process killed at @p deadline.
  *
+ * Without fork the child is a new process of this program, which gets
+ * @p question as text (bv_check_sat_request); a question with no text is
+ * checked in the process, as without a bound.
  * A child that passes the deadline, or ends without answering, gives
- * unknown, sets @p ran_out and notes the budget for the boundary of the unit
- * of work (`note_time_budget_exhausted`).
+ * unknown, sets @p ran_out and notes the budget, with the child's error,
+ * for the boundary of the unit of work (`note_time_budget_exhausted`).
  * @param solver Solver holding the asserted question.
+ * @param question The term asserted in @p solver.
+ * @param alternating Whether @p solver took
+ * `config_cvc5_solver_alternating_quantifiers` before
+ * `config_cvc5_solver(solver, true)`.
  * @param bounded Whether to run the check in a child process.
  * @param deadline When the child is killed; `time_point::max()` runs the
  * check in-process even when @p bounded.
  * @param ran_out Out: set to `true` when the budget ran out; never cleared.
  * @return The verdict; unknown when cvc5 gave up or the budget ran out.
  */
-inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
+inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
+	const cvc5::Term& question, bool alternating, bool bounded,
 	std::chrono::steady_clock::time_point deadline, bool& ran_out)
 {
 	auto verdict = [&solver] {
@@ -650,16 +706,30 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver, bool bounded,
 		deadline - steady_clock::now()).count();
 	bounded_outcome out;
 	out.status = bounded_outcome::timed_out;
-	if (left > 0) out = run_bounded([&] { return (uint8_t)verdict(); },
-		(uint64_t)left);
-	if (out.status == bounded_outcome::done
-		&& out.value <= (uint8_t)bv_sat_status::unknown)
+	if (left > 0 && bounded_calls_available())
+		out = run_bounded([&] { return (uint8_t)verdict(); },
+			(uint64_t)left);
+	else if (left > 0) {
+		auto request = bv_check_sat_request(question, alternating);
+		if (!request) return verdict();
+		out = run_bounded_child("bv-check-sat", *request, (uint64_t)left);
+	}
+	if (out.status == bounded_outcome::done) {
+		if (out.value <= (uint8_t)bv_sat_status::unknown)
 			return (bv_sat_status)out.value;
+		out.status = bounded_outcome::failed;
+		out.rep.error(code::runtime_error, "the bounded child gave no "
+			"verdict of a bitvector question", {{ label::value,
+			std::to_string(out.value) }});
+	}
 	ran_out = true;
+	// the child's error travels with the note to the boundary of the unit
+	// of work, which turns the missing answer into an error
 	note_time_budget_exhausted(out.status == bounded_outcome::timed_out
 		? bv_solve_timeout_message()
 		: "UNKNOWN: the process deciding a bitvector question ended "
-			"without an answer, so no answer is given");
+			"without an answer, so no answer is given",
+		std::move(out.rep));
 	return bv_sat_status::unknown;
 }
 
@@ -775,7 +845,8 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 					return memo(std::nullopt);
 				}
 				qf_solver.assertFormula(qf_expr.value());
-				auto qf_result = bv_check_sat(qf_solver, false,
+				auto qf_result = bv_check_sat(qf_solver,
+					qf_expr.value(), false, false,
 					std::chrono::steady_clock::time_point::max(),
 					ran_out);
 				if (qf_result == bv_sat_status::sat) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
@@ -806,8 +877,8 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	// Non-alternating shapes such as `(ex x P(x)) && (all y Q(y))` would
 	// pay the strategy change's cost (see
 	// config_cvc5_solver_alternating_quantifiers) for no benefit.
-	if (has_alternating_quantifiers<node>(form))
-		config_cvc5_solver_alternating_quantifiers(solver);
+	const bool alternating = has_alternating_quantifiers<node>(form);
+	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
 	// decision_only: this function only ever reads the checkSat verdict,
 	// never a model, so satisfiability-preserving preprocessing is admissible
 	// here (see cvc5_option_set::decision_no_models).
@@ -841,8 +912,9 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	}
 	solver.assertFormula(expr.value());
 	// the questions of a scope sharing one budget all count against it
-	auto result = bv_check_sat(solver, shared_deadline().has_value()
-		|| bv_needs_bound(expr.value()), deadline, ran_out);
+	auto result = bv_check_sat(solver, expr.value(), alternating,
+		shared_deadline().has_value() || bv_needs_bound(expr.value()),
+		deadline, ran_out);
 	if (result == bv_sat_status::unknown)
 		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
 	return memo(result);
@@ -918,7 +990,8 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 		config_cvc5_solver(decider, true);
 		decider.assertFormula(expr.value());
 		bool ran_out = false;
-		if (bv_check_sat(decider, true, deadline, ran_out)
+		if (bv_check_sat(decider, expr.value(), alternating, true,
+			deadline, ran_out)
 			!= bv_sat_status::sat)
 		{
 			LOG_DEBUG << "Bitvector system is not decided sat within "

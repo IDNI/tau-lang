@@ -1816,6 +1816,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		error = true, result = 0;
 		tau::clear_caches();
 		TAU_LOG_ERROR << m;
+		take_time_budget_report().print_pending(err);
 		if (command_type == tau::run_cmd) finish_running();
 	}
 #ifdef DEBUG

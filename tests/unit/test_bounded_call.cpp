@@ -4,6 +4,7 @@
 #include "bounded_call.h"
 
 #include <cstdlib>
+#include <sstream>
 #include <thread>
 
 using namespace idni::tau_lang;
@@ -14,6 +15,7 @@ TEST_SUITE("bounded_call") {
 		auto out = run_bounded([] { return uint8_t{42}; }, 10'000);
 		CHECK( out.status == bounded_outcome::done );
 		CHECK( out.value == 42 );
+		CHECK( !out.rep.has_error() );
 	}
 
 	TEST_CASE("the child works on a copy of the parent") {
@@ -34,6 +36,9 @@ TEST_SUITE("bounded_call") {
 		CHECK( out.status == bounded_outcome::timed_out );
 		CHECK( out.seconds >= 0.3 );
 		CHECK( out.seconds < 5 );
+		CHECK( out.rep.has_error() );
+		CHECK( report_attr_value(out.rep, tau_lang::label::timeout)
+			== 300 );
 	}
 
 	TEST_CASE("a child that dies gives no answer") {
@@ -41,6 +46,27 @@ TEST_SUITE("bounded_call") {
 		auto out = run_bounded([] { std::_Exit(3); return uint8_t{1}; },
 			10'000);
 		CHECK( out.status == bounded_outcome::failed );
+		CHECK( out.rep.has_error() );
+		CHECK( report_attr_value(out.rep, tau_lang::label::exit_code)
+			== 3 );
+	}
+
+	TEST_CASE("the reports of every budget that ran out are kept") {
+		take_time_budget_exhausted();
+		take_time_budget_report();
+		diag::report first, second;
+		first.error(diag::code::runtime_error, "first child");
+		second.error(diag::code::runtime_error, "second child");
+		note_time_budget_exhausted("first", std::move(first));
+		note_time_budget_exhausted("second", std::move(second));
+		CHECK( take_time_budget_exhausted() == "first" );
+		auto rep = take_time_budget_report();
+		CHECK( rep.has_error() );
+		std::ostringstream os;
+		rep.print(os);
+		CHECK( os.str().find("first child") != std::string::npos );
+		CHECK( os.str().find("second child") != std::string::npos );
+		CHECK( !take_time_budget_report().has_error() );
 	}
 
 #ifdef TAU_HAS_BOUNDED_CALL

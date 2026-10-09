@@ -40,6 +40,7 @@
 #include <string_view>
 
 #include "self_exe_path.h"
+#include "tau_diagnostics.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -50,6 +51,7 @@
 #define TAU_HAS_BOUNDED_CALL 1
 #include <cerrno>
 #include <csignal>
+#include <cstring>
 #include <poll.h>
 #include <sys/wait.h>
 #include <thread>
@@ -62,11 +64,13 @@
 namespace idni::tau_lang {
 
 /// What @ref run_bounded got from its work: the status, the one-byte answer
-/// (meaningful only when `status == done`) and the wall-clock seconds spent.
+/// (meaningful only when `status == done`), the wall-clock seconds spent,
+/// and an error that says why when the status is not `done`.
 struct bounded_outcome {
 	enum kind { done, timed_out, failed } status = failed;
 	uint8_t value = 0;
 	double seconds = 0;
+	diag::report rep;
 };
 
 /// Whether @ref run_bounded can bound the work it runs.
@@ -104,12 +108,19 @@ inline bounded_outcome run_bounded(const std::function<uint8_t()>& work,
 	};
 #ifdef TAU_HAS_BOUNDED_CALL
 	int fd[2];
-	if (::pipe(fd) != 0) return finish(bounded_outcome::failed);
+	if (::pipe(fd) != 0) {
+		out.rep.error(code::io_error, "the pipe to a bounded child "
+			"could not be made", {{ label::value, std::strerror(errno) }});
+		return finish(bounded_outcome::failed);
+	}
 	const pid_t parent = ::getpid();
 	const auto deadline = start + std::chrono::milliseconds(timeout_ms);
 	const pid_t pid = ::fork();
 	if (pid < 0) {
+		const int e = errno;
 		::close(fd[0]); ::close(fd[1]);
+		out.rep.error(code::runtime_error, "the bounded child could not "
+			"be started", {{ label::value, std::strerror(e) }});
 		return finish(bounded_outcome::failed);
 	}
 	if (pid == 0) {
@@ -155,8 +166,17 @@ inline bounded_outcome run_bounded(const std::function<uint8_t()>& work,
 	int st = 0;
 	while (::waitpid(pid, &st, 0) < 0 && errno == EINTR) {}
 	if (answered) return finish(bounded_outcome::done);
-	return finish(timed_out ? bounded_outcome::timed_out
-		: bounded_outcome::failed);
+	if (timed_out) {
+		out.rep.error(code::runtime_error, "the bounded child was killed "
+			"at its bound (ms)", {{ label::timeout, timeout_ms }});
+		return finish(bounded_outcome::timed_out);
+	}
+	// a shell's convention: a signal shows as 128 plus its number
+	const int status = WIFSIGNALED(st) ? 128 + WTERMSIG(st)
+		: WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+	out.rep.error(code::runtime_error, "the bounded child ended without "
+		"an answer", {{ label::exit_code, status }});
+	return finish(bounded_outcome::failed);
 #else
 	(void)timeout_ms;
 	out.value = work();
@@ -226,18 +246,29 @@ inline int bounded_child_main(int argc, char** argv) {
 	return 0;
 }
 
-/// The message of the last budget that ran out in the current unit of work;
-/// empty when none did.
+/// The message of the first budget that ran out in the current unit of
+/// work; empty when none did.
 inline std::string& time_budget_exhausted() {
 	static std::string message;
 	return message;
 }
 
-/// Records that work ran past its time budget, described by @p message; the
-/// first message of a unit of work is kept, later ones are dropped.
-inline void note_time_budget_exhausted(std::string message) {
+/// The reports of the work that ran past its budgets in the current unit of
+/// work, which say why: the error of a killed or a dead child.
+inline diag::report& time_budget_report() {
+	static diag::report rep;
+	return rep;
+}
+
+/// Records that work ran past its time budget, described by @p message, and
+/// why, in @p detail; the first message of a unit of work is kept, later
+/// ones are dropped, and every detail is kept.
+inline void note_time_budget_exhausted(std::string message,
+	diag::report detail = {})
+{
 	if (time_budget_exhausted().empty())
 		time_budget_exhausted() = std::move(message);
+	time_budget_report().append(std::move(detail));
 }
 
 /// Returns and clears the message of @ref time_budget_exhausted.
@@ -245,6 +276,13 @@ inline std::string take_time_budget_exhausted() {
 	std::string m;
 	m.swap(time_budget_exhausted());
 	return m;
+}
+
+/// Returns and clears @ref time_budget_report.
+inline diag::report take_time_budget_report() {
+	diag::report r = std::move(time_budget_report());
+	time_budget_report() = diag::report{};
+	return r;
 }
 
 /// While set, the deadline every bounded question asked shares, in place
@@ -285,6 +323,7 @@ inline std::chrono::steady_clock::time_point budget_deadline(
 struct time_budget_handled {
 	using duration = std::chrono::steady_clock::duration;
 	std::string outer = take_time_budget_exhausted();
+	diag::report outer_report = take_time_budget_report();
 	std::optional<std::chrono::steady_clock::time_point> outer_deadline
 		= shared_deadline();
 	duration outer_question = shared_question_budget();
@@ -305,6 +344,8 @@ struct time_budget_handled {
 	/// Restores the enclosing scope's budget state, dropping what ran out here.
 	~time_budget_handled() {
 		time_budget_exhausted() = std::move(outer);
+		// TODO (HIGH) dropped error: the reports of what ran out in the scope -- the caller reads its missing answers as "undecided", and an error would make that answer an error.
+		time_budget_report() = std::move(outer_report);
 		shared_deadline() = outer_deadline;
 		shared_question_budget() = outer_question;
 	}

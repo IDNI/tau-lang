@@ -29,7 +29,9 @@ namespace idni::tau_lang {
  *
  * `done` carries the answer; `timed_out` means the child was killed at the
  * bound; `failed` means no child could be made, or it ended without a valid
- * answer.
+ * answer. Every status but `done` carries the error that says why: the
+ * report of the temp file or of `spawn_capture`, with the exit code and the
+ * output of the child.
  * @param kind A job registered with register_bounded_child.
  * @param request The text the job reads.
  * @param timeout_ms Wall-clock bound in milliseconds, counted from the call.
@@ -47,10 +49,16 @@ inline bounded_outcome run_bounded_child(const std::string& kind,
 			clock::now() - start).count();
 		return out;
 	};
-	if (!bounded_children_available()) return finish(bounded_outcome::failed);
-	// TODO (HIGH) dropped error: the reports of the temp file and the child -- bounded_outcome carries no report.
+	if (!bounded_children_available()) {
+		out.rep.error(code::not_found, "no program is known to run "
+			"a bounded child", {{ label::name, kind }});
+		return finish(bounded_outcome::failed);
+	}
 	auto tmp = fs::temp_file::create("tau_bounded", request);
-	if (!tmp.has_value()) return finish(bounded_outcome::failed);
+	if (!tmp.has_value()) {
+		out.rep.append(std::move(tmp).report());
+		return finish(bounded_outcome::failed);
+	}
 	// whole seconds, rounded up, so the child is never killed before the bound
 	const uint64_t secs = (timeout_ms + 999) / 1000;
 	spawn_options opts;
@@ -59,16 +67,23 @@ inline bounded_outcome run_bounded_child(const std::string& kind,
 		std::string(bounded_child_verb), kind },
 		secs > INT32_MAX ? INT32_MAX : static_cast<int>(secs),
 		[](int c) { return c == 0; }, opts);
-	if (!r.has_value())
-		return finish(report_has_attr(r.report(), label::timeout)
-			? bounded_outcome::timed_out : bounded_outcome::failed);
+	if (!r.has_value()) {
+		const bool timed_out = report_has_attr(r.report(), label::timeout);
+		out.rep.append(std::move(r).report());
+		return finish(timed_out ? bounded_outcome::timed_out
+			: bounded_outcome::failed);
+	}
 	const std::string& text = r.value();
 	const char* end = text.data() + text.size();
 	while (end > text.data() && (end[-1] == '\n' || end[-1] == ' ')) --end;
 	unsigned v = 0;
 	auto [p, ec] = std::from_chars(text.data(), end, v);
-	if (ec != std::errc{} || p != end || v > 255)
+	if (ec != std::errc{} || p != end || v > 255) {
+		out.rep.error(code::runtime_error, "the answer of the bounded "
+			"child is not a number", {{ label::name, kind },
+			{ label::value, truncate_for_message(text) }});
 		return finish(bounded_outcome::failed);
+	}
 	out.value = static_cast<uint8_t>(v);
 	return finish(bounded_outcome::done);
 }
