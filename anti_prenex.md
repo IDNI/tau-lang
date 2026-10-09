@@ -330,7 +330,8 @@ fallback live in `solver_memo` under that table's flush rule.
    outside the workers, the dispatcher tries the fast paths before 2d and
    the expansion, `PUSH_OVER_DISJUNCTION` orders its disjuncts
    smallest-first, `PUSH_OVER_CONJUNCTION` narrows scopes and checks the
-   positives' consistency before anything multiplies, elimination tries
+   positives' consistency before anything multiplies, a block deletes its
+   unate binders before its partition (§5), elimination tries
    witnesses before methods, the push kills binders — pin, case pin — then
    decomposes licensed before expanding, and `EXPAND` queues cheap members
    first. A new branch joins the ladder at its cost class — never ahead of
@@ -1022,6 +1023,10 @@ disjunction instead of a conjunction of one disjunction per member.
 
 ```
 PUSH_EX_BLOCK(body, X, kf):
+    body ← DELETE_UNATE_BINDERS(body, X)          // first, before the partition
+                                                  //   and the callback (below):
+                                                  //   a unate variable leaves
+                                                  //   by substitution
     // Partition at ENTRY: merge two block variables when some ATOM of `body`
     // mentions both — an atom inside a nested binder included: the walk
     // descends through every formula node, units and all, so the partition
@@ -1100,6 +1105,52 @@ the wrap, and the unit reaches enclosing blocks as an ordinary opaque leaf
 event (§1, cache scope): the verdict is a pure function of the completed
 pair, and the entries the discarded push wrote remain correct answers to
 their own keys.
+
+```
+DELETE_UNATE_BINDERS(body, X):
+    // ∃x.φ ≡ φ[x ← 0] when φ is DOWNWARD CLOSED in x — a value satisfying φ
+    // drags every smaller one along, so 0 satisfies φ whenever anything
+    // does — and ∃x.φ ≡ φ[x ← 1] when φ is UPWARD CLOSED. Valid in any BA:
+    // the witness is an end of the order, so no pin is needed. Closure is
+    // read off the literals of the NNF body, syntactically, in ONE walk:
+    //   POLARITY in a term: an occurrence of x is POSITIVE under an even
+    //     number of ′, NEGATIVE under an odd one; · and ∪ keep it. f is
+    //     MONOTONE in x when every occurrence is positive, ANTITONE when
+    //     every one is negative.
+    //   A literal mentioning x is x-LOW — growing x can only make it false —
+    //     when it is f = 0 with f monotone in x, or ¬(f = 0) with f
+    //     antitone; x-HIGH in the mirror cases. `f = 0` is an equation with
+    //     one side syntactically 0: equations are not zero-normalised
+    //     (inv. 4).
+    //   ∧ and ∨ preserve both closures: x-LOW in every literal mentioning x
+    //     makes body downward closed in x, x-HIGH in every one upward closed.
+    //   Anything else mentioning x makes x BINATE, and x stays: x under +
+    //     or any other term operator, a functional quantifier included; an
+    //     equation with no syntactic 0 side; an order atom; a unit; a
+    //     reference; a temporal operator.
+    // The walk is post-order and memoised per node: a node's summary — the
+    //   variables of X it moves up, down, or both ways — is a function of
+    //   the node alone, ¬ and ′ swap up and down, and a subtree whose FV
+    //   misses X is not entered.
+    L ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-LOW }
+    H ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-HIGH }
+    if L ∪ H = ∅: return body
+    return SIMPLIFY(body[x ← 0 for x ∈ L, x ← 1 for x ∈ H])
+        // one simultaneous substitution, 0 and 1 of x's own type: a constant
+        //   leaves every other variable's polarity as it was, so L ∪ H goes
+        //   together; simplified at construction (inv. 6)
+```
+
+**Unate binders.** The deletion is the cheapest binder kill there is — one
+walk and one substitution, no pin to find, no case to build — so it runs
+first, at block entry (inv. 8). It runs before the partition: a deleted
+variable no longer connects the atoms it shared, so the components can only
+get smaller. It runs before any component asks the callback, and it is
+unconditional: a unate binder leaves even where `kf` would keep functional
+quantifiers, since it never reaches the elimination `kf` governs, and the
+substituted body is equivalent. A `∀` run arrives dualised (`PROCESS_BLOCK`),
+so the one `∃` rule serves both kinds. A binate variable is left exactly as
+it was: the test is one-way (§3), it deletes or does nothing.
 
 ---
 
