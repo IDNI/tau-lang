@@ -397,7 +397,7 @@ A backend is compiled and linked only when a pack member asks for it, through
 that BA's `TAU_BA_REQUIRES_PACKAGES` / `TAU_BA_LINK_LIBS`.
 
 A backend serves an engine as well as an algebra. The Spot backend serves LTL
-synthesis, and no BA asks for it.
+synthesis, for core and for the qlt plugin, which runs its own synthesis.
 
 The BAs of a build are its **pack**, chosen at configure time with
 `-DTAU_BAS=` (default `sbf,tau,qint,qlt,nlang,bv,hsb`, minus the BAs a
