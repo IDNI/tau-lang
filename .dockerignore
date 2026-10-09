@@ -10,3 +10,6 @@ external/parser/build
 .local
 **/.local
 **/node_modules
+
+# A local tau-testnet checkout would replace the clone of the suite.
+tau-testnet/
