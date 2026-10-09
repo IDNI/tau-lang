@@ -55,8 +55,8 @@ using quantifier = typename tau_term_bdd<node>::Quantifier;
 enum class answer { sat, unsat, unknown };
 
 /// §3 the REGIME of `SIMPLIFY_TERM`, `SIMPLIFY_ATOM` and `SIMPLIFY`, the
-/// spec's empty or global `order`: `plain` in phases 1, 2 and 5, where no
-/// term is BDD-backed, `backed` in phase 4, under the BDD library's one
+/// spec's empty or global `order`: `plain` in phases 1 and 2, where no term
+/// is BDD-backed, `backed` in phases 4 and 5, under the BDD library's one
 /// global order (§1).
 enum class regime { plain, backed };
 
@@ -73,9 +73,10 @@ using prio_map = subtree_unordered_map<node, int_t>;
 /// `strip_chain` (terms.h); a yes allows keeping the chain, never forces it.
 /// Per COMPONENT of a block (§5) it is handed `REWRAP(body, X)`: the ∃ wrap of
 /// the whole block, its variables outermost first, over the body as that
-/// component's setup finds it — the dualised matrix for a ∀ run, the earlier
-/// components' results already in place. A node, rather than a prefix or a
-/// variable list, so that the policy can look at what is quantified.
+/// component's setup finds it — its equation sides BDD-backed (§1), the
+/// dualised matrix for a ∀ run, the earlier components' results already in
+/// place. A node, rather than a prefix or a variable list, so that the
+/// policy can look at what is quantified.
 /// CONTRACT: the callback never changes once set, every call passing the same
 /// one, so the memo keys carry the per-component flag alone.
 template <NodeType node>

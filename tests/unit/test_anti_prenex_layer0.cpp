@@ -459,11 +459,14 @@ TEST_CASE("canonical chains over prepared atoms and a unit: one node, members as
 	ap::block P{ x };
 	tref A = ap::prepare_terms<node_t>(wff("x & a = 0"));
 	tref B = ap::prepare_terms<node_t>(wff("x & b = 0"));
-	tref U = wff("ex y (x & y = 0)");                     // a unit: opaque to prepare_terms
+	// a unit: prepare_terms enters it, so it is taken converted
+	tref U0 = wff("ex y (x & y = 0)");
+	tref U = ap::prepare_terms<node_t>(U0);
 	// x-free, and backed all the same
 	tref C = ap::prepare_terms<node_t>(wff("c = 0"));
 	REQUIRE(th::is_bdd_backed(sides(A).first));
 	REQUIRE(th::is_bdd_backed(sides(B).first));
+	CHECK(U != U0);
 	CHECK(ap::prepare_terms<node_t>(U) == U);
 	tref chain = ap::canonical_and<node_t>(trefs{ A, U, C, B });
 	CHECK(chain == ap::canonical_and<node_t>(trefs{ B, C, U, A }));
@@ -485,7 +488,7 @@ TEST_CASE("canonical chains over prepared atoms and a unit: one node, members as
 		neg(ap::prepare_terms<node_t>(wff("x & c = 0"))) });
 	CHECK(ap::is_negative_tree<node_t>(nested));
 	CHECK(!ap::is_flat_tree<node_t>(nested));
-	// The component closes and re-opens on the same chain node.
+	// Spelled and converted again, the chain is the same node.
 	tref fin = th::convert_to_tau_terms(chain);
 	CHECK(!has_bdd_id(fin));
 	CHECK(ap::prepare_terms<node_t>(fin) == chain);

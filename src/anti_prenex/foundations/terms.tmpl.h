@@ -355,10 +355,10 @@ std::pair<tref, bool> unwrap_neg(tref a) {
 // --- the representation boundary (PREPARE_TERMS) ---------------------------------
 
 template <NodeType node>
-tref prepare_terms(tref body) {
+tref prepare_terms(tref phi) {
 	using tau = tree<node>;
 	using namespace terms_detail;
-	// Memoised per term, within this call only.
+	// Memoised per term: one side may sit in several equations.
 	subtree_unordered_map<node, tref> term_memo;
 	auto prep = [&](tref t) -> tref {
 		if (thandle<node>::is_bdd_backed(t)) { // already prepared: idempotent
@@ -385,56 +385,22 @@ tref prepare_terms(tref body) {
 		if (l2 == l && r2 == r) return n;
 		return build_bf_eq<node>(l2, r2);
 	};
-	// Descend through connectives and negation only: a binder, a
-	// reference and a temporal operator are opaque.
-	auto visit = [](tref n) {
+	// `while_is_formula` enters binders and temporal operators and stops at
+	// a term, which leaves reference arguments plain.
+	const tref res = pre_order<node>(phi).apply_unique(f,
+		while_is_formula<node>);
+	// Every equation, wherever it sits, has each side backed or not
+	// branching.
+	DBG(assert(tau::get(res).find_top([](tref n) {
 		const tau& tn = tau::get(n);
-		return tn.is(tau::wff) || tn.is(tau::wff_and) || tn.is(tau::wff_or)
-			|| tn.is(tau::wff_neg);
-	};
-	return pre_order<node>(body).apply_unique(f, visit);
-}
-
-template <NodeType node>
-tref finish_terms(tref phi) {
-	using tau = tree<node>;
-	using namespace terms_detail;
-	DBG(assert(phi != nullptr);)
-	// Nothing prepared, nothing to spell: the formula comes back as the
-	// SAME node, its junctions untouched. One cached walk pays for it.
-	if (!holds_bdd_id<node>(phi)) return phi;
-	// An atom holding a stored BDD anywhere is spelled out by the library
-	// and then normalised in the PLAIN regime, the spelling phase 1 gives
-	// every atom. Everything else is handed back unlooked at.
-	auto down = [](tref n) -> tref {
-		if (!is_atomic_fm<node>(n) || !holds_bdd_id<node>(n)) return n;
-		return simplify_atom<node>(
-			thandle<node>::convert_to_tau_terms(n), regime::plain);
-	};
-	// A spelled atom may sort elsewhere among its siblings, and one that
-	// folded to a constant decides the junction it stood in, so every ∧/∨
-	// the walk closes is re-emitted through the canonical constructor over
-	// its member view: content order, deduplicated, the hooks folding `T`,
-	// `F`, a repeated member and a complement pair.
-	//
-	// THE RAW CONSTRUCTOR AND NOT THE RESULT JOINS, which are a normaliser
-	// and may not be included from a foundation. The joins add one thing
-	// to it, the absorption pass, and that finds nothing new here: the
-	// members were already absorbed against each other, and spelling is
-	// injective on atoms, so it cannot bring two of them into a
-	// containment they were not already in.
-	auto up = [](tref r) -> tref {
-		if (is_child<node>(r, tau::wff_and))
-			return canonical_and<node>(members<node>(r));
-		if (is_child<node>(r, tau::wff_or))
-			return canonical_or<node>(members<node>(r));
-		return r;
-	};
-	// `while_is_formula` enters ∧, ∨, ¬, a re-wrapped binder and a temporal
-	// operator, and stops at a term — which is where an atom's own `down`
-	// has already done the work.
-	return pre_order<node>(phi).apply_unique_pure(down,
-		while_is_formula<node>, up);
+		if (!tn.is(tau::bf_eq)) return false;
+		auto settled = [](tref s) {
+			return thandle<node>::is_bdd_backed(s)
+				|| tbdd<node>::leaf(tbdd<node>::build_bdd(s));
+		};
+		return !settled(tn.first()) || !settled(tn.second());
+	}) == nullptr);)
+	return res;
 }
 
 // --- cofactors and quantification -----------------------------------------------
@@ -525,7 +491,7 @@ tref simplify_term(tref t, regime rg) {
 	using namespace terms_detail;
 	t = tau::trim_right_sibling(t);
 	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
-	// Phases 1, 2 and 5 run in the plain regime, and no term holds a stored
+	// Phases 1 and 2 run in the plain regime, and no term holds a stored
 	// BDD there (terms.h) -- the search for a `BDD_ID` is a Debug check of
 	// that contract, never a cost of those phases.
 	if (rg == regime::plain) {
@@ -561,7 +527,7 @@ tref simplify_atom(tref a, regime rg) {
 	DBG(assert(is_atomic_fm<node>(atom));)
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
-	// Phases 1, 2 and 5 run in the plain regime, and no side holds a stored
+	// Phases 1 and 2 run in the plain regime, and no side holds a stored
 	// BDD there (terms.h): a Debug check of that contract.
 	DBG(assert(rg == regime::backed
 		|| (!holds_bdd_id<node>(l) && !holds_bdd_id<node>(r)));)

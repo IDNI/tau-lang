@@ -99,7 +99,7 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y, regime rg);
  * where `usable` is `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a
  * STRICT one first, else the smallest `‖f₁′‖` (`mem_size`).
  *
- * @p rg is the regime (fwd.h); in the plain one (phases 1, 2 and 5)
+ * @p rg is the regime (fwd.h); in the plain one (phases 1 and 2)
  * nothing is BDD-backed and the `X` guard is vacuous.
  */
 template <NodeType node>
@@ -128,8 +128,8 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  *
  * @param phi      a `wff` node (a `bf` term is handed straight to the sweep,
  *                 which has nothing to propagate)
- * @param rg       the regime (fwd.h): `plain` in phases 1, 2 and 5, where
- *                 every term is plain, `backed` in phase 4
+ * @param rg       the regime (fwd.h): `plain` in phases 1 and 2, where
+ *                 every term is plain, `backed` in phases 4 and 5
  * @param X        the block in scope, bound by the caller: the component's
  *                 block inside a push or an elimination, empty in phases 1, 2
  *                 and 5, which makes the propagation guard vacuous

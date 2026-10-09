@@ -133,7 +133,7 @@ TEST_CASE("prepare_terms: every side holding a variable is backed, whatever bloc
 	CHECK(!has_bdd_id(ap::prepare_terms<node_t>(wff("r(x) = 0"))));
 }
 
-TEST_CASE("prepare_terms: an order atom stays plain, a binder is opaque") {
+TEST_CASE("prepare_terms: an order atom stays plain, a binder is entered") {
 	// a Boolean `<=` is decomposed into equations by the construction
 	// hooks, so the only order atoms that survive are bitvector ones
 	CHECK(!tau::get(wff("x & y <= x")).child_is(tau::bf_lteq));
@@ -143,8 +143,15 @@ TEST_CASE("prepare_terms: an order atom stays plain, a binder is opaque") {
 	// while a bitvector EQUATION is prepared
 	tref eqb = wff("x:bv[8] & y:bv[8] = { 0 }:bv[8]");
 	CHECK(ap::prepare_terms<node_t>(eqb) != eqb);
+	// the conversion runs once over the whole formula, so the body of a
+	// binder is converted in place, the binder kept
 	tref unit = wff("ex z (x & z = 0)");
-	CHECK(ap::prepare_terms<node_t>(unit) == unit);
+	tref pu = ap::prepare_terms<node_t>(unit);
+	REQUIRE(pu != unit);
+	REQUIRE(is_child_quantifier<node_t>(pu));
+	CHECK(th::is_bdd_backed(sides(ap::binder_body<node_t>(pu)).first));
+	CHECK(same_function(sides(ap::binder_body<node_t>(pu)).first,
+		sides(ap::binder_body<node_t>(unit)).first));
 	// a negated equation is entered
 	tref neg = wff("!(x & y = 0)");
 	tref prepared = ap::prepare_terms<node_t>(neg);
@@ -165,74 +172,85 @@ TEST_CASE("prepare_terms: equal sides fold through the hooks on BDD_ID operands 
 	CHECK(tau::get(build_bf_eq<node_t>(l, l)).equals_T());
 }
 
-// 1b. finish_terms -------------------------------------------------------------
+// 1b. the spelling (FINISH_TERMS) ----------------------------------------------
 
-TEST_CASE("finish_terms: the round trip of prepare_terms gives the formula "
-	"back plain") {
-	// The atoms are taken as PHASE 1 leaves them, in the plain regime's
-	// normal form, because that is the form the close spells back to.
-	const tref a = ap::simplify_atom<node_t>(wff("x & y = 0"), ap::regime::plain);
-	const tref b = ap::simplify_atom<node_t>(wff("!(x | z = 0)"), ap::regime::plain);
-	const tref phi = ap::canonical_and<node_t>(trefs{ a, b });
+TEST_CASE("spelling: the round trip of prepare_terms gives an equivalent plain formula") {
+	const tref phi = ap::canonical_and<node_t>(trefs{ wff("x & y = 0"),
+		wff("!(x | z = 0)") });
 	const tref prepared = ap::prepare_terms<node_t>(phi);
 	REQUIRE(has_bdd_id(prepared));
-	const tref back = ap::finish_terms<node_t>(prepared);
+	const tref back = th::convert_to_tau_terms(prepared);
 	CHECK(!has_bdd_id(back));
 	CHECK(are_nso_equivalent<node_t>(back, phi));
-	// the negated atom alone, so the negation rebuild is claimed on its own
-	const tref one = ap::prepare_terms<node_t>(b);
-	REQUIRE(has_bdd_id(one));
-	const tref one_back = ap::finish_terms<node_t>(one);
-	CHECK(!has_bdd_id(one_back));
-	CHECK(are_nso_equivalent<node_t>(one_back, b));
+	// the spelling builds back into the BDD it spelled, so a second round
+	// trip is the identity node
+	CHECK(ap::prepare_terms<node_t>(back) == prepared);
 }
 
-TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") {
+TEST_CASE("spelling: complement cofactors are spelled as the ring sum") {
+	// `x + y`: the cofactors on `x` are `y′` and `y`, complements, so the
+	// node is spelled `x + y`, not `x·y′ ∪ x′·y`.
+	tref l = sides(ap::prepare_terms<node_t>(wff("x ^ y = 0"))).first;
+	REQUIRE(th::is_bdd_backed(l));
+	tref s = th::convert_to_tau_terms(l);
+	CHECK(tau::get(s).child_is(tau::bf_xor));
+	CHECK(tb::build_bdd(s) == ref_of(l));
+	// cofactors that are no complements keep the Shannon spelling
+	tref m = sides(ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"))).first;
+	REQUIRE(th::is_bdd_backed(m));
+	tref t = th::convert_to_tau_terms(m);
+	CHECK(tau::get(t).find_top([](tref n) {
+		return tree<node_t>::get(n).is(tau::bf_xor); }) == nullptr);
+	CHECK(tb::build_bdd(t) == ref_of(m));
+}
+
+TEST_CASE("spelling: a cofactor 1 is spelled as a join with the literal") {
+	// `x ∪ y`: the cofactor at `x` is 1, so the node is `x ∪ f₀` with
+	// `f₀ = y`; in `x′ ∪ y` the cofactor at `x′` is 1, so it is `x′ ∪ f₁`.
+	tref l = sides(ap::prepare_terms<node_t>(wff("x | y = 0"))).first;
+	REQUIRE(th::is_bdd_backed(l));
+	CHECK(tau::subtree_equals(th::convert_to_tau_terms(l), bf("x | y")));
+	tref m = sides(ap::prepare_terms<node_t>(wff("x' | y = 0"))).first;
+	REQUIRE(th::is_bdd_backed(m));
+	CHECK(tau::subtree_equals(th::convert_to_tau_terms(m), bf("x' | y")));
+}
+
+TEST_CASE("spelling: a node shared under both polarities is spelled once") {
+	// The parity of eight variables is eight nodes, each reached under both
+	// polarities. Spelled as ring sums, every node is spelled once and the
+	// term is one chain: eight variables and seven sums.
+	tref l = sides(ap::prepare_terms<node_t>(wff(
+		"a ^ b ^ c ^ d ^ e ^ f ^ g ^ h = 0"))).first;
+	REQUIRE(th::is_bdd_backed(l));
+	CHECK(tb::node_count(ref_of(l)) == 8);
+	tref s = th::convert_to_tau_terms(l);
+	CHECK(ap::mem_size<node_t>(s) == 15);
+	CHECK(tb::build_bdd(s) == ref_of(l));
+}
+
+TEST_CASE("spelling: a kept chain's body is spelled inside its leaf") {
 	tref x = vr("x");
-	// A chain over a stored BDD. `FINISH_TERMS` does NOT resolve it — it
-	// spells the body out, in the plain regime's normal form, and the chain
-	// stands.
+	// A chain over a stored BDD: the spelling enters it and the chain
+	// stands, over the spelling of the BDD it held.
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"))).first;
 	REQUIRE(th::is_bdd_backed(l));
 	const tref atm = build_bf_eq_0<node_t>(
 		tb::build_functional_quantifiers({{ x, tb::all }}, l));
 	REQUIRE(has_bdd_id(atm));
-	const tref got = ap::finish_terms<node_t>(atm);
+	const tref got = th::convert_to_tau_terms(atm);
 	CHECK(!has_bdd_id(got));
-	CHECK(ap::carries_functional_quantifier<node_t>(got));
-	// SPELLED CANONICALLY: the spelled atom is in the plain regime's
-	// normal form — the one phase 1 gives every atom — so the plain atom
-	// simplification is the identity on it, a kept chain included.
-	CHECK(ap::simplify_atom<node_t>(got, ap::regime::plain) == got);
+	auto [prefix, body] = ap::strip_chain<node_t>(sides(got).first);
+	REQUIRE(prefix.size() == 1);
+	CHECK(tb::build_bdd(body) == ref_of(l));
 }
 
-TEST_CASE("finish_terms: a formula with no stored BDD is the same node") {
-	const tref phi = ap::simplify_atom<node_t>(wff("x & y = 0"), ap::regime::plain);
+TEST_CASE("spelling: a formula with no stored BDD is the same node") {
+	const tref phi = wff("x & y = 0");
 	REQUIRE(!has_bdd_id(phi));
-	CHECK(ap::finish_terms<node_t>(phi) == phi);
-	// A binder unit and a junction too: nothing is re-emitted when there
-	// is nothing to spell.
+	CHECK(th::convert_to_tau_terms(phi) == phi);
 	const tref psi = wff("ex z (x & z = 0) && !(y = 0)");
 	REQUIRE(!has_bdd_id(psi));
-	CHECK(ap::finish_terms<node_t>(psi) == psi);
-}
-
-TEST_CASE("finish_terms: an atom that decides folds through the junction") {
-	// `x = x′`: two DIFFERENT BDDs, so nothing folds while they are
-	// stored — the hooks cannot read a complement pair off two interned
-	// ids. Spelled out, the plain regime's joint `l + r` is `1`, which
-	// decides the equation as `F`, and `F` decides the conjunction it
-	// stood in.
-	tref l = sides(ap::prepare_terms<node_t>(wff("x = 0"))).first;
-	tref r = sides(ap::prepare_terms<node_t>(wff("x' = 0"))).first;
-	REQUIRE(th::is_bdd_backed(l));
-	REQUIRE(th::is_bdd_backed(r));
-	REQUIRE(l != r);
-	const tref atm = build_bf_eq<node_t>(l, r);
-	REQUIRE(has_bdd_id(atm));
-	const tref phi = ap::canonical_and<node_t>(trefs{ atm, wff("z = 0") });
-	REQUIRE(has_bdd_id(phi));
-	CHECK(tau::get(ap::finish_terms<node_t>(phi)).equals_F());
+	CHECK(th::convert_to_tau_terms(psi) == psi);
 }
 
 // 2. cofactor -----------------------------------------------------------------

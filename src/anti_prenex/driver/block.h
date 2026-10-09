@@ -9,9 +9,8 @@
  * and the matrix below them, which is already final (§4).
  *
  * WHAT GOES OUT: a formula equivalent to the run, pushed as far inward as §6
- * reaches, with every term PLAIN: each component closes by spelling out the
- * BDDs it worked in, in the normal form the plain phases use, so nothing of
- * §1's term representation leaves here and nothing of its spelling either.
+ * reaches, in §1's term representation still: the close does nothing to
+ * terms, and the one spelling waits for phase 5 (§3 `FINISH_TERMS`).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__DRIVER__BLOCK_H__
@@ -24,7 +23,6 @@
 #include "../foundations/ctx.h"
 #include "../foundations/dag.h"
 #include "../foundations/prims.h"
-#include "../foundations/terms.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/nnf.h"
 #include "../push/push_block.h"
@@ -58,16 +56,17 @@ std::vector<block> connected_components(const block& X, tref body);
  * @brief §5 `PUSH_EX_BLOCK(body, X, kf)`: `∃X.body` pushed inward, one
  * component at a time.
  *
- * `X` is narrowed to `X ∩ FV(body)` first — a variable the body does not
- * mention binds nothing and gets no component. Every component of what is
- * left is then set up (ctx.h `for_component`), put into §1's term
- * representation (`PREPARE_TERMS`), pushed (§6), size-checked and closed, and
- * the next component starts from what the previous one left.
+ * @p body arrives in §1's term representation (`PREPARE_TERMS`, run once at
+ * phase 4's start). `X` is narrowed to `X ∩ FV(body)` first — a variable the
+ * body does not mention binds nothing and gets no component. Every component
+ * of what is left is then set up (ctx.h `for_component`), pushed (§6) and
+ * size-checked, and the next component starts from what the previous one
+ * left.
  *
  * THE CALLBACK is asked PER COMPONENT, on `REWRAP(body, X)`: the ∃ wrap of
  * the whole narrowed block over the body as that component's setup finds it —
- * plain, the dualised matrix for a ∀ run, the earlier components' results
- * already in place (§1). Two components of one block may be answered
+ * its terms backed, the dualised matrix for a ∀ run, the earlier components'
+ * results already in place (§1). Two components of one block may be answered
  * differently, which is sound: every memo key carries its component's flag.
  * In keep mode it is asked again on every chain `DISCHARGE` emits (`ctx.kf`).
  *
@@ -78,11 +77,10 @@ std::vector<block> connected_components(const block& X, tref body);
  * taint event — the verdict is a pure function of the completed pair, and the
  * entries the discarded push wrote remain correct answers to their own keys.
  *
- * WHAT GOES OUT IS PLAIN: every chain was decided at its emission (§7
- * `DISCHARGE`), and a component closes by spelling every backed term out
- * canonically (§3 `FINISH_TERMS`) — in the plain regime's normal form, the
- * one phase 1 gives every atom, so what leaves a component is spelled as the
- * phases around the push spell theirs.
+ * WHAT GOES OUT IS STILL BACKED: every chain was decided at its emission (§7
+ * `DISCHARGE`), so the close does nothing to terms; they cross into the next
+ * component and the enclosing blocks as they are, and phase 5 spells them
+ * (§3 `FINISH_TERMS`).
  */
 template <NodeType node>
 tref push_ex_block(tref body, const block& X,

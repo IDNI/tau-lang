@@ -121,8 +121,7 @@ freeze_result<node> freeze_opaque_components(const trefs& conjuncts,
 		(frozen_vars.contains(x) ? Xf : left).push_back(
 			tau::trim_right_sibling(x));
 	// RE-WRAPPED, never decided (invariant 3). The BDD-backed terms inside
-	// stay as they are; the component's finish spells them out under the
-	// binder.
+	// stay as they are; phase 5's spelling reaches them under the binder.
 	return freeze_result<node>{
 		rewrap<node>(simplified_and_join<node>(frozen), Xf),
 		std::move(rest), std::move(left) };

@@ -21,7 +21,7 @@
  *
  * ONE ORDER, THE LIBRARY'S global comparator, for every call (§1): nothing
  * here takes or stores an order. The two simplifiers take the REGIME instead
- * (fwd.h), `plain` by default, the regime of phases 1, 2 and 5, where nothing
+ * (fwd.h), `plain` by default, the regime of phases 1 and 2, where nothing
  * is BDD-backed (§3). Debug builds check at every BDD primitive's entry that
  * the reference passed in is a reduced ordered BDD
  * (`tau_term_bdd::is_ordered`).
@@ -49,7 +49,7 @@ namespace idni::tau_lang::anti_prenexing {
 // Not declared here — used directly, on a `bf` term `t` or a formula `phi`:
 //
 //   BDD-backed term        term_handle<node>::is_bdd_backed(t)
-//   the library's spelling  term_handle<node>::convert_to_tau_terms(phi)
+//   FINISH_TERMS(φ)        term_handle<node>::convert_to_tau_terms(phi)
 //   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
@@ -61,13 +61,14 @@ namespace idni::tau_lang::anti_prenexing {
 // least one decision variable. The `bf` WRAPPER is the form that counts; a
 // bare `BDD_ID` node is not one.
 //
-// THE LIBRARY'S SPELLING: every `BDD_ID` term of `phi` converted back to a
-// plain `bf`, wherever it sits. One memoised walk with no node kind
-// special-cased, and the inverse of `prepare_terms` up to term normal form:
+// FINISH_TERMS, the call's ONE SPELLING, after phase 5's `SIMPLIFY`: every
+// `BDD_ID` term of `phi` converted back to a plain `bf`, wherever it sits,
+// by the library's `to_tau_term` — Shannon per node, the OR form where a
+// cofactor is 1, the ring sum where the cofactors are complements. One
+// memoised walk with no node kind special-cased, and the inverse of
+// `prepare_terms` up to term normal form:
 // `prepare_terms(convert_to_tau_terms(prepared))` yields the same BDD and,
-// by interning, the same `BDD_ID` node. It is the library HALF of §3's
-// `FINISH_TERMS` (below), which spells an atom out with it and then puts the
-// result into the plain regime's normal form.
+// by interning, the same `BDD_ID` node.
 //
 // SYMBOLIC ∀_Y / ∃_Y: the library's chain constructor takes `quants`
 // outermost first. It is canonical — absent subscripts dropped, each
@@ -83,8 +84,9 @@ namespace idni::tau_lang::anti_prenexing {
 // --- the representation boundary (PREPARE_TERMS) ---------------------------------
 
 /**
- * @brief §3 primitive `PREPARE_TERMS`, per component: put `body` into §1's
- * term representation.
+ * @brief §3 primitive `PREPARE_TERMS(φ)`: phase 4's ONE conversion, at its
+ * start — the whole formula put into §1's term representation, which it
+ * keeps until phase 5's spelling.
  *
  * Both sides of every EQUATION holding a variable — one cached free-variable
  * test each — are rebuilt as terms backed by a BDD under the library's one
@@ -93,49 +95,18 @@ namespace idni::tau_lang::anti_prenexing {
  * it touches: it is never cofactored (`cof_memo` keys are `TERM_OF` of
  * equations) and the solver path consumes it as written.
  *
- * A formula-level binder, a reference and a temporal operator are opaque and
- * not entered. A term-level functional-quantifier chain is SLID by the build
- * (§1): the variables above its subscripts' levels are decision variables
- * like any other.
+ * The walk ENTERS formula binders and temporal operators and stops at a term,
+ * so a reference argument stays plain. A term-level functional-quantifier
+ * chain is SLID by the build (§1): the variables above its subscripts' levels
+ * are decision variables like any other.
  *
- * Memoised per term within the call. Idempotent: an already prepared term is
- * returned as it is.
+ * One walk, memoised per node and per term. Idempotent: an already prepared
+ * term is returned as it is.
  *
- * @param body the component's body, a `wff`
+ * @param phi a `wff`
  */
 template <NodeType node>
-tref prepare_terms(tref body);
-
-/**
- * @brief §3 primitive `FINISH_TERMS(φ)`: `PREPARE_TERMS`' inverse, run at a
- * component's close (§5) — every BDD-backed term of @p phi spelled back out
- * as a plain term, wherever it sits.
- *
- * ONE WALK over the formula skeleton. An ATOM carrying a stored BDD anywhere
- * is spelled out by the library and then put through `simplify_atom` in the
- * PLAIN REGIME: exactly what phase 1 does to every atom. A junction the walk
- * closes is re-emitted canonically, because a spelled atom may sort elsewhere
- * among its siblings or fold to a constant, which then decides the junction.
- * A `¬` over an atom is rebuilt over the spelled one, the hooks folding `¬T`
- * and `¬F`. Nothing else is touched, so a formula holding no stored BDD comes
- * back as the SAME node.
- *
- * THE WALK MAY STOP AT A TERM, an atom's own sides apart: a stored BDD never
- * sits in a REFERENCE ARGUMENT. `PREPARE_TERMS` transports a reference
- * opaque, and the library's substitute spells a backed witness out before it
- * enters an argument, so there is nothing below a reference to spell.
- *
- * Why the plain normal form and not the library's raw spelling: every
- * spelled term goes through the plain-regime simplification phase 1 applies
- * to every atom, a kept chain's body included, so the terms leaving a
- * component are normalised the way the phases around the push normalise
- * theirs — ONE normal form on both sides of the module.
- *
- * @param phi a `wff` node, at the close of one component
- * @return the same formula with every term plain
- */
-template <NodeType node>
-tref finish_terms(tref phi);
+tref prepare_terms(tref phi);
 
 // --- cofactors and quantification -----------------------------------------------
 

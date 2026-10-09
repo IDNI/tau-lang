@@ -85,7 +85,8 @@ TEST_SUITE("BDD creation terms") {
 		tref spec = tau::get(sample, opts);
 		bdd::ref xx = bdd::build_bdd(spec);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK(tau::get(t).to_str() == "x&(yz'|y')|x'");
+		// Every node has cofactor 1 at its negative literal: x′ ∪ f₁.
+		CHECK(tau::get(t).to_str() == "x'|y'|z'");
 	}
 	TEST_CASE("(x r(y))': a reference is one leaf") {
 		using bdd = tau_term_bdd<node_t>;
@@ -752,8 +753,9 @@ TEST_SUITE("BDD handle creation") {
 		CHECK(hbdd::U.size() == 1);
 
 		// tau::get(tau_res->get()).print(std::cout << "res: ") << "\n";
+		// y·z ∪ y′·z′ has complement cofactors on y: the ring sum y + z′.
 		CHECK(tau::get(tau_res->get()).to_str() ==
-			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
+			"sv&(wx&(y^z')|w'x'&(y^z'))|s'v'&(wx&(y^z')|w'x'&(y^z'))");
 	}
 
 }

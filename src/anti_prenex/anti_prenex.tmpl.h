@@ -6,8 +6,10 @@
  * `ANTI_PRENEX`, each one call into the module below, in the order the spec
  * fixes.
  *
- * Phases 1, 2 and 5 run in the PLAIN regime: nothing is BDD-backed outside a
- * component (§3), so `simplify`'s propagation guard is vacuous.
+ * Phases 1 and 2 run in the PLAIN regime, phase 5's `simplify` in the BACKED
+ * one: every equation side is backed from phase 4's conversion to phase 5's
+ * spelling (§1). No block is in scope in either, so `simplify`'s propagation
+ * guard is vacuous.
  *
  * The phases run under the call's `time_limit_scope` (ctx.h), and the abort
  * a check point throws is caught here alone, so every frame between a check
@@ -74,12 +76,17 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf,
 		// 3. `f ≠ 0 ↦ ¬(f = 0)` and the fused comparisons, after phase 2
 		//    by the fixed order (§3).
 		phi = normalize_operators<node>(phi);
-		// 4. Every quantifier run pushed inward and eliminated over its
-		//    final matrix (§4, §5).
+		// 4. The one conversion, then every quantifier run pushed inward
+		//    and eliminated over its final matrix (§4, §5).
 		phi = process_all_blocks<node>(phi, kf);
-		// 5. The close: simplify, drop the binders that bind nothing, and
-		//    canonicalise the ids again (§3).
-		phi = simplify<node>(phi);
+		// 5. The close: simplify, the ONE spelling, drop the binders that
+		//    bind nothing, and canonicalise the ids again (§3).
+		phi = simplify<node>(phi, regime::backed);
+		phi = term_handle<node>::convert_to_tau_terms(phi);
+		// The spelling is total: no stored BDD leaves the call.
+		DBG(assert(tree<node>::get(phi).find_top([](tref m) {
+			return tree<node>::get(m).is(tree<node>::BDD_ID);
+		}) == nullptr);)
 		phi = fold_degenerate_binders<node>(phi);
 		return canonicalise_binder_ids<node>(phi);
 	} catch (const time_limit_exceeded&) {

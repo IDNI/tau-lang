@@ -1005,7 +1005,11 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v,
 template<NodeType node>
 tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type) {
 	std::unordered_map<ref, tref> memo;
-	return to_tau_term(x, term_type, memo);
+	const tref r = to_tau_term(x, term_type, memo);
+	// The spelling is the BDD's own term: a wrong ring sum would build back
+	// into another BDD.
+	DBG(assert(build_bdd(r) == x);)
+	return r;
 }
 
 // Memoised worker: term_type is constant within one top-level call, and
@@ -1022,15 +1026,25 @@ tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type,
 	if (const auto it = memo.find(x); it != memo.end()) return it->second;
 
 	tref v = get_var_term(x);
-	ref h = get_high(x);
-	ref l = get_low(x);
-
 	if (leaf(x)) return memo.emplace(x, v), v;
 
-	tref left = tau::build_bf_and(v, to_tau_term(h, term_type, memo));
-	tref right = tau::build_bf_and(tau::build_bf_neg(v),
-		to_tau_term(l, term_type, memo));
-	tref res = tau::build_bf_or(left, right);
+	ref h = get_high(x);
+	ref l = get_low(x);
+	tref res;
+	// A cofactor 1 makes the node a join with its literal, and complement
+	// cofactors (a pointer test under complement edges) a ring sum; either
+	// way the other cofactor is spelled once. A cofactor 0 folds in the hooks.
+	if (h == T)
+		res = tau::build_bf_or(v, to_tau_term(l, term_type, memo));
+	else if (l == T)
+		res = tau::build_bf_or(tau::build_bf_neg(v),
+			to_tau_term(h, term_type, memo));
+	else if (h == bdd_not(l))
+		res = tau::build_bf_xor(v, to_tau_term(l, term_type, memo));
+	else res = tau::build_bf_or(
+		tau::build_bf_and(v, to_tau_term(h, term_type, memo)),
+		tau::build_bf_and(tau::build_bf_neg(v),
+			to_tau_term(l, term_type, memo)));
 	return memo.emplace(x, res), res;
 }
 

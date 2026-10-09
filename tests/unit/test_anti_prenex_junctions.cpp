@@ -138,13 +138,13 @@ fixture make(const char* src, bool keep = false) {
 	return f;
 }
 
-/// In KEEP MODE the component's close (§5) run over what the step gave back:
-/// every backed term spelled out, each chain decided at its emission (§7
-/// `DISCHARGE`). @p emitted takes the result BEFORE the close.
+/// In KEEP MODE what the step gave back, spelled (§3 `FINISH_TERMS`), so a
+/// chain decided at its emission (§7 `DISCHARGE`) and kept in a leaf shows in
+/// the tree. @p emitted takes the result BEFORE the spelling.
 tref closed(fixture& f, tref r, tref* emitted) {
 	if (emitted) *emitted = r;
 	if (!f.c.keep_functional) return r;
-	return ap::finish_terms<node_t>(r);
+	return finished(r);
 }
 
 /// 2d on the prepared clause.

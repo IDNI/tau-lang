@@ -61,9 +61,9 @@ namespace idni::tau_lang::anti_prenexing {
  * Phases, in this fixed order: 0 `CANONICALISE_BINDER_IDS`; 1
  * `RESOLVE_FUNCTIONAL_PLAIN`, `TO_NNF` then `SIMPLIFY(φ, ref_args = true)`; 2
  * `ELIMINATE_BY_SUBSTITUTION` then `SIMPLIFY`; 3 `NORMALIZE_OPERATORS`; 4
- * `PROCESS_ALL_BLOCKS`; 5 `SIMPLIFY`, `FOLD_DEGENERATE_BINDERS`,
- * `CANONICALISE_BINDER_IDS`. A formula without a quantifier is returned as
- * is.
+ * `PROCESS_ALL_BLOCKS`; 5 `SIMPLIFY`, `FINISH_TERMS`,
+ * `FOLD_DEGENERATE_BINDERS`, `CANONICALISE_BINDER_IDS`. A formula without a
+ * quantifier is returned as is.
  *
  * @param phi a `wff` node
  * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes allows

@@ -9,12 +9,10 @@
  * (src/union_find_with_sets.h) for the partition, `is_atomic_fm` and
  * `while_is_formula` (src/tau_tree.h) for the one walk that feeds it,
  * `find_ba_type` (src/ba_types.h) and `ctx::for_component` (ctx.h) for a
- * component's setup, `prepare_terms` and `finish_terms`
- * (foundations/terms.h) for its term representation and its close,
- * `push_block` (push/push_block.h) for the push itself, `formula_size`,
- * `fv_meets`, `fv_intersect` and `members` (foundations/dag.h) with
- * `simplified_and_join` (normalisers/joins.h) and `rewrap`
- * (foundations/prims.h) for the size acceptance, and
+ * component's setup, `push_block` (push/push_block.h) for the push itself,
+ * `formula_size`, `fv_meets`, `fv_intersect` and `members`
+ * (foundations/dag.h) with `simplified_and_join` (normalisers/joins.h) and
+ * `rewrap` (foundations/prims.h) for the size acceptance, and
  * `canonically_factored_neg` with `holds_fused_operator` (normalisers/nnf.h)
  * for the dualisation.
  */
@@ -98,7 +96,6 @@ tref push_ex_block(tref body, const block& X,
 		ctx<node> c = ctx<node>::for_component(P,
 			find_ba_type<node>(P[0]), keep);
 		c.kf = kf;
-		body = prepare_terms<node>(body);
 		const tref prev = body;
 		body = push_block<node>(body, P, c);
 		// SIZE ACCEPTANCE: a result cheap to build and ruinous to
@@ -124,16 +121,10 @@ tref push_ex_block(tref body, const block& X,
 				fv_intersect<node>(dj, P)));
 			body = simplified_and_join<node>(indep);
 		}
-		// THE CLOSE: every chain was decided at its emission (§7
-		// `DISCHARGE`), so every backed term is spelled out CANONICALLY,
-		// chains intact — in the plain regime's normal form, the one
-		// phase 1 gives every atom, so what leaves a component is
-		// spelled as the plain phases spell it (§3 `FINISH_TERMS`).
-		body = finish_terms<node>(body);
+		// The close does nothing to terms: every chain was decided at
+		// its emission (§7 `DISCHARGE`), and the spelling waits for
+		// phase 5 (§3 `FINISH_TERMS`).
 	}
-	// The close is total, so nothing of §1's term representation leaves.
-	DBG(assert(tau::get(body).find_top([](tref m) {
-		return tau::get(m).is(tau::BDD_ID); }) == nullptr);)
 	return body;
 }
 

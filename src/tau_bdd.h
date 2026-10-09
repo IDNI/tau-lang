@@ -314,7 +314,15 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	template <typename Fn>
 	static ref map_leaves(ref x, Fn& fn);
 
-	/** @brief Convert BDD reference @p x to a Tau term of type @p term_type. */
+	/**
+	 * @brief THE SPELLING of @p x as a Tau term of type @p term_type: per
+	 * decision node on `v`, the OR form `v ∪ f₀` where `f₁ = 1` and
+	 * `v′ ∪ f₁` where `f₀ = 1`, else the ring sum `v + f₀` where the
+	 * cofactors are complements (`f₁ = f₀′`), else `v·f₁ ∪ v′·f₀`; a leaf is
+	 * its term, `T` / `F` are `_1` / `_0` of the type. Memoised per
+	 * reference, so a shared node is spelled once; the construction hooks
+	 * fold constants.
+	 */
 	static tref to_tau_term(ref x, size_t term_type);
 
 private:
@@ -525,7 +533,7 @@ struct tau_term_bdd_handle {
 	 * @brief The formula-wide inverse of `convert_to_tau_node`: every
 	 * `bf(BDD_ID)` node of @p formula, wherever it sits — under a binder,
 	 * inside a reference argument, in a functional quantifier's body, under
-	 * a temporal operator — replaced by the plain term of its BDD.
+	 * a temporal operator — replaced by its BDD's spelling (`to_tau_term`).
 	 *
 	 * TOTAL: a `BDD_ID` nested inside a produced term (a leaf may hold one,
 	 * and `build_bdd` absorbs it again) is converted too, so no `BDD_ID`

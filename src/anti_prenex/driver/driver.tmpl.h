@@ -7,7 +7,8 @@
  *
  * The pieces come from the files below: `binder_kind`, `binder_var`,
  * `binder_body` and `members` (foundations/dag.h) with `trim_right_sibling`
- * (src/tau_tree.h) for the walk down a binder chain,
+ * (src/tau_tree.h) for the walk down a binder chain, `prepare_terms`
+ * (foundations/terms.h) for the conversion at its start,
  * `pre_order::apply_unique_pure` (the parser's tree.h) for the pass itself,
  * `simplified_and_join` / `simplified_or_join` (normalisers/joins.h) for
  * folding a result into the context it stood in, and `process_block`
@@ -131,9 +132,10 @@ template <NodeType node>
 tref process_all_blocks(tref phi, const keep_functional_fn<node>& kf) {
 	DBG(assert(phi != nullptr);)
 	driver_detail::pass<node> p{ kf };
-	// Undoes phase 2's renames apart: every block's variables are the
-	// lowest levels of the global order below their scope (§1).
-	return p.process_node(canonicalise_binder_ids<node>(phi));
+	// Canonical ids undo phase 2's renames apart, so every block's and
+	// chain's variables are the lowest levels below their scope (§1).
+	return p.process_node(prepare_terms<node>(
+		canonicalise_binder_ids<node>(phi)));
 }
 
 } // namespace idni::tau_lang::anti_prenexing

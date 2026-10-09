@@ -180,10 +180,8 @@ TEST_CASE("P2: a pin deletes its binder, and a nested one too") {
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(!holds_var(got, "x"));
 	// The witness landed in the sibling's term: `¬(t ∪ a = 0)`. Compared BY
-	// MEANING, because the expectation is hand-built and the pipeline's
-	// spelling of a union's operands is not a normal form — which of `t ∪ a`
-	// and `a ∪ t` comes back depends on the order the substitution built it
-	// in, and both are the same term.
+	// MEANING, because the expectation is hand-built; the spelling the
+	// output comes in is claimed exactly on the nested case below.
 	CHECK(are_nso_equivalent<node_t>(got,
 		neg(eq0(ap::simplify_term<node_t>(lor(t, a))))));
 	// Nested: the outer rewrite substitutes into the inner binder's body
@@ -192,7 +190,11 @@ TEST_CASE("P2: a pin deletes its binder, and a nested one too") {
 		ex("w", conj(eq(w, b), neg(eq0(lor(lor(x, w), a)))))));
 	tref r = anti_prenexed(nested);
 	CHECK(!holds(r, tau::wff_ex));
-	CHECK(same(r, neg(eq0(ap::simplify_term<node_t>(lor(lor(t, b), a))))));
+	CHECK(are_nso_equivalent<node_t>(r, neg(eq0(lor(lor(t, b), a)))));
+	// Spelled from its BDD (§3 `FINISH_TERMS`): `a`, `b`, `t` in the global
+	// order, each node with cofactor 1 on top, so the OR form gives the
+	// flat disjunction `a ∪ (b ∪ t)`.
+	CHECK(same(r, neg(eq0(lor(a, lor(b, t))))));
 }
 
 TEST_CASE("P3: no witness fires on the spec's counterexamples") {
@@ -283,9 +285,18 @@ TEST_CASE("P5: without a quantifier the input comes back as the same node") {
 	tref got = pipeline(only_chain);
 	CHECK(got != only_chain);
 	CHECK(!holds(got, tau::bf_fall));
-	// and stays under a keep-all callback, which keeps the chain.
+	// Under a keep-all callback phase 1 keeps it, and phase 4's conversion
+	// slides it: its piece is closed and folds whatever the callback says
+	// (§1), `∀_y(y ∪ z)` being `z`.
 	auto keep_all = [](tref) { return true; };
-	CHECK(holds(ap::anti_prenex<node_t>(only_chain, keep_all),
+	const tref kept = ap::anti_prenex<node_t>(only_chain, keep_all);
+	CHECK(!holds(kept, tau::bf_fall));
+	CHECK(are_nso_equivalent<node_t>(kept, eq0(lor(a, bvar("z")))));
+	// A chain whose piece keeps `z` free inside a reference stays under the
+	// keep-all callback.
+	const tref hidden = tb::build_functional_quantifiers(
+		{{ y, tb::all }}, lor(bvar("y"), qref(bvar("z"))));
+	CHECK(holds(ap::anti_prenex<node_t>(eq0(lor(a, hidden)), keep_all),
 		tau::bf_fall));
 }
 
