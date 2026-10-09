@@ -168,10 +168,12 @@ endfunction()
 # add_env_error_test(<name> <VAR=value> [REQUIRES <ba-id> ...])
 #
 # A bad value of an option variable is an error: tau prints it and exits
-# with 1 before it runs a command. POSIX only.
+# with 1 before it runs a command. The error names the variable. POSIX only.
 function(add_env_error_test test_name env)
+	string(FIND "${env}" "=" _eq)
+	string(SUBSTRING "${env}" 0 ${_eq} _var)
 	add_raw_repl_test(${test_name}
 		"out=$(${TAU_RUN} -e 'get ltl-timeout' 2>&1); echo \"exit=$? $out\""
-		"exit=1 .*does not take the value"
+		"exit=1 .*The option does not take the value of the environment variable \\(name=${_var} value="
 		NO_FAIL_REGEX ENV ${env} ${ARGN})
 endfunction()
