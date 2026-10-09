@@ -733,15 +733,18 @@ ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
 # wasm configure below. The wasm default pack skips bv and hsb (cvc5 links
 # GMP) and nlang (curl has no wasm port), so the queries use only what both
-# packs hold. Its own store packages resolve in this layer.
+# packs hold. The image has no libcurl, so the native tau takes the wasm
+# pack, which equals the pack of the wasm module. Its own store packages
+# resolve in this layer.
 # The store_publish secret makes configure publish each entry right after it
 # builds it. A secret, unlike a build argument, stays out of the layer cache
 # key, so a test job that does not publish still hits this layer.
 RUN --mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Building native tau for parity" && \
-	scripts/with-gh-token ./dev preset release-tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	echo "(BUILD) -- Building native tau (wasm pack) for parity" && \
+	scripts/with-gh-token ./dev preset release-tau -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_BAS=sbf,tau,qint,qlt; \
 	fi
 
 # Resolve the wasm store packages, and nothing else: the wasm compile lives in
