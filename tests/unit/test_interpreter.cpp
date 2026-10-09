@@ -461,6 +461,71 @@ TEST_SUITE("adt interpreter") {
 	}
 }
 
+TEST_SUITE("repl input") {
+
+	TEST_CASE("drop_utf8_bom drops only a leading byte order mark") {
+		std::string s = "\xEF\xBB\xBFq \xEF\xBB\xBF";
+		drop_utf8_bom(s);
+		CHECK( s == "q \xEF\xBB\xBF" );
+		std::string t = "q";
+		drop_utf8_bom(t);
+		CHECK( t == "q" );
+	}
+
+	TEST_CASE("drop_utf8_bom drops two marks before the first command") {
+		std::string s = "\xEF\xBB\xBF\xEF\xBB\xBFp(X) := X = 0.";
+		drop_utf8_bom(s);
+		CHECK( s == "p(X) := X = 0." );
+	}
+
+	TEST_CASE("the first REPL line runs after two byte order marks") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		re.eval("\xEF\xBB\xBF\xEF\xBB\xBFp(X) := X = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+
+	TEST_CASE("the first REPL line runs after a leading byte order mark") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		re.eval("\xEF\xBB\xBFp(X) := X = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		// only the start of the input can carry the mark
+		re.eval("\xEF\xBB\xBFq(X) := X = 1.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+
+	TEST_CASE("a first REPL command over two lines runs after a leading byte order mark") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		// the terminal gives the whole buffer again, the first line included
+		CHECK( re.eval("\xEF\xBB\xBFp(X) :=").value() == 2 );
+		re.eval("\xEF\xBB\xBFp(X) :=\nX = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+}
+
 // AP2-1: interpreter::step() calls maybe_gc(), and bintree<node>::gc()
 // destroys every node that is neither reachable from a live htref nor in
 // the keep set collect_live_refs() builds. The REPL keeps its rec-relation

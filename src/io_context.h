@@ -22,6 +22,13 @@
 
 namespace idni::tau_lang {
 
+/// @brief Drop every UTF-8 byte order mark at the start of @p s.
+///
+/// Windows PowerShell can write two before the text it pipes into a program.
+inline void drop_utf8_bom(std::string& s) {
+	while (s.starts_with("\xEF\xBB\xBF")) s.erase(0, 3);
+}
+
 /**
  * @brief Abstract base class for serialized constant input streams.
  *

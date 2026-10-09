@@ -1926,6 +1926,15 @@ requires BAsPack<BAs...>
 idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 	const std::string& src)
 {
+	if (!input_started_) {
+		std::string text = src;
+		drop_utf8_bom(text);
+		input_started_ = true;
+		auto r = eval(text);
+		// only the first command, maybe over several lines, starts the input
+		input_started_ = !(r.has_value() && r.value() == 2);
+		return r;
+	}
 	// while a `run` session is pending, src is its answer, not a new command
 	if (pending) {
 		// incomplete value: return 2 so more lines accumulate (multiline)

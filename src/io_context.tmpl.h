@@ -26,6 +26,9 @@ inline std::optional<std::string> console_input_stream::get() {
 	term::enable_getline_mode();
 	std::getline(std::cin, line);
 	term::disable_getline_mode();
+	// only the first line read from stdin can start the input
+	static bool first_line = true;
+	if (first_line) first_line = false, drop_utf8_bom(line);
 	return line;
 }
 

@@ -505,6 +505,8 @@ private:
 	std::unique_ptr<run_session> running;
 	/// What the next eval() call answers, while a `run` waits.
 	std::optional<pending_request> pending;
+	// the first input may start with a UTF-8 byte order mark
+	bool input_started_ = false;
 	// Set by on_repl_key (Ctrl-C) to abort the current run on the next
 	// resume, instead of treating the (empty) submit as a stream value.
 	bool run_abort_ = false;
