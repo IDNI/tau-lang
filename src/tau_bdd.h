@@ -122,6 +122,11 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	static cache_and_t      and_memo;       ///< @brief Memoisation table for AND.
 	static cache_and_many_t and_many_memo;  ///< @brief Memoisation table for AND-many.
+	/// @brief The entries of `and_many_memo` by their am_cmp-least member,
+	/// so `am_simplify` looks only at keys that can be a subset of its list.
+	static std::unordered_map<ref,
+		std::vector<const typename cache_and_many_t::value_type*>>
+		and_many_index;
 	static cache_ex_t       ex_memo;        ///< @brief Memoisation table for existential quantification.
 	static cache_quant_t    quant_memo;     ///< @brief Memoisation table for general quantification.
 	static cache_ite_t      ite_memo;       ///< @brief Memoisation table for if-then-else.
@@ -340,12 +345,21 @@ private:
 	 */
 	static void am_sort(refs& b);
 	/**
-	 * @brief Rewrite @p v using one @p memo hit: if some memoised
+	 * @brief Store @p r as the and-many result of the am_sort-ed @p v in
+	 * @p memo and return the stored result; under TAU_CACHE a new entry
+	 * also goes into `and_many_index`.
+	 */
+	static ref am_memoise(const refs& v, ref r,
+		std::unordered_map<refs, ref>& memo);
+#ifdef TAU_CACHE
+	/**
+	 * @brief Rewrite @p v using one `and_many_memo` hit: if some memoised
 	 * argument set is a subset of @p v, replace that subset by its
 	 * memoised result ({F} collapses the list). Returns true iff @p v
 	 * changed; callers iterate it to a fixpoint.
 	 */
-	static bool am_simplify(refs& v, const std::unordered_map<refs, ref>& memo);
+	static bool am_simplify(refs& v);
+#endif
 	/**
 	 * @brief True iff every element of @p small occurs in @p big; both
 	 * must be non-empty and am_sort-ed (binary search plus range/size
