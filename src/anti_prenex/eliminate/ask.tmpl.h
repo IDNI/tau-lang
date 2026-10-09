@@ -13,9 +13,8 @@
 namespace idni::tau_lang::anti_prenexing {
 
 template <NodeType node>
-answer ask(tref q) {
-	DBG(assert(get_free_vars<node>(q).empty());)
-	const tref k = canonicalise_binder_ids<node>(q);
+answer ask(tref k) {
+	DBG(assert(get_free_vars<node>(k).empty());)
 	// `solver_memo` is not taint-aware: the wrapper records every verdict,
 	// `unknown` included, and only the flush retires one (§1).
 	return memoised<node, table::solver_memo>(k, [k] {

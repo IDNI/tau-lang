@@ -110,7 +110,8 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		// A chain on either side, kept or stuck, is out of the solver's
 		// reach.
 		if (tau::get(j).find_top(is_functional_quantifier<node>) == nullptr
-			&& ask<node>(j) == answer::unsat) return _F<node>();
+			&& ask<node>(canonicalise_binder_ids<node>(j)) == answer::unsat)
+			return _F<node>();
 	}
 	return simplified_and_join<node>(trefs{ fr.frozen, b, a });
 }

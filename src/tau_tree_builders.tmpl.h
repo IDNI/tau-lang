@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <map>
 #include <numeric>
 
 #include "tau_tree.h"
@@ -57,6 +58,8 @@ tref canonize_quantifier_ids(tref fm) {
 	// Next update variables using the information from var_to_id
 	subtree_map<node, std::vector<size_t>> var_to_id;
 	subtree_map<node, tref> old_name;
+	// Building a variable from its name re-interns the name each time.
+	std::map<std::pair<size_t, size_t>, tref> id_var;
 	auto update_var = [&](tref n) {
 		if (is_logical_or_functional_quant<node>(n)) {
 			DBG(assert(scope_to_id.contains(n));)
@@ -65,9 +68,12 @@ tref canonize_quantifier_ids(tref fm) {
 			} else var_to_id.emplace(tau::trim(n), std::vector{scope_to_id.find(n)->second});
 		} else if (is<node, tau::variable>(n)) {
 			if (auto it = var_to_id.find(n); it != var_to_id.end()) {
-				tref nvar = tau::build_variable(
-					std::to_string(it->second.back()),
-					tau::get(n).get_ba_type());
+				const size_t id = it->second.back();
+				const size_t type = tau::get(n).get_ba_type();
+				auto [v, fresh] = id_var.try_emplace({ id, type });
+				if (fresh) v->second = tau::build_variable(
+					std::to_string(id), type);
+				tref nvar = v->second;
 				old_name.emplace(nvar, n);
 				return nvar;
 			}

@@ -232,13 +232,24 @@ tref query_or_rewrap(const trefs& conjuncts, const block& X, Decide&& decide)
 	if (tau::get(q).equals_T() || tau::get(q).equals_F()) return q;
 	const trefs Z = get_free_vars<node>(q);
 	if (Z.empty()) {
-		if (const std::optional<bool> r = decide(q))
+		if (const std::optional<bool> r =
+			decide(canonicalise_binder_ids<node>(q)))
 			return *r ? _T<node>() : _F<node>();
 		return rewrap<node>(phi, X);
 	}
 	// Open: valid under `∀Z`, or unsatisfiable under `∃Z`; detection only.
-	if (decide(rewrap<node>(q, Z, tbdd::all)) == true) return _T<node>();
-	if (decide(rewrap<node>(q, Z, tbdd::ex)) == false) return _F<node>();
+	const tref k = canonicalise_binder_ids<node>(
+		rewrap<node>(q, Z, tbdd::all));
+	if (decide(k) == true) return _T<node>();
+	// Ids depend on depth alone, so the `∃Z` key is the `∀Z` one with its
+	// closing binders flipped.
+	block Zk;
+	tref body = k;
+	for (size_t i = 0; i < Z.size(); ++i) {
+		Zk.push_back(tau::trim_right_sibling(binder_var<node>(body)));
+		body = tau::trim_right_sibling(binder_body<node>(body));
+	}
+	if (decide(rewrap<node>(body, Zk, tbdd::ex)) == false) return _F<node>();
 	return rewrap<node>(phi, X);
 }
 
@@ -280,7 +291,8 @@ tref finite_tier2(const trefs& conjuncts, const block& X, ctx<node>& c) {
 		const tref joint = simplified_and_join<node>(open);
 		const trefs Z = get_free_vars<node>(joint);
 		const tref q = finish_terms<node>(rewrap<node>(joint, Z));
-		if (decide_finite<node>(q, c) == false) return _F<node>();
+		if (decide_finite<node>(canonicalise_binder_ids<node>(q), c)
+			== false) return _F<node>();
 	}
 	return acc.result();
 }

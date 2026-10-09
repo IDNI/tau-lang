@@ -105,8 +105,8 @@ subsume_result<node> subsume_negatives(tref f, const trefs& conjuncts,
  * unsatisfiable gives `F` — else re-wrapped over the prepared clause
  * (invariant 3).
  *
- * @param decide answers a closed query `true`, `false`, or nothing, as a
- *        `std::optional<bool>(tref)`
+ * @param decide answers a closed query, its binder ids canonical, `true`,
+ *        `false`, or nothing, as a `std::optional<bool>(tref)`
  */
 template <NodeType node, typename Decide>
 tref query_or_rewrap(const trefs& conjuncts, const block& X,

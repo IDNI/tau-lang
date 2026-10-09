@@ -228,8 +228,7 @@ std::optional<bool> sweep(tref k, const ctx<node>& c) {
 } // namespace blast_detail
 
 template <NodeType node>
-std::optional<bool> decide_finite(tref q, ctx<node>& c) {
-	const tref k = canonicalise_binder_ids<node>(q);
+std::optional<bool> decide_finite(tref k, ctx<node>& c) {
 	if (const auto r = lookup<node, table::qbf_memo>(k)) return *r;
 	// Constant before exponential (invariant 8): an earlier fallback's
 	// verdict decides without a sweep; a cached `unknown` is a miss, since

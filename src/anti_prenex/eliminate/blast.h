@@ -61,6 +61,9 @@ inline constexpr auto sweep_options = bdd_options<>::create(40, 22);
  * `std::logic_error` in every build. Such a node is a routing bug, never a
  * verdict (§7). A free variable, which the contract excludes, throws the
  * same way.
+ *
+ * The caller canonicalises @p q (`canonicalise_binder_ids`): it is the memo
+ * key as it stands.
  */
 template <NodeType node>
 std::optional<bool> decide_finite(tref q, ctx<node>& c);

@@ -37,7 +37,8 @@ namespace idni::tau_lang::anti_prenexing {
  * is flushed when it changes. A query the solver cannot read — a functional
  * quantifier or a reference inside — is `unknown`. No ctx: nothing
  * component-scoped is read. A free variable in @p q is a caller bug,
- * Debug-asserted.
+ * Debug-asserted. The caller canonicalises @p q (`canonicalise_binder_ids`):
+ * it is the memo key as it stands.
  */
 template <NodeType node>
 answer ask(tref q);
