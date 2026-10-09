@@ -13,7 +13,7 @@ Tau is an expressive, decidable, and executable formal software specification la
 Prefer building via `./dev preset` from the project root. It configures (fresh),
 builds, and optionally tests/runs using `CMakePresets.json`. Build output goes
 to `build/<build type>` (e.g. `build/debug`, `build/release`); a non-default
-toolchain adds a suffix (`-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-clang-cl`), the wasm
+toolchain adds a suffix (`-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`), the wasm
 family adds `-wasm[-nothreads|-repl-browser]`, and the generator never splits a
 folder. The bv-only and no-bv packs are the one exception: they configure the
 same sources with a different pack, so `{release,devel,debug}-tests-bvonly`
@@ -48,8 +48,8 @@ and `cxxflags`, so a configure for one target never evicts the package of anothe
 The target in the id names the platform the package runs on: `linux-x86_64`
 (Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),
 `windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
-`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (cl.exe, and
-the Visual Studio clang-cl for cvc5). The
+`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (clang-cl, with
+Boost from cl.exe and cvc5 from the Visual Studio clang-cl). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
@@ -63,14 +63,22 @@ The id records the hash of both files, so a change to a target script moves the 
 that target only. `./dev dep-<dep>` (for example `./dev dep-cvc5`) runs the script of
 the `-DTAU_DEP_TARGET` target, else of the host.
 
-`windows-x86_64-msvc` builds the full pack from the store, cvc5 included, and runs the
-C++ suite (`release-msvc-all`) with the MSVC shell from `ilammy/msvc-dev-cmd` in
-CI; a producer's `vcvars64.bat` search is only a local fallback. cvc5 does not build
-with cl.exe, so its producer builds it with the Visual Studio clang-cl for both MSVC
-presets, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
+`windows-x86_64-msvc` builds the full pack from the store, cvc5 included.
+clang-cl is the default MSVC toolchain. The `<type>-msvc` presets are aliases of
+`<type>-msvc-clang-cl` and build in `build/<type>-msvc`. The `<type>-msvc-cl`
+presets build with cl.exe in `build/<type>-msvc-cl` and use the default pack. With
+cl.exe a pack fails when it holds both `tau` (the tau_ba algebra) and `bv`, so a cl
+build needs a `-DTAU_BAS` without `bv`. CI builds
+MSVC with clang-cl only. It runs the C++ suite (`release-msvc-all-clang-cl`) with
+the MSVC shell from `ilammy/msvc-dev-cmd`; a producer's `vcvars64.bat` search is
+only a local fallback. Boost builds with cl.exe for every MSVC preset. cvc5 does not
+build with cl.exe, so its producer builds it with the Visual Studio clang-cl for every
+MSVC preset, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
 That package holds the cvc5 library only: cvc5's parser library does not link as a DLL
 of its own there, and tau uses neither it nor the cvc5 binary.
-The id records that builder, so the cl and clang-cl presets share one cvc5 package.
+The ids record these builders, so the cl and clang-cl presets share one Boost package
+and one cvc5 package. An installed MSVC SDK with `bv` needs clang-cl as the compiler
+of the project that uses it.
 Configure copies `cvc5.dll` into the build root, where the executables are. The suites
 carry no platform skip of their own: `tests/test_helpers.h` gives every
 platform a scratch directory, a host-compiler probe and `tau_test_run` over
@@ -93,7 +101,9 @@ Other presets: `{release,devel,debug}-{tests,tau,all}`, `relwithdebinfo-{tests,t
 `coverage`, `release-packages-{deb,rpm,macos}` (the package presets stay release
 only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-packages-zip`,
 `{release,devel,debug}-arm64-{tests,all}`,
-`{release,devel,debug}-msvc-{tau,tests,all}`, `{release,devel,debug}-msvc-all-clang-cl`,
+`{release,devel,debug}-msvc-{tau,tests,all,binding-python}` (aliases on clang-cl),
+`{release,devel,debug}-msvc-clang-cl`, `{release,devel,debug}-msvc-all-clang-cl`,
+`{release,devel,debug}-msvc-cl` and `{release,devel,debug}-msvc-cl-{tau,tests,all}` (cl.exe),
 `release-msvc-packages` (NSIS installer with the SDK box), `release-msvc-packages-zip`,
 `{release,devel,debug}-binding-python`,
 `{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
@@ -126,7 +136,7 @@ wins. `--preset` takes a platform name or any `./dev preset` name, which maps
 to the platform of its build folder, and builds with that platform's SDK box
 and toolchain. A **platform** is the build folder name `./dev preset`
 uses: `release`, `devel`, `debug` and their `-gcc`, `-w64`, `-arm64`, `-msvc`,
-`-msvc-clang-cl`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
+`-msvc-cl`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
 at `build/<platform>/sdk/`, so a cross-platform artifact needs that platform
 built first. `-D NAME=VALUE` and `-G <generator>` go to the emitted project
 configure, and a `-D` value wins over the preset.
@@ -538,6 +548,19 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
   `tgf`, and the Windows curl) resolve through the store at configure time; a missing
   package is read from `TAU_STORE_REMOTE` or built from the preset.
 - The parser library is a git submodule at `external/parser/`.
+
+### Options
+
+- Every limit, flag and BA option is an option of the options repository
+  `idni::options()` (`external/parser/src/utility/options.h`). The core set is
+  in `src/tau_options.h`, the options of the executable in `src/cli_options.h`.
+- An option has one name for the command line, the REPL, the environment and
+  the bindings. The environment variable is `TAU_` plus the name in upper case,
+  with `-` as `_` (`max-fixpoint-steps` reads `TAU_MAX_FIXPOINT_STEPS`).
+- A bad value of a variable is an error, and tau exits with 1.
+- A BA gives its `option_set` from `declared_options()` and binds each option
+  to its field in `bind_options()`. Each name starts with `<type_name>-`
+  (`bv-blasting`). The tau algebra uses the prefix `ba-`.
 
 ### Errors
 

@@ -178,7 +178,7 @@ To build the binaries:
 ```
 
 Alternatively, use the CMake presets declared in
-[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`; a non-default toolchain adds `-gcc`, `-w64`, `-msvc` or `-msvc-clang-cl`, and the wasm family `-wasm`):
+[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`; a non-default toolchain adds `-gcc`, `-w64`, `-msvc` or `-msvc-cl`, and the wasm family `-wasm`):
 
 ```bash
 ./dev preset release-tau run -- --help
@@ -312,9 +312,9 @@ tau compile spec.tau -o sim
 A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` or `tau
 codegen` file list.
 
-`tau gen <spec.tau>... [-o <dir>]` (also `tau codegen`) takes one or more spec
+`tau gen <spec.tau>... [-o, --output-dir <dir>]` (also `tau codegen`) takes one or more spec
 files. Each spec writes its own `<spec>.build/`. A spec from stdin has no name,
-so it writes `a.build/`. `-o` names one output directory. It is an error with
+so it writes `a.build/`. `-o` (`--output-dir`) names one output directory. It is an error with
 more than one spec file.
 
 `tau compile -` reads the spec from stdin. With no `-o`, it writes the
@@ -332,6 +332,8 @@ artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 
 The cmake build stops, and the compile fails, after `--compile-build-timeout`
 seconds (`TAU_COMPILE_BUILD_TIMEOUT`, 3600 by default; 0 waits without bound).
+This is a global option, so it comes before `compile`:
+`tau --compile-build-timeout 600 compile spec.tau`.
 
 Without `--preset`, `tau compile` builds for the machine tau runs on. It uses
 the tau SDK of its own build folder (`<build>/sdk`) or the installed box beside
@@ -341,18 +343,24 @@ the artifact. The build type is `Release`, unless a
 
 With `--preset <name>`, `tau compile` targets another platform. A platform is
 the build folder name `./dev preset` uses: `release`, `devel`, `debug`, and
-their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-clang-cl`, `-wasm` and
-`-wasm-nothreads` twins.
+their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`, `-wasm` and
+`-wasm-nothreads` twins. `-msvc` is the clang-cl build, the default MSVC
+toolchain. `-msvc-cl` is the cl.exe build. The `*-msvc-cl` presets use the
+default pack. With cl.exe a pack fails when it holds both `tau` (the tau_ba
+algebra) and `bv`, so a cl build needs a `-DTAU_BAS` without `bv`.
 
 Any other `./dev preset` name maps to the platform of its build folder, so
-`--preset release-msvc-all` builds with the `release-msvc` platform. An unknown
+`--preset release-msvc-all` builds with the `release-msvc` platform, and
+`--preset release-msvc-cl-all` with the `release-msvc-cl` platform. An unknown
 name fails and lists the platforms before any SDK lookup.
 
 Each platform has an SDK at `build/<platform>/sdk/`. Build that platform first
 with `./dev preset <platform>`. An installed box lives at
 `<prefix>/lib/tau/sdk/<platform>/`; install `tau-sdk`,
 `tau-sdk-windows-x86_64-mingw`, `tau-sdk-wasm32-emscripten` or
-`tau-sdk-linux-arm64` for the platform you target.
+`tau-sdk-linux-arm64` for the platform you target. An MSVC SDK with `bv` needs
+clang-cl as the compiler of the artifact: cl.exe cannot compile the tau
+headers of a pack with `bv`.
 
 The build runs the SDK script `cmake/tau-compile.cmake`. The same script serves
 the CLI and `./dev compile <dir>`. Without a preset both build natively: the
@@ -909,112 +917,117 @@ The LTL(ABA) implementation currently exposes the following synthesis paths:
 
 Algorithm B is the default for formulas over the `qlt` type that contain input
 variables. Pure-output `qlt` formulas route to Algorithm A because no P-bits are
-needed. Algorithm D is accessible via `TAU_LTL_ALG=D`, but remains output-only.
+needed. Algorithm D is selected by `ltl-alg` set to `D` (`TAU_LTL_ALG=D`), but stays output-only.
 The algorithm picker follows the same soundness rule: A and D are excluded when
 input variables are present.
 
-**Synthesis timeout**: by default, `ltlsynt` is given 60 seconds to solve
-the propositional skeleton.  Set the environment variable `TAU_LTL_TIMEOUT_SEC`
-to a positive integer to change the limit, or to `0` to disable it entirely.
+**Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
+propositional skeleton. The option `ltl-timeout` sets the limit, and `0`
+disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
+REPL, or as the environment variable `TAU_LTL_TIMEOUT`:
 
 ```bash
-TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
+TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 ```
 
-**LTL synthesis environment variables** (all optional):
+**LTL synthesis options.** Each row is an option of the options repository
+(see [Options and the environment](#options-and-the-environment)):
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `ltl-timeout` | 60 | Wall-clock limit in seconds for each `ltlsynt` call (0 = no limit). |
+| `ltl-qe-max-vars` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path (0 = off). Values above 2 enable a fast path that is not sound. Keep the default. |
+| `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas (input-bearing formulas still go to B), `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D (input-bearing formulas go to B). Any other word is an error. |
+| `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
+| `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
+| `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited). On the cap the verdict is UNKNOWN. |
+| `ltl-window-max-paths` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited). A hit cap gives UNKNOWN. |
+| `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
+| `ltl-data-game-max-nodes` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited). A full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. |
+| `ltl-data-game-max-memo` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited). A memo that reaches the cap is emptied. This costs recomputation, never a verdict. |
+| `max-consistency-subsets` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited). A fired cap is sound but can answer unrealizable. |
+| `max-cover-products` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited). Beyond it the syntactic verdict stands. |
+| `ltl-data-game-max-combinations` | 4096 | Value combinations the data game tabulates for one comparison its circuits do not encode (0 = unlimited). Past it the comparison has no code, and the game falls back to formula regions or is undecided. |
+| `ltl-max-observations` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks. Beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. |
+| `ltl-mealy-max-states` | 4096 | States of the Mealy view a data-game strategy is played through. Past it the moves are played directly (0 = no view). |
+| `ltl-mealy-max-edges` | 65536 | Edges of that Mealy view (0 = no view). |
+| `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
+| `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
+
+**LTL synthesis environment variables.** These variables are not options. tau
+reads them when it calls the synthesis tools:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TAU_LTL_TIMEOUT_SEC` | 60 | Wall-clock limit for each `ltlsynt` call (0 = disable). Environment fallback of `--ltl-timeout` / REPL `set ltltimeout`; the option wins when given. |
-| `TAU_LTL_EXPORT_STRATEGY` | _unset_ | `hoa` prints winning-strategy HOA to stderr; `dot` prints Graphviz dot (falls back to HOA if `autfilt` is unavailable). |
-| `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | If set to a path, also writes the HOA strategy to that file on success. |
-| `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
-| `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
-| `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path. Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
-| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
-| `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
-| `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
-| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
-| `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
-| `TAU_LTL_CLOSED_REGIONS_TIMEOUT` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt); past either that attempt is undecided. Environment fallback of `--ltl-closed-regions-timeout` / REPL `set ltlclosedregionstimeout`. |
-| `TAU_LTL_DATA_GAME_MAX_NODES` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited); a full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. Environment fallback of `--ltl-data-game-max-nodes` / REPL `set ltldatagamemaxnodes`. |
-| `TAU_LTL_DATA_GAME_MAX_MEMO` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited); a memo that reaches the cap is emptied, which costs recomputation, never a verdict. Environment fallback of `--ltl-data-game-max-memo` / REPL `set ltldatagamemaxmemo`. |
-| `TAU_LTL_MAX_CONSISTENCY_SUBSETS` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited); a fired cap is sound but may answer unrealizable. Environment fallback of `--max-consistency-subsets` / REPL `set maxsubsets`. |
-| `TAU_LTL_MAX_COVER_PRODUCTS` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited); beyond it the syntactic verdict stands. Environment fallback of `--max-cover-products` / REPL `set maxcoverproducts`. |
-| `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` | 4096 | Value combinations the data game tabulates for one comparison its circuits do not encode (0 = unlimited); past it the comparison has no code, and the game falls back to formula regions or is undecided. Environment fallback of `--ltl-data-game-max-combinations` / REPL `set ltldatagamemaxcombinations`. |
-| `TAU_LTL_MAX_OBSERVATIONS` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks; beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. Environment fallback of `--ltl-max-observations` / REPL `set ltlmaxobservations`. |
-| `TAU_LTL_MEALY_MAX_STATES` | 4096 | States of the Mealy view a data-game strategy is played through; past it the moves are played directly (0 = no view). Environment fallback of `--ltl-mealy-max-states` / REPL `set ltlmealymaxstates`. |
-| `TAU_LTL_MEALY_MAX_EDGES` | 65536 | Edges of that Mealy view (0 = no view). Environment fallback of `--ltl-mealy-max-edges` / REPL `set ltlmealymaxedges`. |
-| `TAU_COMPILE_MAX_TABLE_EDGES` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table; a larger strategy is solved as the program runs (0 = never a table). Environment fallback of `--compile-max-table-edges` / REPL `set compilemaxtableedges`. |
-| `TAU_COMPILE_BUILD_TIMEOUT` | 3600 | Seconds the cmake build `tau compile` runs may take; past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped; on Windows only the cmake process `tau compile` started is, and the compilers it launched may run to their end. Environment fallback of `--compile-build-timeout` / REPL `set compilebuildtimeout`. |
+| `TAU_LTL_EXPORT_STRATEGY` | _unset_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. |
+| `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | A path. tau also writes the HOA strategy to that file on success. |
+| `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
+| `TAU_LTL_WITNESS` | _unset_ | `1` prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
 
-Every limit above is a runtime parameter carried by every surface -- a CLI
-flag, a REPL option, an `api::set_*` setter with its `api::get_*` getter, the
-Python and JavaScript bindings (see the CLI and REPL option tables and
-[the API section](#the-c-api-and-language-bindings)) -- with the environment variable as the last
-fallback. Each
-one resolves **option > environment > default**, so a flag or a `set`
-command always wins over a variable a script exported, and each variable is
-validated: a negative, out-of-range or non-numeric value keeps the default
-and says so once. Zero is a value rather than an absence -- it means
-unlimited for every cap here, and no watchdog for the timeout -- except for
-`--ltl-qe-max-vars`, whose own "not set" sentinel is 0 because a cap of 0
-would mean nothing there.
+### Options and the environment
 
-The caps an algebra declares about itself follow the same three surfaces,
-addressed `--<ba>-<option>` on the command line and `<ba>-<option>` in the
-REPL, and are present when that algebra is in the pack: `qlt` declares
-`--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at most 30,
-`TAU_QLT_T3_CAP`) and `--qlt-const-output-max` (constant-output assignments
-the fast path in front of Algorithm B enumerates, default 100,
-`TAU_QLT_CONST_OUTPUT_MAX`), `--qlt-cells-budget` (formula instances one
-decision by cells evaluates before it is left open, default 65536,
-`TAU_QLT_CELLS_BUDGET`) and `--qlt-cells-max-params` (other free variables,
-and named endpoints, such a decision ranges over, default 2,
-`TAU_QLT_CELLS_MAX_PARAMS`); `nlang` declares `--nlang-http-timeout`
-(seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`) and
-`--nlang-max-tokens` (tokens per reply of an Anthropic model, default 16000,
-`TAU_NLANG_MAX_TOKENS`). Every option `<ba>-<option>` takes
-`TAU_<BA>_<OPTION>` (dashes as underscores) at start, and a flag or `set`
-writes it later, so `bv`'s caps read `TAU_BV_BLASTDEPTH`,
-`TAU_BV_CASE_SPLIT_MAX_TESTS`, `TAU_BV_DEFELIM_MAX_CLAUSES`,
-`TAU_BV_DEFELIM_MAX_ATOMS`, `TAU_BV_DEFELIM_MAX_SUBSET`,
-`TAU_BV_DEFELIM_MAX_ROUNDS`, `TAU_BV_BLASTING_MAX_NODES`,
-`TAU_BV_BITBLAST_MAX_NODES`, `TAU_BV_BITBLAST_MAX_WIDTH`,
-`TAU_BV_SOLVE_TIMEOUT` and `TAU_BV_MAX_WIDTH`; a `0` there means what `0`
-means to the option.
+Every limit, flag and algebra option of tau is an option of the options
+repository. An option has one name on every surface:
 
-The engine's other limits take the same fallback, named after their flag, with
-the same precedence and validation. A variable is read once, the first time
-its limit is needed:
+- the command line: `--max-fixpoint-steps 1000`
+- the REPL: `set max-fixpoint-steps 1000`, `get max-fixpoint-steps`
+- the environment: `TAU_MAX_FIXPOINT_STEPS=1000`
+- the C++ API: `idni::options().set_text("max-fixpoint-steps", "1000")`
+- the bindings: `set_option("max-fixpoint-steps", "1000")` in Python,
+  `setOption` in JavaScript
 
-| Variable | Default | Option |
-|----------|---------|--------|
-| `TAU_SPEC_SIZE_WARN` | 0 (off) | `--spec-size-warn` / `specsizewarn` |
-| `TAU_MAX_REVISION_ALTS` | 0 (unlimited) | `--max-revision-alts` / `revisionalts` |
-| `TAU_BLOCK_MAX_SPLITS` | 0 (unlimited) | `--block-max-splits` / `maxsplits` |
-| `TAU_BLOCK_MAX_ROUNDS` | 0 (unlimited) | `--block-max-rounds` / `maxrounds` |
-| `TAU_BA_DECISION_PINS` | 4096 (0 = none) | `--ba-decision-pins` / `decisionpins` |
-| `TAU_CQE_MAX_CLAUSES` | 0 (unlimited) | `--cqe-max-clauses` / `maxclauses` |
-| `TAU_LGRS_MAX_VARS` | 8 | `--lgrs-max-vars` / `lgrsmaxvars` |
-| `TAU_MAX_FIXPOINT_STEPS` | 500 | `--max-fixpoint-steps` / `fixpointsteps` |
-| `TAU_MAX_FLAG_SEARCH_STEPS` | 500 | `--max-flag-search-steps` / `flagsteps` |
-| `TAU_BLOCK_SQUEEZE_CAP` | 0 (unlimited) | `--block-squeeze-cap` / `squeezecap` |
-| `TAU_MAX_SIMPLIFY_ROUNDS` | 0 (unlimited) | `--max-simplify-rounds` / `simplifyrounds` |
-| `TAU_MAX_DEF_PASSES` | 0 (unlimited) | `--max-def-passes` / `defpasses` |
-| `TAU_MAX_ENUM_STEPS` | 0 (unlimited) | `--max-enum-steps` / `enumsteps` |
-| `TAU_MAX_PROBE_STEPS` | 10000 | `--max-probe-steps` / `probesteps` |
-| `TAU_MAX_REWRITE_ROUNDS` | 0 (unlimited) | `--max-rewrite-rounds` / `rewriterounds` |
-| `TAU_MAX_CONSTANT_SIZE` | 2000 | `--max-constant-size` / `maxconstantsize` |
-| `TAU_CACHE_BOUND` | 4096 (0 = unbounded) | `--cache-bound` / `cachebound` |
-| `TAU_BF_DEPENDENCE_MAX_NODES` | 65536 | `--bf-dependence-max-nodes` / `bfdependencemaxnodes` |
-| `TAU_GC_MIN_SIZE` | 256 | `--gc-min-size` / `gcminsize` |
-| `TAU_GC_GROWTH_FACTOR` | 1.5 (<= 0 disables the growth-triggered sweeps) | `--gc-growth-factor` / `gcgrowth` |
-| `TAU_TREF_BUDGET` | 0 (unlimited) | `--tref-budget` / `trefbudget` |
-| `TAU_TREF_BUDGET_SOFT` | 75 | `--tref-budget-soft` / `trefbudgetsoft` |
+The variable of an option is `TAU_` plus the name in upper case, with `-` as
+`_`. tau reads the environment once at start. A flag on the command line and a
+later `set` write over the value of the variable. A bad value in a variable is
+an error, and tau exits with 1. A count above the largest value it holds is an
+error too, never a wrapped value. Zero is a value, not an absence. For every
+cap here it means unlimited, and for a timeout it means no limit, unless the
+table says otherwise.
 
-A program `tau compile` builds has no flags for these limits; the ones its run
-uses still read their variables.
+An algebra declares its own options, named `<ba>-<option>`. They exist when
+that algebra is in the pack. `qlt` declares `qlt-t3-cap` (data atoms its T3
+encodings accept, default 20, at most 30), `qlt-const-output-max`
+(constant-output assignments the fast path in front of Algorithm B
+enumerates, default 100), `qlt-cells-budget` (formula instances one decision
+by cells evaluates before it is left open, default 65536) and
+`qlt-cells-max-params` (other free variables, and named endpoints, such a
+decision ranges over, default 2). `nlang` declares `nlang-http-timeout`
+(seconds per LLM request, default 15) and `nlang-max-tokens` (tokens per
+reply of an Anthropic model, default 16000). The options of `bv` are listed
+under [the command line options](#tau--interpreter-and-repl). The tau algebra
+uses the prefix `ba-`: `ba-component-factoring` and `ba-decision-pins`.
+`qlt-t3-cap` reads `TAU_QLT_T3_CAP`, and `bv-blastdepth` reads
+`TAU_BV_BLASTDEPTH`, by the same rule.
+
+The limits of the engine:
+
+| Option | Default |
+|--------|---------|
+| `spec-size-warn` | 0 (off) |
+| `max-revision-alts` | 0 (unlimited) |
+| `block-max-splits` | 0 (unlimited) |
+| `block-max-rounds` | 0 (unlimited) |
+| `ba-decision-pins` | 4096 (0 = none) |
+| `cqe-max-clauses` | 0 (unlimited) |
+| `lgrs-max-vars` | 8 |
+| `max-fixpoint-steps` | 500 |
+| `max-flag-search-steps` | 500 |
+| `block-squeeze-cap` | 0 (unlimited) |
+| `max-simplify-rounds` | 0 (unlimited) |
+| `max-def-passes` | 0 (unlimited) |
+| `max-enum-steps` | 0 (unlimited) |
+| `max-probe-steps` | 10000 |
+| `max-rewrite-rounds` | 0 (unlimited) |
+| `max-constant-size` | 2000 |
+| `cache-bound` | 4096 (0 = unbounded) |
+| `bf-dependence-max-nodes` | 65536 |
+| `gc-min-size` | 256 |
+| `gc-growth-factor` | 1.5 (<= 0 disables the growth-triggered sweeps) |
+| `tref-budget` | 0 (unlimited) |
+| `tref-budget-soft` | 75 |
+
+A program that `tau compile` builds reads the same variables at start. Its
+command line takes only its own options (see `--help` of the program).
 
 An algebra also declares options that are a flag or a text, on the same
 surfaces. The text options are those of the `nlang` oracle:
@@ -1033,7 +1046,7 @@ lists each with its environment variable and its default.
 
 **Other environment variables.** `TAU_BA_COMPONENT_FACTORING` sets the
 option `ba-component-factoring` at start, and `--ba-component-factoring` /
-`set factoring` write it later (the decision by components
+`set ba-component-factoring` write it later (the decision by components
 is taken on a formula of `always` clauses that read their streams at the
 current step and at steps back, and declined where a unit refers to
 absolute time, through a `sometimes` clause, a stream read at a fixed time
@@ -2087,7 +2100,7 @@ normalize h(x,y,z,w) fallback last
 ```
 
 The enumeration of successive steps is unbounded by default. It can be capped
-with the `-E, --max-enum-steps` command line option or the `enumsteps` REPL
+with the `-E, --max-enum-steps` command line option or the `max-enum-steps` REPL
 option (see [REPL options](#repl-options)); if neither a fixpoint nor a loop is
 found within the cap, the search gives up with an error. Such a cap is a bound
 on the search, not a proof that no fixpoint exists.
@@ -3051,10 +3064,13 @@ The general form of the tau executable command line is:
 
 ```bash
 tau [ options ] [ <specification file> ]
+tau [ options ] gen|codegen|compile [ command options ] <specification file>
 ```
 
-where `[ options ]` are the command line options and `[ <specification file> ]` is
-the path to a file containing the Tau specification you want to run. Use `-` to
+where `[ options ]` are the global options and `[ <specification file> ]` is
+the path to a file containing the Tau specification you want to run. A global
+option comes before the command: `tau -S debug compile spec.tau`, not
+`tau compile -S debug spec.tau`. Use `-` to
 read the specification from standard input. If you omit the file, the Tau REPL
 will be started.
 
@@ -3094,55 +3110,55 @@ non-converging spec from a loud give-up into a hang (pass `0` to opt in);
 `0` means unlimited for every cap except where the table says otherwise
 (`--ba-decision-pins`, `--ltl-mealy-max-*` and `--compile-max-table-edges`
 read it as none, `--spec-size-warn` as off); and the two gc knobs keep their
-tuned defaults. Each has a matching REPL option (see [REPL options](#repl-options)),
-and each falls back to the `TAU_*` environment variable it names when its flag
-is not given (the flag wins when both are; a value that is not a
-non-negative number is an error):
+tuned defaults. Each is also a REPL option of the same name (see [REPL options](#repl-options))
+and reads its variable `TAU_<NAME>` at start (see
+[Options and the environment](#options-and-the-environment)). The flag wins
+over the variable:
 
 | Option                        | Description                                                                            |
 |-------------------------------|----------------------------------------------------------------------------------------|
-| -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (default `TAU_SPEC_SIZE_WARN` or 0; 0 = off) |
-| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (default `TAU_MAX_REVISION_ALTS` or 0; 0 = unlimited) |
+| -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (default 0; 0 = off) |
+| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (default 0; 0 = unlimited) |
 | -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
 | -t, --step-definitional-propagation | propagate the constants a step formula determines before its paths are enumerated, one path instead of 2^k for k guards reading them (on by default) |
-| -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (default `TAU_BLOCK_MAX_SPLITS` or 0; 0 = unlimited) |
-| -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (default `TAU_BLOCK_MAX_ROUNDS` or 0; 0 = unlimited) |
-| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default `TAU_BA_DECISION_PINS` or 4096; 0 = none) |
-| -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (default `TAU_CQE_MAX_CLAUSES` or 0; 0 = unlimited) |
-| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of squeezing it per width and computing a ground solution algebraically, whose Boole expansion is exponential in them (default `TAU_LGRS_MAX_VARS` or 8; 0 = unlimited) |
-| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps; a give-up reports an error, not a verdict (default `TAU_MAX_FIXPOINT_STEPS` or 500; 0 = unlimited) |
-| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default `TAU_MAX_FLAG_SEARCH_STEPS` or 500; 0 = unlimited) |
-| -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (default `TAU_BLOCK_SQUEEZE_CAP` or 0; 0 = unlimited) |
-| -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (default `TAU_MAX_SIMPLIFY_ROUNDS` or 0; 0 = unlimited) |
-| -P, --max-def-passes          | cap definition-expansion passes (default `TAU_MAX_DEF_PASSES` or 0; 0 = unlimited)    |
-| -E, --max-enum-steps          | cap recurrence-relation enumeration steps (default `TAU_MAX_ENUM_STEPS` or 0; 0 = unlimited) |
-| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default `TAU_MAX_PROBE_STEPS` or 10000; 0 = unlimited) |
-| -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (default `TAU_MAX_REWRITE_ROUNDS` or 0; 0 = unlimited) |
-| -G, --gc-min-size             | tree-node count floor before gc may trigger (default `TAU_GC_MIN_SIZE` or 256)       |
-| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default `TAU_GC_GROWTH_FACTOR` or 1.5; <= 0 disables the growth-triggered sweeps) |
-| -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default `TAU_TREF_BUDGET` or 0; 0 = unlimited) |
-| -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
-| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default `TAU_LTL_MAX_CONSISTENCY_SUBSETS` or 4096; 0 = unlimited) |
-| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default `TAU_LTL_MAX_COVER_PRODUCTS` or 256; 0 = unlimited) |
-| -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default `TAU_MAX_CONSTANT_SIZE` or 2000; 0 = unlimited) |
-| -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default `TAU_CACHE_BOUND` or 4096; 0 = unbounded) |
-| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
-| -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
-| -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
-| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default `TAU_LTL_HOA_MAX_STATES` or 4194304; 0 = unlimited) |
-| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
-| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
-| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
-|     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default `TAU_LTL_CLOSED_REGIONS_TIMEOUT` or 20; 0 = no such attempt) |
-|     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default `TAU_LTL_DATA_GAME_MAX_NODES` or 8388608; 0 = unlimited) |
-|     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default `TAU_LTL_DATA_GAME_MAX_MEMO` or 33554432; 0 = unlimited) |
-|     --ltl-data-game-max-combinations | cap the value combinations the data game tabulates for one comparison its circuits do not encode (default `TAU_LTL_DATA_GAME_MAX_COMBINATIONS` or 4096; 0 = unlimited) |
-|     --ltl-max-observations    | cap the observation props whose impossible joint values the synthesis skeleton assumes away (default `TAU_LTL_MAX_OBSERVATIONS` or 8; at most 30, 0 = 30) |
-|     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default `TAU_LTL_MEALY_MAX_STATES` or 4096; 0 = no view) |
-|     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default `TAU_LTL_MEALY_MAX_EDGES` or 65536; 0 = no view) |
-|     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default `TAU_COMPILE_MAX_TABLE_EDGES` or 400; 0 = none) |
-|     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default `TAU_COMPILE_BUILD_TIMEOUT` or 3600; 0 = no timeout) |
-|     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default `TAU_BF_DEPENDENCE_MAX_NODES` or 65536; 0 = unlimited) |
+| -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (default 0; 0 = unlimited) |
+| -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (default 0; 0 = unlimited) |
+| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096; 0 = none) |
+| -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (default 0; 0 = unlimited) |
+| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of squeezing it per width and computing a ground solution algebraically, whose Boole expansion is exponential in them (default 8; 0 = unlimited) |
+| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
+| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
+| -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (default 0; 0 = unlimited) |
+| -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (default 0; 0 = unlimited) |
+| -P, --max-def-passes          | cap definition-expansion passes (default 0; 0 = unlimited)    |
+| -E, --max-enum-steps          | cap recurrence-relation enumeration steps (default 0; 0 = unlimited) |
+| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default 10000; 0 = unlimited) |
+| -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (default 0; 0 = unlimited) |
+| -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)       |
+| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables the growth-triggered sweeps) |
+| -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default 0; 0 = unlimited) |
+| -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default 75) |
+| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
+| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited) |
+| -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
+| -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded) |
+| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (default 60; 0 = no watchdog) |
+| -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `auto`)     |
+| -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (default 2; 0 = off) |
+| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
+| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
+| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
+| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
+|     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
+|     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default 8388608; 0 = unlimited) |
+|     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default 33554432; 0 = unlimited) |
+|     --ltl-data-game-max-combinations | cap the value combinations the data game tabulates for one comparison its circuits do not encode (default 4096; 0 = unlimited) |
+|     --ltl-max-observations    | cap the observation props whose impossible joint values the synthesis skeleton assumes away (default 8; at most 30, 0 = 30) |
+|     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default 4096; 0 = no view) |
+|     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default 65536; 0 = no view) |
+|     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
+|     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
+|     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -3177,10 +3193,10 @@ question stopped there has no answer, so the command asking it answers
 UNKNOWN, naming the limit; 60 by default, `0` runs the solver in the process
 with no limit), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
-the width widening may compute at; `0` leaves the current cap unchanged,
-1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
-and `--bv-blasting` are on. Each count option `--bv-<option>` falls back to
-`TAU_BV_<OPTION>` when it is not given. In a build without bv, `--bv-blasting`,
+the width widening may compute at; 1024 by default, and `0` sets the
+default again); bv blasts only when both `--preprocessing`/`-B`
+and `--bv-blasting` are on. Each option `--bv-<option>` reads
+`TAU_BV_<OPTION>` at start. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
 `--bv-quantifier-free-decision`, `--bv-blasting-max-nodes`,
@@ -3191,9 +3207,9 @@ recognized options at all.
 ## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
 
 ```bash
-tau gen <spec.tau>... [ -o <dir> ]
-tau codegen <spec.tau>... [ -o <dir> ]
-tau compile <spec.tau> [ -o <exe> ] [ -c <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ]
+tau gen <spec.tau>... [ -o, --output-dir <dir> ]
+tau codegen <spec.tau>... [ -o, --output-dir <dir> ]
+tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ]
 ```
 
 `tau gen` (also spelled `tau codegen`) parses each spec file, prepares its
@@ -3201,11 +3217,11 @@ execution exactly as the interpreter does, and emits `<spec.tau>.build/` (a
 `main.cpp` driving the strategy plus a `CMakeLists.txt` that finds the tau SDK
 and links `TAU::TAU`, one preset per platform in `CMakePresets.json`, and the
 `platforms.json` and toolchain that file names).  A spec file may be `-`
-(stdin, once per list).  It emits `a.build/`.  `-o` names one output
+(stdin, once per list).  It emits `a.build/`.  `-o` (`--output-dir`) names one output
 directory.  It is an error with several spec files.  `tau compile` runs `gen`.
 Then the SDK script `cmake/tau-compile.cmake` configures and builds the project
 for this machine by default, or for the `--preset` platform, and copies the
-program to `-o <exe>`
+program to `-o <exe>` (`--output`)
 (default: the spec path without its extension, or `a.out` / `a.exe` on Windows
 for stdin).  `tau compile -` writes the artifact to `a.build/`.  `--preset`
 names a platform or a `./dev preset` name.  `-D` and `-G` reach the emitted
@@ -3295,321 +3311,287 @@ corresponds to the repo commit.
 
 ## **REPL options**
 
-You have several options at your disposal to configure the Tau REPL. In order
-to set or get the value of an option you can use the following commands:
+The REPL reads and writes the options of the options repository by name. An
+option has the name of its command line option, without the dashes in front
+(see [Options and the environment](#options-and-the-environment)). These
+commands use the name:
 
-* `get [<option>]`: shows all configurable settings and their values or a single
-one if its name is provided.
+* `get`: shows every session option and its value.
 
-* `set <option> [=] <value>`: sets a configurable option to a desired value.
+* `get <option>`: shows the value of one option.
 
-* `enable <option>`: sets a boolean option to on.
+* `set <option> [=] <value>`: sets an option to a value. A flag takes `on` or
+`off` (also `true`/`false`, `yes`/`no`, `1`/`0`). A count takes a number. A
+text takes letters, digits and `. - _ : /`, or any characters in double
+quotes.
 
-* `disable <option>`: sets a boolean option to off.
+* `enable <option>`: sets a flag to on.
 
-* `toggle <option>`: toggle an option between on/off.
+* `disable <option>`: sets a flag to off.
 
-The options you have at your disposal are the following:
+* `toggle <option>`: switches a flag between on and off.
 
-* `c|color|colors`: Can be on/off. Controls usage of terminal colors in its
-output. It's on by default.
+`get` shows a flag as `true` or `false`. An unknown name is an error
+(`Unknown option`). `enable`, `disable` and `toggle` refuse an option that is
+not a flag. The session options are the options of the engine, of the output
+and of the algebras in the pack. The options of the command line alone, such
+as `help`, `evaluate` and `output-dir`, are not in the list of `get`.
 
-* `s|status`: Can be on/off. Controls status visibility in the prompt. It's on
+The flags and the words:
+
+* `color`: Can be on/off. Controls usage of terminal colors in the output.
+It is on by default.
+
+* `status`: Can be on/off. Controls status visibility in the prompt. It is on
 by default.
 
-* `S|sev|severity`: Possible values are trace/debug/info/error. The value determines
-how much information the REPL will provide. It's `info` by default in Release
-builds and `debug` in Debug builds.
+* `severity`: `trace`, `debug`, `info` or `error`. The value sets how much
+information the REPL gives. It is `info` by default, and `debug` in a build
+with `DEBUG`.
 
-* `H|highlight|highlighting`: Can be on/off. Controls usage of
-highlighting in the output of commands. It's off by default.
+* `highlighting`: Can be on/off. Controls highlighting in the output of
+commands. It is off by default.
 
-* `I|indent|indenting`: Can be on/off. Controls usage of indentation in the
-output of commands. It's off by default.
+* `indenting`: Can be on/off. Controls indentation in the output of commands.
+It is off by default.
 
-* `V|charvar`: Can be on/off. Controls usage of character variables in the
-REPL. It's on by default.
+* `json`: Can be on/off. Controls output in JSON format. It is off by default.
 
-* `B|preprocessing`: Can be on/off. Master switch for every BA-specific
-preprocessing pass, e.g. bv's own predicate blasting (see below) — off
-disables all of them regardless of their own setting. It's off by default.
+* `charvar`: Can be on/off. Controls usage of character variables in the
+REPL. It is on by default.
 
-* `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
-tau-algebra constant tests: a constant whose clauses share no variables and
-refer to no absolute time is decided per component, each decision remembered
-across steps, instead of as a whole. It's on by default (the REPL starts with the value of the
-`-K, --ba-component-factoring` command line option).
+* `preprocessing`: Can be on/off. Master switch for every BA-specific
+preprocessing pass, for example the predicate blasting of bv (see below).
+Off disables all of them, whatever their own setting. It is off by default.
 
-* `Z|pwrsemantic`: Can be on/off. Enables the semantic (winning-region)
-fallback of the temporal pointwise revision, the mode that re-solves the
-revised specification as an Algorithm D game over the `qlt` type
-(`-Z, --pwr-semantic`). It's off by default.
+* `ba-component-factoring`: Can be on/off. Controls support-component
+factoring of the tau-algebra constant tests: a constant whose clauses share no
+variables and refer to no absolute time is decided per component, each
+decision kept across steps, instead of as a whole. It is on by default.
 
-* `stepprop|stepdefinitionalpropagation`: Can be on/off. Before a step's
-paths are enumerated, normalizes the step formula once, substitutes every
-top-level `o = c` with `c` a constant and repeats until no new constant
-appears, carrying the values into the solution. A guard reading a value the
-same step computes then folds instead of forking the enumeration, so a step
-with `k` such guards solves one path instead of up to `2^k`. An identity on
-the solution set (`-t, --step-definitional-propagation`). It's on by default.
-
-* `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
-benchmarks after each command. It's on by default.
-
-* `d|dbg|debug`: Can be on/off. Controls debug mode. Only available in Debug
-builds, where it's on by default.
-
-Besides the boolean options above, the REPL exposes every limit option as a
-numeric option. These take a count via `set <option> <n>` (so `enable`,
-`disable` and `toggle` refuse them, as they refuse `severity` and `ltlalg`); a
-count above the largest the command line accepts is refused, never wrapped.
-`0` means unlimited, except where an option's entry below says otherwise:
-`specsizewarn` and `ltlclosedregionstimeout` read `0` as off, `decisionpins`
-as none, `gcminsize` as no floor, `ltlqemaxvars` as its default,
-`trefbudgetsoft` as 75 and `ltlmaxobservations` as 30, and `gcgrowth` at or
-below `0` disables the growth-triggered sweeps. Each mirrors the command line option shown alongside, and until it is set
-reads the `TAU_*` environment variable of that option (see
-[Realizability algorithm](#realizability-algorithm) for the list); `get` shows the value
-in force:
-
-* `maxsplits|blockmaxsplits`: per-block Boole-decomposition split budget in
-anti-prenexing (`--block-max-splits`, `TAU_BLOCK_MAX_SPLITS`). Unlimited by
+* `pwr-semantic`: Can be on/off. Enables the semantic (winning-region)
+fallback of the temporal pointwise revision. This mode solves the revised
+specification again as an Algorithm D game over the `qlt` type. It is off by
 default.
 
-* `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
-(`--block-max-rounds`, `TAU_BLOCK_MAX_ROUNDS`). Unlimited by default.
+* `step-definitional-propagation`: Can be on/off. Before the paths of a step
+are enumerated, normalizes the step formula once, substitutes every top-level
+`o = c` with `c` a constant and repeats until no new constant appears. It
+carries the values into the solution. A guard that reads a value the same step
+computes then folds instead of forking the enumeration, so a step with `k`
+such guards solves one path instead of up to `2^k`. The solution set does not
+change. It is on by default.
 
-* `decisionpins|badecisionpins`: how many decided tau-algebra rows keep their key tree alive
-across the interpreter's step sweep, oldest released first
-(`--ba-decision-pins`, `TAU_BA_DECISION_PINS`). 4096 by default; `0` disables
-the pinning (a raw count, not "unlimited").
+* `benchmarks`: Can be on/off. Controls printing of timing benchmarks after
+each command. It is on by default.
 
-* `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
-elimination may distribute one scope into (`--cqe-max-clauses`,
-`TAU_CQE_MAX_CLAUSES`). Unlimited by default.
+* `debug`: Can be on/off. Controls debug mode. Only a build with `DEBUG` has
+it, and there it is on by default.
 
-* `lgrsmaxvars`: above this many distinct variables, a partition of pure
-bitvector equalities is handed to the solver instead of being squeezed per
-width and given a ground solution algebraically (`find_solution`, or
-`find_minimal_solution` in minimum mode), whose Boole expansion is
-exponential in the variables;
-`var = constant` conjuncts are read off before the count (`--lgrs-max-vars`,
-`TAU_LGRS_MAX_VARS`). 8 by default.
+* `ltl-alg`: `A`, `B`, `D` or `auto`, the omcat synthesis algorithm. `auto`
+by default.
 
-* `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
-(`--max-fixpoint-steps`, `TAU_MAX_FIXPOINT_STEPS`). Default 500 — the search
-has no convergence
-guarantee, so unlimited (`0`) hangs on a non-converging spec instead of giving
-up loudly. A give-up is reported as an error ("gave up before reaching a
-result"), never as a `T`/`F` verdict.
+The other session options are counts. They take a number through
+`set <option> <n>`. A count above the largest the option holds is refused,
+never wrapped. `0` means unlimited, except where the entry below says
+otherwise: `spec-size-warn` and `ltl-closed-regions-timeout` read `0` as off,
+`ba-decision-pins` as none, `gc-min-size` as no floor, `ltl-qe-max-vars` as
+off, and `ltl-max-observations` as 30. `gc-growth-factor` takes a decimal,
+and a value at or below `0` disables the growth-triggered sweeps. Each count
+reads its variable `TAU_<NAME>` at start, and `get` shows the value in force:
 
-* `flagsteps|maxflagsearchsteps`: cap on the eventual-flag search past the
-flag boundary (`--max-flag-search-steps`, `TAU_MAX_FLAG_SEARCH_STEPS`).
-Default 500, for the same reason
-as `fixpointsteps`; a give-up is likewise an error, not an unsatisfiable
-verdict.
+* `block-max-splits`: per-block Boole-decomposition split budget in
+anti-prenexing. Unlimited by default.
 
-* `squeezecap|blocksqueezecap`: operand-set size above which block squeezing
-declines (`--block-squeeze-cap`, `TAU_BLOCK_SQUEEZE_CAP`). Unlimited by
-default.
-
-* `simplifyrounds|maxsimplifyrounds`: bitvector simplification rewrite round
-cap (`--max-simplify-rounds`, `TAU_MAX_SIMPLIFY_ROUNDS`). Unlimited by
-default.
-
-* `defpasses|maxdefpasses`: definition-expansion pass cap
-(`--max-def-passes`, `TAU_MAX_DEF_PASSES`). Unlimited by default.
-
-* `enumsteps|maxenumsteps`: recurrence-relation enumeration step cap
-(`--max-enum-steps`, `TAU_MAX_ENUM_STEPS`). Unlimited by default.
-
-* `probesteps|maxprobesteps`: cap on the untyped saturation probe that
-`calculate_fixed_point` runs over a residual recurrence reference to tell a
-type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`,
-`TAU_MAX_PROBE_STEPS`).
-10000 by default, since a diverging probe never stabilizes; a finite
-`enumsteps` tightens it further; 0 = unlimited.
-
-* `rewriterounds|maxrewriterounds`: rewrite-to-fixpoint round cap
-(`--max-rewrite-rounds`, `TAU_MAX_REWRITE_ROUNDS`). Unlimited by default.
-
-* `gcminsize`: tree-node count floor before the interpreter's gc may trigger
-(`--gc-min-size`, `TAU_GC_MIN_SIZE`). 256 by default.
-
-* `gcgrowth|gcgrowthfactor`: gc growth-factor trigger; accepts decimals such
-as `1.5` (`--gc-growth-factor`, `TAU_GC_GROWTH_FACTOR`). 1.5 by default; a
-value at or below 0
-disables the growth-triggered sweeps; a store past `trefbudgetsoft` still
-sweeps.
-
-* `trefbudget`: cap on the live interned tree nodes (`--tref-budget`). A
-command that starts with the store at or above the cap fails without running;
-one that was allowed to start finishes even if it ends above it. Unlimited by
-default, or `TAU_TREF_BUDGET` when that is set.
-
-* `trefbudgetsoft`: percentage of `trefbudget` at which the interpreter sweeps
-regardless of its gc growth trigger (`--tref-budget-soft`). 75 by default, or
-`TAU_TREF_BUDGET_SOFT` when that is set.
-
-* `specsizewarn`: warn when an updated specification exceeds this many printed
-characters (`--spec-size-warn`, `TAU_SPEC_SIZE_WARN`). 0 (off) by default.
-
-* `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
-specification part (`--max-revision-alts`, `TAU_MAX_REVISION_ALTS`).
+* `block-max-rounds`: anti-prenexing quantifier-block driver round cap.
 Unlimited by default.
 
-* `maxsubsets|maxconsistencysubsets`: cap on the k-ary consistency subset checks per atom group in
-LTL(ABA) synthesis (`--max-consistency-subsets`). 4096 by default, or
-`TAU_LTL_MAX_CONSISTENCY_SUBSETS` when that is set; a fired cap is sound but
-may answer unrealizable.
+* `ba-decision-pins`: how many decided tau-algebra rows keep their key tree
+alive across the step sweep of the interpreter, oldest released first. 4096 by
+default. `0` disables the pinning (a raw count, not "unlimited").
 
-* `maxcoverproducts`: cap on the ABA oracle's mixed-type coverage expansion
-(`--max-cover-products`). 256 by default, or `TAU_LTL_MAX_COVER_PRODUCTS` when
-that is set.
+* `cqe-max-clauses`: cap on the DNF clauses complete quantifier elimination
+may distribute one scope into. Unlimited by default.
 
-* `maxconstantsize`: largest region of fresh values, in tree nodes, that a run
-keeps across steps (`--max-constant-size`). Each value a run commits shrinks
-the region, which grows with it; past the cap the run stops tracking it and
-new values come from the general solver (`TAU_MAX_CONSTANT_SIZE`). 2000 by
-default, 0 = unlimited.
+* `lgrs-max-vars`: above this many distinct variables, a partition of pure
+bitvector equalities goes to the solver. It is not squeezed per width and
+given a ground solution algebraically (`find_solution`, or
+`find_minimal_solution` in minimum mode), whose Boole expansion is
+exponential in the variables. `var = constant` conjuncts are read off before
+the count. 8 by default.
 
-* `cachebound`: bound on the string-keyed synthesis caches, with FIFO eviction
-(`--cache-bound`, `TAU_CACHE_BOUND`). 4096 by default; 0 = unbounded.
+* `max-fixpoint-steps`: temporal-normalization fixpoint step cap. Default
+500. The search has no convergence guarantee, so unlimited (`0`) hangs on a
+non-converging spec instead of a loud give-up. A give-up is reported as an
+error ("gave up before reaching a result"), never as a `T`/`F` verdict.
 
-* `ltltimeout`: wall-clock cap in seconds on each `ltlsynt` call
-(`--ltl-timeout`). 60 by default, or `TAU_LTL_TIMEOUT_SEC` when that is set;
-0 disables the watchdog. `get ltltimeout` shows the effective value.
+* `max-flag-search-steps`: cap on the eventual-flag search past the flag
+boundary. Default 500, for the same reason as `max-fixpoint-steps`. A give-up
+is an error too, not an unsatisfiable verdict.
 
-* `ltlalg`: the omcat synthesis algorithm, `A`, `B`, `D` or `auto`
-(`--ltl-alg`). `auto` by default, or `TAU_LTL_ALG` when that is set.
+* `block-squeeze-cap`: operand-set size above which block squeezing
+declines. Unlimited by default.
 
-* `ltlqemaxvars`: free-variable cap of the omcat quantifier-elimination fast
-path (`--ltl-qe-max-vars`). 2 by default, or `TAU_LTL_OMCAT_QE_MAX_VARS` when
-that is set; values above 2 re-enable a fast path that is not sound.
+* `max-simplify-rounds`: bitvector simplification rewrite round cap.
+Unlimited by default.
 
-* `ltlhoamaxstates`: largest state count accepted from an `ltlsynt` HOA
-strategy (`--ltl-hoa-max-states`). 4194304 by default, or
-`TAU_LTL_HOA_MAX_STATES` when that is set; 0 = unlimited. `get` shows the
-effective value, as it does for every limit below.
+* `max-def-passes`: definition-expansion pass cap. Unlimited by default.
 
-* `ltlguardmaxcubes`: cap on the DNF cubes a HOA guard may expand into in the
-Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default, or
-`TAU_LTL_GUARD_MAX_CUBES` when that is set; 0 = unlimited.
+* `max-enum-steps`: recurrence-relation enumeration step cap. Unlimited by
+default.
 
-* `ltlrefinementrounds`: cap on the ABA-oracle refinement rounds of one
-realizability check, each round blocking an infeasible strategy edge and
-re-running `ltlsynt`, and on the fixpoint rounds of its check of a strategy
-against the data (`--ltl-refinement-rounds`). 64 by default, or
-`TAU_LTL_REFINEMENT_ROUNDS` when that is set; 0 = unlimited. On the cap the
-verdict is an error (UNKNOWN), never a false answer.
+* `max-probe-steps`: cap on the untyped saturation probe that
+`calculate_fixed_point` runs over a residual recurrence reference. The probe
+tells a type-blocked rule from a legitimately uninterpreted one. 10000 by
+default, since a diverging probe never stabilizes. A finite `max-enum-steps`
+makes it smaller. 0 = unlimited.
 
-* `ltlwindowmaxpaths`: cap on the strategy paths the multi-step window oracle
-examines per check (`--ltl-window-max-paths`). 4096 by default, or
-`TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
-likewise answers UNKNOWN.
+* `max-rewrite-rounds`: rewrite-to-fixpoint round cap. Unlimited by default.
 
-* `ltlclosedregionstimeout`: seconds the data game may spend on regions that
-keep their quantifiers, all their questions together, each question at most
-a quarter of it (`--ltl-closed-regions-timeout`). 20 by default, or
-`TAU_LTL_CLOSED_REGIONS_TIMEOUT` when that is set; 0 skips the attempt. Past
-either bound that attempt is undecided, and the other routes keep deciding.
+* `gc-min-size`: tree-node count floor before the gc of the interpreter can
+start. 256 by default.
 
-* `ltldatagamemaxnodes`: cap on the live nodes of the BDD a data game over
-codes builds (`--ltl-data-game-max-nodes`). 8388608 (2^23) by default, or
-`TAU_LTL_DATA_GAME_MAX_NODES` when that is set; 0 = unlimited. A full table
+* `gc-growth-factor`: gc growth-factor trigger. It takes decimals such as
+`1.5`. 1.5 by default. A value at or below 0 disables the growth-triggered
+sweeps. A store past `tref-budget-soft` still sweeps.
+
+* `tref-budget`: cap on the live interned tree nodes. A command that starts
+with the store at or above the cap fails without running. A command that
+started finishes, also when it ends above the cap. Unlimited by default.
+
+* `tref-budget-soft`: percentage of `tref-budget` at which the interpreter
+sweeps, whatever its gc growth trigger. 75 by default.
+
+* `spec-size-warn`: warn when an updated specification exceeds this many
+printed characters. 0 (off) by default.
+
+* `max-revision-alts`: cap on revision alternatives kept per specification
+part. Unlimited by default.
+
+* `max-consistency-subsets`: cap on the k-ary consistency subset checks per
+atom group in LTL(ABA) synthesis. 4096 by default. A fired cap is sound but
+can answer unrealizable.
+
+* `max-cover-products`: cap on the mixed-type coverage expansion of the ABA
+oracle. 256 by default.
+
+* `max-constant-size`: largest region of fresh values, in tree nodes, that a
+run keeps across steps. Each value a run commits shrinks the region, which
+grows with it. Past the cap the run stops tracking it, and new values come
+from the general solver. 2000 by default, 0 = unlimited.
+
+* `cache-bound`: bound on the string-keyed synthesis caches, with FIFO
+eviction. 4096 by default. 0 = unbounded.
+
+* `ltl-timeout`: wall-clock cap in seconds on each `ltlsynt` call. 60 by
+default. 0 disables the watchdog.
+
+* `ltl-qe-max-vars`: free-variable cap of the omcat quantifier-elimination
+fast path. 2 by default. Values above 2 enable a fast path that is not sound.
+
+* `ltl-hoa-max-states`: largest state count accepted from an `ltlsynt` HOA
+strategy. 4194304 by default. 0 = unlimited.
+
+* `ltl-guard-max-cubes`: cap on the DNF cubes a HOA guard may expand into in
+the Algorithm D product game. 512 by default. 0 = unlimited.
+
+* `ltl-refinement-rounds`: cap on the ABA-oracle refinement rounds of one
+realizability check, and on the fixpoint rounds of its check of a strategy
+against the data. Each round blocks an infeasible strategy edge and runs
+`ltlsynt` again. 64 by default. 0 = unlimited. On the cap the verdict is an
+error (UNKNOWN), never a false answer.
+
+* `ltl-window-max-paths`: cap on the strategy paths the multi-step window
+oracle examines per check. 4096 by default. 0 = unlimited. A hit cap also
+answers UNKNOWN.
+
+* `ltl-closed-regions-timeout`: seconds the data game may spend on regions
+that keep their quantifiers, all their questions together, each question at
+most a quarter of it. 20 by default. 0 skips the attempt. Past either bound
+that attempt is undecided, and the other routes continue to decide.
+
+* `ltl-data-game-max-nodes`: cap on the live nodes of the BDD a data game
+over codes builds. 8388608 (2^23) by default. 0 = unlimited. A full table
 leaves the game undecided.
 
-* `ltldatagamemaxmemo`: cap on the operation memo entries of that BDD
-(`--ltl-data-game-max-memo`). 33554432 (2^25) by default, or
-`TAU_LTL_DATA_GAME_MAX_MEMO` when that is set; 0 = unlimited. A memo that
-reaches the cap is emptied, which costs recomputation only.
+* `ltl-data-game-max-memo`: cap on the operation memo entries of that BDD.
+33554432 (2^25) by default. 0 = unlimited. A memo that reaches the cap is
+emptied, which costs only recomputation.
 
-* `ltldatagamemaxcombinations`: cap on the value combinations the data game
-tabulates for one comparison its circuits do not encode
-(`--ltl-data-game-max-combinations`). 4096 by default, or
-`TAU_LTL_DATA_GAME_MAX_COMBINATIONS` when that is set; 0 = unlimited. Past it
-the comparison has no code, and the game falls back to formula regions or is
-undecided.
+* `ltl-data-game-max-combinations`: cap on the value combinations the data
+game tabulates for one comparison its circuits do not encode. 4096 by
+default. 0 = unlimited. Past it the comparison has no code, and the game
+falls back to formula regions or is undecided.
 
-* `ltlmaxobservations`: cap on the observation props whose impossible joint
-values the synthesis skeleton assumes away, at 3^n feasibility checks
-(`--ltl-max-observations`). 8 by default, or `TAU_LTL_MAX_OBSERVATIONS` when
-that is set; at most 30, and 0 means 30. Beyond it nothing is assumed, which
+* `ltl-max-observations`: cap on the observation props whose impossible
+joint values the synthesis skeleton assumes away, at 3^n feasibility checks.
+8 by default. At most 30, and 0 means 30. Beyond it nothing is assumed, which
 leaves the environment moves no data produces.
 
-* `ltlmealymaxstates`, `ltlmealymaxedges`: the states and edges of the Mealy
-view a data-game strategy is played through (`--ltl-mealy-max-states`,
-`--ltl-mealy-max-edges`). 4096 and 65536 by default, or
-`TAU_LTL_MEALY_MAX_STATES` / `TAU_LTL_MEALY_MAX_EDGES` when set; past either
-the moves are played directly, and 0 builds no view.
+* `ltl-mealy-max-states`, `ltl-mealy-max-edges`: the states and edges of the
+Mealy view a data-game strategy is played through. 4096 and 65536 by default.
+Past either the moves are played directly, and 0 builds no view.
 
-* `compilemaxtableedges`: the edges of a Mealy view `tau gen` / `tau compile`
-carries as a table (`--compile-max-table-edges`). 400 by default, or
-`TAU_COMPILE_MAX_TABLE_EDGES` when that is set; a larger strategy is solved
+* `compile-max-table-edges`: the edges of a Mealy view `tau gen` /
+`tau compile` carries as a table. 400 by default. A larger strategy is solved
 as the program runs, and 0 never carries a table.
 
-* `compilebuildtimeout`: seconds the cmake build of `tau compile` may take
-before it is stopped and the compile fails (`--compile-build-timeout`). 3600
-by default, or `TAU_COMPILE_BUILD_TIMEOUT` when that is set; 0 waits without
-bound.
+* `compile-build-timeout`: seconds the cmake build of `tau compile` may take
+before it is stopped and the compile fails. 3600 by default. 0 waits without
+a bound.
 
-* `bfdependencemaxnodes`: cap on the BDD nodes the syntactic variable
+* `bf-dependence-max-nodes`: cap on the BDD nodes the syntactic variable
 simplification builds to tell whether a Boolean function depends on a
-variable (`--bf-dependence-max-nodes`). 65536 by default, or
-`TAU_BF_DEPENDENCE_MAX_NODES` when that is set; 0 = unlimited. Past it the
-question is left open and the variable to the slower simplifications.
+variable. 65536 by default. 0 = unlimited. Past it the question stays open,
+and the variable goes to the slower simplifications.
 
-Changing any of these, the two temporal-normalization caps, `preprocessing`
-or an option an algebra declares (below) between two queries drops the
-verdict memos, so the next `sat`/`realizable` is decided
-under the new budgets rather than answered from the old ones.
+A change of a count, of `preprocessing` or of an option of an algebra between
+two queries drops the verdict memos. The next `sat`/`realizable` is then
+decided under the new budgets, not answered from the old ones.
 
-Beyond the options above, each Boolean algebra in the configured pack may
-expose options of its own, addressed `<ba>-<option>` and reachable when that
-BA is part of the build; `set`/`get`/`enable`/`disable`/`toggle` route such a
-name to its owning BA the same way they route a bare name to a core option. bv, for
-instance, declares `bv-blasting` (its own predicate-blasting switch,
-mirroring `--bv-blasting`; on by default, but effective only while the
-master `preprocessing` above is also on), `bv-blastdepth` (blast-block
-re-entry nesting cap in anti-prenexing, mirroring `--bv-blastdepth`;
-unlimited by default), `bv-case-split` (the bitvector case split: a
-quantified bitvector variable that occurs only in comparisons against
-constants of its type is eliminated by one witness per cell those constants
-cut the domain into, before any quantifier block forms; mirroring
-`--bv-case-split`, on by default), `bv-case-split-max-tests` (cap on the
-constants a quantified bitvector variable may be tested against for the case
-split to apply, mirroring `--bv-case-split-max-tests`; unlimited by default),
-`bv-definitional-elimination` (substitute an existentially quantified
+Each Boolean algebra in the pack can declare options of its own, named
+`<ba>-<option>`. They exist when that BA is part of the build, and
+`set`/`get`/`enable`/`disable`/`toggle` take them like every other option.
+bv, for example, declares:
+
+* `bv-blasting`: its own predicate-blasting switch. On by default, but it
+works only while the master `preprocessing` above is also on.
+* `bv-blastdepth`: blast-block re-entry nesting cap in anti-prenexing.
+Unlimited by default.
+* `bv-case-split`: the bitvector case split. A quantified bitvector variable
+that occurs only in comparisons against constants of its type is eliminated
+by one witness per cell those constants cut the domain into, before any
+quantifier block forms. On by default.
+* `bv-case-split-max-tests`: cap on the constants a quantified bitvector
+variable may be tested against for the case split. Unlimited by default.
+* `bv-definitional-elimination`: substitute an existentially quantified
 bitvector variable that a total definition in its scope determines -- a bare
 equation, or clauses `D_i || x = c_i` whose guards cover every case -- where
-it is read, and drop its binder, before the case split; mirroring
-`--bv-definitional-elimination`, on by default) with its caps
-`bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset` and
-`bv-defelim-max-rounds` (mirroring the command line options of the same
-names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose
-binders are all of one kind quantifier-free, mirroring
-`--bv-quantifier-free-decision`; off by default), `bv-blasting-max-nodes`
-(the BDD nodes one predicate blasting may build before it declines,
-mirroring `--bv-blasting-max-nodes`; 500000 by default, 0 = unlimited),
-`bv-bitblast-max-width` (the widest bitvector a question may hold to be
-decided on its bits, mirroring `--bv-bitblast-max-width`; 16 by default, 0
-leaves every question to the solver), `bv-bitblast-max-nodes`
-(the BDD budget, in nodes in use at once, of the decision on the bits of
-values of at most `bv-bitblast-max-width` bits,
-mirroring `--bv-bitblast-max-nodes`; 1048576 by default, 0 leaves every
-question to the solver), `bv-solve-timeout` (the seconds a bitvector question
-with quantifiers may take, on its bits and, when it multiplies or divides two
-values that are not constants, in the solver, before the command asking it
-answers UNKNOWN,
-mirroring `--bv-solve-timeout`; 60 by default, 0 = no limit), `bv-widening` (the
-[exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),
-mirroring `--bv-widening`; off by default) and `bv-max-width` (cap on the
-width widening may compute at, mirroring `--bv-max-width`; 1024 by default,
-and unlike the budgets above it is a hard ceiling that is never unlimited,
-so `set bv-max-width 0` leaves the current value unchanged). Each count
-option reads `TAU_BV_<OPTION>` until it is set.
-In a session built without bv, `set bv-blasting off` reports `No BA named
-'bv' in this pack (...)` instead of changing anything.
+it is read, and drop its binder, before the case split. On by default.
+* `bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset`
+and `bv-defelim-max-rounds`: the caps of that elimination.
+* `bv-quantifier-free-decision`: decide a closed bitvector formula whose
+binders are all of one kind without quantifiers. Off by default.
+* `bv-blasting-max-nodes`: the BDD nodes one predicate blasting may build
+before it declines. 500000 by default, 0 = unlimited.
+* `bv-bitblast-max-width`: the widest bitvector a question may hold to be
+decided on its bits. 16 by default. 0 leaves every question to the solver.
+* `bv-bitblast-max-nodes`: the BDD budget, in nodes in use at once, of the
+decision on the bits of values of at most `bv-bitblast-max-width` bits.
+1048576 by default. 0 leaves every question to the solver.
+* `bv-solve-timeout`: the seconds a bitvector question with quantifiers may
+take, on its bits and, when it multiplies or divides two values that are not
+constants, in the solver. Past it the command that asks it answers UNKNOWN.
+60 by default, 0 = no limit.
+* `bv-widening`: the
+[exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode).
+Off by default.
+* `bv-max-width`: cap on the width widening may compute at. 1024 by default.
+It is a hard ceiling that is never unlimited, so `set bv-max-width 0` sets the
+default 1024 again.
+
+In a session built without bv, `set bv-blasting off` is an error
+(`Unknown option`) and changes nothing.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -4070,9 +4052,10 @@ state, freeing every tree node no `htref` holds. Global switches such as
 `set_severity` mirror the command line options, and every runtime limit has a
 setter of the same name as its option (`set_block_max_splits`,
 `set_max_fixpoint_steps`, `set_ba_decision_pins`, ...) and a getter beside it
-(`get_max_fixpoint_steps()`, ...) that reads back the value in force: the one
-set, else the limit's `TAU_*` environment variable, else its default, with a
-cap read as 0 when unlimited. `count_limits()` lists every numeric limit as a
+(`get_max_fixpoint_steps()`, ...) that reads back the value in force, with a
+cap read as 0 when unlimited. `tau_init()` declares every option. A program
+then reads the environment with `idni::options().load_env("TAU_")`. The `tau`
+executable, a compiled program and the bindings do this at start. `count_limits()` lists every numeric limit as a
 name, a setter and a getter, which is what the bindings enumerate. Every
 option, of core and of each Boolean algebra, is in the options repository
 `idni::options()` under the name it has on the command line, without the

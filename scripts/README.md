@@ -111,7 +111,8 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   `windows-x86_64-msvc` builds with the Visual Studio clang-cl, not the preset's
   compiler, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a
   pinned vcpkg, and packages the cvc5 library without cvc5's parser library and
-  binary.
+  binary. `dep-boost` on `windows-x86_64-msvc` builds with cl.exe for every
+  MSVC preset, so the cl and clang-cl presets share one Boost package.
 - `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
   the parser's own script, so one install serves both repos
 - `dep-chrome`, `dep-js-test-deps` — pinned Chrome for Testing and
@@ -152,7 +153,8 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-arm64-sdk-packages-deb  # the Linux arm64 box, DEB
 ./dev preset release-arm64-sdk-packages-rpm
 ./dev preset release-arm64-tests run        # arm64 cross tests, under qemu
-./dev preset release-msvc-all-clang-cl run  # clang-cl on the MSVC ABI
+./dev preset release-msvc-all run            # clang-cl on the MSVC ABI, in build/release-msvc
+./dev preset release-msvc-cl-all run         # cl.exe, in build/release-msvc-cl; needs -DTAU_BAS without bv
 ./dev preset debug-asan
 ./dev preset coverage
 ./dev preset release-wasm                        # wasm library (tau.js/.wasm/.esm.mjs)
