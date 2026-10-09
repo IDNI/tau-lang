@@ -52,8 +52,7 @@ _dep_cvc5_target_setup() {
 			echo "dep-cvc5: linux-arm64 needs a build-host python3" >&2
 			exit 2
 		fi
-		_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py"
-			"-DPython3_EXECUTABLE=$_py")
+		_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py")
 		# cvc5's FindGMP takes the GMP --host from TOOLCHAIN_PREFIX, which
 		# only cvc5's own toolchain file sets. An empty --host builds a
 		# static x86 GMP that cvc5 cannot link.

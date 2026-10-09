@@ -14,11 +14,13 @@
 # or nothing, and _dep_cvc5_target_setup, which sets the target arguments. It
 # may define _dep_cvc5_target_fields, which prints extra id fields,
 # _dep_cvc5_target_prebuild <work> <build>, which runs before the configure,
-# _dep_cvc5_target_install <build> <prefix>, which replaces the install of every
-# cvc5 target, _dep_cvc5_target_postinstall <prefix> <work>, which runs after
+# _dep_cvc5_target_path <path>, which prints a path as the cmake of the target
+# reads it, _dep_cvc5_target_postinstall <prefix> <work>, which runs after
 # the install, and _dep_cvc5_target_gmp_licenses <dir> <work>, which copies the
-# license of a GMP that cvc5 did not download. _dep_cvc5_target_setup may name
-# the cvc5 targets to build in _DEP_CVC5_BUILD_TARGETS; it builds all otherwise.
+# license of a GMP that cvc5 did not download.
+#
+# Every package holds the cvc5 library only: tau uses neither the parser
+# library of cvc5 nor its binary, so neither is built or installed.
 
 set -u
 
@@ -44,8 +46,8 @@ CVC5_EXPECTED_CLOSURE=(
 
 declare -F _dep_cvc5_target_fields > /dev/null || _dep_cvc5_target_fields() { :; }
 declare -F _dep_cvc5_target_prebuild > /dev/null || _dep_cvc5_target_prebuild() { :; }
-declare -F _dep_cvc5_target_install > /dev/null || _dep_cvc5_target_install() {
-	"$DEP_CVC5_CMAKE" --install "$1"
+declare -F _dep_cvc5_target_path > /dev/null || _dep_cvc5_target_path() {
+	printf '%s' "$1"
 }
 declare -F _dep_cvc5_target_postinstall > /dev/null || _dep_cvc5_target_postinstall() { :; }
 
@@ -182,6 +184,7 @@ _dep_cvc5_field_block() {
 		"provenance.manifest_writer_hash=${manifest_hash}" \
 		"provenance.store_writer_hash=${store_hash}" \
 		"configure_args=${_DEP_CVC5_CONFIGURE_ARGS[*]}" \
+		"cvc5_targets=${_DEP_CVC5_BUILD_TARGETS[*]}" \
 		"closure=${closure}" \
 		"gmp_source=${gmp%%|*}" \
 		"gmp_version=${gmp##*|}" \
@@ -259,6 +262,59 @@ _dep_cvc5_print_logs() {
 		cat "$f"
 		echo "dep-cvc5: ---- end ${f} ----"
 	done
+}
+
+# The install rules of the top folder and of src: the headers, the library, a
+# GMP that cvc5 built, and the package files. CMAKE_INSTALL_LOCAL_ONLY leaves
+# out the rules of their subfolders, which install the parser library and the
+# binary. The prefix is given again: cvc5's configure.sh can change it.
+_dep_cvc5_target_install() {
+	local build="$1" prefix dir
+	prefix="$(_dep_cvc5_target_path "$2")" || return 1
+	for dir in "$build" "${build}/src"; do
+		"$DEP_CVC5_CMAKE" "-DCMAKE_INSTALL_PREFIX=${prefix}" \
+			-DCMAKE_INSTALL_LOCAL_ONLY=ON \
+			-P "$(_dep_cvc5_target_path "${dir}/cmake_install.cmake")" || return 1
+	done
+	_dep_cvc5_drop_parser_target "${prefix}/lib/cmake/cvc5"
+}
+
+# The exported target files of <dir> without cvc5::cvc5parser. find_package
+# refuses a package whose target names a library that is not installed.
+_dep_cvc5_drop_parser_target() {
+	python3 - "$1" <<'PY'
+import glob
+import os
+import re
+import sys
+target = 'cvc5::cvc5parser'
+files = sorted(glob.glob(os.path.join(sys.argv[1], 'cvc5Targets*.cmake')))
+if len(files) < 2:
+	sys.exit('dep-cvc5: no exported target files under ' + sys.argv[1])
+dropped = 0
+for path in files:
+	with open(path, newline='') as fh:
+		text = fh.read()
+	eol = '\r\n' if '\r\n' in text else '\n'
+	# A block of the file is the lines between two empty ones: the parser
+	# target fills whole blocks, and is one name in the list of all targets.
+	blocks = []
+	for block in text.split(eol + eol):
+		block = re.sub(r'(foreach\(_cmake_expected_target IN ITEMS[^)\r\n]*?) '
+			+ target + r'\b', r'\1', block)
+		if target in block:
+			dropped += 1
+			continue
+		blocks.append(block)
+	text = (eol + eol).join(blocks)
+	if 'cvc5parser' in text:
+		sys.exit('dep-cvc5: the parser target is still named in ' + path)
+	with open(path, 'w', newline='') as fh:
+		fh.write(text)
+if dropped < 3:
+	sys.exit('dep-cvc5: expected the parser target in 3 blocks of the '
+		'exported target files, dropped %d' % dropped)
+PY
 }
 
 _dep_cvc5_features() {
@@ -342,7 +398,6 @@ _dep_cvc5_producer() {
 			--name=build --prefix="$staging_prefix" ) \
 		|| { echo "dep-cvc5: configure failed" >&2; _dep_cvc5_print_logs "$build" >&2
 			rm -rf "$work"; return 1; }
-	_dep_cvc5_print_logs "$build" >&2
 	echo "dep-cvc5: feature set (CMakeCache USE_/ENABLE_):"
 	_dep_cvc5_features "${build}/CMakeCache.txt" | sed 's/^/  /' >&2
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
@@ -352,7 +407,6 @@ _dep_cvc5_producer() {
 		-- -j "$CVC5_JOBS" \
 		|| { echo "dep-cvc5: build failed" >&2; _dep_cvc5_print_logs "$build" >&2
 			rm -rf "$work"; return 1; }
-	_dep_cvc5_print_logs "$build" >&2
 	echo "dep-cvc5: verified closure:"
 	_dep_cvc5_verify_closure "$build" || { rm -rf "$work"; return 1; }
 	( unset CPPFLAGS CXXFLAGS CFLAGS LDFLAGS
@@ -458,7 +512,7 @@ DEP_CVC5_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_CVC5_TARGET_ARGS=()
 _DEP_CVC5_COMPILER_ENV=()
 _DEP_CVC5_BUILD_ENV=()
-_DEP_CVC5_BUILD_TARGETS=()
+_DEP_CVC5_BUILD_TARGETS=(cvc5)
 DEP_CVC5_INSTALL_RPATH='${ORIGIN}:${ORIGIN}/../lib'
 DEP_CVC5_BUILD_RPATH='${ORIGIN}'
 _dep_cvc5_target_setup
