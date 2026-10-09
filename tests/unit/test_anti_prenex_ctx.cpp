@@ -281,6 +281,24 @@ TEST_CASE("store/lookup on a gated table follow the build type") {
 #endif
 }
 
+TEST_CASE("the pure-function caches: one call with the table, two without") {
+	tref k = mk_atom("pf1"), v = mk_atom("pf2");
+	size_t calls = 0;
+	auto term = [&] { ++calls; return v; };
+	auto size = [&] { ++calls; return size_t{4}; };
+	for (int i = 0; i < 2; ++i) {
+		CHECK(ap::memoised<node_t, ap::table::term_of_memo>(k, term) == v);
+		CHECK(ap::memoised<node_t, ap::table::simplify_term_memo>(k, term) == v);
+		CHECK(ap::memoised<node_t, ap::table::mem_size_memo>(k, size) == 4);
+	}
+	// The three are separate tables; the result is the same either way.
+#ifdef TAU_CACHE
+	CHECK(calls == 3);
+#else
+	CHECK(calls == 6);
+#endif
+}
+
 TEST_CASE("flush leaves the structural tables alone, gated ones or not") {
 	ap::flush_solver_dependent<node_t>();          // safe with no gated tables
 	tref k = mk_atom("f0");
@@ -377,6 +395,9 @@ TEST_CASE("flush clears the solver-dependent tables and nothing else") {
 	ap::store<node_t, ap::table::qbf_memo>(k, true);
 	ap::store<node_t, ap::table::cof_memo>({ k, v }, ap::cof_entry{ v, v, v, true, true });
 	ap::store<node_t, ap::table::size_memo>(k, 5);
+	ap::store<node_t, ap::table::term_of_memo>(k, v);
+	ap::store<node_t, ap::table::mem_size_memo>(k, 6);
+	ap::store<node_t, ap::table::simplify_term_memo>(k, v);
 
 	ap::flush_solver_dependent<node_t>();
 
@@ -390,6 +411,10 @@ TEST_CASE("flush clears the solver-dependent tables and nothing else") {
 	CHECK(*ap::lookup<node_t, ap::table::qbf_memo>(k) == true);
 	CHECK(ap::find<node_t, ap::table::cof_memo>({ k, v }) != nullptr);
 	CHECK(*ap::find<node_t, ap::table::size_memo>(k) == 5);
+	// The caches of pure term functions embed no solver verdict.
+	CHECK(*ap::find<node_t, ap::table::term_of_memo>(k) == v);
+	CHECK(*ap::find<node_t, ap::table::mem_size_memo>(k) == 6);
+	CHECK(*ap::find<node_t, ap::table::simplify_term_memo>(k) == v);
 }
 
 TEST_CASE("cof_memo pins terms that are not subtrees of its key") {
@@ -434,6 +459,13 @@ TEST_CASE("gc: a live key keeps its row and pins the row's trefs; a dead key goe
 
 	ap::store<node_t, ap::table::atoms_memo>(live, ap::tref_set{ trefs{ value } });
 	ap::store<node_t, ap::table::atoms_memo>(dead, ap::tref_set{ trefs{ value } });
+#ifdef TAU_CACHE
+	tref term_value = mk_atom("gc_term_value");
+	ap::store<node_t, ap::table::term_of_memo>(live, term_value);
+	ap::store<node_t, ap::table::term_of_memo>(dead, term_value);
+	ap::store<node_t, ap::table::mem_size_memo>(live, 9);
+	ap::store<node_t, ap::table::mem_size_memo>(dead, 9);
+#endif
 
 	// A handle is what keeps a node reachable; `dead` and `value` have none,
 	// so `value` survives only if the table's pre-sweep promotion runs.
@@ -449,6 +481,17 @@ TEST_CASE("gc: a live key keeps its row and pins the row's trefs; a dead key goe
 	// The dead key's row is gone. Re-create the node before asking: the old
 	// tref was freed by the sweep.
 	CHECK(ap::find<node_t, ap::table::atoms_memo>(mk_atom("gc_dead")) == nullptr);
+
+#ifdef TAU_CACHE
+	// A tref-valued cache row pins its value; a scalar one just follows its key.
+	const tref* term_row = ap::find<node_t, ap::table::term_of_memo>(live);
+	REQUIRE(term_row != nullptr);
+	CHECK(*term_row == mk_atom("gc_term_value"));
+	CHECK(ap::find<node_t, ap::table::term_of_memo>(mk_atom("gc_dead")) == nullptr);
+	REQUIRE(ap::find<node_t, ap::table::mem_size_memo>(live) != nullptr);
+	CHECK(*ap::find<node_t, ap::table::mem_size_memo>(live) == 9);
+	CHECK(ap::find<node_t, ap::table::mem_size_memo>(mk_atom("gc_dead")) == nullptr);
+#endif
 }
 
 }

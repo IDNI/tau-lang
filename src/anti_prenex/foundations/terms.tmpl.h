@@ -571,7 +571,9 @@ tref simplify_term(tref t, regime rg) {
 	}
 	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
 	DBG(assert(!holds_bdd_id<node>(t));)
-	return cofactor_check<node>(syntactic_path_simplification<node>(t));
+	return memoised<node, table::simplify_term_memo>(t, [t] {
+		return cofactor_check<node>(syntactic_path_simplification<node>(t));
+	});
 }
 
 template <NodeType node>
@@ -664,11 +666,18 @@ tref term_of(tref atom, regime rg) {
 	// The ring sum is a BDD operation in the backed regime, where a side
 	// with no decision variable — a constant or a single leaf — is built
 	// alongside: atoms whose sides are leaves alone exist there too.
-	bref<node> a = tbdd<node>::build_bdd(l), b = tbdd<node>::build_bdd(r);
-	DBG(assert(bdd::is_ordered(a) && bdd::is_ordered(b));)
-	return thandle<node>::convert_to_tau_node_or_term(
-		thandle<node>(bdd::bdd_xor(a, b)),
-		find_ba_type<node>(thandle<node>::is_bdd_backed(l) ? l : r));
+	auto ring_sum = [&] {
+		bref<node> a = tbdd<node>::build_bdd(l), b = tbdd<node>::build_bdd(r);
+		DBG(assert(bdd::is_ordered(a) && bdd::is_ordered(b));)
+		return thandle<node>::convert_to_tau_node_or_term(
+			thandle<node>(bdd::bdd_xor(a, b)),
+			find_ba_type<node>(thandle<node>::is_bdd_backed(l) ? l : r));
+	};
+	const tref sum = memoised<node, table::term_of_memo>(eq, ring_sum);
+	// A cached sum is the fresh one; without the table this checks that the
+	// sum is a function of the atom alone.
+	DBG(assert(sum == ring_sum());)
+	return sum;
 }
 
 template <NodeType node>
@@ -686,7 +695,11 @@ tref norm_equation(tref atom, regime rg) {
 template <NodeType node>
 size_t mem_size(tref t) {
 	using namespace terms_detail;
-	if (!thandle<node>::is_bdd_backed(t)) {
+	using tau = tree<node>;
+	return memoised<node, table::mem_size_memo>(t, [t]() -> size_t {
+		if (thandle<node>::is_bdd_backed(t))
+			return tbdd<node>::node_count(
+				thandle<node>::convert_to_handle(t).get());
 		// Term-structure nodes only, each distinct one once: every child of
 		// a `bf` wrapper — an operator, a functional quantifier, a leaf
 		// (variable, constant or reference) — counts 1; the wrappers are not
@@ -695,7 +708,6 @@ size_t mem_size(tref t) {
 		// subscript. The traversal's `visit_subtree` predicate gates a node's
 		// own visit, so a leaf is admitted by its parent and its children are
 		// not.
-		using tau = tree<node>;
 		size_t n = 0;
 		auto count = [&n](tref m) {
 			if (!tau::get(m).is(tau::bf)) ++n;
@@ -709,8 +721,7 @@ size_t mem_size(tref t) {
 		auto up = [](tref) {};
 		pre_order<node>(t).visit_unique(count, admit, up);
 		return n;
-	}
-	return tbdd<node>::node_count(thandle<node>::convert_to_handle(t).get());
+	});
 }
 
 template <NodeType node>

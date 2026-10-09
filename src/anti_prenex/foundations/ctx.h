@@ -3,13 +3,13 @@
 /**
  * @file ctx.h
  * @brief Anti-prenexing foundations: `ctx` (the §1 ctx table), the call's
- * time limit (§3), the memo tables — the six §1 result tables and the
- * structural per-node facet tables — the memo wrapper with its taint rule
- * (§1 cache scope), and the flush.
+ * time limit (§3), the memo tables — the six §1 result tables, the caches of
+ * three pure term functions, and the structural per-node facet tables — the
+ * memo wrapper with its taint rule (§1 cache scope), and the flush.
  *
  * Every table is an entry of `enum class table` with a `table_traits`
  * specialisation and a static GC-registered `create_cache` instance. A
- * `gated` table — one of the six §1 result tables — exists under
+ * `gated` table — a result table or a pure-function cache — exists under
  * `#ifdef TAU_CACHE` only, which is off in Debug, and no result may depend on
  * a hit. An unconditional table — a structural facet — always exists, so its
  * accessors may return references: `store` and `memoised` return a reference
@@ -149,8 +149,9 @@ inline void check_time_limit();
 
 // --- the tables -------------------------------------------------------------------
 
-/// Every table of the module: the six §1 result tables (gated caches) and the
-/// structural per-node facet tables (unconditional).
+/// Every table of the module: the six §1 result tables and the caches of three
+/// pure term functions (gated), and the structural per-node facet tables
+/// (unconditional).
 enum class table {
 	// §1 result tables — gated
 	push_memo,     ///< `(REWRAP(φ, X), keep_functional) → formula`; also EXPAND's state memo
@@ -159,6 +160,10 @@ enum class table {
 	plain_cof_memo, ///< `(term, y) → cof_entry`; the plain regime's pin match
 	solver_memo,   ///< canonical closed query → sat / unsat / unknown
 	qbf_memo,      ///< canonical closed pure-Boolean query → T / F; never flushed
+	// caches of pure term functions — gated
+	term_of_memo,  ///< equation → its BDD ring sum (`term_of`)
+	mem_size_memo, ///< term → `‖term‖` (`mem_size`)
+	simplify_term_memo, ///< plain term → its `simplify_term`
 	// structural per-node facets — unconditional
 	atoms_memo,    ///< §1: formula node → the atoms occurring in it, units opaque (subst.h)
 	size_memo,     ///< §1 `|φ|` (dag.h `formula_size`, its only writer)
@@ -177,6 +182,7 @@ inline constexpr std::array<table, static_cast<size_t>(table::count_)>
 all_tables = {
 	table::push_memo, table::elim_memo, table::cof_memo,
 	table::plain_cof_memo, table::solver_memo, table::qbf_memo,
+	table::term_of_memo, table::mem_size_memo, table::simplify_term_memo,
 	table::atoms_memo, table::size_memo, table::neg_memo,
 	table::negative_tree_memo
 };
@@ -281,6 +287,32 @@ struct table_traits<node, table::qbf_memo> {
 	static constexpr bool taint_aware    = false;
 	static constexpr bool solver_flushed = false; ///< exempt from every flush (§1)
 };
+
+/// A pure function of its key under the one library order: no taint, no
+/// solver verdict in an entry.
+template <NodeType node>
+struct table_traits<node, table::term_of_memo> {
+	using key_t   = tref;
+	using value_t = tref;
+	using map_t   = subtree_unordered_map<node, value_t>;
+	static constexpr bool gated          = true;
+	static constexpr bool taint_aware    = false;
+	static constexpr bool solver_flushed = false;
+};
+
+template <NodeType node>
+struct table_traits<node, table::mem_size_memo> {
+	using key_t   = tref;
+	using value_t = size_t;
+	using map_t   = subtree_unordered_map<node, value_t>;
+	static constexpr bool gated          = true;
+	static constexpr bool taint_aware    = false;
+	static constexpr bool solver_flushed = false;
+};
+
+template <NodeType node>
+struct table_traits<node, table::simplify_term_memo>
+	: table_traits<node, table::term_of_memo> {};
 
 template <NodeType node>
 struct table_traits<node, table::atoms_memo> {
@@ -423,7 +455,7 @@ memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 /// `solver_flushed` table (`solver_memo`, `push_memo`, `elim_memo`) as a
 /// whole, since an entry carries no record of whether it embedded a solver
 /// verdict. `qbf_memo` is exempt, its entries being mathematical truths, and
-/// so is every structural table.
+/// so are the pure-function caches and every structural table.
 template <NodeType node>
 void flush_solver_dependent();
 
