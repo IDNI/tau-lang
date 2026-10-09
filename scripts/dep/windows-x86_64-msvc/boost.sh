@@ -154,10 +154,6 @@ _dep_boost_target_setup() {
 		DEP_BOOST_B2_TOOLSET="clang-win"
 	fi
 	DEP_BOOST_B2_PIC=""
-	# --layout=system names the static and the shared library identically,
-	# so install static only (Tau links Boost statically).
-	BOOST_LINK_MODE="static"
-	DEP_BOOST_B2_LINK="static"
 	DEP_BOOST_B2_DEFINE="BOOST_LOG_WITHOUT_SYSLOG"
 }
 

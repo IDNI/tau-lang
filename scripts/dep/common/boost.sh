@@ -20,7 +20,8 @@ DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${B
 BOOST_DEFAULT_REPO="https://github.com/boostorg/boost.git"
 BOOST_DEFAULT_COMMIT="65c1319bb92fe7a9a4abd588eff5818d9c2bccf9"
 BOOST_TOOLSET="gcc"
-BOOST_LINK_MODE="static,shared"
+# Tau links the static libraries only.
+BOOST_LINK_MODE="static"
 BOOST_THREADING="multi"
 # Native has no wasm32-emscripten exception encoding; the field exists so the
 # wasm variants can reuse this schema. The legacy .tau-eh-abi stamp covers only
