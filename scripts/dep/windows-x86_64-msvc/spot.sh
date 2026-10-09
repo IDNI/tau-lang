@@ -44,6 +44,8 @@ _dep_spot_target_compiler_fields() {
 # Git Bash rewrites `/c` and `/d` on cmd/bash command lines as
 # filesystem paths; keep the MSYS2 invocation in one login shell and
 # let it set UCRT64 up itself.
+# CPPFLAGS=-w drops the warnings of the Spot sources and keeps the
+# optimization flags that configure picks.
 _dep_spot_target_build() {
 	local src="$1" staging_prefix="$2"
 	local build_script
@@ -58,7 +60,7 @@ _dep_spot_target_build() {
 set -euo pipefail
 export PATH=/ucrt64/bin:/usr/bin:\$PATH
 cd "${src}"
-./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel
+./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS=-w
 make -j${DEP_SPOT_JOBS}
 make install-exec
 EOF
