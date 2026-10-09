@@ -571,6 +571,13 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_leaves(
 	std::span<const ref> leaves)
 {
 	using tau = tree<node>;
+	// The typed BA constant a member spells as `{c}` or `{c}′`, else null.
+	auto constant_of = [](tref t) -> const tau* {
+		const tau& u = tau::get(t);
+		const tau& c = u.child_is(tau::bf_neg)
+			? tau::get(tau::trim2(t))[0] : u[0];
+		return c.is_ba_constant() && c.get_ba_type() > 0 ? &c : nullptr;
+	};
 	// Leaves are compared by identity and a product is reached in any
 	// grouping and order, so it is spelled from its members in content
 	// order.
@@ -587,9 +594,38 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_leaves(
 		if (tau::get(t).child_is(tau::bf_neg) && std::binary_search(
 			m.begin(), m.end(), tau::trim2(t), tau::subtree_less))
 			return F;
+	// For the same reason its BA constants are evaluated, by the operations
+	// `cte_and` and `cte_neg` use: one constant member, never inverted.
+	std::optional<typename tau::constant> k;
+	size_t type = 0, n = 0;
+	bool inverted = false;
+	for (tref t : m)
+		if (const tau* c = constant_of(t)) {
+			const bool inv = tau::get(t).child_is(tau::bf_neg);
+			auto v = inv ? ~c->get_ba_constant() : c->get_ba_constant();
+			// Emplaced: a BA constant need not be assignable.
+			if (n++ == 0) k.emplace(std::move(v)), type = c->get_ba_type();
+			else k.emplace(*k & v);
+			inverted = inverted || inv;
+		}
+	if (n > 1 || inverted) {
+		tref c = build_bf_ba_constant<node>(*k, type);
+		if (tau::get(c).equals_0()) return F;
+		std::erase_if(m, [&constant_of](tref t) {
+			return constant_of(t) != nullptr; });
+		if (!tau::get(c).equals_1()) m.insert(std::upper_bound(
+			m.begin(), m.end(), c, tau::subtree_less), c);
+		if (m.empty()) return T;
+	}
 	tref p = m[0];
 	for (size_t i = 1; i < m.size(); ++i) p = tau::build_bf_and(p, m[i]);
-	return add(tau::trim(p));
+	ref r = add(tau::trim(p));
+	DBG(trefs rm; get_leaves<node>(get_var_term(r), tau::bf_and, rm);)
+	DBG(assert(std::ranges::count_if(rm, [&constant_of](tref t) {
+		return constant_of(t) != nullptr; }) <= 1);)
+	DBG(assert(std::ranges::none_of(rm, [&constant_of](tref t) {
+		return constant_of(t) && tau::get(t).child_is(tau::bf_neg); }));)
+	return r;
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_and(ref, tref) @endinternal */
@@ -857,13 +893,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
 		tref in  = get_var_term(x);
 		tref out = fn(in);
 		if (out == in) r = x;
-		else if (rebuild && has_bdd_var(out, o)) r = build_bdd(out, o);
+		else if (rebuild) r = build_bdd(out, o);
 		else {
 			// Without the rebuild the caller promises to add no
 			// key of @p o a leaf did not already hold, so nothing
 			// of the order is buried by the re-interning.
-			DBG(assert(rebuild || !has_bdd_var(out, o)
-				|| has_bdd_var(in, o));)
+			DBG(assert(!has_bdd_var(out, o) || has_bdd_var(in, o));)
 			r = add(tau::trim(out));
 		}
 	} else {

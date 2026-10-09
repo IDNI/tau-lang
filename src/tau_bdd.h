@@ -247,7 +247,9 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/**
 	 * @brief AND of the leaves @p leaves as one leaf, built once: their
 	 * `bf_and` members sorted into content order and deduplicated; `F` when
-	 * a member meets its complement, `T` when no member is left.
+	 * a member meets its complement, `T` when no member is left. Typed BA
+	 * constant members are evaluated, `{c}′` as `{~c}` and all of them into
+	 * one constant: `F` when it is 0, dropped when it is 1.
 	 */
 	static ref bdd_and_leaves(std::span<const ref> leaves);
 	/**
@@ -297,12 +299,14 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * @brief Rebuild @p x with every non-terminal leaf `ℓ` replaced by
 	 * `fn(ℓ)` (both as `bf` terms), the decision structure kept.
 	 *
-	 * A changed leaf with no decision variable of @p o is re-interned
-	 * through `add`, so leaves that became equal are one node and `h == l`
-	 * folds; a changed leaf that came to hold one is built as a BDD. A
-	 * decision node is rebuilt through `add` while both children stay
-	 * ordered below it, and through `bdd_ite` once a rebuilt leaf brought a
-	 * variable of equal or higher rank up, which re-canonicalises.
+	 * A changed leaf is built again through `build_bdd`, so it is spelled
+	 * as the constructor spells it (products through the leaf product,
+	 * chains through `build_functional_quantifiers`), leaves that became
+	 * equal are one node and `h == l` folds, and a leaf that came to hold
+	 * a decision variable becomes a BDD. A decision node is rebuilt
+	 * through `add` while both children stay ordered below it, and through
+	 * `bdd_ite` once a rebuilt leaf brought a variable of equal or higher
+	 * rank up, which re-canonicalises.
 	 * Memoised per call over the BDD's nodes.
 	 */
 	template <typename Fn>
@@ -401,12 +405,12 @@ private:
 	static bool visit_nodes(ref x, Fn& fn, std::unordered_set<tref>& seen);
 	static bool is_ordered(ref x, const order& o,
 		std::unordered_set<tref>& seen);
-	// @p rebuild: the public map_leaves passes `true` — a changed leaf that
-	// came to hold a decision variable is built as a BDD. `false` keeps
-	// every changed leaf a LEAF (`add`), which is what the chain case of
-	// build_bdd needs: wrapping a leaf in a functional quantifier can leave
-	// a key of @p o inside it (a hazard leaf, a reference argument holding
-	// one), and rebuilding would re-enter the chain case forever.
+	// @p rebuild: the public map_leaves passes `true` — every changed leaf
+	// is built again through build_bdd. `false` keeps every changed leaf a
+	// LEAF (`add`), which is what the chain case of build_bdd needs:
+	// wrapping a leaf in a functional quantifier can leave a key of @p o
+	// inside it (a hazard leaf, a reference argument holding one), and
+	// rebuilding would re-enter the chain case forever.
 	template <typename Fn>
 	static ref map_leaves(ref x, Fn& fn, const order& o, bool rebuild,
 		std::unordered_map<ref, ref>& memo);
