@@ -763,8 +763,8 @@ product or complement of leaves — and one at least is compound: a constant
 leaf answers it, and a single non-constant reference, chain, foreign-typed
 or arithmetic leaf answers "no", as no sweep can change it. A test not
 answered at once is OPEN, and only then does the path sweep run, on its
-compound leaves alone and with no memo: `∃x. x·(r ∪ s) ∪ x′·r′·s′ = 0`
-discharges to `(r ∪ s)·r′·s′ = 0`, a product the leaf product cannot see,
+compound leaves alone and with no memo: `∃x. x·(r ∪ s) ∪ x′·r′·s′·t = 0`
+discharges to `(r ∪ s)·r′·s′·t = 0`, a product the leaf product cannot see,
 and the open test sweeps it to `0`, the atom to `T`. A leaf the sweep
 changes is WRITTEN BACK: the test returns its term rebuilt over the swept
 leaves. A test on a CARRIED term — an atom's `s`, `COF`'s `p`,
