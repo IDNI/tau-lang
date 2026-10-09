@@ -19,7 +19,7 @@
 // Exits 0 only if every step below succeeds, non-zero otherwise:
 //   - the page loads and window.crossOriginIsolated is true
 //   - the welcome banner appears in the xterm terminal buffer
-//   - typing "help" + Enter produces new terminal output
+//   - typing "help" + Enter shows the last line of the help
 
 const fs = require('fs');
 const path = require('path');
@@ -34,8 +34,7 @@ const CHROME_ARGS = (process.env.TAU_CHROME_ARGS || '').split(' ').filter(Boolea
 
 
 // Reads the visible rows. The viewport starts at buffer.viewportY (line 0 is
-// the top of the scrollback), so a marker that scrolled off the top is still
-// matched.
+// the top of the scrollback), so a line that scrolled off the top is not read.
 async function terminalText(page) {
 	return page.evaluate(() => {
 		const buf = window.term.buffer.active;
@@ -57,24 +56,6 @@ async function waitForText(page, substring, timeoutMs) {
 		if (Date.now() - start > timeoutMs) {
 			throw new Error(`timed out after ${timeoutMs}ms waiting for ${JSON.stringify(substring)} in terminal buffer, `
 				+ `last seen:\n${text}`);
-		}
-		await new Promise((r) => setTimeout(r, 200));
-	}
-}
-
-// Waits for the buffer to differ from a baseline snapshot -- used after
-// sending "help", whose own name is already substring-present in the
-// welcome banner's "type \"help\"..." line, so waitForText(page, "help", …)
-// would return immediately on the pre-existing banner text instead of the
-// command's actual output.
-async function waitForChange(page, baseline, timeoutMs) {
-	const start = Date.now();
-	for (;;) {
-		const text = await terminalText(page);
-		if (text !== baseline) return text;
-		if (Date.now() - start > timeoutMs) {
-			throw new Error(`timed out after ${timeoutMs}ms waiting for the terminal buffer to change, `
-				+ `still:\n${text}`);
 		}
 		await new Promise((r) => setTimeout(r, 200));
 	}
@@ -142,7 +123,6 @@ async function main() {
 		}
 		process.stdout.write(`banner observed:\n${banner}\n`);
 
-		const before = await terminalText(page);
 		// Real keyboard input (focus + type + Enter) rather than
 		// window.sendReplInput: it exercises xterm's onData -> stdin_buffer
 		// wiring exactly as a user would, in addition to the upload feature's
@@ -150,10 +130,9 @@ async function main() {
 		await page.click('#terminal');
 		await page.keyboard.type('help');
 		await page.keyboard.press('Enter');
-		const after = await waitForChange(page, before, TIMEOUT_MS);
-		if (!after.includes('General commands:')) {
-			throw new Error(`terminal changed but not with "help"'s own output:\n${after}`);
-		}
+		// The help is longer than the terminal, so its first line scrolls
+		// off. Its last line is not in the banner, which says "help" too.
+		const after = await waitForText(page, "Type 'help <command>'", TIMEOUT_MS);
 		process.stdout.write(`terminal after "help":\n${after}\n`);
 
 		if (pageErrors.length) {
