@@ -18,7 +18,6 @@ _dep_boost_target_setup() {
 	# em++ rejects the -m64 that address-model=64 becomes, and needs no PIC.
 	DEP_BOOST_TARGET_OS=""
 	DEP_BOOST_B2_TOOLSET="emscripten"
-	DEP_BOOST_B2_LINK="static"
 	DEP_BOOST_B2_ADDRESS_MODEL="32"
 	DEP_BOOST_B2_PIC=""
 	case " $DEP_BOOST_CXXFLAGS " in
