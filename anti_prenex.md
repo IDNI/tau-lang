@@ -865,7 +865,8 @@ The remaining primitives are defined by their contracts alone:
   (above): every BDD-backed term of `φ` spelled plain wherever it sits —
   under a binder, a re-wrap's included, under a temporal operator, inside a
   leaf. SHANNON SPELLING per BDD node, `x` its variable:
-      x·f₁ ∪ x′·f₀,   or the RING SUM  x + f₀  wherever f₁ = f₀′
+      x·f₁ ∪ x′·f₀,   or the OR FORM  x ∪ f₀  wherever f₁ = 1  and
+      x′ ∪ f₁  wherever f₀ = 1,   else the RING SUM  x + f₀  wherever f₁ = f₀′
   memoised per node, so shared nodes stay shared and the output is linear in
   the BDD; constants fold through the construction hooks. No `SIMPLIFY_TERM`
   follows: a reduced BDD's spelling leaves the path sweep and the cofactor
