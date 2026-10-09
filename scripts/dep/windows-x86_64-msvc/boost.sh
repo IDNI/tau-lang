@@ -7,14 +7,18 @@ set -u
 DEP_FILE_TARGET=windows-x86_64-msvc
 DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# b2's msvc toolset finds cl through the developer environment the
-# runner set up; naming the compiler path here would freeze a version.
-# clang-cl is b2's clang-win toolset, which takes the path of the compiler:
-# b2's plain clang toolset drives clang with GCC options and builds nothing
-# from the MSVC flags of this target.
+# b2 maps an unknown cl to msvc-6.0, so name 14.3, its newest version, with
+# the cl of PATH. b2 finds no vcvars64.bat beside a cl newer than 14.4x.
+# clang-win takes clang-cl: b2's clang toolset passes GCC options.
 _dep_boost_user_config() {
 	if [ "$(dep_compiler_id "$2")" = MSVC ]; then
-		printf 'using msvc ;\n' > "${1}/user-config.jam"
+		local _vcvars
+		_vcvars="$(dirname "$2")/../../../../../Auxiliary/Build/vcvars64.bat"
+		[ -f "$_vcvars" ] \
+			|| { echo "dep-boost: no vcvars64.bat at ${_vcvars}" >&2; return 1; }
+		printf 'using msvc : 14.3 : "%s" : <setup-amd64>"%s" ;\n' \
+			"$(cygpath -m "$2")" "$(cygpath -m "$_vcvars")" \
+			> "${1}/user-config.jam"
 	else
 		printf 'using clang-win : : "%s" ;\n' "$(cygpath -m "$2")" \
 			> "${1}/user-config.jam"
@@ -117,8 +121,9 @@ _dep_boost_target_build() {
 		done
 		printf ' install\r\n'
 	} > "$_bat"
-	cmd.exe //c "$(cygpath -w "$_bat")"
+	timeout 5400 cmd.exe //c "$(cygpath -w "$_bat")"
 	_rc=$?
+	[ "$_rc" -ne 124 ] || echo "dep-boost: b2 timed out" >&2
 	if [ "$_rc" -eq 0 ]; then
 		_dep_boost_msvc_mask_paths "$staging_prefix" "$_short" \
 				"$(dirname "$staging_prefix")" \
@@ -153,6 +158,7 @@ _dep_boost_target_setup() {
 	if [ "$(dep_compiler_id "$DEP_BOOST_CXX")" != MSVC ]; then
 		DEP_BOOST_B2_TOOLSET="clang-win"
 	fi
+	DEP_BOOST_B2_ARCH="x86"
 	DEP_BOOST_B2_PIC=""
 	DEP_BOOST_B2_DEFINE="BOOST_LOG_WITHOUT_SYSLOG"
 }
