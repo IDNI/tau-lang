@@ -371,7 +371,7 @@ TEST_CASE("S5: a positive whose zero form loses its last block variable") {
 	REQUIRE(ap::members<node_t>(pos).size() == 2);
 	CHECK(has_member(pos, ap::simplify_atom<node_t>(
 		eq0(r.comps[free_k].F), ap::regime::backed)));
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")), ap::regime::backed)));
+	CHECK(has_member(pos, ap::prepare_terms<node_t>(eq0(bf("a")))));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
 		ex("x", finished(k.psi))));
 }
@@ -419,8 +419,8 @@ TEST_CASE("PC1: one atom per component, each over its own variables") {
 	const tref pos = ap::positive_condition<node_t>(s.comps, k.c);
 	REQUIRE(is_child<node_t>(pos, tau::wff_and));
 	CHECK(ap::members<node_t>(pos).size() == 2);
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")), ap::regime::backed)));
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("b")), ap::regime::backed)));
+	CHECK(has_member(pos, ap::prepare_terms<node_t>(eq0(bf("a")))));
+	CHECK(has_member(pos, ap::prepare_terms<node_t>(eq0(bf("b")))));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
 		conj(eq0(bf("a")), eq0(bf("b")))));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
@@ -449,11 +449,34 @@ TEST_CASE("NC1: O1 — a negative whose term is 1 says nothing beyond pos") {
 	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	// The term of `¬(x = x′)`: the ring sum of the two sides is `1`.
-	const tref g = ap::simplify_term<node_t>(
-		lxor(bf("x"), lneg(bf("x"))), ap::regime::backed);
+	const tref g = lxor(bf("x"), lneg(bf("x")));
 	REQUIRE(tau::get(g).equals_1());
 	CHECK(tau::get(ap::negative_condition<node_t>(g, s.comps, k.P, k.c))
 		.equals_T());
+	// O1 is the node test "one": `Q′` with `Q = (r ∪ s)·r′·s′·t` is one
+	// leaf the leaf product cannot decide, and the open test sweeps it to 1
+	const tref q = ap::quantify_over<node_t>(tb::all, sides(
+		ap::prepare_terms<node_t>(eq0(bf("x & (r(a) | s(a)) "
+			"| x' & r(a)' & s(a)' & t(a)")))).first, k.P);
+	REQUIRE(!th::is_bdd_backed(q));
+	const tref qn = th::convert_to_tau_node_or_term(
+		th(tb::bdd_not(tb::build_bdd(q))), find_ba_type<node_t>(q));
+	REQUIRE(!tau::get(qn).equals_1());
+	CHECK(tau::get(ap::negative_condition<node_t>(qn, s.comps, k.P, k.c))
+		.equals_T());
+	// A test that does not decide hands its rebuild to O2 and O3: in
+	// `x·ℓ₁ ∪ x′·ℓ₂`, `ℓ₁ = r(y)·(r(y)′ ∪ r(z))` sweeps to `ℓ₂ = r(y)·r(z)`,
+	// so the rebuilt `g` has lost `x`, no component touches it, and it is
+	// discharged on its own over no variable
+	const tref h = sides(ap::prepare_terms<node_t>(eq0(bf(
+		"x & (r(y) & (r(y)' | r(z))) | x' & (r(y) & r(z))")))).first;
+	REQUIRE(th::is_bdd_backed(h));
+	REQUIRE(ap::fv_meets<node_t>(h, k.P));
+	const tref cond = ap::negative_condition<node_t>(h, s.comps, k.P, k.c);
+	REQUIRE(ap::is_negated_equation<node_t>(cond));
+	const tref side = sides(ap::atom_of<node_t>(cond)).first;
+	CHECK(!th::is_bdd_backed(side));
+	CHECK(same_function(side, bf("r(y) & r(z)")));
 }
 
 TEST_CASE("NC2: O2 — no component touches the negative") {
@@ -472,7 +495,8 @@ TEST_CASE("NC2: O2 — no component touches the negative") {
 	// An `X`-FREE `g` lands in the same case with an empty `X_g` and emits
 	// `¬(g = 0)` itself, `g` backed — under a formula negation, never a
 	// fused `≠` (invariant 4).
-	const tref free = ap::negative_condition<node_t>(bf("a"), s.comps,
+	const tref free = ap::negative_condition<node_t>(
+		sides(ap::prepare_terms<node_t>(eq0(bf("a")))).first, s.comps,
 		k.P, k.c);
 	REQUIRE(ap::is_negated_equation<node_t>(free));
 	CHECK(!holds(free, tau::bf_neq));
@@ -579,7 +603,7 @@ TEST_CASE("TC3: a repeated literal is paid for once") {
 	// the shared literal's condition, computed here the way the walk
 	// computes it, is a member of both branches — one node, twice
 	const tref shared = ap::negative_condition<node_t>(
-		ap::simplify_term<node_t>(land(bf("x"), bf("c")), ap::regime::backed),
+		sides(ap::prepare_terms<node_t>(eq0(land(bf("x"), bf("c"))))).first,
 		s.comps, k.P, k.c);
 	CHECK(has_member(branches[0], shared));
 	CHECK(has_member(branches[1], shared));

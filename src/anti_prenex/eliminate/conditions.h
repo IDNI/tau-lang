@@ -170,7 +170,9 @@ tref positive_condition(const std::vector<component<node>>& comps, ctx<node>& c)
  * Two shortcuts rest on `∃_X f′ = (∀_X f)′` and on `∃_X(f′·g) = g · ∃_X f′`
  * for a `g` independent of `X`: a `g` that is 1 makes the condition `T` under
  * `pos`, and a `g` no component touches is discharged on its own. An `X`-free
- * `g` is the latter with `X_g = ∅`, which emits `¬(g = 0)` itself.
+ * `g` is the latter with `X_g = ∅`, which emits `¬(g = 0)` itself. The first
+ * is the node test "one" on `g` (terms.h), and the rest read `g` as that
+ * test returns it.
  *
  * @param g the term of the literal, `TERM_OF(¬(g = 0))`
  */

@@ -194,8 +194,11 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	using tbdd = tau_term_bdd<node>;
 	using thandle = term_handle<node>;
 	DBG(assert(g != nullptr);)
-	// `∃_X f′·g = (∀_X f)′ ≠ 0` under `pos`, whatever `X` is.
-	if (tau::get(g).equals_1()) return _T<node>();
+	// `∃_X f′·g = (∀_X f)′ ≠ 0` under `pos`, whatever `X` is. The node
+	// test's rebuild is the `g` of the two cases below.
+	const node_answer o1 = node_test<node>(g, node_question::one);
+	if (o1.is(node_question::one)) return _T<node>();
+	g = o1.term;
 	// `K`, by the cached free-variable sets alone: `X_k ∩ FV(g) ≠ ∅`.
 	typename tbdd::refs FK;
 	subtree_unordered_set<node> vars;

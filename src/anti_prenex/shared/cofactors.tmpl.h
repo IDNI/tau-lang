@@ -6,7 +6,7 @@
  * function means; the comments here say how it is built.
  *
  * The pieces come from the foundations: `cofactor`, `quantify_over`,
- * `simplify_term`, `simplify_atom` (terms.h), `free_in` (dag.h), the
+ * `node_test`, `simplify_atom` (terms.h), `free_in` (dag.h), the
  * library's BDD operations, its chain constructor
  * `build_functional_quantifiers` and the slide `build_bdd` runs on a chain
  * (tau_bdd.h), and the memo wrapper `memoised` (ctx.h). Nothing is computed
@@ -76,19 +76,23 @@ cof_entry cof(tref f, tref x) {
 		const auto b0 = tbdd::build_bdd(e.f0);
 		const auto b1 = tbdd::build_bdd(e.f1);
 		// Boole's expansion puts the zeros of `f` at `f₀ ≤ x ≤ f₁′`, an
-		// interval that `f₀ ∪ f₁ = 1` collapses to a point.
-		const tref u = simplify_term<node>(term(tbdd::bdd_or(b0, b1)),
-			regime::backed);
-		e.pin = tau::get(u).equals_1();
-		e.p = simplify_term<node>(term(tbdd::bdd_and(b0, b1)),
-			regime::backed);
+		// interval that `f₀ ∪ f₁ = 1` collapses to a point. The union is
+		// derived, so its node test's sweep is dropped.
+		const node_answer u = node_test<node>(term(tbdd::bdd_or(b0, b1)),
+			node_question::one);
+		e.pin = u.is(node_question::one);
+		e.p = term(tbdd::bdd_and(b0, b1));
 		if (e.pin) {
 			// The LOWER end `f₁′` (§3): it carries the residual
 			// into every sibling's terms, where `p = 0` then folds.
 			e.witness = term(tbdd::bdd_not(b1));
-			e.strict = tau::get(e.p).equals_0();
+			// `p` is carried: recorded as its node test returns it.
+			const node_answer z = node_test<node>(e.p,
+				node_question::zero);
+			e.p = z.term;
+			e.strict = z.is(node_question::zero);
 		}
-		DBG(assert(!e.pin || tbdd::build_bdd(u) == tbdd::T);)
+		DBG(assert(!e.pin || tau::get(u.term).equals_1());)
 		DBG(assert(!e.pin
 			|| tbdd::build_bdd(e.witness) == tbdd::bdd_not(b1));)
 		return e;

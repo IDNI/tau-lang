@@ -7,7 +7,7 @@
  *
  * The pieces come from the files below: `members`, `formula_size`,
  * `fv_intersect` and the shape predicates (foundations/dag.h) for the lists
- * and the keys, `term_of` (foundations/terms.h) with `cof`
+ * and the keys, `term_of` and `node_test` (foundations/terms.h) with `cof`
  * (shared/cofactors.h) for the probe, `atoms` and `subst_atom`
  * (foundations/subst.h) for a tree's literal-wise fold, the result joins
  * (normalisers/joins.h) for every assembly, `simplify`
@@ -46,19 +46,17 @@ tref innermost(const block& vs, const ctx<node>& c) {
 
 /// §6 `FOLD_DECIDED`'s probe: is the equation `atom` `F`? Its term's
 /// cofactors on the innermost block variable have a nonzero constant
-/// product. `COF` memoises it.
+/// product, by the node test on it. `COF` memoises the product.
 template <NodeType node>
 bool probe(tref atom, const block& X, ctx<node>& c) {
-	using tau = tree<node>;
 	// `TERM_OF(atom)` holds no variable the atom lacks.
 	if (!fv_meets<node>(atom, X)) return false;
 	const tref f = term_of<node>(atom, regime::backed);
 	const block vs = fv_intersect<node>(f, X);
 	if (vs.empty()) return false;
 	const cof_entry e = cof<node>(f, innermost<node>(vs, c));
-	// The hooks decide a constant atom, so `p = 0` folds to `F` exactly
-	// when `p` is a nonzero constant.
-	return e.usable && tau::get(build_bf_eq_0<node>(e.p)).equals_F();
+	return e.usable && node_test<node>(e.p, node_question::nonzero)
+		.is(node_question::nonzero);
 }
 
 /// `FOLD_DECIDED` on a negative tree, literal-wise: an atom the probe proves

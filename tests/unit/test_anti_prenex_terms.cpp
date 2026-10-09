@@ -580,39 +580,29 @@ TEST_CASE("simplify_term: the four laws on a plain term") {
 	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("x | x & y")), bf("x")));
 }
 
-TEST_CASE("simplify_term: leaves simplified and merged in the backed regime") {
+TEST_CASE("simplify_term: the backed regime is the identity") {
 	tref x = vr("x");
-	// x·(r(y)·(r(y)′ ∪ r(z))) ∪ x′·(r(y)·r(z)): the high leaf simplifies
-	// to r(y)·r(z) (per path), merges with the low leaf, the decision node
-	// folds, and the result is the plain r(y)·r(z)
+	// x·ℓ₁ ∪ x′·ℓ₂ with ℓ₁ = r(y)·(r(y)′ ∪ r(z)) and ℓ₂ = r(y)·r(z): two
+	// leaves the leaf product keeps apart, and SIMPLIFY_TERM leaves them so
 	tref l = sides(ap::prepare_terms<node_t>(wff(
 		"x & (r(y) & (r(y)' | r(z))) | x' & (r(y) & r(z)) = 0"))).first;
 	REQUIRE(th::is_bdd_backed(l));
-	tref s = ap::simplify_term<node_t>(l, ap::regime::backed);
-	CHECK(!th::is_bdd_backed(s));
-	CHECK(same_function(s, bf("r(y) & r(z)")));
-	// a product and a complement are the library's operations, never raw
-	// trees over BDD-backed subterms: backed, and simplified like any
-	// backed term
+	CHECK(ap::simplify_term<node_t>(l, ap::regime::backed) == l);
+	// a cofactor, a product and a complement are the library's operations,
+	// and their terms come back as they are
 	tref f1 = ap::cofactor<node_t>(l, x, true);   // plain: one leaf
 	REQUIRE(!th::is_bdd_backed(f1));
+	CHECK(ap::simplify_term<node_t>(f1, ap::regime::backed) == f1);
 	tref g  = sides(ap::prepare_terms<node_t>(wff("x & z = 0"))).first;
 	auto term = [&g](tb::ref r) {
 		return th::convert_to_tau_node_or_term(th(r),
 			find_ba_type<node_t>(g));
 	};
-	tref prod = ap::simplify_term<node_t>(
-		term(tb::bdd_and(ref_of(g), ref_of(f1))), ap::regime::backed);
-	CHECK(th::is_bdd_backed(prod));
-	CHECK(same_function(prod, bf("x & z & r(y) & r(z)")));
-	tref comp = ap::simplify_term<node_t>(term(tb::bdd_not(ref_of(g))),
-		ap::regime::backed);
-	CHECK(same_function(comp, bf("(x & z)'")));
-	// a term whose BDD does not branch comes back plain, its leaf swept
-	tref one = ap::simplify_term<node_t>(bf("r(y) & (r(y)' | r(z))"),
-		ap::regime::backed);
-	CHECK(!th::is_bdd_backed(one));
-	CHECK(same_function(one, bf("r(y) & r(z)")));
+	tref prod = term(tb::bdd_and(ref_of(g), ref_of(f1)));
+	REQUIRE(th::is_bdd_backed(prod));
+	CHECK(ap::simplify_term<node_t>(prod, ap::regime::backed) == prod);
+	tref comp = term(tb::bdd_not(ref_of(g)));
+	CHECK(ap::simplify_term<node_t>(comp, ap::regime::backed) == comp);
 }
 
 TEST_CASE("simplify_term: the cofactor check reduces over a variable the term does not decide") {
@@ -709,7 +699,8 @@ TEST_CASE("simplify_atom: an atom nothing decides comes back as written") {
 }
 
 TEST_CASE("simplify_atom: backed regime — the sides, and the hooks around them") {
-	// sides differ as written, are equal once the leaf simplifies: T
+	// sides differ as written; their sum is x·(ℓ₁ + ℓ₂), one compound leaf
+	// under x, which the open node test sweeps to 0: T
 	tref a = ap::prepare_terms<node_t>(
 		wff("x & (r(y) & (r(y)' | r(z))) = x & (r(y) & r(z))"));
 	REQUIRE(th::is_bdd_backed(sides(a).first));
@@ -766,36 +757,14 @@ TEST_CASE("simplify_term / simplify_atom: a keep-mode emission is the slid chain
 	CHECK(ap::simplify_atom<node_t>(atom, ap::regime::backed) == atom);
 }
 
-TEST_CASE("simplify_term: the leaves INSIDE a kept emission are simplified") {
-	tref x = vr("x");
-	// ∀x over the stored BDD of x·ℓ, ℓ = r(y)·(r(y)′ ∪ r(z)), slides into
-	// ONE chain leaf over the piece `x·ℓ`; the path sweep reduces ℓ to
-	// r(y)·r(z) inside it, and the prefix stays
-	tref stored = th::convert_to_tau_node(
-		bf("x & (r(y) & (r(y)' | r(z)))"));
-	REQUIRE(th::is_bdd_backed(stored));
-	tref e = emitted(tb::build_functional_quantifiers({{x, tb::all}}, stored));
-	REQUIRE(tau::get(e).child_is(tau::bf_fall));
-	tref got = ap::simplify_term<node_t>(e, ap::regime::backed);
-	CHECK(got != e);
-	REQUIRE(tau::get(got).child_is(tau::bf_fall));
-	CHECK(prefix_of(got) == prefix_of(e));
-	tb::ref gb = tb::build_bdd(ap::strip_chain<node_t>(got).second);
-	REQUIRE(!tb::leaf(gb));
-	CHECK(tau::subtree_equals(tb::get_var(gb), x));
-	REQUIRE(tb::leaf(tb::get_high(gb)));
-	CHECK(same_function(tb::get_var_term(tb::get_high(gb)),
-		bf("r(y) & r(z)")));
-	CHECK(tb::get_low(gb) == tb::F);
-}
-
-TEST_CASE("simplify_term: the sweep simplifies AROUND a kept emission") {
+TEST_CASE("simplify_term: around a kept emission the hooks fold and the rest stands") {
 	tref y = vr("y");
 	tref stored = th::convert_to_tau_node(bf("b & (y & r(a) | y' & r(c))"));
 	tref e = emitted(tb::build_functional_quantifiers({{y, tb::all}}, stored));
 	REQUIRE(th::is_bdd_backed(e));
-	// a repeat of it folds, `·0` folds, and its complement, the library's,
-	// is the complemented BDD, the chain leaf untouched
+	// a repeat of it and `·0` fold through the construction hooks, and its
+	// complement, the library's, is the complemented BDD, the chain leaf
+	// untouched
 	CHECK(ap::simplify_term<node_t>(
 		build_bf_or<node_t>(e, e), ap::regime::backed) == e);
 	CHECK(tau::get(ap::simplify_term<node_t>(build_bf_and<node_t>(e,
@@ -805,6 +774,141 @@ TEST_CASE("simplify_term: the sweep simplifies AROUND a kept emission") {
 		ap::regime::backed);
 	REQUIRE(th::is_bdd_backed(neg));
 	CHECK(ref_of(neg) == tb::bdd_not(ref_of(e)));
+}
+
+// 6b. node_test --------------------------------------------------------------
+
+TEST_CASE("node_test: an open test sweeps the compound leaves, and its rebuild is carried") {
+	// x·ℓ₁ ∪ x′·ℓ₂ as above: both leaves are products, so "zero" is OPEN.
+	// The sweep reduces ℓ₁ to r(y)·r(z) by its literal r(y), the leaves
+	// merge, the decision node folds, and the rebuild is the plain ℓ₂: not
+	// zero, and handed back
+	tref l = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(y) & (r(y)' | r(z))) | x' & (r(y) & r(z)) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(l));
+	const ap::node_answer a = ap::node_test<node_t>(l,
+		ap::node_question::zero);
+	CHECK(a.cls == 0);
+	CHECK(!th::is_bdd_backed(a.term));
+	CHECK(same_function(a.term, bf("r(y) & r(z)")));
+	// SIMPLIFY_ATOM on `l = 0` runs that test and CARRIES its rebuild
+	tref atom = build_bf_eq_0<node_t>(l);
+	REQUIRE(sides(atom).first == l);
+	tref s = ap::simplify_atom<node_t>(atom, ap::regime::backed);
+	CHECK(tau::subtree_equals(sides(s).first, a.term));
+	CHECK(tau::get(sides(s).second).equals_0());
+	// a test whose leaves sweep to nothing new hands its term back
+	tref plain = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(y) & r(z)) | x' & r(w) & r(z) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(plain));
+	const ap::node_answer b = ap::node_test<node_t>(plain,
+		ap::node_question::zero);
+	CHECK(b.term == plain);
+	CHECK(b.cls == 0);
+}
+
+TEST_CASE("node_test: an atomic leaf answers no at once") {
+	tref x = vr("x");
+	// x·ℓ₁ ∪ x′·r(z): ℓ₁ would sweep, but r(z) is a single reference no
+	// sweep changes, so every question is answered at once, nothing swept
+	tref l = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(y) & (r(y)' | r(z))) | x' & r(z) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(l));
+	for (unsigned char q : { ap::node_question::zero,
+		ap::node_question::one, ap::node_question::nonzero })
+	{
+		const ap::node_answer a = ap::node_test<node_t>(l, q);
+		CHECK(a.term == l);
+		CHECK(a.cls == 0);
+	}
+	// a kept emission: ∀x over x·ℓ₁ slides into ONE chain leaf, atomic,
+	// never entered — ℓ₁ inside it stays as written
+	tref stored = th::convert_to_tau_node(
+		bf("x & (r(y) & (r(y)' | r(z)))"));
+	REQUIRE(th::is_bdd_backed(stored));
+	tref e = emitted(tb::build_functional_quantifiers({{x, tb::all}}, stored));
+	REQUIRE(tau::get(e).child_is(tau::bf_fall));
+	CHECK(ap::simplify_term<node_t>(e, ap::regime::backed) == e);
+	const ap::node_answer k = ap::node_test<node_t>(e,
+		ap::node_question::zero);
+	CHECK(k.term == e);
+	CHECK(k.cls == 0);
+	// so does a wrong terminal: x·ℓ₁ asked "one" meets 0 and sweeps
+	// nothing, asked "zero" it opens and hands back x·r(y)·r(z)
+	tref xl = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(y) & (r(y)' | r(z))) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(xl));
+	CHECK(ap::node_test<node_t>(xl, ap::node_question::one).term == xl);
+	const ap::node_answer z = ap::node_test<node_t>(xl,
+		ap::node_question::zero);
+	CHECK(z.term != xl);
+	CHECK(z.cls == 0);
+	CHECK(same_function(z.term, bf("x & r(y) & r(z)")));
+}
+
+TEST_CASE("node_test: the classes of a terminal and a constant") {
+	const size_t type = find_ba_type<node_t>(bf("x"));
+	const ap::node_answer z = ap::node_test<node_t>(tau::_0(type),
+		ap::node_question::one);
+	CHECK(z.is(ap::node_question::zero));
+	CHECK(!z.is(ap::node_question::nonzero));
+	const ap::node_answer o = ap::node_test<node_t>(tau::_1(type),
+		ap::node_question::zero);
+	CHECK(o.is(ap::node_question::one));
+	CHECK(o.is(ap::node_question::nonzero));
+	CHECK(!o.is(ap::node_question::zero));
+	// a BA constant other than 0 and 1 is a nonzero constant, not `1`
+	const ap::node_answer c = ap::node_test<node_t>(bf("{ 5 }:bv[8]"),
+		ap::node_question::zero);
+	CHECK(c.is(ap::node_question::constant));
+	CHECK(c.is(ap::node_question::nonzero));
+	CHECK(!c.is(ap::node_question::one));
+}
+
+TEST_CASE("node_test: the spec's open example decides T") {
+	tref x = vr("x");
+	const ap::block X{ x };
+	// ∃x. x·(r ∪ s) ∪ x′·r′·s′ = 0 discharges to (r ∪ s)·r′·s′ = 0
+	tref f = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(a) | s(a)) | x' & r(a)' & s(a)' = 0"))).first;
+	REQUIRE(th::is_bdd_backed(f));
+	tref q = ap::quantify_over<node_t>(tb::all, f, X);
+	CHECK(tau::get(ap::simplify_atom<node_t>(build_bf_eq_0<node_t>(q),
+		ap::regime::backed)).equals_T());
+	// here r ∪ s is built as the complement of the product r′·s′, so the
+	// library meets the two as one node and its complement: 0 at once
+	CHECK(tau::get(q).equals_0());
+	// with a third member, (r ∪ s)·r′·s′·t(a) is a product the leaf
+	// product cannot see: the test "zero" is open, and the sweep folds it
+	tref g = sides(ap::prepare_terms<node_t>(wff(
+		"x & (r(a) | s(a)) | x' & r(a)' & s(a)' & t(a) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(g));
+	tref p = ap::quantify_over<node_t>(tb::all, g, X);
+	REQUIRE(!th::is_bdd_backed(p));
+	REQUIRE(!tau::get(p).equals_0());
+	const ap::node_answer a = ap::node_test<node_t>(p,
+		ap::node_question::zero);
+	CHECK(a.is(ap::node_question::zero));
+	CHECK(tau::get(a.term).equals_0());
+	tref atom = build_bf_eq_0<node_t>(p);
+	REQUIRE(!tau::get(atom).equals_T());
+	CHECK(tau::get(ap::simplify_atom<node_t>(atom, ap::regime::backed))
+		.equals_T());
+	// the same product as a DERIVED sum decides the atom and leaves its
+	// sides as they stand
+	tref ne = tau::get(tau::wff, tau::get(tau::bf_eq, p,
+		tau::_0(find_ba_type<node_t>(p))));
+	CHECK(tau::get(ap::simplify_atom<node_t>(build_wff_neg<node_t>(ne),
+		ap::regime::backed)).equals_F());
+}
+
+TEST_CASE("node_test: the canonical sum decides, and its sweep is dropped") {
+	// x·ℓ₁ = x·r(w): the sum x·(ℓ₁ + r(w)) opens, its sweep decides
+	// nothing, and the atom comes back as written — ℓ₁ not re-spelled
+	tref b = ap::prepare_terms<node_t>(wff(
+		"x & (r(y) & (r(y)' | r(z))) = x & r(w)"));
+	REQUIRE(th::is_bdd_backed(sides(b).first));
+	CHECK(ap::simplify_atom<node_t>(b, ap::regime::backed) == b);
 }
 
 // 7. term_of, norm_equation ---------------------------------------------------

@@ -100,6 +100,27 @@ TEST_CASE("C1: a strict pin — the spelled shape x + t = 0") {
 	CHECK(tb::build_bdd(e.witness) == tb::bdd_not(tb::build_bdd(e.f1)));
 }
 
+TEST_CASE("C1b: STRICT by an open node test — a residual the leaf product cannot see") {
+	tref x = vr("x");
+	// `x′·A ∪ x·B` with `A = r ∪ s` and `B = r′·s′·(r′ ∪ t)`, which is
+	// `A′` spelled otherwise: the union and the product are single leaves,
+	// `1` and `0` only once the sweep has been through them.
+	tref f = prepared(eq0(bf(
+		"x' & (r(a) | s(a)) | x & r(a)' & s(a)' & (r(a)' | t(a))")));
+	REQUIRE(th::is_bdd_backed(f));
+	const ap::cof_entry e = ap::cof<node_t>(f, x);
+	const tb::ref b0 = tb::build_bdd(e.f0), b1 = tb::build_bdd(e.f1);
+	REQUIRE(tb::bdd_or(b0, b1) != tb::T);
+	REQUIRE(tb::bdd_and(b0, b1) != tb::F);
+	CHECK(e.usable);
+	CHECK(e.pin);
+	CHECK(e.strict);
+	// `p` is carried: recorded as the strict test returned it
+	REQUIRE(e.p != nullptr);
+	CHECK(tau::get(e.p).equals_0());
+	CHECK(tb::build_bdd(e.witness) == tb::bdd_not(b1));
+}
+
 TEST_CASE("C2: the WEAK pin (y + t) ∪ G = 0 keeps its residual") {
 	tref y = vr("y");
 	const ap::block P{ y };

@@ -34,9 +34,11 @@ namespace idni::tau_lang::anti_prenexing {
  * `f₀` and `f₁` are the RESTRICTS of `f`'s BDD (§1), child selection with
  * no `SIMPLIFY_TERM`; every other term of the `cof_entry` (fwd.h) is a BDD
  * operation on them: the pin test on their union, the residual `p` their
- * product — both through `SIMPLIFY_TERM` — and a pin's witness `f₁′` the
- * complemented BDD of `f₁`, STRICT when `p` folds to `0`. A usable record
- * carries `p` whether it pins or not.
+ * product and a pin's witness `f₁′` the complemented BDD of `f₁`. The pin
+ * and strict tests are node tests (terms.h): "one" on the union, whose sweep
+ * is dropped, and, for a pin, "zero" on `p`, which is recorded as that test
+ * returns it, STRICT when it is `0`. A usable record carries `p` whether it
+ * pins or not.
  *
  * `f` IS THE KEY, exactly as it arrives (§1 cache scope): pass the backed
  * regime's `TERM_OF` of the atom, not the atom. `cof_memo` is GLOBAL: the

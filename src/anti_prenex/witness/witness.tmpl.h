@@ -31,17 +31,6 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace witness_detail {
 
-/// Does `n` carry a BDD-backed term anywhere? The `BDD_ID` search of
-/// tau_bdd.tmpl.h, on the whole subtree. DEBUG ONLY: it is the entry guard of
-/// the spelled mode (§3, "nothing is BDD-backed there"), where a backed term
-/// is a caller bug.
-template <NodeType node>
-bool holds_bdd_term(tref n) {
-	using tau = tree<node>;
-	return tau::get(n).find_top([](tref m) {
-		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
-}
-
 /// The result join of `ms` in the connective `conj` picks (§3): the ∧-join
 /// for a `wff_and` spine, the ∨-join for a `wff_or` one. An empty list is the
 /// connective's neutral constant — what a spine minus its only other member
@@ -267,7 +256,7 @@ template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi) {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
-	DBG(assert(!holds_bdd_term<node>(psi));)
+	DBG(assert(!terms_detail::holds_bdd_id<node>(psi));)
 	// The SPELLED match on every conjunct: phase 2 is the plain regime,
 	// where nothing is BDD-backed.
 	return witness_with<node>(x, psi, regime::plain, {}, [x](const trefs& cs) {
@@ -296,7 +285,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	using tau = tree<node>;
 	using namespace witness_detail;
 	DBG(assert(phi != nullptr && x != nullptr);)
-	DBG(assert(!holds_bdd_term<node>(phi));)
+	DBG(assert(!terms_detail::holds_bdd_id<node>(phi));)
 	const bool ex = Q == tau_term_bdd<node>::ex;
 	const size_t spine_nt = ex ? tau::wff_and : tau::wff_or;
 	const size_t other_nt = ex ? tau::wff_or : tau::wff_and;
@@ -398,7 +387,7 @@ template <NodeType node>
 std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
-	DBG(assert(!holds_bdd_term<node>(psi));)
+	DBG(assert(!terms_detail::holds_bdd_id<node>(psi));)
 	const trefs cs = get_cnf_wff_clauses<node>(psi);
 	// SMALLEST `|D|` FIRST (§3): one scan over the conjuncts, the smallest
 	// case pin kept. `|·|` is `formula_size` (dag.h).
@@ -464,7 +453,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi,
 template <NodeType node>
 tref eliminate_by_substitution(tref phi) {
 	DBG(assert(phi != nullptr);)
-	DBG(assert(!witness_detail::holds_bdd_term<node>(phi));)
+	DBG(assert(!terms_detail::holds_bdd_id<node>(phi));)
 	// The default memo slot is the traversal's own per-call one
 	// (normal_forms_transformations.h): the result at a binder node is a
 	// pure function of the node, so a shared binder is tried once.

@@ -28,9 +28,10 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
 
-// `syntactic_path_simplification` (heuristics/) is the sweep the two
-// normalisers below reuse. The heuristics header must be included through
-// normal_forms.h, which declares what its body uses before the body.
+// `syntactic_path_simplification` (heuristics/) is the sweep the plain
+// regime's normalisers and the node test reuse. The heuristics header must be
+// included through normal_forms.h, which declares what its body uses before
+// the body.
 #include "normal_forms.h"
 
 #include <cstdint>
@@ -44,10 +45,10 @@ template <NodeType node> using tbdd  = tau_term_bdd<node>;
 template <NodeType node> using bref  = typename tau_term_bdd<node>::ref;
 template <NodeType node> using thandle = term_handle<node>;
 
+#ifdef DEBUG
 /// Does @p t carry a `BDD_ID` anywhere -- a stored BDD at the top, or one
 /// held under an operator, a functional-quantifier chain or inside a leaf?
-/// The BDD regime of the two normalisers below is keyed on it: nothing outside
-/// this file knows a `BDD_ID`.
+/// The check that a term meant to be plain holds no stored BDD.
 template <NodeType node>
 bool holds_bdd_id(tref t) {
 	using tau = tree<node>;
@@ -57,7 +58,7 @@ bool holds_bdd_id(tref t) {
 
 /// Does @p t, not BDD-backed itself, hold a BDD-backed subterm at a Boolean
 /// position, a combination the library's operations should have built?
-/// DEBUG ONLY: the backed regime's entry check of the two normalisers below.
+/// The backed regime's entry check of the two normalisers below.
 template <NodeType node>
 bool mixes_bdd_id(tref t) {
 	if (thandle<node>::is_bdd_backed(t)) return false;
@@ -71,6 +72,7 @@ bool mixes_bdd_id(tref t) {
 		while_is_boolean_operation<node>, up);
 	return found;
 }
+#endif // DEBUG
 
 /// What the chain step hands back: the body's BDD quantified over the
 /// subscripts it took, and the prefix that STAYS over it, outermost first. An
@@ -177,47 +179,63 @@ tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 	return r;
 }
 
-/// §3 `SIMPLIFY_TERM`'s LEAF SIMPLIFIER, the function its BDD regime maps
-/// over the leaves.
-///
-/// A leaf that holds no `BDD_ID` goes through the path sweep. A leaf that
-/// holds one is swept over its PLAIN structure alone: to the sweep a
-/// `bf(BDD_ID)` is an opaque leaf, never descended into, negated into or
-/// substituted into. The stored BDDs the sweep left standing are
-/// then simplified from the inside, one `map_leaves` each with this same
-/// simplifier, so a nest of them settles innermost leaf first.
-///
-/// Results are memoised per leaf node: a leaf's simplified form is a function
-/// of the leaf, and one leaf is reached from several BDDs.
+/// A BDD leaf as the node test reads it, its inverter aside: a product of
+/// leaves, a BA constant, or a single anything else.
+enum class leaf_kind : unsigned char { compound, constant, atomic };
+
+/// The kind of the leaf whose `bf` term, as `get_var_term` spells it, is
+/// @p leaf.
 template <NodeType node>
-struct leaf_simplifier {
-	tref operator()(tref leaf) {
-		if (auto it = memo.find(leaf); it != memo.end())
-			return it->second;
-		tref r = simplify(leaf);
-		memo.emplace(leaf, r);
-		return r;
-	}
+leaf_kind kind_of_leaf(tref leaf) {
+	using tau = tree<node>;
+	const tau& u = tau::get(leaf);
+	const tau& own = u.child_is(tau::bf_neg)
+		? tau::get(tau::trim2(leaf))[0] : u[0];
+	if (own.is(tau::bf_and)) return leaf_kind::compound;
+	if (own.is_ba_constant()) return leaf_kind::constant;
+	return leaf_kind::atomic;
+}
 
-private:
-	subtree_unordered_map<node, tref> memo;
+/// The node-test class of the BDD @p r (`node_question`): a terminal, a
+/// constant leaf, or none.
+template <NodeType node>
+unsigned char class_of(bref<node> r) {
+	if (r == tbdd<node>::F) return node_question::zero;
+	if (r == tbdd<node>::T) return node_question::one;
+	if (tbdd<node>::leaf(r) && kind_of_leaf<node>(
+		tbdd<node>::get_var_term(r)) == leaf_kind::constant)
+			return node_question::constant;
+	return 0;
+}
 
-	tref simplify(tref leaf) {
-		tref swept = syntactic_path_simplification<node>(leaf);
-		if (!holds_bdd_id<node>(swept)) return swept;
-		auto inside = [this](tref m) -> tref {
-			if (!thandle<node>::is_bdd_backed(m)) return m;
-			bref<node> b = thandle<node>::convert_to_handle(m).get();
-			DBG(assert(tbdd<node>::is_ordered(b));)
-			return thandle<node>::convert_to_tau_node_or_term(
-				thandle<node>(tbdd<node>::map_leaves(b, *this)),
-				find_ba_type<node>(m));
-		};
-		// A rebuilt stored BDD is not re-entered: its own leaves went
-		// through this simplifier already.
-		return pre_order<node>(swept).apply_unique_until_change(inside);
-	}
-};
+/// OPEN for @p asked: every leaf compound or one same asked value, terminals
+/// included, and one at least compound. `visit_nodes` skips a node met again
+/// under the other inverter, which can only open a test needlessly.
+template <NodeType node>
+bool is_open(bref<node> r, unsigned char asked) {
+	using bdd = tbdd<node>;
+	bool compound = false;
+	std::optional<bref<node>> value;
+	auto meet = [&](bref<node> v) {
+		if (value && *value != v) return false;
+		if ((class_of<node>(v) & asked) == 0) return false;
+		return value = v, true;
+	};
+	auto at_node = [&](bref<node> x, bool is_leaf) {
+		if (!is_leaf) {
+			for (bref<node> c : { bdd::get_high(x), bdd::get_low(x) })
+				if ((c == bdd::T || c == bdd::F) && !meet(c))
+					return false;
+			return true;
+		}
+		switch (kind_of_leaf<node>(bdd::get_var_term(x))) {
+		case leaf_kind::compound: return compound = true, true;
+		case leaf_kind::constant: return meet(x);
+		default: return false;
+		}
+	};
+	return bdd::visit_nodes(r, at_node) && compound;
+}
 
 /// Refutes the cofactor check on 64 content-derived assignments at once: the
 /// hooks folding a cofactor are Boolean identities, so cofactors whose words
@@ -500,6 +518,38 @@ tref resolve_functional_quantifiers_plain(tref n,
 	return resolve_plain_chains<node>(n, keep, memo);
 }
 
+// --- the node test ---------------------------------------------------------------
+
+template <NodeType node>
+node_answer node_test(tref t, unsigned char asked) {
+	using tau = tree<node>;
+	using namespace terms_detail;
+	t = tau::trim_right_sibling(t);
+	const bref<node> r = thandle<node>::is_bdd_backed(t)
+		? thandle<node>::convert_to_handle(t).get()
+		: tbdd<node>::build_bdd(t);
+	// A plain term in the backed regime holds no variable at a Boolean
+	// position: it is a single leaf or a constant.
+	DBG(assert(thandle<node>::is_bdd_backed(t) || tbdd<node>::leaf(r));)
+	DBG(assert(tbdd<node>::is_ordered(r));)
+	if (!is_open<node>(r, asked)) return { t, class_of<node>(r) };
+	// OPEN: the compound leaves alone through the sweep, which keeps its own
+	// root memo, and the rebuild through the leaf product, so leaves that
+	// became equal merge.
+	auto sweep = [](tref leaf) {
+		return kind_of_leaf<node>(leaf) == leaf_kind::compound
+			? syntactic_path_simplification<node>(leaf) : leaf;
+	};
+	const bref<node> s = tbdd<node>::map_leaves(r, sweep);
+	DBG(assert(tbdd<node>::is_ordered(s));)
+	if (s == r) return { t, class_of<node>(r) };
+	const node_answer a{ thandle<node>::convert_to_tau_node_or_term(
+		thandle<node>(s), find_ba_type<node>(t)), class_of<node>(s) };
+	DBG(assert(!a.is(node_question::zero) || tau::get(a.term).equals_0());)
+	DBG(assert(!a.is(node_question::one) || tau::get(a.term).equals_1());)
+	return a;
+}
+
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 
 template <NodeType node>
@@ -507,33 +557,21 @@ tref simplify_term(tref t, regime rg) {
 	using tau = tree<node>;
 	using namespace terms_detail;
 	t = tau::trim_right_sibling(t);
-	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
-	// Phases 1 and 2 run in the plain regime, and no term holds a stored
-	// BDD there (terms.h) -- the search for a `BDD_ID` is a Debug check of
-	// that contract, never a cost of those phases.
-	if (rg == regime::plain) {
-		DBG(assert(!holds_bdd_id<node>(t));)
-		return cofactor_check<node>(syntactic_path_simplification<node>(t));
+	// The backed regime is the IDENTITY: the reduced BDD decides every
+	// variable, and a leaf is re-spelled by an open node test alone. Its
+	// input is therefore its own canonical form: a stored BDD, a single leaf
+	// or a constant.
+	if (rg == regime::backed) {
+		DBG(assert(!mixes_bdd_id<node>(t));)
+		DBG(assert(thandle<node>::is_bdd_backed(t)
+			? tbdd<node>::is_ordered(
+				thandle<node>::convert_to_handle(t).get())
+			: tbdd<node>::leaf(tbdd<node>::build_bdd(t)));)
+		return t;
 	}
-	// Terms are combined by the library's operations, never by the tree
-	// builders, so no raw tree reaches here holding a stored BDD.
-	DBG(assert(!mixes_bdd_id<node>(t));)
-	// A term with no variable and no stored BDD has nothing to build; the
-	// last test is what keeps a term holding a `BDD_ID` out of the sweep,
-	// which knows no `BDD_ID`.
-	if (!thandle<node>::is_bdd_backed(t) && get_free_vars<node>(t).empty()
-		&& !holds_bdd_id<node>(t))
-		return syntactic_path_simplification<node>(t);
-	// The representation re-established (a BDD-backed term is canonical
-	// already; a plain term is built, a chain slid, §1), then every leaf
-	// through the leaf simplifier and the rebuild that merges leaves that
-	// became equal.
-	bref<node> r = tbdd<node>::build_bdd(t);
-	DBG(assert(tbdd<node>::is_ordered(r));)
-	leaf_simplifier<node> simp;
-	return thandle<node>::convert_to_tau_node_or_term(
-		thandle<node>(tbdd<node>::map_leaves(r, simp)),
-		find_ba_type<node>(t));
+	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
+	DBG(assert(!holds_bdd_id<node>(t));)
+	return cofactor_check<node>(syntactic_path_simplification<node>(t));
 }
 
 template <NodeType node>
@@ -547,28 +585,49 @@ tref simplify_atom(tref a, regime rg) {
 	DBG(assert(is_atomic_fm<node>(atom));)
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
-	// Phases 1 and 2 run in the plain regime, and no side holds a stored
-	// BDD there (terms.h); in the backed regime no side is a raw tree
-	// combining stored BDDs. Debug checks of those contracts.
+	// No side holds a stored BDD in the plain regime, and in the backed one
+	// no side is a raw tree combining stored BDDs.
 	DBG(assert(rg == regime::backed
 		|| (!holds_bdd_id<node>(l) && !holds_bdd_id<node>(r)));)
 	DBG(assert(rg == regime::plain
 		|| (!mixes_bdd_id<node>(l) && !mixes_bdd_id<node>(r)));)
-	// ONE recipe in both regimes: the sides simplified, the atom rebuilt
-	// through the construction hooks, which fold a constant-only atom,
-	// equal sides and a side against its complement. The atom is never
-	// reshaped.
+	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
+	// `0` decides `=` as `T` and a nonzero constant as `F`, dually for `≠`,
+	// which phase 1 meets before NORMALIZE_OPERATORS.
+	auto decided = [eq](bool zero) {
+		return zero == eq ? tau::_T() : tau::_F(); };
+	tref res = atom;
+	if (rg == regime::backed) {
+		// The sides stand. A `0` side makes the decision the node test
+		// "zero" on the other side, whose rebuild the atom CARRIES;
+		// otherwise it is the node test on the canonical sum, whose
+		// sweep is dropped.
+		if (eq || neq) {
+			const bool l0 = tau::get(l).equals_0();
+			const bool r0 = tau::get(r).equals_0();
+			node_answer d;
+			if (l0 || r0) {
+				d = node_test<node>(l0 ? r : l, node_question::zero);
+				if (d.term != (l0 ? r : l)) res = tau::get(tau::wff,
+					tau::get(t[0].value.nt, l0 ? l : d.term,
+						l0 ? d.term : r));
+			} else d = node_test<node>(term_of<node>(atom, rg),
+				node_question::zero | node_question::nonzero);
+			if (d.is(node_question::zero)) res = decided(true);
+			else if (d.is(node_question::nonzero))
+				res = decided(false);
+		}
+		return negated ? build_wff_neg<node>(res) : res;
+	}
+	// The plain regime: the sides simplified, the atom rebuilt through the
+	// construction hooks, which fold a constant-only atom, equal sides and a
+	// side against its complement. The atom is never reshaped.
 	tref l2 = simplify_term<node>(l, rg);
 	tref r2 = simplify_term<node>(r, rg);
 	DBG(assert(tau::get(l2).is(tau::bf) && tau::get(r2).is(tau::bf));)
-	tref res = (l2 == l && r2 == r) ? atom
-		: tau::get(tau::wff, tau::get(t[0].value.nt, l2, r2));
-	// The joint `l + r` then DECIDES a (¬)equation and does nothing else:
-	// it is what sees two sides the hooks cannot compare, two `BDD_ID`
-	// nodes above all. `0` decides `=` as `T` and a nonzero constant as
-	// `F`, dually for `≠`, which phase 1 meets before NORMALIZE_OPERATORS;
-	// anything else leaves the atom as its sides stand.
-	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
+	if (l2 != l || r2 != r)
+		res = tau::get(tau::wff, tau::get(t[0].value.nt, l2, r2));
+	// The joint `l + r` then DECIDES a (¬)equation and does nothing else.
 	// A side of `0` makes `term_of` the other side, simplified two lines
 	// above already, its own constant (if any) folded by the hooks.
 	if (const tau& rt = tau::get(res);
@@ -577,8 +636,8 @@ tref simplify_atom(tref a, regime rg) {
 	{
 		tref f = simplify_term<node>(term_of<node>(res, rg), rg);
 		const tau& z = tau::get(build_bf_eq_0<node>(f));
-		if (z.equals_T()) res = eq ? tau::_T() : tau::_F();
-		else if (z.equals_F()) res = eq ? tau::_F() : tau::_T();
+		if (z.equals_T()) res = decided(true);
+		else if (z.equals_F()) res = decided(false);
 	}
 	return negated ? build_wff_neg<node>(res) : res;
 }

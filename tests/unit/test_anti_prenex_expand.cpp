@@ -289,6 +289,17 @@ TEST_CASE("FD5: the probe variable is the innermost block variable") {
 	CHECK(got->size() == 1);
 }
 
+TEST_CASE("FD6: an open probe sweeps a residual the leaf product cannot see") {
+	// `x ∪ Q′ = 0` with `Q = (r(a) ∪ s(a))·r(a)′·s(a)′·t(a)`: the
+	// cofactors on `x` are `Q′` and `1`, so the residual is the one leaf
+	// `Q′`. The node test sweeps `Q` to `0`, the residual is the nonzero
+	// constant `1`, and the atom is `F`.
+	fixture f = make("ex x ((x | (((r(a) | s(a)) & r(a)' & s(a)' "
+		"& t(a))')) = 0).");
+	REQUIRE(ap::members<node_t>(f.clause).size() == 1);
+	CHECK(!folded(f).has_value());
+}
+
 // --- CONJOINABLE --------------------------------------------------------------------
 
 TEST_CASE("CJ1: a literal is conjoinable") {

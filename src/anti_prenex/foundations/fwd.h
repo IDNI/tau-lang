@@ -116,9 +116,10 @@ struct tref_set {
  * and `f₀ ∪ f₁ = 1`; a pin gives §3 `TRY_WITNESS` the `witness` `f₁′` — on a
  * backed `f₁` its complemented BDD — and the residual equation `p = 0`, and
  * is `strict` when `p` folds to `0`, so that the residual vanishes. `p` is
- * the residual `SIMPLIFY_TERM(f₀·f₁)` when `pin` holds; a usable non-pin
- * record has it from `COF` alone, `nullptr` (⊥) otherwise. `witness` is
- * `nullptr` and `strict` false on a record that is no pin.
+ * the residual `f₀·f₁`: from `COF` on every usable record, a pin's as its
+ * node test "zero" returns it (terms.h); in the plain regime on a pin alone,
+ * through `SIMPLIFY_TERM`; `nullptr` (⊥) otherwise. `witness` is `nullptr`
+ * and `strict` false on a record that is no pin.
  *
  * The four terms are built by `COF` and are not subtrees of the key, so the
  * table has to pin them against garbage collection: `for_each_tref` opts this

@@ -197,13 +197,53 @@ template <NodeType node>
 tref resolve_functional_quantifiers_plain(tref n,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
+// --- the node test ---------------------------------------------------------------
+
+/// What a §3 NODE TEST asks, as a mask, and what it answers, the class of
+/// the term it hands back: the terminal `0`, the terminal `1`, or a BA
+/// constant that is neither. `nonzero` asks for either of the last two.
+struct node_question {
+	enum : unsigned char { zero = 1, one = 2, constant = 4,
+		nonzero = one | constant };
+};
+
+/// What `node_test` hands back: the term, rebuilt over its swept leaves when
+/// the test was OPEN and a sweep changed one, and the term's class
+/// (`node_question`), `0` when it is none of the three.
+struct node_answer {
+	tref term = nullptr;
+	unsigned char cls = 0;
+	/// Is the term of a class the mask @p q asks for?
+	bool is(unsigned char q) const { return (cls & q) != 0; }
+};
+
+/**
+ * @brief §3 NODE TEST, every decision on a term in the backed regime: is
+ * @p t — BDD-backed, a single leaf or a constant — of a class @p asked asks
+ * for?
+ *
+ * A leaf is a BA CONSTANT, COMPOUND (a product of leaves) or ATOMIC (a
+ * single reference, chain, foreign-typed or arithmetic subterm), each
+ * inverted or not. The test is OPEN when every leaf is compound or one same
+ * asked value, terminals included, and one at least is compound: each
+ * compound leaf then goes through the path sweep, with no table of the
+ * test's own, and the term is rebuilt through the leaf product. Otherwise no
+ * sweep could change the answer, which is given at once.
+ *
+ * The answer is the class of the term handed back, @p t or its rebuild. A
+ * caller testing a CARRIED term keeps the rebuild, one testing a DERIVED
+ * term drops it.
+ */
+template <NodeType node>
+node_answer node_test(tref t, unsigned char asked);
+
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 
 /**
  * @brief §3 `SIMPLIFY_TERM(t, order = ∅)`: constant folding, complement
- * laws, per-path contradiction, the cofactor check, and reduction to the
- * canonical form of the BDD backing `t`. The spec's empty order is the
- * `plain` regime, its global one the `backed` regime (fwd.h).
+ * laws, per-path contradiction and the cofactor check in the `plain` regime,
+ * the spec's empty order; in the `backed` regime, its global one (fwd.h),
+ * the IDENTITY.
  *
  * Per-path contradiction is the rule `prop:xfx` — `x·f(x) = x·f(1)` and
  * `x′·f(x) = x′·f(0)` — so a subterm under a literal is reduced by that
@@ -211,32 +251,30 @@ tref resolve_functional_quantifiers_plain(tref n,
  * a compound one (`ab ∪ ab·c`) stays as written.
  *
  * The first three laws are THE SWEEP, the existing
- * `syntactic_path_simplification` (heuristics/). In the plain regime a term
- * goes through it whole. In the backed regime a term holding a variable or a
- * stored BDD — BDD-backed, or carrying a stored BDD inside a leaf — is first
- * (re)built, then every leaf goes through the sweep and the BDD is rebuilt,
- * so leaves that became equal merge; a term holding neither is swept whole.
- * A raw tree combining stored BDDs under a Boolean operator is never handed
- * in: terms are combined by the library's operations (Debug-asserted, here
- * and in `simplify_atom`).
+ * `syntactic_path_simplification` (heuristics/), which takes the term whole.
  *
- * THE COFACTOR CHECK runs in the plain regime alone: in the backed one every
- * variable is a variable of the order, decided by the BDD already or sitting
- * in a leaf, where the expansion is not licensed (§1's leaf hazard). It is
- * one-level Shannon reduction of the WHOLE term over every free variable of
- * `t`. For each `y`, `f₀ = t[y←0]` and `f₁ = t[y←1]`, the substitution
- * reaching BOOLEAN
- * POSITIONS only — under `∪ · ′ +` and the functional quantifiers, never
- * under an arithmetic operator, a reference or a foreign-typed subterm, where
- * no Shannon expansion holds — with constants folding through the
- * construction hooks; `f₀ = f₁`, a constant included, makes `t ← f₀`. It is
- * what stops nested Boole normal forms from compounding as substitutions
- * stack terms inside terms.
+ * THE COFACTOR CHECK is one-level Shannon reduction of the WHOLE term over
+ * every free variable of `t`. For each `y`, `f₀ = t[y←0]` and
+ * `f₁ = t[y←1]`, the substitution reaching BOOLEAN POSITIONS only — under
+ * `∪ · ′ +` and the functional quantifiers, never under an arithmetic
+ * operator, a reference or a foreign-typed subterm, where no Shannon
+ * expansion holds — with constants folding through the construction hooks;
+ * `f₀ = f₁`, a constant included, makes `t ← f₀`. It is what stops nested
+ * Boole normal forms from compounding as substitutions stack terms inside
+ * terms.
  *
  * TWO PHASES, no interplay: the sweep first, then the check ONCE over the
  * swept term. A cofactor is what the substitution hands back, folded by the
  * hooks and simplified no further. So this is NOT idempotent: a second call
  * may simplify further.
+ *
+ * THE BACKED REGIME: every variable is a decision variable of the term's BDD
+ * or sits in a leaf, where no expansion is licensed (§1's leaf hazard), so
+ * the sweep and the check find nothing the reduced BDD has not decided. A
+ * leaf is simplified where it is made and re-spelled by an open `node_test`
+ * alone. A raw tree combining stored BDDs under a Boolean operator is never
+ * handed in: terms are combined by the library's operations (Debug-asserted,
+ * here and in `simplify_atom`).
  *
  * Canonical up to LEAF EQUALITY only (§3): that is the single source of
  * incompleteness behind every syntactic test of the spec.
@@ -245,20 +283,25 @@ template <NodeType node>
 tref simplify_term(tref t, regime rg = regime::plain);
 
 /**
- * @brief §3 `SIMPLIFY_ATOM(a, order = ∅)`: ONE recipe in both regimes.
- * `simplify_term` on both sides, the atom rebuilt through the construction
- * hooks, which fold a constant-only atom and equal sides. `a` is a `wff`
- * atom, optionally under one `¬`, which is folded through.
+ * @brief §3 `SIMPLIFY_ATOM(a, order = ∅)`: ONE recipe in both regimes. `a`
+ * is a `wff` atom, optionally under one `¬`, which is folded through.
  *
- * For a (¬)equation the joint ring sum `l + r` (`term_of`) then goes through
- * `simplify_term` as a DECISION alone, skipped when either simplified side is
- * `0`: `0` decides `=` as `T`, a nonzero constant as `F`, dually for `≠`. It
- * is what sees two sides no hook can compare, two `BDD_ID` nodes above all.
+ * The sides go through `simplify_term` and the atom is rebuilt through the
+ * construction hooks, which fold a constant-only atom and equal sides. For a
+ * (¬)equation the joint ring sum `l + r` (`term_of`) then DECIDES the atom
+ * and does nothing else: `0` decides `=` as `T`, a nonzero constant as `F`,
+ * dually for `≠`. It is what sees two sides no hook can compare, two `BDD_ID`
+ * nodes above all. In the plain regime the decision is `simplify_term` of
+ * the sum, skipped when either simplified side is `0`.
+ *
+ * In the backed regime the sides stand and the decision is a `node_test`: on
+ * the canonical sum, a DERIVED term whose sweep is dropped; or, when a side
+ * is `0`, the test "zero" on the other side, whose rebuild the atom CARRIES.
+ *
  * Anything else leaves the atom as its sides stand: the atom is NEVER
  * reshaped, and `norm_equation` stays the one rewrite of an equation's
- * shape. An order atom is simplified side-wise alone.
- *
- * NOT IDEMPOTENT, like `simplify_term`.
+ * shape. An order atom is simplified side-wise alone. NOT IDEMPOTENT, like
+ * `simplify_term`.
  */
 template <NodeType node>
 tref simplify_atom(tref a, regime rg = regime::plain);
