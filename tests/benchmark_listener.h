@@ -7,7 +7,7 @@
 #ifndef __IDNI__TAU__BENCHMARK_LISTENER_H__
 #define __IDNI__TAU__BENCHMARK_LISTENER_H__
 
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include <chrono>
 #include <fstream>
 #include <string>

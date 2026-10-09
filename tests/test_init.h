@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "defs.h"
 #include "logging.h"
 #include "benchmark_listener.h"
