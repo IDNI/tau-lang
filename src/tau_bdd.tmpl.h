@@ -81,6 +81,9 @@ template<NodeType node>
 tau_term_bdd<node>::cache_and_many_t tau_term_bdd<node>::and_many_memo;
 
 template<NodeType node>
+tau_term_bdd<node>::cache_and_many_index_t tau_term_bdd<node>::and_many_index;
+
+template<NodeType node>
 tau_term_bdd<node>::cache_quant_t tau_term_bdd<node>::quant_memo;
 
 template<NodeType node>
@@ -98,6 +101,7 @@ void tau_term_bdd<node>::clear_caches() {
 	and_memo.clear();
 	ex_memo.clear();
 	and_many_memo.clear();
+	and_many_index.clear();
 	quant_memo.clear();
 	ite_memo.clear();
 	// The tables and the order they were populated under go together: a
@@ -1123,7 +1127,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 #ifdef TAU_CACHE
 	static refs v1;
 	do {
-		if (v1=v, am_simplify(v, memo), v.size()==1) return v[0];
+		if (v1=v, am_simplify(v), v.size()==1) return v[0];
 	} while (v1 != v);
 #endif
 
@@ -1133,8 +1137,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 	if (auto it = memo.find(v); it != memo.end()) return it->second;
 
 	if (v.size() == 2) {
-		ref r = bdd_and(v[0], v[1], o);
-		return memo.emplace(v, r).first->second;
+		return am_memoize(memo, v, bdd_and(v[0], v[1], o));
 	}
 
 	ref res = F, h, l;
@@ -1144,12 +1147,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 		case 0: l = bdd_and_many(std::move(vl), o, memo),
 			h = bdd_and_many(std::move(vh), o, memo);
 			break;
-		case 1: return memo.emplace(v, res).first->second;
+		case 1: return am_memoize(memo, v, res);
 		case 2: h = bdd_and_many(std::move(vh), o, memo), l = F; break;
 		case 3: h = F, l = bdd_and_many(std::move(vl), o, memo); break;
 		default: { DBG(assert(false)); return ref(); }
 	}
-	return memo.emplace(v, add(m, h, l)).first->second;
+	return am_memoize(memo, v, add(m, h, l));
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_or_many(refs, const order&) @endinternal */
@@ -1182,21 +1185,36 @@ void tau_term_bdd<node>::am_sort(refs& b) {
 	b.resize(w);
 }
 
-/** @internal @copydoc tau_term_bdd::am_simplify(refs&, const std::unordered_map<refs, ref>&) @endinternal */
+#ifdef TAU_CACHE
+/** @internal @copydoc tau_term_bdd::am_simplify(refs&) @endinternal */
 template<NodeType node>
-bool tau_term_bdd<node>::am_simplify(refs& v,
-	const std::unordered_map<refs, ref>& memo) {
+bool tau_term_bdd<node>::am_simplify(refs& v) {
 	am_sort(v);
-	for (auto x : memo)
-		if (subset(x.first, v)) {
-			if (x.second == F) return v={F}, true;
-			for (size_t n = 0; n < v.size();)
-				if (!hasbc(x.first, v[n], am_cmp)) ++n;
-				else v.erase(v.begin() + n);
-			if (!hasbc(v, x.second, am_cmp)) v.push_back(x.second);
-			return true;
-		}
+	// Memo keys are am_sorted, so a subset of v is indexed under a member of v.
+	for (const ref& first : v)
+		if (auto it = and_many_index.find(first); it != and_many_index.end())
+			for (const auto* x : it->second)
+				if (subset(x->first, v)) {
+					if (x->second == F) return v={F}, true;
+					for (size_t n = 0; n < v.size();)
+						if (!hasbc(x->first, v[n], am_cmp)) ++n;
+						else v.erase(v.begin() + n);
+					if (!hasbc(v, x->second, am_cmp)) v.push_back(x->second);
+					return true;
+				}
 	return false;
+}
+#endif
+
+/** @internal @copydoc tau_term_bdd::am_memoize(std::unordered_map<refs, ref>&, const refs&, ref) @endinternal */
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::am_memoize(
+	std::unordered_map<refs, ref>& memo, const refs& v, ref r) {
+	[[maybe_unused]] const auto [it, fresh] = memo.emplace(v, r);
+#ifdef TAU_CACHE
+	if (fresh) and_many_index[v[0]].push_back(&*it);
+#endif
+	return it->second;
 }
 
 /** @internal @copydoc tau_term_bdd::subset(const refs&, const refs&) @endinternal */

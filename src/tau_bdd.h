@@ -118,12 +118,17 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 #ifdef TAU_CACHE
 	using cache_and_t      = std::unordered_map<std::array<ref, 2>, ref>;
 	using cache_and_many_t = std::unordered_map<refs, ref>;
+	using cache_and_many_index_t = std::unordered_map<ref,
+		std::vector<const typename cache_and_many_t::value_type*>>;
 	using cache_ex_t       = std::map<trefs, std::unordered_map<ref, ref>>;
 	using cache_quant_t    = std::map<quants, std::unordered_map<ref, ref>>;
 	using cache_ite_t      = std::unordered_map<std::array<ref, 3>, ref>;
 
 	static cache_and_t      and_memo;       ///< @brief Memoisation table for AND.
 	static cache_and_many_t and_many_memo;  ///< @brief Memoisation table for AND-many.
+	/// @brief Entries of `and_many_memo` by their first (am_cmp-least) argument;
+	/// they point into the memo and are cleared with it.
+	static cache_and_many_index_t and_many_index;
 	static cache_ex_t       ex_memo;        ///< @brief Memoisation table for existential quantification.
 	static cache_quant_t    quant_memo;     ///< @brief Memoisation table for general quantification.
 	static cache_ite_t      ite_memo;       ///< @brief Memoisation table for if-then-else.
@@ -350,13 +355,23 @@ private:
 	 * to {F} when it contains F or a complementary pair.
 	 */
 	static void am_sort(refs& b);
+#ifdef TAU_CACHE
 	/**
-	 * @brief Rewrite @p v using one @p memo hit: if some memoised
+	 * @brief Rewrite @p v using one `and_many_memo` hit: if some memoised
 	 * argument set is a subset of @p v, replace that subset by its
 	 * memoised result ({F} collapses the list). Returns true iff @p v
 	 * changed; callers iterate it to a fixpoint.
 	 */
-	static bool am_simplify(refs& v, const std::unordered_map<refs, ref>& memo);
+	static bool am_simplify(refs& v);
+#endif
+	/**
+	 * @brief Memoise @p r as the result for the am_sort-ed argument list
+	 * @p v (at least two arguments) in @p memo, which is `and_many_memo`
+	 * under TAU_CACHE; there the entry also joins `and_many_index`.
+	 * Returns the memoised result.
+	 */
+	static ref am_memoize(std::unordered_map<refs, ref>& memo, const refs& v,
+		ref r);
 	/**
 	 * @brief True iff every element of @p small occurs in @p big; both
 	 * must be non-empty and am_sort-ed (binary search plus range/size
