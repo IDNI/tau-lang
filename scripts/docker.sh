@@ -118,8 +118,25 @@ case "${CMD}" in
                         --output "type=local,dest=${TAU_WHEEL_DIR:-build/tau-wheel}" "${@:2}"
                 ;;
         "test-with-testnet")
+                # The commit of the tau-testnet ref goes into the layer key, so
+                # a move of main reruns the suite. A failed lookup keeps the default.
+                testnet_args=()
+                testnet_ref="${TAU_TESTNET_REF:-origin/main}"
+                if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
+                        testnet_hash="$testnet_ref"
+                else
+                        testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
+                                "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
+                fi
+                if [ -n "$testnet_hash" ]; then
+                        echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
+                        testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
+                else
+                        echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
+                fi
                 build --target testnet \
                         --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
+                        ${testnet_args[@]+"${testnet_args[@]}"} \
                         -t tau:testnet "${@:2}"
                 ;;
         "asan")

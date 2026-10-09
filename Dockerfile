@@ -366,11 +366,16 @@ WORKDIR /tau-lang
 
 COPY --from=tau-wheel-dir / /tau-wheel/
 
+# The clone runs inside the RUN below, so the tau-testnet commit must be part
+# of its cache key. docker.sh passes the current commit of main.
+ARG TAU_TESTNET_REF=origin/main
+
 # The wheel binds one CPython version and ABI, so the venv takes that version.
 RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
 	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
 	test -n "$minor" && command -v "python3.${minor}" && \
 	TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
+	TAU_TESTNET_REF="$TAU_TESTNET_REF" \
 		./dev test-with-tau-testnet
 
 # ------------------------------------------------------------
