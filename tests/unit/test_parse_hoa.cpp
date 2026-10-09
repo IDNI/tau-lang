@@ -269,7 +269,8 @@ TEST_SUITE("spawn_capture") {
 		CHECK(!timeout_from_env("abc"));
 		CHECK(!timeout_from_env("12x"));
 		CHECK(!timeout_from_env("-3"));
-		CHECK(!timeout_from_env(""));
+		// blank, not empty: an empty value removes the variable on Windows
+		CHECK(!timeout_from_env(" "));
 		CHECK(ltl_timeout_sec() == 60);
 	}
 	// A value past the one-day maximum is clamped. A value that does not fit
