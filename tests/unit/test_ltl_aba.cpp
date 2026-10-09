@@ -6117,12 +6117,14 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 		}
 		chmod(stub.c_str(), 0755);
 
-		const char* old_path = std::getenv("PATH");
-		REQUIRE(old_path != nullptr);
+		auto old_path = test_env("PATH");
+		old_path.print_pending();
+		REQUIRE(old_path.has_value());
+		REQUIRE(old_path.value().has_value());
 		struct restore_path {
 			std::string p;
 			~restore_path() { setenv("PATH", p.c_str(), 1); }
-		} restore{old_path};
+		} restore{*old_path.value()};
 		setenv("PATH", (std::string(dir) + ":" + restore.p).c_str(), 1);
 
 		auto r = synthesize("F(p0)", {}, {"p0"}, 0);

@@ -8,6 +8,7 @@
 #define __IDNI__TAU__BENCHMARK_LISTENER_H__
 
 #include "quiet_doctest.h"
+#include "test_env.h"
 #include <chrono>
 #include <fstream>
 #include <string>
@@ -32,9 +33,12 @@ struct benchmark_listener : public doctest::IReporter {
 
 	benchmark_listener(const doctest::ContextOptions& in)
 		: opt_(in) {
-		// Output file: TAU_BENCHMARK_FILE env var, or default name
-		const char* env = std::getenv("TAU_BENCHMARK_FILE");
-		if (env && env[0]) output_file_ = env;
+		// Output file: TAU_BENCHMARK_FILE env var, or default name.
+		// A constructor carries no report, so a failed read prints it.
+		auto env = test_env("TAU_BENCHMARK_FILE");
+		env.print_pending();
+		if (env.has_value() && env.value() && !env.value()->empty())
+			output_file_ = *env.value();
 		else output_file_ = "benchmark_timing.json";
 	}
 

@@ -10,6 +10,7 @@
 #include "defs.h"
 #include "logging.h"
 #include "benchmark_listener.h"
+#include "test_env.h"
 #include "utility/diagnostics.h"
 #include "utility/options.h"
 // Only the preprocessing/solver placement/cvc5-option parameters, not the
@@ -40,7 +41,12 @@ using namespace idni::tau_lang;
 // _putenv_s, and an empty value removes the variable, which is unsetenv.
 inline int setenv(const char* name, const char* value, int overwrite) {
 	if (!name || !value) return -1;
-	if (!overwrite && std::getenv(name)) return 0;
+	if (!overwrite) {
+		auto old = test_env(name);
+		old.print_pending();
+		if (!old.has_value()) return -1;
+		if (old.value()) return 0;
+	}
 	return _putenv_s(name, value) == 0 ? 0 : -1;
 }
 inline int unsetenv(const char* name) {
@@ -66,11 +72,16 @@ inline int unsetenv(const char* name) {
 //
 // Out-of-range values clamp to the default, matching the api setters
 // (api::set_preprocess_placement and friends).
-inline void apply_tau_experiment_env() {
-	auto env_int = [](const char* name, int lo, int hi, int fallback) {
-		const char* v = std::getenv(name);
-		if (!v) return fallback;
-		int i = std::atoi(v);
+inline idni::diagnostics::result<void> apply_tau_experiment_env() {
+	idni::diagnostics::result<void> r;
+	auto env_int = [&r](const char* name, int lo, int hi, int fallback) {
+		auto v = test_env(name);
+		const bool read = v.has_value();
+		const std::optional<std::string> text =
+			read ? v.value() : std::nullopt;
+		r.merge(std::move(v));
+		if (!read || !text) return fallback;
+		int i = std::atoi(text->c_str());
 		return (i >= lo && i <= hi) ? i : fallback;
 	};
 	preprocess_placement = static_cast<preprocess_site>(
@@ -86,6 +97,7 @@ inline void apply_tau_experiment_env() {
 		env_int("TAU_CVC5_OPTIONS", 0,
 			static_cast<int>(cvc5_option_set::combined_best),
 			static_cast<int>(cvc5_options)));
+	return r;
 }
 
 // Set by test_helpers.h once node_t is known; stays a bare pointer here
@@ -102,7 +114,9 @@ int main(int argc, char** argv) {
 	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	if (int rc = bounded_child_main(argc, argv); rc >= 0) return rc;
 	enable_bounded_children();
-	apply_tau_experiment_env();
+	auto experiment = apply_tau_experiment_env();
+	experiment.print_pending();
+	if (experiment.has_error()) return 1;
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
 #ifdef TAU_LOG_TRACE_TESTS
 	logging::trace();

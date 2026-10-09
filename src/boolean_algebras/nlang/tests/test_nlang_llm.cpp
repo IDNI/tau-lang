@@ -20,9 +20,10 @@ struct clean_llm_env {
 	std::vector<std::pair<std::string, std::optional<std::string>>> saved;
 	clean_llm_env() {
 		for (const char* v : vars) {
-			const char* old = std::getenv(v);
-			saved.emplace_back(v, old ? std::optional<std::string>(old)
-				: std::nullopt);
+			auto old = test_env(v);
+			old.print_pending();
+			REQUIRE(old.has_value());
+			saved.emplace_back(v, old.value());
 			unsetenv(v);
 		}
 	}

@@ -690,8 +690,11 @@ inline bool tau_test_cxx_available(const std::string& cxx) {
 /// TAU_TEST_CXX override, else the first of g++, clang++ and cl that runs.
 inline const std::string& tau_test_cxx() {
 	static const std::string cxx = []() -> std::string {
-		if (const char* v = std::getenv("TAU_TEST_CXX"); v && *v)
-			return v;
+		// a skip decorator can call this before main, where no case can fail
+		auto v = test_env("TAU_TEST_CXX");
+		v.print_pending();
+		if (v.has_value() && v.value() && !v.value()->empty())
+			return *v.value();
 		for (const char* name : { "g++", "clang++", "cl" })
 			if (tau_test_cxx_available(name)) return name;
 		return "g++";

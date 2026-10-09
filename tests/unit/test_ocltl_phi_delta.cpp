@@ -750,8 +750,10 @@ TEST_SUITE("ocltl_phi_delta: stage1 symbolic (sigma/rho/D only) correctness") {
 // Opt-in: TAU_OCLTL_RUN_STAGE1=1. Off by default -- the K=18/20-atom point
 // is a bounded but potentially long, memory-heavy run, not a default ctest cost.
 bool run_stage1() {
-	const char* v = std::getenv("TAU_OCLTL_RUN_STAGE1");
-	return v && *v && std::string(v) != "0";
+	auto v = test_env("TAU_OCLTL_RUN_STAGE1");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && !v.value()->empty() && *v.value() != "0";
 }
 
 void run_stage1_point(const std::string& label, size_t s, size_t l,

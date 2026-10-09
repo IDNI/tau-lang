@@ -529,6 +529,14 @@ TEST_SUITE("bv stress check: single rule execution") {
 // (preprocessing=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
 // the load tester's own default (bv[64], fourteen rules) now passes too --
 // see its own case below for why it still stays opt-in.
+// The skip decorator runs before main, where no case can fail, so a failed
+// read prints its report and reads as unset.
+static bool stress_oldrules_set() {
+	auto v = test_env("TAU_STRESS_OLDRULES");
+	v.print_pending();
+	return v.has_value() && v.value().has_value();
+}
+
 TEST_SUITE("bv stress check: execution") {
 
 	TEST_CASE("8 iterations at bv[1]") {
@@ -595,19 +603,24 @@ TEST_SUITE("bv stress check: execution") {
 	// during static initialisation, before main() runs, which is early
 	// enough for the environment to have been read.
 	TEST_CASE("historical logged rules at bv[16]"
-		* doctest::skip(std::getenv("TAU_STRESS_OLDRULES") == nullptr))
+		* doctest::skip(!stress_oldrules_set()))
 	{
-		const char* path = std::getenv("TAU_STRESS_OLDRULES");
-		REQUIRE( path != nullptr );
-		std::ifstream in(path);
+		auto path = test_env("TAU_STRESS_OLDRULES");
+		path.print_pending();
+		REQUIRE( path.has_value() );
+		REQUIRE( path.value().has_value() );
+		std::ifstream in(*path.value());
 		REQUIRE( in.good() );
 		strings rules;
 		std::string line;
 		while (std::getline(in, line))
 			if (!line.empty()) rules.push_back(line);
 		REQUIRE( !rules.empty() );
-		const char* n_env = std::getenv("TAU_STRESS_OLDRULES_N");
-		size_t n = n_env ? static_cast<size_t>(std::atoi(n_env)) : 2;
+		auto n_env = test_env("TAU_STRESS_OLDRULES_N");
+		n_env.print_pending();
+		REQUIRE( n_env.has_value() );
+		size_t n = n_env.value()
+			? static_cast<size_t>(std::atoi(n_env.value()->c_str())) : 2;
 		REQUIRE( n > 0 );
 		auto res = run_stress({ .iterations = n, .width = 16,
 			.rules = rules });

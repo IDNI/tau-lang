@@ -146,9 +146,11 @@ TEST_SUITE("spawn_capture") {
 		std::string old_val;
 		bool had;
 		EnvGuard(const char* k, const char* v) : key(k) {
-			const char* c = std::getenv(k);
-			had = c != nullptr;
-			if (had) old_val = c;
+			auto c = test_env(k);
+			c.print_pending();
+			REQUIRE(c.has_value());
+			had = c.value().has_value();
+			if (had) old_val = *c.value();
 			setenv(k, v, 1);
 		}
 		~EnvGuard() {

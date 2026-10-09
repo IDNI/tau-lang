@@ -11,7 +11,10 @@ namespace {
 // Sets an environment variable for the scope and restores its old value.
 struct scoped_env {
 	scoped_env(const char* name, const char* value) : name(name) {
-		if (const char* old = std::getenv(name)) saved = old;
+		auto old = test_env(name);
+		old.print_pending();
+		REQUIRE(old.has_value());
+		saved = old.value();
 		setenv(name, value, 1);
 	}
 	~scoped_env() {

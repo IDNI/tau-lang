@@ -42,8 +42,10 @@ bool has(const std::string& s, const std::string& pat) {
 
 // Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
 bool run_sdk_link_test() {
-	const char* v = std::getenv("TAU_CODEGEN_RUN_SDK_LINK_TEST");
-	return v && *v && std::string(v) != "0";
+	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && !v.value()->empty() && *v.value() != "0";
 }
 
 // Run the artifact, returning its combined stdout+stderr and whether it

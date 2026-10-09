@@ -163,7 +163,10 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): atomless2's exact step shape"
 // documents the finding without making every default run pay for it.
 TEST_SUITE("ocltl runtime witness decode: atomless2 exact scale on tau_ba (opt-in, tractability)") {
 	TEST_CASE("tau: 9 exclusions then 11 with the sibling (atomless2's actual algebra)") {
-		if (!std::getenv("TAU_OCLTL_RUN_TAU_SCALE")) {
+		auto run_scale = test_env("TAU_OCLTL_RUN_TAU_SCALE");
+		run_scale.print_pending();
+		REQUIRE(run_scale.has_value());
+		if (!run_scale.value()) {
 			MESSAGE("TAU_OCLTL_RUN_TAU_SCALE not set; skipping (see comment above -- measured non-terminating within 400s)");
 			return;
 		}

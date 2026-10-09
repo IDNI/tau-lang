@@ -40,8 +40,10 @@ static double timed_realizable(const char* s, bool* result = nullptr) {
 
 // Check whether perf tests should be skipped (set TAU_LTL_SKIP_PERF=1 in CI).
 static bool skip_perf() {
-	const char* v = std::getenv("TAU_LTL_SKIP_PERF");
-	return v && v[0] == '1';
+	auto v = test_env("TAU_LTL_SKIP_PERF");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && v.value()->starts_with('1');
 }
 
 TEST_SUITE("LTL perf (performance regression)") {

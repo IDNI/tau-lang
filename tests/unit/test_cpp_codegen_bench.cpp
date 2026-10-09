@@ -218,8 +218,10 @@ TEST_SUITE("cpp_codegen_bench") {
     // lookup, so a handful of steps already cost whole seconds. Stays out of
     // the default ctest budget.
     static bool run_bench() {
-        const char* v = std::getenv("TAU_CODEGEN_RUN_BENCH");
-        return v && *v && std::string(v) != "0";
+        auto v = test_env("TAU_CODEGEN_RUN_BENCH");
+        v.print_pending();
+        REQUIRE(v.has_value());
+        return v.value() && !v.value()->empty() && *v.value() != "0";
     }
 
     TEST_CASE("compiled vs interpreter throughput (real interpreter, multi-spec)") {
@@ -310,7 +312,10 @@ TEST_SUITE("cpp_codegen_bench") {
             // CG-RT3: the speed comparison is a load-sensitive race on a
             // shared CI box; it is informative by default and asserted only
             // when TAU_BENCH_ASSERT is set.
-            if (std::getenv("TAU_BENCH_ASSERT")) CHECK(c_rate > i_rate);
+            auto bench_assert = test_env("TAU_BENCH_ASSERT");
+            bench_assert.print_pending();
+            REQUIRE(bench_assert.has_value());
+            if (bench_assert.value()) CHECK(c_rate > i_rate);
             else if (!(c_rate > i_rate))
                 MESSAGE("compiled program not faster than the interpreter "
                         "(not asserted; set TAU_BENCH_ASSERT to enforce)");

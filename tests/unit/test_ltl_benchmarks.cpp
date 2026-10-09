@@ -21,8 +21,10 @@
 using namespace idni::tau_lang;
 
 static bool skip_benchmarks() {
-	const char* s = std::getenv("TAU_LTL_SKIP_BENCHMARKS");
-	return s && *s && std::string(s) != "0";
+	auto s = test_env("TAU_LTL_SKIP_BENCHMARKS");
+	s.print_pending();
+	REQUIRE(s.has_value());
+	return s.value() && !s.value()->empty() && *s.value() != "0";
 }
 
 // Unwraps is_ltl_aba_realizable. An undecided verdict fails the test

@@ -95,10 +95,12 @@ std::vector<stdfs::path> discover_fixtures(const stdfs::path& dir) {
 // TAU_CODEGEN_PARITY_ONLY: comma-separated fixture basenames (no .tau) that
 // restrict the opt-in loop to; unset runs the corpus unfiltered, as before.
 std::vector<stdfs::path> filter_parity_only(std::vector<stdfs::path> fixtures) {
-	const char* v = std::getenv("TAU_CODEGEN_PARITY_ONLY");
-	if (!v || !*v) return fixtures;
+	auto v = test_env("TAU_CODEGEN_PARITY_ONLY");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	if (!v.value() || v.value()->empty()) return fixtures;
 	std::vector<stdfs::path> kept;
-	std::stringstream ss(v);
+	std::stringstream ss(*v.value());
 	for (std::string name; std::getline(ss, name, ','); ) {
 		if (name.empty()) continue;
 		auto it = std::find_if(fixtures.begin(), fixtures.end(),
@@ -148,15 +150,20 @@ bool has_console_output(const std::string& text) {
 // Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST -- drives a real cmake
 // configure+build per case, so it stays out of the default ctest budget.
 bool run_parity_test() {
-	const char* v = std::getenv("TAU_CODEGEN_RUN_PARITY_TEST");
-	return v && *v && std::string(v) != "0";
+	auto v = test_env("TAU_CODEGEN_RUN_PARITY_TEST");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && !v.value()->empty() && *v.value() != "0";
 }
 
 // The tau CLI binary: an env override, else the path baked in at configure
 // time from the tau target (tests/unit/CMakeLists.txt), when built.
 std::optional<std::string> resolve_tau_exe() {
-	if (const char* e = std::getenv("TAU_CODEGEN_TAU_EXE"); e && *e)
-		return stdfs::exists(e) ? std::optional(std::string(e)) : std::nullopt;
+	auto e = test_env("TAU_CODEGEN_TAU_EXE");
+	e.print_pending();
+	REQUIRE(e.has_value());
+	if (e.value() && !e.value()->empty())
+		return stdfs::exists(*e.value()) ? e.value() : std::nullopt;
 #ifdef TAU_CLI_EXE_PATH
 	if (stdfs::exists(TAU_CLI_EXE_PATH)) return std::string(TAU_CLI_EXE_PATH);
 #endif
@@ -755,7 +762,10 @@ TEST_SUITE("codegen_parity") {
 	// calls were eligible, since a disagreement is this batch's designated
 	// stop condition, not a rate to tolerate.
 	TEST_CASE("Mechanism 1(a) shadow crosscheck: synthesis-time swap measurement") {
-		if (!std::getenv("TAU_PHI_DELTA_SWAP_MEASURE")) {
+		auto swap_measure = test_env("TAU_PHI_DELTA_SWAP_MEASURE");
+		swap_measure.print_pending();
+		REQUIRE(swap_measure.has_value());
+		if (!swap_measure.value()) {
 			MESSAGE("TAU_PHI_DELTA_SWAP_MEASURE not set; skipping "
 				"(set TAU_PHI_DELTA_CROSSCHECK=1 alongside it for the "
 				"correctness counters, off for a clean timing read)");

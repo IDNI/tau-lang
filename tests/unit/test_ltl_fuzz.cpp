@@ -186,17 +186,21 @@ static int spot_decide(const string& ltl_formula) {
 // mt19937 seeds from 32 bits only, so a seed that does not fit fails the test
 // instead of losing its high bits.
 static uint32_t get_env_seed(const char* name, uint32_t def) {
-	const char* v = std::getenv(name);
-	if (!v) return def;
-	const unsigned long long seed = std::stoull(v);
+	auto v = test_env(name);
+	v.print_pending();
+	REQUIRE(v.has_value());
+	if (!v.value()) return def;
+	const unsigned long long seed = std::stoull(*v.value());
 	if (seed > std::numeric_limits<uint32_t>::max())
 		FAIL(name << "=" << seed << " does not fit the 32-bit mt19937 seed");
 	return static_cast<uint32_t>(seed);
 }
 
 static int get_env_int(const char* name, int def) {
-	const char* v = std::getenv(name);
-	return v ? std::stoi(v) : def;
+	auto v = test_env(name);
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() ? std::stoi(*v.value()) : def;
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────────

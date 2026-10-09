@@ -118,8 +118,10 @@ struct path_stubs {
 		char* d = mkdtemp(tmpl);
 		REQUIRE(d != nullptr);
 		dir = d;
-		const char* old = std::getenv("PATH");
-		saved_path = old ? old : "";
+		auto old = test_env("PATH");
+		old.print_pending();
+		REQUIRE(old.has_value());
+		saved_path = old.value().value_or("");
 		for (const auto& [name, body] : scripts) {
 			std::string text = body;
 			for (const char* tool : {"ltlsynt", "ltlfilt"}) {
