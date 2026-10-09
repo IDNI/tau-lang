@@ -7,15 +7,26 @@ set -u
 DEP_FILE_TARGET=windows-x86_64-msvc
 DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
+# The vcvars64.bat of the developer shell. VSINSTALLDIR is a Windows path,
+# often with a trailing backslash.
+_dep_boost_vcvars() {
+	[ -n "${VSINSTALLDIR:-}" ] || return 1
+	local _dir
+	_dir="$(cygpath -u "$VSINSTALLDIR")" || return 1
+	[ -f "${_dir%/}/VC/Auxiliary/Build/vcvars64.bat" ] || return 1
+	printf '%s\n' "${_dir%/}/VC/Auxiliary/Build/vcvars64.bat"
+}
+
 # b2 maps an unknown cl to msvc-6.0, so name 14.3, its newest version, with
 # the cl of PATH. b2 finds no vcvars64.bat beside a cl newer than 14.4x.
 # clang-win takes clang-cl: b2's clang toolset passes GCC options.
 _dep_boost_user_config() {
 	if [ "$(dep_compiler_id "$2")" = MSVC ]; then
 		local _vcvars
-		_vcvars="$(dirname "$2")/../../../../../Auxiliary/Build/vcvars64.bat"
-		[ -f "$_vcvars" ] \
-			|| { echo "dep-boost: no vcvars64.bat at ${_vcvars}" >&2; return 1; }
+		_vcvars="$(_dep_boost_vcvars)" || {
+			echo "dep-boost: no VC/Auxiliary/Build/vcvars64.bat under VSINSTALLDIR='${VSINSTALLDIR:-}'. Start the MSVC developer shell." >&2
+			return 1
+		}
 		printf 'using msvc : 14.3 : "%s" : <setup-amd64>"%s" ;\n' \
 			"$(cygpath -m "$2")" "$(cygpath -m "$_vcvars")" \
 			> "${1}/user-config.jam"
@@ -81,7 +92,7 @@ _dep_boost_target_build() {
 	_tmp_win="$(cygpath -w "${_short}/tmp")"
 	_vcvars=""
 	for _v in \
-		"${VSINSTALLDIR:-}/VC/Auxiliary/Build/vcvars64.bat" \
+		"$(_dep_boost_vcvars)" \
 		"/c/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/vcvars64.bat" \
 		"/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat" \
 		"/c/Program Files/Microsoft Visual Studio/2022/Professional/VC/Auxiliary/Build/vcvars64.bat"
