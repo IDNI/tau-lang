@@ -569,9 +569,9 @@ TEST_SUITE("pack_bind_options") {
 		auto r = pack_bind_options<bad_node>(repo);
 		REQUIRE_FALSE(r.has_value());
 		CHECK(report_has_code(r.report(), code::invalid_argument));
-		CHECK(attr_text(r.report(), label::name) == "width-max");
-		CHECK(attr_text(r.report(), label::type_name) == "bb");
-		CHECK(attr_text(r.report(), label::expected) == "bb-width-max");
+		CHECK(attr_text(r.report(), idni::tau_lang::label::name) == "width-max");
+		CHECK(attr_text(r.report(), idni::tau_lang::label::type_name) == "bb");
+		CHECK(attr_text(r.report(), idni::tau_lang::label::expected) == "bb-width-max");
 		// aa comes first in the pack and is bound; bb is neither
 		// declared nor bound
 		CHECK(repo.find("aa-limit"));

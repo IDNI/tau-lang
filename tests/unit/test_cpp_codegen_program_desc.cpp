@@ -205,7 +205,7 @@ TEST_SUITE("run_compile_script") {
 		const auto took = std::chrono::steady_clock::now() - start;
 		compile_build_timeout = saved;
 		CHECK(!r.has_value());
-		CHECK(report_has_attr(r.report(), label::timeout));
+		CHECK(report_has_attr(r.report(), idni::tau_lang::label::timeout));
 		CHECK(took < std::chrono::seconds(30));
 		CHECK(!std::filesystem::exists(out));
 	}
