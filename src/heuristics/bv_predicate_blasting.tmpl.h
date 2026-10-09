@@ -82,21 +82,68 @@ using bit_slice_memo = std::unordered_map<std::pair<tref, size_t>,
 	std::optional<typename tau_term_bdd<node>::ref>>;
 
 /**
- * @brief Builds the BDD for a blasted bf term's bit-@p i, under order @p o.
+ * @brief The bits of one bv variable as BDD decision variables: per bit
+ * index, the fresh variable standing for the bit and the bit atom
+ * `V & {2^i}` (`bit<node>`) it stands for. `slot` numbers the bv variable
+ * among all that ever had bits minted.
+ */
+struct minted_bits {
+	/// The bound on a bit index, and the stride of one bit's id range.
+	static constexpr std::uint64_t max_bits = std::uint64_t{1} << 20;
+	static constexpr std::uint64_t slots = std::uint64_t{1} << 40;
+	size_t slot = 0;
+	std::vector<std::pair<tref, tref>> bits;
+	void for_each_tref(auto&& f) const {
+		for (const auto& [v, a] : bits) f(v), f(a);
+	}
+};
+
+/**
+ * @brief The first @p width bits of the bv variable @p w (trimmed) as
+ * decision variables, minted once per (variable, bit) and kept while @p w
+ * lives.
+ *
+ * The BDD library orders variables, so a bit enters a BDD as a fresh
+ * variable of its own, mapped back to its atom when the BDD is spelled. Its
+ * decimal id makes the library's order (highest id first) BIT-MAJOR: every
+ * variable's bit i sits above any bit i+1, and within one bit the variables
+ * follow their slots. Requires @p width <= `minted_bits::max_bits`.
+ */
+template<NodeType node>
+static const minted_bits& bit_variables(tref w, size_t width) {
+	using tau = tree<node>;
+	using table_t = std::unordered_map<tref, minted_bits>;
+	static table_t& table = tree<node>::template create_cache<table_t>();
+	static size_t next_slot = 0;
+	auto [it, fresh] = table.try_emplace(w);
+	minted_bits& m = it->second;
+	if (fresh) m.slot = next_slot++;
+	DBG(assert(width <= minted_bits::max_bits
+		&& m.slot < minted_bits::slots);)
+	const size_t type = tau::get(w).get_ba_type();
+	for (size_t i = m.bits.size(); i < width; ++i) {
+		const std::uint64_t id = (minted_bits::max_bits - i)
+			* minted_bits::slots + (minted_bits::slots - 1 - m.slot);
+		m.bits.emplace_back(tau::build_variable(std::to_string(id), type),
+			tau::get(tau::bf, tau::trim(bit<node>(tau::get(tau::bf, w),
+				static_cast<int_t>(i)))));
+	}
+	return m;
+}
+
+/// The bits of the bv variables one elimination attempt slices, by variable.
+template<NodeType node>
+using bit_variables_of = subtree_unordered_map<node, const minted_bits*>;
+
+/**
+ * @brief Builds the BDD for a blasted bf term's bit-@p i.
  *
  * Recurses structurally over bf_and/bf_or/bf_xor/bf_neg -- all bitwise, so
  * bit i of the combination is the bdd_and/bdd_or/bdd_xor-via-bdd_and-or/
  * bdd_not of bit i of each operand. At a bv variable leaf, the decision
- * variable is bit<node>(V, i) -- the same masked term blasted atoms already
- * build, so hash-consing lines it up with existing atoms and with the order
- * @p o registers under (see quantify_aux_vars) -- looked up directly and
- * built via from_bit, deliberately NOT via build_bdd(term, o): build_bdd's
- * bf_and/bf_or cases flatten through get_cnf_bf_clauses/get_dnf_bf_clauses,
- * a purely structural walk that does not consult @p o, so re-embedding a
- * registered bit(V,i) leaf (itself a bf_and node) as a plain subterm of
- * another reconstructed bf_and/bf_or would let that flattening shatter it
- * into its raw (unregistered) variable and mask constant. Combining BDD
- * refs directly, one leaf at a time, avoids ever re-emitting such a term.
+ * variable is the fresh variable @p vars holds for that bit (see
+ * bit_variables), built via from_bit. Combining BDD refs directly, one leaf
+ * at a time, keeps every bit a decision variable of its own.
  * At a bv constant leaf, evaluates bit i directly to the T/F terminal.
  * Declines (returns std::nullopt) on anything else -- casts, unresolved
  * recurrence calls, non-bv content -- rather than guess.
@@ -109,13 +156,13 @@ using bit_slice_memo = std::unordered_map<std::pair<tref, size_t>,
  * @tparam node Node type
  * @param t The (bf-wrapped) term to slice
  * @param i Bit index (0 = least significant)
- * @param o Bit-level variable order (see quantify_aux_vars)
+ * @param vars The bits of the variables that may be met
  * @param memo (t, i) -> BDD memo
  * @return The bit-i BDD, or std::nullopt if t cannot be sliced
  */
 template<NodeType node>
 static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
-	size_t i, const typename term_handle<node>::order& o,
+	size_t i, const bit_variables_of<node>& vars,
 	bit_slice_memo<node>& memo)
 {
 	using tau = tree<node>;
@@ -126,29 +173,27 @@ static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
 		return it->second;
 	std::optional<ref> res;
 	switch (tau::get(t).get_type()) {
-		case tau::bf: res = bit_slice<node>(tau::trim(t), i, o, memo); break;
+		case tau::bf: res = bit_slice<node>(tau::trim(t), i, vars, memo); break;
 		case tau::bf_and: case tau::bf_or: case tau::bf_xor: {
 			const tau& tt = tau::get(t);
-			auto l = bit_slice<node>(tt.first(), i, o, memo);
-			auto r = l ? bit_slice<node>(tt.second(), i, o, memo)
+			auto l = bit_slice<node>(tt.first(), i, vars, memo);
+			auto r = l ? bit_slice<node>(tt.second(), i, vars, memo)
 				: std::nullopt;
 			if (!l || !r) break;
-			if (tt.is(tau::bf_and)) res = tbdd::bdd_and(*l, *r, o);
-			else if (tt.is(tau::bf_or)) res = tbdd::bdd_or(*l, *r, o);
-			else res = tbdd::bdd_or(
-				tbdd::bdd_and(*l, tbdd::bdd_not(*r), o),
-				tbdd::bdd_and(tbdd::bdd_not(*l), *r, o), o);
+			if (tt.is(tau::bf_and)) res = tbdd::bdd_and(*l, *r);
+			else if (tt.is(tau::bf_or)) res = tbdd::bdd_or(*l, *r);
+			else res = tbdd::bdd_xor(*l, *r);
 			break;
 		}
 		case tau::bf_neg: {
-			auto c = bit_slice<node>(tau::get(t).first(), i, o, memo);
+			auto c = bit_slice<node>(tau::get(t).first(), i, vars, memo);
 			if (c) res = tbdd::bdd_not(*c);
 			break;
 		}
 		case tau::variable: {
-			tref leaf = tau::trim(bit<node>(tau::get(tau::bf, t),
-				static_cast<int_t>(i)));
-			if (o.find(leaf) != o.end()) res = tbdd::from_bit(leaf);
+			if (auto it = vars.find(t); it != vars.end()
+				&& i < it->second->bits.size())
+				res = tbdd::from_bit(it->second->bits[i].first);
 			break;
 		}
 		case tau::ba_constant: {
@@ -190,13 +235,13 @@ static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
  *
  * @tparam node Node type
  * @param f The (wff-wrapped) formula to build a BDD for
- * @param o Bit-level variable order (see quantify_aux_vars)
+ * @param vars The bits of the variables that may be met (see bit_slice)
  * @param memo bit_slice's memo, shared across the whole call
  * @return The BDD reference, or std::nullopt on decline
  */
 template<NodeType node>
 static std::optional<typename tau_term_bdd<node>::ref> build_wff_bdd(tref f,
-	const typename term_handle<node>::order& o, bit_slice_memo<node>& memo)
+	const bit_variables_of<node>& vars, bit_slice_memo<node>& memo)
 {
 	using tau = tree<node>;
 	using tbdd = tau_term_bdd<node>;
@@ -217,47 +262,47 @@ static std::optional<typename tau_term_bdd<node>::ref> build_wff_bdd(tref f,
 		typename tbdd::refs bits;
 		bits.reserve(bitwidth);
 		for (size_t i = 0; i < bitwidth; ++i) {
-			auto s = bit_slice<node>(x, i, o, memo);
+			auto s = bit_slice<node>(x, i, vars, memo);
 			if (!s) return std::nullopt;
 			bits.push_back(tbdd::bdd_not(*s));
 		}
-		return tbdd::bdd_and_many(std::move(bits), o);
+		return tbdd::bdd_and_many(std::move(bits));
 	};
 
 	switch (tau::get(f).get_type()) {
-		case tau::wff: return build_wff_bdd<node>(tau::trim(f), o, memo);
+		case tau::wff: return build_wff_bdd<node>(tau::trim(f), vars, memo);
 		case tau::wff_t: return tbdd::T;
 		case tau::wff_f: return tbdd::F;
 		case tau::wff_and: {
 			typename tbdd::refs clauses;
 			for (tref c : get_cnf_wff_clauses<node>(f)) {
-				auto r = build_wff_bdd<node>(c, o, memo);
+				auto r = build_wff_bdd<node>(c, vars, memo);
 				if (!r) return std::nullopt;
 				clauses.push_back(*r);
 			}
-			return tbdd::bdd_and_many(std::move(clauses), o);
+			return tbdd::bdd_and_many(std::move(clauses));
 		}
 		case tau::wff_or: {
 			typename tbdd::refs clauses;
 			for (tref d : get_dnf_wff_clauses<node>(f)) {
-				auto r = build_wff_bdd<node>(d, o, memo);
+				auto r = build_wff_bdd<node>(d, vars, memo);
 				if (!r) return std::nullopt;
 				clauses.push_back(*r);
 			}
-			return tbdd::bdd_or_many(std::move(clauses), o);
+			return tbdd::bdd_or_many(std::move(clauses));
 		}
 		case tau::wff_neg: {
-			auto r = build_wff_bdd<node>(tau::get(f).first(), o, memo);
+			auto r = build_wff_bdd<node>(tau::get(f).first(), vars, memo);
 			if (!r) return std::nullopt;
 			return tbdd::bdd_not(*r);
 		}
 		case tau::wff_equiv: {
 			const tau& tf = tau::get(f);
-			auto a = build_wff_bdd<node>(tf.first(), o, memo);
+			auto a = build_wff_bdd<node>(tf.first(), vars, memo);
 			if (!a) return std::nullopt;
-			auto b = build_wff_bdd<node>(tf.second(), o, memo);
+			auto b = build_wff_bdd<node>(tf.second(), vars, memo);
 			if (!b) return std::nullopt;
-			return tbdd::bdd_ite(*a, *b, tbdd::bdd_not(*b), o);
+			return tbdd::bdd_ite(*a, *b, tbdd::bdd_not(*b));
 		}
 		case tau::bf_eq: {
 			const tau& tf = tau::get(f);
@@ -282,18 +327,20 @@ static std::optional<typename tau_term_bdd<node>::ref> build_wff_bdd(tref f,
  * so their term-AND is identically zero. (Sanity check: phi = "bit 0 of V
  * is 1"; the term route yields bit(V,0) wrapped `= 0`, asserting the
  * opposite.) This instead rebuilds the disjunction of guarded branches at
- * the formula level: for a decision on leaf v = bit(V, i) with branches
- * high/low, ( !(v=0) && high ) || ( (v=0) && low ), using the same
- * zero-test atom shape blasting already builds elsewhere (is_bit_zero /
+ * the formula level: for a decision on the bit variable of v = bit(V, i)
+ * with branches high/low, ( !(v=0) && high ) || ( (v=0) && low ), using the
+ * same zero-test atom shape blasting already builds elsewhere (is_bit_zero /
  * is_bit_one). Memoized by BDD ref.
  *
  * @tparam node Node type
  * @param x BDD reference to convert
+ * @param atom_of The bit atom each bit variable stands for
  * @param memo BDD ref -> wff memo
  * @return The equivalent wff
  */
 template<NodeType node>
 static tref bdd_to_wff(typename tau_term_bdd<node>::ref x,
+	const auto& atom_of,
 	std::unordered_map<typename tau_term_bdd<node>::ref, tref>& memo)
 {
 	using tau = tree<node>;
@@ -303,9 +350,9 @@ static tref bdd_to_wff(typename tau_term_bdd<node>::ref x,
 	if (x == tbdd::F) return _F<node>();
 	if (const auto it = memo.find(x); it != memo.end()) return it->second;
 
-	tref v = tau::get(tau::bf, tbdd::get_var(x));
-	tref hw = bdd_to_wff<node>(tbdd::get_high(x), memo);
-	tref lw = bdd_to_wff<node>(tbdd::get_low(x), memo);
+	tref v = atom_of(tbdd::get_var(x));
+	tref hw = bdd_to_wff<node>(tbdd::get_high(x), atom_of, memo);
+	tref lw = bdd_to_wff<node>(tbdd::get_low(x), atom_of, memo);
 
 	tref pos = tau::build_wff_neg(tau::build_bf_eq_0(v)); // is_bit_one shape
 	tref neg = tau::build_bf_eq_0(v);                     // is_bit_zero shape
@@ -353,8 +400,8 @@ static size_t bdd_node_count(typename tau_term_bdd<node>::ref x,
 }
 
 /**
- * @brief Collects the decision variables (bit(V,i) trefs) reachable from a
- * BDD -- its support.
+ * @brief Collects the decision variables (bit variables, see bit_variables)
+ * reachable from a BDD -- its support.
  *
  * Used by quantify_aux_vars to schedule per-BIT early quantification: a
  * plain visited-node walk, same traversal shape as bdd_node_count, deduping
@@ -440,11 +487,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	// disjunctions and many atoms, and naive atom-by-atom Boole
 	// decomposition scales combinatorially with atom count where BDD
 	// elimination does not.
-	typename term_handle<node>::order ord;
-	for (size_t i = 0; i < vars.size(); ++i)
-		ord.emplace(changes[vars[vars.size() - 1 - i]],
-			static_cast<int_t>(i));
-	tref result = resolve_quantifiers2<node>(res, ord, eliminability<node>::none());
+	tref result = resolve_quantifiers2<node>(res, eliminability<node>::none());
 
 	// resolve_quantifiers2's fast path only handles a single-atom body;
 	// blasted arithmetic's conjunction of carry/definition constraints
@@ -467,10 +510,11 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	if (!stuck) return result;
 
 	// Collect every bv-typed variable occurring in the renamed body (aux
-	// images and any surviving free variables alike) and register each
-	// one's bits as BDD decision variables, bit-major/variable-minor (all
-	// vars' bit i adjacent), so a variable narrower than the widest one
-	// present is simply absent from the higher ranks.
+	// images and any surviving free variables alike) and take each one's
+	// bits as BDD decision variables, ranked bit-major/variable-minor (all
+	// vars' bit i adjacent) as the library orders them, so a variable
+	// narrower than the widest one present is simply absent from the
+	// higher ranks.
 	tref body = res;
 	for (size_t i = 0; i < vars.size(); ++i) body = tau::get(body)[0].second();
 	trefs occurring;
@@ -479,30 +523,37 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		if (is<node, tau::variable>(m)
 			&& is_bv_type_family<node>(tau::get(m).get_ba_type())
 			&& seen.insert(m).second)
-			occurring.push_back(m);
+			occurring.push_back(tau::trim_right_sibling(m));
 		return true;
 	};
 	pre_order<node>(body).visit_unique(collect_vars);
-	std::vector<std::pair<tref, size_t>> widths;
+	bit_variables_of<node> bit_vars;
 	size_t max_bitwidth = 0;
 	for (tref w : occurring) {
 		size_t bw = get_bv_type_bitwidth<node>(w);
-		if (bw == 0) return result; // not actually bv-typed; bail out safely
-		widths.emplace_back(w, bw);
+		// not actually bv-typed, or wider than the bit ids reach: bail
+		// out safely
+		if (bw == 0 || bw > minted_bits::max_bits) return result;
+		bit_vars.emplace(w, &bit_variables<node>(w, bw));
 		max_bitwidth = std::max(max_bitwidth, bw);
 	}
-	typename term_handle<node>::order bit_ord;
-	subtree_set<node> aux_bits;
-	subtree_unordered_map<node, tref> bit_owner;
+	std::ranges::sort(occurring, {}, [&bit_vars](tref w) {
+		return bit_vars.at(w)->slot; });
+	// Per bit variable: its rank, the variable it is a bit of, its atom,
+	// and whether that variable is an aux image.
+	struct bit_info {
+		int_t rank;
+		tref owner;
+		tref atom;
+		bool aux;
+	};
+	subtree_unordered_map<node, bit_info> bit_of;
 	int_t rank = 0;
 	for (size_t i = 0; i < max_bitwidth; ++i)
-		for (const auto& [w, bw] : widths)
-			if (i < bw) {
-				tref b = tau::trim(bit<node>(tau::get(tau::bf, w), (int_t)i));
-				bit_ord.emplace(b, rank++);
-				bit_owner.emplace(b, w);
-				if (aux_images.contains(w)) aux_bits.insert(b);
-			}
+		for (tref w : occurring)
+			if (const auto& bits = bit_vars.at(w)->bits; i < bits.size())
+				bit_of.emplace(bits[i].first, bit_info{ rank++, w,
+					bits[i].second, aux_images.contains(w) });
 
 	// Early quantification, at per-BIT granularity: fold the top-level
 	// conjuncts in batches (see the batching loop below) instead of
@@ -524,13 +575,13 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	// ~k and k+1), so each bit can be closed shortly after its last use,
 	// keeping the live BDD frontier short.
 	//
-	// Conjuncts' BDDs are built once, upfront (bit_ord is already fixed),
-	// so their actual support -- the decision variables they reach -- is
-	// known before conjuncts are ordered into batches. Order: sorted by
-	// the HIGHEST bit_ord rank in each conjunct's support, lowest rank as
-	// a tie-break, original position as a final tie-break. Since bit_ord
-	// assigns ranks bit-major (all variables' bit i before any variable's
-	// bit i+1), sorting by highest support rank tracks chain adjacency: a
+	// Conjuncts' BDDs are built once, upfront (the ranks are already
+	// fixed), so their actual support -- the decision variables they reach
+	// -- is known before conjuncts are ordered into batches. Order: sorted
+	// by the HIGHEST rank in each conjunct's support, lowest rank as a
+	// tie-break, original position as a final tie-break. Since the ranks
+	// are bit-major (all variables' bit i before any variable's bit i+1),
+	// sorting by highest support rank tracks chain adjacency: a
 	// conjunct touching only bit i sorts near other bit-i/(i+1)
 	// conjuncts, and a wide-spanning conjunct sorts after every conjunct
 	// that could still shorten its support once folded in.
@@ -542,7 +593,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	std::vector<typename tbdd::ref> conjunct_bdds;
 	conjunct_bdds.reserve(conjuncts.size());
 	for (tref c : conjuncts) {
-		auto cbdd = build_wff_bdd<node>(c, bit_ord, slice_memo);
+		auto cbdd = build_wff_bdd<node>(c, bit_vars, slice_memo);
 		if (!cbdd) return result; // decline path: keep today's result
 		conjunct_bdds.push_back(*cbdd);
 	}
@@ -552,18 +603,18 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		collect_bdd_support<node>(conjunct_bdds[k], supports[k], seen);
 	}
 
-	const int_t no_bit = static_cast<int_t>(bit_ord.size()); // sorts last
+	const int_t no_bit = rank; // sorts last
 	std::vector<std::tuple<int_t, int_t, size_t>> ranked;
 	ranked.reserve(conjuncts.size());
 
 	// Branch-aware conjunct grouping. Global rank-only order interleaves
-	// independent aux-var chains bit-by-bit (bit_ord is bit-major across
+	// independent aux-var chains bit-by-bit (the ranks are bit-major across
 	// ALL occurring variables), so a shared producer feeding two
 	// downstream consumer chains keeps BOTH chains' carry/borrow bits
 	// simultaneously live for most of the fold -- `running` then carries
 	// their joint state, which is what grows geometrically. Fix: identify
 	// which aux var each conjunct "defines" -- the aux bit with the
-	// highest bit_ord rank in its support, sound because a recurrence
+	// highest rank in its support, sound because a recurrence
 	// conjunct's output bit always outranks its inputs (bit-major: a
 	// higher bit index always outranks any bit at a lower or equal
 	// index) -- group conjuncts by that owner, and schedule whole groups
@@ -583,12 +634,12 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		int_t max_rank = -1, min_rank = no_bit, aux_max_rank = -1;
 		tref aux_owner = nullptr;
 		for (tref b : supports[k]) {
-			int_t r = bit_ord.at(b);
-			max_rank = std::max(max_rank, r);
-			min_rank = std::min(min_rank, r);
-			if (aux_bits.contains(b) && r > aux_max_rank) {
-				aux_max_rank = r;
-				aux_owner = bit_owner.at(b);
+			const bit_info& bi = bit_of.at(b);
+			max_rank = std::max(max_rank, bi.rank);
+			min_rank = std::min(min_rank, bi.rank);
+			if (bi.aux && bi.rank > aux_max_rank) {
+				aux_max_rank = bi.rank;
+				aux_owner = bi.owner;
 			}
 		}
 		if (supports[k].empty()) max_rank = min_rank = no_bit;
@@ -612,7 +663,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	// Producer -> consumer edges: group g depends on every other aux var
 	// whose bits g's own conjuncts reference -- but only those that are
 	// themselves a real group (own at least one conjunct as their
-	// argmax-rank owner). An aux var can be referenced via bit_owner
+	// argmax-rank owner). An aux var can be referenced via a bit's owner
 	// without ever being any conjunct's argmax owner (e.g. its own
 	// defining conjunct's argmax happens to be a different, more
 	// downstream aux var's bit) -- such a var has no conjuncts of its
@@ -623,8 +674,8 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		subtree_set<node> d;
 		for (size_t k : groups.at(g))
 			for (tref b : supports[k])
-				if (aux_bits.contains(b))
-					if (tref o = bit_owner.at(b); o != g && groups.contains(o))
+				if (const bit_info& bi = bit_of.at(b); bi.aux)
+					if (tref o = bi.owner; o != g && groups.contains(o))
 						d.insert(o);
 		deps.emplace(g, trefs(d.begin(), d.end()));
 	}
@@ -670,20 +721,18 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 
 	// Last conjunct (in the sorted/fold order) whose support reaches each
 	// aux bit -- that's when it becomes safe to existentially close that
-	// bit. Only bits in aux_bits (aux-variable images) are ever tracked
-	// here, so free-variable bits are never targeted for elimination.
+	// bit. Only aux-variable images' bits are ever tracked here, so
+	// free-variable bits are never targeted for elimination. A bit absent
+	// from every conjunct's support has nothing to eliminate: the BDD
+	// never mentions it in the first place.
 	std::unordered_map<tref, size_t> last_use_bit;
 	for (size_t j = 0; j < ranked.size(); ++j) {
 		size_t k = std::get<2>(ranked[j]);
 		for (tref b : supports[k])
-			if (aux_bits.contains(b)) last_use_bit[b] = j;
+			if (bit_of.at(b).aux) last_use_bit[b] = j;
 	}
 	std::vector<trefs> elim_at(ranked.size());
-	for (tref b : aux_bits)
-		if (auto it = last_use_bit.find(b); it != last_use_bit.end())
-			elim_at[it->second].push_back(b);
-		// Absent from every conjunct's support: nothing to eliminate, the
-		// BDD never mentions this bit in the first place.
+	for (const auto& [b, j] : last_use_bit) elim_at[j].push_back(b);
 
 	// Defensive budget: 500k unique BDD nodes. TAU_CACHE is off in Debug
 	// (project convention), so bdd_and/bdd_ex recursion has no memo to
@@ -789,16 +838,17 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		}
 		size_t estimate = new_members_estimate(new_members);
 		if (estimate > NODE_BUDGET) return result;
-		running = tbdd::bdd_and_many(std::move(batch), bit_ord);
+		running = tbdd::bdd_and_many(std::move(batch));
 		if (over_budget_after_fold(running, estimate)) return result;
 		if (!elim_at[j].empty()) {
-			running = tbdd::bdd_ex(running, elim_at[j], bit_ord);
+			running = tbdd::bdd_ex(running, elim_at[j]);
 			if (over_budget(running)) return result;
 		}
 		batch_start = j + 1;
 	}
 	std::unordered_map<typename tbdd::ref, tref> wff_memo;
-	return bdd_to_wff<node>(running, wff_memo);
+	auto atom_of = [&bit_of](tref b) { return bit_of.at(b).atom; };
+	return bdd_to_wff<node>(running, atom_of, wff_memo);
 }
 
 /**

@@ -46,8 +46,7 @@ template<NodeType node>
 tref anti_prenex(tref formula, const eliminability<node>& el);
 
 template<NodeType node>
-tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
-	const eliminability<node>& el);
+tref resolve_quantifiers2(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.

@@ -138,19 +138,17 @@ TEST_SUITE("leaf_clause direct calls") {
 
 	TEST_CASE("a T clause is returned unchanged") {
 		tref x = tau::get(parse("ex x x = 0."))[0].first();
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_T(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{});
 		CHECK( tau::get(res).equals_T() );
 	}
 
 	TEST_CASE("an F clause is returned unchanged") {
 		tref x = tau::get(parse("ex x x = 0."))[0].first();
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_F(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{});
 		CHECK( tau::get(res).equals_F() );
 	}
 
@@ -172,9 +170,8 @@ TEST_SUITE("leaf_clause direct calls") {
 		auto conjs = get_cnf_wff_clauses<node_t>(body);
 		auto el = analyse_block<node_t>(block, conjs,
 			analysis_context<node_t>{});
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, block, el, order);
+			body, block, el);
 		REQUIRE( res != nullptr );
 		// The reference and exactly one surviving binder remain.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
@@ -240,9 +237,8 @@ TEST_SUITE("leaf_clause direct calls") {
 		CHECK( tau::get(binder_block[0]) == tau::get(v) );
 		auto elim = production_style_elim(el, { v });
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim);
 		REQUIRE( res != nullptr );
 		// The binder survives -- no solver decision was reached.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
@@ -266,9 +262,8 @@ TEST_SUITE("leaf_clause direct calls") {
 		CHECK( tau::get(binder_block[0]) == tau::get(v) );
 		auto elim = production_style_elim(el, { v });
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim);
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 		CHECK( !tau::get(res).equals_T() );
@@ -295,9 +290,8 @@ TEST_SUITE("leaf_clause direct calls") {
 		CHECK( tau::get(binder_block[0]) == tau::get(v) );
 		auto elim = production_style_elim(el, { v });
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim);
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}

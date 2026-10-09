@@ -6,31 +6,26 @@
 #include "normalizer.h"
 TEST_SUITE("AntiPrenexBlock") {
 	// Helper: peel the leading ex-quantifier prefix into a block,
-	// innermost variable gets the lowest order index
-	static std::tuple<tref, trefs, term_handle<node_t>::order> peel_block(
-		tref fm)
-	{
+	// outermost variable first
+	static std::pair<tref, trefs> peel_block(tref fm) {
 		trefs block;
-		term_handle<node_t>::order order;
 		while (tau::get(fm)[0].is(tau::wff_ex)) {
 			block.push_back(tau::get(fm)[0].first());
 			fm = tau::get(fm)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
-		return {fm, block, order};
+		return {fm, block};
 	}
 
 	// Helper: run anti_prenex_block on a parsed "ex ... (...)" sample
 	static std::pair<tref, size_t> run_apb(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
-		auto [body, block, order] = peel_block(fm);
+		auto [body, block] = peel_block(fm);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order, eliminability<node_t>::bv_only());
+			used_atms, quant_pattern, eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
 
@@ -41,13 +36,13 @@ TEST_SUITE("AntiPrenexBlock") {
 	static std::pair<tref, size_t> run_apb_norm(const char* sample) {
 		tref fm = normalize_atomic_formula_operators<node_t>(
 			get_nso_rr(sample).value().main->get());
-		auto [body, block, order] = peel_block(fm);
+		auto [body, block] = peel_block(fm);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order,
+			used_atms, quant_pattern,
 			eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
@@ -877,16 +872,12 @@ TEST_SUITE("BooleAtomAnalysis") {
 }
 
 TEST_SUITE("ResolveQuantifiers2Binders") {
-	TEST_CASE("a binder absent from the order is left in place") {
-		// ex x ex y (xy = 0) with an order covering only the outer
-		// variable. bdd_quant can only eliminate what it finds in the
-		// order, so stripping the whole prefix leaves the uncovered
-		// variable free in the resulting term. It must stay bound.
+	TEST_CASE("no binder's variable is left free") {
+		// ex x ex y (xy = 0): stripping a prefix whose variable the
+		// quantification does not reach would leave it free in the
+		// resulting term. It must stay bound.
 		tref fm = get_nso_rr("ex x ex y (xy = 0).").value().main->get();
-		tref outer = tau::trim2(fm);
-		term_handle<node_t>::order order;
-		order.emplace(outer, 0);
-		tref res = resolve_quantifiers2<node_t>(fm, order,
+		tref res = resolve_quantifiers2<node_t>(fm,
 			eliminability<node_t>::bv_only());
 		// Whatever was eliminated, no variable may have leaked free.
 		CHECK( get_free_vars<node_t>(res).size()
@@ -903,9 +894,8 @@ TEST_SUITE("QuantBlockPush") {
 		fm = tau::get(fm)[0].second();
 		quant_block.push_back(tau::get(fm)[0].first());
 		fm = tau::get(fm)[0].second();
-		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(fm, quant_block,
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{});
 		// tau::get(res).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
 	}
@@ -971,20 +961,17 @@ TEST_SUITE("Gamma4Guard") {
 		tref fm = normalize_atomic_formula_operators<node_t>(
 			get_nso_rr(sample).value().main->get());
 		trefs block;
-		term_handle<node_t>::order order;
 		tref body = fm;
 		while (tau::get(body)[0].is(tau::wff_ex)) {
 			block.push_back(tau::get(body)[0].first());
 			body = tau::get(body)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block, used_atms,
-			quant_pattern, order, eliminability<node_t>::bv_only());
+			quant_pattern, eliminability<node_t>::bv_only());
 		const trefs& fv = get_free_vars<node_t>(res);
 		for (tref v : block) {
 			tref tv = tau::trim_right_sibling(v);
@@ -1163,14 +1150,11 @@ TEST_SUITE("Gamma1NegatedBranch") {
 	static tref g1_core(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
 		trefs block;
-		term_handle<node_t>::order order;
 		tref body = fm;
 		while (tau::get(body)[0].is(tau::wff_ex)) {
 			block.push_back(tau::get(body)[0].first());
 			body = tau::get(body)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
 		body = normalize_atomic_formula_operators<node_t>(body);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> qp;
@@ -1181,7 +1165,7 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		const block_eliminability<node_t> elim = analyse_block<node_t>(
 			block, get_cnf_wff_clauses<node_t>(body), ac);
 		return anti_prenex_block<node_t>(body, block, used_atms, qp,
-			order, eliminability<node_t>::bv_only(), sl, elim);
+			eliminability<node_t>::bv_only(), sl, elim);
 	}
 
 	// The named free variable of @p fm -- the PARSED node, since a node

@@ -53,14 +53,12 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
  * @param clause Clause to eliminate over.
  * @param block Block variables, outermost first.
  * @param elim Verdicts for @p block against @p clause's conjuncts.
- * @param order BDD variable order for the block.
  * @return Clause with the eliminable part of the block removed and the frozen
  * part re-wrapped around only its own conjuncts.
  */
 template <NodeType node>
 tref eliminate_block_over_clause(tref clause, const trefs& block,
-	const block_eliminability<node>& elim,
-	const typename term_handle<node>::order& order);
+	const block_eliminability<node>& elim);
 
 } // namespace idni::tau_lang
 

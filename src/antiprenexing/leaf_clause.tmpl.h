@@ -55,11 +55,9 @@ bool is_squeezable_conjunct(tref conj) {
 /** @internal @copydoc eliminate_block_over_clause @endinternal */
 template <NodeType node>
 tref eliminate_block_over_clause(tref clause, const trefs& block,
-	const block_eliminability<node>& elim,
-	const typename term_handle<node>::order& order)
+	const block_eliminability<node>& elim)
 {
 	using tau = tree<node>;
-	(void) order; // reserved: the squeezes below build their own orders
 
 	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
 		return clause;
