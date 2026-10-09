@@ -54,10 +54,10 @@ inline size_t max_flag_search_steps = 500;
  * @return A hash of the current values; equal values give equal hashes.
  */
 template <NodeType node>
-size_t verdict_budget_fingerprint() {
-	size_t seed = 0;
-	auto mix = [&seed](size_t v) {
-		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+uint64_t verdict_budget_fingerprint() {
+	uint64_t seed = 0;
+	auto mix = [&seed](uint64_t v) {
+		seed ^= v + grcprime + (seed << 6) + (seed >> 2);
 	};
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
@@ -2029,8 +2029,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	// The continuation depends on the runtime budgets (fixpoint and flag
 	// search steps, the synthesis knobs, the algebras' options); a change
 	// between two queries must not return the first one's result.
-	static size_t cache_budget = verdict_budget_fingerprint<node>();
-	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
+	static uint64_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const uint64_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
 		universal_cache.clear();
 		guarded_cache.clear();
@@ -2702,8 +2702,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// LTL(ABA) caps and knobs, the algebras' options) can change the
 	// verdict: `sat φ`, `set fixpointsteps 0`, `sat φ` must not return the
 	// first query's answer. Drop the entries whenever the budgets moved.
-	static size_t cache_budget = verdict_budget_fingerprint<node>();
-	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
+	static uint64_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const uint64_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
 		cache.clear();
 		undecided.clear();

@@ -30,10 +30,12 @@
 #include "boolean_algebras/nso_ba.h"
 #include "logging.h"
 #include "ltl_aba_limits.h"
+#include "utility/hashing.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <memory>
@@ -108,9 +110,9 @@ inline size_t max_cover_products() { return max_cover_products_param; }
  * @param seed Initial hash value.
  * @return @p seed mixed with every verdict-relevant limit.
  */
-inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
-	auto mix = [&seed](size_t v) {
-		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
+	auto mix = [&seed](uint64_t v) {
+		seed ^= v + grcprime + (seed << 6) + (seed >> 2);
 	};
 	mix(max_consistency_subsets());
 	mix(max_cover_products());

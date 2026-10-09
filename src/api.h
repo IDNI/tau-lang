@@ -32,6 +32,7 @@
 #include "tau_memory_budget.h"
 #include "reset_hooks.h"
 
+#include <cstdint>
 #include <span>
 
 namespace idni::tau_lang {
@@ -72,7 +73,7 @@ struct option_change_guard {
 	option_change_guard& operator=(const option_change_guard&) = delete;
 private:
 	/// Fingerprint recorded on entry.
-	size_t before;
+	uint64_t before;
 };
 
 /**

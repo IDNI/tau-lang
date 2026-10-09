@@ -11,10 +11,12 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <utility>
 #include <variant>
 
+#include "utility/hashing.h"
 #include "utility/options.h"
 #include "tau_diagnostics.h"
 
@@ -51,10 +53,10 @@ inline option_hook ba_option_hook(option_hook own = {}) {
 }
 
 /// @p seed mixed with @ref ba_options_generation.
-inline std::size_t ba_options_fingerprint(std::size_t seed = 0) {
-	const std::size_t g =
+inline std::uint64_t ba_options_fingerprint(std::uint64_t seed = 0) {
+	const std::uint64_t g =
 		ba_options_generation.load(std::memory_order_relaxed);
-	return seed ^ (g + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+	return seed ^ (g + grcprime + (seed << 6) + (seed >> 2));
 }
 
 } // namespace idni::tau_lang

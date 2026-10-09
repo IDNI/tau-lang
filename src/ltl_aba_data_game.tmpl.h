@@ -577,7 +577,7 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 	// algebras' options steer, so a change of either drops the entries
 	static std::mutex known_mutex;
 	static std::map<std::pair<std::string, size_t>, size_t> known;
-	static size_t known_budget = ltl_verdict_budget_fingerprint(
+	static uint64_t known_budget = ltl_verdict_budget_fingerprint(
 		ba_options_fingerprint());
 	static const bool reset_registered = (on_reset([] {
 		std::lock_guard lock(known_mutex);
@@ -599,7 +599,7 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 	};
 	{
 		std::lock_guard lock(known_mutex);
-		if (const size_t fp = ltl_verdict_budget_fingerprint(
+		if (const uint64_t fp = ltl_verdict_budget_fingerprint(
 				ba_options_fingerprint());
 			fp != known_budget) { known.clear(); known_budget = fp; }
 		if (auto it = known.find({ name, max }); it != known.end()) {

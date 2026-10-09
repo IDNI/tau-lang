@@ -379,9 +379,9 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	// The verdict depends on the QE free-variable cap (below) and on how
 	// the algebras decide the atoms; a change of either between two queries
 	// must not return the old answer.
-	static size_t cache_budget = ltl_verdict_budget_fingerprint(
+	static uint64_t cache_budget = ltl_verdict_budget_fingerprint(
 		ba_options_fingerprint());
-	if (const size_t fp = ltl_verdict_budget_fingerprint(
+	if (const uint64_t fp = ltl_verdict_budget_fingerprint(
 			ba_options_fingerprint());
 		fp != cache_budget) { cache.clear(); cache_budget = fp; }
 	if (auto it = cache.find(fm); it != cache.end())

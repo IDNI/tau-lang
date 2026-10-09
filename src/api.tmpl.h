@@ -84,10 +84,10 @@ namespace api_detail {
 // Every runtime option that can change what a normalization or a decision
 // computes: the verdict fingerprint and the knobs outside it.
 template <NodeType node>
-size_t semantic_options_fingerprint() {
-	size_t seed = verdict_budget_fingerprint<node>();
-	auto mix = [&seed](size_t v) {
-		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+uint64_t semantic_options_fingerprint() {
+	uint64_t seed = verdict_budget_fingerprint<node>();
+	auto mix = [&seed](uint64_t v) {
+		seed ^= v + grcprime + (seed << 6) + (seed >> 2);
 	};
 	mix(block_boole_max_splits);
 	mix(block_max_rounds);
@@ -120,7 +120,7 @@ option_change_guard<node>::option_change_guard()
 
 template <NodeType node>
 option_change_guard<node>::~option_change_guard() {
-	const size_t after = api_detail::semantic_options_fingerprint<node>();
+	const uint64_t after = api_detail::semantic_options_fingerprint<node>();
 	if (after != before) tree<node>::clear_caches();
 	semantic_options_seen<node> = after;
 }

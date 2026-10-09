@@ -20,6 +20,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <string_view>
@@ -254,19 +255,19 @@ inline const option_set tau_core_option_set{ {
 } };
 
 namespace api_detail {
-template <NodeType node> size_t semantic_options_fingerprint();
+template <NodeType node> uint64_t semantic_options_fingerprint();
 }
 
 /// The semantic fingerprint after the last option write. A hook runs after
 /// its write only, so this is what it compares against.
 template <NodeType node>
-inline size_t semantic_options_seen = 0;
+inline uint64_t semantic_options_seen = 0;
 
 /// The hook of every core option: what `option_change_guard` does around
 /// an api setter, for a write by name.
 template <NodeType node>
 void clear_caches_on_semantic_change() {
-	const size_t now = api_detail::semantic_options_fingerprint<node>();
+	const uint64_t now = api_detail::semantic_options_fingerprint<node>();
 	if (now != semantic_options_seen<node>) tree<node>::clear_caches();
 	semantic_options_seen<node> = now;
 }

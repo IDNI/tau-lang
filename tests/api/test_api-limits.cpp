@@ -280,7 +280,7 @@ TEST_SUITE("Tau API - runtime limits") {
 	// Both new caps can change a verdict (decided vs UNKNOWN), so the memos
 	// must see them move.
 	TEST_CASE("refinement and window caps are part of the budget fingerprint") {
-		const size_t base = verdict_budget_fingerprint<node_t>();
+		const uint64_t base = verdict_budget_fingerprint<node_t>();
 		const size_t s3 = ltl_max_refinement_rounds_param;
 		const size_t s4 = ltl_window_max_paths_param;
 		tau_api::set_ltl_max_refinement_rounds(
@@ -297,7 +297,7 @@ TEST_SUITE("Tau API - runtime limits") {
 	// change a verdict; the memo cap is in the fingerprint as a budget of
 	// the same game.
 	TEST_CASE("data game caps are part of the budget fingerprint") {
-		const size_t base = verdict_budget_fingerprint<node_t>();
+		const uint64_t base = verdict_budget_fingerprint<node_t>();
 		const size_t s1 = ltl_data_game_max_nodes_param;
 		const size_t s2 = ltl_data_game_max_memo_param;
 		tau_api::set_ltl_data_game_max_nodes(
@@ -329,7 +329,7 @@ TEST_SUITE("Tau API - runtime limits") {
 			CAPTURE( vars[i] );
 			const size_t saved = *params[i];
 			*params[i] = 12;
-			const size_t base = verdict_budget_fingerprint<node_t>();
+			const uint64_t base = verdict_budget_fingerprint<node_t>();
 			CHECK( load_env_with(vars[i], "13") );
 			CHECK( verdict_budget_fingerprint<node_t>() != base );
 			*params[i] = 12;
@@ -341,7 +341,7 @@ TEST_SUITE("Tau API - runtime limits") {
 	// The verdict memos are keyed on the formula; the budget fingerprint
 	// is what tells them a runtime budget moved in between.
 	TEST_CASE("verdict budget fingerprint moves with every budget") {
-		const size_t base = verdict_budget_fingerprint<node_t>();
+		const uint64_t base = verdict_budget_fingerprint<node_t>();
 		const size_t saved_fp = max_fixpoint_steps;
 		const size_t saved_fl = max_flag_search_steps;
 		const size_t saved_cs = max_consistency_subsets_param;
@@ -386,12 +386,12 @@ TEST_SUITE("Tau API - runtime limits") {
 			CAPTURE(spec.name);
 			// the key reads back as set or unset, not as itself
 			if (spec.name == "nlang-api-key") continue;
-			const size_t before = verdict_budget_fingerprint<node_t>();
+			const uint64_t before = verdict_budget_fingerprint<node_t>();
 			REQUIRE( repo.set(spec.name, repo.value(spec.name))
 				.has_value() );
 			CHECK( verdict_budget_fingerprint<node_t>() != before );
 		}
-		const size_t base = verdict_budget_fingerprint<node_t>();
+		const uint64_t base = verdict_budget_fingerprint<node_t>();
 		const bool saved = preprocessing;
 		tau_api::set_preprocessing(!saved);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
@@ -706,7 +706,7 @@ TEST_SUITE("Tau API - runtime limits") {
 	TEST_CASE("the new verdict caps are part of the budget fingerprint") {
 		const size_t s1 = ltl_max_observations_param;
 		const size_t s2 = ltl_data_game_max_combinations_param;
-		const size_t base = verdict_budget_fingerprint<node_t>();
+		const uint64_t base = verdict_budget_fingerprint<node_t>();
 		tau_api::set_ltl_max_observations(3);
 		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_max_observations_param = s1;

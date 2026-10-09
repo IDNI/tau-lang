@@ -424,9 +424,9 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 	TEST_CASE("the constant size budget is part of the options fingerprint")
 	{
 		const size_t saved = max_constant_size;
-		const size_t before = api_detail::semantic_options_fingerprint<node_t>();
+		const uint64_t before = api_detail::semantic_options_fingerprint<node_t>();
 		api<node_t>::set_max_constant_size(saved + 17);
-		const size_t after = api_detail::semantic_options_fingerprint<node_t>();
+		const uint64_t after = api_detail::semantic_options_fingerprint<node_t>();
 		api<node_t>::set_max_constant_size(saved);
 		CHECK(before != after);
 	}
