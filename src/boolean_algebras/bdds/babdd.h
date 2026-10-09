@@ -406,12 +406,13 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	 * every shifted instance; the cached result is stored rebased the
 	 * same way and is rebased back to the query's level on a hit.
 	 * Variants: (x) rebases by x's own top variable; (x, v) also
-	 * rebases the quantified variable v; (x, y) rebases both operands
-	 * by their common reference level d (the first variable in the
-	 * BDD order: max of the shifts with INV_ORDER, min otherwise), so
-	 * only the operands' relative offset is keyed. Without shifters
-	 * the keys are used as-is. check_cache returns true on a hit and
-	 * replaces x with the (rebased) cached result.
+	 * rebases the quantified variable v, in unsigned arithmetic so that
+	 * a v above the top wraps and keeps its own key; (x, y) rebases
+	 * both operands by their common reference level d (the first
+	 * variable in the BDD order: max of the shifts with INV_ORDER, min
+	 * otherwise), so only the operands' relative offset is keyed.
+	 * Without shifters the keys are used as-is. check_cache returns
+	 * true on a hit and replaces x with the (rebased) cached result.
 	 */
 	static bool check_cache(bdd_ref& x, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
@@ -436,7 +437,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -463,7 +464,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 					{bdd_ref::to_cache_node(x, x.shift),
-					 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
+					 x.shift + 1 - v}); it != cache.end()) {
 				x = bdd_ref::from_cache_node(it->second, x.shift);
 				return true;
 			} else return false;
@@ -486,8 +487,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(move(x), move(r));
@@ -497,10 +497,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_cache_node(x, x.shift),
-					      abs((int_t)v - x.shift - 1)},
+					      x.shift + 1 - v},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -510,13 +509,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_cache_node(x, d),
 					      bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			uint_t d = min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
@@ -1098,7 +1096,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -1125,7 +1123,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 				{bdd_ref::to_cache_node(x, x.shift),
-				 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
+				 x.shift + 1 - v}); it != cache.end()) {
 				x = bdd_ref::from_cache_node(it->second, x.shift);
 				return true;
 			} else return false;
@@ -1148,8 +1146,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(move(x), move(r));
@@ -1159,10 +1156,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 				bdd_ref::to_cache_node(x, x.shift),
-				abs((int_t)v - x.shift - 1)},
+				x.shift + 1 - v},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -1172,13 +1168,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 				bdd_ref::to_cache_node(x, d),
 				bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			auto d = std::min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),

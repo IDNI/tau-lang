@@ -205,3 +205,42 @@ TEST_SUITE("quantify") {
 		}
 	}
 }
+
+TEST_SUITE("descending variable order") {
+	TEST_CASE("quantifying a variable above the top does not answer for one "
+		"below it") {
+		constexpr auto o = bdd_options<INV_IN | INV_OUT | VARSHIFT
+			| INV_ORDER>::create();
+		using engine = bdd<Bool, o>;
+		using handle = bdd_handle<Bool, o>;
+		bdd_init<Bool, o>();
+		auto var = [](uint_t v) {
+			return handle::get(engine::add(v, engine::T, engine::F));
+		};
+		// The top of x5·x3 is 5. Variable 7 lies above it and 3 below,
+		// and their shifted cache keys differ.
+		const hbdd<Bool, o> f = var(5) & var(3);
+		CHECK((f->ex(7) == f));
+		CHECK((f->ex(3) == var(5)));
+		CHECK((f->all(7) == f));
+		CHECK((f->all(3) == handle::hfalse));
+	}
+
+	TEST_CASE("variables as far above the top as below it keep apart") {
+		constexpr auto o = bdd_options<INV_IN | INV_OUT | VARSHIFT
+			| INV_ORDER>::create();
+		using engine = bdd<Bool, o>;
+		using handle = bdd_handle<Bool, o>;
+		bdd_init<Bool, o>();
+		auto var = [](uint_t v) {
+			return handle::get(engine::add(v, engine::T, engine::F));
+		};
+		// The cache keys of x6·x2 count from 7: variable 8 lies one step
+		// above it, the top 6 one step below.
+		const hbdd<Bool, o> g = var(6) & var(2);
+		CHECK((g->ex(8) == g));
+		CHECK((g->ex(6) == var(2)));
+		CHECK((g->all(8) == g));
+		CHECK((g->all(6) == handle::hfalse));
+	}
+}
