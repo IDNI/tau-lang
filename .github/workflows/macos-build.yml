@@ -23,11 +23,15 @@ jobs:
 
       # Every dependency resolves from the store, which builds a missing
       # package with the preset's AppleClang.
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-15-${{ github.sha }}
           restore-keys: |
             tau-store-macos-15-
@@ -69,5 +73,8 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}

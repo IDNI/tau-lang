@@ -705,11 +705,15 @@ jobs:
         with:
           arch: x64
 
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-windows-latest-${{ github.sha }}
           restore-keys: |
             tau-store-windows-latest-
@@ -734,7 +738,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   # The name holds no matrix value: GitHub appends (clang-cl) itself, and a
@@ -778,7 +785,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-windows-latest-${{ github.sha }}
           restore-keys: |
             tau-store-windows-latest-
@@ -826,7 +836,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-arm64-${{ github.sha }}
           restore-keys: |
             tau-store-macos-arm64-
@@ -852,7 +865,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   macos-arm64:
@@ -874,7 +890,10 @@ jobs:
       - name: Restore the dependency store (~/.tau/store)
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-arm64-${{ github.sha }}
           fail-on-cache-miss: true
 
@@ -968,7 +987,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-x86_64-${{ github.sha }}
           restore-keys: |
             tau-store-macos-x86_64-
@@ -994,7 +1016,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   macos-x86_64:
@@ -1016,7 +1041,10 @@ jobs:
       - name: Restore the dependency store (~/.tau/store)
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-x86_64-${{ github.sha }}
           fail-on-cache-miss: true
 

@@ -100,11 +100,15 @@ jobs:
 
       # The store is content-addressed; a restored entry is reused and a miss
       # is built here with the preset's own AppleClang.
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-15-debug-${{ github.sha }}
           restore-keys: |
             tau-store-macos-15-
@@ -129,7 +133,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Run tau

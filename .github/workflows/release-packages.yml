@@ -290,11 +290,15 @@ jobs:
 
       # The store is content-addressed; a miss is built with the preset's
       # AppleClang and reused by the next run.
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-15-${{ github.sha }}
           restore-keys: |
             tau-store-macos-15-
@@ -338,7 +342,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       # upload-artifact globs literally and will not expand ~,
@@ -382,7 +389,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-15-${{ github.sha }}
           restore-keys: |
             tau-store-macos-15-
@@ -430,7 +440,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
@@ -482,7 +495,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-windows-latest-${{ github.sha }}
           restore-keys: |
             tau-store-windows-latest-
@@ -513,7 +529,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
@@ -556,7 +575,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-x86_64-${{ github.sha }}
           restore-keys: |
             tau-store-macos-x86_64-
@@ -600,7 +622,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate macOS packages
@@ -638,7 +663,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-macos-x86_64-${{ github.sha }}
           restore-keys: |
             tau-store-macos-x86_64-
@@ -686,7 +714,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
@@ -739,7 +770,10 @@ jobs:
         id: cache-store
         uses: actions/cache/restore@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: tau-store-windows-latest-${{ github.sha }}
           restore-keys: |
             tau-store-windows-latest-
@@ -767,7 +801,10 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: ~/.tau/store
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       # upload-artifact reads a Windows path, not the Git Bash form of $HOME.
