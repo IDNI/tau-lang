@@ -6,9 +6,9 @@
  * each procedure means; the comments here say how it is built.
  *
  * The pieces come from the files below: `parts` (§6) for every grouping,
- * `norm_equation`, `term_of`, `simplify_term` and `simplify_atom` (§3) for the
- * rewrite, `discharge` (§7) for every quantified atom that goes out, the
- * result joins (§3) for every formula, and `rewrap` (§3) for what is frozen.
+ * `norm_equation`, `term_of` and `simplify_atom` (§3) for the rewrite,
+ * `discharge` (§7) for every quantified atom that goes out, the result joins
+ * (§3) for every formula, and `rewrap` (§3) for what is frozen.
  * The union of a list of terms is the hooked binary `build_bf_or`; what feeds
  * `discharge` alone needs only the representation step of `simplify_term`'s
  * BDD regime, not its leaf sweep or cofactor check.
@@ -176,7 +176,7 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 		r.comps.push_back(component<node>{ F, std::move(p.vars) });
 	}
 	// `f = ⋃_k F_k` over pairwise disjoint `X_k`, the whole positive part.
-	r.f = simplify_term<node>(build_bf_or<node>(terms, type), order);
+	r.f = build_bf_or<node>(terms, type);
 	return r;
 }
 

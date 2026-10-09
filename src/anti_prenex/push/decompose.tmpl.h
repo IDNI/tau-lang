@@ -98,7 +98,7 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 	for (tref a : cands)
 		if (!fold_decided<node>({ a }, X, c))
 			return push_block<node>(simplify<node>(
-				subst_atom<node>(psi, a, false), c.order), X, c);
+				subst_atom<node>(psi, a, false), c.order, c.P), X, c);
 
 	// THE LICENCE on BUILT cofactors of the touched region,
 	// `Σ|m[a ↦ T]| + |m[a ↦ F]| ≤ Σ|m| + Σ|m|/4` in integers: the
@@ -171,7 +171,7 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 
 	join_builder<node, false> acc;
 	for (const auto& [phi, Y] : arms) {
-		tref r = simplify<node>(phi, c.order);
+		tref r = simplify<node>(phi, c.order, c.P);
 		// An arm folded to a constant is no case, and is inserted as it
 		// stands.
 		if (!tau::get(r).equals_T() && !tau::get(r).equals_F()) {

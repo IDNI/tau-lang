@@ -209,16 +209,8 @@ template <NodeType node>
 struct propagation {
 	using tau = tree<node>;
 
-	propagation(const var_order<node>& order, bool ref_args)
-		: order(order), ref_args(ref_args)
-	{
-		// §1: the block in scope IS the live order's key set. Sorted,
-		// so that the pass reads the same whatever order the map hands
-		// its keys out in.
-		X.reserve(order.size());
-		for (const auto& [var, rank] : order) X.push_back(var);
-		std::sort(X.begin(), X.end(), tau::subtree_less);
-	}
+	propagation(const var_order<node>& order, const block& X, bool ref_args)
+		: order(order), X(X), ref_args(ref_args) {}
 
 	tref run(tref phi) {
 		auto f = [this](tref n) { return down(n); };
@@ -306,8 +298,8 @@ private:
 		subtree_pair_equal<node, size_t>>;
 
 	const var_order<node>& order;
+	const block& X;
 	const bool ref_args;
-	block X;
 
 	/// THE PIN ENVIRONMENT: the admitted pins, the active ones in
 	/// `substitute`'s own parameter form, and the two sums the cap
@@ -735,12 +727,14 @@ private:
 } // namespace detail
 
 template <NodeType node>
-tref simplify(tref phi, const var_order<node>& order, bool ref_args) {
+tref simplify(tref phi, const var_order<node>& order, const block& X,
+	bool ref_args)
+{
 	DBG(assert(phi != nullptr);)
 	// A term input has nothing to propagate — the traversal's continuation
 	// predicate stops on it and hands it back — and goes straight to the
 	// sweep.
-	const tref propagated = detail::propagation<node>(order, ref_args)
+	const tref propagated = detail::propagation<node>(order, X, ref_args)
 		.run(phi);
 	return syntactic_path_simplification_unchanged_negations<node>(
 		propagated);

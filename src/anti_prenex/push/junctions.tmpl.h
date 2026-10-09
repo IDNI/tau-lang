@@ -158,7 +158,7 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 			// (§3), and the copy is simplified where it is built.
 			const tref b = simplify<node>(subst_var<node>(
 				simplified_and_join<node>({ d, cw->rest }),
-				x, t, c.order), c.order);
+				x, t, c.order), c.order, c.P);
 			if (acc.insert(push_block<node>(b, rest_of_X, c)))
 				break;
 		}

@@ -12,7 +12,7 @@
  * (foundations/subst.h) for a tree's literal-wise fold, the result joins
  * (normalisers/joins.h) for every assembly, `simplify`
  * (normalisers/simplify.h) at the case edge, `canonically_factored_neg` with
- * `normalize_operators` (normalisers/nnf.h) for a complement,
+ * `holds_fused_operator` (normalisers/nnf.h) for a complement,
  * `check_time_limit` (foundations/ctx.h) per case, and `push_block` — the
  * hub, `push/push_block.h` — for every case.
  */
@@ -181,7 +181,8 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 		// DEEP over `E`, the exclusions and the member alone: the other
 		// disjunctive conjuncts meet the exclusions at their own expansion.
 		const tref cc = simplify<node>(
-			simplified_and_join<node>(concat(*E, excl, *dc)), c.order);
+			simplified_and_join<node>(concat(*E, excl, *dc)),
+			c.order, c.P);
 		if (tau::get(cc).equals_F()) continue;
 		// The wrapper narrows `X` and strips what the case decided about
 		// free variables; `T` decides the ∨-join (∃'s short-circuit).
@@ -190,9 +191,9 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 				break;
 		// The later cases exclude `d`'s worlds, unless its complement
 		// would add positive case structure.
-		const tref e = normalize_operators<node>(
-			canonically_factored_neg<node>(
-				tau::trim_right_sibling(d)));
+		const tref e = canonically_factored_neg<node>(
+			tau::trim_right_sibling(d));
+		DBG(assert(!holds_fused_operator<node>(e));)
 		if (is_conjoinable<node>(e)) excl.push_back(e);
 	}
 	// Every case dead is the empty join, `F`.

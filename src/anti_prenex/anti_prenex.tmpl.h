@@ -64,7 +64,7 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf,
 		//    (§3).
 		phi = resolve_functional_quantifiers_plain<node>(phi, kf);
 		phi = to_canonically_factored_nnf<node>(phi);
-		phi = simplify<node>(phi, {}, true);
+		phi = simplify<node>(phi, {}, {}, true);
 		// 2. The deep witness pass, then the global simplification it
 		//    leaves to its caller (§3, `TRY_WITNESS_DEEP`).
 		const tref pre_witness = phi;

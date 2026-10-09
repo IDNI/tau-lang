@@ -616,7 +616,7 @@ TEST_CASE("WC6: the result stays BDD-backed over the rest of the block, and "
 	REQUIRE(is_child<node_t>(*r, tau::bf_eq));
 	CHECK(th::is_bdd_backed(sides(*r).first));
 	// SIMPLIFIED here (invariant 6): simplifying again changes nothing.
-	CHECK(ap::simplify<node_t>(*r, k.c.order) == *r);
+	CHECK(ap::simplify<node_t>(*r, k.c.order, k.c.P) == *r);
 	CHECK(are_nso_equivalent<node_t>(finished(*r), ex("x", finished(k.psi))));
 }
 

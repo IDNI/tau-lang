@@ -130,9 +130,11 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  *
  * @param phi      a `wff` node (a `bf` term is handed straight to the sweep,
  *                 which has nothing to propagate)
- * @param order    the live order (§1 `ctx.order`); its key set IS the block
- *                 `X` in scope. Empty in phases 1, 2 and 5, which makes the
- *                 propagation guard vacuous and every term plain
+ * @param order    the live order (§1 `ctx.order`); empty in phases 1, 2 and
+ *                 5, where every term is plain
+ * @param X        the block in scope, bound by the caller: the component's
+ *                 block inside a push or an elimination, empty in phases 1, 2
+ *                 and 5, which makes the propagation guard vacuous
  * @param ref_args phase 1's entry state, which ESTABLISHES invariant 6: every
  *                 atom goes through `SIMPLIFY_ATOM` whether the environment
  *                 changed it or not, and every reference argument through
@@ -142,7 +144,7 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  */
 template <NodeType node>
 tref simplify(tref phi, const var_order<node>& order = {},
-	bool ref_args = false);
+	const block& X = {}, bool ref_args = false);
 
 } // namespace idni::tau_lang::anti_prenexing
 

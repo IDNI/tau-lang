@@ -66,6 +66,14 @@ template <NodeType node>
 tref canonically_factored_neg(tref psi);
 
 /**
+ * @brief Does `phi` hold a `bf_neq`, or a negated or mirrored order operator
+ * (`≰ ≮ ≥ > ≱ ≯`)? Invariant 4 forbids all of them in NEG's output, so a
+ * `true` on one is a construction bug; it is the Debug assertion's predicate.
+ */
+template <NodeType node>
+bool holds_fused_operator(tref phi);
+
+/**
  * @brief §3 `NORMALIZE_OPERATORS(φ)`: `f ≠ 0 ↦ ¬(f = 0)` for every type, and
  * the six comparison rewrites (`≰ ≮ ≥ > ≱ ≯`) only where the operator denotes
  * ARITHMETIC comparison — today a bitvector type.

@@ -500,7 +500,7 @@ TEST_CASE("S12: reference arguments only under `ref_args`") {
 	// Opaque by default.
 	CHECK(ap::simplify<node_t>(ref) == ref);
 	// In phase 1's entry state the argument goes through SIMPLIFY_TERM.
-	tref got = ap::simplify<node_t>(ref, {}, true);
+	tref got = ap::simplify<node_t>(ref, {}, {}, true);
 	INFO("ref_args: ", tau::get(got).to_str());
 	CHECK(is_child<node_t>(got, tau::wff_ref));
 	CHECK(got != ref);
@@ -519,7 +519,7 @@ TEST_CASE("S12a: a reference INSIDE an atom's terms has its arguments "
 	REQUIRE(holds_parsed_var(atom, "y"));
 	// Opaque by default: the same node.
 	CHECK(ap::simplify<node_t>(atom) == atom);
-	tref got = ap::simplify<node_t>(atom, {}, true);
+	tref got = ap::simplify<node_t>(atom, {}, {}, true);
 	INFO("ref_args: ", tau::get(got).to_str());
 	CHECK(got != atom);
 	CHECK(is_child<node_t>(got, tau::bf_eq));
@@ -529,13 +529,13 @@ TEST_CASE("S12a: a reference INSIDE an atom's terms has its arguments "
 	// argument.
 	tref negated = tau::get("!(f(x & (x | y)) = 0)", parse_wff());
 	REQUIRE(negated != nullptr);
-	tref ngot = ap::simplify<node_t>(negated, {}, true);
+	tref ngot = ap::simplify<node_t>(negated, {}, {}, true);
 	INFO("negated: ", tau::get(ngot).to_str());
 	CHECK(is_child<node_t>(ngot, tau::wff_neg));
 	CHECK(!holds_parsed_var(ngot, "y"));
 	tref nested = tau::get("g(f(x & (x | y))) = 0", parse_wff());
 	REQUIRE(nested != nullptr);
-	tref nested_got = ap::simplify<node_t>(nested, {}, true);
+	tref nested_got = ap::simplify<node_t>(nested, {}, {}, true);
 	INFO("nested: ", tau::get(nested_got).to_str());
 	CHECK(!holds_parsed_var(nested_got, "y"));
 }

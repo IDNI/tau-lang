@@ -67,7 +67,7 @@ tref nnf(tref n) { return ap::to_canonically_factored_nnf<node_t>(n); }
 /// run in.
 tref pipeline(tref phi) {
 	return ap::normalize_operators<node_t>(
-		ap::simplify<node_t>(nnf(phi), {}, true));
+		ap::simplify<node_t>(nnf(phi), {}, {}, true));
 }
 
 /// Invariant 4 over a whole formula: no `bf_neq` and no negated or mirrored
@@ -277,7 +277,7 @@ TEST_CASE("L5b: the same example in the BDD regime") {
 	// The preparation must have backed a term, or this case would only
 	// repeat the plain one.
 	REQUIRE(holds(prepared, tau::BDD_ID));
-	tref got = ap::simplify<node_t>(prepared, o);
+	tref got = ap::simplify<node_t>(prepared, o, P);
 	// The propagation runs on the plain pinning equation (`X`-free, as
 	// §3's orientation rule demands) and rewrites the BDD-backed target
 	// through the library's compose: both its cofactors become `t`, the

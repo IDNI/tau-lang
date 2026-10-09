@@ -16,7 +16,7 @@
  * `fv_meets`, `fv_intersect` and `members` (foundations/dag.h) with
  * `simplified_and_join` (normalisers/joins.h) and `rewrap`
  * (foundations/prims.h) for the size acceptance, and
- * `canonically_factored_neg` with `normalize_operators` (normalisers/nnf.h)
+ * `canonically_factored_neg` with `holds_fused_operator` (normalisers/nnf.h)
  * for the dualisation.
  */
 
@@ -148,10 +148,12 @@ template <NodeType node>
 tref process_block(const run<node>& blk, const keep_functional_fn<node>& kf) {
 	if (blk.kind != tau_term_bdd<node>::all)
 		return push_ex_block<node>(blk.matrix, blk.vars, kf);
-	const tref body = normalize_operators<node>(
-		canonically_factored_neg<node>(blk.matrix));
+	const tref body = canonically_factored_neg<node>(blk.matrix);
+	DBG(assert(!holds_fused_operator<node>(body));)
 	const tref r = push_ex_block<node>(body, blk.vars, kf);
-	return normalize_operators<node>(canonically_factored_neg<node>(r));
+	const tref negated = canonically_factored_neg<node>(r);
+	DBG(assert(!holds_fused_operator<node>(negated));)
+	return negated;
 }
 
 } // namespace idni::tau_lang::anti_prenexing

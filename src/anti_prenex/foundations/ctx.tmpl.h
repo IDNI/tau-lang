@@ -31,6 +31,7 @@ ctx<node> ctx<node>::for_component(const block& P, ba_type_id type,
 	// are provisional and tunable).
 	ctx c;
 	c.type = type;
+	c.P = P;
 	c.keep_functional = keep_functional;
 	// §5: `ctx.order ← { P[i] ↦ |P|-i }` (inner → LOWER) and
 	// `ctx.prio ← { P[i] ↦ i+1 }` (inner → HIGHER), both over ranks

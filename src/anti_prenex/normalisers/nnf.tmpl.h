@@ -172,6 +172,18 @@ tref canonically_factored_neg(tref psi) {
 }
 
 template <NodeType node>
+bool holds_fused_operator(tref phi) {
+	using tau = tree<node>;
+	return tau::get(phi).find_top([](tref m) {
+		const auto& t = tau::get(m);
+		return t.is(tau::bf_neq) || t.is(tau::bf_nlt)
+			|| t.is(tau::bf_nlteq) || t.is(tau::bf_gt)
+			|| t.is(tau::bf_gteq) || t.is(tau::bf_ngt)
+			|| t.is(tau::bf_ngteq);
+	}) != nullptr;
+}
+
+template <NodeType node>
 tref normalize_operators(tref phi) {
 	DBG(assert(phi != nullptr);)
 	return normalize_atomic_formula_operators<node, true, true>(phi);

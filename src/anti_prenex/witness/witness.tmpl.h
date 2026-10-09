@@ -75,16 +75,16 @@ std::optional<pin<node>> best_pin(const trefs& cs, Match&& match) {
 /// witness in EVERY conjunct, THE PINNING ONE INCLUDED — its image is the
 /// residual `p = 0`, `T` for a strict pin, so no site emits a residual of its
 /// own — and the result is SIMPLIFIED (invariant 6). One substitution over
-/// `ψ` reaches every conjunct. `order` is the mode's: empty for the spelled
-/// one, `ctx.order` for the COF one.
+/// `ψ` reaches every conjunct. `order` and `X` are the mode's: empty for the
+/// spelled one, `ctx.order` and `ctx.P` for the COF one.
 template <NodeType node, typename Search>
 std::optional<tref> witness_with(tref x, tref psi,
-	const var_order<node>& order, Search&& search)
+	const var_order<node>& order, const block& X, Search&& search)
 {
 	const std::optional<pin<node>> best = search(get_cnf_wff_clauses<node>(psi));
 	if (!best) return {};
 	return simplify<node>(
-		subst_var<node>(psi, x, best->witness, order), order);
+		subst_var<node>(psi, x, best->witness, order), order, X);
 }
 
 /// The POSITIVE EQUATION the pin match reads off a spine member, in `Q`'s
@@ -276,7 +276,7 @@ std::optional<tref> try_witness(tref x, tref psi) {
 	DBG(assert(!holds_bdd_term<node>(psi));)
 	// The SPELLED match on every conjunct, under the empty order: phase 2 is
 	// the plain regime, where nothing is BDD-backed.
-	return witness_with<node>(x, psi, {}, [x](const trefs& cs) {
+	return witness_with<node>(x, psi, {}, {}, [x](const trefs& cs) {
 		return best_pin<node>(cs,
 			[x](tref m) { return find_pin_for<node>(m, x); });
 	});
@@ -291,9 +291,8 @@ std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c) {
 	// The same tail over the COF match (§6), under the component's order:
 	// the substitution rewrites a BDD-backed conjunct through the library's
 	// compose, and the pinning conjunct's image is the residual `p = 0`.
-	return witness_with<node>(x, psi, c.order, [x, &c](const trefs& cs) {
-		return cof_pin_in<node>(cs, x, c);
-	});
+	return witness_with<node>(x, psi, c.order, c.P,
+		[x, &c](const trefs& cs) { return cof_pin_in<node>(cs, x, c); });
 }
 
 // --- TRY_WITNESS_DEEP, phase 2's deep pass ---------------------------------------
