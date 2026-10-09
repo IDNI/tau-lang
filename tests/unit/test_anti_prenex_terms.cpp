@@ -63,6 +63,13 @@ bool same_function(tref a, tref b) {
 		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
+/// §7 DISCHARGE's keep-mode emission of @p chain: the chain BUILT, which
+/// slides it to its subscripts' levels, emitted like every other term.
+tref emitted(tref chain) {
+	return th::convert_to_tau_node_or_term(th(tb::build_bdd(chain)),
+		find_ba_type<node_t>(chain));
+}
+
 /// The prefix of the chain node a `keep_functional_fn` is handed (fwd.h),
 /// outermost first with the kinds: what §3 says `keep` reads off that node.
 tb::quants prefix_of(tref chain) { return ap::strip_chain<node_t>(chain).first; }
@@ -182,9 +189,9 @@ TEST_CASE("finish_terms: the round trip of prepare_terms gives the formula "
 
 TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") {
 	tref x = vr("x");
-	// §7 `DISCHARGE`'s keep-mode emission: a chain over the component's own
-	// stored BDD. `FINISH_TERMS` does NOT resolve it — it spells the body
-	// out, in the plain regime's normal form, and the chain stands.
+	// A chain over a stored BDD. `FINISH_TERMS` does NOT resolve it — it
+	// spells the body out, in the plain regime's normal form, and the chain
+	// stands.
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"))).first;
 	REQUIRE(th::is_bdd_backed(l));
 	const tref atm = build_bf_eq_0<node_t>(
@@ -282,24 +289,42 @@ TEST_CASE("quantify_over over all the decision variables: meet / join of the lea
 
 // 4. a chain in a BDD, and RESOLVE_FUNCTIONAL ----------------------------------
 
-TEST_CASE("prepare_terms: a functional-quantifier chain is one leaf") {
+TEST_CASE("prepare_terms: the library slides a functional quantifier to its subscripts' levels") {
 	tref x = vr("x");
-	// ∀_y (x·y ∪ x′·z): the chain, body and all, is ONE LEAF, so the side
-	// does not branch and stays plain, the chain in canonical form
+	// ∀_y (x·y ∪ x′·z) = x·∀_y y ∪ x′·∀_y z = x′·z: the parser gives `y` a
+	// canonical id, which sorts below the free `x` and `z`, and the closed
+	// piece `y` folds
 	tref l = sides(ap::prepare_terms<node_t>(
 		wff("fall y (x & y | x' & z) = 0"))).first;
-	CHECK(!th::is_bdd_backed(l));
-	CHECK(ap::carries_functional_quantifier<node_t>(l));
-	// `x` hides in that leaf
-	trefs lfv = ap::leaf_fv<node_t>(l);
-	CHECK(std::binary_search(lfv.begin(), lfv.end(), x, tau::subtree_less));
-	// beside a decision variable the chain hangs under it as a leaf
+	REQUIRE(th::is_bdd_backed(l));
+	CHECK(ref_of(l) == tb::build_bdd(bf("x' & z")));
+	CHECK(!ap::carries_functional_quantifier<node_t>(l));
+	// a piece holding a free variable in a leaf stays a chain:
+	// ∀_y ∃_w (x·y·w·r(v) ∪ x′·z) → x·∀_y ∃_w (y·w·r(v)) ∪ x′·z. The chain
+	// keeps the parser's canonical ids, which no parse string reproduces,
+	// so it is compared binder by binder and its body as a function.
+	tref n = sides(ap::prepare_terms<node_t>(
+		wff("fall y fex w (x & y & w & r(v) | x' & z) = 0"))).first;
+	REQUIRE(th::is_bdd_backed(n));
+	CHECK(ap::carries_functional_quantifier<node_t>(n));
+	{
+		tref got = ap::cofactor<node_t>(n, x, true);
+		tref want = bf("fall y fex w (y & w & r(v))");
+		auto var  = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].first()); };
+		auto body = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].second()); };
+		REQUIRE(tau::get(got).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(var(got), var(want)));
+		tref got_in = body(got), want_in = body(want);
+		REQUIRE(tau::get(got_in).child_is(tau::bf_fex));
+		CHECK(tau::subtree_equals(var(got_in), var(want_in)));
+		CHECK(same_function(body(got_in), body(want_in)));
+	}
+	CHECK(same_function(ap::cofactor<node_t>(n, x, false), bf("z")));
+	// beside a decision variable a chain slides too: x·∀_y (y ∪ z) = x·z
 	tref m = sides(ap::prepare_terms<node_t>(
 		wff("x & fall y (y | z) = 0"))).first;
 	REQUIRE(th::is_bdd_backed(m));
-	CHECK(tau::subtree_equals(ap::cofactor<node_t>(m, x, true),
-		bf("fall y (y | z)")));
-	CHECK(tau::get(ap::cofactor<node_t>(m, x, false)).equals_0());
+	CHECK(ref_of(m) == tb::build_bdd(bf("x & z")));
 }
 
 TEST_CASE("carries_functional_quantifier: plain, and in a BDD-backed term's leaves") {
@@ -354,7 +379,7 @@ TEST_CASE("resolve_functional_quantifiers_plain: plain, nested, hazard, keep") {
 	CHECK(same_function(r3, bf("z & u")));
 }
 
-TEST_CASE("resolve_functional_quantifiers: a chain inside a BDD-backed term's leaf") {
+TEST_CASE("resolve_functional_quantifiers_plain: a chain anywhere inside a term") {
 	tref y = vr("y");
 	// x·(∀y (y ∪ z)) ∪ x′·w. The ENTRY pass finds the chain wherever it
 	// sits, and resolving it gives x·z ∪ x′·w.
@@ -364,92 +389,6 @@ TEST_CASE("resolve_functional_quantifiers: a chain inside a BDD-backed term's le
 	tref plain = ap::resolve_functional_quantifiers_plain<node_t>(t);
 	CHECK(!ap::carries_functional_quantifier<node_t>(plain));
 	CHECK(same_function(plain, bf("x & z | x' & w")));
-	// PREPARED, the chain is a LEAF — and the close never enters a leaf,
-	// so the term comes back as the same node.
-	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t))).first;
-	REQUIRE(th::is_bdd_backed(l));
-	REQUIRE(ap::carries_functional_quantifier<node_t>(l));
-	CHECK(ap::resolve_functional_quantifiers_bdd<node_t>(l) == l);
-}
-
-TEST_CASE("resolve_functional_quantifiers_bdd: a whole-block chain over a stored BDD") {
-	tref x = vr("x"), y = vr("y");
-	tref node = th::convert_to_tau_node(bf("x & y & a | x' & b"));
-	REQUIRE(th::is_bdd_backed(node));
-	tb::ref s = th::convert_to_handle(node).get();
-	const size_t ty = find_ba_type<node_t>(node);
-	// one kind over the subscripts: one quantification on the stored ref,
-	// emitted like every other term
-	for (auto kind : { tb::all, tb::ex }) {
-		tref c = tb::build_functional_quantifiers(
-			{{ x, kind }, { y, kind }}, node);
-		REQUIRE(ap::carries_functional_quantifier<node_t>(c));
-		trefs v{ x, y };
-		tb::ref want = kind == tb::all ? tb::bdd_all(s, v)
-			: tb::bdd_ex(s, v);
-		CHECK(ap::resolve_functional_quantifiers_bdd<node_t>(c)
-			== th::convert_to_tau_node_or_term(th(want), ty));
-	}
-	// MIXED kinds: one same-kind run at a time, innermost first, whatever
-	// the order puts where
-	tb::quants qin {{ y, tb::all }, { x, tb::ex }};
-	tref cin = tb::build_functional_quantifiers(qin, node);
-	tref rin = ap::resolve_functional_quantifiers_bdd<node_t>(cin);
-	CHECK(rin == th::convert_to_tau_node_or_term(
-		th(tb::bdd_quant(s, qin)), ty));
-	CHECK(same_function(rin, bf("b")));   // ∀y ∃x = b
-	tb::quants qout {{ x, tb::ex }, { y, tb::all }};
-	tref rout = ap::resolve_functional_quantifiers_bdd<node_t>(
-		tb::build_functional_quantifiers(qout, node));
-	CHECK(same_function(rout, bf("b")));  // ∃x ∀y = b
-}
-
-TEST_CASE("resolve_functional_quantifiers_bdd: a whole-block emission over P") {
-	tref x = vr("x"), y = vr("y");
-	// `r(a) ∪ x·y·r(b)` over P = {x, y}: the leaves are `r(a)` and
-	// `r(a) ∪ r(b)`, so ∀x∀y is their meet and ∃x∃y their join. The chain
-	// binds all of P, which is keep mode's whole-block emission (§7
-	// DISCHARGE).
-	tref t = bf("r(a) | x & y & r(b)");
-	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t))).first;
-	REQUIRE(th::is_bdd_backed(l));
-	for (auto kind : { tb::all, tb::ex }) {
-		tref c = tb::build_functional_quantifiers(
-			{{ x, kind }, { y, kind }}, l);
-		REQUIRE(ap::carries_functional_quantifier<node_t>(c));
-		tref r = ap::resolve_functional_quantifiers_bdd<node_t>(c);
-		CHECK(!ap::carries_functional_quantifier<node_t>(r));
-		// nothing branches once all of P is quantified, so the result is
-		// emitted PLAIN: the meet or the join of the leaves, as the leaf
-		// product spells it, which the sweep reduces
-		CHECK(!th::is_bdd_backed(r));
-		CHECK(same_function(ap::simplify_term<node_t>(r),
-			kind == tb::all ? bf("r(a)") : bf("r(a) | r(b)")));
-	}
-}
-
-TEST_CASE("resolve_functional_quantifiers_bdd: a subscript hiding in a leaf keeps its binder") {
-	tref x = vr("x"), y = vr("y");
-	// `y ∪ r(x)`: `x` occurs inside a reference argument alone, which
-	// prepare_terms puts in a LEAF, so no quantification reaches it. ∀y is
-	// taken — ∀y (y ∪ r(x)) = r(x) — and ∀x stays over the result.
-	tref l = sides(ap::prepare_terms<node_t>(
-		build_bf_eq_0<node_t>(bf("y | r(x)")))).first;
-	REQUIRE(th::is_bdd_backed(l));
-	tref c = tb::build_functional_quantifiers(
-		{{ x, tb::all }, { y, tb::all }}, l);
-	tref r = ap::resolve_functional_quantifiers_bdd<node_t>(c);
-	CHECK(tau::subtree_equals(r, tb::build_functional_quantifiers(
-		{{ x, tb::all }}, bf("r(x)"))));
-}
-
-TEST_CASE("resolve_functional_quantifiers_bdd: a chain over a plain body stays") {
-	tref y = vr("y");
-	// A chain whose body is PLAIN is one whose BDD did not branch: every
-	// subscript of it sits in a leaf, and it stays.
-	tref c = tb::build_functional_quantifiers({{ y, tb::all }}, bf("y & r(y)"));
-	REQUIRE(ap::carries_functional_quantifier<node_t>(c));
-	CHECK(ap::resolve_functional_quantifiers_bdd<node_t>(c) == c);
 }
 
 TEST_CASE("resolve_functional_quantifiers_plain: a mixed nest is ONE unit of work") {
@@ -692,18 +631,22 @@ TEST_CASE("simplify_term: in the backed regime the BDD decides every variable") 
 	CHECK(same_function(s, bf("x & z | x' & w")));
 }
 
-TEST_CASE("simplify_term: a kept emission's stored BDD decides its variables already") {
+TEST_CASE("simplify_term: a kept emission's BDD decides its variables already") {
 	tref x = vr("x"), w = vr("w");
-	// §7 DISCHARGE's keep-mode emission over a stored BDD of
-	// `x·(w·u ∪ w′·u)`, which decides nothing over w: the stored BDD has no
-	// w node, and the emission comes back as it stands
-	tref stored = th::convert_to_tau_node(bf("x & (w & u | w' & u)"));
+	// §7 DISCHARGE's keep-mode emission of ∀x over the stored BDD of
+	// `a·(w·x·r(u) ∪ w′·x·r(u)) ∪ a′·b`, which decides nothing over w: the
+	// BDD has no w node, and the emission, slid to x's levels — `a` and `b`
+	// above, the piece `x·r(u)` one chain leaf — comes back as it stands
+	tref stored = th::convert_to_tau_node(
+		bf("a & (w & x & r(u) | w' & x & r(u)) | a' & b"));
 	REQUIRE(th::is_bdd_backed(stored));
-	const trefs& sfv = get_free_vars<node_t>(stored);
-	CHECK(!std::binary_search(sfv.begin(), sfv.end(), w, tau::subtree_less));
-	tref chain = tb::build_functional_quantifiers({{x, tb::all}}, stored);
-	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
-	CHECK(ap::simplify_term<node_t>(chain, ap::regime::backed) == chain);
+	tref e = emitted(tb::build_functional_quantifiers({{x, tb::all}}, stored));
+	REQUIRE(th::is_bdd_backed(e));
+	const trefs& fv = get_free_vars<node_t>(e);
+	CHECK(!std::binary_search(fv.begin(), fv.end(), w, tau::subtree_less));
+	CHECK(!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
+	CHECK(ap::carries_functional_quantifier<node_t>(e));
+	CHECK(ap::simplify_term<node_t>(e, ap::regime::backed) == e);
 }
 
 TEST_CASE("simplify_term: the check's result is emitted as it stands, so a second call may go further") {
@@ -773,43 +716,45 @@ TEST_CASE("simplify_atom: the joint decides what no hook can compare") {
 	CHECK(tau::get(ap::simplify_atom<node_t>(neq, ap::regime::backed)).equals_T());
 }
 
-TEST_CASE("simplify_term / simplify_atom: a keep-mode emission over a stored BDD (D11)") {
-	tref x = vr("x"), y = vr("y");
-	// §7 DISCHARGE in keep mode emits the whole block symbolically over
-	// the stored BDD: `∀x ∀y (bf(BDD_ID))`, not backed itself.
-	tref stored = th::convert_to_tau_node(bf("x & y | x' & z"));
+TEST_CASE("simplify_term / simplify_atom: a keep-mode emission is the slid chain (D11)") {
+	tref y = vr("y"), b = vr("b");
+	// §7 DISCHARGE in keep mode emits ∀y over the stored BDD SLID to y's
+	// levels: `b` stays a decision variable, and the piece under it,
+	// `y·r(a) ∪ y′·r(c)`, holding `a` and `c` free, is ONE chain leaf
+	tref stored = th::convert_to_tau_node(bf("b & (y & r(a) | y' & r(c))"));
 	REQUIRE(th::is_bdd_backed(stored));
-	tref chain = tb::build_functional_quantifiers(
-		{{x, tb::all}, {y, tb::all}}, stored);
+	tref chain = tb::build_functional_quantifiers({{y, tb::all}}, stored);
 	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
-	REQUIRE(ap::strip_chain<node_t>(chain).second == stored);
-	// the emission comes back as it stands, holding the SAME stored BDD
-	CHECK(ap::simplify_term<node_t>(chain, ap::regime::backed) == chain);
+	tref e = emitted(chain);
+	REQUIRE(th::is_bdd_backed(e));
+	tb::ref eb = ref_of(e);
+	CHECK(tau::subtree_equals(tb::get_var(eb), b));
+	REQUIRE(tb::leaf(tb::get_high(eb)));
+	CHECK(tau::get(tb::get_var_term(tb::get_high(eb))).child_is(tau::bf_fall));
+	CHECK(tb::get_low(eb) == tb::F);
+	// the emission comes back as it stands
+	CHECK(ap::simplify_term<node_t>(e, ap::regime::backed) == e);
 	// and so does the atom it rides in
-	tref atom = build_bf_eq_0<node_t>(chain);
-	REQUIRE(sides(atom).first == chain);
-	tref s = ap::simplify_atom<node_t>(atom, ap::regime::backed);
-	CHECK(s == atom);
-	CHECK(sides(s).first == chain);
-	CHECK(ap::strip_chain<node_t>(sides(s).first).second == stored);
+	tref atom = build_bf_eq_0<node_t>(e);
+	REQUIRE(sides(atom).first == e);
+	CHECK(ap::simplify_atom<node_t>(atom, ap::regime::backed) == atom);
 }
 
 TEST_CASE("simplify_term: the leaves INSIDE a kept emission are simplified") {
 	tref x = vr("x");
-	// the stored BDD's one leaf is `r(y)·(r(y)′ ∪ r(z))`, which the path
-	// sweep reduces to `r(y)·r(z)`; the chain around it is untouched
+	// ∀x over the stored BDD of x·ℓ, ℓ = r(y)·(r(y)′ ∪ r(z)), slides into
+	// ONE chain leaf over the piece `x·ℓ`; the path sweep reduces ℓ to
+	// r(y)·r(z) inside it, and the prefix stays
 	tref stored = th::convert_to_tau_node(
 		bf("x & (r(y) & (r(y)' | r(z)))"));
 	REQUIRE(th::is_bdd_backed(stored));
-	tref chain = tb::build_functional_quantifiers({{x, tb::all}}, stored);
-	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
-	tref got = ap::simplify_term<node_t>(chain, ap::regime::backed);
-	CHECK(got != chain);
+	tref e = emitted(tb::build_functional_quantifiers({{x, tb::all}}, stored));
+	REQUIRE(tau::get(e).child_is(tau::bf_fall));
+	tref got = ap::simplify_term<node_t>(e, ap::regime::backed);
+	CHECK(got != e);
 	REQUIRE(tau::get(got).child_is(tau::bf_fall));
-	CHECK(prefix_of(got) == prefix_of(chain));
-	tref gbody = ap::strip_chain<node_t>(got).second;
-	REQUIRE(th::is_bdd_backed(gbody));
-	tb::ref gb = ref_of(gbody);
+	CHECK(prefix_of(got) == prefix_of(e));
+	tb::ref gb = tb::build_bdd(ap::strip_chain<node_t>(got).second);
 	REQUIRE(!tb::leaf(gb));
 	CHECK(tau::subtree_equals(tb::get_var(gb), x));
 	REQUIRE(tb::leaf(tb::get_high(gb)));
@@ -819,19 +764,19 @@ TEST_CASE("simplify_term: the leaves INSIDE a kept emission are simplified") {
 }
 
 TEST_CASE("simplify_term: the sweep simplifies AROUND a kept emission") {
-	tref x = vr("x"), y = vr("y");
-	tref stored = th::convert_to_tau_node(bf("x & y | x' & z"));
-	tref chain = tb::build_functional_quantifiers(
-		{{x, tb::all}, {y, tb::all}}, stored);
-	// the emission is an opaque leaf to the sweep: it is its own key, so
-	// a repeat of it folds, `·0` folds, and a negation stays outside it
+	tref y = vr("y");
+	tref stored = th::convert_to_tau_node(bf("b & (y & r(a) | y' & r(c))"));
+	tref e = emitted(tb::build_functional_quantifiers({{y, tb::all}}, stored));
+	REQUIRE(th::is_bdd_backed(e));
+	// a repeat of it folds, `·0` folds, and its complement is the
+	// complemented BDD, the chain leaf untouched
 	CHECK(ap::simplify_term<node_t>(
-		build_bf_or<node_t>(chain, chain), ap::regime::backed) == chain);
-	CHECK(tau::get(ap::simplify_term<node_t>(build_bf_and<node_t>(chain,
-		tau::_0(find_ba_type<node_t>(chain))), ap::regime::backed)).equals_0());
-	tref neg = ap::simplify_term<node_t>(build_bf_neg<node_t>(chain), ap::regime::backed);
-	CHECK(has_bdd_id(neg));
-	CHECK(neg == build_bf_neg<node_t>(chain));
+		build_bf_or<node_t>(e, e), ap::regime::backed) == e);
+	CHECK(tau::get(ap::simplify_term<node_t>(build_bf_and<node_t>(e,
+		tau::_0(find_ba_type<node_t>(e))), ap::regime::backed)).equals_0());
+	tref neg = ap::simplify_term<node_t>(build_bf_neg<node_t>(e), ap::regime::backed);
+	REQUIRE(th::is_bdd_backed(neg));
+	CHECK(ref_of(neg) == tb::bdd_not(ref_of(e)));
 }
 
 // 7. term_of, norm_equation ---------------------------------------------------

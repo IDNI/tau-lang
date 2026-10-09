@@ -66,16 +66,18 @@ template <NodeType node>
 using prio_map = subtree_unordered_map<node, int_t>;
 
 /// §1 `keep_functional`: the ONE callback `ANTI_PRENEX` takes, a pure
-/// predicate on a NODE, asked once per site. Per CHAIN
-/// (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a
-/// component's close, §3) it is handed the canonical chain's term node —
-/// prefix outermost first with the kinds, body below it, both read off with
-/// `strip_chain` (terms.h).
+/// predicate on a NODE, asked once per site. Per CHAIN — every chain present
+/// at entry (`RESOLVE_FUNCTIONAL_PLAIN`, §3), and every chain §7 `DISCHARGE`
+/// emits in keep mode — it is handed the canonical chain's term node, prefix
+/// outermost first with the kinds, body below it, both read off with
+/// `strip_chain` (terms.h); a yes allows keeping the chain, never forces it.
 /// Per COMPONENT of a block (§5) it is handed `REWRAP(body, X)`: the ∃ wrap of
 /// the whole block, its variables outermost first, over the body as that
 /// component's setup finds it — the dualised matrix for a ∀ run, the earlier
 /// components' results already in place. A node, rather than a prefix or a
 /// variable list, so that the policy can look at what is quantified.
+/// CONTRACT: the callback never changes once set, every call passing the same
+/// one, so the memo keys carry the per-component flag alone.
 template <NodeType node>
 using keep_functional_fn = std::function<bool(tref)>;
 

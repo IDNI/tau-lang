@@ -69,6 +69,7 @@ std::vector<block> connected_components(const block& X, tref body);
  * plain, the dualised matrix for a ∀ run, the earlier components' results
  * already in place (§1). Two components of one block may be answered
  * differently, which is sound: every memo key carries its component's flag.
+ * In keep mode it is asked again on every chain `DISCHARGE` emits (`ctx.kf`).
  *
  * SIZE ACCEPTANCE (§5) is one test per component on the COMPLETED push: a
  * result whose tree count sits past both `accept_growth · |input|` and
@@ -77,11 +78,11 @@ std::vector<block> connected_components(const block& X, tref body);
  * taint event — the verdict is a pure function of the completed pair, and the
  * entries the discarded push wrote remain correct answers to their own keys.
  *
- * WHAT GOES OUT IS PLAIN: a component closes by resolving the functional
- * quantifiers `kf` does not keep while the terms are still BDDs, and then
- * spelling every backed term out canonically (§3 `FINISH_TERMS`) — in the
- * plain regime's normal form, the one phase 1 gives every atom, so what
- * leaves a component is spelled as the phases around the push spell theirs.
+ * WHAT GOES OUT IS PLAIN: every chain was decided at its emission (§7
+ * `DISCHARGE`), and a component closes by spelling every backed term out
+ * canonically (§3 `FINISH_TERMS`) — in the plain regime's normal form, the
+ * one phase 1 gives every atom, so what leaves a component is spelled as the
+ * phases around the push spell theirs.
  */
 template <NodeType node>
 tref push_ex_block(tref body, const block& X,

@@ -176,16 +176,11 @@ fixture make(const char* src, bool keep = false) {
 	return f;
 }
 
-/// THE HARNESS: `∃P.ψ` eliminated exactly as a component's caller does it —
-/// the block eliminated, and in KEEP MODE the component's close run over what
-/// came back, which resolves every chain `DISCHARGE` emitted (§7). @p emitted
-/// takes the result BEFORE that close, where the chains are still there.
-tref eliminated(fixture& f, tref* emitted = nullptr) {
-	const tref r = ap::eliminate_block<node_t>(f.clause, f.P, f.c);
-	if (emitted) *emitted = r;
-	if (!f.c.keep_functional) return r;
-	return ap::resolve_functional_quantifiers_bdd<node_t>(r,
-		ap::keep_no_functional<node_t>);
+/// THE HARNESS: `∃P.ψ` eliminated exactly as a component's caller does it.
+/// In KEEP MODE every chain is decided at its emission (§7 `DISCHARGE`), so
+/// nothing is left for the component's close.
+tref eliminated(fixture& f) {
+	return ap::eliminate_block<node_t>(f.clause, f.P, f.c);
 }
 
 /// What every eliminated clause claims: equivalent to `∃P.ψ`, no free
@@ -480,26 +475,30 @@ TEST_CASE("L17: a block variable hidden in a leaf freezes its component") {
 
 // --- keep mode ------------------------------------------------------------------------
 
-TEST_CASE("L18: keep mode emits the chain, and the close resolves it") {
-	// `DISCHARGE` under `ctx.keep_functional` spells the block instead of
-	// solving it: `pos` comes out as `∀_X F = 0` and a condition as
-	// `∃_X h ≠ 0`, both as functional-quantifier chains over the stored
-	// BDD. The component's close (`RESOLVE_FUNCTIONAL_BDD`) is one
-	// quantification per chain, and what it leaves is the non-keep answer.
+TEST_CASE("L18: keep mode emits the chain, and the emission decides it") {
+	// `DISCHARGE` under `ctx.keep_functional` builds the block's chain —
+	// `∀_X F` for a positive component, `∃_X h` for a condition — and asks
+	// `kf` ONCE on it as built. A yes allows keeping it, SLID to X's
+	// levels: `x` is a binder variable, below every free one, and every
+	// piece of these clauses is closed and folds (§1), so the answer is the
+	// non-keep one, with nothing kept.
 	for (const char* src : { "ex x (xy = 0 && xw != 0).",
 		"ex x (xy != 0 && xw != 0).",
 		"ex x (x a = 0 && !(x b = 0))." }) {
+		// A push the tables answer asks no callback.
+		ap::flush_solver_dependent<node_t>();
 		fixture plain = make(src);
 		fixture kept = make(src, true);
+		trefs asked;
+		const ap::keep_functional_fn<node_t> keep_all =
+			[&asked](tref n) { asked.push_back(n); return true; };
+		kept.c.kf = keep_all;
 		const tref want = eliminated(plain);
-		tref emitted = nullptr;
-		const tref got = eliminated(kept, &emitted);
-		// BEFORE the close: a chain of the block's own kind — `∀` for a
-		// positive component, `∃` for a negative's absorption term.
-		CHECK((holds(emitted, tau::bf_fall) || holds(emitted,
-			tau::bf_fex)));
-		CHECK(!same(emitted, want));
-		// AFTER it: the same answer, with nothing kept.
+		const tref got = eliminated(kept);
+		// asked on chains of the block's own kinds, as built
+		REQUIRE(!asked.empty());
+		for (tref n : asked)
+			CHECK(!ap::strip_chain<node_t>(n).first.empty());
 		check_against_source(got, kept);
 		check_resolved(got, kept);
 		CHECK(!holds(got, tau::bf_fall));

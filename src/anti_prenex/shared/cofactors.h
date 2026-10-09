@@ -6,13 +6,13 @@
  * meets the BDD backing a term — the memoised record of cofactoring one
  * variable out, and the emission of a whole quantified block as an atom.
  *
- * Both work on the §1 TERM REPRESENTATION (terms.h): a term prepared for a
- * component has exactly the component's block as its decision variables, so
- * cofactoring is child selection and quantifying is one BDD operation. What
- * neither reaches is the LEAF HAZARD — a block variable that also sits inside
- * a leaf, in a reference argument or under a functional quantifier — and `COF`
- * reports that as `usable = false` rather than silently answering about the
- * occurrences it could see.
+ * Both work on the §1 TERM REPRESENTATION (terms.h): every variable of a
+ * prepared term at a Boolean position is a decision variable, so cofactoring
+ * is child selection and quantifying is one BDD operation. What neither
+ * reaches is the LEAF HAZARD — a block variable that also sits inside a leaf,
+ * in a reference argument or a foreign-typed subterm — and `COF` reports that
+ * as `usable = false` rather than silently answering about the occurrences it
+ * could see.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__SHARED__COFACTORS_H__
@@ -61,13 +61,21 @@ cof_entry cof(tref f, tref x);
  * An empty `X` is legal and quantifies nothing.
  *
  * TWO MODES. In the ordinary one the block is discharged: ONE BDD
- * quantification of `term`, no expansion into `2^|X|` terms. Under `ctx.keep_functional` it is kept instead, emitted as the
- * canonical functional-quantifier chain over `term` (§1) — the same block,
- * spelled rather than solved. Either way the atom is `SIMPLIFY_ATOM`'d before
- * it goes out, and a negative one is `¬(h = 0)`, never `h ≠ 0` (invariant 4).
+ * quantification of `term`, no expansion into `2^|X|` terms. Under
+ * `ctx.keep_functional`, when `X`'s levels are the lowest of `term`, the
+ * block is decided HERE, at its emission: the canonical chain over `term` is
+ * built, `ctx.kf` is asked ONCE on it, and a yes ALLOWS keeping it, SLID to
+ * `X`'s levels (§1 transparency) — the variables above stay decision
+ * structure, each piece over `X`'s levels is one leaf, a closed piece folded
+ * to its constant. A no, or a sub-block with block variables pending below
+ * `X`'s levels, is quantified at once, so no emission hides a block variable.
+ * Either way the atom is `SIMPLIFY_ATOM`'d before it goes out, and a negative
+ * one is `¬(h = 0)`, never `h ≠ 0` (invariant 4).
  *
  * `DISCHARGE` has no memo of its own (§1 ctx table): the quantification is
- * covered by the library's memos and the chain constructor is O(|X|).
+ * covered by the library's memos, the chain constructor is O(|X|), the slide
+ * is one walk over the term's BDD, and `kf`, a pure function of the chain, is
+ * asked once per emission.
  */
 template <NodeType node>
 tref discharge(tref term, bool negative, const block& X, ctx<node>& c);

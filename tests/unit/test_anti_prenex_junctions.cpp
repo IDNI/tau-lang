@@ -139,15 +139,12 @@ fixture make(const char* src, bool keep = false) {
 }
 
 /// In KEEP MODE the component's close (§5) run over what the step gave back:
-/// one quantification per chain over the stored BDD, then every remaining
-/// backed term spelled out. @p emitted takes the result BEFORE the close,
-/// where the chains are still there.
+/// every backed term spelled out, each chain decided at its emission (§7
+/// `DISCHARGE`). @p emitted takes the result BEFORE the close.
 tref closed(fixture& f, tref r, tref* emitted) {
 	if (emitted) *emitted = r;
 	if (!f.c.keep_functional) return r;
-	return ap::finish_terms<node_t>(
-		ap::resolve_functional_quantifiers_bdd<node_t>(r,
-			ap::keep_no_functional<node_t>));
+	return ap::finish_terms<node_t>(r);
 }
 
 /// 2d on the prepared clause.
@@ -304,27 +301,59 @@ TEST_CASE("N4: a clause whose ∨-nodes settle nothing is pushed home") {
 	CHECK(!same(got, rewrapped(f)));
 }
 
-TEST_CASE("N5: in keep mode the settled sub-block emits its chain") {
-	// `DISCHARGE` under `ctx.keep_functional` spells the sub-block instead
-	// of solving it: `∃x(x·y = 0)` comes back as the atom `(∀_x x·y) = 0`,
-	// a chain, which rides on as a conjunct of the smaller block — where
-	// 2b squeezes it INTO the terms it builds, so the chain ends up in a
-	// BDD leaf (§1's leaf hazard) and is only visible once the terms are
-	// spelled out. The close resolves the chains it can reach and never
-	// enters a leaf (§3 `RESOLVE_FUNCTIONAL_BDD`), so that one stays —
-	// decided already, and the answer is the plain mode's.
+TEST_CASE("N5: in keep mode the settled sub-block is decided at its emission") {
+	using quants = tau_term_bdd<node_t>::quants;
+	// The callback keeps every chain and records the prefixes it is asked
+	// about. A push the tables answer asks no callback, hence the flushes.
+	std::vector<quants> asked;
+	const ap::keep_functional_fn<node_t> keep_all = [&asked](tref n) {
+		quants q = ap::strip_chain<node_t>(n).first;
+		if (!q.empty()) asked.push_back(std::move(q));
+		return true;
+	};
+	auto binds = [](const quants& q, tref v) {
+		return std::ranges::any_of(q, [v](const auto& yk) {
+			return tau::subtree_equals(yk.first, v); });
+	};
+	// `∃x(x·y = 0)`, settled out of `ex x ex y …`: the inner `y` sits BELOW
+	// x's levels, still pending, so `DISCHARGE` quantifies the sub-block at
+	// once without asking the callback, and the answer is the plain mode's.
+	ap::flush_solver_dependent<node_t>();
 	fixture plain = make("ex x ex y (x y = 0 && (y a = 0 || y b = 0)).");
 	fixture kept = make("ex x ex y (x y = 0 && (y a = 0 || y b = 0)).",
 		true);
+	kept.c.kf = keep_all;
 	const tref want = pushed_and(plain);
-	tref emitted = nullptr;
-	const tref got = pushed_and(kept, &emitted);
-	CHECK(holds(finished(emitted), tau::bf_fall));
-	CHECK(!same(emitted, want));
+	const tref got = pushed_and(kept);
+	CHECK(std::ranges::none_of(asked,
+		[&](const quants& q) { return binds(q, kept.P[0]); }));
 	check_against_source(got, kept);
-	CHECK(holds(got, tau::bf_fall));
+	CHECK(!holds(got, tau::bf_fall));
 	CHECK(!holds(got, tau::bf_fex));
 	CHECK(are_nso_equivalent<node_t>(finished(got), finished(want)));
+	// The other nesting puts the settled `x` innermost, and its piece holds
+	// `y` free in a reference, so the callback keeps the chain: the atom
+	// `(∀_x x·q(y)) = 0` rides on as a conjunct of the smaller block, where
+	// `y` hides in its leaf (§1 leaf hazard) and the chain stays. The
+	// checker does not read a reference, so these claims are structural.
+	ap::flush_solver_dependent<node_t>();
+	asked.clear();
+	fixture rplain = make(
+		"ex y ex x ((q(y) x) = 0 && (y a = 0 || y b = 0)).");
+	fixture rkept = make(
+		"ex y ex x ((q(y) x) = 0 && (y a = 0 || y b = 0)).", true);
+	rkept.c.kf = keep_all;
+	const tref rwant = pushed_and(rplain);
+	tref emitted = nullptr;
+	const tref rgot = pushed_and(rkept, &emitted);
+	CHECK(std::ranges::any_of(asked,
+		[&](const quants& q) { return binds(q, rkept.P[1]); }));
+	CHECK(holds(finished(emitted), tau::bf_fall));
+	CHECK(holds(rgot, tau::bf_fall));
+	CHECK(!holds(rgot, tau::bf_fex));
+	CHECK(!same(rgot, rwant));
+	CHECK(invariant_4(rgot));
+	CHECK(no_escape(finished(rgot), rkept.quantified));
 }
 
 // --- the fast paths through the conjunction ---------------------------------------

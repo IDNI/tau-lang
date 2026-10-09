@@ -161,17 +161,10 @@ fixture make(const char* src, bool keep = false, size_t vars = 0) {
 	return f;
 }
 
-/// THE HARNESS: `∃P.ψ` pushed as a component's caller pushes it — the block
-/// pushed, and in KEEP MODE `RESOLVE_FUNCTIONAL_BDD`, the first half of the
-/// component's close (§5), run over what came back, which resolves every
-/// chain `DISCHARGE` emitted. @p emitted takes the result BEFORE that pass,
-/// where the chains are still there.
-tref pushed(fixture& f, tref* emitted = nullptr) {
-	const tref r = ap::push_block<node_t>(f.clause, f.P, f.c);
-	if (emitted) *emitted = r;
-	if (!f.c.keep_functional) return r;
-	return ap::resolve_functional_quantifiers_bdd<node_t>(r,
-		ap::keep_no_functional<node_t>);
+/// THE HARNESS: `∃P.ψ` pushed as a component's caller pushes it. In KEEP
+/// MODE each chain is decided at its emission (§7 `DISCHARGE`).
+tref pushed(fixture& f) {
+	return ap::push_block<node_t>(f.clause, f.P, f.c);
 }
 
 /// What every pushed block claims: equivalent to `∃P.ψ`, no free variable
@@ -278,13 +271,16 @@ TEST_CASE("P5: the key is the wrap node, and the entry is the result") {
 
 TEST_CASE("P6: keep_functional is part of the key") {
 	// The entry embeds what `DISCHARGE` emitted, and the flag switches
-	// that (§1): the same formula under the two flags gives two results
-	// and, where the table exists, two entries.
-	fixture f = make("ex x (x p = 0).");
+	// that (§1): the same formula under the two flags gives two results —
+	// the piece holds `p` free in a reference, so a keeping callback keeps
+	// its chain — and, where the table exists, two entries.
+	fixture f = make("ex x ((q(p) x) = 0).");
 	const std::pair<tref, bool> key{ ap::rewrap<node_t>(f.clause, f.P),
 		false };
 	const std::pair<tref, bool> kept{ key.first, true };
 	auto kc = ap::ctx<node_t>::for_component(f.P, f.c.type, true);
+	const ap::keep_functional_fn<node_t> keep_all = [](tref) { return true; };
+	kc.kf = keep_all;
 	const tref got = ap::push_block<node_t>(f.clause, f.P, f.c);
 	const tref kept_got = ap::push_block<node_t>(f.clause, f.P, kc);
 	CHECK(!same(kept_got, got));
@@ -484,27 +480,39 @@ TEST_CASE("P18: a sub-block is pushed under the component's full order") {
 
 // --- keep mode ------------------------------------------------------------------------
 
-TEST_CASE("P19: keep mode emits the chain, and the close resolves it") {
-	// `DISCHARGE` under `ctx.keep_functional` spells the block instead of
-	// solving it: the one-literal clause comes back as `∀_x x·y = 0`, a
-	// functional-quantifier chain over the stored BDD. One quantification
-	// of that BDD resolves the chain, and what is left is the non-keep
-	// answer.
-	fixture plain = make("ex x (x y = 0).");
-	fixture kept = make("ex x (x y = 0).", true);
+TEST_CASE("P19: keep mode emits the chain, and a closed piece folds") {
+	// `DISCHARGE` under `ctx.keep_functional` asks the callback on the
+	// block's chain and keeps it SLID to the block's levels. Its piece holds
+	// `y` free in a reference, so it stays a chain: the one-literal clause
+	// comes back as `(∀_x x·q(y)) = 0`, where the plain run answers `T`.
+	// The checker does not read a reference, so these claims are
+	// structural.
+	const ap::keep_functional_fn<node_t> keep_all = [](tref) { return true; };
+	fixture plain = make("ex x ((q(y) x) = 0).");
+	fixture kept = make("ex x ((q(y) x) = 0).", true);
+	kept.c.kf = keep_all;
 	const tref want = pushed(plain);
-	tref emitted = nullptr;
-	const tref got = pushed(kept, &emitted);
-	// BEFORE that pass: one atom whose term is a chain.
-	REQUIRE(is_child<node_t>(emitted, tau::bf_eq));
-	CHECK(!ap::strip_chain<node_t>(sides(emitted).first).first.empty());
-	CHECK(!same(emitted, want));
-	// AFTER it: the same answer, with nothing kept.
-	check_against_source(got, kept);
-	check_resolved(got, kept);
-	CHECK(!holds(got, tau::bf_fall));
-	CHECK(!holds(got, tau::bf_fex));
-	CHECK(same(got, want));
+	const tref got = pushed(kept);
+	CHECK(tau::get(want).equals_T());
+	REQUIRE(is_child<node_t>(got, tau::bf_eq));
+	const auto prefix = ap::strip_chain<node_t>(sides(got).first).first;
+	REQUIRE(prefix.size() == 1);
+	CHECK(prefix[0].second == tau_term_bdd<node_t>::all);
+	CHECK(!same(got, want));
+	check_structurally(got, kept);
+	CHECK(binder_count(got) == 0);
+	// On a pure term the piece is closed and folds: the kept run gives the
+	// plain answer, with nothing kept.
+	fixture pplain = make("ex x (x y = 0).");
+	fixture pkept = make("ex x (x y = 0).", true);
+	pkept.c.kf = keep_all;
+	const tref pwant = pushed(pplain);
+	const tref pgot = pushed(pkept);
+	check_against_source(pgot, pkept);
+	check_resolved(pgot, pkept);
+	CHECK(!holds(pgot, tau::bf_fall));
+	CHECK(!holds(pgot, tau::bf_fex));
+	CHECK(same(pgot, pwant));
 }
 
 TEST_CASE("P20: a negative tree of a bitvector block goes whole to the leaf") {

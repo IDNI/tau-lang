@@ -9,8 +9,7 @@
  * (src/union_find_with_sets.h) for the partition, `is_atomic_fm` and
  * `while_is_formula` (src/tau_tree.h) for the one walk that feeds it,
  * `find_ba_type` (src/ba_types.h) and `ctx::for_component` (ctx.h) for a
- * component's setup, `prepare_terms`,
- * `resolve_functional_quantifiers_bdd` and `finish_terms`
+ * component's setup, `prepare_terms` and `finish_terms`
  * (foundations/terms.h) for its term representation and its close,
  * `push_block` (push/push_block.h) for the push itself, `formula_size`,
  * `fv_meets`, `fv_intersect` and `members` (foundations/dag.h) with
@@ -94,9 +93,11 @@ tref push_ex_block(tref body, const block& X,
 		// node, never a memo key.
 		const bool keep = kf(rewrap<node>(body, Xc));
 		// `for_component` is §5's whole ctx setup: `prio` over `P` and
-		// the knobs. The type is the component's by invariant 2.
+		// the knobs. The type is the component's by invariant 2. The
+		// callback rides along for the chains `DISCHARGE` emits.
 		ctx<node> c = ctx<node>::for_component(P,
 			find_ba_type<node>(P[0]), keep);
+		c.kf = kf;
 		body = prepare_terms<node>(body);
 		const tref prev = body;
 		body = push_block<node>(body, P, c);
@@ -123,15 +124,11 @@ tref push_ex_block(tref body, const block& X,
 				fv_intersect<node>(dj, P)));
 			body = simplified_and_join<node>(indep);
 		}
-		// THE CLOSE, in this order: while the terms are still BDDs a
-		// whole-block chain over `P`'s own BDD resolves by one
-		// quantification of what is stored, and a chain `kf` keeps or
-		// the stuck rule leaves behind stays; then every remaining
-		// backed term is spelled out CANONICALLY, chains intact — in
-		// the plain regime's normal form, the one phase 1 gives every
-		// atom, so what leaves a component is spelled as the plain
-		// phases spell it (§3 `FINISH_TERMS`).
-		body = resolve_functional_quantifiers_bdd<node>(body, kf);
+		// THE CLOSE: every chain was decided at its emission (§7
+		// `DISCHARGE`), so every backed term is spelled out CANONICALLY,
+		// chains intact — in the plain regime's normal form, the one
+		// phase 1 gives every atom, so what leaves a component is
+		// spelled as the plain phases spell it (§3 `FINISH_TERMS`).
 		body = finish_terms<node>(body);
 	}
 	// The close is total, so nothing of §1's term representation leaves.

@@ -390,15 +390,16 @@ TEST_CASE("B6: two components may be answered differently") {
 	// One flag per component, and each memo key carries its own: the first
 	// component keeps its emission, the second discharges. The callback
 	// tells a BLOCK node from a CHAIN node by the prefix `strip_chain`
-	// reads off, and keeps every chain, so the first component's emission
-	// survives its close.
-	fixture f = split("ex x ex y (x a = 0 && y b = 0).");
+	// reads off, and keeps every chain. A piece holding a free variable in
+	// a reference stays a chain under the slide, so only the first
+	// component's emission survives as one.
 	size_t blocks = 0;
 	auto mixed = [&blocks](tref n) {
 		if (ap::strip_chain<node_t>(n).first.empty())
 			return blocks++ == 0;
 		return true;
 	};
+	fixture f = split("ex x ex y ((q(a) x) = 0 && (q(b) y) = 0).");
 	const tref got = ap::push_ex_block<node_t>(f.blk.matrix, f.blk.vars,
 		mixed);
 	CHECK(blocks == 2);
@@ -406,16 +407,25 @@ TEST_CASE("B6: two components may be answered differently") {
 	CHECK(invariant_4(got));
 	CHECK(!holds(got, tau::BDD_ID));
 	CHECK(no_escape(got, f.quantified));
-	CHECK(are_nso_equivalent<node_t>(finished(got), f.quantified));
+	// On pure terms every piece is closed and folds, whatever the callback
+	// says: both components resolve, which the checker reads.
+	blocks = 0;
+	fixture p = split("ex x ex y (x a = 0 && y b = 0).");
+	const tref pg = ap::push_ex_block<node_t>(p.blk.matrix, p.blk.vars,
+		mixed);
+	CHECK(blocks == 2);
+	CHECK(functional_count(pg) == 0);
+	check_claims(pg, p);
 }
 
 TEST_CASE("B7: keep mode emits the chain, and the close leaves it plain") {
-	// `DISCHARGE` under `ctx.keep_functional` spells the block instead of
-	// solving it, `RESOLVE_FUNCTIONAL_BDD` keeps what the callback keeps,
-	// and `FINISH_TERMS` spells the chain's body out: `∃x. x·y = 0` comes
-	// back as the one atom `(∀_x x·y) = 0`.
-	fixture f = split("ex x (x y = 0).");
+	// `DISCHARGE` under `ctx.keep_functional` asks the callback on the
+	// block's chain and keeps it SLID to the block's levels. Its piece holds
+	// `y` free in a reference, so it stays a chain, and `FINISH_TERMS`
+	// leaves it plain: `∃x. q(y)·x = 0` comes back as the one atom
+	// `(∀_x x·q(y)) = 0`.
 	auto keep_all = [](tref) { return true; };
+	fixture f = split("ex x ((q(y) x) = 0).");
 	const tref got = ap::push_ex_block<node_t>(f.blk.matrix, f.blk.vars,
 		keep_all);
 	REQUIRE(is_child<node_t>(got, tau::bf_eq));
@@ -426,12 +436,19 @@ TEST_CASE("B7: keep mode emits the chain, and the close leaves it plain") {
 	CHECK(!holds(got, tau::BDD_ID));
 	CHECK(binder_count(got) == 0);
 	CHECK(no_escape(got, f.quantified));
-	CHECK(are_nso_equivalent<node_t>(finished(got), f.quantified));
+	// On a pure term the piece is closed and folds: `∃x. x·y = 0` is `T`,
+	// which the checker reads.
+	fixture p = split("ex x (x y = 0).");
+	const tref pg = ap::push_ex_block<node_t>(p.blk.matrix, p.blk.vars,
+		keep_all);
+	CHECK(tau::get(pg).equals_T());
+	CHECK(functional_count(pg) == 0);
+	check_claims(pg, p);
 }
 
-TEST_CASE("B8: a callback keeping blocks but no chain resolves at the close") {
-	// The emission is made and then quantified away by one pass over the
-	// stored BDD, which is the answer the non-keep run gives directly.
+TEST_CASE("B8: a callback keeping blocks but no chain quantifies at the emission") {
+	// The chain is built and the callback declines it, so `DISCHARGE`
+	// quantifies at once: the answer the non-keep run gives directly.
 	fixture f = split("ex x (x y = 0).");
 	auto keep_blocks = [](tref n) {
 		return ap::strip_chain<node_t>(n).first.empty();

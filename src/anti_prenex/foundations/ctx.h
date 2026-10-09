@@ -69,7 +69,8 @@ namespace idni::tau_lang::anti_prenexing {
  * The GLOBAL members of the spec's table — `taint_count` and the memo tables
  * — are not stored here. They are reached through `taint_count<node>()` and
  * the table functions below (§1: "the global tables, cross-run, never
- * reset"). Everything stored here is component-scoped.
+ * reset"). Everything stored here is component-scoped, but for `kf`, the
+ * phase's callback.
  */
 template <NodeType node>
 struct ctx {
@@ -92,6 +93,11 @@ struct ctx {
 	/// §1 `keep_functional`: emit `∀_X`/`∃_X` symbolically instead of
 	/// discharging them. Part of the `push_memo` / `elim_memo` keys.
 	bool keep_functional = false;
+	/// §1 `ctx.kf`, PHASE STATE: the caller's callback, asked once per chain
+	/// `DISCHARGE` emits in keep mode. Held by reference, so the callback
+	/// outlives every component it is set for; the default keeps nothing.
+	std::reference_wrapper<const keep_functional_fn<node>> kf =
+		keep_no_functional<node>;
 
 	/**
 	 * @brief §5 setup for one component: `type`, `P` itself, `prio` over `P`

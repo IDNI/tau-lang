@@ -88,10 +88,10 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 			(fv_meets<node>(m, inc.settled) ? A : others)
 				.push_back(m);
 		// A SUB-BLOCK of the component, eliminated like a block of
-		// its own. Under `keep_functional` its emission
-		// hides the variables of `X ∖ Xs` it carries (§7 `DISCHARGE`,
-		// §1 the leaf hazard), and they ride on as a dependent
-		// conjunct.
+		// its own. Under `keep_functional` an emission over variables
+		// of `X ∖ Xs` pending below its levels is quantified at once
+		// (§7 `DISCHARGE`), so none hides in a leaf, and they ride on
+		// as a dependent conjunct.
 		const tref r = eliminate_block<node>(
 			simplified_and_join<node>(A), inc.settled, c);
 		// Eager F (invariant 7): no sibling can make an unsatisfiable

@@ -141,10 +141,11 @@ TEST_CASE("C3: what does not pin, and the LEAF HAZARD") {
 
 TEST_CASE("C4: child selection passes through a kept chain in a leaf") {
 	tref x = vr("x"), y = vr("y");
-	// `∀y (y ∪ a)` is ONE LEAF of the term's BDD (§1) — a kept emission
-	// of an inner block looks exactly like this.
+	// `∀y (y ∪ r(a))` holds `a` free in a reference, so the slide leaves it
+	// ONE LEAF of the term's BDD (§1) — a kept emission of an inner block
+	// looks exactly like this.
 	tref chain = tb::build_functional_quantifiers({{ y, tb::all }},
-		lor(bf("y"), bf("a")));
+		lor(bf("y"), bf("r(a)")));
 	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
 	tref f = prepared(eq0(lor(land(bf("x"), chain),
 		land(lneg(bf("x")), bf("b")))));
@@ -266,54 +267,86 @@ TEST_CASE("D2: a whole block of two, and a sub-block that leaves one behind") {
 
 // --- DISCHARGE, keep mode ----------------------------------------------------------
 
-TEST_CASE("D3: a whole-block keep emission holds its BDD until the close") {
+TEST_CASE("D3: a whole-block keep emission is decided at its emission") {
 	tref x = vr("x"), y = vr("y");
 	const ap::block P{ x, y };
 	auto plain = ap::ctx<node_t>::for_component(P, 0, false);
 	auto keep = ap::ctx<node_t>::for_component(P, 0, true);
-	tref atom = eq0(lor(lor(bf("a"), land(bf("x"), bf("b"))),
-		land(bf("y"), bf("cc"))));
-	tref f = prepared(atom);
+	trefs asked;
+	const ap::keep_functional_fn<node_t> keep_all = [&asked](tref n) {
+		asked.push_back(n);
+		return true;
+	};
+	keep.kf = keep_all;
+	tref f = prepared(eq0(lor(lor(bf("a"), land(bf("x"), bf("b"))),
+		land(bf("y"), bf("cc")))));
 	REQUIRE(th::is_bdd_backed(f));
 
+	// `kf` is asked ONCE, on the canonical chain over the stored BDD as
+	// built (§1 ctx table)
 	tref kept = ap::discharge<node_t>(f, false, P, keep);
-	// the emission is the canonical chain over the STORED BDD, which
-	// `SIMPLIFY_ATOM` leaves alone (§1: nothing spells a stored BDD out
-	// before the component's close)
-	tref l = sides(kept).first;
-	REQUIRE(tau::get(l).child_is(tau::bf_fall));
-	auto [prefix, body] = ap::strip_chain<node_t>(l);
-	CHECK(prefix.size() == 2);
-	CHECK(th::is_bdd_backed(body));
-	CHECK(!ap::fv_meets<node_t>(l, P));      // X-free, the block is bound
-
-	// the CLOSE resolves it with one quantification of that stored BDD,
-	// and what comes out is the discharging mode's own answer
-	tref closed = th::convert_to_tau_terms(
-		ap::resolve_functional_quantifiers_bdd<node_t>(kept,
-			ap::keep_no_functional<node_t>));
+	REQUIRE(asked.size() == 1);
+	CHECK(asked[0] == tb::build_functional_quantifiers(
+		{{ x, tb::all }, { y, tb::all }}, f));
+	// its yes keeps the chain SLID to P's levels: `a`, `b` and `cc` sort
+	// above `x` and `y` and stay decision structure, and every piece over
+	// `x`, `y` is closed and folds, so the emission is the discharging
+	// mode's own answer, `a`
 	tref discharged = ap::discharge<node_t>(f, false, P, plain);
-	CHECK(same_function(sides(closed).first, sides(discharged).first));
-	CHECK(same_function(sides(closed).first, bf("a")));
+	CHECK(same_function(sides(kept).first, sides(discharged).first));
+	CHECK(same_function(sides(kept).first, bf("a")));
+
+	// a piece holding a free variable in a leaf stays a chain:
+	// `c ∪ x·y·r(b)` keeps ∀x ∀y (x·y·r(b)) under `c′`, one leaf
+	tref g = prepared(eq0(lor(bf("c"), land(land(bf("x"), bf("y")),
+		bf("r(b)")))));
+	REQUIRE(th::is_bdd_backed(g));
+	tref kg = sides(ap::discharge<node_t>(g, false, P, keep)).first;
+	CHECK(asked.size() == 2);
+	CHECK(ap::carries_functional_quantifier<node_t>(kg));
+	CHECK(!ap::fv_meets<node_t>(kg, P));         // X-free, the block is bound
+	REQUIRE(th::is_bdd_backed(kg));
+	const tb::ref kb = th::convert_to_handle(kg).get();
+	CHECK(same(tb::get_var(kb), vr("c")));
+	CHECK(tb::get_high(kb) == tb::T);
+	REQUIRE(tb::leaf(tb::get_low(kb)));
+	CHECK(ap::strip_chain<node_t>(tb::get_var_term(tb::get_low(kb)))
+		.first.size() == 2);
+
+	// a chain `kf` does not keep is quantified at once
+	auto keep_none = ap::ctx<node_t>::for_component(P, 0, true);
+	CHECK(ap::discharge<node_t>(f, false, P, keep_none) == discharged);
 }
 
-TEST_CASE("D4: a settled sub-block's emission hides the variables it carries") {
+TEST_CASE("D4: a sub-block with block variables pending below its levels is quantified at once") {
 	tref x = vr("x"), y = vr("y");
 	tref f = prepared(eq0(lor(land(land(bf("x"), bf("y")), bf("a")),
 		land(lneg(bf("x")), bf("b")))));
 	REQUIRE(th::is_bdd_backed(f));
-	// `∀y (BDD over {x, y})`, the shape the settle move emits in keep
-	// mode: `x` is still inside the stored BDD, and no slide puts it back
-	// on the outside (Q5).
-	tref sub = tb::build_functional_quantifiers({{ y, tb::all }}, f);
-	REQUIRE(tau::get(sub).child_is(tau::bf_fall));
-	REQUIRE(ap::fv_meets<node_t>(sub, ap::block{ x }));
+	const ap::block P{ x, y };
+	auto plain = ap::ctx<node_t>::for_component(P, 0, false);
+	auto keep = ap::ctx<node_t>::for_component(P, 0, true);
+	size_t asked = 0;
+	const ap::keep_functional_fn<node_t> keep_all = [&asked](tref) {
+		return ++asked, true;
+	};
+	keep.kf = keep_all;
 
-	// so `COF` on it refuses to answer about `x` (§1 leaf hazard)
-	const ap::cof_entry e = ap::cof<node_t>(sub, x);
-	CHECK(!e.usable);
-	CHECK(!e.pin);
-	CHECK(e.p == nullptr);
+	// the sub-block `{x}` with `y` pending BELOW its levels: quantified at
+	// once, whatever `kf` would answer, so no chain hides `y` (§1)
+	tref low = ap::discharge<node_t>(f, false, ap::block{ x }, keep);
+	CHECK(asked == 0);
+	CHECK(low == ap::discharge<node_t>(f, false, ap::block{ x }, plain));
+	CHECK(!ap::carries_functional_quantifier<node_t>(sides(low).first));
+
+	// the sub-block `{y}` with `x` pending ABOVE: slid, ∀y (x·y·a ∪ x′·b) =
+	// x′·b, and `x` stays a decision variable, which `COF` reads
+	tref high = sides(ap::discharge<node_t>(f, false, ap::block{ y }, keep))
+		.first;
+	CHECK(asked == 1);
+	CHECK(same_function(high, land(lneg(bf("x")), bf("b"))));
+	const ap::cof_entry e = ap::cof<node_t>(high, x);
+	CHECK(e.usable);
 }
 
 } // TEST_SUITE

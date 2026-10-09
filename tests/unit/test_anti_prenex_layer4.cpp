@@ -265,14 +265,15 @@ TEST_CASE("M11: both spellings of a disequation give the same node") {
 // --- 5. keep mode end to end ------------------------------------------------------
 
 TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
-	// `DISCHARGE` under `ctx.keep_functional` spells the block out instead
-	// of solving it, and the component's close keeps what the callback
-	// keeps: `∃x. x·y = 0` comes back as the one atom `(∀_x x·y) = 0`,
-	// with no formula binder left.
+	// `DISCHARGE` under `ctx.keep_functional` keeps the block's chain, SLID
+	// to its levels, where the callback allows it. Its piece holds `y` free
+	// in a reference, so it stays a chain: `∃x. q(y)·x = 0` comes back as
+	// the one atom `(∀_x x·q(y)) = 0`, with no formula binder left.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
-	// what this case pins is the KEPT shape, under its own callback.
-	const tref phi = parse("ex x (xy = 0).");
+	// what this case pins is the KEPT shape, under its own callback, and
+	// the checker does not read a reference.
+	const tref phi = parse("ex x ((q(y) x) = 0).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
 	CHECK(holds(got, tau::bf_fall));
@@ -280,14 +281,18 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	CHECK(invariant_4(got));
 	CHECK(no_escape(got, phi));
 	CHECK(!holds(got, tau::BDD_ID));
-	// EQUIVALENT, which the checker does answer for this chain.
-	CHECK(are_nso_equivalent<node_t>(got, phi));
 	// Handed back to the default callback, phase 1's
 	// `RESOLVE_FUNCTIONAL_PLAIN` resolves the chain, and what is left is
-	// the answer the plain run gives directly.
+	// the answer the plain run gives directly: `T`, as `x := 0` satisfies
+	// the body.
 	CHECK(ap::anti_prenex<node_t>(got) == ap::anti_prenex<node_t>(phi));
-	// Which is `T`: `x := 0` satisfies the body.
-	CHECK(tau::get(anti_prenexed(phi)).equals_T());
+	CHECK(tau::get(ap::anti_prenex<node_t>(phi)).equals_T());
+	// On a pure term the piece is closed and folds under the same callback:
+	// `∃x. x·y = 0` comes back `T`, which the checker reads.
+	const tref pure = parse("ex x (xy = 0).");
+	const tref pg = ap::anti_prenex<node_t>(pure, keep_all);
+	CHECK(tau::get(pg).equals_T());
+	CHECK(are_nso_equivalent<node_t>(pg, pure));
 }
 
 // --- 6. a run under a temporal operator -------------------------------------------

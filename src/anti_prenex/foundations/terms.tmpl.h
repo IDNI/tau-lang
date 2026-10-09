@@ -19,8 +19,8 @@
  *    per-call memo, the shape of its own workers (`bdd_ex`,
  *    `bdd_compose_impl`). Walks over the TAU tree go through `pre_order`
  *    (dag.h, tree.h) instead.
- *  - `build_bdd` collects a functional-quantifier chain whole and makes it
- *    ONE LEAF through the chain constructor, hiding what its body carries
+ *  - `build_bdd` collects a functional-quantifier chain whole, puts it
+ *    through the chain constructor and slides it to its subscripts' levels
  *    (§1). Nothing here prepares a term for that, and every caller hands it
  *    the term as written.
  */
@@ -45,9 +45,9 @@ template <NodeType node> using bref  = typename tau_term_bdd<node>::ref;
 template <NodeType node> using thandle = term_handle<node>;
 
 /// Does @p t carry a `BDD_ID` anywhere -- a stored BDD at the top, or one
-/// held under a functional-quantifier chain (§7 `DISCHARGE`'s keep-mode
-/// emission) or inside a leaf? The BDD regime of the two normalisers below is
-/// keyed on it: nothing outside this file knows a `BDD_ID`.
+/// held under an operator, a functional-quantifier chain or inside a leaf?
+/// The BDD regime of the two normalisers below is keyed on it: nothing outside
+/// this file knows a `BDD_ID`.
 template <NodeType node>
 bool holds_bdd_id(tref t) {
 	using tau = tree<node>;
@@ -55,7 +55,7 @@ bool holds_bdd_id(tref t) {
 		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
 }
 
-/// What the chain step hands back: the stored BDD quantified over the
+/// What the chain step hands back: the body's BDD quantified over the
 /// subscripts it took, and the prefix that STAYS over it, outermost first. An
 /// empty `kept` is a chain that resolved whole.
 template <NodeType node>
@@ -65,7 +65,7 @@ struct chain_result {
 };
 
 /**
- * @brief THE CHAIN STEP: ONE quantification of the STORED BDD @p s by those
+ * @brief THE CHAIN STEP: ONE quantification of the body's BDD @p s by those
  * subscripts of the canonical prefix @p q — outermost first — that the stuck
  * rule (terms.h) takes, one same-kind run at a time (`bdd_quant`).
  * `std::nullopt` says nothing was taken, which leaves the chain as it is.
@@ -140,11 +140,10 @@ tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 		if (keep(c)) return done.insert(c), c;
 		// The body under the global order: nothing is BDD-backed here,
 		// so there is nothing to spell out first. A chain of the body
-		// that survived is ONE LEAF of the build, hiding what it holds,
-		// an outer subscript included. A build that does not BRANCH
-		// has every subscript in a leaf and settles the chain as it is.
-		// TODO (HIGH): slide a surviving inner chain below the outer
-		// subscripts' levels, where their quantification crosses it.
+		// that survived is SLID by the build below the outer
+		// subscripts' levels, where their quantification crosses it. A
+		// build that does not BRANCH has every subscript in a leaf and
+		// settles the chain as it is.
 		bref<node> b = tbdd<node>::build_bdd(body);
 		if (tbdd<node>::leaf(b)) return done.insert(c), c;
 		auto r = resolve_chain<node>(q, b);
@@ -165,10 +164,9 @@ tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 /// over the leaves.
 ///
 /// A leaf that holds no `BDD_ID` goes through the path sweep. A leaf that
-/// holds one — a functional-quantifier chain over a stored BDD, which
-/// `build_bdd` keeps whole — is swept over its PLAIN structure alone: to the
-/// sweep a `bf(BDD_ID)` is an opaque leaf, never descended into, negated
-/// into or substituted into. The stored BDDs the sweep left standing are
+/// holds one is swept over its PLAIN structure alone: to the sweep a
+/// `bf(BDD_ID)` is an opaque leaf, never descended into, negated into or
+/// substituted into. The stored BDDs the sweep left standing are
 /// then simplified from the inside, one `map_leaves` each with this same
 /// simplifier, so a nest of them settles innermost leaf first.
 ///
@@ -519,59 +517,6 @@ tref resolve_functional_quantifiers_plain(tref n,
 	return resolve_plain_chains<node>(n, keep, memo);
 }
 
-template <NodeType node>
-tref resolve_functional_quantifiers_bdd(tref n,
-	const keep_functional_fn<node>& keep)
-{
-	using tau = tree<node>;
-	using namespace terms_detail;
-	n = tau::trim_right_sibling(n);
-	// What this pass produced: a chain `keep` accepted, a chain the stuck
-	// rule left standing, and a quantified result, plus every BDD-backed
-	// term met on the way. All of them are decided — the traversal refuses
-	// to enter one.
-	subtree_unordered_set<node> done;
-	auto f = [&](tref m) -> tref {
-		const tau& tm = tau::get(m);
-		if (!tm.is(tau::bf)) return m;
-		// A BDD-backed term keeps its chains in the LEAVES, and a leaf
-		// is never entered: a chain there is an inner block's kept
-		// emission or a stuck one, and both are decided (§3).
-		if (thandle<node>::is_bdd_backed(m)) return done.insert(m), m;
-		if (!tm.child_is(tau::bf_fall) && !tm.child_is(tau::bf_fex))
-			return m;    // a chain may still sit deeper: descend
-		// THE WHOLE NEST at once, canonicalised through the
-		// constructor. Its body is not resolved first: at the close a
-		// body is either BDD-backed or the chain stays whole.
-		auto [q0, b0] = strip_chain<node>(m);
-		tref c = tbdd<node>::build_functional_quantifiers(q0, b0);
-		// `keep` sees that canonical chain NODE, ONCE — prefix and body
-		// come off it with `strip_chain` (§3) — and its yes keeps the
-		// whole chain.
-		auto [q, body] = strip_chain<node>(c);
-		if (q.empty()) return done.insert(c), c;
-		if (keep(c)) return done.insert(c), c;
-		// A PLAIN body is one whose BDD did not branch: every subscript
-		// sits in a leaf, so nothing of the chain resolves.
-		if (!thandle<node>::is_bdd_backed(body))
-			return done.insert(c), c;
-		// The subscripts are decision variables of the stored BDD, so
-		// ONE quantification settles the chain where it lies, and the
-		// result is emitted like every other term: plain when nothing
-		// branches, which is the usual whole-block outcome.
-		bref<node> s = thandle<node>::convert_to_handle(body).get();
-		auto r = resolve_chain<node>(q, s);
-		if (!r) return done.insert(c), c;
-		tref e = thandle<node>::convert_to_tau_node_or_term(
-			thandle<node>(r->b), find_ba_type<node>(body));
-		// The prefix the stuck rule left, re-attached in its order.
-		tref res = tbdd<node>::build_functional_quantifiers(r->kept, e);
-		return done.insert(res), res;
-	};
-	auto visit = [&done](tref m) { return !done.contains(m); };
-	return pre_order<node>(n).apply_unique(f, visit);
-}
-
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 
 template <NodeType node>
@@ -588,17 +533,15 @@ tref simplify_term(tref t, regime rg) {
 		return cofactor_check<node>(syntactic_path_simplification<node>(t));
 	}
 	// A term with no variable and no stored BDD has nothing to build; the
-	// last test is what keeps a chain over a `BDD_ID` out of the sweep,
+	// last test is what keeps a term holding a `BDD_ID` out of the sweep,
 	// which knows no `BDD_ID`.
 	if (!thandle<node>::is_bdd_backed(t) && get_free_vars<node>(t).empty()
 		&& !holds_bdd_id<node>(t))
 		return syntactic_path_simplification<node>(t);
 	// The representation re-established (a BDD-backed term is canonical
 	// already; a plain combination of BDD-backed subterms is built; a chain
-	// is ONE LEAF of its own, §1), then every leaf through the leaf
-	// simplifier and the rebuild that merges leaves that became equal. A
-	// whole-block keep emission is that single leaf and comes back as it
-	// stands, its inner leaves simplified.
+	// is slid, §1), then every leaf through the leaf simplifier and the
+	// rebuild that merges leaves that became equal.
 	bref<node> r = tbdd<node>::build_bdd(t);
 	DBG(assert(tbdd<node>::is_ordered(r));)
 	leaf_simplifier<node> simp;

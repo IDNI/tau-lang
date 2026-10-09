@@ -226,26 +226,31 @@ TEST_CASE("M6: a constant-false atom is folded at the floor") {
 TEST_CASE("M7: keep mode on an expanding input stays binder-free") {
 	// L17's clause under a callback that keeps every chain, on M1's route:
 	// EXPAND's two cases each settle whole, and under `keep_functional` the
-	// leaf's DISCHARGE emits `∀_x` of the case's positive and `∃_x` of each
-	// negative condition as chains instead of quantifying — whole-block
-	// emissions, free of `x`. The component's close asks the callback on
-	// each chain, which keeps it, and the finish spells its body: no formula
-	// binder is ever built, and both kinds of chain stand in the answer.
+	// leaf's DISCHARGE asks the callback ONCE on `∀_x` of the case's
+	// positive and on `∃_x` of each negative condition, as built. Each yes
+	// keeps its chain SLID to x's levels, where every piece is closed and
+	// folds (§1): nothing is kept, no formula binder is ever built, and the
+	// answer is the plain one.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
-	// what this case pins is the KEPT shape, under its own callback.
+	// what this case pins is the keep-mode run, under its own callback.
+	// A push the tables answer asks no callback.
+	ap::flush_solver_dependent<node_t>();
 	const tref phi = parse(l17);
-	auto keep_all = [](tref) { return true; };
+	size_t chains = 0;
+	auto keep_all = [&chains](tref n) {
+		if (!ap::strip_chain<node_t>(n).first.empty()) ++chains;
+		return true;
+	};
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
-	CHECK(holds(got, tau::bf_fall));
-	CHECK(holds(got, tau::bf_fex));
+	CHECK(chains > 0);
+	CHECK(!holds(got, tau::bf_fall));
+	CHECK(!holds(got, tau::bf_fex));
 	CHECK(binder_count(got) == 0);
 	CHECK(invariant_4(got));
 	CHECK(no_escape(got, phi));
 	CHECK(!holds(got, tau::BDD_ID));
-	// The checker cannot decide kept chains; the default callback resolves
-	// them in phase 1 (§3 RESOLVE_FUNCTIONAL_PLAIN).
-	CHECK(are_nso_equivalent<node_t>(ap::anti_prenex<node_t>(got), phi));
+	CHECK(are_nso_equivalent<node_t>(got, phi));
 }
 
 // --- the time limit (§3) -----------------------------------------------------------

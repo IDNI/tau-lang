@@ -54,6 +54,13 @@ tref tbf(const char* name) {
 	return tau::build_bf_variable(name, tau_type_id<node_t>());
 }
 
+/// The term reference `q(arg)`, built over a built argument as this file
+/// builds its typed variables.
+tref qref(tref arg) {
+	return tau::get(tau::bf, tau::get(tau::bf_ref,
+		tau::build_ref("q", trefs{ arg })));
+}
+
 tref eq0(tref t)          { return build_bf_eq_0<node_t>(t); }
 tref land(tref l, tref r) { return build_bf_and<node_t>(l, r); }
 tref lor(tref l, tref r)  { return build_bf_or<node_t>(l, r); }
@@ -371,12 +378,11 @@ TEST_CASE("E10: a reference freezes its component and nothing else") {
 }
 
 TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
-	// A settled sub-block's KEEP emission (§7 DISCHARGE) is a functional
-	// quantifier over a stored BDD, and the block variables that body
-	// still carries are HIDDEN from then on (§1 leaf hazard): the chain is
-	// ONE LEAF, so no cofactor reaches the `x` inside it and `DISCHARGE`
-	// would emit it free. The atom is therefore opaque, and its component
-	// is re-wrapped.
+	// A kept chain whose piece holds `x` inside a reference argument: the
+	// piece is open, so the slide leaves the chain ONE LEAF, and `x` is
+	// HIDDEN in it (§1 leaf hazard). No cofactor reaches that `x` and
+	// `DISCHARGE` would emit it free, so the atom is opaque and its
+	// component is re-wrapped.
 	const tref x = tvar("x"), y = tvar("y"), z = tvar("z");
 	// The COMPONENT is `{x, y, z}` while the block still being pushed is
 	// `{x, z}`: `y` is the settled sub-block, which the emission below has
@@ -385,15 +391,12 @@ TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 	auto c = ap::ctx<node_t>::for_component(component,
 		tau_type_id<node_t>(), false);
 	const ap::block X{ x, z };
-	const tref body = sides(ap::prepare_terms<node_t>(
-		eq0(lor(tbf("x"), tbf("y"))))).first;
-	REQUIRE(th::is_bdd_backed(body));
 	// `x` stays free in the body, so the constructor wraps it rather than
-	// folding, and `x` stays inside: the whole chain is one leaf of
-	// anything built from it.
+	// folding.
 	tb::quants qs;
 	qs.emplace_back(y, tb::all);
-	const tref emission = eq0(tb::build_functional_quantifiers(qs, body));
+	const tref emission = eq0(tb::build_functional_quantifiers(qs,
+		lor(tbf("y"), qref(tbf("x")))));
 	REQUIRE(ap::fv_meets<node_t>(emission, ap::block{ x }));
 
 	const tref clause = ap::prepare_terms<node_t>(
@@ -426,8 +429,9 @@ TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 
 TEST_CASE("E12: the key is the wrap node and the keep flag") {
 	// A clause of its own: the table is global, so a clause another case
-	// eliminated would already have an entry.
-	fixture f = make("ex x (x m = 0 && !(x n = 0)).");
+	// eliminated would already have an entry. Its pieces hold `m` and `n`
+	// free in references, so a keeping callback keeps their chains.
+	fixture f = make("ex x ((q(m) x) = 0 && !((q(n) x) = 0)).");
 	const std::pair<tref, bool> key{ ap::rewrap<node_t>(f.clause, f.P),
 		false };
 	// The table is a cache: it does not exist in Debug, so the answer is
@@ -438,6 +442,8 @@ TEST_CASE("E12: the key is the wrap node and the keep flag") {
 	// `DISCHARGE` emitted and the flag switches that (§1).
 	const std::pair<tref, bool> kept{ key.first, true };
 	auto kc = ap::ctx<node_t>::for_component(f.P, f.c.type, true);
+	const ap::keep_functional_fn<node_t> keep_all = [](tref) { return true; };
+	kc.kf = keep_all;
 	const tref kept_got = ap::eliminate_block<node_t>(f.clause, f.P, kc);
 	CHECK(!same(kept_got, got));
 #ifdef TAU_CACHE

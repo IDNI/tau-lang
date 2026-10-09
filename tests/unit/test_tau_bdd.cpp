@@ -1103,6 +1103,14 @@ tref qvar(tref n) {
 tref qbody(tref n) {
 	return tau::trim_right_sibling(tau::get(n)[0].second());
 }
+/// The binder variable of canonical id @p id, of `pvar`'s type: it sorts
+/// below every free variable, an outer (higher) id above an inner one.
+tref bvar(size_t id) {
+	return tau::build_variable(std::to_string(id),
+		tau::get(pvar("q")).get_ba_type());
+}
+/// The `bf` term of `bvar(id)`.
+tref bbf(size_t id) { return tau::get(tau::bf, bvar(id)); }
 
 } // namespace
 
@@ -1218,63 +1226,107 @@ TEST_SUITE("BDD build_functional_quantifiers") {
 TEST_SUITE("BDD build_bdd functional-quantifier chain") {
 	using bdd = tau_term_bdd<node_t>;
 
-	TEST_CASE("a chain is one leaf, its body hidden") {
+	TEST_CASE("the slide: the variables above stay, a closed piece folds") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref ty = pvar("y"), tw = pvar("w");
-		// ∀y (x·y ∪ x′·z): neither the subscript nor `x` and `z` is a
-		// decision variable of the result -- they are HIDDEN inside the
-		// leaf (§1's leaf hazard)
-		tref f = bdd::build_functional_quantifiers({{ty, bdd::all}},
-			pbf("x & y | x' & z"));
+		tref y1 = bvar(1);
+		// ∀1 (x·1 ∪ x′·z) = x·∀1 1 ∪ x′·∀1 z = x′·z: the free `x` and
+		// `z` sit above the binder variable, and the piece `1` folds
+		tref f = bdd::build_functional_quantifiers({{y1, bdd::all}},
+			tau::build_bf_or(tau::build_bf_and(pbf("x"), bbf(1)),
+				pbf("x' & z")));
 		REQUIRE(tau::get(f).child_is(tau::bf_fall));
 		bdd::ref r = bdd::build_bdd(f);
-		CHECK(bdd::leaf(r));
-		CHECK(bdd::node_count(r) == 1);
-		CHECK(tau::subtree_equals(bdd::get_var_term(r), f));
-		// nested, mixed kinds: one leaf as well
-		tref g = bdd::build_functional_quantifiers(
-			{{ty, bdd::all}, {tw, bdd::ex}},
-			pbf("x & y & w & v | x' & z"));
-		bdd::ref rg = bdd::build_bdd(g);
-		CHECK(bdd::leaf(rg));
-		CHECK(tau::subtree_equals(bdd::get_var_term(rg), g));
-		// and so is a chain over a body of variables alone: ∀x (x·y)
-		tref h = bdd::build_functional_quantifiers({{pvar("x"), bdd::all}},
-			pbf("x & y"));
-		REQUIRE(tau::get(h).child_is(tau::bf_fall));
-		bdd::ref rh = bdd::build_bdd(h);
-		CHECK(bdd::leaf(rh));
-		CHECK(tau::subtree_equals(bdd::get_var_term(rh), h));
-		// the leaf sits under the decision variables of what surrounds it
+		CHECK(bdd::is_ordered(r));
+		CHECK(r == bdd::build_bdd(pbf("x' & z")));
+		// what surrounds the chain stays above it
 		bdd::ref s = bdd::build_bdd(tau::build_bf_and(pbf("a"), f));
 		REQUIRE(!bdd::leaf(s));
 		CHECK(tau::subtree_equals(bdd::get_var(s), pvar("a")));
 		CHECK(bdd::get_high(s) == r);
 	}
 
-	TEST_CASE("a chain over a stored BDD is one leaf: nothing is spelled out") {
+	TEST_CASE("the slide: a piece holding a free variable in a leaf is one chain leaf") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref y1 = bvar(1);
+		// ∀1 (x·(1 ∪ r(a)) ∪ x′·z): the piece under `x` holds `a` free in
+		// a leaf, so it stays a chain over its own subscript, ONE LEAF
+		tref piece = tau::build_bf_or(bbf(1), pbf("r(a)"));
+		tref g = bdd::build_functional_quantifiers({{y1, bdd::all}},
+			tau::build_bf_or(tau::build_bf_and(pbf("x"), piece),
+				pbf("x' & z")));
+		bdd::ref r = bdd::build_bdd(g);
+		CHECK(bdd::is_ordered(r));
+		REQUIRE(!bdd::leaf(r));
+		CHECK(tau::subtree_equals(bdd::get_var(r), pvar("x")));
+		CHECK(bdd::get_low(r) == bdd::from_bit(pvar("z")));
+		bdd::ref hi = bdd::get_high(r);
+		REQUIRE(bdd::leaf(hi));
+		tref lt = bdd::get_var_term(hi);
+		REQUIRE(tau::get(lt).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(qvar(lt), y1));
+		CHECK(bdd::build_bdd(qbody(lt)) == bdd::build_bdd(piece));
+		// the subscript is bound inside that leaf; `a` hides there
+		const trefs lfv = term_handle<node_t>::get_free_leaf_vars(r.b);
+		REQUIRE(lfv.size() == 1);
+		CHECK(tau::subtree_equals(lfv[0], pvar("a")));
+	}
+
+	TEST_CASE("the slide hands every piece the whole prefix, one run at a time") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref y2 = bvar(2), y1 = bvar(1);
+		// the piece under `x` is `2 ↔ 1`: ∀2 ∃1 of it is 1, ∃2 ∀1 of it
+		// is 0, so the two nestings slide to x ∪ z and x′·z
+		tref iff = tau::build_bf_or(tau::build_bf_and(bbf(2), bbf(1)),
+			tau::build_bf_and(tau::build_bf_neg(bbf(2)),
+				tau::build_bf_neg(bbf(1))));
+		tref body = tau::build_bf_or(tau::build_bf_and(pbf("x"), iff),
+			pbf("x' & z"));
+		tref ae = bdd::build_functional_quantifiers(
+			{{y2, bdd::all}, {y1, bdd::ex}}, body);
+		REQUIRE(tau::get(ae).child_is(tau::bf_fall));
+		CHECK(bdd::build_bdd(ae) == bdd::build_bdd(pbf("x | z")));
+		tref ea = bdd::build_functional_quantifiers(
+			{{y2, bdd::ex}, {y1, bdd::all}}, body);
+		REQUIRE(tau::get(ea).child_is(tau::bf_fex));
+		CHECK(bdd::build_bdd(ea) == bdd::build_bdd(pbf("x' & z")));
+	}
+
+	TEST_CASE("a chain over a stored BDD slides like its spelling") {
 		using hbdd = term_handle<node_t>;
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = pvar("x");
-		// §7 DISCHARGE's keep-mode emission: a chain over a STORED BDD
-		tref stored = hbdd::convert_to_tau_node(pbf("x & y | x' & a"));
+		tref y1 = bvar(1);
+		// §7 DISCHARGE's shape: a chain over a STORED BDD
+		tref plain = tau::build_bf_or(tau::build_bf_and(pbf("x"),
+			tau::build_bf_and(bbf(1), pbf("r(b)"))), pbf("x' & a"));
+		tref stored = hbdd::convert_to_tau_node(plain);
 		REQUIRE(hbdd::is_bdd_backed(stored));
 		tref chain = bdd::build_functional_quantifiers(
-			{{tx, bdd::all}}, stored);
+			{{y1, bdd::all}}, stored);
 		REQUIRE(tau::get(chain).child_is(tau::bf_fall));
 		REQUIRE(qbody(chain) == stored);
 		bdd::ref r = bdd::build_bdd(chain);
-		// one leaf, the chain itself, holding the SAME stored BDD: no
-		// decision node, no spell-out, no rebuild
-		CHECK(bdd::leaf(r));
-		CHECK(bdd::node_count(r) == 1);
-		tref lt = bdd::get_var_term(r);
-		CHECK(tau::subtree_equals(lt, chain));
-		CHECK(qbody(lt) == stored);
+		CHECK(bdd::is_ordered(r));
+		CHECK(r == bdd::build_bdd(bdd::build_functional_quantifiers(
+			{{y1, bdd::all}}, plain)));
+		// every piece is spelled plain: a chain leaf, no stored BDD left
+		size_t chains = 0;
+		auto plain_leaf = [&chains](bdd::ref n, bool is_leaf) {
+			if (!is_leaf) return true;
+			tref t = bdd::get_var_term(n);
+			if (tau::get(t).child_is(tau::bf_fall)) ++chains;
+			return tau::get(t).find_top([](tref m) {
+				return tau::get(m).is(tau::BDD_ID); }) == nullptr;
+		};
+		CHECK(bdd::visit_nodes(r, plain_leaf));
+		CHECK(chains == 1);
 	}
 
 	TEST_CASE("an input chain goes through the constructor on its way in") {
@@ -1282,15 +1334,17 @@ TEST_SUITE("BDD build_bdd functional-quantifier chain") {
 		bdd::clear_caches();
 #endif
 		tref ty = pvar("y"), tz = pvar("z");
-		// the run comes out in content order, either way round
-		tref raw = tau::build_bf_fall(tz,
-			tau::build_bf_fall(ty, pbf("y & z & w"), false), false);
-		bdd::ref rr = bdd::build_bdd(raw);
+		// either way round the run comes out in content order: one BDD,
+		// one chain leaf, since `w` hides in the body's leaf
+		tref body = pbf("y & z & r(w)");
+		bdd::ref rr = bdd::build_bdd(tau::build_bf_fall(tz,
+			tau::build_bf_fall(ty, body, false), false));
+		CHECK(rr == bdd::build_bdd(tau::build_bf_fall(ty,
+			tau::build_bf_fall(tz, body, false), false)));
+		CHECK(rr == bdd::build_bdd(bdd::build_functional_quantifiers(
+			{{ty, bdd::all}, {tz, bdd::all}}, body)));
 		REQUIRE(bdd::leaf(rr));
-		CHECK(tau::subtree_equals(bdd::get_var_term(rr),
-			bdd::build_functional_quantifiers(
-				{{ty, bdd::all}, {tz, bdd::all}},
-				pbf("y & z & w"))));
+		CHECK(tau::get(bdd::get_var_term(rr)).child_is(tau::bf_fall));
 		// a closed one folds: `fall y y` is F
 		CHECK(bdd::build_bdd(
 			tau::build_bf_fall(ty, pbf("y"), false)) == bdd::F);
@@ -1325,15 +1379,14 @@ TEST_SUITE("BDD build_bdd functional-quantifier chain") {
 		tref chain = bdd::build_functional_quantifiers({{one, bdd::all}},
 			tau::build_bf_or(b1, tau::get(tau::bf, q)));
 		REQUIRE(tau::get(chain).child_is(tau::bf_fall));
-		// the chain holds only `q` free: its own `1` is bound
+		// the chain holds only `q` free: its own `1` is bound, and the
+		// slide quantifies it away, ∀1 (1 ∪ q) = q
 		CHECK(get_free_vars<node_t>(chain).size() == 1);
+		CHECK(bdd::build_bdd(chain) == bdd::from_bit(q));
+		// the free `1` beside it stays a decision variable
 		tref f = tau::build_bf_and(b1, chain);
 		bdd::ref r = bdd::build_bdd(f);
-		REQUIRE(!bdd::leaf(r));
-		CHECK(tau::subtree_equals(bdd::get_var(r), one));
-		bdd::ref hi = bdd::get_high(r);
-		REQUIRE(bdd::leaf(hi));
-		CHECK(tau::subtree_equals(bdd::get_var_term(hi), chain));
+		CHECK(r == bdd::bdd_and(bdd::from_bit(one), bdd::from_bit(q)));
 		// as a function: the free `1` set to 1 leaves the chain, set to 0
 		// gives 0 — the bound `1` is untouched either way
 		CHECK(bdd::bdd_cofactor(r, one, true) == bdd::build_bdd(chain));

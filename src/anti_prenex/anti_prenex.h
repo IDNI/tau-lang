@@ -66,9 +66,10 @@ namespace idni::tau_lang::anti_prenexing {
  * is.
  *
  * @param phi a `wff` node
- * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes keeps
- *            a functional-quantifier chain symbolic instead of resolving it.
- *            The default keeps nothing
+ * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes allows
+ *            a functional-quantifier chain to stay symbolic instead of being
+ *            resolved, a closed piece of it still folding (§1). The default
+ *            keeps nothing
  * @param time_limit §3 `time_limit`, the one cutoff on the call's total
  *            work, none by default. Past it the call aborts WHOLE: nothing
  *            partial is returned, no computation it cuts short writes a

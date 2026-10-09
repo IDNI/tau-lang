@@ -48,6 +48,13 @@ tref fvar(const char* name) {
 	return tau::build_variable(name, tau_type_id<node_t>());
 }
 
+/// The term reference `q(arg)`, built over a built argument as this file
+/// builds its typed variables.
+tref qref(tref arg) {
+	return tau::get(tau::bf, tau::get(tau::bf_ref,
+		tau::build_ref("q", trefs{ arg })));
+}
+
 tref eq(tref l, tref r)   { return tau::build_bf_eq(l, r); }
 tref eq0(tref t)          { return tau::build_bf_eq_0(t); }
 tref neq(tref l, tref r)  { return tau::build_bf_neq(l, r); }
@@ -224,10 +231,11 @@ TEST_CASE("P3: no witness fires on the spec's counterexamples") {
 
 TEST_CASE("P4: a functional-quantifier chain is resolved at phase 1, or kept") {
 	tref x = bvar("x"), b = bvar("b"), y = tau::trim(bvar("y"));
-	// `∀_y (y ∪ z)` inside a term, under a binder with no pin, so nothing
-	// but phase 1 touches the chain.
+	// `∀_y (y ∪ q(z))` inside a term, under a binder. Its piece holds `z`
+	// free in a reference, so a kept chain is not folded when phase 4
+	// slides it (§1).
 	const tref chain = tb::build_functional_quantifiers(
-		{{ y, tb::all }}, lor(bvar("y"), bvar("z")));
+		{{ y, tb::all }}, lor(bvar("y"), qref(bvar("z"))));
 	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
 	const tref phi = ex("x", conj(eq0(land(x, b)), eq0(lor(x, chain))));
 	REQUIRE(holds(phi, tau::bf_fall));

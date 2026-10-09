@@ -28,10 +28,7 @@
  *
  * WHEN A TERM IS BDD-BACKED: exactly when its BDD branches. A BDD that has
  * become a single leaf or a terminal comes back as its plain term, so a term
- * with no variable at a Boolean position never carries a `BDD_ID` — with one
- * exception: a functional-quantifier chain over a stored BDD, which
- * `discharge` (cofactors.h) emits in keep mode. It keeps its BDD body until
- * the component's close, and the simplifiers treat it as BDD-backed.
+ * with no variable at a Boolean position never carries a `BDD_ID`.
  *
  * `term_of` and `norm_equation` live here because both are term operations
  * (`l + r` is a ring sum). NAME CLASH: inside this namespace `norm_equation`
@@ -56,7 +53,8 @@ namespace idni::tau_lang::anti_prenexing {
 //   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
-//   RESOLVE_FUNCTIONAL_*   resolve_functional_quantifiers_plain / _bdd (below)
+//   the slide of a chain   tau_term_bdd<node>::build_bdd of the chain
+//   RESOLVE_FUNCTIONAL_PLAIN resolve_functional_quantifiers_plain (below)
 //   φ[x ← t]  /  f[x ← t]  tree<node>::substitute(φ, bf(x), t, hook)
 //
 // BDD-BACKED: the term is a `bf(BDD_ID)` node — backed by a BDD with at
@@ -76,6 +74,11 @@ namespace idni::tau_lang::anti_prenexing {
 // same-kind run in content order, an adjoining run of the body merged — and
 // it folds a chain that binds every free variable of its body, plain or
 // backed, to its constant, unless a subscript hides in a leaf.
+//
+// THE SLIDE: building a chain into a BDD slides it down its body to its
+// subscripts' levels (§1 transparency). The variables above stay decision
+// structure, and each piece over the subscripts' levels becomes one leaf, the
+// constructor's chain over that piece, so a closed piece folds.
 
 // --- the representation boundary (PREPARE_TERMS) ---------------------------------
 
@@ -91,8 +94,9 @@ namespace idni::tau_lang::anti_prenexing {
  * equations) and the solver path consumes it as written.
  *
  * A formula-level binder, a reference and a temporal operator are opaque and
- * not entered. A term-level functional quantifier chain is ONE LEAF, put
- * through the library's chain constructor (§1).
+ * not entered. A term-level functional-quantifier chain is SLID by the build
+ * (§1): the variables above its subscripts' levels are decision variables
+ * like any other.
  *
  * Memoised per term within the call. Idempotent: an already prepared term is
  * returned as it is.
@@ -108,14 +112,13 @@ tref prepare_terms(tref body);
  * as a plain term, wherever it sits.
  *
  * ONE WALK over the formula skeleton. An ATOM carrying a stored BDD anywhere
- * — on a side, or in the body of a functional-quantifier chain `DISCHARGE`
- * emitted in keep mode — is spelled out by the library and then put through
- * `simplify_atom` in the PLAIN REGIME: exactly what phase 1 does to every
- * atom. A junction the walk closes is re-emitted canonically,
- * because a spelled atom may sort elsewhere among its siblings or fold to a
- * constant, which then decides the junction. A `¬` over an atom is rebuilt
- * over the spelled one, the hooks folding `¬T` and `¬F`. Nothing else is
- * touched, so a formula holding no stored BDD comes back as the SAME node.
+ * is spelled out by the library and then put through `simplify_atom` in the
+ * PLAIN REGIME: exactly what phase 1 does to every atom. A junction the walk
+ * closes is re-emitted canonically, because a spelled atom may sort elsewhere
+ * among its siblings or fold to a constant, which then decides the junction.
+ * A `¬` over an atom is rebuilt over the spelled one, the hooks folding `¬T`
+ * and `¬F`. Nothing else is touched, so a formula holding no stored BDD comes
+ * back as the SAME node.
  *
  * THE WALK MAY STOP AT A TERM, an atom's own sides apart: a stored BDD never
  * sits in a REFERENCE ARGUMENT. `PREPARE_TERMS` transports a reference
@@ -172,14 +175,14 @@ bool carries_functional_quantifier(tref f);
 template <NodeType node>
 std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
 
-// --- the two resolvers (RESOLVE_FUNCTIONAL_PLAIN, RESOLVE_FUNCTIONAL_BDD) --------
+// --- the resolver (RESOLVE_FUNCTIONAL_PLAIN) --------------------------------------
 //
 // THE UNIT OF WORK IS THE MAXIMAL CHAIN, any mix of `∀` and `∃`, taken at its
 // top and quantified by `bdd_quant`, one same-kind run at a time, innermost
-// run first. Both resolvers canonicalise its prefix
-// through the library's constructor and then ask `keep` ONCE, on that
-// canonical chain's node (`strip_chain` reads prefix and body off it). A yes
-// keeps the whole chain, and nothing inside it is looked at again.
+// run first. The resolver canonicalises its prefix through the library's
+// constructor and then asks `keep` ONCE, on that canonical chain's node
+// (`strip_chain` reads prefix and body off it). A yes keeps the whole chain,
+// and nothing inside it is looked at again.
 //
 // THE STUCK RULE says what a chain resolves into. A subscript sitting inside a
 // LEAF — in a reference argument, in a foreign-typed subterm — is reached by no
@@ -194,8 +197,7 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
 // the constructor. A choice of SIZE, not of soundness: crossing an alternation
 // by cofactors is legal, and duplicates the stuck chain.
 //
-// Neither resolver has a memo of its own: the entry pass runs once, and the
-// close's quantifications are covered by the library's memos.
+// The resolver has no memo of its own: the entry pass runs once.
 
 /**
  * @brief §3 `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)`: resolve the
@@ -210,29 +212,17 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
  * The body of a chain to resolve is built as a BDD under the global order,
  * phase 0's canonical ids putting its subscripts, innermost lowest, at the
  * bottom, and what comes back is spelled PLAIN before the pass moves on, phase
- * 1 being the plain regime. A body whose BDD does not branch holds every
- * subscript in a leaf, and that chain stays as it is.
+ * 1 being the plain regime. A chain nested in the body that a kept or stuck
+ * one left standing is SLID by that build below the outer subscripts' levels,
+ * where their quantification crosses it (§1 transparency). A body whose BDD
+ * does not branch holds every subscript in a leaf, and that chain stays as it
+ * is.
  *
  * After this pass a chain is a kept one or a stuck one, and both stay: no later
  * step resolves a chain it finds in a leaf.
  */
 template <NodeType node>
 tref resolve_functional_quantifiers_plain(tref n,
-	const keep_functional_fn<node>& keep = keep_no_functional<node>);
-
-/**
- * @brief §3 `RESOLVE_FUNCTIONAL_BDD(φ, kf)`: the same at a component's CLOSE
- * (§5).
- *
- * A chain met here sits over a BDD-backed body with its subscripts among the
- * decision variables (a keep-mode emission of `discharge`), so ONE
- * quantification of the STORED BDD settles it where it lies, and the result is
- * emitted like every other term: plain when nothing branches. A chain over a
- * PLAIN body has every subscript in a leaf and stays as it is. Leaves are
- * never entered: a chain in a leaf is decided already.
- */
-template <NodeType node>
-tref resolve_functional_quantifiers_bdd(tref n,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------

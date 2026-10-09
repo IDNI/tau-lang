@@ -1362,7 +1362,8 @@ TEST_SUITE("tree::substitute") {
 		CHECK(tau::get(f).find_top([](tref m) {
 			return tau::get(m).is(tau::variable); }) == nullptr);
 		CHECK(find_biggest_var_id<node_t>(f) == 5);
-		tref t = bf("fall w (w | q5)");         // the subscript is "1"
+		// the piece holds `q5` free in a reference, so the chain stays
+		tref t = bf("fall w (w | r(q5))");      // the subscript is "1"
 		REQUIRE(binder_id(t, tau::bf_fall) == "1");
 		tref res = tau::get(f).substitute(bf("x"), t);
 		// the chain is a leaf of the composed BDD; spell the term to read

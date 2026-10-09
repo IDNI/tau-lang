@@ -197,8 +197,17 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/**
 	 * @brief Build the BDD of the Tau term @p f: every `variable` reached
 	 * through `∪ · ′ +` is a decision variable; references, foreign-typed
-	 * and arithmetic subterms, constants and functional-quantifier chains
-	 * are leaves.
+	 * and arithmetic subterms and constants are leaves.
+	 *
+	 * A functional-quantifier chain `Q_Y b` goes through the constructor and
+	 * then SLIDES down its body to its subscripts' levels: the decision
+	 * nodes above them stay, and each PIECE, the sub-BDD from the first
+	 * subscript node or leaf on a path, is decided as the constructor
+	 * decides a chain: dropped when it holds no subscript, quantified on
+	 * its BDD when closed, else ONE LEAF, the chain over its term. Sound for
+	 * any order, since `Q_Y` commutes with cofactoring on a variable outside
+	 * `Y`; with canonical ids the subscripts are the body's lowest levels,
+	 * so a piece holds them alone.
 	 */
 	static ref build_bdd(tref f);
 	/** @brief Build a single-bit BDD for the `variable` node @p v. */
@@ -227,8 +236,12 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 *
 	 * An empty @p q, a constant @p body, and a chain left with no subscript
 	 * all give @p body itself.
+	 *
+	 * @p body_bdd, when the caller holds it, is @p body's BDD, which the
+	 * fold then quantifies instead of building @p body again.
 	 */
-	static tref build_functional_quantifiers(const quants& q, tref body);
+	static tref build_functional_quantifiers(const quants& q, tref body,
+		const ref* body_bdd = nullptr);
 
 	/**
 	 * @brief AND of the leaves @p leaves as one leaf, built once: their
@@ -290,7 +303,7 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 *
 	 * A changed leaf is built again through `build_bdd`, so it is spelled
 	 * as the constructor spells it (products through the leaf product,
-	 * chains through `build_functional_quantifiers`), leaves that became
+	 * chains through the slide), leaves that became
 	 * equal are one node and `h == l` folds, and a leaf that came to hold
 	 * a decision variable becomes a BDD. A decision node is rebuilt
 	 * through `add` while both children stay ordered below it, and through
@@ -386,6 +399,17 @@ private:
 		std::unordered_map<ref, ref>& memo);
 	static ref bdd_cofactor_impl(ref x, tref xi, bool bit,
 		std::unordered_map<ref, ref>& memo);
+	/**
+	 * @brief The slide of `build_bdd`'s chain case over the body's BDD @p x:
+	 * the chain's canonical prefix @p q, its subscripts @p ys sorted by
+	 * `subtree_less`, and the body's BA type @p type for the spelling of a
+	 * piece that stays a chain, which @p spelled memoises across the
+	 * pieces. @p memo is keyed per ref, inverters included: a chain does
+	 * not commute with complement.
+	 */
+	static ref slide(ref x, const quants& q, const trefs& ys, size_t type,
+		std::unordered_map<ref, ref>& memo,
+		std::unordered_map<ref, tref>& spelled);
 	// Workers of the walks above, carrying the per-call visited set / memo:
 	// recursive over BDD refs, the shape of bdd_compose_impl.
 	template <typename Fn>

@@ -380,30 +380,44 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f) {
 		case tau::bf_fall:
 		case tau::bf_fex: {
 			// §1 the functional-quantifier CHAIN `Q_Y b`, collected
-			// whole and put through the constructor, which puts it in
-			// content order, merges its runs, drops a degenerate
-			// subscript and folds a closed chain. What is still a
-			// chain is ONE LEAF, hiding what its body carries (§1's
-			// leaf hazard, read through `LEAF_FV`); anything else is
-			// built, a smaller term than `f`.
-			// TODO (HIGH): slide a chain to its subscripts' levels.
-			quants q;
-			tref body = nullptr;
-			for (tref c = f;;) {
-				const tau& tc = tau::get(c);
-				q.emplace_back(tau::trim_right_sibling(tc.first()),
-					tc.is(tau::bf_fall) ? all : ex);
-				body = tau::trim_right_sibling(tc.second());
-				const tau& tb = tau::get(body);
-				if (!tb.child_is(tau::bf_fall)
-					&& !tb.child_is(tau::bf_fex)) break;
-				c = tb.first();
-			}
-			const tref c = build_functional_quantifiers(q, body);
+			// whole from a binder node down, outermost first.
+			auto strip = [](tref n) {
+				std::pair<quants, tref> r;
+				for (;;) {
+					const tau& tn = tau::get(n);
+					r.first.emplace_back(
+						tau::trim_right_sibling(tn.first()),
+						tn.is(tau::bf_fall) ? all : ex);
+					r.second = tau::trim_right_sibling(tn.second());
+					const tau& tb = tau::get(r.second);
+					if (!tb.child_is(tau::bf_fall)
+						&& !tb.child_is(tau::bf_fex)) return r;
+					n = tb.first();
+				}
+			};
+			const auto [q0, b0] = strip(f);
+			// The constructor puts it in content order, merges its
+			// runs, drops a degenerate subscript and folds a closed
+			// chain; what is no chain any more is built as it is.
+			const tref c = build_functional_quantifiers(q0, b0);
 			const tau& tc = tau::get(c);
-			if (tc.child_is(tau::bf_fall) || tc.child_is(tau::bf_fex))
-				return add(tau::trim(c));
-			return build_bdd(c);
+			if (!tc.child_is(tau::bf_fall) && !tc.child_is(tau::bf_fex))
+				return build_bdd(c);
+			// THE SLIDE over the body's BDD, a chain nested in the
+			// body slid already by that build.
+			const auto [q, body] = strip(tc.first());
+			trefs ys;
+			ys.reserve(q.size());
+			for (const auto& yk : q) ys.push_back(yk.first);
+			std::sort(ys.begin(), ys.end(), tau::subtree_less);
+			// The canonical prefix repeats no subscript, so a piece's
+			// fold only drops the subscripts it does not hold.
+			DBG(assert(std::adjacent_find(ys.begin(), ys.end(),
+				tau::subtree_equals) == ys.end());)
+			std::unordered_map<ref, ref> memo;
+			std::unordered_map<ref, tref> spelled;
+			return slide(build_bdd(body), q, ys, find_ba_type<node>(body),
+				memo, spelled);
 		}
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
@@ -432,10 +446,10 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::from_bit(tref v) {
 	return add(v, T, F);
 }
 
-/** @internal @copydoc tau_term_bdd::build_functional_quantifiers(const quants&, tref) @endinternal */
+/** @internal @copydoc tau_term_bdd::build_functional_quantifiers(const quants&, tref, const ref*) @endinternal */
 template<NodeType node>
 tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
-	tref body)
+	tref body, const ref* body_bdd)
 {
 	using tau = tree<node>;
 	body = tau::trim_right_sibling(body);
@@ -478,6 +492,7 @@ tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
 			segs.back().second.push_back(
 				tau::trim_right_sibling(c.first()));
 			body = tau::trim_right_sibling(c.second());
+			body_bdd = nullptr;
 		}
 	}
 	// The chain, outermost first.
@@ -501,7 +516,7 @@ tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
 	//    leaf hazard: a reference argument, a foreign-typed subterm) is
 	//    reached by no quantification, and that chain stands.
 	if (std::ranges::all_of(get_free_vars<node>(body), is_subscript)) {
-		const ref b = build_bdd(body);
+		const ref b = body_bdd ? *body_bdd : build_bdd(body);
 		if (std::ranges::none_of(
 			term_handle<node>::get_free_leaf_vars(b.b), is_subscript))
 			return to_tau_term(bdd_quant(b, prefix),
@@ -824,6 +839,64 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_cofactor_impl(ref x, tref xi,
 	if (tau::subtree_equals(xi, var)) r = bit ? get_high(x) : get_low(x);
 	else r = add(var, bdd_cofactor_impl(get_high(x), xi, bit, memo),
 		bdd_cofactor_impl(get_low(x), xi, bit, memo));
+	return memo.emplace(x, r).first->second;
+}
+
+/**
+ * @internal
+ * @brief A node whose variable is no subscript stays, rebuilt through `add`,
+ * which keeps canonicity because every piece comes back a leaf or a
+ * terminal; the first subscript node or leaf on a path is a PIECE. A closed
+ * piece folds on its BDD; only one that stays a chain is spelled.
+ * @endinternal
+ */
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::slide(ref x, const quants& q,
+	const trefs& ys, size_t type, std::unordered_map<ref, ref>& memo,
+	std::unordered_map<ref, tref>& spelled)
+{
+	using tau = tree<node>;
+	if (x == T || x == F) return x;
+	if (auto it = memo.find(x); it != memo.end()) return it->second;
+	auto is_subscript = [&ys](tref v) {
+		return std::binary_search(ys.begin(), ys.end(), v,
+			tau::subtree_less);
+	};
+	ref r;
+	if (!leaf(x) && !is_subscript(get_var(x)))
+		r = add(get_var(x), slide(get_high(x), q, ys, type, memo, spelled),
+			slide(get_low(x), q, ys, type, memo, spelled));
+	else {
+		// Canonical ids put the subscripts at the bottom, so a piece of a
+		// chain over binder variables holds no other decision variable.
+		DBG(auto only_ys = [&is_subscript](ref n, bool is_leaf) {
+			return is_leaf || is_subscript(get_var(n)); };)
+		DBG(assert(!std::ranges::all_of(ys, [](tref y) {
+			return sort_key_of(y).binder; }) || visit_nodes(x, only_ys));)
+		const trefs& fv = term_handle<node>::get_free_tau_vars(x.b);
+		auto bare_leaf = [](ref n, bool is_leaf) {
+			return !is_leaf || get_free_vars<node>(get_var_term(n)).empty();
+		};
+		if (std::ranges::none_of(fv, is_subscript)) r = x;
+		else if (std::includes(ys.begin(), ys.end(), fv.begin(), fv.end(),
+			tau::subtree_less) && visit_nodes(x, bare_leaf))
+		{
+			// CLOSED, no subscript hidden in a leaf: the constructor's
+			// fold, taken on the BDD over the subscripts the piece holds.
+			quants held;
+			for (const auto& yk : q)
+				if (std::binary_search(fv.begin(), fv.end(), yk.first,
+					tau::subtree_less)) held.push_back(yk);
+			r = bdd_quant(x, held);
+		} else {
+			// The chain stands: ONE LEAF over the piece's spelling.
+			const tref c = build_functional_quantifiers(q,
+				to_tau_term(x, type, spelled), &x);
+			DBG(assert(tau::get(c).child_is(tau::bf_fall)
+				|| tau::get(c).child_is(tau::bf_fex));)
+			r = add(tau::trim(c));
+		}
+	}
 	return memo.emplace(x, r).first->second;
 }
 

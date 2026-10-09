@@ -445,32 +445,57 @@ TEST_CASE("L26: a ∀ run whose dual is expanded resolves") {
 // --- 8. keep mode end to end --------------------------------------------------------
 
 TEST_CASE("L27: a kept emission rides into the next step's terms") {
-	// The settle move hands `∃x(x·y = 0)` to §7 as a SUB-block, and under
-	// `keep_functional` `DISCHARGE` spells it instead of solving it: the
-	// atom `(∀_x x·y) = 0` rides on as a conjunct of the smaller block,
-	// where 2b squeezes it INTO the terms it builds. The chain then sits
-	// in a BDD LEAF, which no quantification reaches (§1's leaf hazard),
-	// so the elimination of those one-atom clauses under `∃y` freezes and
-	// re-wraps instead of discharging (invariant 3) — two blocks, each
-	// carrying the chain, where the plain run answers `T`.
-	//
-	// The claims are spelled out rather than taken from `anti_prenexed`:
-	// what this case pins is the KEPT shape, under its own callback.
+	using quants = tau_term_bdd<node_t>::quants;
+	// The settle move hands a SUB-block to §7, and under `keep_functional`
+	// `DISCHARGE` decides it at its emission. The callback keeps every
+	// chain and records the prefixes it is asked about.
+	std::vector<quants> asked;
+	auto keep_all = [&asked](tref n) {
+		quants q = ap::strip_chain<node_t>(n).first;
+		if (!q.empty()) asked.push_back(std::move(q));
+		return true;
+	};
+	auto binds = [](const quants& q, tref v) {
+		return std::ranges::any_of(q, [v](const auto& yk) {
+			return tau::subtree_equals(yk.first, v); });
+	};
+	// `∃x(x·y = 0)` out of `ex x ex y …`: the inner `y` sits BELOW x's
+	// levels, still pending, so the sub-block is quantified at once, the
+	// callback never asked about it, and the answer is the plain one, `T`.
+	// A push the tables answer asks no callback, hence the flushes.
+	ap::flush_solver_dependent<node_t>();
 	const tref phi = parse("ex x ex y (xy = 0 && (ya = 0 || yb = 0)).");
-	auto keep_all = [](tref) { return true; };
+	const tref x = tau::trim_right_sibling(ap::binder_var<node_t>(phi));
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
-	CHECK(holds(got, tau::bf_fall));
-	CHECK(binder_count(got) == 2);
-	CHECK(invariant_4(got));
-	CHECK(no_escape(got, phi));
-	CHECK(!holds(got, tau::BDD_ID));
+	CHECK(std::ranges::none_of(asked,
+		[&](const quants& q) { return binds(q, x); }));
+	CHECK(tau::get(got).equals_T());
 	CHECK(are_nso_equivalent<node_t>(got, phi));
+	CHECK(tau::get(anti_prenexed(phi)).equals_T());
+	// The other nesting puts the settled `x` innermost, and its piece holds
+	// `y` free in a reference, so the callback keeps the chain:
+	// `(∀_x x·q(y)) = 0` rides on as a conjunct of the smaller block, where
+	// `y` hides in its leaf (§1 leaf hazard), so `∃y` is re-wrapped around
+	// it rather than discharged (invariant 3). The checker does not read a
+	// reference, so these claims are structural.
+	ap::flush_solver_dependent<node_t>();
+	asked.clear();
+	const tref psi = parse(
+		"ex y ex x ((q(y) x) = 0 && (ya = 0 || yb = 0)).");
+	const tref xi = tau::trim_right_sibling(ap::binder_var<node_t>(
+		tau::trim_right_sibling(ap::binder_body<node_t>(psi))));
+	const tref kept = ap::anti_prenex<node_t>(psi, keep_all);
+	CHECK(std::ranges::any_of(asked,
+		[&](const quants& q) { return binds(q, xi); }));
+	CHECK(holds(kept, tau::bf_fall));
+	CHECK(binder_count(kept) >= 1);
+	CHECK(invariant_4(kept));
+	CHECK(no_escape(kept, psi));
+	CHECK(!holds(kept, tau::BDD_ID));
 	// Handed back to the DEFAULT callback, the kept answer gives what the
 	// plain run gives directly: phase 1's `RESOLVE_FUNCTIONAL_PLAIN` takes
-	// the chains and the blocks are pushed with nothing kept.
-	CHECK(ap::anti_prenex<node_t>(got) == ap::anti_prenex<node_t>(phi));
-	// Which is `T`: `x := 0, y := 0` satisfies the body.
-	CHECK(tau::get(anti_prenexed(phi)).equals_T());
+	// the chain and the blocks are pushed with nothing kept.
+	CHECK(ap::anti_prenex<node_t>(kept) == ap::anti_prenex<node_t>(psi));
 }
 
 } // TEST_SUITE
