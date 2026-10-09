@@ -64,7 +64,8 @@ inline cvc5::Term normalize_bv(const cvc5::Term& fm);
 // Basic Boolean algebra operators
 //
 // Each operator builds a new term via the matching make_bitvector_* builder
-// (see cvc5_builders.tmpl.h); both operands must have the same bitvector
+// (see cvc5_builders.tmpl.h); |, &, ^ and ~ return it normalised, a value
+// when the operands are values. Both operands must have the same bitvector
 // sort. Kind mapping:
 //   |  BITVECTOR_OR      &  BITVECTOR_AND     ^  BITVECTOR_XOR
 //   ~  BITVECTOR_NOT     +  BITVECTOR_ADD     -  BITVECTOR_SUB

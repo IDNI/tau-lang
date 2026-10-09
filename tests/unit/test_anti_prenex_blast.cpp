@@ -218,4 +218,13 @@ TEST_CASE("B11: two atoms of bv[8], each distinct from its predecessor") {
 		"&& !(w:bv[8] = v:bv[8])).")) == true);
 }
 
+TEST_CASE("B12: a constant folded from two constants is read by its value") {
+	CHECK(decide(parse("ex s (!(s:bv[8] & ({ 2 }:bv[8] | { 4 }:bv[8]) "
+		"= { 0 }:bv[8]) && !(s:bv[8] & { 1 }:bv[8] = { 0 }:bv[8]))."))
+		== true);
+	CHECK(decide(parse("ex s (!(s:bv[8] & ({ 2 }:bv[8] | { 4 }:bv[8]) "
+		"= { 0 }:bv[8]) && s:bv[8] & ({ 1 }:bv[8] | { 6 }:bv[8]) "
+		"= { 0 }:bv[8]).")) == false);
+}
+
 } // TEST_SUITE

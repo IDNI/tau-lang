@@ -153,6 +153,32 @@ TEST_SUITE("bv comparison hooks: constant folding") {
 }
 
 // ---------------------------------------------------------------------------
+// Boolean operators over two constants
+// ---------------------------------------------------------------------------
+
+// The zero/one tests, the comparison folds and the anti-prenex conversion
+// read a bv constant only as a bit-vector value, so a fold must yield one.
+TEST_SUITE("bv Boolean constant folds") {
+
+	TEST_CASE("or, and and xor fold to the value") {
+		CHECK(bf("{2}:bv[8] | {4}:bv[8]") == bf("{6}:bv[8]"));
+		CHECK(bf("{2}:bv[8] & {6}:bv[8]") == bf("{2}:bv[8]"));
+		CHECK(bf("{1}:bv[8] ^ {2}:bv[8]") == bf("{3}:bv[8]"));
+		CHECK(bf("({1}:bv[8] | {2}:bv[8]) & {6}:bv[8]") == bf("{2}:bv[8]"));
+	}
+
+	TEST_CASE("a fold to the bottom or top element is that element") {
+		CHECK(bf("{2}:bv[8] & {4}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("{1}:bv[2] | {2}:bv[2]") == bf("1:bv[2]"));
+	}
+
+	TEST_CASE("a comparison over a fold folds") {
+		CHECK(wff("({2}:bv[8] | {4}:bv[8]) < {7}:bv[8]") == wff("T"));
+		CHECK(wff("({2}:bv[8] | {4}:bv[8]) > {7}:bv[8]") == wff("F"));
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Arithmetic with the BA top element `1:bv[8]` (= 255) and bottom `0:bv[8]`
 // ---------------------------------------------------------------------------
 

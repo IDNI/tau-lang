@@ -14,21 +14,24 @@ using namespace idni;
 // delegates to the matching make_bitvector_* builder (cvc5_builders.tmpl.h);
 // see the kind mapping in cvc5.h. Note the unsigned/logical choices there:
 // `/` UDIV, `%` UREM, `>>` LSHR.
+//
+// The four Boolean operators fold BA constants, and every reader of a bv
+// constant expects a bit-vector value, so they return the normalised value.
 
 Term operator|(const Term& lhs, const Term& rhs) {
-	return make_bitvector_or(lhs, rhs);
+	return normalize_bv(make_bitvector_or(lhs, rhs));
 }
 
 Term operator&(const Term& lhs, const Term& rhs) {
-	return make_bitvector_and(lhs, rhs);
+	return normalize_bv(make_bitvector_and(lhs, rhs));
 }
 
 Term operator^(const Term& lhs, const Term& rhs) {
-	return make_bitvector_xor(lhs, rhs);
+	return normalize_bv(make_bitvector_xor(lhs, rhs));
 }
 
 Term operator~(const Term& operand) {
-	return make_bitvector_not(operand);
+	return normalize_bv(make_bitvector_not(operand));
 }
 
 Term operator+(const Term& lhs, const Term& rhs) {
