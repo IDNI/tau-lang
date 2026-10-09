@@ -52,9 +52,8 @@ cd "${REPO_ROOT}"
 
 TESTNET_REPO="${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}"
 TESTNET_DIR="${TAU_TESTNET_DIR:-${REPO_ROOT}/tau-testnet}"
-# The downstream revision the suite runs against. TAU_TESTNET_REF overrides
-# it, so a move of the pin is an explicit, visible change.
-TESTNET_REF="${TAU_TESTNET_REF:-8fa7f60748e676926bfeccf98cc60f9f623b7228}"
+# The suite follows tau-testnet main. TAU_TESTNET_REF selects another ref.
+TESTNET_REF="${TAU_TESTNET_REF:-origin/main}"
 # When set, install this prebuilt wheel instead of building the binding, so the
 # suite exercises the exact artifact a consumer would install.
 TESTNET_WHEEL="${TAU_TESTNET_WHEEL:-}"
@@ -79,11 +78,11 @@ if [ ! -d "${TESTNET_DIR}" ]; then
 	git clone "${TESTNET_REPO}" "${TESTNET_DIR}"
 else
 	echo "Using tau-testnet at ${TESTNET_DIR}"
+	git -C "${TESTNET_DIR}" fetch origin
 fi
 
-# Pin the downstream ref so a rerun is reproducible.
-echo "Pinning tau-testnet to ${TESTNET_REF}"
 git -C "${TESTNET_DIR}" checkout --detach "${TESTNET_REF}"
+echo "tau-testnet at ${TESTNET_REF}: $(git -C "${TESTNET_DIR}" log -1 --format='%H %s')"
 
 # tau_native.load_tau_module() looks for a build under <parent>/tau-lang
 # *before* falling back to PYTHONPATH. When TAU_TESTNET_DIR points at a
