@@ -282,10 +282,15 @@ _dep_cvc5_target_prebuild() {
 # The install rules of the top folder and of src: the headers, the library and
 # the package files. CMAKE_INSTALL_LOCAL_ONLY leaves out the rules of their
 # subfolders, which install the parser library and the binary.
+#
+# The prefix is given again here: cvc5's configure.sh takes one that starts
+# with a drive letter for a relative path and puts its own folder before it.
 _dep_cvc5_target_install() {
-	local build="$1" prefix="$2" dir
+	local build="$1" prefix dir
+	prefix="$(cygpath -m "$2")" || return 1
 	for dir in "$build" "${build}/src"; do
-		"$DEP_CVC5_CMAKE" -DCMAKE_INSTALL_LOCAL_ONLY=ON \
+		"$DEP_CVC5_CMAKE" "-DCMAKE_INSTALL_PREFIX=${prefix}" \
+			-DCMAKE_INSTALL_LOCAL_ONLY=ON \
 			-P "$(cygpath -m "${dir}/cmake_install.cmake")" || return 1
 	done
 	_dep_cvc5_msvc_drop_parser_target "${prefix}/lib/cmake/cvc5"
