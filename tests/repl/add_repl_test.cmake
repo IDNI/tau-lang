@@ -54,7 +54,7 @@ endfunction()
 
 # add_repl_test(<name> <cmd> <regex> [FLAGS <arg>...] [NO_TRACE]
 #     [ENV <VAR=value>...] [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
-#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
+#     [REQUIRES ltlsynt|hostfs|bounded|<ba-id> ...])
 #
 # Runs `tau <flags> -e "<cmd>" -S trace`. NO_TRACE drops `-S trace`.
 function(add_repl_test test_name test_cmd test_regex)
@@ -78,12 +78,13 @@ endfunction()
 
 # `test_cmd` asks a bitvector question that neither the bits nor cvc5 decide
 # within a budget of 3 seconds (--bv-solve-timeout): the answer is UNKNOWN,
-# naming the budget, and never a verdict.
+# naming the budget, and never a verdict. The budget holds only where a child
+# process can be killed at its deadline.
 function(add_repl_budget_test test_name test_cmd)
 	add_repl_test(${test_name} "${test_cmd}"
 		"UNKNOWN: a bitvector question passed its time budget [(]bv-solve-timeout, 3 s"
 		FLAGS --bv-solve-timeout 3 NO_TRACE
-		FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 120)
+		FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 120 REQUIRES bounded)
 endfunction()
 
 # add_echo_repl_test(<name> <cmd> <regex> [ENV <VAR=value>...]
@@ -105,6 +106,24 @@ function(add_echo_repl_test test_name test_cmd test_regex)
 			COMMAND bash -c "echo \"${test_cmd}. q\" | ${TAU_RUN}")
 	endif()
 	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")
+endfunction()
+
+# Sets <out> to <text> with the \xHH and \NNN escapes of printf replaced by
+# the characters they name, for a host whose shell has no printf.
+function(tau_repl_printf_escapes out text)
+	while("${text}" MATCHES "\\\\x([0-9a-fA-F][0-9a-fA-F])")
+		math(EXPR _code "0x${CMAKE_MATCH_1}")
+		string(ASCII ${_code} _char)
+		string(REPLACE "\\x${CMAKE_MATCH_1}" "${_char}" text "${text}")
+	endwhile()
+	while("${text}" MATCHES "\\\\([0-7])([0-7])([0-7])")
+		math(EXPR _code
+			"${CMAKE_MATCH_1} * 64 + ${CMAKE_MATCH_2} * 8 + ${CMAKE_MATCH_3}")
+		string(ASCII ${_code} _char)
+		string(REPLACE "\\${CMAKE_MATCH_1}${CMAKE_MATCH_2}${CMAKE_MATCH_3}"
+			"${_char}" text "${text}")
+	endwhile()
+	set(${out} "${text}" PARENT_SCOPE)
 endfunction()
 
 # add_multiline_repl_test(<name> <regex> <line1> [<line2> ...]
@@ -139,6 +158,7 @@ function(add_multiline_repl_test test_name test_regex)
 		# PowerShell needs real newlines. It doubles a single quote inside a
 		# single-quoted string.
 		string(REPLACE "\\n" "\n" _ps_stdin "${_payload}")
+		tau_repl_printf_escapes(_ps_stdin "${_ps_stdin}")
 		string(REPLACE "'" "''" _ps_stdin "${_ps_stdin}")
 		string(JOIN " " _ps_args ${_args})
 		add_test(NAME "test_repl-${test_name}"

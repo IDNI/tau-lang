@@ -39,6 +39,8 @@ using namespace idni::tau_lang;
 
 static void do_gc() {
 	std::unordered_set<tref> keep;
+	// The Tau-BDD store is never swept and holds raw Tau trefs.
+	tau_term_bdd<node_t>::collect_live_refs(keep);
 	tau::gc(keep);
 }
 using std::string;

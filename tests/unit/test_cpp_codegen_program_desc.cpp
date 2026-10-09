@@ -1581,7 +1581,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: file-bound input stream is captured "
 	          "as binding::file with its filename, console output unchanged") {
 		compile_detail::scoped_clean_definitions<node_t> clean_defs;
-		const std::string stream_file = cg_tmp("_tau_cg_pd_stream_test.in");
+		// Forward slashes on every host: the emitted string literal escapes
+		// a backslash, so only such a name is found in main.cpp as written.
+		const std::string stream_file = std::filesystem::path(
+			cg_tmp("_tau_cg_pd_stream_test.in")).generic_string();
 		std::string src =
 			"i1:tau := in file(\"" + stream_file + "\").\n"
 			"o1:tau := out console.\n"

@@ -111,7 +111,7 @@ TEST_SUITE("bv width completion") {
 		CHECK( src != nullptr );
 		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
 		CHECK( var != nullptr );
-		CHECK( tau::get(var).get_ba_type() == bv8_type_id<node_t> );
+		CHECK( tau::get(var).get_ba_type() == bv8_type_id<node_t>() );
 	}
 
 	// { 5 }:bv = x:bv[8]: same propagation, the other direction.
@@ -120,7 +120,7 @@ TEST_SUITE("bv width completion") {
 		CHECK( src != nullptr );
 		auto cst = tau::get(src).find_top(is<node_t, tau::ba_constant>);
 		CHECK( cst != nullptr );
-		CHECK( tau::get(cst).get_ba_type() == bv8_type_id<node_t> );
+		CHECK( tau::get(cst).get_ba_type() == bv8_type_id<node_t>() );
 	}
 
 	// x:bv = {5}:bv has no width anywhere and no cast to complete it from: a type error, never a pack default.
@@ -200,6 +200,7 @@ TEST_SUITE("bv solver budgets and declines") {
 	}
 
 	TEST_CASE("an unknown verdict is neither unsat nor valid") {
+		if (!bounded_calls_available()) return;
 		tref fm = closed_form("ex x:bv[8] (x + { 1 }:bv[8] = { 2 }:bv[8]).");
 		{
 			time_budget_handled scope(std::chrono::seconds(0));
@@ -217,6 +218,7 @@ TEST_SUITE("bv solver budgets and declines") {
 	// formula is decided again once the scope closes, and nothing of the
 	// scope's budget reaches a later question.
 	TEST_CASE("a shared budget already spent leaves the question unknown") {
+		if (!bounded_calls_available()) return;
 		tref fm = closed_form(
 			"ex x:bv[8] (x + { 3 }:bv[8] = { 5 }:bv[8]).");
 		{
