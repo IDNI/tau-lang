@@ -805,9 +805,52 @@ jobs:
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
+      # A crashed test prints little, so Windows keeps a mini dump of it.
+      - name: Keep a crash dump of each crashing program
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dir -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 20 -Force | Out-Null
+
       # Git Bash runs ./dev, and the preset carries the compiler choice.
+      # CodeView info and a PDB per program give the crash dumps their
+      # symbols. The cache variables stay out of the dependency ids.
       - name: Build and test
-        run: ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        env:
+          # Git Bash would rewrite /DEBUG as a path for cmake.exe.
+          MSYS2_ARG_CONV_EXCL: -DCMAKE_EXE_LINKER_FLAGS=
+        run: |
+          ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
+            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF"
+
+      # A dump is named <program>.exe.<pid>.dmp, so only the programs that
+      # crashed send their PDB.
+      - name: Add the PDB of each crashed program
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for d in crash-dumps/*.dmp; do
+            exe="$(basename "$d")"
+            pdb="build/release-msvc/${exe%%.exe.*}.pdb"
+            [ -f "$pdb" ] && cp -n "$pdb" crash-dumps/
+          done
+          ls -la crash-dumps || true
+
+      - name: Upload the crash dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-crash-dumps
+          path: crash-dumps/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The darwin-arm64 environment: resolves and publishes the store and saves it
   # for the tests job below. A miss builds with the preset's own AppleClang.

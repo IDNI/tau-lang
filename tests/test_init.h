@@ -96,6 +96,8 @@ inline idni::diagnostics::result<void> (*test_tau_init_hook)() = nullptr;
 inline int (*test_child_hook)(int argc, char** argv) = nullptr;
 
 int main(int argc, char** argv) {
+	// ctest reads a pipe, which stdio buffers, and a crash loses that buffer
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	apply_tau_experiment_env();
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
 #ifdef TAU_LOG_TRACE_TESTS
