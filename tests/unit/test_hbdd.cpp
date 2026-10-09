@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <random>
+
 #include "test_init.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/sbf_ba.h"
@@ -151,5 +153,55 @@ TEST_SUITE("and_many") {
 		const hbdd<Bool> many = bdd_handle<Bool>::and_many(eqs);
 		for (size_t i = 2; i < eqs.size(); ++i) fold = fold & eqs[i];
 		CHECK((many == fold));
+	}
+}
+
+TEST_SUITE("quantify") {
+	TEST_CASE("one pass over a set equals one variable at a time") {
+		using engine = bdd<Bool>;
+		using handle = bdd_handle<Bool>;
+		bdd_init<Bool>();
+		const uint_t vars = 24, stride = 3;
+		auto var = [](uint_t v) {
+			return handle::get(engine::add(v, engine::T, engine::F));
+		};
+		// A random function over offset + 1 .. offset + 16; the same g at
+		// two offsets gives two shifted copies of one skeleton.
+		std::function<hbdd<Bool>(std::mt19937&, uint_t, int)> random_bdd =
+			[&](std::mt19937& g, uint_t offset, int depth) {
+			if (depth == 0) {
+				const hbdd<Bool> l = var(offset + 1 + g() % 16);
+				return g() % 2 ? l : ~l;
+			}
+			const hbdd<Bool> a = random_bdd(g, offset, depth - 1);
+			const hbdd<Bool> b = random_bdd(g, offset, depth - 1);
+			switch (g() % 3) {
+				case 0: return a & b;
+				case 1: return a | b;
+				default: return a ^ b;
+			}
+		};
+		std::mt19937 rng(20261009);
+		for (int trial = 0; trial < 300; ++trial) {
+			std::mt19937 g(rng()), g2 = g;
+			const hbdd<Bool> f = random_bdd(g, 0, 4);
+			const hbdd<Bool> x = trial % 3 == 0 ? f
+				: trial % 3 == 1 ? f ^ random_bdd(g2, 1 + rng() % 8, 4)
+				: f & ~random_bdd(g2, 1 + rng() % 8, 4);
+			// Odd trials take the sweep's slice-major layout: one rank's
+			// bits, `stride` apart; even ones a random set, unsorted and
+			// reaching past the function's variables.
+			std::vector<uint_t> vs;
+			if (trial % 2) for (uint_t v = 1 + rng() % stride; v <= vars;
+				v += stride) vs.push_back(v);
+			else for (uint_t v = vars + 4; v >= 1; --v)
+				if (rng() % 3 == 0) vs.push_back(v);
+			for (const bool universal : { false, true }) {
+				hbdd<Bool> one_by_one = x;
+				for (const uint_t v : vs) one_by_one = universal
+					? one_by_one->all(v) : one_by_one->ex(v);
+				CHECK((x->quantify(vs, universal) == one_by_one));
+			}
+		}
 	}
 }

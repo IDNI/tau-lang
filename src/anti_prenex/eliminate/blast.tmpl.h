@@ -117,10 +117,10 @@ sweep_bdd sweeper<node>::formula(tref n) {
 	} else if (is_child_quantifier<node>(n)) {
 		const tref v = binder_var<node>(n);
 		if (foreign(v)) fail();
-		r = formula(binder_body<node>(n));
-		const bool ex = binder_kind<node>(n) == tau_term_bdd<node>::ex;
-		for (size_t i = 0; i < width; ++i)
-			r = note(ex ? r->ex(id(v, i)) : r->all(id(v, i)));
+		std::vector<uint_t> bits(width);
+		for (size_t i = 0; i < width; ++i) bits[i] = id(v, i);
+		r = note(formula(binder_body<node>(n))->quantify(std::move(bits),
+			binder_kind<node>(n) == tau_term_bdd<node>::all));
 	} else if (t.child_is(tau::bf_eq)) {
 		// The general form `⋀ᵢ (⟦l⟧ᵢ ↔ ⟦r⟧ᵢ)`: a swallowed unit's body is
 		// not in zero form (§7).
@@ -179,10 +179,16 @@ const slices& sweeper<node>::term(tref n) {
 		const slices& x = term(body);
 		for (size_t i = 0; i < width; ++i) {
 			sweep_bdd b = x[i];
-			for (auto q = prefix.rbegin(); q != prefix.rend(); ++q)
-				b = note(q->second == tau_term_bdd<node>::all
-					? b->all(id(q->first, i))
-					: b->ex(id(q->first, i)));
+			// Neighbouring subscripts of one kind commute, so each
+			// run of them is quantified in one pass.
+			for (auto q = prefix.rbegin(); q != prefix.rend();) {
+				const auto kind = q->second;
+				std::vector<uint_t> ids;
+				for (; q != prefix.rend() && q->second == kind; ++q)
+					ids.push_back(id(q->first, i));
+				b = note(b->quantify(std::move(ids),
+					kind == tau_term_bdd<node>::all));
+			}
 			s[i] = b;
 		}
 	} else fail();

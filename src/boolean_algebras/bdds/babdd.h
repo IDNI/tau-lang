@@ -15,6 +15,7 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <span>
 
 #include "boolean_algebras/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
@@ -1466,6 +1467,42 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		else if (var_cmp(v, nx.v)) r = x;
 		else r = bdd_and(nx.h, nx.l);
 		update_cache(x, v, r, all_memo);
+		return r;
+	}
+
+	// Universal (or existential) quantification of every variable in vs in
+	// one pass; one variable at a time would rebuild everything above each
+	// variable again
+	static bdd_ref quantify(bdd_ref x, std::vector<uint_t> vs, bool universal) {
+		std::sort(vs.begin(), vs.end(), var_cmp);
+		std::unordered_map<bdd_ref, bdd_ref> memo;
+		return quantify(x, std::span<const uint_t>(vs), universal, memo);
+	}
+
+	// vs is sorted in the BDD order. The memo is keyed by x alone: the
+	// variables of vs left to quantify below x follow from x's top variable
+	static bdd_ref quantify(bdd_ref x, std::span<const uint_t> vs,
+		bool universal, std::unordered_map<bdd_ref, bdd_ref>& memo)
+	{
+		if (leaf(x)) return x;
+		const bdd &nx = get(x);
+		vs = vs.subspan(std::lower_bound(vs.begin(), vs.end(), nx.v,
+			var_cmp) - vs.begin());
+		if (vs.empty()) return x;
+		if (auto it = memo.find(x); it != memo.end()) return it->second;
+		bdd_ref r;
+		if (vs.front() != nx.v)
+			r = add(nx.v, quantify(nx.h, vs, universal, memo),
+				quantify(nx.l, vs, universal, memo));
+		else {
+			r = quantify(nx.h, vs.subspan(1), universal, memo);
+			if (r != (universal ? F : T)) {
+				const bdd_ref l =
+					quantify(nx.l, vs.subspan(1), universal, memo);
+				r = universal ? bdd_and(r, l) : bdd_or(r, l);
+			}
+		}
+		memo.emplace(x, r);
 		return r;
 	}
 

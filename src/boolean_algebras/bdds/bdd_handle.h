@@ -454,6 +454,10 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::all(b, v));
 	}
 
+	hbdd<Bool, o> quantify(std::vector<uint_t> vs, bool universal) const {
+		return get(bdd<Bool, o>::quantify(b, std::move(vs), universal));
+	}
+
 	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
 		return get(bdd<Bool, o>::subst(b, v, x->b));
 	}
