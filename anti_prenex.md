@@ -128,14 +128,13 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
     f(x⃗) = ⋃_{a ∈ 2^|x⃗|} f(a) · x⃗^a, the leaves its BA coefficients.
     THE ORDER is ONE GLOBAL COMPARATOR, the same for every call: the free
     variables by name, then the binder variables by canonical binder id,
-    outermost first. Phase 0's ids decrease strictly inward (§3), so the
-    innermost land at the BOTTOM; sibling scopes sharing an id share the
-    variable — harmless, they never meet in one term. A call's ORDER LIST is
-    its variables sorted by the comparator, built at phase 4's entry (§4);
-    the comparator places any variable, a later one included. The BDD
-    library holds one order at a time — a chain's own at entry
-    (`RESOLVE_FUNCTIONAL_PLAIN`, §3), then the global one — and its tables
-    are never cleared within phases 4 and 5.
+    outermost first; ties by content order, the BA type included. Phase 0's
+    ids decrease strictly inward (§3), so the innermost land at the BOTTOM;
+    sibling scopes sharing an id share the variable — harmless, they never
+    meet in one term. Every variable met at a Boolean position is a decision
+    variable, and the comparator places any variable, one born during the
+    call included. The BDD library holds this one order for every phase and
+    every call, so no order change ever clears its tables.
     Only the sides of EQUATIONS are backed: an order atom is never cofactored
     (cof_memo keys are TERM_OF of equations) and the solver path consumes it
     as written, so it stays plain whatever it touches; reference arguments,
@@ -169,16 +168,14 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
         Y-substitution is a homomorphism fixing x, and meet/join distribute
         over an orthogonal decomposition — so a chain SLIDES down its body to
         its subscripts' levels. The slide lives in the BDD library's term
-        construction. At ENTRY (`RESOLVE_FUNCTIONAL_PLAIN`, §3), over PLAIN
-        bodies: a chain is collected whole, its body built under the chain's
-        own order and the chain wrapped onto every leaf; a chain touching no
-        decision variable is one canonical leaf, put through the
-        constructor. Linear in the body's BDD; nesting recurses
-        innermost-first. In PHASE 4, on every chain kept or stuck at entry,
-        met by the conversion (`PREPARE_TERMS`, §3), and on every chain
-        `DISCHARGE` keeps (§7): with ids canonical from phase 4's entry
-        (§4), the chain's subscripts are the lowest levels of its body, so
-        the slide is one linear walk. The variables above
+        construction and runs wherever a chain is built into a BDD: at ENTRY
+        on every chain kept or stuck inside a body `RESOLVE_FUNCTIONAL_PLAIN`
+        builds (§3), in PHASE 4 on every chain kept or stuck at entry, met by
+        the conversion (`PREPARE_TERMS`, §3), and on every chain `DISCHARGE`
+        keeps (§7). With canonical ids — phase 0's, and again from phase 4's
+        entry (§4) — the chain's subscripts are the lowest levels of its
+        body, so the slide is one linear walk; nesting recurses
+        innermost-first. The variables above
         stay decision structure; below each path through them the piece over
         the subscripts' levels becomes ONE LEAF, the chain over that piece,
         put through the constructor, which drops the chain from a piece
@@ -204,7 +201,7 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | field | meaning |
 |---|---|
 | `type` | the block's BA type `τ`. Single, by invariant 2 |
-| `order` | the call's ORDER LIST of the global order (§1): built at phase 4's entry (§4) and shared by every component — free variables on top, the innermost block at the **bottom** |
+| `order` | the global order (§1), the same for every component and every call — free variables on top, the innermost block at the **bottom** |
 | `prio` | variable priority. inner → **higher** rank — read by `EXPAND`'s disjunct key, `DECOMPOSE_ARMS`'s choice among a pin atom's pinned variables, and `FOLD_DECIDED`'s probe variable |
 | `subsume_max` | threshold on a clause's negative count, above which `SUBSUME_NEGATIVES` (finite method only) skips its O3 scan. `K = 32`. Free to tune: subsumption costs no precision, so neither taint nor flush attaches (cache scope, below) |
 | `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁰` |
@@ -229,14 +226,13 @@ factor and the occurrence limit) is provisional pending benchmarks.
 COMPONENT STATE — `type`, `prio`, the five component knobs and
 `keep_functional` — is set at component setup (§5) and
 lives for that component alone. PHASE STATE — `order` and the callback `kf` —
-is the same for every component of phase 4: the call's order list, built at
-the phase's entry (§4) and read again by phase 5's `SIMPLIFY` (§3), and the
-caller's callback. GLOBAL — `taint_count` and the seven tables — outlives
-the call (cache scope, below). The component
-knobs are read from the process-wide defaults at setup, so a changed one
-applies from the next component on; `propagate_growth` and `absorb_occ_max`
-belong to `SIMPLIFY` and the joins, which run in every phase without a ctx,
-and are read bare at every use.
+is the same for every component of phase 4: the global order (§1), read
+again by phase 5's `SIMPLIFY` (§3), and the caller's callback. GLOBAL —
+`taint_count` and the seven tables — outlives the call (cache scope, below).
+The component knobs are read from the process-wide defaults at setup, so a
+changed one applies from the next component on; `propagate_growth` and
+`absorb_occ_max` belong to `SIMPLIFY` and the joins, which run in every
+phase without a ctx, and are read bare at every use.
 
 The two conventions are distinct and cannot be merged: `order` is the global
 order over every variable, the innermost block at the bottom, where BDD
@@ -417,8 +413,8 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞):
                                        //   here to the spelling
  5. φ ← SIMPLIFY(φ) ; φ ← FINISH_TERMS(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
                                        // SIMPLIFY: the last reader of the
-                                       //   backed terms, under the call's
-                                       //   order list, the empty block in
+                                       //   backed terms, under the global
+                                       //   order, the empty block in
                                        //   scope; FINISH_TERMS: the one
                                        //   spelling (§3)
     return CANONICALISE_BINDER_IDS(φ)
@@ -693,7 +689,9 @@ dropped, a repeated subscript is kept at its innermost occurrence, each
 same-kind run sits in content order outermost first — one node per SET per
 kind — an adjoining same-kind run of `f` is merged into it, and a chain
 binding every free variable of `f`, plain or BDD-backed, is folded to its
-constant unless a subscript hides in a leaf), `NORM_EQUATION(atom, order)`
+constant unless a subscript hides in a leaf — its prefix quantified one
+same-kind run at a time, innermost run first, as every mixed prefix is
+under the global order (§1)), `NORM_EQUATION(atom, order)`
 (`l = r ↦ l + r = 0`, descending through one `¬`), `TERM_OF(atom, order)` (for
 an atom `l = r` — or `l ≠ r`, which phase 1 meets before
 `NORMALIZE_OPERATORS` — the term `l + r`, read through one `¬`) and
@@ -741,8 +739,8 @@ So are the two aggressive normalisers of invariant 6:
   again; keys do not drift because an atom is simplified ONCE, at
   construction, and again only when a substitution rewrote it.
 
-The `order` these four carry is the call's one list (§1) from phase 4 on;
-the EMPTY order is the plain regime — phases 1 and 2. From phase 4 on every
+The `order` these four carry is the global order (§1) from phase 4 on; the
+EMPTY order is the plain regime — phases 1 and 2. From phase 4 on every
 variable is a variable of the order, so on a backed term the sweep and the
 cofactor check find nothing the reduced BDD has not decided: `SIMPLIFY_TERM`
 is the IDENTITY. A leaf is simplified where it is made — inside its term by
@@ -787,11 +785,11 @@ The remaining primitives are defined by their contracts alone:
   (`[x ← t]`), and at the end. An outer binder's id strictly exceeds every
   id below it — siblings may share one — and that strict decrease is what
   makes `[x ← t]` capture-safe and puts the innermost block at the bottom of
-  phase 4's order (§1).
+  the global order (§1).
 - `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)` — resolves every functional-quantifier
   chain PRESENT in `φ` that the callback `kf` does not keep: the input's own
-  chains, at entry (phase 1), before phase 4's order exists. No term of `φ`
-  is BDD-backed.
+  chains, at entry (phase 1), under the global order (§1) like every BDD of
+  the call. No term of `φ` is BDD-backed.
 
   The unit of work is the MAXIMAL chain at its top, any mix of `∀`/`∃`,
   found anywhere — under binders, in reference arguments, in chain bodies.
@@ -802,15 +800,13 @@ The remaining primitives are defined by their contracts alone:
   closed plain chain folded), then ask `kf` ONCE, on the canonical chain's
   NODE — prefix outermost first with kinds, the body below it, for the
   callback to read. Kept ⇒ the whole chain stays. Else the body is built as
-  a BDD over the CHAIN'S OWN order, innermost subscript lowest, and handed to
-  THE CHAIN STEP with that order as the live one: ONE quantification of the
-  body's BDD — `bdd_ex`/`bdd_all` for a prefix of one kind, `bdd_quant` for
-  a mixed one, nested by the chain's order, which nests by construction.
-  What comes back is spelled PLAIN before the pass moves on — a node minted
-  under a chain's order belongs to no later order — and a chain nothing of
-  which resolved is the node as written. Chain orders re-rank a subscript
-  from chain to chain, so the library's tables clear between chains; nothing
-  is cached yet, which is why the chain's own order lives here alone.
+  a BDD under the global order — phase 0's canonical ids put the subscripts,
+  innermost lowest, at its bottom — and handed to THE CHAIN STEP: ONE
+  quantification of the body's BDD by the prefix, one same-kind run at a
+  time, innermost run first, each run one `bdd_ex`/`bdd_all`. What comes
+  back is spelled PLAIN before the pass moves on — phases 1 and 2 are the
+  plain regime (§3) — and a chain nothing of which resolved is the node as
+  written.
 
   LEAF HAZARD: a subscript hiding in a leaf — a reference argument, a
   foreign-typed subterm — is reached by no quantification and STAYS. The
@@ -822,8 +818,8 @@ The remaining primitives are defined by their contracts alone:
   body through the constructor. A choice of size, not of soundness —
   crossing an alternation by cofactors is legal, and duplicates the stuck
   chain — and a choice per NEST: a stuck chain nested deeper in the body was
-  slid onto the leaves by the build (§1 transparency), where an outer
-  subscript's quantification crosses it.
+  slid below the outer subscripts' levels by the build (§1 transparency),
+  where an outer subscript's quantification crosses it.
 
   After this pass a chain in `φ` is a kept one or a stuck one, and both
   stay: no later step resolves a chain it finds in a leaf. The pass has no
@@ -858,14 +854,13 @@ The remaining primitives are defined by their contracts alone:
 - `CONNECTED_COMPONENTS(X, body)` — the partition of `X` by atom
   connectivity, descending into nested binders, references connecting
   nothing (§5); each component in `X`'s order.
-- `PREPARE_TERMS(φ, order)` — phase 4's ONE conversion, at its start (§4):
-  both sides of every EQUATION of `φ`, wherever it sits — under binders,
-  under temporal operators — built as a BDD over `order` (§1), everything
-  else in the leaves, every chain kept or stuck at entry SLID to its
-  subscripts' levels (§1 transparency); order atoms and reference arguments
-  left plain. No binder unit exists yet: units are
-  phase 4's own re-wraps. One memoised walk. The caller owns `order` and
-  passes it to every later term operation of phases 4 and 5.
+- `PREPARE_TERMS(φ)` — phase 4's ONE conversion, at its start (§4): both
+  sides of every EQUATION of `φ`, wherever it sits — under binders, under
+  temporal operators — built as a BDD under the global order (§1),
+  everything else in the leaves, every chain kept or stuck at entry SLID to
+  its subscripts' levels (§1 transparency); order atoms and reference
+  arguments left plain. No binder unit exists yet: units are phase 4's own
+  re-wraps. One memoised walk.
 - `FINISH_TERMS(φ)` — the call's ONE spelling, at phase 5, after `SIMPLIFY`
   (above): every BDD-backed term of `φ` spelled plain wherever it sits —
   under a binder, a re-wrap's included, under a temporal operator, inside a
@@ -1035,11 +1030,7 @@ PROCESS_ALL_BLOCKS(φ, kf):                    // kf: the caller's callback
                                               //   apart: every chain's
                                               //   subscripts the lowest
                                               //   levels of its body (§1)
-    order ← φ's variables sorted by the global
-            order (§1)                        // the call's ORDER LIST: every
-                                              //   component's ctx.order (§5),
-                                              //   and phase 5's (§3)
-    φ ← PREPARE_TERMS(φ, order)               // the ONE conversion (§3)
+    φ ← PREPARE_TERMS(φ)                      // the ONE conversion (§3)
     memo ← ∅                                  // node → formula, whole pass;
                                               //   exact because kf is a pure
                                               //   function of the block
@@ -1145,8 +1136,8 @@ PUSH_EX_BLOCK(body, X, kf):
     for P in CONNECTED_COMPONENTS(X, body):       // each keeps X's order;
                                                   //   0-based: P[0] outermost
         ctx.type  ← the BA type of P
-        ctx.order ← the call's order list         // PHASE state (§1, §4): one
-                                                  //   list for every component
+        ctx.order ← the global order              // PHASE state (§1): one
+                                                  //   order for every component
         ctx.prio  ← { P[i] ↦ i+1 }                // inner → HIGHER, ranks 1..|P|
         ctx.kf ← kf                               // asked per emitted chain (§7)
         ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per component,
