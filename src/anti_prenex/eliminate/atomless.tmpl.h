@@ -43,7 +43,8 @@ bool atomless_opaque(tref conjunct, const block& X) {
 	// block variable in a leaf. An order atom is no equation and falls
 	// through to the last line.
 	if (is_child<node>(atom_of<node>(conjunct), tau::bf_eq))
-		return leaf_hides<node>(term_of<node>(conjunct), X);
+		return leaf_hides<node>(
+			term_of<node>(conjunct, regime::backed), X);
 	if (is_negative_tree<node>(conjunct)) {
 		// LITERAL-WISE: one walk down to the negated equations, each of
 		// them once, stopping at the first hidden one. Every leaf of a
@@ -52,8 +53,8 @@ bool atomless_opaque(tref conjunct, const block& X) {
 		bool hidden = false;
 		auto check = [&hidden, &X](tref m) {
 			if (!is_negated_equation<node>(m)) return true;
-			if (!leaf_hides<node>(term_of<node>(m), X))
-				return true;
+			const tref t = term_of<node>(m, regime::backed);
+			if (!leaf_hides<node>(t, X)) return true;
 			return hidden = true, false;
 		};
 		auto up = [](tref) {};
@@ -94,8 +95,9 @@ tref eliminate_atomless_clause(const trefs& conjuncts, const block& X,
 	for (tref n : s.negatives)
 		if (neg.insert(is_negative_tree<node>(n)
 			? tree_condition<node>(n, s.comps, fr.X, c)
-			: negative_condition<node>(term_of<node>(n),
-				s.comps, fr.X, c)))
+			: negative_condition<node>(
+				term_of<node>(n, regime::backed), s.comps,
+				fr.X, c)))
 			return _F<node>();
 	return simplified_and_join<node>(trefs{ fr.frozen, pos, neg.result() });
 }

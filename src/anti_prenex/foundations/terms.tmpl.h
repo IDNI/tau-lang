@@ -55,6 +55,23 @@ bool holds_bdd_id(tref t) {
 		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
 }
 
+/// Does @p t, not BDD-backed itself, hold a BDD-backed subterm at a Boolean
+/// position, a combination the library's operations should have built?
+/// DEBUG ONLY: the backed regime's entry check of the two normalisers below.
+template <NodeType node>
+bool mixes_bdd_id(tref t) {
+	if (thandle<node>::is_bdd_backed(t)) return false;
+	bool found = false;
+	auto check = [&found](tref m) {
+		if (!thandle<node>::is_bdd_backed(m)) return true;
+		return found = true, false;
+	};
+	auto up = [](tref) {};
+	pre_order<node>(t).search_unique(check,
+		while_is_boolean_operation<node>, up);
+	return found;
+}
+
 /// What the chain step hands back: the body's BDD quantified over the
 /// subscripts it took, and the prefix that STAYS over it, outermost first. An
 /// empty `kept` is a chain that resolved whole.
@@ -498,6 +515,9 @@ tref simplify_term(tref t, regime rg) {
 		DBG(assert(!holds_bdd_id<node>(t));)
 		return cofactor_check<node>(syntactic_path_simplification<node>(t));
 	}
+	// Terms are combined by the library's operations, never by the tree
+	// builders, so no raw tree reaches here holding a stored BDD.
+	DBG(assert(!mixes_bdd_id<node>(t));)
 	// A term with no variable and no stored BDD has nothing to build; the
 	// last test is what keeps a term holding a `BDD_ID` out of the sweep,
 	// which knows no `BDD_ID`.
@@ -505,9 +525,9 @@ tref simplify_term(tref t, regime rg) {
 		&& !holds_bdd_id<node>(t))
 		return syntactic_path_simplification<node>(t);
 	// The representation re-established (a BDD-backed term is canonical
-	// already; a plain combination of BDD-backed subterms is built; a chain
-	// is slid, §1), then every leaf through the leaf simplifier and the
-	// rebuild that merges leaves that became equal.
+	// already; a plain term is built, a chain slid, §1), then every leaf
+	// through the leaf simplifier and the rebuild that merges leaves that
+	// became equal.
 	bref<node> r = tbdd<node>::build_bdd(t);
 	DBG(assert(tbdd<node>::is_ordered(r));)
 	leaf_simplifier<node> simp;
@@ -528,9 +548,12 @@ tref simplify_atom(tref a, regime rg) {
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
 	// Phases 1 and 2 run in the plain regime, and no side holds a stored
-	// BDD there (terms.h): a Debug check of that contract.
+	// BDD there (terms.h); in the backed regime no side is a raw tree
+	// combining stored BDDs. Debug checks of those contracts.
 	DBG(assert(rg == regime::backed
 		|| (!holds_bdd_id<node>(l) && !holds_bdd_id<node>(r)));)
+	DBG(assert(rg == regime::plain
+		|| (!mixes_bdd_id<node>(l) && !mixes_bdd_id<node>(r)));)
 	// ONE recipe in both regimes: the sides simplified, the atom rebuilt
 	// through the construction hooks, which fold a constant-only atom,
 	// equal sides and a side against its complement. The atom is never
@@ -552,7 +575,7 @@ tref simplify_atom(tref a, regime rg) {
 		(eq || neq) && !rt.equals_T() && !rt.equals_F()
 		&& !tau::get(l2).equals_0() && !tau::get(r2).equals_0())
 	{
-		tref f = simplify_term<node>(term_of<node>(res), rg);
+		tref f = simplify_term<node>(term_of<node>(res, rg), rg);
 		const tau& z = tau::get(build_bf_eq_0<node>(f));
 		if (z.equals_T()) res = eq ? tau::_T() : tau::_F();
 		else if (z.equals_F()) res = eq ? tau::_F() : tau::_T();
@@ -563,7 +586,7 @@ tref simplify_atom(tref a, regime rg) {
 // --- reading and rewriting equations ---------------------------------------------
 
 template <NodeType node>
-tref term_of(tref atom) {
+tref term_of(tref atom, regime rg) {
 	using namespace terms_detail;
 	using tau = tree<node>;
 	using bdd = tbdd<node>;
@@ -576,10 +599,12 @@ tref term_of(tref atom) {
 	}
 	tref l = t[0].first();
 	tref r = t[0].second();
-	if (!thandle<node>::is_bdd_backed(l) && !thandle<node>::is_bdd_backed(r))
+	if (rg == regime::plain && !thandle<node>::is_bdd_backed(l)
+		&& !thandle<node>::is_bdd_backed(r))
 		return build_bf_xor<node>(l, r);
-	// The ring sum of two BDD-backed sides is a BDD operation; a plain side
-	// is built alongside, a constant or a single leaf.
+	// The ring sum is a BDD operation in the backed regime, where a side
+	// with no decision variable — a constant or a single leaf — is built
+	// alongside: atoms whose sides are leaves alone exist there too.
 	bref<node> a = tbdd<node>::build_bdd(l), b = tbdd<node>::build_bdd(r);
 	DBG(assert(bdd::is_ordered(a) && bdd::is_ordered(b));)
 	return thandle<node>::convert_to_tau_node_or_term(
@@ -588,12 +613,12 @@ tref term_of(tref atom) {
 }
 
 template <NodeType node>
-tref norm_equation(tref atom) {
+tref norm_equation(tref atom, regime rg) {
 	using tau = tree<node>;
 	using namespace terms_detail;
 	auto [eq, negated] = unwrap_neg<node>(atom);
 	if (!tau::get(eq).child_is(tau::bf_eq)) return atom;
-	tref res = build_bf_eq_0<node>(term_of<node>(eq));
+	tref res = build_bf_eq_0<node>(term_of<node>(eq, rg));
 	return negated ? build_wff_neg<node>(res) : res;
 }
 

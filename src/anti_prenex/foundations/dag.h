@@ -121,6 +121,11 @@ size_t formula_size(tref n);
 template <NodeType node>
 bool fv_meets(tref n, const block& X);
 
+/// `y ∈ FV(t)` for one trimmed variable node `y`: a binary search over the
+/// cached sorted set, the one-variable form of `fv_meets`.
+template <NodeType node>
+bool free_in(tref t, tref y);
+
 /// `X ∩ FV(n)`, KEEPING X's order: how a block is narrowed to what a node
 /// still holds.
 template <NodeType node>

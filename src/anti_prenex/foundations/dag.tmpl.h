@@ -113,6 +113,13 @@ bool fv_meets(tref n, const block& X) {
 }
 
 template <NodeType node>
+bool free_in(tref t, tref y) {
+	const trefs& fv = get_free_vars<node>(t);
+	return std::binary_search(fv.begin(), fv.end(), y,
+		tree<node>::subtree_less);
+}
+
+template <NodeType node>
 block fv_intersect(tref n, const block& X) {
 	using tau = tree<node>;
 	block out;

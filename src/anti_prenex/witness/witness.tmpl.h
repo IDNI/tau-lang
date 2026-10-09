@@ -248,23 +248,17 @@ std::optional<pin<node>> cof_pin(tref m, tref x) {
 	m = tau::trim_right_sibling(m);
 	if (!is_child<node>(m, tau::bf_eq)) return {};
 	// `TERM_OF(m)` holds no variable `m` lacks.
-	if (!detail::free_in<node>(m, x)) return {};
+	if (!free_in<node>(m, x)) return {};
 	// `TERM_OF(m)` as it arrives IS `cof_memo`'s key (§1), so this site
 	// forms it itself.
-	const tref f = term_of<node>(m);
+	const tref f = term_of<node>(m, regime::backed);
 	if (f == nullptr) return {};
 	// A term not mentioning `x` pins nothing, and `COF` Debug-asserts
-	// against such a vacuous entry. The binary search over the cached
-	// free-variable set (simplify.tmpl.h).
-	if (!detail::free_in<node>(f, x)) return {};
+	// against such a vacuous entry.
+	if (!free_in<node>(f, x)) return {};
 	const cof_entry e = cof<node>(f, x);
 	if (!e.pin) return {};
-	// THE WITNESS IS THE LOWER END `f₁′` (§3): it carries the residual into
-	// every sibling's terms, where `p = 0` then folds. The record carries
-	// neither the witness nor the STRICT verdict, so both are read off here.
-	const tref witness =
-		simplify_term<node>(build_bf_neg<node>(e.f1), regime::backed);
-	return pin<node>{ x, witness, tau::get(e.p).equals_0() };
+	return pin<node>{ x, e.witness, e.strict };
 }
 
 // --- TRY_WITNESS, spelled mode ---------------------------------------------------

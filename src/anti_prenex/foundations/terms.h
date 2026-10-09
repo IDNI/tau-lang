@@ -111,12 +111,13 @@ tref prepare_terms(tref phi);
 // --- cofactors and quantification -----------------------------------------------
 
 /**
- * @brief §1 cofactor by CHILD SELECTION: `f[x ← bit]` for a BDD-backed `f`
- * and a variable `x` at any depth. It is the library's `bdd_cofactor`, with
- * the result emitted through `convert_to_tau_node_or_term`. Canonical over
- * the decision variables, and NOT run through `simplify_term`; `cof`
- * (cofactors.h) does that. Returns `f` itself when `x` is not one of its
- * decision variables, or when `f` is plain.
+ * @brief §1 cofactor by CHILD SELECTION, the RESTRICT: `f[x ← bit]` for a
+ * BDD-backed `f` and a variable `x` at any depth. It is the library's
+ * `bdd_cofactor`, with the result emitted through
+ * `convert_to_tau_node_or_term`. Canonical over the decision variables, and
+ * NOT run through `simplify_term`, by `cof` (cofactors.h) either. Returns
+ * `f` itself when `x` is not one of its decision variables, or when `f` is
+ * plain.
  */
 template <NodeType node>
 tref cofactor(tref f, tref x, bool bit);
@@ -212,10 +213,12 @@ tref resolve_functional_quantifiers_plain(tref n,
  * The first three laws are THE SWEEP, the existing
  * `syntactic_path_simplification` (heuristics/). In the plain regime a term
  * goes through it whole. In the backed regime a term holding a variable or a
- * stored BDD — BDD-backed, a plain combination of BDD-backed subterms, or a
- * term carrying a stored BDD anywhere — is first (re)built, then every leaf
- * goes through the sweep and the BDD is rebuilt, so leaves that became equal
- * merge; a term holding neither is swept whole.
+ * stored BDD — BDD-backed, or carrying a stored BDD inside a leaf — is first
+ * (re)built, then every leaf goes through the sweep and the BDD is rebuilt,
+ * so leaves that became equal merge; a term holding neither is swept whole.
+ * A raw tree combining stored BDDs under a Boolean operator is never handed
+ * in: terms are combined by the library's operations (Debug-asserted, here
+ * and in `simplify_atom`).
  *
  * THE COFACTOR CHECK runs in the plain regime alone: in the backed one every
  * variable is a variable of the order, decided by the BDD already or sitting
@@ -262,18 +265,20 @@ tref simplify_atom(tref a, regime rg = regime::plain);
 
 // --- reading and rewriting equations ---------------------------------------------
 
-/// §3 `TERM_OF(atom)`: for an equation `l = r` or `l ≠ r`, seen through one
-/// optional `¬`, the term `l + r`. Read off without touching the atom
-/// (invariant 4). The ring sum is a BDD operation when a side is
-/// BDD-backed, the other side built alongside it. `nullptr` on anything
-/// else, which is a caller bug and is Debug-asserted.
+/// §3 `TERM_OF(atom, order)`: for an equation `l = r` or `l ≠ r`, seen
+/// through one optional `¬`, the term `l + r`. Read off without touching the
+/// atom (invariant 4). In the backed regime the ring sum is ALWAYS a BDD
+/// operation, even on sides that are leaves alone; in the plain regime it is
+/// the `bf_xor` of the two sides, unless a side is BDD-backed. `nullptr` on
+/// anything else, which is a caller bug and is Debug-asserted.
 template <NodeType node>
-tref term_of(tref atom);
+tref term_of(tref atom, regime rg = regime::plain);
 
-/// §3 `NORM_EQUATION`: `l = r ↦ l + r = 0`, descending through one `¬`.
-/// Anything that is no equation comes back as it is.
+/// §3 `NORM_EQUATION(atom, order)`: `l = r ↦ l + r = 0`, descending through
+/// one `¬`, the ring sum `term_of`'s in the regime @p rg. Anything that is no
+/// equation comes back as it is.
 template <NodeType node>
-tref norm_equation(tref atom);
+tref norm_equation(tref atom, regime rg = regime::plain);
 
 // --- in-memory size and the leaf hazard -------------------------------------------
 

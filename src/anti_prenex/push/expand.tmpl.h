@@ -52,7 +52,7 @@ bool probe(tref atom, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
 	// `TERM_OF(atom)` holds no variable the atom lacks.
 	if (!fv_meets<node>(atom, X)) return false;
-	const tref f = term_of<node>(atom);
+	const tref f = term_of<node>(atom, regime::backed);
 	const block vs = fv_intersect<node>(f, X);
 	if (vs.empty()) return false;
 	const cof_entry e = cof<node>(f, innermost<node>(vs, c));

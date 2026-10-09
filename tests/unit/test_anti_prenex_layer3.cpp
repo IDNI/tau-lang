@@ -537,8 +537,7 @@ TEST_CASE("L19: the squeeze's hidden pin is read back by the weak test") {
 	// the residual is `G = x·b` and the witness is `t·G′ = a·(x·b)′`
 	const tref G = land(as_bf(x), as_bf(b));
 	CHECK(same_function(e.p, G));
-	CHECK(same_function(ap::simplify_term<node_t>(lneg(e.f1), ap::regime::backed),
-		land(as_bf(a), lneg(G))));
+	CHECK(same_function(e.witness, land(as_bf(a), lneg(G))));
 	// The pass fires on it, and the block resolves: `∃x∃y.((y + a) ∪ x·b =
 	// 0 ∧ y·c ≠ 0)` is `a·c ≠ 0`.
 	CHECK(ap::try_witness<node_t>(y, f.clause, f.c).has_value());

@@ -142,7 +142,8 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 	// atom is no equation, and `term_of` is asked of an equation alone.
 	tref x = nullptr, w = nullptr;
 	if (is_child<node>(a, tau::bf_eq)) {
-		block vs = fv_intersect<node>(term_of<node>(a), X);
+		block vs = fv_intersect<node>(
+			term_of<node>(a, regime::backed), X);
 		std::ranges::sort(vs, [&c](tref l, tref r) {
 			return expand_detail::prio_of<node>(l, c)
 				> expand_detail::prio_of<node>(r, c); });

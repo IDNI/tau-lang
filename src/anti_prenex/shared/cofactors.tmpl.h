@@ -6,11 +6,11 @@
  * function means; the comments here say how it is built.
  *
  * The pieces come from the foundations: `cofactor`, `quantify_over`,
- * `simplify_term`, `simplify_atom` (terms.h), the library's chain
- * constructor `build_functional_quantifiers` and the slide `build_bdd` runs
- * on a chain (tau_bdd.h), the memo wrapper `memoised` (ctx.h), and the pin
- * test `pin_from_cofactors` (simplify.h). Nothing is computed here that one
- * of them already computes.
+ * `simplify_term`, `simplify_atom` (terms.h), `free_in` (dag.h), the
+ * library's BDD operations, its chain constructor
+ * `build_functional_quantifiers` and the slide `build_bdd` runs on a chain
+ * (tau_bdd.h), and the memo wrapper `memoised` (ctx.h). Nothing is computed
+ * here that one of them already computes.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__SHARED__COFACTORS_TMPL_H__
@@ -54,23 +54,43 @@ bool lowest_levels(tref term, const block& X) {
 
 template <NodeType node>
 cof_entry cof(tref f, tref x) {
-	// `x` free in `f`: `free_in` (simplify.tmpl.h) is the binary search
-	// over `get_free_vars`' sorted set, the cheapest form of the test.
-	DBG(assert(detail::free_in<node>(f, x) && "cof: x is not free in f");)
+	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
+	DBG(assert(free_in<node>(f, x) && "cof: x is not free in f");)
+	DBG(assert(thandle::is_bdd_backed(f)
+		|| !terms_detail::holds_bdd_id<node>(f));)
 	return memoised<node, table::cof_memo>({ f, x }, [&] {
-		// CHILD SELECTION, then `SIMPLIFY_TERM` (§6): `cofactor` is
-		// canonical over the decision variables but leaves the leaves
-		// alone, and the pin test compares terms syntactically.
-		const tref f0 = simplify_term<node>(cofactor<node>(f, x, false),
+		// RESTRICTS (§1): canonical over the decision variables as
+		// built, the leaves left as they are.
+		cof_entry e{ cofactor<node>(f, x, false),
+			cofactor<node>(f, x, true) };
+		// The leaf hazard (§1): `x` still inside a leaf of a cofactor.
+		if (free_in<node>(e.f0, x) || free_in<node>(e.f1, x)) return e;
+		e.usable = true;
+		const size_t type = find_ba_type<node>(f);
+		auto term = [type](typename tbdd::ref r) {
+			return thandle::convert_to_tau_node_or_term(thandle(r),
+				type);
+		};
+		const auto b0 = tbdd::build_bdd(e.f0);
+		const auto b1 = tbdd::build_bdd(e.f1);
+		// Boole's expansion puts the zeros of `f` at `f₀ ≤ x ≤ f₁′`, an
+		// interval that `f₀ ∪ f₁ = 1` collapses to a point.
+		const tref u = simplify_term<node>(term(tbdd::bdd_or(b0, b1)),
 			regime::backed);
-		const tref f1 = simplify_term<node>(cofactor<node>(f, x, true),
+		e.pin = tau::get(u).equals_1();
+		e.p = simplify_term<node>(term(tbdd::bdd_and(b0, b1)),
 			regime::backed);
-		cof_entry e = pin_from_cofactors<node>(f0, f1, x, regime::backed);
-		// A non-pin's residual, left unbuilt there, is still part of the
-		// record this table promises for every usable entry.
-		if (e.usable && !e.pin)
-			e.p = simplify_term<node>(build_bf_and<node>(f0, f1),
-				regime::backed);
+		if (e.pin) {
+			// The LOWER end `f₁′` (§3): it carries the residual
+			// into every sibling's terms, where `p = 0` then folds.
+			e.witness = term(tbdd::bdd_not(b1));
+			e.strict = tau::get(e.p).equals_0();
+		}
+		DBG(assert(!e.pin || tbdd::build_bdd(u) == tbdd::T);)
+		DBG(assert(!e.pin
+			|| tbdd::build_bdd(e.witness) == tbdd::bdd_not(b1));)
 		return e;
 	});
 }

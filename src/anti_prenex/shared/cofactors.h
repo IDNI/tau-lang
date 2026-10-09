@@ -20,28 +20,29 @@
 
 #include "../foundations/fwd.h"
 #include "../foundations/ctx.h"
+#include "../foundations/dag.h"
 #include "../foundations/terms.h"
-#include "../normalisers/simplify.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
 /**
- * @brief §6 `COF(f, x, ctx)`: the record of cofactoring the term `f` by the
- * block variable `x`, memoised in §1 `cof_memo`. Of the ctx it reads nothing.
+ * @brief §6 `COF(f, x)`: the record of cofactoring the term `f` by the
+ * variable `x`, memoised in §1 `cof_memo` — THE ONE RECIPE on backed terms,
+ * for a block variable of the push and for a free variable of §3
+ * `SIMPLIFY`'s propagation alike. It takes no ctx.
  *
- * `f₀` and `f₁` are `SIMPLIFY_TERM` of the two cofactors, taken by CHILD
- * SELECTION in `f`'s BDD; the rest of the `cof_entry`
- * (fwd.h) is the pin test `pin_from_cofactors` (simplify.h) applied to them,
- * with `p` filled in here too for a usable non-pin record — this table's own
- * promise, `pin_from_cofactors`'s alone stopping at the pin. There is no
- * witness slot: a consumer that needs `f₁′` builds `SIMPLIFY_TERM(¬f₁)`
- * itself, and reads STRICT off `p = 0`.
+ * `f₀` and `f₁` are the RESTRICTS of `f`'s BDD (§1), child selection with
+ * no `SIMPLIFY_TERM`; every other term of the `cof_entry` (fwd.h) is a BDD
+ * operation on them: the pin test on their union, the residual `p` their
+ * product — both through `SIMPLIFY_TERM` — and a pin's witness `f₁′` the
+ * complemented BDD of `f₁`, STRICT when `p` folds to `0`. A usable record
+ * carries `p` whether it pins or not.
  *
- * `f` IS THE KEY, exactly as it arrives (§1 cache scope): pass `TERM_OF` of
- * the atom, not the atom. `cof_memo` is GLOBAL: the entry is a pure function
- * of `(f, x)`, and nothing of the component enters it, every BDD being built
- * under the one global order. The table is a cache, absent in Debug builds,
- * so nothing here may depend on a hit.
+ * `f` IS THE KEY, exactly as it arrives (§1 cache scope): pass the backed
+ * regime's `TERM_OF` of the atom, not the atom. `cof_memo` is GLOBAL: the
+ * entry is a pure function of `(f, x)`, and nothing of the component enters
+ * it, every BDD being built under the one global order. The table is a
+ * cache, absent in Debug builds, so nothing here may depend on a hit.
  *
  * `x` must be free in `f` (Debug-asserted): an `x`-free term pins nothing.
  * `x` need not be a DECISION variable — when it is not, child selection

@@ -13,6 +13,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "anti_prenex/shared/cofactors.h"
+#include "anti_prenex/normalisers/simplify.h"
 
 using namespace idni::tau_lang;
 namespace ap = idni::tau_lang::anti_prenexing;
@@ -66,10 +67,10 @@ tref prepared(tref atom) {
 	return sides(ap::prepare_terms<node_t>(atom)).first;
 }
 
-/// The witness `f₁′` a consumer of `COF` builds for itself (§6: there is no
-/// slot for it in the record).
+/// The witness `f₁′` a pin record carries.
 tref witness_of(const ap::cof_entry& e) {
-	return ap::simplify_term<node_t>(build_bf_neg<node_t>(e.f1), ap::regime::backed);
+	REQUIRE(e.pin);
+	return e.witness;
 }
 
 } // namespace
@@ -90,10 +91,13 @@ TEST_CASE("C1: a strict pin — the spelled shape x + t = 0") {
 	// nothing beyond the pin itself.
 	REQUIRE(e.p != nullptr);
 	CHECK(tau::get(e.p).equals_0());
-	// the cofactors are `t` and `t′`, and the witness is the lower end `f₁′`
+	CHECK(e.strict);
+	// the cofactors are `t` and `t′`, and the witness is the lower end
+	// `f₁′`, the complement of `f₁`'s BDD
 	CHECK(same_function(e.f0, bf("t")));
 	CHECK(same_function(e.f1, bf("t'")));
 	CHECK(same_function(witness_of(e), bf("t")));
+	CHECK(tb::build_bdd(e.witness) == tb::bdd_not(tb::build_bdd(e.f1)));
 }
 
 TEST_CASE("C2: the WEAK pin (y + t) ∪ G = 0 keeps its residual") {
@@ -112,6 +116,7 @@ TEST_CASE("C2: the WEAK pin (y + t) ∪ G = 0 keeps its residual") {
 	CHECK(e.pin);
 	REQUIRE(e.p != nullptr);
 	CHECK(!tau::get(e.p).equals_0());               // weak, not strict
+	CHECK(!e.strict);
 	// the residual is `G` and the witness is `t·G′` (§3's hidden pin)
 	CHECK(same_function(e.p, G));
 	CHECK(same_function(witness_of(e), land(bf("t"), lneg(G))));
@@ -127,6 +132,9 @@ TEST_CASE("C3: what does not pin, and the LEAF HAZARD") {
 	REQUIRE(e.p != nullptr);
 	CHECK(same_function(e.f0, tau::_0(find_ba_type<node_t>(f))));
 	CHECK(same_function(e.f1, bf("a")));
+	// no pin: no witness, nothing strict
+	CHECK(e.witness == nullptr);
+	CHECK(!e.strict);
 
 	// `x·a ∪ r(x)`: `x` is a decision variable AND sits inside a
 	// reference argument, where no cofactor reaches it (§1). The record
@@ -137,6 +145,7 @@ TEST_CASE("C3: what does not pin, and the LEAF HAZARD") {
 	CHECK(!hz.usable);
 	CHECK(!hz.pin);
 	CHECK(hz.p == nullptr);
+	CHECK(hz.witness == nullptr);
 }
 
 TEST_CASE("C4: child selection passes through a kept chain in a leaf") {
@@ -171,6 +180,7 @@ TEST_CASE("C5: the record is a pure function of (f, x), cached under TAU_CACHE")
 	const ap::cof_entry again = ap::cof<node_t>(f, x);
 	CHECK(first.usable == again.usable);
 	CHECK(first.pin == again.pin);
+	CHECK(first.strict == again.strict);
 	CHECK(same(first.f0, again.f0));
 	CHECK(same(first.f1, again.f1));
 #ifdef TAU_CACHE
@@ -190,20 +200,33 @@ TEST_CASE("C6: ONE pin recipe — the plain regime's match agrees (D9)") {
 		eq0(lor(lxor(bf("y"), bf("t")), G)), y);
 	REQUIRE(weak.has_value());
 	const ap::cof_entry we = ap::pin_from_cofactors<node_t>(
-		lor(bf("t"), G), lor(lneg(bf("t")), G), y, ap::regime::plain);
+		lor(bf("t"), G), lor(lneg(bf("t")), G), y);
 	CHECK(we.usable);
 	CHECK(we.pin);
 	CHECK(tau::get(we.p).equals_0() == weak->strict);
+	CHECK(we.strict == weak->strict);
 	CHECK(same_function(witness_of(we), weak->witness));
 
 	auto strict = ap::find_pin_for<node_t>(eq0(lxor(bf("y"), bf("t"))), y);
 	REQUIRE(strict.has_value());
 	const ap::cof_entry se = ap::pin_from_cofactors<node_t>(
-		bf("t"), lneg(bf("t")), y, ap::regime::plain);
+		bf("t"), lneg(bf("t")), y);
 	CHECK(se.pin);
 	CHECK(tau::get(se.p).equals_0() == strict->strict);
+	CHECK(se.strict);
 	CHECK(strict->strict);
 	CHECK(same_function(witness_of(se), strict->witness));
+
+	// The backed regime's match is `COF`'s record on the same atom.
+	tref atom = ap::prepare_terms<node_t>(
+		eq0(lor(lxor(bf("y"), bf("t")), G)));
+	auto backed = ap::find_pin_for<node_t>(atom, y, ap::regime::backed);
+	REQUIRE(backed.has_value());
+	const ap::cof_entry be = ap::cof<node_t>(sides(atom).first, y);
+	CHECK(be.pin);
+	CHECK(backed->witness == be.witness);
+	CHECK(backed->strict == be.strict);
+	CHECK(same_function(be.witness, weak->witness));
 }
 
 // --- DISCHARGE, discharging mode ---------------------------------------------------

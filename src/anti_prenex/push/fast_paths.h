@@ -107,9 +107,9 @@ tref distribute_to_atoms(tref phi, const block& X, ctx<node>& c,
  * clauses — the honest cost of 2b (invariant 8). A shared sub-skeleton is
  * squeezed once.
  *
- * RAW: the unions are built by the hooked binary alone, and the list is NOT
- * deduplicated — a repeated factor inside one term and an equal atom
- * elsewhere in the list are both left standing.
+ * Each union is the library's `bdd_or` of the two terms' BDDs, and the list
+ * is NOT deduplicated — an equal term elsewhere in the list is left
+ * standing.
  */
 template <NodeType node>
 trefs squeeze_positives(tref phi);

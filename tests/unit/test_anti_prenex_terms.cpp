@@ -591,14 +591,22 @@ TEST_CASE("simplify_term: leaves simplified and merged in the backed regime") {
 	tref s = ap::simplify_term<node_t>(l, ap::regime::backed);
 	CHECK(!th::is_bdd_backed(s));
 	CHECK(same_function(s, bf("r(y) & r(z)")));
-	// a plain combination of BDD-backed subterms is built again
+	// a product and a complement are the library's operations, never raw
+	// trees over BDD-backed subterms: backed, and simplified like any
+	// backed term
 	tref f1 = ap::cofactor<node_t>(l, x, true);   // plain: one leaf
 	REQUIRE(!th::is_bdd_backed(f1));
 	tref g  = sides(ap::prepare_terms<node_t>(wff("x & z = 0"))).first;
-	tref prod = ap::simplify_term<node_t>(build_bf_and<node_t>(g, f1), ap::regime::backed);
+	auto term = [&g](tb::ref r) {
+		return th::convert_to_tau_node_or_term(th(r),
+			find_ba_type<node_t>(g));
+	};
+	tref prod = ap::simplify_term<node_t>(
+		term(tb::bdd_and(ref_of(g), ref_of(f1))), ap::regime::backed);
 	CHECK(th::is_bdd_backed(prod));
 	CHECK(same_function(prod, bf("x & z & r(y) & r(z)")));
-	tref comp = ap::simplify_term<node_t>(build_bf_neg<node_t>(g), ap::regime::backed);
+	tref comp = ap::simplify_term<node_t>(term(tb::bdd_not(ref_of(g))),
+		ap::regime::backed);
 	CHECK(same_function(comp, bf("(x & z)'")));
 	// a term whose BDD does not branch comes back plain, its leaf swept
 	tref one = ap::simplify_term<node_t>(bf("r(y) & (r(y)' | r(z))"),
@@ -786,13 +794,15 @@ TEST_CASE("simplify_term: the sweep simplifies AROUND a kept emission") {
 	tref stored = th::convert_to_tau_node(bf("b & (y & r(a) | y' & r(c))"));
 	tref e = emitted(tb::build_functional_quantifiers({{y, tb::all}}, stored));
 	REQUIRE(th::is_bdd_backed(e));
-	// a repeat of it folds, `·0` folds, and its complement is the
-	// complemented BDD, the chain leaf untouched
+	// a repeat of it folds, `·0` folds, and its complement, the library's,
+	// is the complemented BDD, the chain leaf untouched
 	CHECK(ap::simplify_term<node_t>(
 		build_bf_or<node_t>(e, e), ap::regime::backed) == e);
 	CHECK(tau::get(ap::simplify_term<node_t>(build_bf_and<node_t>(e,
 		tau::_0(find_ba_type<node_t>(e))), ap::regime::backed)).equals_0());
-	tref neg = ap::simplify_term<node_t>(build_bf_neg<node_t>(e), ap::regime::backed);
+	tref neg = ap::simplify_term<node_t>(th::convert_to_tau_node_or_term(
+		th(tb::bdd_not(ref_of(e))), find_ba_type<node_t>(e)),
+		ap::regime::backed);
 	REQUIRE(th::is_bdd_backed(neg));
 	CHECK(ref_of(neg) == tb::bdd_not(ref_of(e)));
 }
@@ -817,6 +827,16 @@ TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends
 	// one BDD-backed side and a constant: the side itself
 	tref eq0 = ap::prepare_terms<node_t>(wff("x & y = 0"));
 	CHECK(ap::term_of<node_t>(eq0) == sides(eq0).first);
+	CHECK(ap::term_of<node_t>(prepared, ap::regime::backed) == tb);
+	// sides that are leaves alone: the plain regime writes the `bf_xor`,
+	// the backed regime takes the ring sum on their BDDs all the same
+	tref leaves = wff("r(y) = r(z)");
+	tref lp = ap::term_of<node_t>(leaves);
+	CHECK(tau::get(lp).child_is(tau::bf_xor));
+	tref lb = ap::term_of<node_t>(leaves, ap::regime::backed);
+	CHECK(lb != lp);
+	CHECK(ref_of(lb) == tau_term_bdd<node_t>::bdd_xor(ref_of(bf("r(y)")),
+		ref_of(bf("r(z)"))));
 	// norm_equation: ours descends through ¬, the old one does not — pinned
 	tref neg = wff("!(x = y)");
 	tref ours = ap::norm_equation<node_t>(neg);

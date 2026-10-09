@@ -6,9 +6,10 @@
  * each procedure means; the comments here say how it is built.
  *
  * The pieces come from the files below: `fv_meets` and the shape predicates
- * (foundations/dag.h) for the classification, `is_pure_equation`, `term_of`,
- * `simplify_term` and `simplify_atom` (foundations/terms.h) for the literals
- * and the terms, the result joins (normalisers/joins.h) for every assembly,
+ * (foundations/dag.h) for the classification, `is_pure_equation`, `term_of`
+ * and `simplify_atom` (foundations/terms.h) for the literals and the terms,
+ * the library's `bdd_or` for the squeeze's products, the result joins
+ * (normalisers/joins.h) for every assembly,
  * and `eliminate_block` with `ex_distributes_over_negatives`
  * (eliminate/eliminate_block.h) for the clauses and for 2a's licence.
  *
@@ -200,17 +201,24 @@ tref distribute_to_atoms(tref phi, const block& X, ctx<node>& c,
 template <NodeType node>
 trefs squeeze_positives(tref phi) {
 	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
 	using namespace fast_paths_detail;
 	DBG(assert(phi != nullptr);)
 	// One list per junction, filled in POST ORDER, so a junction reads
 	// lists its children left behind and a shared sub-skeleton is squeezed
-	// once. A LEAF has no list: its one term is read where it is used.
-	subtree_unordered_map<node, trefs> lists;
-	auto list_of = [&](tref n) -> trefs {
+	// once. A LEAF has no list: its one term is read where it is used. The
+	// lists hold BDDs, converted to terms once, at the end.
+	subtree_unordered_map<node, typename tbdd::refs> lists;
+	// Every leaf is an equation over the block: the terms share one type.
+	size_t type = 0;
+	auto list_of = [&](tref n) -> typename tbdd::refs {
 		if (const auto it = lists.find(n); it != lists.end())
 			return it->second;
 		DBG(assert(is_child<node>(n, tau::bf_eq));)
-		return trefs{ term_of<node>(n) };
+		const tref t = term_of<node>(n, regime::backed);
+		type = find_ba_type<node>(t);
+		return { tbdd::build_bdd(t) };
 	};
 	// Over the operator node's OWN children, not the flattened member view:
 	// a chain's spine then holds partial products its parent goes on with,
@@ -219,21 +227,18 @@ trefs squeeze_positives(tref phi) {
 		const tau& t = tau::get(n);
 		if (!t.is(tau::wff) || !is_junction<node>(n)) return;
 		const bool conj = is_child<node>(n, tau::wff_and);
-		trefs out;
+		typename tbdd::refs out;
 		bool opened = false;
 		for (tref m : tau::get(t.first()).children()) {
-			trefs l = list_of(m);
+			typename tbdd::refs l = list_of(m);
 			if (!conj) out.insert(out.end(), l.begin(), l.end());
 			else if (!opened) out = std::move(l);
 			else {
-				// `f₁ = 0 ∧ f₂ = 0` squeezes to `f₁ ∪ f₂ = 0`;
-				// the union is RAW, the hooks folding what they
-				// fold — the list comes back exactly that way.
-				trefs product;
+				// `f₁ = 0 ∧ f₂ = 0` squeezes to `f₁ ∪ f₂ = 0`.
+				typename tbdd::refs product;
 				product.reserve(out.size() * l.size());
-				for (tref a : out) for (tref b : l)
-					product.push_back(
-						build_bf_or<node>(a, b));
+				for (auto a : out) for (auto b : l)
+					product.push_back(tbdd::bdd_or(a, b));
 				out = std::move(product);
 			}
 			opened = true;
@@ -248,7 +253,13 @@ trefs squeeze_positives(tref phi) {
 		return false;
 	};
 	pre_order<node>(phi).visit_unique(classify, skeleton<node>, up);
-	return list_of(phi);
+	const typename tbdd::refs bs = list_of(phi);
+	trefs out;
+	out.reserve(bs.size());
+	for (auto b : bs)
+		out.push_back(thandle::convert_to_tau_node_or_term(thandle(b),
+			type));
+	return out;
 }
 
 } // namespace idni::tau_lang::anti_prenexing

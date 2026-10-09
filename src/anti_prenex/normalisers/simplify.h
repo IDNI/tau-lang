@@ -3,7 +3,7 @@
 /**
  * @file simplify.h
  * @brief §3 `SIMPLIFY` — equality propagation, then the path sweep — and the
- * plain-regime pin match it shares with `TRY_WITNESS`.
+ * pin match it shares with `TRY_WITNESS`.
  *
  * TWO PASSES over an NNF formula, in this order (§3): EQUALITY PROPAGATION,
  * then the PATH SWEEP. Neither re-spells an atom (invariant 4), and neither
@@ -42,12 +42,13 @@
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
 #include "../foundations/options.h"
+#include "../shared/cofactors.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
 /**
- * @brief §3 `TRY_WITNESS`'s match on a plain term: the variable an equation
- * pins, the witness to substitute for it, and whether the pin is STRICT.
+ * @brief §3 `TRY_WITNESS`'s match: the variable an equation pins, the
+ * witness to substitute for it, and whether the pin is STRICT.
  *
  * `var` is a free variable of the equation's term, `witness` is `f₁′` — the
  * lower end of the interval the one-point rule leaves — and `strict` says
@@ -63,31 +64,28 @@ struct pin {
 };
 
 /**
- * @brief §3 `TRY_WITNESS`'s PIN TEST as ONE recipe over a pair of cofactors:
- * what `f₀` and `f₁` say about the variable `y` they were taken on, recorded
- * in a `cof_entry` (fwd.h).
+ * @brief §3 `TRY_WITNESS`'s PIN TEST in the PLAIN regime, over a pair of
+ * cofactors: what `f₀` and `f₁` say about the variable `y` they were taken
+ * on, recorded in a `cof_entry` (fwd.h).
  *
  * `usable` holds iff `y ∉ FV(f₀) ∪ FV(f₁)`; where it does not, `y` still
  * hides inside a subterm no cofactor reached (§1, the LEAF HAZARD) and the
  * record must not be used. `pin` holds iff `usable` and
  * `SIMPLIFY_TERM(f₀ ∪ f₁) = 1`, the test that collapses Boole's interval
- * `f₀ ≤ y ≤ f₁′` to a point. `p`, the residual `SIMPLIFY_TERM(f₀·f₁)`, is
- * built here when `pin` holds and is `nullptr` otherwise; a usable non-pin
- * record has it filled in by `cof` (cofactors.h) instead. A pin gives the
- * witness `f₁′` — which the consumer builds itself, there being no slot for
- * it — and the residual equation `p = 0`, and is STRICT when `p` folds to
- * `0`.
+ * `f₀ ≤ y ≤ f₁′` to a point. A pin carries the residual
+ * `p = SIMPLIFY_TERM(f₀·f₁)`, the witness `SIMPLIFY_TERM(f₁′)` and the
+ * STRICT flag, `p` folding to `0`; a record that is no pin has none of them.
  *
- * The one pin recipe: `find_pin` / `find_pin_for` take the cofactors by
- * SUBSTITUTION, `cof` (cofactors.h) by CHILD SELECTION in the term's BDD,
- * and both record the result in `cof_memo` (§1). @p rg is handed to every
- * `SIMPLIFY_TERM` here.
+ * The plain half of the one pin match: `find_pin` / `find_pin_for` take the
+ * cofactors by SUBSTITUTION in the plain regime and hand them here; on
+ * backed terms the match is `COF`'s recipe (cofactors.h), and both record
+ * the result in `cof_memo` (§1).
  */
 template <NodeType node>
-cof_entry pin_from_cofactors(tref f0, tref f1, tref y, regime rg);
+cof_entry pin_from_cofactors(tref f0, tref f1, tref y);
 
 /**
- * @brief §3 `TRY_WITNESS`'s pin match, by substitution: the best pin of
+ * @brief §3 `TRY_WITNESS`'s pin match on an `X`-free atom: the best pin of
  * `atom`, or `nullopt`.
  *
  * `atom` must be a POSITIVE equation — an equation under `¬` pins nothing —
@@ -95,12 +93,14 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y, regime rg);
  * leaf would break the child-is-cofactor identity, so an `X`-free conjunct is
  * the guard. On
  * `f = TERM_OF(atom)` a free `y` is pinned iff `usable ∧ f₀ ∪ f₁ = 1` on the
- * cofactors `f₀ = SIMPLIFY_TERM(f[y←0])` and `f₁ = SIMPLIFY_TERM(f[y←1])`,
- * where `usable` is `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a
- * STRICT one first, else the smallest `‖f₁′‖` (`mem_size`).
+ * cofactors `f₀ = f[y←0]` and `f₁ = f[y←1]`, where `usable` is
+ * `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a STRICT one first,
+ * else the smallest `‖f₁′‖` (`mem_size`).
  *
- * @p rg is the regime (fwd.h); in the plain one (phases 1 and 2)
- * nothing is BDD-backed and the `X` guard is vacuous.
+ * @p rg is the regime (fwd.h). In the plain one (phases 1 and 2) nothing
+ * is BDD-backed, the cofactors are substitutions and the `X` guard is
+ * vacuous; in the backed one (phases 4 and 5) the record is `COF`'s, taken
+ * by restricts.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin(tref atom, const block& X,

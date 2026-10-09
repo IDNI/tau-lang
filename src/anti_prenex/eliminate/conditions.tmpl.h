@@ -9,9 +9,9 @@
  * `norm_equation`, `term_of` and `simplify_atom` (§3) for the rewrite,
  * `discharge` (§7) for every quantified atom that goes out, the result joins
  * (§3) for every formula, and `rewrap` (§3) for what is frozen.
- * The union of a list of terms is the hooked binary `build_bf_or`; what feeds
- * `discharge` alone needs only the representation step of `simplify_term`'s
- * backed regime, not its leaf sweep.
+ * Every term built here — a component's union, the whole positive part, the
+ * absorption term — is the library's BDD operation on the terms' BDDs, and
+ * what feeds `discharge` needs no leaf sweep on top.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__CONDITIONS_TMPL_H__
@@ -34,22 +34,6 @@ ba_type_id block_type(const block& X) {
 }
 
 /**
- * @brief The representation step of `simplify_term`'s backed regime alone:
- * no leaf simplifier. A term `simplify_term` would sweep whole comes back
- * as built, untouched.
- */
-template <NodeType node>
-tref build_only(tref t) {
-	using tbdd = tau_term_bdd<node>;
-	using thandle = term_handle<node>;
-	if (!thandle::is_bdd_backed(t) && get_free_vars<node>(t).empty()
-		&& !terms_detail::holds_bdd_id<node>(t))
-		return t;
-	return thandle::convert_to_tau_node_or_term(
-		thandle(tbdd::build_bdd(t)), find_ba_type<node>(t));
-}
-
-/**
  * @brief §7 `SQUEEZE` step 1 on ONE conjunct: the zero form.
  *
  * A (¬)equation goes through `NORM_EQUATION` and is simplified again —
@@ -65,8 +49,8 @@ template <NodeType node>
 tref zero_form(tref c) {
 	using tau = tree<node>;
 	if (is_child<node>(c, tau::bf_eq) || is_negated_equation<node>(c))
-		return simplify_atom<node>(norm_equation<node>(c),
-			regime::backed);
+		return simplify_atom<node>(norm_equation<node>(c,
+			regime::backed), regime::backed);
 	if (!is_negative_tree<node>(c)) return c;
 	// One walk down to the literals, each of them once: the map is keyed by
 	// content, and every leaf of a negative tree is a negated equation (§1),
@@ -74,8 +58,8 @@ tref zero_form(tref c) {
 	subtree_map<node, tref> zero;
 	auto collect = [&zero](tref m) {
 		if (!is_negated_equation<node>(m)) return true;
-		const tref z = simplify_atom<node>(norm_equation<node>(m),
-			regime::backed);
+		const tref z = simplify_atom<node>(norm_equation<node>(m,
+			regime::backed), regime::backed);
 		if (!tree<node>::subtree_equals(z, m))
 			zero.emplace(tree<node>::trim_right_sibling(m), z);
 		return false;
@@ -132,6 +116,8 @@ freeze_result<node> freeze_opaque_components(const trefs& conjuncts,
 template <NodeType node>
 squeeze_result<node> squeeze(const trefs& conjuncts, const block& X) {
 	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
 	using namespace conditions_detail;
 	squeeze_result<node> r;
 	// STEP 1 — the zero form, conjunct by conjunct. An atom that folds to
@@ -159,21 +145,30 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X) {
 		else if (is_negated_equation<node>(c)
 			|| is_negative_tree<node>(c)) r.negatives.push_back(c);
 	}
-	const ba_type_id type = block_type<node>(X);
+	// A union takes its terms' type id, so a one-term union is that term's
+	// own node; the block's id is the empty union's.
+	ba_type_id type = block_type<node>(X);
 	std::vector<part<node>> ps = parts<node>(positives, X);
-	trefs terms;
+	typename tbdd::refs fs;
+	fs.reserve(ps.size());
 	r.comps.reserve(ps.size());
 	for (part<node>& p : ps) {
-		trefs part_terms;
+		typename tbdd::refs part_terms;
 		part_terms.reserve(p.conjuncts.size());
-		for (tref a : p.conjuncts)
-			part_terms.push_back(term_of<node>(a));
-		const tref F = build_only<node>(build_bf_or<node>(part_terms, type));
-		terms.push_back(F);
-		r.comps.push_back(component<node>{ F, std::move(p.vars) });
+		for (tref a : p.conjuncts) {
+			const tref t = term_of<node>(a, regime::backed);
+			type = find_ba_type<node>(t);
+			part_terms.push_back(tbdd::build_bdd(t));
+		}
+		fs.push_back(tbdd::bdd_or_many(std::move(part_terms)));
+		r.comps.push_back(component<node>{
+			thandle::convert_to_tau_node_or_term(thandle(fs.back()),
+				type),
+			std::move(p.vars) });
 	}
 	// `f = ⋃_k F_k` over pairwise disjoint `X_k`, the whole positive part.
-	r.f = build_bf_or<node>(terms, type);
+	r.f = thandle::convert_to_tau_node_or_term(
+		thandle(tbdd::bdd_or_many(std::move(fs))), type);
 	return r;
 }
 
@@ -196,16 +191,17 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	const block& X, ctx<node>& c)
 {
 	using tau = tree<node>;
-	using namespace conditions_detail;
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
 	DBG(assert(g != nullptr);)
 	// `∃_X f′·g = (∀_X f)′ ≠ 0` under `pos`, whatever `X` is.
 	if (tau::get(g).equals_1()) return _T<node>();
 	// `K`, by the cached free-variable sets alone: `X_k ∩ FV(g) ≠ ∅`.
-	trefs FK;
+	typename tbdd::refs FK;
 	subtree_unordered_set<node> vars;
 	for (const component<node>& k : comps) {
 		if (!fv_meets<node>(g, k.vars)) continue;
-		FK.push_back(k.F);
+		FK.push_back(tbdd::build_bdd(k.F));
 		for (tref x : k.vars) vars.insert(x);
 	}
 	const block Xg = fv_intersect<node>(g, X);
@@ -219,9 +215,10 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	block vs;
 	for (tref x : X)
 		if (vars.contains(x)) vs.push_back(tau::trim_right_sibling(x));
-	const tref h = build_only<node>(build_bf_and<node>(
-		build_bf_neg<node>(build_bf_or<node>(FK, c.type)), g));
-	return discharge<node>(h, true, vs, c);
+	const auto h = tbdd::bdd_and(tbdd::bdd_not(tbdd::bdd_or_many(
+		std::move(FK))), tbdd::build_bdd(g));
+	return discharge<node>(thandle::convert_to_tau_node_or_term(thandle(h),
+		find_ba_type<node>(g)), true, vs, c);
 }
 
 template <NodeType node>
@@ -240,8 +237,8 @@ tref tree_condition(tref t, const std::vector<component<node>>& comps,
 		if (is_child<node>(n, tau::wff_and))
 			return simplified_and_join<node>(members<node>(n));
 		if (!is_negated_equation<node>(n)) return n;
-		return negative_condition<node>(term_of<node>(n),
-			comps, X, c);
+		return negative_condition<node>(
+			term_of<node>(n, regime::backed), comps, X, c);
 	};
 	// The memo is the walk's own, local to this call, which is what makes
 	// it exact: `comps` and `X` are fixed here and nowhere else. `up`

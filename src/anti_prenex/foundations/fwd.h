@@ -107,18 +107,20 @@ struct tref_set {
  * @brief §1 `cof_memo` entry: the value of `COF(f, x)`, the record of
  * cofactoring the term `f` by the variable `x`.
  *
- * `f0` and `f1` are the simplified cofactors `f[x ← 0]` and `f[x ← 1]`, taken
- * by child selection in the BDD (§1) or, at §3 `SIMPLIFY`'s pin match, by
- * substitution on a plain term. `usable` holds iff
+ * `f0` and `f1` are the cofactors `f[x ← 0]` and `f[x ← 1]`: on a backed
+ * term the RESTRICTS `COF` takes (§1), canonical as built and simplified no
+ * further; in the plain regime of §3 `SIMPLIFY`'s pin match, the simplified
+ * substitutions. `usable` holds iff
  * `x ∉ FV(f₀) ∪ FV(f₁)`; otherwise `x` still hides inside a leaf — the LEAF
  * HAZARD of §1 — and the record must not be used. `pin` holds iff `usable`
- * and `f₀ ∪ f₁ = 1`; a pin gives §3 `TRY_WITNESS` the witness `f₁′` and the
- * residual equation `p = 0`, and is STRICT when `p` folds to `0`, so that the
- * residual vanishes. `p` is the residual `SIMPLIFY_TERM(f₀·f₁)` when `pin`
- * holds; a usable non-pin record has it from `COF` alone, `nullptr` (⊥)
- * otherwise.
+ * and `f₀ ∪ f₁ = 1`; a pin gives §3 `TRY_WITNESS` the `witness` `f₁′` — on a
+ * backed `f₁` its complemented BDD — and the residual equation `p = 0`, and
+ * is `strict` when `p` folds to `0`, so that the residual vanishes. `p` is
+ * the residual `SIMPLIFY_TERM(f₀·f₁)` when `pin` holds; a usable non-pin
+ * record has it from `COF` alone, `nullptr` (⊥) otherwise. `witness` is
+ * `nullptr` and `strict` false on a record that is no pin.
  *
- * The three terms are built by `COF` and are not subtrees of the key, so the
+ * The four terms are built by `COF` and are not subtrees of the key, so the
  * table has to pin them against garbage collection: `for_each_tref` opts this
  * type into the collector's introspection.
  */
@@ -128,10 +130,13 @@ struct cof_entry {
 	tref p  = nullptr;
 	bool usable = false;
 	bool pin    = false;
+	tref witness = nullptr;
+	bool strict  = false;
 	void for_each_tref(auto&& f) const {
 		if (f0) f(f0);
 		if (f1) f(f1);
 		if (p)  f(p);
+		if (witness) f(witness);
 	}
 };
 
