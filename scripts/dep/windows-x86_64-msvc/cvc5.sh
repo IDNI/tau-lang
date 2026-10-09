@@ -174,8 +174,10 @@ _dep_cvc5_msvc_gmp() {
 	# The runner's own VCPKG_ROOT must not redirect this pinned checkout, and
 	# Git Bash must not rewrite the port:triplet argument as a path list. A
 	# GMP from vcpkg's binary cache carries the paths of the build that made it.
+	# The gmp port needs itself as a host tool. The same host triplet builds it once.
 	( cd "$vcpkg" && env -u VCPKG_ROOT VCPKG_DISABLE_METRICS=1 MSYS2_ARG_CONV_EXCL='*' \
-		VCPKG_BINARY_SOURCES=clear ./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" ) \
+		VCPKG_BINARY_SOURCES=clear ./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" \
+		--host-triplet="${CVC5_MSVC_GMP_PORT#*:}" ) \
 		|| { echo "dep-cvc5: vcpkg install ${CVC5_MSVC_GMP_PORT} failed" >&2; return 1; }
 	installed="${vcpkg}/installed/${CVC5_MSVC_GMP_PORT#*:}"
 	mkdir -p "${deps}/include" "${deps}/lib" "${deps}/bin" || return 1
