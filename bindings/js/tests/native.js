@@ -74,7 +74,7 @@ function nativeBool(command, formula) {
 // get_spec_or_term/get_formula_or_term do (full spec grammar first,
 // falling back to a bare term), including the same IO type resolution --
 // unlike bare REPL evaluation, which leaves IO streams untyped. It is the
-// native equivalent of both toStr() and getSpec().
+// native equivalent of both to_str() and get_spec().
 function nativeWhatis(expression) {
 	return lastResult(runRepl(`whatis ${expression}`));
 }
@@ -116,7 +116,8 @@ function nativeSolve(formula, mode) {
 }
 
 // Drives the interpreter through the REPL's "run N steps" command with an
-// explicit input file, the native equivalent of interpreterCreate/Step.
+// explicit input file, the native equivalent of
+// interpreter_create/interpreter_step.
 // Returns the collected output-stream values in step order.
 function nativeInterpreterRun(spec, inputValues, scratchDir) {
 	const inFile = path.join(scratchDir, `native-run-${process.pid}-${Date.now()}.in`);

@@ -973,8 +973,8 @@ repository. An option has one name on every surface:
 - the REPL: `set max-fixpoint-steps 1000`, `get max-fixpoint-steps`
 - the environment: `TAU_MAX_FIXPOINT_STEPS=1000`
 - the C++ API: `idni::options().set_text("max-fixpoint-steps", "1000")`
-- the bindings: `set_option("max-fixpoint-steps", "1000")` in Python,
-  `setOption` in JavaScript
+- the bindings: `set_option("max-fixpoint-steps", "1000")` in Python and
+  JavaScript
 
 The variable of an option is `TAU_` plus the name in upper case, with `-` as
 `_`. tau reads the environment once at start. A flag on the command line and a
@@ -2574,8 +2574,7 @@ Every setting is an option of `nlang`, with the same name on each surface:
 the command line (`--nlang-model claude-opus-5-5`), the REPL
 (`set nlang-model claude-opus-5-5`, `get nlang-model`), the options
 repository of the C++ API (`idni::options().set_text("nlang-model", ...)`)
-and the Python and JavaScript bindings (`set_option("nlang-model", ...)`,
-`setOption` in JavaScript). An
+and the Python and JavaScript bindings (`set_option("nlang-model", ...)`). An
 option takes its environment variable at start, and an empty text option
 takes its default:
 
@@ -4125,16 +4124,16 @@ the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm). Its
 the algebras declare.
 
 The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
-carries the same budgets and switches under the camelCase form of those names
-(`tau.setMaxFixpointSteps(1000)`, `tau.setTrefBudget(n)`,
-`tau.setPreprocessing(false)`, `tau.setMaxConstantSize(n)`,
-`tau.setBfDependenceMaxNodes(n)`, `tau.trefCount()`, ...), reads each budget
-back with the getter of the same name (`tau.getMaxConstantSize()`,
-`tau.getMaxFixpointSteps()`, `tau.getGcGrowthFactor()`, ...), and
-carries every option by name (`tau.optionNames()`,
-`tau.setOption("qlt-t3-cap", "5")`, `tau.setOption("qlt-cells-budget", "0")`,
-`tau.getOption(name)`, which return the text the option reads, or `null`
-with the reason in `tau.getLastError()` for an unknown name or a bad text).
+carries the same budgets and switches under the same snake_case names
+(`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
+`tau.set_preprocessing(false)`, `tau.set_max_constant_size(n)`,
+`tau.set_bf_dependence_max_nodes(n)`, `tau.tref_count()`, ...), reads each budget
+back with the getter of the same name (`tau.get_max_constant_size()`,
+`tau.get_max_fixpoint_steps()`, `tau.get_gc_growth_factor()`, ...), and
+carries every option by name (`tau.option_names()`,
+`tau.set_option("qlt-t3-cap", "5")`, `tau.set_option("qlt-cells-budget", "0")`,
+`tau.get_option(name)`, which return the text the option reads, or `null`
+with the reason in `tau.get_last_error()` for an unknown name or a bad text).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`, `set_ltl_guard_max_cubes`,

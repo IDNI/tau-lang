@@ -25,11 +25,11 @@
 //    stripped; only the REPL's final "%N: <result>" history line is read.
 //  - sat/unsat/valid/realizable/unrealizable: native prints "T"/"F",
 //    the wasm binding returns a JS boolean.
-//  - toStr/getSpec: compared against the native "whatis" command, not bare
+//  - to_str/get_spec: compared against the native "whatis" command, not bare
 //    REPL evaluation -- whatis parses through the same
 //    get_spec_or_term/get_formula_or_term path (full spec grammar first,
 //    IO streams type-resolved) that the string API uses, where bare REPL
-//    evaluation does neither. getSpec's trailing '.' (full spec grammar)
+//    evaluation does neither. get_spec's trailing '.' (full spec grammar)
 //    is stripped for comparison since whatis's history line does not carry
 //    one. get_spec_or_term simplifies by default, so only inputs already
 //    in their simplified/canonical form are used here: an input like
@@ -59,7 +59,7 @@
 //  - interpreter: native ground truth comes from the REPL's
 //    "run N steps" command against an explicit input file, reading the
 //    resulting "o[K] := VALUE" lines -- a different code path than
-//    interpreterCreate/Step, but the same interpreter semantics.
+//    interpreter_create/Step, but the same interpreter semantics.
 
 const os = require('os');
 const path = require('path');
@@ -99,7 +99,7 @@ function diffSolve(label, wasmSol, nativeSol) {
 		+ `native=${JSON.stringify(nativeSol)}`);
 }
 
-// wasm getSpec()/toStr() append the full-spec grammar's trailing '.',
+// wasm get_spec()/to_str() append the full-spec grammar's trailing '.',
 // with indenting on, a newline ahead of it; whatis's history line carries
 // neither, native.lastResult already having trimmed its trailing
 // whitespace.
@@ -154,7 +154,7 @@ function runBoolCases(tau) {
 	}
 }
 
-// -- normalizeFormula -------------------------------------------------------
+// -- normalize_formula -------------------------------------------------------
 // [formula, expected normalized text]
 
 const NORMALIZE_CASES = [
@@ -174,17 +174,17 @@ const NORMALIZE_CASES = [
 
 function runNormalizeCases(tau) {
 	for (const [formula, expected] of NORMALIZE_CASES) {
-		const wasmNorm = tau.normalizeFormula(formula);
+		const wasmNorm = tau.normalize_formula(formula);
 		const nativeNorm = native.nativeNormalize(formula);
-		diverges(`normalizeFormula(${JSON.stringify(formula)})`,
+		diverges(`normalize_formula(${JSON.stringify(formula)})`,
 			wasmNorm, nativeNorm);
 		check(wasmNorm === expected,
-			`normalizeFormula(${JSON.stringify(formula)}) === `
+			`normalize_formula(${JSON.stringify(formula)}) === `
 			+ `${JSON.stringify(expected)} (expected)`);
 	}
 }
 
-// -- toStr / getSpec (via whatis) -------------------------------------------
+// -- to_str / get_spec (via whatis) -------------------------------------------
 // Bare formulas/terms already in canonical form (see file header).
 
 const TOSTR_CASES = [
@@ -200,17 +200,17 @@ const GETSPEC_CASES = [
 
 function runToStrCases(tau) {
 	for (const expr of TOSTR_CASES) {
-		const wasmStr = stripTrailingPeriod(tau.toStr(expr));
+		const wasmStr = stripTrailingPeriod(tau.to_str(expr));
 		const nativeStr = native.nativeWhatis(expr);
-		diverges(`toStr(${JSON.stringify(expr)})`, wasmStr, nativeStr);
+		diverges(`to_str(${JSON.stringify(expr)})`, wasmStr, nativeStr);
 	}
 }
 
 function runGetSpecCases(tau) {
 	for (const spec of GETSPEC_CASES) {
-		const wasmSpec = stripTrailingPeriod(tau.getSpec(spec));
+		const wasmSpec = stripTrailingPeriod(tau.get_spec(spec));
 		const nativeSpec = native.nativeWhatis(spec);
-		diverges(`getSpec(${JSON.stringify(spec)})`, wasmSpec, nativeSpec);
+		diverges(`get_spec(${JSON.stringify(spec)})`, wasmSpec, nativeSpec);
 	}
 }
 
@@ -233,23 +233,23 @@ function runSolveCases(tau) {
 	}
 }
 
-// -- settings: setIndenting is the one setting with an observable, directly
+// -- settings: set_indenting is the one setting with an observable, directly
 // comparable textual effect (native's -I flag); the rest are exercised for
 // crash-safety and to confirm they don't corrupt later results.
 
 function runSettingsCases(tau) {
 	const expr = '(G (o1[t] != 0)) && (G (o2[t] != 0))';
-	tau.setIndenting(true);
-	const wasmIndented = stripTrailingPeriod(tau.toStr(expr));
-	tau.setIndenting(false);
+	tau.set_indenting(true);
+	const wasmIndented = stripTrailingPeriod(tau.to_str(expr));
+	tau.set_indenting(false);
 	const nativeText = native.lastResult(native.runRepl(`whatis ${expr}`, ['-I']));
-	diverges('setIndenting(true) -> toStr', wasmIndented, nativeText);
+	diverges('set_indenting(true) -> to_str', wasmIndented, nativeText);
 
-	tau.setCharvar(true);
-	tau.setBlasting(true);
-	tau.setHighlighting(false);
-	tau.setJson(false);
-	tau.setSeverity('error');
+	tau.set_charvar(true);
+	tau.set_preprocessing(true);
+	tau.set_highlighting(false);
+	tau.set_json(false);
+	tau.set_severity('error');
 	check(tau.sat('x = 0') === true,
 		'sat still correct after touching every setting');
 }
@@ -258,10 +258,10 @@ function runSettingsCases(tau) {
 
 function runMalformedCases(tau) {
 	const badSyntax = 'x ) ( invalid !!!';
-	check(tau.getSpec(badSyntax) === null, 'getSpec rejects bad syntax');
-	check(tau.toStr(badSyntax) === null, 'toStr rejects bad syntax');
-	check(tau.normalizeFormula(badSyntax) === null,
-		'normalizeFormula rejects bad syntax');
+	check(tau.get_spec(badSyntax) === null, 'get_spec rejects bad syntax');
+	check(tau.to_str(badSyntax) === null, 'to_str rejects bad syntax');
+	check(tau.normalize_formula(badSyntax) === null,
+		'normalize_formula rejects bad syntax');
 	check(tau.sat(badSyntax) === false, 'sat rejects bad syntax');
 	// Unparseable input yields no result, so unsat returns false, not
 	// true (api.tmpl.string.h's unsat(const std::string&)).
@@ -274,7 +274,7 @@ function runMalformedCases(tau) {
 		+ `(sat returned ${JSON.stringify(nativeRejected)})`);
 
 	// Not cross-checked against native -- see file header.
-	check(tau.getSpec('') === null, 'getSpec rejects empty input');
+	check(tau.get_spec('') === null, 'get_spec rejects empty input');
 	check(tau.sat('') === false, 'sat rejects empty input');
 }
 
@@ -284,18 +284,18 @@ function runInterpreterCases(tau) {
 	const spec = 'o[t] = i[t].';
 	const inputValues = ['F', 'T', 'F'];
 
-	const handle = tau.interpreterCreate(spec);
-	check(handle > 0, `interpreterCreate(${JSON.stringify(spec)})`);
+	const handle = tau.interpreter_create(spec);
+	check(handle > 0, `interpreter_create(${JSON.stringify(spec)})`);
 	const wasmOutputs = [];
 	for (const v of inputValues) {
-		const inputVars = tau.interpreterInputVars(handle);
+		const inputVars = tau.interpreter_input_vars(handle);
 		const inputs = {};
 		for (const name of inputVars) inputs[name] = `${v}.`;
-		const out = tau.interpreterStep(handle, inputs);
-		check(out !== null, `interpreterStep produced output for input ${v}`);
+		const out = tau.interpreter_step(handle, inputs);
+		check(out !== null, `interpreter_step produced output for input ${v}`);
 		wasmOutputs.push(out.o);
 	}
-	tau.interpreterFree(handle);
+	tau.interpreter_free(handle);
 
 	const nativeOutputs = native.nativeInterpreterRun(spec, inputValues, SCRATCH_DIR);
 	check(JSON.stringify(wasmOutputs) === JSON.stringify(nativeOutputs),

@@ -208,7 +208,7 @@ void js_interpreter_free(int handle) {
 	g_interpreters.erase(handle);
 }
 
-// The text of option @p name, or null with the reason in getLastError()
+// The text of option @p name, or null with the reason in get_last_error()
 // when the repository declares no such option.
 val js_get_option(const std::string& name) {
 	if (!begin_engine_call()) return val::null();
@@ -218,7 +218,7 @@ val js_get_option(const std::string& name) {
 }
 
 // Writes option @p name from @p text and gives the text it reads after the
-// write, or null with the reason in getLastError().
+// write, or null with the reason in get_last_error().
 val js_set_option(const std::string& name, const std::string& text) {
 	if (!begin_engine_call()) return val::null();
 	auto r = idni::options().set_text(name, text);
@@ -234,8 +234,8 @@ val js_option_names() {
 	return out;
 }
 
-// Runtime budgets and engine switches, under the camelCase form of the
-// Python binding's names. Each forwards to the api setter the CLI option
+// Runtime budgets and engine switches, each under the name of its api setter.
+// Each forwards to the api setter the CLI option
 // and the REPL `set` option of the same meaning write, and each count has
 // a getter of the same name with `get` for `set`, which reads back the value
 // in force.
@@ -248,59 +248,59 @@ val js_option_names() {
 // played on its game (closed regions, BDD nodes and memo, tabulated values,
 // the Mealy view and the table `tau compile` carries of it) have nothing to
 // act on. The two LTL(ABA) budgets that act before or without ltlsynt
-// (setLtlQeMaxVars, setLtlMaxRefinementRounds) are bound.
+// (set_ltl_qe_max_vars, set_ltl_max_refinement_rounds) are bound.
 struct count_setter {
 	const char* name;
 	void (*set)(size_t);
 	size_t (*get)();
 };
 constexpr count_setter count_setters[] = {
-	{ "setBlockMaxSplits", &tau_api::set_block_max_splits,
+	{ "set_block_max_splits", &tau_api::set_block_max_splits,
 		&tau_api::get_block_max_splits },
-	{ "setBlockMaxRounds", &tau_api::set_block_max_rounds,
+	{ "set_block_max_rounds", &tau_api::set_block_max_rounds,
 		&tau_api::get_block_max_rounds },
-	{ "setCqeMaxClauses", &tau_api::set_cqe_max_clauses,
+	{ "set_cqe_max_clauses", &tau_api::set_cqe_max_clauses,
 		&tau_api::get_cqe_max_clauses },
-	{ "setLgrsMaxVars", &tau_api::set_lgrs_max_vars,
+	{ "set_lgrs_max_vars", &tau_api::set_lgrs_max_vars,
 		&tau_api::get_lgrs_max_vars },
-	{ "setBlockSqueezeCap", &tau_api::set_block_squeeze_cap,
+	{ "set_block_squeeze_cap", &tau_api::set_block_squeeze_cap,
 		&tau_api::get_block_squeeze_cap },
-	{ "setMaxFixpointSteps", &tau_api::set_max_fixpoint_steps,
+	{ "set_max_fixpoint_steps", &tau_api::set_max_fixpoint_steps,
 		&tau_api::get_max_fixpoint_steps },
-	{ "setMaxFlagSearchSteps", &tau_api::set_max_flag_search_steps,
+	{ "set_max_flag_search_steps", &tau_api::set_max_flag_search_steps,
 		&tau_api::get_max_flag_search_steps },
-	{ "setMaxDefPasses", &tau_api::set_max_def_passes,
+	{ "set_max_def_passes", &tau_api::set_max_def_passes,
 		&tau_api::get_max_def_passes },
-	{ "setMaxEnumSteps", &tau_api::set_max_enum_steps,
+	{ "set_max_enum_steps", &tau_api::set_max_enum_steps,
 		&tau_api::get_max_enum_steps },
-	{ "setMaxProbeSteps", &tau_api::set_max_probe_steps,
+	{ "set_max_probe_steps", &tau_api::set_max_probe_steps,
 		&tau_api::get_max_probe_steps },
-	{ "setMaxRewriteRounds", &tau_api::set_max_rewrite_rounds,
+	{ "set_max_rewrite_rounds", &tau_api::set_max_rewrite_rounds,
 		&tau_api::get_max_rewrite_rounds },
-	{ "setMaxSimplifyRounds", &tau_api::set_max_simplify_rounds,
+	{ "set_max_simplify_rounds", &tau_api::set_max_simplify_rounds,
 		&tau_api::get_max_simplify_rounds },
-	{ "setGcMinSize", &tau_api::set_gc_min_size, &tau_api::get_gc_min_size },
-	{ "setTrefBudget", &tau_api::set_tref_budget, &tau_api::get_tref_budget },
-	{ "setTrefBudgetSoftPercent", &tau_api::set_tref_budget_soft_percent,
+	{ "set_gc_min_size", &tau_api::set_gc_min_size, &tau_api::get_gc_min_size },
+	{ "set_tref_budget", &tau_api::set_tref_budget, &tau_api::get_tref_budget },
+	{ "set_tref_budget_soft_percent", &tau_api::set_tref_budget_soft_percent,
 		&tau_api::get_tref_budget_soft_percent },
-	{ "setSpecSizeWarn", &tau_api::set_spec_size_warn,
+	{ "set_spec_size_warn", &tau_api::set_spec_size_warn,
 		&tau_api::get_spec_size_warn },
-	{ "setMaxRevisionAlts", &tau_api::set_max_revision_alts,
+	{ "set_max_revision_alts", &tau_api::set_max_revision_alts,
 		&tau_api::get_max_revision_alts },
-	{ "setMaxConsistencySubsets", &tau_api::set_max_consistency_subsets,
+	{ "set_max_consistency_subsets", &tau_api::set_max_consistency_subsets,
 		&tau_api::get_max_consistency_subsets },
-	{ "setCacheBound", &tau_api::set_cache_bound, &tau_api::get_cache_bound },
-	{ "setMaxCoverProducts", &tau_api::set_max_cover_products,
+	{ "set_cache_bound", &tau_api::set_cache_bound, &tau_api::get_cache_bound },
+	{ "set_max_cover_products", &tau_api::set_max_cover_products,
 		&tau_api::get_max_cover_products },
-	{ "setMaxConstantSize", &tau_api::set_max_constant_size,
+	{ "set_max_constant_size", &tau_api::set_max_constant_size,
 		&tau_api::get_max_constant_size },
-	{ "setLtlQeMaxVars", &tau_api::set_ltl_qe_max_vars,
+	{ "set_ltl_qe_max_vars", &tau_api::set_ltl_qe_max_vars,
 		&tau_api::get_ltl_qe_max_vars },
-	{ "setLtlMaxRefinementRounds", &tau_api::set_ltl_max_refinement_rounds,
+	{ "set_ltl_max_refinement_rounds", &tau_api::set_ltl_max_refinement_rounds,
 		&tau_api::get_ltl_max_refinement_rounds },
-	{ "setBfDependenceMaxNodes", &tau_api::set_bf_dependence_max_nodes,
+	{ "set_bf_dependence_max_nodes", &tau_api::set_bf_dependence_max_nodes,
 		&tau_api::get_bf_dependence_max_nodes },
-	{ "setBaDecisionPins", &tau_api::set_ba_decision_pins,
+	{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
 		&tau_api::get_ba_decision_pins },
 };
 
@@ -309,10 +309,10 @@ struct flag_setter {
 	void (*set)(bool);
 };
 constexpr flag_setter flag_setters[] = {
-	{ "setPreprocessing", &tau_api::set_preprocessing },
-	{ "setBaComponentFactoring", &tau_api::set_ba_component_factoring },
-	{ "setPwrSemanticFallback", &tau_api::set_pwr_semantic_fallback },
-	{ "setStepDefinitionalPropagation",
+	{ "set_preprocessing", &tau_api::set_preprocessing },
+	{ "set_ba_component_factoring", &tau_api::set_ba_component_factoring },
+	{ "set_pwr_semantic_fallback", &tau_api::set_pwr_semantic_fallback },
+	{ "set_step_definitional_propagation",
 		&tau_api::set_step_definitional_propagation },
 };
 
@@ -320,31 +320,30 @@ constexpr flag_setter flag_setters[] = {
 
 EMSCRIPTEN_BINDINGS(tau) {
 	disable_logging();
-	// getLastError() after the load shows the warnings of a successful init
+	// get_last_error() after the load shows the warnings of a successful init
 	auto init = tau_init<node_t>();
 	if (init.has_value()) init.merge(idni::options().load_env("TAU_"));
 	set_last_error(init);
 	if (!init.has_value()) g_init_error = g_last_error;
 
-	emscripten::function("getSpec", &js_get_spec);
-	emscripten::function("normalizeFormula", &js_normalize_formula);
+	emscripten::function("get_spec", &js_get_spec);
+	emscripten::function("normalize_formula", &js_normalize_formula);
 	emscripten::function("sat", &js_sat);
 	emscripten::function("unsat", &js_unsat);
 	emscripten::function("valid", &js_valid);
 	emscripten::function("solve", &js_solve);
-	emscripten::function("toStr", &js_to_str);
-	emscripten::function("getLastError", &js_get_last_error);
+	emscripten::function("to_str", &js_to_str);
+	emscripten::function("get_last_error", &js_get_last_error);
 
-	emscripten::function("setCharvar", &tau_api::set_charvar);
-	emscripten::function("resetDefinitions", &tau_api::reset_definitions);
+	emscripten::function("set_charvar", &tau_api::set_charvar);
+	emscripten::function("reset_definitions", &tau_api::reset_definitions);
 	emscripten::function("reset", optional_override(
 		[]() { return static_cast<double>(tau_api::reset()); }));
-	emscripten::function("setBlasting", &tau_api::set_preprocessing);
-	emscripten::function("setIndenting", &tau_api::set_indenting);
-	emscripten::function("setHighlighting", &tau_api::set_highlighting);
-	emscripten::function("setColors", &tau_api::set_colors);
-	emscripten::function("setJson", &tau_api::set_json);
-	emscripten::function("setSeverity", optional_override(
+	emscripten::function("set_indenting", &tau_api::set_indenting);
+	emscripten::function("set_highlighting", &tau_api::set_highlighting);
+	emscripten::function("set_colors", &tau_api::set_colors);
+	emscripten::function("set_json", &tau_api::set_json);
+	emscripten::function("set_severity", optional_override(
 		[](const std::string& lvl) {
 			tau_api::set_severity(parse_severity(lvl));
 		}));
@@ -356,18 +355,18 @@ EMSCRIPTEN_BINDINGS(tau) {
 	}
 	for (const flag_setter& s : flag_setters)
 		emscripten::function(s.name, s.set);
-	emscripten::function("setGcGrowthFactor",
+	emscripten::function("set_gc_growth_factor",
 		&tau_api::set_gc_growth_factor);
-	emscripten::function("getGcGrowthFactor",
+	emscripten::function("get_gc_growth_factor",
 		&tau_api::get_gc_growth_factor);
-	emscripten::function("trefCount", optional_override(
+	emscripten::function("tref_count", optional_override(
 		[]() { return static_cast<double>(tau_api::tref_count()); }));
-	emscripten::function("optionNames", &js_option_names);
-	emscripten::function("setOption", &js_set_option);
-	emscripten::function("getOption", &js_get_option);
+	emscripten::function("option_names", &js_option_names);
+	emscripten::function("set_option", &js_set_option);
+	emscripten::function("get_option", &js_get_option);
 
-	emscripten::function("interpreterCreate", &js_interpreter_create);
-	emscripten::function("interpreterStep", &js_interpreter_step);
-	emscripten::function("interpreterInputVars", &js_interpreter_input_vars);
-	emscripten::function("interpreterFree", &js_interpreter_free);
+	emscripten::function("interpreter_create", &js_interpreter_create);
+	emscripten::function("interpreter_step", &js_interpreter_step);
+	emscripten::function("interpreter_input_vars", &js_interpreter_input_vars);
+	emscripten::function("interpreter_free", &js_interpreter_free);
 };

@@ -20,7 +20,7 @@ const tauModule = require('@idni/tau-lang');
 
 tauModule().then((tau) => {
 	console.log(tau.sat('x = 0 && x = 1'));        // false
-	console.log(tau.normalizeFormula('x = 0 || x = 0')); // "x = 0"
+	console.log(tau.normalize_formula('x = 0 || x = 0')); // "x = 0"
 });
 ```
 
@@ -33,9 +33,22 @@ const tau = await init();
 console.log(tau.valid('x = x')); // true
 ```
 
-The full surface is `getSpec`, `normalizeFormula`, `sat`, `unsat`, `valid`,
-`solve`, `toStr`, `getLastError`, the `set*` options, and the `interpreter*`
-step API. `tau.node.js` and `tau.node.mjs` are the CommonJS/ESM smoke-test
+The full surface is `get_spec`, `normalize_formula`, `sat`, `unsat`, `valid`,
+`solve`, `reset`, `to_str`, `get_last_error`, the `set_*` budgets with their
+`get_*` getters, the options by name, and the `interpreter_*` step API.
+
+Every option of the options repository has the name of its `tau` command line
+option. `option_names()` lists the names. `set_option(name, text)` sets an
+option from its text and gives the text it reads after the write.
+`get_option(name)` gives the text of an option. Both give `null` for an
+unknown name or a bad text, with the reason in `get_last_error()`.
+
+```js
+tau.set_option('max-fixpoint-steps', '1000');
+console.log(tau.get_option('max-fixpoint-steps')); // '1000'
+```
+
+`tau.node.js` and `tau.node.mjs` are the CommonJS/ESM smoke-test
 wrappers; a consumer needs only the entry points named in `package.json`.
 
 ## Build from source
