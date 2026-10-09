@@ -1,8 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // ltl_aba_synthesis.tmpl.h - HOA parsing and the tau-lang side of ltlsynt
-// calls. The Spot subprocess mechanics (spawn, argv, tempfiles, the
-// exit-code convention) live in backends/spot/spot.h; call_ltlsynt builds
+// calls. The Spot tool calls (argv, tempfiles, the exit-code convention)
+// live in backends/spot/spot.h, the spawn in spawn_capture.h; call_ltlsynt builds
 // the request, calls the backend, and interprets the verdict.
 
 // Generated from parser/hoa.tgf into the build tree; bare spelling, same as

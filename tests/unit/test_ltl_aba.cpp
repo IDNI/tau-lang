@@ -6011,7 +6011,7 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 	// UNREALIZABLE verdict.
 	//
 	// The exit-code convention lives entirely inside spawn_capture
-	// (backends/spot/spot.h), which decides it once from a real spawn and
+	// (spawn_capture.h), which decides it once from a real spawn and
 	// never returns the raw code; these cases drive that decision with
 	// small `sh` stubs instead of a synthetic (exit_code, stdout) pair.
 

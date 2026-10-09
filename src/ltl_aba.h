@@ -279,9 +279,9 @@ bool is_pure_input_atom(tref atom);
 // Every skeleton/translation walker reports the same way, via its own
 // `result<T>` return.
 //
-// The Spot subprocess mechanics, including the exit-code convention, live
-// in backends/spot/spot.h; nothing outside that backend reads a raw exit
-// code.
+// The Spot tool calls, including their exit-code convention, live in
+// backends/spot/spot.h over spawn_capture (spawn_capture.h); nothing outside them
+// reads a raw exit code.
 
 /**
  * @brief Invoke ltlsynt as a subprocess and return {realizable,
