@@ -205,11 +205,11 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 //
 // A BDD_ID is no black box here: its ids count too. A term backed by a BDD
 // holds its variables in the store, not as tree nodes -- a decision variable
-// has no node at all -- so the stored BDD's free variables (decision
-// variables included) are read through U, exactly as get_free_vars does
-// (tau_tree_extractors.tmpl.h). Without that a fresh id could land on a
-// block variable that only occurs inside a backed term, and the collision
-// would surface when the finish spells the BDD out again.
+// has no node at all -- so the stored BDD is read through U, as get_free_vars
+// does (tau_tree_extractors.tmpl.h): its decision variables, and every id in
+// its leaves, bound ones included. Without that a fresh id could land on a
+// variable that only occurs inside a backed term, and the collision would
+// surface when the BDD is spelled out again.
 template <NodeType node>
 int_t find_biggest_var_id(tref fm) {
 	using tau = tree<node>;
@@ -240,17 +240,22 @@ int_t find_biggest_var_id(tref fm) {
 			consider_name(tau::get(t.first()).get_string());
 		else consider_name(get_var_name<node>(v));
 	};
+	using tbdd = tau_term_bdd<node>;
 	auto f = [&](tref n) {
 		if (is<node, tau::variable>(n)) consider(n);
 		else if (tau::get(n).is(tau::BDD_ID)) {
 			// `U` is keyed by the id the `BDD_ID` node carries (tau_bdd.h).
 			const auto& bdd_u = tau_term_bdd_handle<node>::U;
+			auto in_bdd = [&](typename tbdd::ref x, bool is_leaf) {
+				if (!is_leaf) consider(tbdd::get_var(x));
+				else id = std::max(id, find_biggest_var_id<node>(
+					tbdd::get_var_term(x)));
+				return true;
+			};
 			if (auto jt = bdd_u.find(
 					tau_term_bdd_handle<node>::key_of(n));
 				jt != bdd_u.end())
-				for (tref v : tau_term_bdd_handle<node>::
-					get_free_tau_vars(jt->second.get().b))
-					consider(v);
+				tbdd::visit_nodes(jt->second.get(), in_bdd);
 		}
 		return true;
 	};

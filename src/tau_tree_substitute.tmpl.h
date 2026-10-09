@@ -29,10 +29,20 @@ namespace idni::tau_lang {
 template<NodeType node>
 trefs tree<node>::bound_vars(tref t) {
 	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using handle = tau_term_bdd_handle<node>;
 	subtree_set<node> vs;
-	auto f = [&vs](tref m) {
+	auto in_leaf = [&vs](typename tbdd::ref x, bool is_leaf) {
+		if (is_leaf) for (tref v : bound_vars(tbdd::get_var_term(x)))
+			vs.insert(v);
+		return true;
+	};
+	auto f = [&](tref m) {
 		if (is_logical_or_functional_quant<node>(m))
 			vs.insert(tau::trim_right_sibling(tau::get(m).first()));
+		else if (tau::get(m).is(tau::BDD_ID))
+			tbdd::visit_nodes(handle::convert_to_handle(m).get(),
+				in_leaf);
 		return true;
 	};
 	pre_order<node>(t).visit_unique(f);
@@ -43,6 +53,8 @@ trefs tree<node>::bound_vars(tref t) {
 template<NodeType node>
 tref tree<node>::rename_apart(tref n, tref t) {
 	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using handle = tau_term_bdd_handle<node>;
 	const trefs bound = bound_vars(t);
 	if (bound.empty()) return t;
 	const int_t base = std::max(find_biggest_var_id<node>(n),
@@ -60,7 +72,21 @@ tref tree<node>::rename_apart(tref n, tref t) {
 			tau::get(v).get_ba_type()));
 	}
 	if (changes.empty()) return t;
-	return rewriter::replace<node>(t, changes);
+	// `rewriter::replace`, entering the leaves of every BDD-backed term as
+	// well: `map_leaves` builds a changed leaf again through `build_bdd`.
+	auto rename = [&changes](this const auto& self, tref u) -> tref {
+		auto f = [&](tref m) -> tref {
+			if (const tref r = get_cached<node>(m, changes); r != m)
+				return r;
+			if (!handle::is_bdd_backed(m)) return m;
+			auto leaf = [&self](tref l) { return self(l); };
+			return handle::convert_to_tau_node_or_term(handle(
+				tbdd::map_leaves(handle::convert_to_handle(m).get(),
+					leaf)), find_ba_type<node>(m));
+		};
+		return pre_order<node>(u).apply_unique_until_change(f);
+	};
+	return rename(t);
 }
 
 /** @internal @copydoc tree::prepare(substitution&, tref, tref, tref) @endinternal */
@@ -68,33 +94,12 @@ template<NodeType node>
 void tree<node>::prepare(substitution& s, tref formula, tref key, tref value)
 {
 	using tau = tree<node>;
-	using handle = tau_term_bdd_handle<node>;
 	tref k = tau::trim_right_sibling(key);
+	// A BDD-backed replacement stays its BDD, renamed apart inside its
+	// leaves; the walk spells it where an occurrence sits in the tree.
 	tref w = tau::trim_right_sibling(value);
 	DBG(assert(k != nullptr && w != nullptr);)
-	// One scan of the replacement answers both questions it is asked: is
-	// a `BDD_ID` in it, and is a binder. The walk stops as soon as both
-	// are known.
-	bool has_bdd_id = false, has_binder = false;
-	tau::get(w).find_top([&](tref m) {
-		if (tau::get(m).is(tau::BDD_ID)) has_bdd_id = true;
-		else if (is_logical_or_functional_quant<node>(m))
-			has_binder = true;
-		return has_bdd_id && has_binder;
-	});
-	// A replacement carrying a `BDD_ID` is spelled out as a plain term
-	// once, here, rather than at every leaf and reference argument below.
-	if (has_bdd_id) {
-		w = handle::convert_to_tau_terms(w);
-		// The spelling may have brought binders out of the BDD's
-		// leaves, which are not tree children, so the question is put
-		// again to the spelled-out term.
-		has_binder = tau::get(w).find_top(
-			is_logical_or_functional_quant<node>) != nullptr;
-	}
-	// Bound variables are renamed apart after the spelling, and renaming
-	// is not idempotent, so it happens in this one place.
-	if (has_binder) w = rename_apart(formula, w);
+	w = rename_apart(formula, w);
 	// The key is matched exactly as given. Either spelling of a variable
 	// key, bare or in its `bf` wrapper, names the variable the occurrence
 	// guard and the compose need.
@@ -160,16 +165,23 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	const tref formula = this->get();
 	DBG(assert(formula != nullptr);)
 	if (changes.empty()) return formula;
-	// The entry step, once per call: every replacement is spelled out and
-	// renamed apart here, and the walk below — the leaves of a BDD and the
-	// arguments of a reference included — reuses the result.
-	substitution s;
+	substitution s = prepare(formula, changes);
 	if (descend) s.descend = &descend;
 	if (hooked) s.hooked = &hooked;
+	return tau::substitute(formula, s, on_argument);
+}
+
+/** @internal @copydoc tree::prepare(tref, const subtree_map<node, tref>&) @endinternal */
+template<NodeType node>
+tree<node>::substitution tree<node>::prepare(tref formula,
+	const subtree_map<node, tref>& changes)
+{
+	DBG(assert(formula != nullptr);)
+	substitution s;
 	for (const auto& [key, value] : changes)
 		prepare(s, formula, key, value);
 	finish(s);
-	return tau::substitute(formula, s, on_argument);
+	return s;
 }
 
 /** @internal @copydoc tree::substitute(tref, const substitution&, const argument_hook&, bool) @endinternal */
@@ -255,16 +267,16 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		const trefs* fv = cached_free_vars<node>(n);
 		return fv == nullptr || holds_key(*fv);
 	};
-	// The compose list, built at the first BDD-backed node this call meets
-	// and reused by every later one. The replacements are constants of the
-	// call, so their BDDs are built once per call rather than once per
-	// backed node. It is built here rather than in the entry step because a
-	// formula with no backed node in it must not pay for a BDD it never
-	// composes.
+	// The compose list, built at the first BDD-backed node a walk meets and
+	// reused by every later one: a formula with no backed node in it must
+	// not pay for a BDD it never composes. A BDD-backed replacement is its
+	// own BDD, a plain one is built.
 	auto compose_list = [&s]() -> const typename tbdd::subs_t& {
 		if (!s.compose_prepared) {
 			for (const auto& [v, w] : s.by_variable)
-				s.compose_subs.emplace_back(v, tbdd::build_bdd(w));
+				s.compose_subs.emplace_back(v, handle::is_bdd_backed(w)
+					? handle::convert_to_handle(w).get()
+					: tbdd::build_bdd(w));
 			// The order a compose descends in, sorted once here
 			// instead of at every node.
 			std::sort(s.compose_subs.begin(), s.compose_subs.end(),
@@ -275,9 +287,29 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		}
 		return s.compose_subs;
 	};
+	// One key takes the single-pair compose, which is the shape the
+	// module's calls have and the one that routes a constant replacement
+	// through the cofactor.
+	auto compose = [](typename tbdd::ref x,
+		const typename tbdd::subs_t& subs)
+	{
+		if (subs.size() == 1) return tbdd::bdd_compose(x,
+			subs.front().first, subs.front().second);
+		return subs.empty() ? x : tbdd::bdd_compose(x, subs);
+	};
+	// What an occurrence in the tree receives: a plain replacement as it
+	// is, a BDD-backed one spelled at its first such occurrence, the
+	// spelling then reused.
+	auto in_tree = [&s](tref w) -> tref {
+		if (!handle::is_bdd_backed(w)) return w;
+		auto it = s.spellings.find(w);
+		if (it == s.spellings.end()) it = s.spellings.emplace(w,
+			handle::convert_to_tau_terms(w)).first;
+		return it->second;
+	};
 	// A reference argument or a named node is rewritten whole by a walk of
 	// its own, which leaves its root to this step, and passed through the
-	// hook once per call: a node the walk changes never enters the
+	// hook once per substitution: a node the walk changes never enters the
 	// traversal's cache, so the memo is what spares a shared one.
 	auto rewrite_whole = [&](tref a) -> tref {
 		auto it = s.hook_memo.find(a);
@@ -298,7 +330,7 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		// connectives, names, constants -- is of no key's type.
 		if (s.key_types.test(static_cast<size_t>(t.get_type())))
 			if (const tref r = get_cached<node>(n, s.changes);
-				r != n) return r;
+				r != n) return in_tree(r);
 		// A named node is finished here, so its parent is rebuilt
 		// around the hook's result.
 		if (s.hooked != nullptr && (hook_root || n != formula)
@@ -312,7 +344,8 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		// as tree nodes. Its leaves are rewritten first, on the
 		// original leaves, so a key inside a replacement is not
 		// substituted again; then one compose removes the keys that
-		// are decision variables.
+		// are decision variables. Most terms hold no key in a leaf,
+		// which the cached leaf variables tell without a walk.
 		if (handle::is_bdd_backed(n)) {
 			const typename tbdd::ref x =
 				handle::convert_to_handle(n).get();
@@ -320,16 +353,35 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 			auto leaf = [&](tref l) {
 				return tau::substitute(l, s, on_argument);
 			};
-			typename tbdd::ref r = tbdd::map_leaves(x, leaf);
-			const typename tbdd::subs_t& subs = compose_list();
-			// One key takes the single-pair compose, which is the
-			// shape the module's calls have and the one that routes
-			// a constant replacement through the cofactor.
-			if (subs.size() == 1)
-				r = tbdd::bdd_compose(r, subs.front().first,
-					subs.front().second);
-			else if (!subs.empty())
-				r = tbdd::bdd_compose(r, subs);
+			const typename tbdd::ref mapped = !s.keys_are_variables
+				|| holds_key(handle::get_free_leaf_vars(x.b))
+				? tbdd::map_leaves(x, leaf) : x;
+			const typename tbdd::ref r = compose(mapped,
+				compose_list());
+#ifdef DEBUG
+			// The compose with each backed replacement's own BDD is
+			// the compose with its spelling built again (small terms).
+			constexpr size_t small = 64;
+			auto is_small = [](tref w) {
+				return !handle::is_bdd_backed(w) || tbdd::node_count(
+					handle::convert_to_handle(w).get()) <= small;
+			};
+			if (tbdd::node_count(mapped) <= small
+				&& std::ranges::all_of(s.by_variable, is_small,
+					&std::pair<tref, tref>::second))
+			{
+				typename tbdd::subs_t spelled;
+				for (const auto& [v, w] : s.by_variable)
+					spelled.emplace_back(v, tbdd::build_bdd(
+						handle::is_bdd_backed(w)
+						? handle::convert_to_tau_terms(w) : w));
+				std::sort(spelled.begin(), spelled.end(),
+					[](const auto& a, const auto& b) {
+						return tbdd::less_then(a.first,
+							b.first); });
+				assert(compose(mapped, spelled) == r);
+			}
+#endif
 			if (r == x) return n;
 			return handle::convert_to_tau_node_or_term(handle(r),
 				find_ba_type<node>(n));

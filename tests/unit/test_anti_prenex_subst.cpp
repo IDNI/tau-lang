@@ -277,4 +277,51 @@ TEST_CASE("subst_var: in the backed regime the rewrite composes a stored BDD") {
 	CHECK(res == ap::prepare_terms<node_t>(wff("x & a | x' & z = 0")));
 }
 
+TEST_CASE("subst_var: a backed replacement composes as its own BDD, and a leaf receives its spelling") {
+	using th = term_handle<node_t>;
+	using tb = tau_term_bdd<node_t>;
+	tref x = vr("x");
+	tref t = th::convert_to_tau_node(bf("a & b"));
+	REQUIRE(th::is_bdd_backed(t));
+	// `x` a decision variable alone: one compose, the BDD the same formula
+	// prepares to.
+	tref phi = ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"));
+	CHECK(ap::subst_var<node_t>(phi, x, t, ap::regime::backed)
+		== ap::prepare_terms<node_t>(wff("a & b & y | (a & b)' & z = 0")));
+	// `x` inside a reference too: the leaf takes the replacement spelled,
+	// so no leaf of the result holds a `BDD_ID`.
+	tref psi = ap::prepare_terms<node_t>(wff("x & r(x) | x' & z = 0"));
+	tref res = ap::subst_var<node_t>(psi, x, t, ap::regime::backed);
+	CHECK(!in_fv(res, x));
+	CHECK(in_fv(res, vr("a")));
+	tref l = tau::trim_right_sibling(tau::get(res)[0].first());
+	REQUIRE(th::is_bdd_backed(l));
+	size_t leaves = 0, backed_leaves = 0;
+	auto count = [&](tb::ref n, bool is_leaf) {
+		if (is_leaf) ++leaves,
+			backed_leaves += has_bdd_id(tb::get_var_term(n));
+		return true;
+	};
+	tb::visit_nodes(th::convert_to_handle(l).get(), count);
+	CHECK(leaves == 1);                   // r(a·b)
+	CHECK(backed_leaves == 0);
+}
+
+TEST_CASE("subst_var: a chain the rewrite closes folds through the constructor") {
+	tref x = vr("x");
+	// ∀w (w ∪ x) under x ← 0 is ∀w w, closed: the constructor folds it to
+	// 0, which takes the argument's product with it.
+	tref phi = wff("f(a & fall w (w | x)) && u = 0");
+	tref res = ap::subst_var<node_t>(phi, x, bf("0"));
+	tref ref = member_where(res, is_child<node_t, tau::wff_ref>);
+	REQUIRE(ref != nullptr);
+	CHECK(tau::get(ref).find_top([](tref m) {
+		return tau::get(m).is(tau::bf_fall); }) == nullptr);
+	tref arg = tau::get(ref).find_top([](tref m) {
+		return tau::get(m).is(tau::ref_arg); });
+	REQUIRE(arg != nullptr);
+	CHECK(tau::get(tau::get(arg).first()).equals_0());
+	CHECK(ap::is_member<node_t>(res, wff("u = 0")));
+}
+
 } // TEST_SUITE

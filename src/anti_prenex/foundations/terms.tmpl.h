@@ -96,7 +96,7 @@ std::optional<chain_result<node>> resolve_chain(
 	using tau = tree<node>;
 	DBG(assert(!q.empty() && tbdd<node>::is_ordered(s));)
 	// The subscripts no quantification reaches, read off the leaves.
-	trefs lfv = thandle<node>::get_free_leaf_vars(s.b);
+	const trefs& lfv = thandle<node>::get_free_leaf_vars(s.b);
 	std::vector<bool> hidden(q.size());
 	for (size_t i = 0; i < q.size(); ++i)
 		hidden[i] = std::binary_search(lfv.begin(), lfv.end(),
@@ -714,11 +714,9 @@ size_t mem_size(tref t) {
 }
 
 template <NodeType node>
-trefs leaf_fv(tref f) {
+const trefs& leaf_fv(tref f) {
 	using namespace terms_detail;
 	if (!thandle<node>::is_bdd_backed(f)) return get_free_vars<node>(f);
-	// The library's `get_free_leaf_vars`, by value and never stored: the
-	// per-leaf sets are `get_free_vars`' own cached entries.
 	return thandle<node>::get_free_leaf_vars(
 		thandle<node>::convert_to_handle(f).get().b);
 }

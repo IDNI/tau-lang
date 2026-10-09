@@ -546,15 +546,19 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * comes back as the same tref, and a key rebound below a node is left
 	 * alone.
 	 *
-	 * @p with is prepared once: a `BDD_ID` inside it is spelled out as a
-	 * plain term, and the bound variables of every binder inside it are
-	 * renamed apart (`rename_apart`), so no binder of this subtree shares
-	 * an id with one of @p with. Binder ids are never renumbered here.
+	 * @p with is prepared once: the bound variables of every binder inside
+	 * it, inside the leaves of a BDD-backed one included, are renamed apart
+	 * (`rename_apart`), so no binder of this subtree shares an id with one
+	 * of @p with. Binder ids are never renumbered here. A BDD-backed @p with
+	 * stays its BDD: an occurrence in the tree (a BDD leaf, a reference
+	 * argument, an order atom) receives its spelling
+	 * (`convert_to_tau_terms`), built once per call on first need.
 	 *
 	 * A BDD-backed term keeps its variables in the BDD store, not as tree
 	 * nodes, and is rewritten there: its leaves first, by this same
-	 * substitution, then one `bdd_compose` for the key variables, each
-	 * replacement built as a BDD under the library's one order.
+	 * substitution and only when a key is free in one of them, then one
+	 * `bdd_compose` for the key variables, each replacement as its own BDD
+	 * (a plain one built under the library's one order).
 	 *
 	 * A reference argument is rewritten by this same substitution and then
 	 * passed through @p on_argument, once per argument that changed,
@@ -590,18 +594,84 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		const descent_guard& descend = {},
 		const hook_target& hooked = {}) const;
 
+	/// A substitution PREPARED once and applied by any number of walks
+	/// (`substitute(tref, const substitution&, ...)`), each walk reusing
+	/// what an earlier one built. One thread at a time.
+	struct substitution {
+		/// Matched node → its replacement; a variable key in its `bf`
+		/// wrapper.
+		subtree_map<node, tref> changes;
+		/// Key variable → its replacement, ordered by the variable.
+		/// Duplicates are kept: two keys naming one variable are two
+		/// pairs, and the compose is entitled to see both. The
+		/// occurrence guard searches this and the BDD compose iterates
+		/// it, so one container serves both.
+		std::vector<std::pair<tref, tref>> by_variable;
+		/// Every key is a variable, so the occurrence guard applies.
+		bool keys_are_variables = true;
+		/// The node types the keys have. A match is by content and
+		/// content includes the type, so a node of no key's type
+		/// cannot be one and is never looked up.
+		std::bitset<size_t(1) << node::nt_bits> key_types;
+		/// The free variables of the replacements, for Debug's capture
+		/// check; empty in Release.
+		trefs free_in_with;
+		/// Reference argument or named node → its result after the
+		/// hook, so a shared one is rewritten once, whichever walk
+		/// meets it first; every walk over one substitution therefore
+		/// passes the same hook.
+		mutable subtree_unordered_map<node, tref> hook_memo;
+		/// The caller's guard, asked before entering a node at every
+		/// depth the call reaches, so the leaves of a BDD and the
+		/// arguments of a reference see the one the top saw. Null
+		/// where there is none, which is what spares a plain
+		/// substitution a call per node. It points at the caller's
+		/// argument, which outlives the walk.
+		const descent_guard* descend = nullptr;
+		/// The caller's `hook_target`, null where there is none, which
+		/// spares a plain substitution a call per node. It points at the
+		/// caller's argument, which outlives the walk.
+		const hook_target* hooked = nullptr;
+		/// The key variables with their replacements as BDDs, in the
+		/// order a compose wants them. Built at the first BDD-backed node
+		/// a walk meets, at whatever depth, and reused by every later
+		/// one. Empty is an answer, hence the flag.
+		mutable bool compose_prepared = false;
+		mutable std::vector<std::pair<tref, tau_bdd_ref<node>>>
+			compose_subs;
+		/// A BDD-backed replacement → its spelling, built at its first
+		/// occurrence in the tree.
+		mutable subtree_unordered_map<node, tref> spellings;
+	};
+	/**
+	 * @brief @p changes prepared for walks over @p formula, or over any
+	 * term whose ids @p formula's largest id bounds: that id is the base
+	 * the replacements' bound variables are renamed apart from.
+	 */
+	static substitution prepare(tref formula,
+		const subtree_map<node, tref>& changes);
+	/**
+	 * @brief The walk of `substitute` over @p formula, by the prepared
+	 * @p s. @p hook_root false exempts @p formula itself from the named
+	 * kind: it is a node a caller rewrites whole and hooks.
+	 */
+	static tref substitute(tref formula, const substitution& s,
+		const argument_hook& on_argument, bool hook_root = true);
+
 	/// The bound variables of @p t, from formula binders and functional
-	/// quantifiers alike, trimmed and sorted by `subtree_less`.
+	/// quantifiers alike, the leaves of its BDD-backed terms included,
+	/// trimmed and sorted by `subtree_less`.
 	static trefs bound_vars(tref t);
 	/**
 	 * @brief @p t with every bound variable renamed so that none equals a
 	 * bound variable of @p n: each numeric id `k` becomes `k + base`, where
 	 * `base` is the largest id in @p n or @p t. Every new id lies above
-	 * every id in either tree, so one `rewriter::replace` over @p t renames
-	 * without capture. The map is keyed by the variable node, so binders
-	 * sharing an id are renamed alike, together with every occurrence in
-	 * their scope. A bound variable whose name is not a number is left
-	 * alone.
+	 * every id in either tree, so one replacement over @p t renames
+	 * without capture; it reaches the leaves of a BDD-backed term, which
+	 * are rebuilt through `map_leaves`. The map is keyed by the variable
+	 * node, so binders sharing an id are renamed alike, together with
+	 * every occurrence in their scope. A bound variable whose name is not
+	 * a number is left alone.
 	 */
 	static tref rename_apart(tref n, tref t);
 
@@ -1086,65 +1156,14 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 private:
 	using tt = traverser;
 
-	/// What `substitute` prepares once and every recursive call below it
-	/// reuses.
-	struct substitution {
-		/// Matched node → its replacement; a variable key in its `bf`
-		/// wrapper.
-		subtree_map<node, tref> changes;
-		/// Key variable → its replacement, ordered by the variable.
-		/// Duplicates are kept: two keys naming one variable are two
-		/// pairs, and the compose is entitled to see both. The
-		/// occurrence guard searches this and the BDD compose iterates
-		/// it, so one container serves both.
-		std::vector<std::pair<tref, tref>> by_variable;
-		/// Every key is a variable, so the occurrence guard applies.
-		bool keys_are_variables = true;
-		/// The node types the keys have. A match is by content and
-		/// content includes the type, so a node of no key's type
-		/// cannot be one and is never looked up.
-		std::bitset<size_t(1) << node::nt_bits> key_types;
-		/// The free variables of the replacements, for Debug's capture
-		/// check; empty in Release.
-		trefs free_in_with;
-		/// Reference argument or named node → its result after the
-		/// hook, so a shared one is rewritten once per call.
-		mutable subtree_unordered_map<node, tref> hook_memo;
-		/// The caller's guard, asked before entering a node at every
-		/// depth the call reaches, so the leaves of a BDD and the
-		/// arguments of a reference see the one the top saw. Null
-		/// where there is none, which is what spares a plain
-		/// substitution a call per node. It points at the caller's
-		/// argument, which outlives the walk.
-		const descent_guard* descend = nullptr;
-		/// The caller's `hook_target`, null where there is none, which
-		/// spares a plain substitution a call per node. It points at the
-		/// caller's argument, which outlives the walk.
-		const hook_target* hooked = nullptr;
-		/// The key variables with their replacements as BDDs, in the
-		/// order a compose wants them. Built at the first BDD-backed node
-		/// the call meets, at whatever depth, and reused by every later
-		/// one: the replacements are constants of the call, so the list
-		/// is too. Empty is an answer, hence the flag.
-		mutable bool compose_prepared = false;
-		mutable std::vector<std::pair<tref, tau_bdd_ref<node>>>
-			compose_subs;
-	};
 	/**
 	 * @brief Prepare one (@p key, @p value) pair into @p s: the
-	 * replacement spelled out and renamed apart against @p formula, the
-	 * variable the key names recorded for the guard and the compose.
+	 * replacement renamed apart against @p formula, the variable the key
+	 * names recorded for the guard and the compose.
 	 */
 	static void prepare(substitution& s, tref formula, tref key, tref value);
 	/** @brief Put @p s in the shape the walk reads it in, once every pair is prepared. */
 	static void finish(substitution& s);
-	/**
-	 * @brief The walk of `substitute`, over a prepared @p s. @p hook_root
-	 * false exempts @p formula itself from the named kind: it is a node a
-	 * caller rewrites whole and hooks.
-	 */
-	static tref substitute(tref formula, const substitution& s,
-		const argument_hook& on_argument, bool hook_root = true);
 
 };
 

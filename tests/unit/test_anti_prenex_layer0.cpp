@@ -577,6 +577,27 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	// A reference whose arguments do not hold the variable is the same node.
 	CHECK(tau::get(wff("f(u1)")).substitute(bf("x"), bf("z"), resimplify)
 		== wff("f(u1)"));
+	// SIMPLIFY's propagation prepares its environment ONCE and rewrites
+	// atom after atom with it: each atom comes out as a call of its own
+	// would make it, and an argument two atoms share is re-emitted once.
+	tref two = wff("f(x) && g(x)");
+	tref fx = member_where(two, [](tref m) {
+		return same(m, wff("f(x)")); });
+	tref gx = member_where(two, [](tref m) {
+		return same(m, wff("g(x)")); });
+	REQUIRE(fx != nullptr);
+	REQUIRE(gx != nullptr);
+	size_t calls = 0;
+	const tau::argument_hook counted = [&calls, &resimplify](tref a) {
+		return ++calls, resimplify(a);
+	};
+	const auto env = tau::prepare(two,
+		subtree_map<node_t, tref>{ { bf("x"), bf("z") } });
+	CHECK(tau::substitute(fx, env, counted)
+		== tau::get(fx).substitute(bf("x"), bf("z"), resimplify));
+	CHECK(tau::substitute(gx, env, counted)
+		== tau::get(gx).substitute(bf("x"), bf("z"), resimplify));
+	CHECK(calls == 1);
 }
 
 // --- last: a sweep rebuilds every table in the process --------------------------------------

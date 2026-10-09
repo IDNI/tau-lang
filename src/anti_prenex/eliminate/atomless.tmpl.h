@@ -21,12 +21,12 @@ namespace idni::tau_lang::anti_prenexing {
 namespace atomless_detail {
 
 /// §1 the LEAF HAZARD test, `LEAF_FV(t) ∩ X ≠ ∅`: one binary search per
-/// `x ∈ X` over the sorted set `leaf_fv` hands back (terms.h). `fv_meets`
-/// (dag.h) cannot serve, since it intersects a NODE's cached set and this
-/// intersection is against a computed one.
+/// `x ∈ X` over the cached sorted set `leaf_fv` hands back (terms.h).
+/// `fv_meets` (dag.h) cannot serve, since it intersects a node's free
+/// variables, which include the decision variables.
 template <NodeType node>
 bool leaf_hides(tref t, const block& X) {
-	const trefs ls = leaf_fv<node>(t);
+	const trefs& ls = leaf_fv<node>(t);
 	for (tref x : X)
 		if (std::binary_search(ls.begin(), ls.end(), x,
 			tree<node>::subtree_less)) return true;

@@ -12,7 +12,8 @@
  *
  * `[x ← t]` IS the library's `tree<node>::substitute`, which is where the
  * compose, the capture rules and the rename-apart live. What is added here is
- * the key — the variable's `bf` term — the hook, and the atoms named for it.
+ * the key — the variable's `bf` term — the hook, and the atoms and chains
+ * named for it.
  *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
  * node, on either nesting side — get no `atoms_memo` row, the rule
@@ -174,17 +175,29 @@ bool has_atom(tref n, tref atm) {
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, regime rg) {
 	using tau = tree<node>;
-	// One hook for both kinds the library hands it: a reference argument
-	// is a `bf` term, a rewritten atom a `wff`.
-	const typename tau::argument_hook resimplify = [rg](tref n) {
-		return tau::get(n).is(tau::wff) ? simplify_atom<node>(n, rg)
-			: detail::resimplify_argument<node>()(n);
+	auto is_chain = [](tref n) {
+		const tau& u = tau::get(n);
+		return u.child_is(tau::bf_fall) || u.child_is(tau::bf_fex);
+	};
+	// One hook for every kind the library hands it: a rewritten atom is a
+	// `wff`, a reference argument and a chain are `bf` terms. A chain goes
+	// through the constructor, which folds a piece the rewrite closed; the
+	// hook cannot tell a chain that IS an argument, so a chain is
+	// re-simplified as an argument first.
+	const typename tau::argument_hook resimplify = [rg, is_chain](tref n) {
+		if (tau::get(n).is(tau::wff)) return simplify_atom<node>(n, rg);
+		const tref s = detail::resimplify_argument<node>()(n);
+		if (!is_chain(s)) return s;
+		const auto [q, body] = strip_chain<node>(s);
+		return tau_term_bdd<node>::build_functional_quantifiers(q, body);
+	};
+	const typename tau::hook_target named = [is_chain](tref n) {
+		return is_atomic_fm<node>(n) || is_chain(n);
 	};
 	// The rewrite happens inside `phi`, so a right sibling it carries as a
 	// chain member is not part of it.
 	return tau::get(tau::trim_right_sibling(phi))
-		.substitute(tau::get(tau::bf, x), t, resimplify, {},
-			is_atomic_fm<node>);
+		.substitute(tau::get(tau::bf, x), t, resimplify, {}, named);
 }
 
 } // namespace idni::tau_lang::anti_prenexing

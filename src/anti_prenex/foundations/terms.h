@@ -350,12 +350,11 @@ size_t mem_size(tref t);
  * that case — a block variable that is both a decision variable and hidden in
  * a leaf.
  *
- * The BDD case is the library's `get_free_leaf_vars`, returned BY VALUE and
- * not stored: the per-leaf sets are `get_free_vars`' own cached entries, and
- * their union is one walk over the BDD's distinct nodes per call.
+ * Both cases are cached sets, `get_free_vars`' and the library's
+ * `get_free_leaf_vars`', so the reference is valid until a collection.
  */
 template <NodeType node>
-trefs leaf_fv(tref f);
+const trefs& leaf_fv(tref f);
 
 // --- the PURE shapes --------------------------------------------------------------
 

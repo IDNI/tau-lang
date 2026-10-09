@@ -577,20 +577,15 @@ struct tau_term_bdd_handle {
 	 * deduplicated.
 	 *
 	 * The body of `get_free_tau_vars` and `get_free_leaf_vars`, which differ
-	 * only in that flag and in whether they cache the answer.
+	 * only in that flag.
 	 */
 	static trefs collect_free_tau_vars(tref bdd_tref, bool leaves_only);
 	/**
 	 * @brief The free Tau variables contributed by the LEAVES alone of the
 	 * BDD rooted at @p bdd_tref (the decision variables left out), sorted
-	 * as its sibling `get_free_tau_vars` sorts.
-	 *
-	 * BY VALUE, and not cached, where the sibling returns a cached
-	 * reference: the per-leaf sets are `get_free_vars`' own cached entries,
-	 * so their union is one linear walk over the BDD's distinct nodes per
-	 * call.
+	 * and cached as its sibling `get_free_tau_vars` sorts and caches them.
 	 */
-	static trefs get_free_leaf_vars(tref bdd_tref);
+	static const trefs& get_free_leaf_vars(tref bdd_tref);
 
 	/** @brief Equality comparison. */
 	bool operator==(const tau_term_bdd_handle& other) const;

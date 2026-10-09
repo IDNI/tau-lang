@@ -1250,8 +1250,8 @@ TEST_SUITE("tree::substitute") {
 		CHECK(same_function(s, bf("y & z & r(y & z)")));
 		// the finish: nothing BDD-backed remains anywhere
 		CHECK(!has_bdd_id(hbdd::convert_to_tau_terms(s)));
-		// a replacement carrying a BDD_ID is spelled out ONCE by the
-		// entry step, and gives the same result
+		// a BDD-backed replacement composes as its own BDD and reaches
+		// the leaf spelled, which gives the same result
 		tref backed = hbdd::convert_to_tau_node(t);
 		REQUIRE(hbdd::is_bdd_backed(backed));
 		CHECK(tau::get(f).substitute(bf("x"), backed) == s);
@@ -1343,6 +1343,20 @@ TEST_SUITE("tree::substitute") {
 		// the free variables are the replacement's, unchanged by the rename
 		CHECK(get_free_vars<node_t>(res).size() == 1);
 		CHECK(get_free_vars<node_t>(res)[0] == vr("q5"));
+		// a BDD-backed replacement keeps its subscript inside a leaf, and
+		// the rename reaches it there
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tb = hbdd::convert_to_tau_node(bf("p & (fall w (w | r(q5)))"));
+		REQUIRE(hbdd::is_bdd_backed(tb));
+		REQUIRE(binder_id(hbdd::convert_to_tau_terms(tb), tau::bf_fall)
+			== "1");
+		tref resb = tau::get(unit).substitute(bf("x"), tb);
+		CHECK(binder_id(resb, tau::wff_ex) == "1");
+		CHECK(binder_id(hbdd::convert_to_tau_terms(resb), tau::bf_fall)
+			!= "1");
+		CHECK(get_free_vars<node_t>(resb).size() == 2);   // p and q5
 	}
 
 	TEST_CASE("rename apart: the base counts ids that live only inside a BDD_ID") {
@@ -1370,6 +1384,26 @@ TEST_SUITE("tree::substitute") {
 		// its subscript
 		CHECK(binder_id(hbdd::convert_to_tau_terms(res), tau::bf_fall)
 			== "6");                        // 1 + base, base = 5
+		// the same when "5" is BOUND inside a leaf: the subscript of a
+		// chain the build keeps as one leaf, so no variable of the term,
+		// free or decision, carries it
+		tref g = hbdd::convert_to_tau_node(tau::build_bf_and(
+			tau::get(tau::bf, x), tau::build_bf_fall(p5,
+				tau::build_bf_or(tau::get(tau::bf, p5),
+					ref_term(trefs{ bf("q") })), false)));
+		REQUIRE(hbdd::is_bdd_backed(g));
+		REQUIRE(get_free_vars<node_t>(g).size() == 2);  // x and q
+		CHECK(find_biggest_var_id<node_t>(g) == 5);
+		std::vector<std::string> ids;
+		auto subscripts = [&ids](tref m) {
+			if (tau::get(m).is(tau::bf_fall)) ids.push_back(
+				get_var_name<node_t>(tau::get(m).first()));
+			return true;
+		};
+		pre_order<node_t>(hbdd::convert_to_tau_terms(
+			tau::get(g).substitute(bf("x"), t))).visit_unique(subscripts);
+		std::ranges::sort(ids);
+		CHECK(ids == std::vector<std::string>{ "5", "6" });
 	}
 
 	TEST_CASE("the walk descends into a binder and keeps it") {

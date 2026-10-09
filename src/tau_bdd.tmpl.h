@@ -1540,9 +1540,16 @@ trefs tau_term_bdd_handle<node>::collect_free_tau_vars(tref bdd_tref,
 
 /** @internal @copydoc tau_term_bdd_handle::get_free_leaf_vars(tref) @endinternal */
 template<NodeType node>
-trefs tau_term_bdd_handle<node>::get_free_leaf_vars(tref bdd_tref) {
-	if (!bdd_tref) return {};
-	return collect_free_tau_vars(bdd_tref, true);
+const trefs& tau_term_bdd_handle<node>::get_free_leaf_vars(tref bdd_tref) {
+	static const trefs no_free_vars{};
+	if (!bdd_tref) return no_free_vars;
+	static bdd_fv_cache_t& cache =
+		tbdd::template create_cache<bdd_fv_cache_t>();
+	if (auto it = cache.find(bdd_tref); it != cache.end())
+		return it->second;
+	auto [it, _] = cache.emplace(bdd_tref,
+		collect_free_tau_vars(bdd_tref, true));
+	return it->second;
 }
 
 } // namespace idni::tau_lang

@@ -197,6 +197,7 @@ struct propagation {
 		: rg(rg), X(X), ref_args(ref_args) {}
 
 	tref run(tref phi) {
+		root = phi;
 		auto f = [this](tref n) { return down(n); };
 		auto visit = [this](tref n) {
 			// The sweep's one-shot flag: `down` sets it for a node
@@ -295,8 +296,15 @@ private:
 		subtree_map<node, tref> changes;
 		size_t witness_sum = 0;   ///< `Σ‖witness‖` over `pins`
 		size_t atom_sum = 0;      ///< `Σ‖TERM_OF(pinning atom)‖`
+		/// A fresh number at every change, live or scratch, so one
+		/// version is one content: the key of the memo and of the
+		/// prepared substitutions.
+		size_t version = 0;
 	};
 
+	/// The pass's input. Every atom the pass rewrites is a node of it, so
+	/// its largest id bounds theirs: the environment is prepared against it.
+	tref root = nullptr;
 	environment env;
 	std::vector<undo_record> undo;
 	std::vector<std::vector<size_t>> suspensions;
@@ -304,7 +312,14 @@ private:
 	std::vector<frame> frames;
 	memo_t memo;
 	subtree_unordered_map<node, std::optional<pin<node>>> pin_memo;
-	size_t version = 0;
+	/// Environment version → its changes prepared as one substitution,
+	/// whose spellings, compose list and argument memo every atom
+	/// rewritten at that version shares.
+	std::unordered_map<size_t, typename tau::substitution> prepared;
+#ifdef DEBUG
+	/// The changes each version was prepared from.
+	std::unordered_map<size_t, subtree_map<node, tref>> prepared_from;
+#endif
 	size_t next_version = 0;
 	bool no_descend = false;
 
@@ -321,7 +336,7 @@ private:
 	tref rewrite_under(const environment& e, tref a) {
 		const tref bare = tau::trim_right_sibling(a);
 		tref res = e.changes.empty() ? bare
-			: tau::get(bare).substitute(e.changes,
+			: tau::substitute(bare, prepared_for(e),
 				resimplify_argument<node>());
 		if (ref_args) res = simplify_reference_arguments(res);
 		if (res != bare || ref_args)
@@ -364,6 +379,7 @@ private:
 	tref rewrite_atom_excluding(const environment& before,
 		const trefs& candidates, tref leaf, tref own_key)
 	{
+		const size_t scratch_from = next_version;
 		environment e = before;
 		for (tref c : candidates) {
 			// One conjunct is left out, not every copy of it: a
@@ -372,7 +388,27 @@ private:
 			if (c == leaf) continue;
 			admit_into(e, rewrite_under(e, c), nullptr, own_key);
 		}
-		return rewrite_under(e, leaf);
+		const tref res = rewrite_under(e, leaf);
+		// The scratch versions are never met again.
+		for (size_t v = scratch_from + 1; v <= next_version; ++v) {
+			prepared.erase(v);
+			DBG(prepared_from.erase(v);)
+		}
+		return res;
+	}
+
+	/// The environment `e` prepared as one substitution, once per version
+	/// (§3), against the pass's root.
+	const typename tau::substitution& prepared_for(const environment& e) {
+		auto it = prepared.find(e.version);
+		if (it == prepared.end()) {
+			it = prepared.emplace(e.version,
+				tau::prepare(root, e.changes)).first;
+			DBG(prepared_from.emplace(e.version, e.changes);)
+		}
+		// A prepared environment serves the version it was prepared at.
+		DBG(assert(prepared_from.at(e.version) == e.changes);)
+		return it->second;
 	}
 
 	/// `ref_args` mode: every `bf` argument of a reference below `n`
@@ -432,17 +468,20 @@ private:
 		// environment stays idempotent.
 		tref w = p->witness;
 		if (!e.changes.empty()) w = simplify_term<node>(
-			tau::get(w).substitute(e.changes,
+			tau::substitute(w, prepared_for(e),
 				resimplify_argument<node>()), rg);
-		// and every range in force rewritten by the new pin.
+		// and every range in force rewritten by the new pin, prepared
+		// once for all of them.
 		subtree_map<node, tref> one;
 		one.emplace(key, w);
+		std::optional<typename tau::substitution> by_new;
 		std::vector<std::pair<size_t, tref>> rewritten;
 		size_t new_witness_sum = mem_size<node>(w);
 		for (size_t i = 0; i < e.pins.size(); ++i) {
 			tref r = e.pins[i].witness;
 			if (e.pins[i].active) {
-				r = tau::get(r).substitute(one,
+				if (!by_new) by_new = tau::prepare(root, one);
+				r = tau::substitute(r, *by_new,
 					resimplify_argument<node>());
 				if (r != e.pins[i].witness)
 					r = simplify_term<node>(r, rg);
@@ -475,16 +514,8 @@ private:
 		e.changes[key] = w;
 		e.witness_sum = new_witness_sum;
 		e.atom_sum = new_atom_sum;
+		e.version = ++next_version;
 		return admission{ e.pins.size() - 1, !rewritten.empty() };
-	}
-
-	/// The admission into the LIVE environment: it records its undo and
-	/// bumps the version the pass's memo is keyed by.
-	std::optional<admission> try_admit(tref atom) {
-		const std::optional<admission> a =
-			admit_into(env, atom, &undo);
-		if (a) version = ++next_version;
-		return a;
 	}
 
 	void undo_to(size_t mark) {
@@ -514,7 +545,7 @@ private:
 	void memo_store(const marker& m, tref res) {
 		// `up` has restored whatever the node's own descent changed, so
 		// the environment is the one `down` saw.
-		DBG(assert(m.version == version);)
+		DBG(assert(m.version == env.version);)
 		memo.emplace(std::make_pair(m.orig, m.version), res);
 	}
 
@@ -529,7 +560,7 @@ private:
 	tref down(tref n) {
 		DBG(assert(!no_descend);)
 		const tau& t = tau::get(n);
-		marker m{ n, plain, version };
+		marker m{ n, plain, env.version };
 		// An operator node (`wff_and`, `wff_neg`, …) carries no state
 		// of its own; the traversal rebuilds it from its children.
 		if (!t.is(tau::wff)) return markers.push_back(m), n;
@@ -564,10 +595,10 @@ private:
 	 * STAGE 1, MATCH: the X-FREE positive equations, in content order —
 	 * an X-touching one can never pin (§3's orientation rule), since a
 	 * witness is X-free and a substitution cannot remove a block variable.
-	 * Each is rewritten by the environment in force so far and offered to
-	 * `try_admit`, so a chained pin joins for the leaves after it and the
-	 * environment stays normalised on insert. That first form exists for
-	 * the pin test alone.
+	 * Each is rewritten by the environment in force so far and admitted
+	 * into the live one, so a chained pin joins for the leaves after it
+	 * and the environment stays normalised on insert. That first form
+	 * exists for the pin test alone.
 	 *
 	 * STAGE 2, REWRITE: EVERY positive equation of the frame, X-touching
 	 * ones included, rewritten from the ORIGINAL leaf — one substitution
@@ -589,7 +620,7 @@ private:
 	tref open_frame(tref n, marker m) {
 		frame fr;
 		fr.undo_mark = undo.size();
-		fr.version_before = version;
+		fr.version_before = env.version;
 		fr.witness_sum_before = env.witness_sum;
 		fr.atom_sum_before = env.atom_sum;
 		trefs leaves, inner;
@@ -623,7 +654,8 @@ private:
 			const tref first = rewrite_atom(e);
 			// A leaf that only BECOMES a pin once rewritten joins
 			// the environment like any other (§3).
-			const std::optional<admission> own = try_admit(first);
+			const std::optional<admission> own =
+				admit_into(env, first, &undo);
 			stage1.emplace(e, matched_leaf{ first, own,
 				env.pins.size() });
 		}
@@ -668,7 +700,7 @@ private:
 			env.changes.erase(env.pins[i].key);
 			suspended.push_back(i);
 		}
-		if (!suspended.empty()) version = ++next_version;
+		if (!suspended.empty()) env.version = ++next_version;
 		suspensions.push_back(std::move(suspended));
 		m.kind = binder_;
 		return markers.push_back(m), n;
@@ -685,14 +717,14 @@ private:
 				env.changes[env.pins[i].key] = env.pins[i].witness;
 			}
 			suspensions.pop_back();
-			version = m.version;
+			env.version = m.version;
 			break;
 		}
 		case frame_top: {
 			const frame fr = std::move(frames.back());
 			frames.pop_back();
 			undo_to(fr.undo_mark);
-			version = fr.version_before;
+			env.version = fr.version_before;
 			env.witness_sum = fr.witness_sum_before;
 			env.atom_sum = fr.atom_sum_before;
 			break;

@@ -9,7 +9,8 @@
  * `φ[x ← t]` IS the library's `tree<node>::substitute` (tau_tree.h), wrapped
  * here with the re-simplifying hook §3 and invariant 6
  * ask for: every atom the rewrite changed goes through `SIMPLIFY_ATOM`, every
- * reference argument through `SIMPLIFY_TERM`. That hook is what makes the
+ * reference argument through `SIMPLIFY_TERM`, every functional-quantifier
+ * chain through the term constructor. That hook is what makes the
  * library call the spec's primitive. `SIMPLIFY`'s propagation takes the
  * argument half from here and re-simplifies its atoms itself.
  */
@@ -68,7 +69,9 @@ bool has_atom(tref n, tref atm);
  * invariant 6, which re-simplifies once every reference argument the rewrite
  * changed. Every atom the rewrite changed goes through `SIMPLIFY_ATOM` in the
  * regime @p rg once, in the same walk, and a constant that yields folds out
- * through the construction hooks.
+ * through the construction hooks. Every functional-quantifier chain it
+ * changed goes through `SIMPLIFY_TERM` and then the constructor
+ * (`build_functional_quantifiers`), which folds a piece the rewrite closed.
  *
  * @p x is the VARIABLE node; the key the library matches is its `bf` term,
  * the form every occurrence takes inside a term, and it is formed here so
