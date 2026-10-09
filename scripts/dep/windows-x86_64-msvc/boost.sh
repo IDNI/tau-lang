@@ -15,18 +15,60 @@ using msvc ;
 EOF
 }
 
+# Overwrite each <folder> in every file under <prefix> with '@' of the same
+# length: MSVC has no flag that maps a path, and each library keeps the path
+# of its objects and sources. A folder is masked under each of its spellings,
+# with either slash and with its long and its 8.3 name.
+_dep_boost_msvc_mask_paths() {
+	local prefix="$1" dir spellings=()
+	shift
+	for dir in "$@"; do
+		spellings+=("$dir" "$(cygpath -w "$dir")" "$(cygpath -m "$dir")"
+			"$(cygpath -wl "$dir")" "$(cygpath -ml "$dir")")
+	done
+	python3 - "$prefix" "${spellings[@]}" <<'PY'
+import os
+import sys
+top, *roots = sys.argv[1:]
+olds = sorted({r.encode() for r in roots if r}, key=len, reverse=True)
+for dirpath, _dirs, files in os.walk(top):
+	for name in files:
+		path = os.path.join(dirpath, name)
+		with open(path, 'rb') as fh:
+			data = fh.read()
+		new = data
+		for old in olds:
+			new = new.replace(old, b'@' * len(old))
+		if new != data:
+			with open(path, 'wb') as fh:
+				fh.write(new)
+PY
+}
+
 # bootstrap.bat + b2 in one cmd session, so both inherit the vcvars
 # environment. Git Bash rewrites `/c`, `/d` and `--`-switches on a
 # cmd.exe command line as filesystem paths; keeping them in a .bat
 # lets cmd parse them itself. vcvars64.bat is a local fallback only:
 # CI gets the MSVC shell from an action, so cl is already on PATH and
 # a missing vcvars is not fatal.
+#
+# b2 builds in a folder with a short path: under the staging folder, the
+# paths of its objects and of the cmake files it writes pass the 260
+# characters cl.exe and cmd accept.
 _dep_boost_target_build() {
 	local work="$1" staging_prefix="$2"
-	local _boost_win _prefix_win _build_win _vcvars _v _a
+	local _boost_win _prefix_win _build_win _tmp_win _vcvars _v _a _short _rc
+	local _base="${TMPDIR:-/tmp}"
+	if [ -n "${RUNNER_TEMP:-}" ]; then
+		_base="$(cygpath -u "$RUNNER_TEMP")" || return 1
+	fi
+	_short="$(mktemp -d "${_base}/boost.XXXXXX")" \
+		|| { echo "dep-boost: cannot create a short build folder" >&2; return 1; }
 	_boost_win="$(cygpath -w "$work")"
 	_prefix_win="$(cygpath -w "$staging_prefix")"
-	_build_win="$(cygpath -w "${work}/bin.v2")"
+	_build_win="$(cygpath -w "$_short")"
+	mkdir -p "${_short}/tmp" || return 1
+	_tmp_win="$(cygpath -w "${_short}/tmp")"
 	_vcvars=""
 	for _v in \
 		"${VSINSTALLDIR:-}/VC/Auxiliary/Build/vcvars64.bat" \
@@ -46,6 +88,9 @@ _dep_boost_target_build() {
 			printf 'call "%s"\r\n' "$_vcvars"
 			printf 'if errorlevel 1 exit /b 1\r\n'
 		fi
+		# The librarian names a member it converts after a file in TEMP,
+		# so TEMP is under the short folder, whose path is masked.
+		printf 'set "TEMP=%s"\r\nset "TMP=%s"\r\n' "$_tmp_win" "$_tmp_win"
 		printf 'cd /d "%s"\r\n' "$_boost_win"
 		printf 'if errorlevel 1 exit /b 1\r\n'
 		printf 'call bootstrap.bat --with-libraries=log\r\n'
@@ -54,12 +99,25 @@ _dep_boost_target_build() {
 		printf ' --prefix="%s" --build-dir="%s"' \
 			"$_prefix_win" "$_build_win"
 		printf ' --with-log --layout=system -j%s' "$DEP_BOOST_JOBS"
+		# An argument with a space, as a cxxflags list, stays one argument
+		# of b2 only between quotes.
 		for _a in "${_DEP_BOOST_B2_ARGS[@]}"; do
-			printf ' %s' "$_a"
+			case "$_a" in
+				*[[:space:]]*) printf ' "%s"' "$_a" ;;
+				*) printf ' %s' "$_a" ;;
+			esac
 		done
 		printf ' install\r\n'
 	} > "$_bat"
-	cmd.exe //c "$(cygpath -w "$_bat")" \
+	cmd.exe //c "$(cygpath -w "$_bat")"
+	_rc=$?
+	if [ "$_rc" -eq 0 ]; then
+		_dep_boost_msvc_mask_paths "$staging_prefix" "$_short" \
+				"$(dirname "$staging_prefix")" \
+			|| { echo "dep-boost: cannot mask the build paths" >&2; _rc=1; }
+	fi
+	rm -rf "$_short"
+	[ "$_rc" -eq 0 ] \
 		|| { echo "dep-boost: MSVC bootstrap+b2 failed" >&2; return 1; }
 }
 
