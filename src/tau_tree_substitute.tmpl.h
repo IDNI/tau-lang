@@ -131,10 +131,9 @@ void tree<node>::finish(substitution& s) {
 #endif
 }
 
-/** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
+/** @internal @copydoc tree::substitute(tref, tref, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref that, tref with,
-	const subtree_unordered_map<node, int_t>& o,
 	const argument_hook& on_argument, const descent_guard& descend,
 	const hook_target& hooked) const
 {
@@ -148,13 +147,12 @@ tref tree<node>::substitute(tref that, tref with,
 	if (hooked) s.hooked = &hooked;
 	prepare(s, formula, that, with);
 	finish(s);
-	return tau::substitute(formula, s, o, on_argument);
+	return tau::substitute(formula, s, on_argument);
 }
 
-/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
+/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(const subtree_map<node, tref>& changes,
-	const subtree_unordered_map<node, int_t>& o,
 	const argument_hook& on_argument, const descent_guard& descend,
 	const hook_target& hooked) const
 {
@@ -171,13 +169,12 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	for (const auto& [key, value] : changes)
 		prepare(s, formula, key, value);
 	finish(s);
-	return tau::substitute(formula, s, o, on_argument);
+	return tau::substitute(formula, s, on_argument);
 }
 
-/** @internal @copydoc tree::substitute(tref, const substitution&, const subtree_unordered_map<node, int_t>&, const argument_hook&, bool) @endinternal */
+/** @internal @copydoc tree::substitute(tref, const substitution&, const argument_hook&, bool) @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref formula, const substitution& s,
-	const subtree_unordered_map<node, int_t>& o,
 	const argument_hook& on_argument, bool hook_root)
 {
 	using tau   = tree<node>;
@@ -259,22 +256,21 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		return fv == nullptr || holds_key(*fv);
 	};
 	// The compose list, built at the first BDD-backed node this call meets
-	// and reused by every later one. `build_bdd(w, o)` turns a replacement
-	// into a BDD under the live order, and both are constants of the call,
-	// so the answer is one per call rather than one per backed node. It is
-	// built here rather than in the entry step because a formula with no
-	// backed node in it must not pay for a BDD it never composes.
-	auto compose_list = [&s, &o]() -> const typename tbdd::subs_t& {
+	// and reused by every later one. The replacements are constants of the
+	// call, so their BDDs are built once per call rather than once per
+	// backed node. It is built here rather than in the entry step because a
+	// formula with no backed node in it must not pay for a BDD it never
+	// composes.
+	auto compose_list = [&s]() -> const typename tbdd::subs_t& {
 		if (!s.compose_prepared) {
 			for (const auto& [v, w] : s.by_variable)
-				if (o.contains(v)) s.compose_subs.emplace_back(
-					v, tbdd::build_bdd(w, o));
+				s.compose_subs.emplace_back(v, tbdd::build_bdd(w));
 			// The order a compose descends in, sorted once here
 			// instead of at every node.
 			std::sort(s.compose_subs.begin(), s.compose_subs.end(),
-				[&o](const auto& a, const auto& b) {
+				[](const auto& a, const auto& b) {
 					return tbdd::less_then(a.first,
-						b.first, o); });
+						b.first); });
 			s.compose_prepared = true;
 		}
 		return s.compose_subs;
@@ -286,7 +282,7 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 	auto rewrite_whole = [&](tref a) -> tref {
 		auto it = s.hook_memo.find(a);
 		if (it == s.hook_memo.end()) {
-			tref r = tau::substitute(a, s, o, on_argument, false);
+			tref r = tau::substitute(a, s, on_argument, false);
 			if (r != a) r = on_argument(r);
 			it = s.hook_memo.emplace(a, r).first;
 		}
@@ -318,23 +314,22 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		// substituted again; then one compose removes the keys that
 		// are decision variables.
 		if (handle::is_bdd_backed(n)) {
-			DBG(assert(!o.empty());)
 			const typename tbdd::ref x =
 				handle::convert_to_handle(n).get();
-			DBG(assert(tbdd::is_ordered(x, o));)
+			DBG(assert(tbdd::is_ordered(x));)
 			auto leaf = [&](tref l) {
-				return tau::substitute(l, s, o, on_argument);
+				return tau::substitute(l, s, on_argument);
 			};
-			typename tbdd::ref r = tbdd::map_leaves(x, leaf, o);
+			typename tbdd::ref r = tbdd::map_leaves(x, leaf);
 			const typename tbdd::subs_t& subs = compose_list();
 			// One key takes the single-pair compose, which is the
 			// shape the module's calls have and the one that routes
 			// a constant replacement through the cofactor.
 			if (subs.size() == 1)
 				r = tbdd::bdd_compose(r, subs.front().first,
-					subs.front().second, o);
+					subs.front().second);
 			else if (!subs.empty())
-				r = tbdd::bdd_compose(r, subs, o);
+				r = tbdd::bdd_compose(r, subs);
 			if (r == x) return n;
 			return handle::convert_to_tau_node_or_term(handle(r),
 				find_ba_type<node>(n));
@@ -368,23 +363,21 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 
 template <NodeType node>
 tref substitute(tref formula, tref that, tref with,
-	const subtree_unordered_map<node, int_t>& o,
 	const typename tree<node>::argument_hook& on_argument,
 	const typename tree<node>::descent_guard& descend,
 	const typename tree<node>::hook_target& hooked)
 {
-	return tree<node>::get(formula).substitute(that, with, o, on_argument,
+	return tree<node>::get(formula).substitute(that, with, on_argument,
 		descend, hooked);
 }
 
 template <NodeType node>
 tref substitute(tref formula, const subtree_map<node, tref>& changes,
-	const subtree_unordered_map<node, int_t>& o,
 	const typename tree<node>::argument_hook& on_argument,
 	const typename tree<node>::descent_guard& descend,
 	const typename tree<node>::hook_target& hooked)
 {
-	return tree<node>::get(formula).substitute(changes, o, on_argument,
+	return tree<node>::get(formula).substitute(changes, on_argument,
 		descend, hooked);
 }
 

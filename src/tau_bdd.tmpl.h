@@ -4,6 +4,9 @@
 #define TAU_TAU_BDD_TMPL_H
 
 #include <algorithm>
+#include <cctype>
+#include <charconv>
+#include <limits>
 
 #include "tau_bdd.h"
 
@@ -71,8 +74,18 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::F = tau_term_bdd::ref(
 	tau_term_bdd::get(bdd_node(tree<node>::get(tree<node>::bf_t)), nullptr, nullptr), true);
 
 #ifdef TAU_CACHE
+// The tables are caches keyed by BDD refs, valid under the one global order
+// in every call; a tree collection clears them, which bounds their growth.
+// Every operation reaches `and_memo`, so its definition hooks them in.
 template<NodeType node>
-tau_term_bdd<node>::cache_and_t tau_term_bdd<node>::and_memo;
+tau_term_bdd<node>::cache_and_t& tau_term_bdd<node>::and_memo =
+	[]() -> cache_and_t& {
+		static cache_and_t memo;
+		std::unique_lock lock(bintree<node>::mtx_);
+		bintree<node>::gc_callbacks.push_back(
+			[](const std::unordered_set<tref>&) { clear_caches(); });
+		return memo;
+	}();
 
 template<NodeType node>
 tau_term_bdd<node>::cache_ex_t tau_term_bdd<node>::ex_memo;
@@ -84,16 +97,7 @@ template<NodeType node>
 tau_term_bdd<node>::cache_and_many_index_t tau_term_bdd<node>::and_many_index;
 
 template<NodeType node>
-tau_term_bdd<node>::cache_quant_t tau_term_bdd<node>::quant_memo;
-
-template<NodeType node>
 tau_term_bdd<node>::cache_ite_t tau_term_bdd<node>::ite_memo;
-
-template<NodeType node>
-tau_term_bdd<node>::order tau_term_bdd<node>::last_order;
-
-template<NodeType node>
-bool tau_term_bdd<node>::has_last_order = false;
 
 /** @internal @copydoc tau_term_bdd::clear_caches() @endinternal */
 template<NodeType node>
@@ -102,33 +106,7 @@ void tau_term_bdd<node>::clear_caches() {
 	ex_memo.clear();
 	and_many_memo.clear();
 	and_many_index.clear();
-	quant_memo.clear();
 	ite_memo.clear();
-	// The tables and the order they were populated under go together: a
-	// caller clearing them by hand (the tests do, between cases) starts
-	// the union afresh as well.
-	last_order.clear();
-	has_last_order = false;
-}
-
-/** @internal @copydoc tau_term_bdd::sync_order_cache(const order&) @endinternal */
-template<NodeType node>
-void tau_term_bdd<node>::sync_order_cache(const order& o) {
-	// last_order is the UNION of the orders seen since the last clear. A
-	// memo entry is keyed by BDD refs alone, so it stays valid under any
-	// order that gives the keys it was computed under the SAME ranks; only
-	// a key coming back with a different rank invalidates the tables.
-	for (const auto& [k, r] : o)
-		if (auto it = last_order.find(k);
-			it != last_order.end() && it->second != r)
-		{
-			clear_caches();
-			last_order = o;
-			has_last_order = true;
-			return;
-		}
-	last_order.insert(o.begin(), o.end());
-	has_last_order = true;
 }
 #endif
 
@@ -138,13 +116,43 @@ void tau_term_bdd<node>::make_canonical(ref& x, ref& y) {
 	if (y < x) std::swap(x,y);
 }
 
-/** @internal @copydoc tau_term_bdd::less_then(tref, tref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::sort_key_of(tref) @endinternal */
 template<NodeType node>
-bool tau_term_bdd<node>::less_then(tref x, tref y, const order& o) {
-	const auto xiter = o.find(x), yiter = o.find(y);
-	// Both variables must be present in the order for comparison
-	if (xiter == o.end() || yiter == o.end()) return false;
-	return xiter->second < yiter->second;
+tau_term_bdd<node>::sort_key tau_term_bdd<node>::sort_key_of(tref v) {
+#ifdef TAU_CACHE
+	using keys_t = std::unordered_map<tref, sort_key>;
+	static keys_t& keys = tree<node>::template create_cache<keys_t>();
+	if (auto it = keys.find(v); it != keys.end()) return it->second;
+#endif
+	sort_key k;
+	k.name = get_var_name_sid<node>(v);
+	const std::string& name = dict(k.name);
+	k.binder = !name.empty() && std::ranges::all_of(name,
+		[](unsigned char c) { return std::isdigit(c) != 0; });
+	// An id past the range only ties with another such id, which the
+	// content order then breaks.
+	if (k.binder && std::from_chars(name.data(), name.data() + name.size(),
+		k.id).ec != std::errc{})
+		k.id = std::numeric_limits<std::uint64_t>::max();
+#ifdef TAU_CACHE
+	keys.emplace(v, k);
+#endif
+	return k;
+}
+
+/** @internal @copydoc tau_term_bdd::less_then(tref, tref) @endinternal */
+template<NodeType node>
+bool tau_term_bdd<node>::less_then(tref x, tref y) {
+	using tau = tree<node>;
+	DBG(assert(tau::get(x).is(tau::variable) && tau::get(y).is(tau::variable));)
+	if (x == y) return false;
+	const sort_key a = sort_key_of(x), b = sort_key_of(y);
+	if (a.binder != b.binder) return b.binder;
+	if (a.binder) { if (a.id != b.id) return a.id > b.id; }
+	else if (a.name != b.name) return dict(a.name) < dict(b.name);
+	DBG(assert(tau::subtree_less(x, y) || tau::subtree_less(y, x)
+		|| tau::subtree_equals(x, y));)
+	return tau::subtree_less(x, y);
 }
 
 /** @internal @copydoc tau_term_bdd::add(tref, ref, ref) @endinternal */
@@ -185,9 +193,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref leaf) {
 	if (tl.is(tau::bf_f)) return F;
 	// In case leaf is negated, use inverter
 	if (tl.is(tau::bf_neg)) {
+		DBG(assert(!tau::get(tau::trim2(leaf)).is(tau::variable));)
 		const auto bn = bdd_node(tau::trim2(leaf));
 		return ref(tau_term_bdd::get(bn, nullptr, nullptr), true);
 	} else {
+		// A variable is a decision variable, never a leaf.
+		DBG(assert(!tl.is(tau::variable));)
 		const auto bn = bdd_node(leaf);
 		return ref(tau_term_bdd::get(bn, nullptr, nullptr), false);
 	}
@@ -312,79 +323,70 @@ size_t tau_term_bdd<node>::node_count(ref x) {
 	return n;
 }
 
-/** @internal @copydoc tau_term_bdd::is_ordered(ref, const order&, std::unordered_set<tref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::is_ordered(ref, std::unordered_set<tref>&) @endinternal */
 template<NodeType node>
-bool tau_term_bdd<node>::is_ordered(ref x, const order& o,
-	std::unordered_set<tref>& seen) {
+bool tau_term_bdd<node>::is_ordered(ref x, std::unordered_set<tref>& seen) {
+	using tau = tree<node>;
 	if (leaf(x)) return true;
 	if (!seen.insert(x.b).second) return true;
 	tref v = get_var(x);
-	if (!o.contains(v)) return false;
+	if (!tau::get(v).is(tau::variable)) return false;
 	for (ref c : { get_high(x), get_low(x) }) {
-		if (!leaf(c) && !less_then(v, get_var(c), o)) return false;
-		if (!is_ordered(c, o, seen)) return false;
+		if (leaf(c)) continue;
+		tref cv = get_var(c);
+		if (!tau::get(cv).is(tau::variable) || !less_then(v, cv)
+			|| !is_ordered(c, seen)) return false;
 	}
 	return true;
 }
 
-/** @internal @copydoc tau_term_bdd::is_ordered(ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::is_ordered(ref) @endinternal */
 template<NodeType node>
-bool tau_term_bdd<node>::is_ordered(ref x, const order& o) {
+bool tau_term_bdd<node>::is_ordered(ref x) {
 	std::unordered_set<tref> seen;
-	return is_ordered(x, o, seen);
+	return is_ordered(x, seen);
 }
 
-/**
- * @internal
- * @brief Creates a BDD from a given Tau term
- * @param f The Tau term to build the BDD from
- * @param o The ordering of tau terms
- * @param o_bound The current highest ordering id
- * @return A reference to the BDD corresponding to f
- * @endinternal
- */
+/** @internal @copydoc tau_term_bdd::build_bdd(tref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(f).get_type() != tau::wff));
-	// If the current tree is considered to be a BDD variable, it is
-	// contained in o
-	if (auto it = o.find(f); it != o.end()) {
-		// Current tree is variable
-		return from_bit(f);
-	}
 	switch (auto nt = tau::get(f).get_type()) {
-		case tau::bf: return build_bdd(tau::trim(f), o);
+		case tau::variable: return from_bit(f);
+		case tau::bf: return build_bdd(tau::trim(f));
 		case tau::bf_and: {
 			refs bdds;
 			for (tref c : get_cnf_bf_clauses<node>(f))
-				bdds.emplace_back(build_bdd(c, o));
-			return bdd_and_many(std::move(bdds), o);
+				bdds.emplace_back(build_bdd(c));
+			return bdd_and_many(std::move(bdds));
 		}
 		case tau::bf_or: {
 			refs bdds;
 			for (tref d : get_dnf_bf_clauses<node>(f))
-				bdds.emplace_back(build_bdd(d, o));
-			return bdd_or_many(std::move(bdds), o);
+				bdds.emplace_back(build_bdd(d));
+			return bdd_or_many(std::move(bdds));
 		}
 		case tau::bf_xor: {
 			const tau& tf = tau::get(f);
-			const ref a = build_bdd(tf.first(), o);
-			const ref b = build_bdd(tf.second(), o);
-			return bdd_xor(a, b, o);
+			const ref a = build_bdd(tf.first());
+			const ref b = build_bdd(tf.second());
+			return bdd_xor(a, b);
 		}
 		case tau::bf_neg: {
 			const tau& tf = tau::get(f);
-			return bdd_not(build_bdd(tf.first(), o));
+			return bdd_not(build_bdd(tf.first()));
 		}
 		case tau::bf_fall:
 		case tau::bf_fex: {
-			// §1 the functional-quantifier CHAIN `Q_Y b`, with two
-			// outcomes and no third. It SLIDES onto the leaves when
-			// no subscript is a key of @p o: `Q_Y b` is
-			// `x·Q_Y b₁ ∪ x′·Q_Y b₀` for a key `x` outside `Y`,
-			// i.e. the body's BDD with the chain pushed onto every
-			// leaf. Otherwise it is ONE LEAF.
+			// §1 the functional-quantifier CHAIN `Q_Y b`, collected
+			// whole and put through the constructor, which puts it in
+			// content order, merges its runs, drops a degenerate
+			// subscript and folds a closed chain. What is still a
+			// chain is ONE LEAF, hiding what its body carries (§1's
+			// leaf hazard, read through `LEAF_FV`); anything else is
+			// built, a smaller term than `f`.
+			// TODO (HIGH): slide a chain to its subscripts' levels.
 			quants q;
 			tref body = nullptr;
 			for (tref c = f;;) {
@@ -397,53 +399,18 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 					&& !tb.child_is(tau::bf_fex)) break;
 				c = tb.first();
 			}
-			// ONE LEAF, and a canonical one -- the constructor
-			// puts an input chain into content order, merges its
-			// runs, drops a degenerate subscript and folds a closed
-			// chain, and `add` maps a folded `bf_t`/`bf_f` to the
-			// terminals -- in two cases. A chain meeting no key is
-			// a leaf like any other term free of decision
-			// variables. And so is a chain BINDING one: its
-			// subscript is no decision variable of the result, and
-			// the keys its body still carries are hidden with it,
-			// which is §1's leaf hazard and what the rest of the
-			// push reads through `LEAF_FV`. Spelling the body out
-			// to re-back it under the remaining keys is what §1
-			// forbids: "No later term construction slides ... A
-			// stored BDD is never spelled out before the
-			// component's close, and never reordered."
-			// The body is never built under @p o (it may be
-			// arbitrarily large), only inside the constructor's
-			// fold, under the chain's own order; a chain nested in
-			// it lands in this same case with a smaller body, so
-			// the recursion terminates. The free variables of a
-			// chain are read off its `bf` wrapper, which excludes
-			// the subscripts.
-			bool keyed = false;
-			for (const auto& qy : q)
-				if (o.contains(qy.first)) { keyed = true; break; }
-			if (keyed || !has_bdd_var(tau::get(tau::bf,
-				tau::trim_right_sibling(f)), o))
-				return add(tau::trim(
-					build_functional_quantifiers(q, body)));
-			// The slide. rebuild = false: a wrapped leaf is
-			// re-interned as a leaf, never built as a BDD -- see
-			// the worker.
-			auto wrap = [&q](tref leaf) {
-				return build_functional_quantifiers(q, leaf);
-			};
-			std::unordered_map<ref, ref> memo;
-			ref r = map_leaves(build_bdd(body, o), wrap, o, false,
-				memo);
-			DBG(assert(is_ordered(r, o));)
-			return r;
+			const tref c = build_functional_quantifiers(q, body);
+			const tau& tc = tau::get(c);
+			if (tc.child_is(tau::bf_fall) || tc.child_is(tau::bf_fex))
+				return add(tau::trim(c));
+			return build_bdd(c);
 		}
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
 			const auto& m = term_handle<node>::U;
 			auto it = m.find(term_handle<node>::key_of(f));
 			if (it != m.end()) {
-				DBG(assert(is_ordered(it->second.get(), o));)
+				DBG(assert(is_ordered(it->second.get()));)
 				return it->second.get();
 			} else {
 				// If the BDD id is not found,
@@ -461,15 +428,8 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 /** @internal @copydoc tau_term_bdd::from_bit(tref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::from_bit(tref v) {
+	DBG(assert(tree<node>::get(v).is(tree<node>::variable));)
 	return add(v, T, F);
-}
-
-/** @internal @copydoc tau_term_bdd::has_bdd_var(tref, const order&) @endinternal */
-template<NodeType node>
-bool tau_term_bdd<node>::has_bdd_var(tref term, const order& o) {
-	if (o.empty()) return false;
-	for (tref v : get_free_vars<node>(term)) if (o.contains(v)) return true;
-	return false;
 }
 
 /** @internal @copydoc tau_term_bdd::build_functional_quantifiers(const quants&, tref) @endinternal */
@@ -520,39 +480,32 @@ tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
 			body = tau::trim_right_sibling(c.second());
 		}
 	}
-	// The chain, outermost first, and the order it quantifies under:
-	// the INNERMOST subscript ranks 1, outward from there, which is what
-	// `bdd_quant` asserts of the reversed prefix.
+	// The chain, outermost first.
 	quants prefix;
+	trefs subscripts;
 	for (auto& [k, ys] : segs) {
 		std::sort(ys.begin(), ys.end(), tau::subtree_less);
 		for (tref y : ys) prefix.emplace_back(y, k);
+		subscripts.insert(subscripts.end(), ys.begin(), ys.end());
 	}
-	order o;
-	for (size_t i = 0; i < prefix.size(); ++i)
-		o.emplace(prefix[i].first, int_t(prefix.size() - i));
-	// 4. FOLD: a chain binding every free variable of a PLAIN body is a
-	//    CONSTANT -- once no subscript is left in a leaf either, the
-	//    quantified BDD holds no variable at all, so its term is the
-	//    chain's value whatever it spells (`_1`/`_0` for a terminal, the
-	//    leaf itself for a variable-free leaf). Two bodies are left
-	//    standing: one holding a `BDD_ID`, which belongs to another order
-	//    and folds at the finish; and one with a subscript hidden inside a
-	//    LEAF (§1's leaf hazard: a reference argument, a foreign-typed
-	//    subterm), which `bdd_quant` does not reach. The cached free-var
-	//    test comes first so the `BDD_ID` walk only runs on closed bodies.
-	bool bound = true;
-	for (tref v : get_free_vars<node>(body))
-		if (!o.contains(v)) { bound = false; break; }
-	if (bound) bound = tau::get(body).find_top([](tref m) {
-		return tau::get(m).is(tau::BDD_ID); }) == nullptr;
-	if (bound) {
-		ref b = build_bdd(body, o);
-		bool hidden = false;
-		for (tref v : term_handle<node>::get_free_leaf_vars(b.b))
-			if (o.contains(v)) { hidden = true; break; }
-		if (!hidden) return to_tau_term(bdd_quant(b, prefix, o),
-			find_ba_type<node>(body));
+	std::sort(subscripts.begin(), subscripts.end(), tau::subtree_less);
+	auto is_subscript = [&subscripts](tref v) {
+		return std::binary_search(subscripts.begin(), subscripts.end(), v,
+			tau::subtree_less);
+	};
+	// 4. FOLD: a chain binding every free variable of its body, plain or
+	//    BDD-backed, is a CONSTANT -- once no subscript is left in a leaf
+	//    either, the quantified BDD holds no variable at all, so its term
+	//    is the chain's value (`_1`/`_0` for a terminal, the leaf itself
+	//    for a variable-free leaf). A subscript hidden inside a LEAF (§1's
+	//    leaf hazard: a reference argument, a foreign-typed subterm) is
+	//    reached by no quantification, and that chain stands.
+	if (std::ranges::all_of(get_free_vars<node>(body), is_subscript)) {
+		const ref b = build_bdd(body);
+		if (std::ranges::none_of(
+			term_handle<node>::get_free_leaf_vars(b.b), is_subscript))
+			return to_tau_term(bdd_quant(b, prefix),
+				find_ba_type<node>(body));
 	}
 	// 5. Wrap, innermost subscript first. The builders rename the bound
 	//    variable by default; here the subscripts are spelled by the
@@ -647,25 +600,24 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 	return r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y) {
 	// Fresh per-call memo when there is no persistent (TAU_CACHE) one to
 	// thread instead -- see the memoised worker below: the recursion is
 	// always memoized within this call, so shared sub-BDDs reached via
 	// different paths are computed once, not once per path.
 #ifdef TAU_CACHE
-	sync_order_cache(o);
-	return bdd_and(x, y, o, and_memo);
+	return bdd_and(x, y, and_memo);
 #else
 	std::unordered_map<std::array<ref, 2>, ref> local_memo;
-	return bdd_and(x, y, o, local_memo);
+	return bdd_and(x, y, local_memo);
 #endif
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref, const order&, std::unordered_map<std::array<ref,2>,ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref, std::unordered_map<std::array<ref,2>,ref>&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o,
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y,
 	std::unordered_map<std::array<ref, 2>, ref>& memo) {
 	// Check trivial cases
 	if (x == F || y == F || x == bdd_not(y)) return F;
@@ -682,24 +634,24 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o
 	tref yv = get_var(y);
 	ref r;
 	if (tree<node>::subtree_equals(xv, yv)) {
-		r = add(xv, bdd_and(get_high(x), get_high(y), o, memo),
-			bdd_and(get_low(x), get_low(y), o, memo));
-	} else if (less_then(xv, yv, o)) {
+		r = add(xv, bdd_and(get_high(x), get_high(y), memo),
+			bdd_and(get_low(x), get_low(y), memo));
+	} else if (less_then(xv, yv)) {
 		// var of x is smaller than var of y
-		r = add(xv, bdd_and(get_high(x), y, o, memo),
-			bdd_and(get_low(x), y, o, memo));
+		r = add(xv, bdd_and(get_high(x), y, memo),
+			bdd_and(get_low(x), y, memo));
 	} else {
-		r = add(yv, bdd_and(get_high(y), x, o, memo),
-			bdd_and(get_low(y), x, o, memo));
+		r = add(yv, bdd_and(get_high(y), x, memo),
+			bdd_and(get_low(y), x, memo));
 	}
 	memo.emplace(std::array<ref, 2>{x, y}, r);
 	return r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_or(ref, ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_or(ref, ref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or(ref x, ref y, const order& o) {
-	return bdd_not(bdd_and(bdd_not(x), bdd_not(y), o));
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or(ref x, ref y) {
+	return bdd_not(bdd_and(bdd_not(x), bdd_not(y)));
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_not(ref) @endinternal */
@@ -708,32 +660,30 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_not(ref x) {
 	return x.inv = !x.inv, x;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_xor(ref, ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_xor(ref, ref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_xor(ref x, ref y, const order& o) {
-	return bdd_or(bdd_and(x, bdd_not(y), o), bdd_and(bdd_not(x), y, o), o);
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_xor(ref x, ref y) {
+	return bdd_or(bdd_and(x, bdd_not(y)), bdd_and(bdd_not(x), y));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
-	const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h) {
 	// See bdd_and's public entry: always memoize the recursion within
 	// this call, via the static ite_memo (TAU_CACHE, cross-call too) or a
 	// fresh local map otherwise.
 #ifdef TAU_CACHE
-	sync_order_cache(o);
-	return bdd_ite(f, g, h, o, ite_memo);
+	return bdd_ite(f, g, h, ite_memo);
 #else
 	std::unordered_map<std::array<ref, 3>, ref> local_memo;
-	return bdd_ite(f, g, h, o, local_memo);
+	return bdd_ite(f, g, h, local_memo);
 #endif
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref, const order&, std::unordered_map<std::array<ref,3>,ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref, std::unordered_map<std::array<ref,3>,ref>&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
-	const order& o, std::unordered_map<std::array<ref, 3>, ref>& memo) {
+	std::unordered_map<std::array<ref, 3>, ref>& memo) {
 	using tau = tree<node>;
 	// Rule 1: normalize complement on f
 	if (f.inv) { f.inv = false; std::swap(g, h); }
@@ -743,30 +693,31 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 	if (g == h) return g;
 	if (g == T && h == F) return f;
 	if (g == F && h == T) return bdd_not(f);
-	if (g == T) return bdd_or(f, h, o);
-	if (h == F) return bdd_and(f, g, o);
-	if (g == F) return bdd_and(bdd_not(f), h, o);
-	if (h == T) return bdd_or(bdd_not(f), g, o);
-	if (g == f) return bdd_or(f, h, o);
-	if (h == f) return bdd_and(f, g, o);
-	if (g == bdd_not(f)) return bdd_and(bdd_not(f), h, o);
-	if (h == bdd_not(f)) return bdd_or(bdd_not(f), g, o);
+	if (g == T) return bdd_or(f, h);
+	if (h == F) return bdd_and(f, g);
+	if (g == F) return bdd_and(bdd_not(f), h);
+	if (h == T) return bdd_or(bdd_not(f), g);
+	if (g == f) return bdd_or(f, h);
+	if (h == f) return bdd_and(f, g);
+	if (g == bdd_not(f)) return bdd_and(bdd_not(f), h);
+	if (h == bdd_not(f)) return bdd_or(bdd_not(f), g);
 	// All-leaf fallback: delegate to composed form
 	if (leaf(f) && leaf(g) && leaf(h))
-		return bdd_or(bdd_and(f, g, o), bdd_and(bdd_not(f), h, o), o);
+		return bdd_or(bdd_and(f, g), bdd_and(bdd_not(f), h));
 	// Rule 2: normalize common complement on g and h
 	bool out_inv = false;
 	if (g.inv && h.inv) { g.inv = false; h.inv = false; out_inv = true; }
 	const std::array<ref, 3> key = {f, g, h};
 	if (auto it = memo.find(key); it != memo.end())
 		return out_inv ? bdd_not(it->second) : it->second;
-	// Top variable: minimum rank among the non-leaf roots; a leaf's term is
-	// no variable of the order, so splitting on it never shrinks anything.
+	// Top variable: the least decision variable among the non-leaf roots;
+	// a leaf holds no decision variable, so splitting on it never shrinks
+	// anything.
 	tref top = nullptr;
 	auto upd = [&](ref x) {
 		if (leaf(x)) return;
 		tref v = get_var(x);
-		if (!top || less_then(v, top, o)) top = v;
+		if (!top || less_then(v, top)) top = v;
 	};
 	upd(f); upd(g); upd(h);
 	// Co-factor inline — no temporary BDD allocation
@@ -775,252 +726,206 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 		return hi ? get_high(x) : get_low(x);
 	};
 	ref r = add(top,
-		bdd_ite(cof(f, true),  cof(g, true),  cof(h, true),  o, memo),
-		bdd_ite(cof(f, false), cof(g, false), cof(h, false), o, memo));
+		bdd_ite(cof(f, true),  cof(g, true),  cof(h, true),  memo),
+		bdd_ite(cof(f, false), cof(g, false), cof(h, false), memo));
 	memo.emplace(key, r);
 	return out_inv ? bdd_not(r) : r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose(ref, tref, ref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_compose(ref, tref, ref) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g,
-	const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g) {
 	// A terminal g IS a cofactor: child selection, without routing every
 	// node through bdd_ite.
-	if (g == T || g == F) return bdd_cofactor(x, xi, g == T, o);
+	if (g == T || g == F) return bdd_cofactor(x, xi, g == T);
 	std::unordered_map<ref, ref> memo;
-	return bdd_compose_impl(x, xi, g, o, memo);
+	return bdd_compose_impl(x, xi, g, memo);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, tref, ref, const order&, std::unordered_map<ref, ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, tref, ref, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi, ref g,
-	const order& o, std::unordered_map<ref, ref>& memo) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi,
+	ref g, std::unordered_map<ref, ref>& memo) {
 	using tau = tree<node>;
 	if (leaf(x)) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	tref var = get_var(x);
-	if (less_then(xi, var, o)) return x;
+	if (less_then(xi, var)) return x;
 	ref r;
 	if (tau::subtree_equals(xi, var))
 		r = bdd_ite(g,
-			bdd_compose_impl(get_high(x), xi, g, o, memo),
-			bdd_compose_impl(get_low(x), xi, g, o, memo), o);
+			bdd_compose_impl(get_high(x), xi, g, memo),
+			bdd_compose_impl(get_low(x), xi, g, memo));
 	else
 		r = bdd_ite(from_bit(var),
-			bdd_compose_impl(get_high(x), xi, g, o, memo),
-			bdd_compose_impl(get_low(x), xi, g, o, memo), o);
+			bdd_compose_impl(get_high(x), xi, g, memo),
+			bdd_compose_impl(get_low(x), xi, g, memo));
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose(ref, subs_t, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_compose(ref, subs_t) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs,
-	const order& o) {
-	auto cmp = [&o](const auto& a, const auto& b) {
-		return less_then(a.first, b.first, o); };
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs) {
+	auto cmp = [](const auto& a, const auto& b) {
+		return less_then(a.first, b.first); };
 	sortc(subs, cmp);
 	std::unordered_map<ref, ref> memo;
-	return bdd_compose_impl(x, subs, 0, o, memo);
+	return bdd_compose_impl(x, subs, 0, memo);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, const subs_t&, size_t, const order&, std::unordered_map<ref, ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, const subs_t&, size_t, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
-	const subs_t& subs, size_t i, const order& o,
-	std::unordered_map<ref, ref>& memo) {
+	const subs_t& subs, size_t i, std::unordered_map<ref, ref>& memo) {
 	using tau = tree<node>;
 	if (leaf(x) || i >= subs.size()) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	tref var = get_var(x);
-	while (i < subs.size() && less_then(subs[i].first, var, o)) ++i;
+	while (i < subs.size() && less_then(subs[i].first, var)) ++i;
 	if (i >= subs.size()) return x;
 	ref r;
 	if (tau::subtree_equals(subs[i].first, var))
 		r = bdd_ite(subs[i].second,
-			bdd_compose_impl(get_high(x), subs, i + 1, o, memo),
-			bdd_compose_impl(get_low(x), subs, i + 1, o, memo), o);
+			bdd_compose_impl(get_high(x), subs, i + 1, memo),
+			bdd_compose_impl(get_low(x), subs, i + 1, memo));
 	else
 		r = bdd_ite(from_bit(var),
-			bdd_compose_impl(get_high(x), subs, i, o, memo),
-			bdd_compose_impl(get_low(x), subs, i, o, memo), o);
+			bdd_compose_impl(get_high(x), subs, i, memo),
+			bdd_compose_impl(get_low(x), subs, i, memo));
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_cofactor(ref, tref, bool, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_cofactor(ref, tref, bool) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_cofactor(ref x, tref xi,
-	bool bit, const order& o) {
-	if (!o.contains(xi)) return x;
+	bool bit) {
 	std::unordered_map<ref, ref> memo;
-	return bdd_cofactor_impl(x, xi, bit, o, memo);
+	return bdd_cofactor_impl(x, xi, bit, memo);
 }
 
 /**
  * @internal
  * @brief Memoised worker for bdd_cofactor: a leaf is itself; a node whose
- * variable is above @p xi in the order is itself (an ordered BDD holds @p xi
- * at most once per path, never above); the node of @p xi is its child by
- * @p bit; any other node is rebuilt through `add`, which keeps canonicity
- * because both children stay ordered below it.
+ * variable comes after @p xi in the order is itself (on an ordered path
+ * @p xi can only sit above it); the node of @p xi is its child by @p bit;
+ * any other node is rebuilt through `add`, which keeps canonicity because
+ * both children stay ordered below it.
  * @endinternal
  */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_cofactor_impl(ref x, tref xi,
-	bool bit, const order& o, std::unordered_map<ref, ref>& memo) {
+	bool bit, std::unordered_map<ref, ref>& memo) {
 	using tau = tree<node>;
 	if (leaf(x)) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	tref var = get_var(x);
-	if (less_then(xi, var, o)) return x;
+	if (less_then(xi, var)) return x;
 	ref r;
 	if (tau::subtree_equals(xi, var)) r = bit ? get_high(x) : get_low(x);
-	else r = add(var, bdd_cofactor_impl(get_high(x), xi, bit, o, memo),
-		bdd_cofactor_impl(get_low(x), xi, bit, o, memo));
+	else r = add(var, bdd_cofactor_impl(get_high(x), xi, bit, memo),
+		bdd_cofactor_impl(get_low(x), xi, bit, memo));
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&, const order&, bool, std::unordered_map<ref, ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
 template<typename Fn>
 tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
-	const order& o, bool rebuild, std::unordered_map<ref, ref>& memo) {
-	using tau = tree<node>;
+	std::unordered_map<ref, ref>& memo) {
 	if (x == T || x == F) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	ref r;
 	if (leaf(x)) {
 		tref in  = get_var_term(x);
 		tref out = fn(in);
-		if (out == in) r = x;
-		else if (rebuild) r = build_bdd(out, o);
-		else {
-			// Without the rebuild the caller promises to add no
-			// key of @p o a leaf did not already hold, so nothing
-			// of the order is buried by the re-interning.
-			DBG(assert(!has_bdd_var(out, o) || has_bdd_var(in, o));)
-			r = add(tau::trim(out));
-		}
+		r = out == in ? x : build_bdd(out);
 	} else {
-		ref h = map_leaves(get_high(x), fn, o, rebuild, memo);
-		ref l = map_leaves(get_low(x), fn, o, rebuild, memo);
+		ref h = map_leaves(get_high(x), fn, memo);
+		ref l = map_leaves(get_low(x), fn, memo);
 		tref var = get_var(x);
 		auto below = [&](ref c) {
-			return leaf(c) || less_then(var, get_var(c), o);
+			return leaf(c) || less_then(var, get_var(c));
 		};
 		if (h == get_high(x) && l == get_low(x)) r = x;
 		else if (below(h) && below(l)) r = add(var, h, l);
-		else r = bdd_ite(from_bit(var), h, l, o);
+		else r = bdd_ite(from_bit(var), h, l);
 	}
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&) @endinternal */
 template<NodeType node>
 template<typename Fn>
-tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
-	const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn) {
 	std::unordered_map<ref, ref> memo;
-	return map_leaves(x, fn, o, true, memo);
+	return map_leaves(x, fn, memo);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v,
-	const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v) {
 	// sort v, so the smallest variable is up front
-	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
+	auto cmp = [](tref e1, tref e2) { return less_then(e1, e2); };
 	sortc(v, cmp);
 	// Always memoize the recursion within this call (fresh local map), on
 	// top of which TAU_CACHE's static ex_memo, keyed by v, is the
 	// optional cross-call persistence layer -- see bdd_and's public entry
 	// for the same pattern.
 #ifdef TAU_CACHE
-	sync_order_cache(o);
-	return bdd_ex(x, v, 0, o, ex_memo[v]);
+	return bdd_ex(x, v, 0, ex_memo[v]);
 #else
 	std::unordered_map<ref, ref> local_memo;
-	return bdd_ex(x, v, 0, o, local_memo);
+	return bdd_ex(x, v, 0, local_memo);
 #endif
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_all(ref, trefs, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_all(ref, trefs) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_all(ref x, trefs v,
-	const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_all(ref x, trefs v) {
 	// We utilize existential quantification in order to share cache
-	return bdd_not(bdd_ex(bdd_not(x), v, o));
+	return bdd_not(bdd_ex(bdd_not(x), v));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
-	const order& o) {
-	// v holds the logical quantification pattern, ie. we have the
-	// assumption that the last entry is resolved first.
-	// To ease the algorithm, we reverse the pattern
-	quants v_rev (v.rbegin(), v.rend());
-	// Assert that v is ordered correctly according to o
-#ifdef DEBUG
-	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
-	for (size_t i = 1; i < v_rev.size(); ++i)
-		assert(cmp(v_rev[i-1].first, v_rev[i].first));
-#endif
-#ifdef TAU_CACHE
-	sync_order_cache(o);
-	return bdd_quant(x, v_rev, 0, o, quant_memo[v]);
-#else
-	std::unordered_map<ref, ref> local_memo;
-	return bdd_quant(x, v_rev, 0, o, local_memo);
-#endif
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v) {
+	// A run of one kind commutes, so it is one set quantification; the
+	// runs themselves are taken innermost first, which holds whatever the
+	// order puts where.
+	for (size_t end = v.size(); end > 0 && !leaf(x);) {
+		size_t begin = end - 1;
+		while (begin > 0 && v[begin - 1].second == v[end - 1].second)
+			--begin;
+		trefs run;
+		run.reserve(end - begin);
+		for (size_t i = begin; i < end; ++i) run.push_back(v[i].first);
+		x = v[end - 1].second == ex ? bdd_ex(x, run)
+			: bdd_all(x, std::move(run));
+		end = begin;
+	}
+	return x;
 }
 
 // Memoised worker, used unconditionally (not just under TAU_CACHE): the
 // caller (bdd_ex's public entry above) always supplies a memo, either a
 // fresh local one or the persistent static ex_memo.
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, const order&, auto&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, auto&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t i,
-	const order& o, auto& memo) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v,
+	size_t i, auto& memo) {
 	using tau = tree<node>;
+	if (leaf(x) || i >= v.size()) return x;
 	const tref var = get_var(x);
-	if (leaf(x) || i >= v.size() || less_then(v.back(), var, o)) return x;
+	if (less_then(v.back(), var)) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
-	while (i < v.size() && less_then(v[i], var, o)) ++i;
+	while (i < v.size() && less_then(v[i], var)) ++i;
 	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i], var))
-		return bdd_ex(bdd_or(get_high(x), get_low(x), o), v, ++i, o, memo);
+		return bdd_ex(bdd_or(get_high(x), get_low(x)), v, ++i, memo);
 	return memo.emplace(x,
-		add(var, bdd_ex(get_high(x), v, i, o, memo),
-			bdd_ex(get_low(x), v, i, o, memo))).first->second;
-}
-
-// Memoised worker, used unconditionally -- see bdd_ex's worker above.
-/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&, auto&) @endinternal */
-template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
-	size_t i, const order& o, auto& memo) {
-	using tau = tree<node>;
-	const tref var = get_var(x);
-	// If we have passed the last variable in v, we are done
-	if (leaf(x) || i >= v.size() || less_then(v.back().first, var, o))
-		return x;
-	if (auto it = memo.find(x); it != memo.end()) return it->second;
-	// while current variable is bigger, increase index
-	while (i < v.size() && less_then(v[i].first, var, o)) ++i;
-	if (i >= v.size()) return x;
-	if (tau::subtree_equals(v[i].first, var)) {
-		// Eliminate the quantifier
-		if (v[i].second == Quantifier::ex)
-			return bdd_quant(bdd_or(get_high(x),
-				get_low(x), o), v, ++i, o, memo);
-		// Otherwise Quantifier::all
-		else return bdd_quant(bdd_and(get_high(x),
-			get_low(x), o), v, ++i, o, memo);
-	}
-	return memo.emplace(x, add(var, bdd_quant(get_high(x), v, i, o, memo),
-		bdd_quant(get_low(x), v, i, o, memo))).first->second;
+		add(var, bdd_ex(get_high(x), v, i, memo),
+			bdd_ex(get_low(x), v, i, memo))).first->second;
 }
 
 /** @internal @copydoc tau_term_bdd::to_tau_term(ref, size_t) @endinternal */
@@ -1056,10 +961,10 @@ tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type,
 	return memo.emplace(x, res), res;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and_many_iter(const refs&, refs&, refs&, ref&, tref&, const order&, std::unordered_map<refs,ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_and_many_iter(const refs&, refs&, refs&, ref&, tref&, std::unordered_map<refs,ref>&) @endinternal */
 template<NodeType node>
 size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
-	refs& h, refs& l, ref& res, tref& m, const order& o,
+	refs& h, refs& l, ref& res, tref& m,
 	std::unordered_map<refs, ref>& memo) {
 	using tau = tree<node>;
 	size_t i;
@@ -1073,7 +978,7 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 	// m becomes smallest variable
 	for (; i != v.size(); ++i)
 		if (!leaf(v[i])) {
-			if ( less_then(get_var(v[i]), m, o) ) m = get_var(v[i]);
+			if (less_then(get_var(v[i]), m)) m = get_var(v[i]);
 		} else if (v[i] == F) return res = F, 1;
 
 	h.reserve(v.size()), l.reserve(v.size());
@@ -1107,7 +1012,7 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 			if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
 			else ++n;
 		h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
-		ref r = bdd_and_many(std::move(x), o, memo);
+		ref r = bdd_and_many(std::move(x), memo);
 		if (r == F) return res = F, 1;
 		if (r != T) {
 			if (!hasbc(h, r, am_cmp)) h.push_back(r), am_sort(h);
@@ -1117,24 +1022,23 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 	return 0;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and_many(refs, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_and_many(refs) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v) {
 	// See bdd_and's public entry: always memoize the recursion within
 	// this call, via the static and_many_memo (TAU_CACHE, cross-call too)
 	// or a fresh local map otherwise.
 #ifdef TAU_CACHE
-	sync_order_cache(o);
-	return bdd_and_many(std::move(v), o, and_many_memo);
+	return bdd_and_many(std::move(v), and_many_memo);
 #else
 	std::unordered_map<refs, ref> local_memo;
-	return bdd_and_many(std::move(v), o, local_memo);
+	return bdd_and_many(std::move(v), local_memo);
 #endif
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and_many(refs, const order&, std::unordered_map<refs,ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_and_many(refs, std::unordered_map<refs,ref>&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v,
 	std::unordered_map<refs, ref>& memo) {
 #ifdef TAU_CACHE
 	// Cross-call pairwise-duplicate elimination: only meaningful against
@@ -1172,29 +1076,29 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o,
 	if (auto it = memo.find(v); it != memo.end()) return it->second;
 
 	if (v.size() == 2) {
-		return am_memoize(memo, v, bdd_and(v[0], v[1], o));
+		return am_memoize(memo, v, bdd_and(v[0], v[1]));
 	}
 
 	ref res = F, h, l;
 	tref m = nullptr;
 	refs vh, vl;
-	switch (bdd_and_many_iter(v, vh, vl, res, m, o, memo)) {
-		case 0: l = bdd_and_many(std::move(vl), o, memo),
-			h = bdd_and_many(std::move(vh), o, memo);
+	switch (bdd_and_many_iter(v, vh, vl, res, m, memo)) {
+		case 0: l = bdd_and_many(std::move(vl), memo),
+			h = bdd_and_many(std::move(vh), memo);
 			break;
 		case 1: return am_memoize(memo, v, res);
-		case 2: h = bdd_and_many(std::move(vh), o, memo), l = F; break;
-		case 3: h = F, l = bdd_and_many(std::move(vl), o, memo); break;
+		case 2: h = bdd_and_many(std::move(vh), memo), l = F; break;
+		case 3: h = F, l = bdd_and_many(std::move(vl), memo); break;
 		default: { DBG(assert(false)); return ref(); }
 	}
 	return am_memoize(memo, v, add(m, h, l));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_or_many(refs, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_or_many(refs) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or_many(refs v, const order& o) {
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or_many(refs v) {
 	for (ref& el : v) el = bdd_not(el);
-	return bdd_not(bdd_and_many(v, o));
+	return bdd_not(bdd_and_many(std::move(v)));
 }
 
 /** @internal @copydoc tau_term_bdd::am_sort(refs&) @endinternal */
@@ -1309,10 +1213,10 @@ tau_term_bdd_handle<node>::tau_term_bdd_handle(ref x) {
 	inv = x.inv;
 }
 
-/** @internal @copydoc tau_term_bdd_handle::build(tref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::build(tref) @endinternal */
 template<NodeType node>
-tau_term_bdd_handle<node> tau_term_bdd_handle<node>::build(tref term, const order& o) {
-	return term_handle(tbdd::build_bdd(term, o));
+tau_term_bdd_handle<node> tau_term_bdd_handle<node>::build(tref term) {
+	return term_handle(tbdd::build_bdd(term));
 }
 
 /** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(term_handle, size_t) @endinternal */
@@ -1336,10 +1240,10 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t t
 	return tau::get_typed(tau::bf, id_node, term_type);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(tref, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(tref) @endinternal */
 template<NodeType node>
-tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
-	return convert_to_tau_node(build(term, o), find_ba_type<node>(term));
+tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term) {
+	return convert_to_tau_node(build(term), find_ba_type<node>(term));
 }
 
 /** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node_or_term(term_handle, size_t) @endinternal */
@@ -1401,18 +1305,18 @@ tref tau_term_bdd_handle<node>::convert_to_tau_terms(tref formula) {
 	return pre_order<node>(formula).apply_unique_until_change(f);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_and(term_handle, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_and(term_handle) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_and(term_handle other, const order& o) const {
-	return term_handle(tbdd::bdd_and(get(), other.get(), o));
+bdd_and(term_handle other) const {
+	return term_handle(tbdd::bdd_and(get(), other.get()));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_or(term_handle, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_or(term_handle) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_or(term_handle other, const order& o) const {
-	return term_handle(tbdd::bdd_or(get(), other.get(), o));
+bdd_or(term_handle other) const {
+	return term_handle(tbdd::bdd_or(get(), other.get()));
 }
 
 /** @internal @copydoc tau_term_bdd_handle::bdd_not() const @endinternal */
@@ -1421,69 +1325,69 @@ tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::bdd_not() cons
 	return term_handle(h, !inv);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_and_many(const term_handles&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_and_many(const term_handles&) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_and_many(const term_handles& bdds, const order& o) {
+bdd_and_many(const term_handles& bdds) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
 	for (const term_handle b : bdds) refs.emplace_back(b.get());
-	return term_handle(tbdd::bdd_and_many(std::move(refs), o));
+	return term_handle(tbdd::bdd_and_many(std::move(refs)));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_or_many(const term_handles&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_or_many(const term_handles&) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_or_many(const term_handles& bdds, const order& o) {
+bdd_or_many(const term_handles& bdds) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
 	for (const term_handle b : bdds) refs.emplace_back(b.get());
-	return term_handle(tbdd::bdd_or_many(std::move(refs), o));
+	return term_handle(tbdd::bdd_or_many(std::move(refs)));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_ex(const trefs&, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_ex(trefs&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_ex(trefs& v, const order& o) const {
-	return term_handle(tbdd::bdd_ex(get(), v, o));
+bdd_ex(trefs& v) const {
+	return term_handle(tbdd::bdd_ex(get(), v));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_all(const trefs&, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_all(const trefs&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_all(const trefs& v, const order& o) const {
-	return term_handle(tbdd::bdd_all(get(), v, o));
+bdd_all(const trefs& v) const {
+	return term_handle(tbdd::bdd_all(get(), v));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_quant(const quants&, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_quant(const quants&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_quant(const quants& q, const order& o) const {
-	return term_handle(tbdd::bdd_quant(get(), q, o));
+bdd_quant(const quants& q) const {
+	return term_handle(tbdd::bdd_quant(get(), q));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_ite(term_handle, term_handle, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_ite(term_handle, term_handle) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_ite(term_handle g, term_handle h, const order& o) const {
-	return term_handle(tbdd::bdd_ite(get(), g.get(), h.get(), o));
+bdd_ite(term_handle g, term_handle h) const {
+	return term_handle(tbdd::bdd_ite(get(), g.get(), h.get()));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_compose(tref, term_handle, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_compose(tref, term_handle) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_compose(tref xi, term_handle g, const order& o) const {
-	return term_handle(tbdd::bdd_compose(get(), xi, g.get(), o));
+bdd_compose(tref xi, term_handle g) const {
+	return term_handle(tbdd::bdd_compose(get(), xi, g.get()));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_compose(const std::vector<std::pair<tref, term_handle>>&, const order&) const @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bdd_compose(const std::vector<std::pair<tref, term_handle>>&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const {
+bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs) const {
 	typename tbdd::subs_t raw;
 	raw.reserve(subs.size());
 	for (const auto& [v, th] : subs) raw.emplace_back(v, th.get());
-	return term_handle(tbdd::bdd_compose(get(), std::move(raw), o));
+	return term_handle(tbdd::bdd_compose(get(), std::move(raw)));
 }
 
 /** @internal @copydoc tau_term_bdd_handle::get() const @endinternal */

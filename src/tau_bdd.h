@@ -79,16 +79,15 @@ struct tau_bdd_ref {
  * @brief BDD whose variables are Tau tree references.
  *
  * Each node stores a `tau_bdd_node` (variable + three inversion bits) and
- * two child tree references (`high` / `low`) inside a `bintree`.  The variable
- * ordering is explicit: each `tref` variable maps to an integer rank via an
- * `order` map; smaller rank = higher in the diagram.
+ * two child tree references (`high` / `low`) inside a `bintree`. Every
+ * `variable` met at a Boolean position is a decision variable, everything
+ * else is a leaf, and ONE global comparator (`less_then`) orders the decision
+ * variables for every caller and every call.
  *
  * @tparam node Tree node type.
  */
 template <NodeType node>
 struct tau_term_bdd : bintree<tau_bdd_node<node>> {
-	/** @brief Variable ordering: each Tau-tree variable → integer rank. */
-	using order = subtree_unordered_map<node, int_t>;
 	using ref = tau_bdd_ref<node>;              ///< @brief BDD reference (node + inversion).
 	using refs = std::vector<ref>;              ///< @brief Vector of BDD references.
 	using bdd_node = tau_bdd_node<node>;        ///< @brief BDD node type.
@@ -121,45 +120,35 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	using cache_and_many_index_t = std::unordered_map<ref,
 		std::vector<const typename cache_and_many_t::value_type*>>;
 	using cache_ex_t       = std::map<trefs, std::unordered_map<ref, ref>>;
-	using cache_quant_t    = std::map<quants, std::unordered_map<ref, ref>>;
 	using cache_ite_t      = std::unordered_map<std::array<ref, 3>, ref>;
 
-	static cache_and_t      and_memo;       ///< @brief Memoisation table for AND.
+	/// @brief Memoisation table for AND. Its definition also hooks the
+	/// operation tables into the tree's collection (`clear_caches`).
+	static cache_and_t&     and_memo;
 	static cache_and_many_t and_many_memo;  ///< @brief Memoisation table for AND-many.
 	/// @brief Entries of `and_many_memo` by their first (am_cmp-least) argument;
 	/// they point into the memo and are cleared with it.
 	static cache_and_many_index_t and_many_index;
 	static cache_ex_t       ex_memo;        ///< @brief Memoisation table for existential quantification.
-	static cache_quant_t    quant_memo;     ///< @brief Memoisation table for general quantification.
 	static cache_ite_t      ite_memo;       ///< @brief Memoisation table for if-then-else.
 
-	/** @brief Clear all memoisation caches, and with them `last_order`. */
-	static void clear_caches();
-
-	// The memo tables are keyed by BDD refs alone, not by order, so a
-	// cached entry is only valid under an order that AGREES with the one it
-	// was computed under on their common keys. Every public entry point
-	// calls sync_order_cache() first, which merges @p o into last_order and
-	// clears all five tables only on a conflicting rank.
-	static order last_order;      ///< @brief UNION of the orders the memo caches were populated under since the last clear.
-	static bool  has_last_order;  ///< @brief Whether `last_order` holds a valid previous order.
-
 	/**
-	 * @brief Merge @p o into `last_order`, clearing all memoisation caches
-	 * when @p o gives a key of `last_order` a DIFFERENT rank.
-	 *
-	 * Orders that agree on their common keys live together: a component's
-	 * `P` and a sub-order of it, or the tiny order a functional-quantifier
-	 * fold builds over its own subscripts. Rank EQUALITY is the test, so a
-	 * sub-order keeps the tables.
+	 * @brief Clear the operation tables above. Every collection of the tree
+	 * runs it: the tables are caches, and the BDD node store, which is never
+	 * swept, is left alone.
 	 */
-	static void sync_order_cache(const order& o);
+	static void clear_caches();
 #endif
 
 	/** @brief Canonicalise the pair @p x, @p y so @p x ≤ @p y. */
 	static void make_canonical(ref& x, ref& y);
-	/** @brief Return `true` if variable @p x has lower rank than @p y under @p o. */
-	static bool less_then(tref x, tref y, const order& o);
+	/**
+	 * @brief THE GLOBAL ORDER on `variable` nodes, @p x above @p y: the free
+	 * variables first, by name; then the binder variables (a decimal name,
+	 * the ids canonicalisation mints) by id, highest (outermost) first; ties
+	 * by content order, the BA type included. A strict total order.
+	 */
+	static bool less_then(tref x, tref y);
 
 	/** @brief Canonically insert a non-leaf BDD node into the universe. */
 	static ref add(tref v, ref h, ref l);
@@ -199,23 +188,21 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 */
 	static size_t node_count(ref x);
 	/**
-	 * @brief `true` iff @p x is a reduced ordered BDD under @p o: every
-	 * decision variable is a key of @p o and ranks strictly increase down
-	 * every path. Catches a mixed-order operand and a ref built under
-	 * another order. Linear in the BDD.
+	 * @brief `true` iff @p x is a reduced ordered BDD: every decision
+	 * variable is a `variable` node and `less_then` strictly increases down
+	 * every path. Linear in the BDD.
 	 */
-	static bool is_ordered(ref x, const order& o);
+	static bool is_ordered(ref x);
 
-	/** @brief Build a BDD for Tau formula @p f using variable order @p o. */
-	static ref build_bdd(tref f, const order& o);
-	/** @brief Build a single-bit BDD for variable @p v. */
-	static ref from_bit(tref v);
 	/**
-	 * @brief `true` iff some free variable of the Tau term @p term is a key
-	 * of @p o, i.e. @p term would have a decision variable under it. Always
-	 * `false` for an empty order.
+	 * @brief Build the BDD of the Tau term @p f: every `variable` reached
+	 * through `∪ · ′ +` is a decision variable; references, foreign-typed
+	 * and arithmetic subterms, constants and functional-quantifier chains
+	 * are leaves.
 	 */
-	static bool has_bdd_var(tref term, const order& o);
+	static ref build_bdd(tref f);
+	/** @brief Build a single-bit BDD for the `variable` node @p v. */
+	static ref from_bit(tref v);
 
 	/**
 	 * @brief The canonical functional-quantifier chain over @p body (a `bf`
@@ -232,12 +219,11 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * one joins that run, so the same chain assembled in two steps is one
 	 * node.
 	 *
-	 * FOLD: a chain binding every free variable of a PLAIN @p body (no
-	 * `BDD_ID` anywhere) is a CONSTANT — the body's BDD over the subscripts,
-	 * quantified with `bdd_quant`, as its constant term (`_1` / `_0` of the
-	 * body's type for a terminal). A body holding a `BDD_ID` is never folded
-	 * here (it folds at the finish), and neither is one whose leaves hide a
-	 * subscript (the §1 LEAF HAZARD).
+	 * FOLD: a chain binding every free variable of @p body, plain or
+	 * BDD-backed, is a CONSTANT — the body's BDD quantified by the prefix
+	 * with `bdd_quant`, as its constant term (`_1` / `_0` of the body's type
+	 * for a terminal) — unless a subscript hides in a leaf (the §1 LEAF
+	 * HAZARD), which no quantification reaches.
 	 *
 	 * An empty @p q, a constant @p body, and a chain left with no subscript
 	 * all give @p body itself.
@@ -257,44 +243,47 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * of the two at a leaf @p x.
 	 */
 	static ref bdd_and(ref x, tref y);
-	/** @brief AND of two BDD references @p x and @p y under order @p o. */
-	static ref bdd_and(ref x, ref y, const order& o);
-	/** @brief OR of @p x and @p y under @p o. */
-	static ref bdd_or(ref x, ref y, const order& o);
+	/** @brief AND of two BDD references @p x and @p y. */
+	static ref bdd_and(ref x, ref y);
+	/** @brief OR of @p x and @p y. */
+	static ref bdd_or(ref x, ref y);
 	/** @brief NOT of @p x (flips the output inverter). */
 	static ref bdd_not(ref x);
-	/** @brief XOR of @p x and @p y under @p o. */
-	static ref bdd_xor(ref x, ref y, const order& o);
+	/** @brief XOR of @p x and @p y. */
+	static ref bdd_xor(ref x, ref y);
 
-	/** @brief Existentially quantify variables @p v from @p x under @p o. */
-	static ref bdd_ex(ref x, trefs& v, const order& o);
-	/** @brief Universally quantify variables @p v from @p x under @p o. */
-	static ref bdd_all(ref x, trefs v, const order& o);
-	/** @brief Apply a sequence of mixed quantifiers @p v to @p x under @p o. */
-	static ref bdd_quant(ref x, const quants& v, const order& o);
+	/** @brief Existentially quantify the variables @p v from @p x; @p v comes back sorted by `less_then`. */
+	static ref bdd_ex(ref x, trefs& v);
+	/** @brief Universally quantify the variables @p v from @p x. */
+	static ref bdd_all(ref x, trefs v);
+	/**
+	 * @brief Apply the mixed prefix @p v, OUTERMOST FIRST, to @p x: one
+	 * maximal same-kind run at a time, innermost run first, each run one
+	 * `bdd_ex` / `bdd_all`.
+	 */
+	static ref bdd_quant(ref x, const quants& v);
 
-	/** @brief AND of all references in @p v under @p o. */
-	static ref bdd_and_many(refs v, const order& o);
-	/** @brief OR of all references in @p v under @p o. */
-	static ref bdd_or_many(refs v, const order& o);
+	/** @brief AND of all references in @p v. */
+	static ref bdd_and_many(refs v);
+	/** @brief OR of all references in @p v. */
+	static ref bdd_or_many(refs v);
 
-	/** @brief If-then-else of three BDD references under @p o. */
-	static ref bdd_ite(ref f, ref g, ref h, const order& o);
+	/** @brief If-then-else of three BDD references. */
+	static ref bdd_ite(ref f, ref g, ref h);
 
 	/** @brief Replace variable @p xi with @p g in @p x. */
-	static ref bdd_compose(ref x, tref xi, ref g, const order& o);
+	static ref bdd_compose(ref x, tref xi, ref g);
 	/** @brief Apply multiple simultaneous variable substitutions @p subs. */
-	static ref bdd_compose(ref x, subs_t subs, const order& o);
+	static ref bdd_compose(ref x, subs_t subs);
 	/**
 	 * @brief Cofactor `x[xi ← bit]` by CHILD SELECTION, at any depth: the
 	 * node of @p xi is its child by @p bit, everything else rebuilt as it
-	 * is. @p x itself when @p xi is not a key of @p o. Cheaper than
-	 * `bdd_compose(x, xi, T/F, o)`, which routes every node through
-	 * `bdd_ite`; that entry point delegates here for a terminal @p g.
-	 * @p xi is taken as the caller spells it, untrimmed (as in
-	 * `bdd_compose`).
+	 * is; @p x itself when @p xi is no decision variable of it. Cheaper than
+	 * `bdd_compose(x, xi, T/F)`, which routes every node through `bdd_ite`;
+	 * that entry point delegates here for a terminal @p g. @p xi is taken as
+	 * the caller spells it, untrimmed (as in `bdd_compose`).
 	 */
-	static ref bdd_cofactor(ref x, tref xi, bool bit, const order& o);
+	static ref bdd_cofactor(ref x, tref xi, bool bit);
 	/**
 	 * @brief Rebuild @p x with every non-terminal leaf `ℓ` replaced by
 	 * `fn(ℓ)` (both as `bf` terms), the decision structure kept.
@@ -310,7 +299,7 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * Memoised per call over the BDD's nodes.
 	 */
 	template <typename Fn>
-	static ref map_leaves(ref x, Fn& fn, const order& o);
+	static ref map_leaves(ref x, Fn& fn);
 
 	/** @brief Convert BDD reference @p x to a Tau term of type @p term_type. */
 	static tref to_tau_term(ref x, size_t term_type);
@@ -327,15 +316,14 @@ private:
 		x.inv = false, y.inv = false;
 		return x < y ? true : x == y ? s : false;
 	};
-	// Memoised worker for bdd_and_many(refs, const order&): always
-	// memoizes the recursion within one top-level call, same pattern as
-	// bdd_and/bdd_ite/bdd_ex/bdd_quant's workers above.
-	static ref bdd_and_many(refs v, const order& o,
-		std::unordered_map<refs, ref>& memo);
+	// Memoised worker for bdd_and_many(refs): always memoizes the
+	// recursion within one top-level call, same pattern as
+	// bdd_and/bdd_ite/bdd_ex's workers above.
+	static ref bdd_and_many(refs v, std::unordered_map<refs, ref>& memo);
 	/**
 	 * @brief One Shannon-expansion step of the and-many recursion.
 	 *
-	 * Picks @p m, the order-smallest decision variable among the
+	 * Picks @p m, the `less_then`-least decision variable among the
 	 * non-leaf conjuncts of @p v, and cofactors every conjunct on it
 	 * into the high worklist @p h and low worklist @p l (both am_sort
 	 * canonicalised; conjuncts common to both are ANDed once via the
@@ -352,7 +340,7 @@ private:
 	 *   result is add(m, F, low).
 	 */
 	static size_t bdd_and_many_iter(const refs& v, refs& h, refs& l, ref& res,
-		tref& m, const order& o, std::unordered_map<refs, ref>& memo);
+		tref& m, std::unordered_map<refs, ref>& memo);
 	/**
 	 * @brief Canonicalise an and-many worklist: sort by am_cmp, drop T,
 	 * dedupe, AND adjacent leaves together, and collapse the whole list
@@ -387,33 +375,35 @@ private:
 	// Memoised recursive workers, independent of TAU_CACHE: the public
 	// entry points thread through a static map when TAU_CACHE is on, or
 	// a fresh local one otherwise.
-	static ref bdd_and(ref x, ref y, const order& o,
+	static ref bdd_and(ref x, ref y,
 		std::unordered_map<std::array<ref, 2>, ref>& memo);
-	static ref bdd_ite(ref f, ref g, ref h, const order& o,
+	static ref bdd_ite(ref f, ref g, ref h,
 		std::unordered_map<std::array<ref, 3>, ref>& memo);
-	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o, auto& memo);
-	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o, auto& memo);
-	static ref bdd_compose_impl(ref x, tref xi, ref g, const order& o,
+	static ref bdd_ex(ref x, const trefs& v, size_t i, auto& memo);
+	static ref bdd_compose_impl(ref x, tref xi, ref g,
 		std::unordered_map<ref, ref>& memo);
 	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
-		const order& o, std::unordered_map<ref, ref>& memo);
-	static ref bdd_cofactor_impl(ref x, tref xi, bool bit, const order& o,
+		std::unordered_map<ref, ref>& memo);
+	static ref bdd_cofactor_impl(ref x, tref xi, bool bit,
 		std::unordered_map<ref, ref>& memo);
 	// Workers of the walks above, carrying the per-call visited set / memo:
 	// recursive over BDD refs, the shape of bdd_compose_impl.
 	template <typename Fn>
 	static bool visit_nodes(ref x, Fn& fn, std::unordered_set<tref>& seen);
-	static bool is_ordered(ref x, const order& o,
-		std::unordered_set<tref>& seen);
-	// @p rebuild: the public map_leaves passes `true` — every changed leaf
-	// is built again through build_bdd. `false` keeps every changed leaf a
-	// LEAF (`add`), which is what the chain case of build_bdd needs:
-	// wrapping a leaf in a functional quantifier can leave a key of @p o
-	// inside it (a hazard leaf, a reference argument holding one), and
-	// rebuilding would re-enter the chain case forever.
+	static bool is_ordered(ref x, std::unordered_set<tref>& seen);
 	template <typename Fn>
-	static ref map_leaves(ref x, Fn& fn, const order& o, bool rebuild,
-		std::unordered_map<ref, ref>& memo);
+	static ref map_leaves(ref x, Fn& fn, std::unordered_map<ref, ref>& memo);
+	/// What `less_then` compares before content order: a binder variable
+	/// (decimal name) carries its id, a free one the dictionary id of its
+	/// name.
+	struct sort_key {
+		bool binder = false;
+		std::uint64_t id = 0;
+		size_t name = 0;
+	};
+	/// The sort key of the `variable` node @p v, kept per node under
+	/// TAU_CACHE, since `less_then` runs at every apply step.
+	static sort_key sort_key_of(tref v);
 	// Memoised worker for to_tau_term(ref, size_t): shared BDD nodes are
 	// rebuilt once per top-level call instead of once per path.
 	static tref to_tau_term(ref x, size_t term_type,
@@ -434,7 +424,6 @@ private:
  */
 template <NodeType node>
 struct tau_term_bdd_handle {
-	using order        = subtree_unordered_map<node, int_t>; ///< @brief Variable ordering map.
 	using ref          = tau_bdd_ref<node>;                  ///< @brief BDD reference type.
 	using refs         = std::vector<ref>;                   ///< @brief Vector of BDD references.
 	using term_handle  = tau_term_bdd_handle;                ///< @brief Self alias.
@@ -469,8 +458,8 @@ struct tau_term_bdd_handle {
 	/** @brief Construct from an existing `htref` and inversion flag. */
 	tau_term_bdd_handle(htref _h, const bool _inv) : h(std::move(_h)), inv(_inv) {}
 
-	/** @brief Build a BDD handle from Tau formula @p term using variable order @p o. */
-	static term_handle build(tref term, const order& o);
+	/** @brief Build a BDD handle from Tau formula @p term. */
+	static term_handle build(tref term);
 	/**
 	 * @brief The `bf(BDD_ID)` term of @p handle with type @p term_type,
 	 * without a right sibling: the `bf` wrapper, re-derived through the
@@ -479,8 +468,8 @@ struct tau_term_bdd_handle {
 	 * @p U and @p I. Two calls with equal handles return the same node.
 	 */
 	static tref convert_to_tau_node(term_handle handle, size_t term_type);
-	/** @brief Build a BDD from @p term using @p o and return its interned `bf(BDD_ID)` term. */
-	static tref convert_to_tau_node(tref term, const order& o);
+	/** @brief Build a BDD from @p term and return its interned `bf(BDD_ID)` term. */
+	static tref convert_to_tau_node(tref term);
 	/**
 	 * @brief The term of @p handle with type @p term_type, minting a
 	 * `BDD_ID` only for a BDD that actually BRANCHES: a BDD with no
@@ -520,30 +509,30 @@ struct tau_term_bdd_handle {
 	 */
 	static tref convert_to_tau_terms(tref formula);
 
-	/** @brief AND with @p other under @p o. */
-	term_handle bdd_and(term_handle other, const order& o) const;
-	/** @brief OR with @p other under @p o. */
-	term_handle bdd_or(term_handle other, const order& o) const;
+	/** @brief AND with @p other. */
+	term_handle bdd_and(term_handle other) const;
+	/** @brief OR with @p other. */
+	term_handle bdd_or(term_handle other) const;
 	/** @brief NOT (flips `inv`). */
 	term_handle bdd_not() const;
-	/** @brief AND of all @p bdds under @p o. */
-	static term_handle bdd_and_many(const term_handles& bdds, const order& o);
-	/** @brief OR of all @p bdds under @p o. */
-	static term_handle bdd_or_many(const term_handles& bdds, const order& o);
-	/** @brief Existentially quantify @p v from this handle under @p o.
-	 * @p v comes back sorted by @p o, as the static `tbdd::bdd_ex` leaves it. */
-	term_handle bdd_ex(trefs& v, const order& o) const;
-	/** @brief Universally quantify @p v from this handle under @p o. */
-	term_handle bdd_all(const trefs& v, const order& o) const;
-	/** @brief Apply quantifier sequence @p q from this handle under @p o. */
-	term_handle bdd_quant(const quants& q, const order& o) const;
-	/** @brief If-then-else of this (condition), @p g (then), @p h (else) under @p o. */
-	term_handle bdd_ite(term_handle g, term_handle h, const order& o) const;
+	/** @brief AND of all @p bdds. */
+	static term_handle bdd_and_many(const term_handles& bdds);
+	/** @brief OR of all @p bdds. */
+	static term_handle bdd_or_many(const term_handles& bdds);
+	/** @brief Existentially quantify @p v from this handle.
+	 * @p v comes back sorted, as the static `tbdd::bdd_ex` leaves it. */
+	term_handle bdd_ex(trefs& v) const;
+	/** @brief Universally quantify @p v from this handle. */
+	term_handle bdd_all(const trefs& v) const;
+	/** @brief Apply the quantifier prefix @p q, outermost first, to this handle. */
+	term_handle bdd_quant(const quants& q) const;
+	/** @brief If-then-else of this (condition), @p g (then), @p h (else). */
+	term_handle bdd_ite(term_handle g, term_handle h) const;
 
-	/** @brief Substitute variable @p xi with @p g under @p o. */
-	term_handle bdd_compose(tref xi, term_handle g, const order& o) const;
-	/** @brief Apply simultaneous substitutions @p subs under @p o. */
-	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const;
+	/** @brief Substitute variable @p xi with @p g. */
+	term_handle bdd_compose(tref xi, term_handle g) const;
+	/** @brief Apply simultaneous substitutions @p subs. */
+	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs) const;
 
 	/** @brief Return the underlying BDD reference. */
 	ref get() const;

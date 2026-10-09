@@ -553,10 +553,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 *
 	 * A BDD-backed term keeps its variables in the BDD store, not as tree
 	 * nodes, and is rewritten there: its leaves first, by this same
-	 * substitution, then one `bdd_compose` for the key variables that are
-	 * decision variables of @p o. @p o is the order the term was built
-	 * under; it is required, and Debug-asserted, whenever the subtree holds
-	 * a BDD-backed term.
+	 * substitution, then one `bdd_compose` for the key variables, each
+	 * replacement built as a BDD under the library's one order.
 	 *
 	 * A reference argument is rewritten by this same substitution and then
 	 * passed through @p on_argument, once per argument that changed,
@@ -583,13 +581,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * the rewritten members.
 	 */
 	tref substitute(tref that, tref with,
-		const subtree_unordered_map<node, int_t>& o = {},
 		const argument_hook& on_argument = identity,
 		const descent_guard& descend = {},
 		const hook_target& hooked = {}) const;
 	/** @brief This subtree with every key of @p changes replaced by its value, all at once. */
 	tref substitute(const subtree_map<node, tref>& changes,
-		const subtree_unordered_map<node, int_t>& o = {},
 		const argument_hook& on_argument = identity,
 		const descent_guard& descend = {},
 		const hook_target& hooked = {}) const;
@@ -1125,12 +1121,11 @@ private:
 		/// spares a plain substitution a call per node. It points at the
 		/// caller's argument, which outlives the walk.
 		const hook_target* hooked = nullptr;
-		/// The key variables that are decision variables of the order,
-		/// with their replacements as BDDs, in the order a compose
-		/// wants them. Built at the first BDD-backed node the call
-		/// meets, at whatever depth, and reused by every later one:
-		/// the replacements and the order are constants of the call, so
-		/// the list is too. Empty is an answer, hence the flag.
+		/// The key variables with their replacements as BDDs, in the
+		/// order a compose wants them. Built at the first BDD-backed node
+		/// the call meets, at whatever depth, and reused by every later
+		/// one: the replacements are constants of the call, so the list
+		/// is too. Empty is an answer, hence the flag.
 		mutable bool compose_prepared = false;
 		mutable std::vector<std::pair<tref, tau_bdd_ref<node>>>
 			compose_subs;
@@ -1149,7 +1144,6 @@ private:
 	 * caller rewrites whole and hooks.
 	 */
 	static tref substitute(tref formula, const substitution& s,
-		const subtree_unordered_map<node, int_t>& o,
 		const argument_hook& on_argument, bool hook_root = true);
 
 };
@@ -1161,7 +1155,6 @@ tref untype(tref term);
 /** @brief @p formula with @p that replaced by @p with; see `tree<node>::substitute`. */
 template <NodeType node>
 tref substitute(tref formula, tref that, tref with,
-	const subtree_unordered_map<node, int_t>& o = {},
 	const typename tree<node>::argument_hook& on_argument = identity,
 	const typename tree<node>::descent_guard& descend = {},
 	const typename tree<node>::hook_target& hooked = {});
@@ -1169,7 +1162,6 @@ tref substitute(tref formula, tref that, tref with,
 /** @brief @p formula with every key of @p changes replaced by its value; see `tree<node>::substitute`. */
 template <NodeType node>
 tref substitute(tref formula, const subtree_map<node, tref>& changes,
-	const subtree_unordered_map<node, int_t>& o = {},
 	const typename tree<node>::argument_hook& on_argument = identity,
 	const typename tree<node>::descent_guard& descend = {},
 	const typename tree<node>::hook_target& hooked = {});
