@@ -138,9 +138,15 @@ _dep_spot_producer() {
 import os
 import sys
 root, *old_paths = sys.argv[1:]
-# A Windows compiler writes the same paths with backslashes.
-olds = sorted({s.encode() for p in old_paths if p
-	for s in (p, p.replace('/', '\\'))}, key=len, reverse=True)
+# A Windows compiler writes the same paths with backslashes, and an MSYS2
+# tool writes the drive as a folder: C:/x is /c/x.
+def spellings(p):
+	out = {p, p.replace('/', '\\')}
+	if len(p) > 2 and p[0].isalpha() and p[1:3] == ':/':
+		out.add('/' + p[0].lower() + p[2:])
+	return out
+olds = sorted({s.encode() for p in old_paths if p for s in spellings(p)},
+	key=len, reverse=True)
 for dirpath, _dirs, files in os.walk(root):
 	for name in files:
 		path = os.path.join(dirpath, name)
