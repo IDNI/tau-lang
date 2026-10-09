@@ -450,18 +450,19 @@ TEST_CASE("L26: a ∀ run whose dual is expanded resolves") {
 // --- 8. keep mode end to end --------------------------------------------------------
 
 TEST_CASE("L27: a kept emission rides into the next step's terms") {
-	// The settle move hands `∃x(x·y = 0)` to §7 as a SUB-block, and under
-	// `keep_functional` `DISCHARGE` spells it instead of solving it: the
-	// atom `(∀_x x·y) = 0` rides on as a conjunct of the smaller block,
-	// where 2b squeezes it INTO the terms it builds. The chain then sits
-	// in a BDD LEAF, which no quantification reaches (§1's leaf hazard),
-	// so the elimination of those one-atom clauses under `∃y` freezes and
-	// re-wraps instead of discharging (invariant 3) — two blocks, each
-	// carrying the chain, where the plain run answers `T`.
+	// The settle move hands `∃x(x·y ∪ x′·c = 0)` to §7 as a SUB-block, and
+	// under `keep_functional` `DISCHARGE` spells it instead of solving it:
+	// the atom `(∀_x (x·y ∪ x′·c)) = 0` rides on as a conjunct of the
+	// smaller block, where 2b squeezes it INTO the terms it builds. The
+	// chain then sits in a BDD LEAF, which no quantification reaches (§1's
+	// leaf hazard), so the elimination of those one-atom clauses under `∃y`
+	// freezes and re-wraps instead of discharging (invariant 3) — two
+	// blocks, each carrying the chain, where the plain run answers `T`.
+	// Both variables are binate, so neither leaves at block entry.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
 	// what this case pins is the KEPT shape, under its own callback.
-	const tref phi = parse("ex x ex y (xy = 0 && (ya = 0 || yb = 0)).");
+	const tref phi = parse("ex x ex y ((xy | x'c = 0) && (ya = 0 || y'b = 0)).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
 	CHECK(holds(got, tau::bf_fall));
@@ -474,7 +475,7 @@ TEST_CASE("L27: a kept emission rides into the next step's terms") {
 	// plain run gives directly: phase 1's `RESOLVE_FUNCTIONAL_PLAIN` takes
 	// the chains and the blocks are pushed with nothing kept.
 	CHECK(ap::anti_prenex<node_t>(got) == ap::anti_prenex<node_t>(phi));
-	// Which is `T`: `x := 0, y := 0` satisfies the body.
+	// Which is `T`: `x := 1, y := 0` satisfies the body.
 	CHECK(tau::get(anti_prenexed(phi)).equals_T());
 }
 

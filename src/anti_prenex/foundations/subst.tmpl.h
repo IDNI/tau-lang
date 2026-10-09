@@ -73,6 +73,20 @@ const typename tree<node>::argument_hook& resimplify_argument() {
 	return hook;
 }
 
+/// The hook of `φ[x ← t]`, one for both kinds the library hands it: a
+/// rewritten atom is a `wff` and goes through `SIMPLIFY_ATOM` under
+/// @p order, a reference argument is a `bf` term.
+template <NodeType node>
+typename tree<node>::argument_hook resimplify_rewritten(
+	const var_order<node>& order)
+{
+	return [&order](tref n) {
+		return tree<node>::get(n).is(tree<node>::wff)
+			? simplify_atom<node>(n, order)
+			: resimplify_argument<node>()(n);
+	};
+}
+
 } // namespace detail
 
 // --- φ[atm ↦ T/F] ------------------------------------------------------------------
@@ -174,17 +188,24 @@ bool has_atom(tref n, tref atm) {
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, const var_order<node>& order) {
 	using tau = tree<node>;
-	// One hook for both kinds the library hands it: a reference argument
-	// is a `bf` term, a rewritten atom a `wff`.
-	const typename tau::argument_hook resimplify = [&order](tref n) {
-		return tau::get(n).is(tau::wff) ? simplify_atom<node>(n, order)
-			: detail::resimplify_argument<node>()(n);
-	};
 	// The rewrite happens inside `phi`, so a right sibling it carries as a
 	// chain member is not part of it.
 	return tau::get(tau::trim_right_sibling(phi))
-		.substitute(tau::get(tau::bf, x), t, order, resimplify, {},
+		.substitute(tau::get(tau::bf, x), t, order,
+			detail::resimplify_rewritten<node>(order), {},
 			is_atomic_fm<node>);
+}
+
+template <NodeType node>
+tref subst_var(tref phi, const subtree_map<node, tref>& by_var,
+	const var_order<node>& order)
+{
+	using tau = tree<node>;
+	subtree_map<node, tref> changes;
+	for (const auto& [x, t] : by_var) changes.emplace(tau::get(tau::bf, x), t);
+	return tau::get(tau::trim_right_sibling(phi))
+		.substitute(changes, order, detail::resimplify_rewritten<node>(order),
+			{}, is_atomic_fm<node>);
 }
 
 } // namespace idni::tau_lang::anti_prenexing

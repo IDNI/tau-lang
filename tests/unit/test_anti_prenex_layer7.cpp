@@ -257,11 +257,12 @@ TEST_CASE("N6: F8's open tier-2 queries, closed both ways") {
 		CHECK(tau::get(got).equals_T());
 	}
 	SUBCASE("neither: the block waits") {
-		// Not valid (`a = 0`), satisfiable (`a = b = x = 1`): the query
-		// re-wraps.
+		// F8's clause with `x` complemented in its second literal, so
+		// that `x` is binate and reaches the query. Not valid (`a = 0`),
+		// satisfiable (`a = x = 1`, `b = 2`): the query re-wraps.
 		const tref got = bv_anti_prenexed(parse(
 			"ex x (!(x:bv[2] & a:bv[2] = { 0 }:bv[2]) "
-			"&& !(x:bv[2] & b:bv[2] = { 0 }:bv[2]))."));
+			"&& !(x:bv[2]' & b:bv[2] = { 0 }:bv[2]))."));
 		waits(got, 1);
 	}
 }
@@ -340,6 +341,20 @@ TEST_CASE("N11: keep mode on F3's input keeps its chains") {
 	CHECK(!holds(plain, tau::bf_fall));
 	CHECK(!holds(plain, tau::bf_fex));
 	CHECK(bv_equivalent(plain, phi));
+}
+
+TEST_CASE("N12: a bv variable that only lowers the truth leaves at block entry") {
+	// x·a = 0 falls as x grows and so does ¬(x′·b = 0): §5 deletes x at
+	// x := 0 before any component, which leaves ¬(b = 0).
+	const tref phi = parse("ex x (x:bv[8] & a:bv[8] = { 0 }:bv[8] "
+		"&& !(x:bv[8]' & b:bv[8] = { 0 }:bv[8])).");
+	const tref matrix = tau::trim_right_sibling(ap::binder_body<node_t>(phi));
+	const ap::block X{ tau::trim_right_sibling(ap::binder_var<node_t>(phi)) };
+	const tref got = ap::delete_unate_binders<node_t>(matrix, X);
+	CHECK(!ap::fv_meets<node_t>(got, X));
+	CHECK(bv_equivalent(got, phi));
+	CHECK(bv_equivalent(got, parse("!(b:bv[8] = { 0 }:bv[8]).")));
+	resolved(bv_anti_prenexed(phi));
 }
 
 } // TEST_SUITE

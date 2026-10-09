@@ -269,12 +269,12 @@ TEST_CASE("M11: both spellings of a disequation give the same node") {
 TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	// `DISCHARGE` under `ctx.keep_functional` spells the block out instead
 	// of solving it, and the component's close keeps what the callback
-	// keeps: `∃x. x·y = 0` comes back as the one atom `(∀_x x·y) = 0`,
-	// with no formula binder left.
+	// keeps: `∃x. x·y ∪ x′·w = 0`, binate in `x`, comes back as the one
+	// atom `(∀_x (x·y ∪ x′·w)) = 0`, with no formula binder left.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
 	// what this case pins is the KEPT shape, under its own callback.
-	const tref phi = parse("ex x (xy = 0).");
+	const tref phi = parse("ex x (xy | x'w = 0).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
 	CHECK(holds(got, tau::bf_fall));
@@ -288,8 +288,8 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	// `RESOLVE_FUNCTIONAL_PLAIN` resolves the chain, and what is left is
 	// the answer the plain run gives directly.
 	CHECK(ap::anti_prenex<node_t>(got) == ap::anti_prenex<node_t>(phi));
-	// Which is `T`: `x := 0` satisfies the body.
-	CHECK(tau::get(anti_prenexed(phi)).equals_T());
+	// Which is `y·w = 0`, the product of the two cofactors.
+	CHECK(are_nso_equivalent<node_t>(anti_prenexed(phi), parse("yw = 0.")));
 }
 
 // --- 6. a run under a temporal operator -------------------------------------------

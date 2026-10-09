@@ -81,6 +81,12 @@ bool has_atom(tref n, tref atm);
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, const var_order<node>& order = {});
 
+/// §3 `φ[x ← t]` for several variables in one simultaneous rewrite, with the
+/// hook above; @p by_var maps each VARIABLE node to its term.
+template <NodeType node>
+tref subst_var(tref phi, const subtree_map<node, tref>& by_var,
+	const var_order<node>& order = {});
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #include "subst.tmpl.h"
