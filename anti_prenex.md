@@ -215,7 +215,8 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it, held as `ctx.kf`: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body: every chain present at entry (`RESOLVE_FUNCTIONAL_PLAIN`, §3), and ONCE per chain `DISCHARGE` emits in keep mode (§7), a chain not kept quantified at once. A yes ALLOWS keeping, never forces it: a closed piece of the slid chain folds (§1 transparency), and a settled sub-block with block variables still pending below its levels is quantified at once (§7). It sees each emission as built, never a later merged or rewritten chain. It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. CONTRACT: the callback never changes once set — every call passes the same one. Two components of one block may be answered differently; every key carries its component's flag, and by the contract the flag alone, so the tables stay exact (cache scope, below) |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
-| `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`, and by `SIMPLIFY`'s equality propagation (§3), whose match records its cofactors under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, a key no `COF` call forms, `COF` asking about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
+| `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF` alone, which `SIMPLIFY`'s equality propagation calls on backed terms (§3) under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, where every other caller asks about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
+| `plain_cof_memo` | `(term, y) → (f₀, f₁, p, usable, pin)`, GLOBAL. The plain regime's pin records: `SIMPLIFY`'s equality propagation in phases 1 and 2 (§3) records its match under `(TERM_OF(c), y)`, the cofactors taken by substitution. Apart from `cof_memo`: a term with no decision variable is one node in both regimes, and the two recipes record different cofactors — a substitution reaches into a leaf, a restrict does not. Read BARE — `SIMPLIFY` has no ctx. Pure functions of the key |
 | `atoms_memo` | `formula node → the atoms reachable in it through ∧, ∨ and ¬ alone` — units, references and temporal operators are opaque (§4), so a reference's formula argument contributes none — GLOBAL, purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query's terms in `FINISH_TERMS`' spelling (§3), so its keys are canonical. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
@@ -247,8 +248,8 @@ shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its ke
 names everything its entries depend on. The variable set is explicit: the
 ordered `X` of `push_memo`/`elim_memo` fixes the type, every atom's block
 subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
-carries its `x`; `atoms_memo` is purely structural; `solver_memo` and
-`qbf_memo` involve none. `keep_functional` joins `push_memo`'s and
+and `plain_cof_memo` carry their variable; `atoms_memo` is purely structural;
+`solver_memo` and `qbf_memo` involve none. `keep_functional` joins `push_memo`'s and
 `elim_memo`'s keys alone — their entries embed `DISCHARGE`'s output, which
 the flag switches, with `kf`'s answer on each chain it emits (§7), a pure
 function of the chain because the callback never changes once set (§1 ctx
@@ -944,7 +945,8 @@ unequal until `y := a` turns `f` into `a`.
   a free `y` of `f = TERM_OF(c)` iff `usable ∧ f₀ ∪ f₁ = 1` on the cofactors
   `f₀ = SIMPLIFY_TERM(f[y←0])`, `f₁ = SIMPLIFY_TERM(f[y←1])` — on backed
   terms restricts (§1), the union test a node test (§3) — the record
-  memoised in `cof_memo` under `(f, y)` (§1) — a pure function of its key,
+  memoised under `(f, y)` in `plain_cof_memo`, on backed terms by `COF` in
+  `cof_memo` (§1) — a pure function of its key,
   and the same conjunct is matched again at every construction site of a
   push; the witness is `f₁′`, STRICT when `p = f₀f₁` folds to `0` (a node
   test on backed terms) — the spelled shape `y + t = 0`, `y ∉ FV(t)`, is
@@ -2464,8 +2466,8 @@ algorithm's:
   later one reads the memo. That is what makes the acceptance comparison, the
   sort keys, and every `X ∩ FV` test in this document O(1).
 - **The result tables are caches, never premises.** `push_memo`, `elim_memo`,
-  `cof_memo`, `solver_memo` and `qbf_memo` (§1) may be absent
-  altogether — a build without caching, the Debug build — so no result may
+  `cof_memo`, `plain_cof_memo`, `solver_memo` and `qbf_memo` (§1) may be
+  absent altogether — a build without caching, the Debug build — so no result may
   depend on a hit: a miss costs time and nothing else. The structural facets
   are not caches and always exist: `|·|`, `neg`, the negative-tree flag, and
   `atoms_memo`.
