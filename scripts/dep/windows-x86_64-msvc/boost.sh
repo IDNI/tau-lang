@@ -131,7 +131,10 @@ _dep_boost_target_build() {
 }
 
 _dep_boost_target_setup() {
-	local _cl
+	local _cl _n="${GIT_CONFIG_COUNT:-0}"
+	# A submodule doc path under the staging folder passes 260 characters.
+	export "GIT_CONFIG_KEY_${_n}=core.longpaths" "GIT_CONFIG_VALUE_${_n}=true"
+	export GIT_CONFIG_COUNT=$((_n + 1))
 	# b2 takes clang-cl for clang on Linux, so every MSVC preset builds with cl.
 	_cl="$(command -v cl.exe 2>/dev/null)" || {
 		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2
