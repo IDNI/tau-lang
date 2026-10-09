@@ -63,11 +63,10 @@ tref nnf(tref n) { return ap::to_canonically_factored_nnf<node_t>(n); }
 
 /// Phases 1 and 3 of §3 in one call: `TO_NNF`, then `SIMPLIFY` in phase 1's
 /// entry state (`ref_args = true`, which establishes invariant 6), then
-/// `NORMALIZE_OPERATORS`. The empty order is the plain regime phases 1 and 3
-/// run in.
+/// `NORMALIZE_OPERATORS`, in the plain regime phases 1 and 3 run in.
 tref pipeline(tref phi) {
 	return ap::normalize_operators<node_t>(
-		ap::simplify<node_t>(nnf(phi), {}, {}, true));
+		ap::simplify<node_t>(nnf(phi), ap::regime::plain, {}, true));
 }
 
 /// Invariant 4 over a whole formula: no `bf_neq` and no negated or mirrored
@@ -254,10 +253,10 @@ TEST_CASE("L5: the spec's `f = xy ∪ x′t` example reaches `t`") {
 		if (ap::fv_meets<node_t>(m, ap::block{ fvar("y") })) {
 			++with_y;
 			CHECK(is_child<node_t>(m, tau::bf_eq));
-			CHECK(same(ap::term_of<node_t>(m, {}),
+			CHECK(same(ap::term_of<node_t>(m),
 				ap::simplify_term<node_t>(lxor(y, t))));
 		} else if (is_child<node_t>(m, tau::bf_eq)
-			&& same(ap::term_of<node_t>(m, {}), t)) ++folded;
+			&& same(ap::term_of<node_t>(m), t)) ++folded;
 	}
 	CHECK(with_y == 1);
 	CHECK(folded == 1);
@@ -267,26 +266,24 @@ TEST_CASE("L5b: the same example in the BDD regime") {
 	tref x = bvar("x"), y = bvar("y"), a = bvar("a"), b = bvar("b");
 	const tref t = land(a, b);
 	tref phi = conj(eq(y, t), eq0(lor(land(x, y), land(lneg(x), t))));
-	// §5's setup for a one-variable block: the order over `x`, then the
-	// terms prepared under it — the target touches `x` and becomes
-	// BDD-backed, the pinning equation does not and stays plain.
+	// §5's setup for a one-variable block `x`: every side holding a
+	// variable is BDD-backed, the pinning equation's included.
 	const ap::block P{ fvar("x") };
-	const ap::var_order<node_t> o =
-		ap::ctx<node_t>::for_component(P, 0, false).order;
-	tref prepared = ap::prepare_terms<node_t>(phi, P, o);
+	tref prepared = ap::prepare_terms<node_t>(phi);
 	// The preparation must have backed a term, or this case would only
 	// repeat the plain one.
 	REQUIRE(holds(prepared, tau::BDD_ID));
-	tref got = ap::simplify<node_t>(prepared, o, P);
-	// The propagation runs on the plain pinning equation (`X`-free, as
-	// §3's orientation rule demands) and rewrites the BDD-backed target
-	// through the library's compose: both its cofactors become `t`, the
-	// BDD stops branching on `x`, and the atom comes back PLAIN.
+	tref got = ap::simplify<node_t>(prepared, ap::regime::backed, P);
+	// The propagation runs on the pinning equation (`X`-free, as §3's
+	// orientation rule demands) and rewrites the BDD-backed target through
+	// the library's compose: both its cofactors become `t`, and the BDD
+	// stops branching on `x`.
 	size_t with_y = 0, folded = 0;
 	for (tref m : ap::members<node_t>(got)) {
 		if (ap::fv_meets<node_t>(m, ap::block{ fvar("y") })) ++with_y;
 		else if (is_child<node_t>(m, tau::bf_eq)
-			&& same(ap::term_of<node_t>(m, o), t)) ++folded;
+			&& tau_term_bdd<node_t>::build_bdd(ap::term_of<node_t>(m))
+				== tau_term_bdd<node_t>::build_bdd(t)) ++folded;
 	}
 	CHECK(with_y == 1);
 	CHECK(folded == 1);

@@ -134,7 +134,7 @@ fixture make(const char* src, bool keep = false) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), keep);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 
@@ -146,7 +146,7 @@ tref closed(fixture& f, tref r, tref* emitted) {
 	if (emitted) *emitted = r;
 	if (!f.c.keep_functional) return r;
 	return ap::finish_terms<node_t>(
-		ap::resolve_functional_quantifiers_bdd<node_t>(r, f.c.order,
+		ap::resolve_functional_quantifiers_bdd<node_t>(r,
 			ap::keep_no_functional<node_t>));
 }
 

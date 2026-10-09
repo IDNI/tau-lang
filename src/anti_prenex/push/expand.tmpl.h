@@ -52,10 +52,10 @@ bool probe(tref atom, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
 	// `TERM_OF(atom)` holds no variable the atom lacks.
 	if (!fv_meets<node>(atom, X)) return false;
-	const tref f = term_of<node>(atom, c.order);
+	const tref f = term_of<node>(atom);
 	const block vs = fv_intersect<node>(f, X);
 	if (vs.empty()) return false;
-	const cof_entry e = cof<node>(f, innermost<node>(vs, c), c);
+	const cof_entry e = cof<node>(f, innermost<node>(vs, c));
 	// The hooks decide a constant atom, so `p = 0` folds to `F` exactly
 	// when `p` is a nonzero constant.
 	return e.usable && tau::get(build_bf_eq_0<node>(e.p)).equals_F();
@@ -182,7 +182,7 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 		// disjunctive conjuncts meet the exclusions at their own expansion.
 		const tref cc = simplify<node>(
 			simplified_and_join<node>(concat(*E, excl, *dc)),
-			c.order, c.P);
+			regime::backed, c.P);
 		if (tau::get(cc).equals_F()) continue;
 		// The wrapper narrows `X` and strips what the case decided about
 		// free variables; `T` decides the ∨-join (∃'s short-circuit).

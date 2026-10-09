@@ -54,12 +54,16 @@ using quantifier = typename tau_term_bdd<node>::Quantifier;
 /// The three answers of `ASK` (§7); the value type of §1 `solver_memo`.
 enum class answer { sat, unsat, unknown };
 
-/// §1 `ctx.order` and `ctx.prio`: a variable → integer rank map. The BDD
-/// library's own map type, so an order can be handed to it unchanged. The two
-/// conventions are opposite: in `order` an inner variable has the LOWER rank,
-/// in `prio` the HIGHER one. Ranks run 1..|P| (§5).
+/// §3 the REGIME of `SIMPLIFY_TERM`, `SIMPLIFY_ATOM` and `SIMPLIFY`, the
+/// spec's empty or global `order`: `plain` in phases 1, 2 and 5, where no
+/// term is BDD-backed, `backed` in phase 4, under the BDD library's one
+/// global order (§1).
+enum class regime { plain, backed };
+
+/// §1 `ctx.prio`: a variable → integer rank map, an inner variable ranking
+/// HIGHER, ranks 1..|P| (§5).
 template <NodeType node>
-using var_order = typename term_handle<node>::order;
+using prio_map = subtree_unordered_map<node, int_t>;
 
 /// §1 `keep_functional`: the ONE callback `ANTI_PRENEX` takes, a pure
 /// predicate on a NODE, asked once per site. Per CHAIN

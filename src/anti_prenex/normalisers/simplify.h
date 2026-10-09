@@ -79,34 +79,32 @@ struct pin {
  * `0`.
  *
  * The one pin recipe: `find_pin` / `find_pin_for` take the cofactors by
- * SUBSTITUTION on a plain term, `cof` (cofactors.h) by CHILD SELECTION in
- * the term's BDD, and both record the result in `cof_memo` (§1). `order` is
- * the live order, handed to every `SIMPLIFY_TERM` here; the plain regime
- * passes the empty one.
+ * SUBSTITUTION, `cof` (cofactors.h) by CHILD SELECTION in the term's BDD,
+ * and both record the result in `cof_memo` (§1). @p rg is handed to every
+ * `SIMPLIFY_TERM` here.
  */
 template <NodeType node>
-cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
-	const var_order<node>& order);
+cof_entry pin_from_cofactors(tref f0, tref f1, tref y, regime rg);
 
 /**
- * @brief §3 `TRY_WITNESS`'s pin match, on a plain term: the best pin of
+ * @brief §3 `TRY_WITNESS`'s pin match, by substitution: the best pin of
  * `atom`, or `nullopt`.
  *
  * `atom` must be a POSITIVE equation — an equation under `¬` pins nothing —
- * and must be free of every variable of `X`, which by §1 makes both sides
- * plain: pushing a block variable into a leaf would break the
- * child-is-cofactor identity, so an `X`-free conjunct is the guard. On
+ * and must be free of every variable of `X`: pushing a block variable into a
+ * leaf would break the child-is-cofactor identity, so an `X`-free conjunct is
+ * the guard. On
  * `f = TERM_OF(atom)` a free `y` is pinned iff `usable ∧ f₀ ∪ f₁ = 1` on the
  * cofactors `f₀ = SIMPLIFY_TERM(f[y←0])` and `f₁ = SIMPLIFY_TERM(f[y←1])`,
  * where `usable` is `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a
  * STRICT one first, else the smallest `‖f₁′‖` (`mem_size`).
  *
- * `order` is the live order; the plain regime (phases 1, 2 and 5) passes the
- * empty one, where nothing is BDD-backed and the `X` guard is vacuous.
+ * @p rg is the regime (fwd.h); in the plain one (phases 1, 2 and 5)
+ * nothing is BDD-backed and the `X` guard is vacuous.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin(tref atom, const block& X,
-	const var_order<node>& order = {});
+	regime rg = regime::plain);
 
 /**
  * @brief §3 `TRY_WITNESS`'s pin match asked about ONE variable: the pin `x`
@@ -122,7 +120,7 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin_for(tref atom, tref x,
-	const var_order<node>& order = {});
+	regime rg = regime::plain);
 
 /**
  * @brief §3 `SIMPLIFY(φ)`: equality propagation, then the spelling-preserving
@@ -130,8 +128,8 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  *
  * @param phi      a `wff` node (a `bf` term is handed straight to the sweep,
  *                 which has nothing to propagate)
- * @param order    the live order (§1 `ctx.order`); empty in phases 1, 2 and
- *                 5, where every term is plain
+ * @param rg       the regime (fwd.h): `plain` in phases 1, 2 and 5, where
+ *                 every term is plain, `backed` in phase 4
  * @param X        the block in scope, bound by the caller: the component's
  *                 block inside a push or an elimination, empty in phases 1, 2
  *                 and 5, which makes the propagation guard vacuous
@@ -143,8 +141,8 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  *         node
  */
 template <NodeType node>
-tref simplify(tref phi, const var_order<node>& order = {},
-	const block& X = {}, bool ref_args = false);
+tref simplify(tref phi, regime rg = regime::plain, const block& X = {},
+	bool ref_args = false);
 
 } // namespace idni::tau_lang::anti_prenexing
 

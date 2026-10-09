@@ -33,15 +33,10 @@ ctx<node> ctx<node>::for_component(const block& P, ba_type_id type,
 	c.type = type;
 	c.P = P;
 	c.keep_functional = keep_functional;
-	// §5: `ctx.order ← { P[i] ↦ |P|-i }` (inner → LOWER) and
-	// `ctx.prio ← { P[i] ↦ i+1 }` (inner → HIGHER), both over ranks
-	// 1..|P|, with `P[0]` the OUTERMOST variable. The two conventions are
-	// opposite and cannot be merged (§1).
+	// §5: `ctx.prio ← { P[i] ↦ i+1 }` (inner → HIGHER), with `P[0]` the
+	// OUTERMOST variable.
 	const int_t n = static_cast<int_t>(P.size());
-	for (int_t i = 0; i < n; ++i) {
-		c.order[P[i]] = n - i;
-		c.prio[P[i]]  = i + 1;
-	}
+	for (int_t i = 0; i < n; ++i) c.prio[P[i]] = i + 1;
 	return c;
 }
 

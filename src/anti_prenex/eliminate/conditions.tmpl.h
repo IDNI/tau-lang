@@ -11,7 +11,7 @@
  * (§3) for every formula, and `rewrap` (§3) for what is frozen.
  * The union of a list of terms is the hooked binary `build_bf_or`; what feeds
  * `discharge` alone needs only the representation step of `simplify_term`'s
- * BDD regime, not its leaf sweep or cofactor check.
+ * backed regime, not its leaf sweep.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__CONDITIONS_TMPL_H__
@@ -34,19 +34,19 @@ ba_type_id block_type(const block& X) {
 }
 
 /**
- * @brief The representation step of `simplify_term`'s BDD regime alone: no
- * leaf simplifier, no cofactor check. A term `simplify_term` would send to
- * the plain regime comes back as built, untouched.
+ * @brief The representation step of `simplify_term`'s backed regime alone:
+ * no leaf simplifier. A term `simplify_term` would sweep whole comes back
+ * as built, untouched.
  */
 template <NodeType node>
-tref build_only(tref t, const var_order<node>& order) {
+tref build_only(tref t) {
 	using tbdd = tau_term_bdd<node>;
 	using thandle = term_handle<node>;
-	if (!thandle::is_bdd_backed(t) && !tbdd::has_bdd_var(t, order)
+	if (!thandle::is_bdd_backed(t) && get_free_vars<node>(t).empty()
 		&& !terms_detail::holds_bdd_id<node>(t))
 		return t;
 	return thandle::convert_to_tau_node_or_term(
-		thandle(tbdd::build_bdd(t, order)), find_ba_type<node>(t));
+		thandle(tbdd::build_bdd(t)), find_ba_type<node>(t));
 }
 
 /**
@@ -62,19 +62,20 @@ tref build_only(tref t, const var_order<node>& order) {
  * conjunction, a literal or a constant. Anything else comes back untouched.
  */
 template <NodeType node>
-tref zero_form(tref c, const var_order<node>& order) {
+tref zero_form(tref c) {
 	using tau = tree<node>;
 	if (is_child<node>(c, tau::bf_eq) || is_negated_equation<node>(c))
-		return simplify_atom<node>(norm_equation<node>(c, order), order);
+		return simplify_atom<node>(norm_equation<node>(c),
+			regime::backed);
 	if (!is_negative_tree<node>(c)) return c;
 	// One walk down to the literals, each of them once: the map is keyed by
 	// content, and every leaf of a negative tree is a negated equation (§1),
 	// so nothing below a literal has to be entered.
 	subtree_map<node, tref> zero;
-	auto collect = [&zero, &order](tref m) {
+	auto collect = [&zero](tref m) {
 		if (!is_negated_equation<node>(m)) return true;
-		const tref z = simplify_atom<node>(
-			norm_equation<node>(m, order), order);
+		const tref z = simplify_atom<node>(norm_equation<node>(m),
+			regime::backed);
 		if (!tree<node>::subtree_equals(z, m))
 			zero.emplace(tree<node>::trim_right_sibling(m), z);
 		return false;
@@ -130,9 +131,7 @@ freeze_result<node> freeze_opaque_components(const trefs& conjuncts,
 // --- the squeeze ------------------------------------------------------------------
 
 template <NodeType node>
-squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
-	const var_order<node>& order)
-{
+squeeze_result<node> squeeze(const trefs& conjuncts, const block& X) {
 	using tau = tree<node>;
 	using namespace conditions_detail;
 	squeeze_result<node> r;
@@ -143,7 +142,7 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 	// or step 2 would read none of them.
 	r.conjuncts.reserve(conjuncts.size());
 	for (tref c : conjuncts)
-		for (tref n : get_cnf_wff_clauses<node>(zero_form<node>(c, order)))
+		for (tref n : get_cnf_wff_clauses<node>(zero_form<node>(c)))
 		{
 			if (tau::get(n).equals_T()) continue;
 			if (tau::get(n).equals_F())
@@ -169,9 +168,8 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 		trefs part_terms;
 		part_terms.reserve(p.conjuncts.size());
 		for (tref a : p.conjuncts)
-			part_terms.push_back(term_of<node>(a, order));
-		const tref F = build_only<node>(
-			build_bf_or<node>(part_terms, type), order);
+			part_terms.push_back(term_of<node>(a));
+		const tref F = build_only<node>(build_bf_or<node>(part_terms, type));
 		terms.push_back(F);
 		r.comps.push_back(component<node>{ F, std::move(p.vars) });
 	}
@@ -215,17 +213,15 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	// No component touches `g`: every factor of the product is 1 under
 	// `pos`, so `g` is discharged on its own. An `X`-free `g` lands here
 	// with an empty `X_g` and emits `¬(g = 0)` itself — under §1's term
-	// representation a BDD-backed `g` is canonical over the block, so
+	// representation a BDD-backed `g` is canonical over its variables, so
 	// "independent of `X`" IS `FV(g) ∩ X = ∅`.
 	if (FK.empty()) return discharge<node>(g, true, Xg, c);
 	for (tref x : Xg) vars.insert(x);
 	block vs;
 	for (tref x : X)
 		if (vars.contains(x)) vs.push_back(tau::trim_right_sibling(x));
-	const tref h = build_only<node>(
-		build_bf_and<node>(
-			build_bf_neg<node>(build_bf_or<node>(FK, c.type)), g),
-		c.order);
+	const tref h = build_only<node>(build_bf_and<node>(
+		build_bf_neg<node>(build_bf_or<node>(FK, c.type)), g));
 	return discharge<node>(h, true, vs, c);
 }
 
@@ -245,7 +241,7 @@ tref tree_condition(tref t, const std::vector<component<node>>& comps,
 		if (is_child<node>(n, tau::wff_and))
 			return simplified_and_join<node>(members<node>(n));
 		if (!is_negated_equation<node>(n)) return n;
-		return negative_condition<node>(term_of<node>(n, c.order),
+		return negative_condition<node>(term_of<node>(n),
 			comps, X, c);
 	};
 	// The memo is the walk's own, local to this call, which is what makes

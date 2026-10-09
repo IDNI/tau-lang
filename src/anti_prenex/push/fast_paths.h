@@ -110,11 +110,9 @@ tref distribute_to_atoms(tref phi, const block& X, ctx<node>& c,
  * RAW: the unions are built by the hooked binary alone, and the list is NOT
  * deduplicated — a repeated factor inside one term and an equal atom
  * elsewhere in the list are both left standing.
- *
- * @param order the live order, under which the terms are read
  */
 template <NodeType node>
-trefs squeeze_positives(tref phi, const var_order<node>& order);
+trefs squeeze_positives(tref phi);
 
 } // namespace idni::tau_lang::anti_prenexing
 

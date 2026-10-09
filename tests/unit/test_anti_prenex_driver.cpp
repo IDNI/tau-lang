@@ -150,7 +150,7 @@ tref normalised(tref body) {
 tref plainly_spelled(tref n) {
 	trefs ms;
 	for (tref m : ap::members<node_t>(n))
-		ms.push_back(ap::simplify_atom<node_t>(m, {}));
+		ms.push_back(ap::simplify_atom<node_t>(m, ap::regime::plain));
 	return is_child<node_t>(n, tau::wff_or)
 		? ap::simplified_or_join<node_t>(ms)
 		: ap::simplified_and_join<node_t>(ms);
@@ -663,7 +663,8 @@ TEST_CASE("A7: a formula with no formula binder comes back as the same node") {
 
 TEST_CASE("A8: a term is never entered, so a functional quantifier is untouched") {
 	// The only quantifier here is TERM-level, and the pass stops at a term
-	// (§4): resolving a chain belongs to the phases before this one.
+	// (§4): resolving a chain belongs to the phases before this one. The
+	// pass's entry canonicalises the binder ids, the chain's included.
 	const tref chain = tb::build_functional_quantifiers(
 		{{ tau::trim(bvar("x")), tb::all }},
 		tau::build_bf_or(bvar("x"), bvar("z")));
@@ -672,7 +673,7 @@ TEST_CASE("A8: a term is never entered, so a functional quantifier is untouched"
 	REQUIRE(functional_count(phi) == 1);
 	const tref got = ap::process_all_blocks<node_t>(phi,
 		ap::keep_no_functional<node_t>);
-	CHECK(got == phi);
+	CHECK(got == ap::canonicalise_binder_ids<node_t>(phi));
 	CHECK(functional_count(got) == 1);
 }
 

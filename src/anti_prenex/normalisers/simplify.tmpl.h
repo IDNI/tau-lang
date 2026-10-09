@@ -75,7 +75,7 @@ namespace detail {
 /// so in the BDD regime this walk changes nothing. `nullptr` when the atom
 /// cannot pin at all: it is no positive equation, or it touches `X`.
 template <NodeType node>
-tref pin_term(tref atom, const block& X, const var_order<node>& order) {
+tref pin_term(tref atom, const block& X) {
 	if (atom == nullptr || !is_positive_equation<node>(atom)) return nullptr;
 	// ORIENTATION (§3): only an `X`-free conjunct propagates — pushing a
 	// block variable into a leaf would break the child-is-cofactor
@@ -83,7 +83,7 @@ tref pin_term(tref atom, const block& X, const var_order<node>& order) {
 	// also makes every free variable below `X`-free, so the scan needs no
 	// second guard.
 	if (fv_meets<node>(atom, X)) return nullptr;
-	const tref f = term_of<node>(atom, order);
+	const tref f = term_of<node>(atom);
 	if (f == nullptr) return nullptr;
 	return apply_all_xor_def<node>(f);
 }
@@ -94,29 +94,26 @@ tref pin_term(tref atom, const block& X, const var_order<node>& order) {
 ///
 /// The cofactors are taken by SUBSTITUTION and tested by
 /// `pin_from_cofactors`. The record is MEMOISED in `cof_memo` (§1) under
-/// `(f, y)`, the table `cof` fills by child selection: `f` is `X`-free, so
-/// no order enters its cofactors and the entry is a pure function of its
-/// key. The two writers never meet at one key — `cof` asks about a block
-/// variable of a BDD-backed term, this site about a free variable outside the
-/// block. The table is a cache, absent in Debug builds, so nothing here
-/// depends on a hit.
+/// `(f, y)`, the table `cof` fills by child selection: one global order, so
+/// the entry is a pure function of its key. The two writers never meet at one
+/// key — `cof` asks about a block variable of a BDD-backed term, this site
+/// about a free variable outside the block. The table is a cache, absent in
+/// Debug builds, so nothing here depends on a hit.
 template <NodeType node>
-std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
-	const var_order<node>& order)
-{
+std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type, regime rg) {
 	using tau = tree<node>;
 	const cof_entry e = memoised<node, table::cof_memo>({ f, y }, [&] {
 		const tref key = tau::get(tau::bf, y);
 		const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
-			_0<node>(type), order, resimplify_argument<node>()), order);
+			_0<node>(type), resimplify_argument<node>()), rg);
 		const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
-			_1<node>(type), order, resimplify_argument<node>()), order);
-		return pin_from_cofactors<node>(f0, f1, y, order);
+			_1<node>(type), resimplify_argument<node>()), rg);
+		return pin_from_cofactors<node>(f0, f1, y, rg);
 	});
 	if (!e.pin) return {};
 	// The witness is the LOWER end `f₁′`: it carries the residual into
 	// every sibling's terms, where `p = 0` then folds syntactically (§3).
-	const tref witness = simplify_term<node>(build_bf_neg<node>(e.f1), order);
+	const tref witness = simplify_term<node>(build_bf_neg<node>(e.f1), rg);
 	return pin<node>{ y, witness, tau::get(e.p).equals_0() };
 }
 
@@ -125,9 +122,7 @@ std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 // --- the one pin recipe ----------------------------------------------------------
 
 template <NodeType node>
-cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
-	const var_order<node>& order)
-{
+cof_entry pin_from_cofactors(tref f0, tref f1, tref y, regime rg) {
 	using tau = tree<node>;
 	cof_entry e{ f0, f1, nullptr, false, false };
 	// `usable`: `y` gone from both cofactors. Where it is not, `y` still
@@ -138,18 +133,16 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
 	e.usable = true;
 	// Boole's expansion puts the zeros of the term at `f₀ ≤ y ≤ f₁′`, an
 	// interval that `f₀ ∪ f₁ = 1` collapses to a point.
-	e.pin = tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), order))
+	e.pin = tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), rg))
 		.equals_1();
 	// `p` is the pin's own residual equation; a non-pin reads none of it.
-	if (e.pin) e.p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
+	if (e.pin) e.p = simplify_term<node>(build_bf_and<node>(f0, f1), rg);
 	return e;
 }
 
 template <NodeType node>
-std::optional<pin<node>> find_pin(tref atom, const block& X,
-	const var_order<node>& order)
-{
-	const tref f = detail::pin_term<node>(atom, X, order);
+std::optional<pin<node>> find_pin(tref atom, const block& X, regime rg) {
+	const tref f = detail::pin_term<node>(atom, X);
 	if (f == nullptr) return {};
 	const size_t type = find_ba_type<node>(f);
 	// By value: the loop builds nodes, and a reference into
@@ -159,7 +152,7 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 	size_t best_size = 0;
 	for (tref y : vars) {
 		std::optional<pin<node>> p =
-			detail::pin_of_var<node>(f, y, type, order);
+			detail::pin_of_var<node>(f, y, type, rg);
 		if (!p) continue;
 		// A STRICT pin ends the scan: §3 takes one without comparing
 		// witnesses.
@@ -172,19 +165,17 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 }
 
 template <NodeType node>
-std::optional<pin<node>> find_pin_for(tref atom, tref x,
-	const var_order<node>& order)
-{
+std::optional<pin<node>> find_pin_for(tref atom, tref x, regime rg) {
 	// A term built from the atom holds no variable the atom lacks.
 	if (!detail::free_in<node>(atom, x)) return {};
 	// The block is empty here (simplify.h): phase 2 has none, and a later
 	// caller hands in an atom its own guard already found `X`-free.
-	const tref f = detail::pin_term<node>(atom, {}, order);
+	const tref f = detail::pin_term<node>(atom, {});
 	if (f == nullptr) return {};
 	// `find_pin` asks only about free variables, so the per-variable half
 	// may assume it; a variable that does not occur is no pin of the atom.
 	if (!detail::free_in<node>(f, x)) return {};
-	return detail::pin_of_var<node>(f, x, find_ba_type<node>(f), order);
+	return detail::pin_of_var<node>(f, x, find_ba_type<node>(f), rg);
 }
 
 namespace detail {
@@ -209,8 +200,8 @@ template <NodeType node>
 struct propagation {
 	using tau = tree<node>;
 
-	propagation(const var_order<node>& order, const block& X, bool ref_args)
-		: order(order), X(X), ref_args(ref_args) {}
+	propagation(regime rg, const block& X, bool ref_args)
+		: rg(rg), X(X), ref_args(ref_args) {}
 
 	tref run(tref phi) {
 		auto f = [this](tref n) { return down(n); };
@@ -297,7 +288,7 @@ private:
 		subtree_pair_hash<node, size_t>,
 		subtree_pair_equal<node, size_t>>;
 
-	const var_order<node>& order;
+	const regime rg;
 	const block& X;
 	const bool ref_args;
 
@@ -337,11 +328,11 @@ private:
 	tref rewrite_under(const environment& e, tref a) {
 		const tref bare = tau::trim_right_sibling(a);
 		tref res = e.changes.empty() ? bare
-			: tau::get(bare).substitute(e.changes, order,
+			: tau::get(bare).substitute(e.changes,
 				resimplify_argument<node>());
 		if (ref_args) res = simplify_reference_arguments(res);
 		if (res != bare || ref_args)
-			return simplify_atom<node>(res, order);
+			return simplify_atom<node>(res, rg);
 		return bare;
 	}
 
@@ -402,7 +393,7 @@ private:
 			if (!t.is(tau::ref_arg)) return m;
 			const tref a = t.first();
 			if (!tau::get(a).is(tau::bf)) return m;
-			const tref s = simplify_term<node>(a, order);
+			const tref s = simplify_term<node>(a, rg);
 			return s == a ? m : tau::get(t.value, s);
 		};
 		return post_order<node>(n).apply_unique(f);
@@ -414,7 +405,7 @@ private:
 		if (auto it = pin_memo.find(atom); it != pin_memo.end())
 			return it->second;
 		return pin_memo.emplace(atom,
-			find_pin<node>(atom, X, order)).first->second;
+			find_pin<node>(atom, X, rg)).first->second;
 	}
 
 	/**
@@ -448,8 +439,8 @@ private:
 		// environment stays idempotent.
 		tref w = p->witness;
 		if (!e.changes.empty()) w = simplify_term<node>(
-			tau::get(w).substitute(e.changes, order,
-				resimplify_argument<node>()), order);
+			tau::get(w).substitute(e.changes,
+				resimplify_argument<node>()), rg);
 		// and every range in force rewritten by the new pin.
 		subtree_map<node, tref> one;
 		one.emplace(key, w);
@@ -458,10 +449,10 @@ private:
 		for (size_t i = 0; i < e.pins.size(); ++i) {
 			tref r = e.pins[i].witness;
 			if (e.pins[i].active) {
-				r = tau::get(r).substitute(one, order,
+				r = tau::get(r).substitute(one,
 					resimplify_argument<node>());
 				if (r != e.pins[i].witness)
-					r = simplify_term<node>(r, order);
+					r = simplify_term<node>(r, rg);
 			}
 			if (r == e.pins[i].witness) {
 				new_witness_sum += e.pins[i].size;
@@ -476,7 +467,7 @@ private:
 		// the match goes on to the next candidate. Precision, never
 		// soundness.
 		const size_t new_atom_sum = e.atom_sum
-			+ mem_size<node>(term_of<node>(atom, order));
+			+ mem_size<node>(term_of<node>(atom));
 		if (new_witness_sum > propagate_growth * new_atom_sum) return {};
 		for (const auto& [i, r] : rewritten) {
 			if (rec) rec->push_back({ i, false, e.pins[i].witness,
@@ -727,14 +718,12 @@ private:
 } // namespace detail
 
 template <NodeType node>
-tref simplify(tref phi, const var_order<node>& order, const block& X,
-	bool ref_args)
-{
+tref simplify(tref phi, regime rg, const block& X, bool ref_args) {
 	DBG(assert(phi != nullptr);)
 	// A term input has nothing to propagate — the traversal's continuation
 	// predicate stops on it and hands it back — and goes straight to the
 	// sweep.
-	const tref propagated = detail::propagation<node>(order, X, ref_args)
+	const tref propagated = detail::propagation<node>(rg, X, ref_args)
 		.run(phi);
 	return syntactic_path_simplification_unchanged_negations<node>(
 		propagated);

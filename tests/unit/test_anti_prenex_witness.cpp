@@ -6,10 +6,10 @@
 // §1's `case_max`.
 //
 // The suite `anti_prenex/witness` runs in the PLAIN regime — phase 2 has no
-// block, no live order and nothing BDD-backed — which is exactly what the
-// spelled mode assumes. The suite `anti_prenex/witness-cof` runs the COF mode
-// instead: a block, the component's ctx and its order, and `prepare_terms`
-// over the conjunction, the production spelling of phase 4. A BDD-backed term
+// block and nothing BDD-backed — which is exactly what the spelled mode
+// assumes. The suite `anti_prenex/witness-cof` runs the COF mode instead: a
+// block, the component's ctx, and `prepare_terms` over the conjunction, the
+// production spelling of phase 4. A BDD-backed term
 // is never compared by `to_str()`: semantic equality is `same_function`, and
 // a formula is finished with `convert_to_tau_terms` before the oracle reads
 // it.
@@ -108,7 +108,7 @@ struct component {
 	tref psi;
 	component(const ap::block& block, tref body)
 		: P(block), c(ap::ctx<node_t>::for_component(block, 0, false)),
-		psi(ap::prepare_terms<node_t>(body, block, c.order)) {}
+		psi(ap::prepare_terms<node_t>(body)) {}
 };
 
 /// The `l = r` sides of an atom, through no negation.
@@ -120,14 +120,11 @@ std::pair<tref, tref> sides(tref atom) {
 		tau::trim_right_sibling(t[0].second()) };
 }
 
-/// Semantic equality of two terms over the variables `vs`: equal ROBDDs under
-/// one order over all of them (leaves opaque), both finished first.
-bool same_function(tref a, tref b, const ap::block& vs) {
-	ap::var_order<node_t> o;
-	for (size_t i = 0; i < vs.size(); ++i)
-		o.emplace(vs[i], int_t(vs.size() - i));
-	return tb::build_bdd(th::convert_to_tau_terms(a), o)
-		== tb::build_bdd(th::convert_to_tau_terms(b), o);
+/// Semantic equality of two terms: equal ROBDDs (leaves opaque), both
+/// finished first.
+bool same_function(tref a, tref b) {
+	return tb::build_bdd(th::convert_to_tau_terms(a))
+		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
 /// The formula with every stored BDD spelled out, which is what the oracle
@@ -512,8 +509,7 @@ TEST_CASE("WC1: a strict pin is witnessed in every conjunct") {
 	// the pinning conjunct's image is `p = 0`, which a STRICT pin folds to
 	// `T`, so the sibling `t ∪ a = 0` is all that is left
 	REQUIRE(is_child<node_t>(*r, tau::bf_eq));
-	CHECK(same_function(sides(*r).first, lor(bvar("t"), bvar("a")),
-		{ fvar("t"), fvar("a") }));
+	CHECK(same_function(sides(*r).first, lor(bvar("t"), bvar("a"))));
 	CHECK(tau::get(sides(*r).second).equals_0());
 	CHECK(are_nso_equivalent<node_t>(finished(*r), ex("x", finished(k.psi))));
 }
@@ -536,7 +532,7 @@ TEST_CASE("WC2: the WEAK pin's conjunct carries its residual") {
 	const tref image = member_without(*r, "b");
 	REQUIRE(image != nullptr);
 	REQUIRE(is_child<node_t>(image, tau::bf_eq));
-	CHECK(same_function(sides(image).first, G, { fvar("c"), fvar("d") }));
+	CHECK(same_function(sides(image).first, G));
 	CHECK(tau::get(sides(image).second).equals_0());
 }
 
@@ -555,8 +551,7 @@ TEST_CASE("WC3: a strict pin comes first, then the smallest witness") {
 		REQUIRE(r.has_value());
 		CHECK(!holds_var(*r, "x"));
 		REQUIRE(is_child<node_t>(*r, tau::bf_eq));
-		CHECK(same_function(sides(*r).first, lor(bvar("b"), bvar("a")),
-			{ fvar("a"), fvar("b") }));
+		CHECK(same_function(sides(*r).first, lor(bvar("b"), bvar("a"))));
 		CHECK(are_nso_equivalent<node_t>(finished(*r),
 			ex("x", finished(k.psi))));
 	}
@@ -573,7 +568,7 @@ TEST_CASE("WC3: a strict pin comes first, then the smallest witness") {
 	const tref residual = member_without(*r, "t");
 	REQUIRE(residual != nullptr);
 	REQUIRE(is_child<node_t>(residual, tau::bf_eq));
-	CHECK(same_function(sides(residual).first, bvar("a"), { fvar("a") }));
+	CHECK(same_function(sides(residual).first, bvar("a")));
 }
 
 TEST_CASE("WC4: a negated equation pins nothing in the ∃ sense") {
@@ -616,7 +611,7 @@ TEST_CASE("WC6: the result stays BDD-backed over the rest of the block, and "
 	REQUIRE(is_child<node_t>(*r, tau::bf_eq));
 	CHECK(th::is_bdd_backed(sides(*r).first));
 	// SIMPLIFIED here (invariant 6): simplifying again changes nothing.
-	CHECK(ap::simplify<node_t>(*r, k.c.order, k.c.P) == *r);
+	CHECK(ap::simplify<node_t>(*r, ap::regime::backed, k.c.P) == *r);
 	CHECK(are_nso_equivalent<node_t>(finished(*r), ex("x", finished(k.psi))));
 }
 
@@ -640,14 +635,13 @@ TEST_CASE("WC7: the guarded-assignment match, its branches and its rest") {
 	REQUIRE(cases != nullptr);
 	const trefs bs = ap::members<node_t>(cases);
 	REQUIRE(bs.size() == 2);
-	const ap::block ts{ fvar("t1"), fvar("t2") };
 	for (const auto& [branch, witness] : r->branches) {
 		CHECK((same(branch, bs[0]) || same(branch, bs[1])));
-		CHECK((same_function(witness, bvar("t1"), ts)
-			|| same_function(witness, bvar("t2"), ts)));
+		CHECK((same_function(witness, bvar("t1"))
+			|| same_function(witness, bvar("t2"))));
 	}
 	CHECK(!same(r->branches[0].first, r->branches[1].first));
-	CHECK(!same_function(r->branches[0].second, r->branches[1].second, ts));
+	CHECK(!same_function(r->branches[0].second, r->branches[1].second));
 	// `rest` is ψ without the case pin, and nothing about `x` is decided
 	// here: this function only MATCHES.
 	CHECK(same(r->rest, kept));
@@ -723,15 +717,15 @@ TEST_CASE("WC11: the pin test on one equation gives the witness and its "
 	// `1`, so `x` is pinned; the witness is `f₁′ = t` and the residual
 	// `t·t′` folds to `0`, so the pin is STRICT.
 	component k({ x }, eq(bvar("x"), bvar("t")));
-	const auto p = ap::cof_pin<node_t>(k.psi, x, k.c);
+	const auto p = ap::cof_pin<node_t>(k.psi, x);
 	REQUIRE(p.has_value());
 	CHECK(same(p->var, x));
-	CHECK(same_function(p->witness, bvar("t"), { fvar("t") }));
+	CHECK(same_function(p->witness, bvar("t")));
 	CHECK(p->strict);
 	// `x ∪ a = 0`: the cofactors `a` and `1` pin `x` WEAKLY — the witness
 	// is `1′ = 0` and the residual `a` is no constant.
 	component w({ x }, eq0(lor(bvar("x"), bvar("a"))));
-	const auto q = ap::cof_pin<node_t>(w.psi, x, w.c);
+	const auto q = ap::cof_pin<node_t>(w.psi, x);
 	REQUIRE(q.has_value());
 	CHECK(tau::get(q->witness).equals_0());
 	CHECK(!q->strict);
@@ -742,13 +736,13 @@ TEST_CASE("WC12: the pin test on one conjunct answers nullopt for anything "
 	tref x = fvar("x");
 	// `x·b` has the cofactors `0` and `b`, whose union is not `1`.
 	component k({ x }, eq0(land(bvar("x"), bvar("b"))));
-	CHECK(!ap::cof_pin<node_t>(k.psi, x, k.c).has_value());
+	CHECK(!ap::cof_pin<node_t>(k.psi, x).has_value());
 	// An equation under `¬` pins nothing in the ∃ sense, and a term that
 	// does not mention `x` is not asked.
 	component n({ x }, neg(eq(bvar("x"), bvar("t"))));
-	CHECK(!ap::cof_pin<node_t>(n.psi, x, n.c).has_value());
+	CHECK(!ap::cof_pin<node_t>(n.psi, x).has_value());
 	component f({ x }, eq(bvar("a"), bvar("t")));
-	CHECK(!ap::cof_pin<node_t>(f.psi, x, f.c).has_value());
+	CHECK(!ap::cof_pin<node_t>(f.psi, x).has_value());
 }
 
 TEST_CASE("WC13: every atom the witness rewrote is simplified, so a strict "
@@ -762,7 +756,7 @@ TEST_CASE("WC13: every atom the witness rewrote is simplified, so a strict "
 	const tref A2 = lor(land(b, lneg(a)), land(a, lneg(b)));
 	const tref pin = eq0(lor(land(x, A), land(lneg(x), A2)));
 	component k({ fvar("x") }, pin);
-	const tref psi = ap::simplify_atom<node_t>(k.psi, k.c.order);
+	const tref psi = ap::simplify_atom<node_t>(k.psi, ap::regime::backed);
 	auto r = ap::try_witness<node_t>(fvar("x"), psi, k.c);
 	REQUIRE(r.has_value());
 	CHECK(tau::get(*r).equals_T());

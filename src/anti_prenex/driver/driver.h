@@ -46,7 +46,8 @@ template <NodeType node>
 run<node> collect_run(tref h);
 
 /**
- * @brief §4 `PROCESS_ALL_BLOCKS(φ, kf)`: the pass — every run collected, its
+ * @brief §4 `PROCESS_ALL_BLOCKS(φ, kf)`: the binder ids canonicalised
+ * (`CANONICALISE_BINDER_IDS`, §3), then the pass — every run collected, its
  * matrix processed FIRST, then the run eliminated over that final matrix
  * (§5), and the result folded into its context through the result joins
  * (invariant 6).
@@ -62,9 +63,8 @@ run<node> collect_run(tref h);
  * because a head's result is a pure function of the head and of @p kf.
  *
  * @p kf is the caller's callback (§1), handed to every block unchanged.
- * A formula holding no formula binder comes back AS THE SAME NODE: every step
- * of the pass is then the identity or a re-join of an already canonical
- * chain.
+ * A formula holding no binder comes back AS THE SAME NODE: every step of the
+ * pass is then the identity or a re-join of an already canonical chain.
  */
 template <NodeType node>
 tref process_all_blocks(tref phi, const keep_functional_fn<node>& kf);

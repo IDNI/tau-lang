@@ -55,7 +55,6 @@ namespace {
 
 using tb      = tau_term_bdd<node_t>;
 using th      = term_handle<node_t>;
-using order_t = ap::var_order<node_t>;
 
 // --- mirrored from tests/unit/test_anti_prenex_terms.cpp ----------------------
 
@@ -69,30 +68,22 @@ tref wff(const char* s) {
 	REQUIRE(t != nullptr);
 	return t;
 }
-/// The trimmed `variable` node of a one-variable term — the shape order keys,
+/// The trimmed `variable` node of a one-variable term — the shape
 /// blocks and free-variable sets hold.
 tref vr(const char* s) { return tau::trim(bf(s)); }
 
-/// §5's order for a block, built the way PUSH_EX_BLOCK builds it (package E):
-/// the integration test's replacement for the terms test's local `order_of`.
-order_t order_for(const ap::block& P) {
-	return ap::ctx<node_t>::for_component(P, 0, false).order;
-}
-
-/// The BDD ref of a term under `o` (a BDD-backed term's own ref).
-tb::ref ref_of(tref t, const order_t& o) {
+/// The BDD ref of a term (a BDD-backed term's own ref).
+tb::ref ref_of(tref t) {
 	if (th::is_bdd_backed(t))
 		return th::U.find(th::key_of(t))->second.get();
-	return tb::build_bdd(t, o);
+	return tb::build_bdd(t);
 }
 
-/// Semantic equality of two terms over the variables `vs`: equal ROBDDs
-/// under one order over all of them (leaves opaque). Both are finished
-/// first, since a BDD-backed term's own ref belongs to its own order.
-bool same_function(tref a, tref b, const ap::block& vs) {
-	order_t o = order_for(vs);
-	return tb::build_bdd(th::convert_to_tau_terms(a), o)
-		== tb::build_bdd(th::convert_to_tau_terms(b), o);
+/// Semantic equality of two terms: equal ROBDDs (leaves opaque), both
+/// finished first.
+bool same_function(tref a, tref b) {
+	return tb::build_bdd(th::convert_to_tau_terms(a))
+		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
 /// The two sides of an `l = r` atom, trimmed.
@@ -271,7 +262,7 @@ TEST_CASE("FV: right on module-built nodes, by reference, stable across construc
 
 // --- §5's setup across packages: parsed binders → ctx → prepare_terms ---------------
 
-TEST_CASE("a parsed block through ctx into prepare_terms: inner on top, |·| and FV across D2, ids kept") {
+TEST_CASE("a parsed block into prepare_terms: free variables on top, binders outermost first, |·| and FV across D2, ids kept") {
 	tref outer = wff("ex x ex y (x & y & a = 0 && x & b = 0 && c = 0)");
 	REQUIRE(is_child_quantifier<node_t>(outer));
 	// The block read off the binders, outermost first (§1), in the spelling
@@ -281,37 +272,34 @@ TEST_CASE("a parsed block through ctx into prepare_terms: inner on top, |·| and
 	tref y = ap::binder_var<node_t>(inner);
 	tref body = ap::binder_body<node_t>(inner);
 	ap::block P{ x, y };
-	auto c = ap::ctx<node_t>::for_component(P, find_ba_type<node_t>(bf("a")), false);
-	// E's order accepts that spelling and the trimmed one alike: the map is
-	// content-keyed (tau_bdd.h), so B's lookups by the term's own variable
-	// nodes hit. Inner → LOWER rank (§5).
-	CHECK(c.order.contains(x));
-	CHECK(c.order.contains(tau::trim_right_sibling(x)));
-	CHECK(c.order.at(x) == 2);
-	CHECK(c.order.at(y) == 1);
-	tref prepared = ap::prepare_terms<node_t>(body, P, c.order);
+	tref prepared = ap::prepare_terms<node_t>(body);
 	CHECK(prepared != body);
 	REQUIRE(ap::members<node_t>(prepared).size() == 3);
-	// The atom touching both: y (inner, rank 1) on top, x below it.
+	// The atom touching both: the free `a` on top, then the binders
+	// outermost first, x above y (§1's global order).
 	tref both = member_touching(prepared, { x, y }, {});
 	REQUIRE(both != nullptr);
 	tref l0 = sides(both).first;
 	REQUIRE(th::is_bdd_backed(l0));
-	tb::ref f0 = ref_of(l0, c.order);
+	tb::ref f0 = ref_of(l0);
 	REQUIRE(!tb::leaf(f0));
-	CHECK(same(tb::get_var(f0), y));
-	CHECK(same(tb::get_var(tb::get_high(f0)), x));
-	// The atom touching x alone: x on top.
+	CHECK(get_var_name<node_t>(tb::get_var(f0)) == "a");
+	tb::ref f0x = tb::get_high(f0);
+	REQUIRE(!tb::leaf(f0x));
+	CHECK(same(tb::get_var(f0x), x));
+	CHECK(same(tb::get_var(tb::get_high(f0x)), y));
+	// The atom touching x alone: the free `b` on top, x below it.
 	tref only_x = member_touching(prepared, { x }, { y });
 	REQUIRE(only_x != nullptr);
 	tref l1 = sides(only_x).first;
 	REQUIRE(th::is_bdd_backed(l1));
-	CHECK(same(tb::get_var(ref_of(l1, c.order)), x));
-	// The P-free atom: untouched, by content the parsed node.
+	CHECK(get_var_name<node_t>(tb::get_var(ref_of(l1))) == "b");
+	CHECK(same(tb::get_var(tb::get_high(ref_of(l1))), x));
+	// The P-free atom: backed as well, as every side holding a variable is.
 	tref free = member_touching(prepared, {}, P);
 	REQUIRE(free != nullptr);
-	CHECK(same(free, wff("c = 0")));
-	CHECK(!has_bdd_id(free));
+	CHECK(has_bdd_id(free));
+	CHECK(same_function(sides(free).first, bf("c")));
 	// |·| and FV are invariant across D2's boundary: an atom counts 1
 	// whatever its terms, and `get_free_vars` reads the BDD leaves and decision
 	// variables alike.
@@ -334,43 +322,43 @@ TEST_CASE("a parsed block through ctx into prepare_terms: inner on top, |·| and
 	tref finished = th::convert_to_tau_terms(r);
 	CHECK(!has_bdd_id(finished));
 	CHECK(finished == ap::rewrap<node_t>(th::convert_to_tau_terms(prepared), P));
-	CHECK(ap::prepare_terms<node_t>(th::convert_to_tau_terms(prepared), P, c.order)
+	CHECK(ap::prepare_terms<node_t>(th::convert_to_tau_terms(prepared))
 		== prepared);
 	CHECK(ap::canonicalise_binder_ids<node_t>(finished) == finished);
 }
 
 // --- claim 2: cofactors are children ------------------------------------------------
 
-TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain and leaves the P-touching set") {
-	tref x = vr("x"), y = vr("y"), a = vr("a"), b = vr("b");
+TEST_CASE("cofactors under the global order are children; a P-free cofactor leaves the P-touching set") {
+	tref x = vr("x"), y = vr("y"), a = vr("a");
 	ap::block P{ x, y };
-	order_t o = order_for(P);
-	tref atom = ap::prepare_terms<node_t>(wff("x & y & a | x' & b = 0"), P, o);
+	tref atom = ap::prepare_terms<node_t>(wff("x & y & a | x' & b = 0"));
 	tref l = sides(atom).first;
 	REQUIRE(th::is_bdd_backed(l));
-	tb::ref f = ref_of(l, o);
+	tb::ref f = ref_of(l);
 	REQUIRE(!tb::leaf(f));
-	REQUIRE(same(tb::get_var(f), y));                   // inner on top
+	REQUIRE(same(tb::get_var(f), a));                   // by name: a on top
 	// The top variable: child selection.
-	tref fy1 = ap::cofactor<node_t>(l, y, true, o);
-	tref fy0 = ap::cofactor<node_t>(l, y, false, o);
-	CHECK(ref_of(fy1, o) == tb::get_high(f));
-	CHECK(ref_of(fy0, o) == tb::get_low(f));
+	tref fa1 = ap::cofactor<node_t>(l, a, true);
+	tref fa0 = ap::cofactor<node_t>(l, a, false);
+	CHECK(ref_of(fa1) == tb::get_high(f));
+	CHECK(ref_of(fa0) == tb::get_low(f));
+	tref fy1 = ap::cofactor<node_t>(l, y, true);
+	tref fy0 = ap::cofactor<node_t>(l, y, false);
 	// Below the top: the nodes above x are rebuilt, and the emitted term
 	// reads back as the library's cofactor (`bdd_compose` on a terminal
 	// delegates to it).
-	tref fx1 = ap::cofactor<node_t>(l, x, true, o);
-	tref fx0 = ap::cofactor<node_t>(l, x, false, o);
-	CHECK(ref_of(fx1, o) == tb::bdd_compose(f, x, tb::T, o));
-	CHECK(ref_of(fx0, o) == tb::bdd_compose(f, x, tb::F, o));
+	tref fx1 = ap::cofactor<node_t>(l, x, true);
+	tref fx0 = ap::cofactor<node_t>(l, x, false);
+	CHECK(ref_of(fx1) == tb::bdd_compose(f, x, tb::T));
+	CHECK(ref_of(fx0) == tb::bdd_compose(f, x, tb::F));
 	// Child selection commutes: the same node either way round.
-	CHECK(ap::cofactor<node_t>(fy1, x, true, o) == ap::cofactor<node_t>(fx1, y, true, o));
-	CHECK(ap::cofactor<node_t>(fy0, x, false, o) == ap::cofactor<node_t>(fx0, y, false, o));
-	// Fully cofactored: plain, and the atom over it is out of the P-touching
+	CHECK(ap::cofactor<node_t>(fy1, x, true) == ap::cofactor<node_t>(fx1, y, true));
+	CHECK(ap::cofactor<node_t>(fy0, x, false) == ap::cofactor<node_t>(fx0, y, false));
+	// Fully cofactored over P: the atom over it is out of the P-touching
 	// set (§5's `dep` selection) while still counting 1.
-	tref g = ap::cofactor<node_t>(fy1, x, true, o);      // x = y = 1: a
-	CHECK(!th::is_bdd_backed(g));
-	CHECK(same(g, bf("a")));
+	tref g = ap::cofactor<node_t>(fy1, x, true);      // x = y = 1: a
+	CHECK(same_function(g, bf("a")));
 	tref ga = build_bf_eq_0<node_t>(g);
 	CHECK(ap::formula_size<node_t>(ga) == 1);
 	CHECK(!ap::fv_meets<node_t>(ga, P));
@@ -382,7 +370,7 @@ TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain 
 	CHECK(ap::fv_meets<node_t>(hb, P));
 	CHECK(ap::fv_meets<node_t>(hb, { x }));
 	CHECK(!ap::fv_meets<node_t>(hb, { y }));
-	CHECK(same_function(fy1, bf("x & a | x' & b"), { x, a, b }));
+	CHECK(same_function(fy1, bf("x & a | x' & b")));
 	// The §1 classification is invariant across D2's boundary.
 	CHECK(is_atomic_fm<node_t>(atom));
 	CHECK(is_child<node_t>(atom, tau::bf_eq));
@@ -391,7 +379,7 @@ TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain 
 	CHECK(!is_child<node_t>(atom, tau::wff_or));
 	CHECK(ap::is_negated_equation<node_t>(neg(atom)));
 	CHECK(ap::is_literal<node_t>(neg(atom)));
-	tref other = ap::prepare_terms<node_t>(wff("x & b = 0"), P, o);
+	tref other = ap::prepare_terms<node_t>(wff("x & b = 0"));
 	tref tree = ap::canonical_or<node_t>(trefs{ neg(atom), neg(other) });
 	CHECK(ap::is_negative_tree<node_t>(tree));
 	CHECK(ap::is_flat_tree<node_t>(tree));
@@ -406,10 +394,8 @@ TEST_CASE("cof_memo: one row for the trimmed and the untrimmed spelling of a BDD
 	// halves are hashed by content (ctx.h `tref_pair_hash`), so the spelling
 	// a caller reads off an atom or a binder — carrying a right sibling —
 	// lands on the row the trimmed spelling wrote.
-	tref x = vr("x"), y = vr("y"), a = vr("a");
-	ap::block P{ x, y };
-	order_t o = order_for(P);
-	tref atom = ap::prepare_terms<node_t>(wff("x & y & a = 0"), P, o);
+	tref x = vr("x"), y = vr("y");
+	tref atom = ap::prepare_terms<node_t>(wff("x & y & a = 0"));
 	tref l = sides(atom).first;                          // trimmed
 	tref l_in_place = tau::get(atom)[0].first();         // carries the right side
 	REQUIRE(th::is_bdd_backed(l));
@@ -421,8 +407,8 @@ TEST_CASE("cof_memo: one row for the trimmed and the untrimmed spelling of a BDD
 	size_t calls = 0;
 	auto compute = [&] {
 		++calls;
-		return ap::cof_entry{ ap::cofactor<node_t>(l, x, false, o),
-			ap::cofactor<node_t>(l, x, true, o), nullptr, true, false };
+		return ap::cof_entry{ ap::cofactor<node_t>(l, x, false),
+			ap::cofactor<node_t>(l, x, true), nullptr, true, false };
 	};
 	ap::cof_entry e1 = ap::memoised<node_t, ap::table::cof_memo>({ l, x }, compute);
 	CHECK(calls == 1);
@@ -435,7 +421,7 @@ TEST_CASE("cof_memo: one row for the trimmed and the untrimmed spelling of a BDD
 	ap::memoised<node_t, ap::table::cof_memo>({ l, y }, compute);
 	CHECK(calls == 2);
 	// And the row holds the children (claim 2 through the table).
-	CHECK(same_function(e1.f1, bf("y & a"), { y, a }));
+	CHECK(same_function(e1.f1, bf("y & a")));
 	CHECK(!th::is_bdd_backed(e1.f0));
 }
 #endif // TAU_CACHE
@@ -471,14 +457,14 @@ TEST_CASE("rewrap over fv_intersect is the D3 key; fold cleans a re-wrapped lost
 TEST_CASE("canonical chains over prepared atoms and a unit: one node, members as a set, facets composed") {
 	tref x = vr("x");
 	ap::block P{ x };
-	order_t o = order_for(P);
-	tref A = ap::prepare_terms<node_t>(wff("x & a = 0"), P, o);
-	tref B = ap::prepare_terms<node_t>(wff("x & b = 0"), P, o);
+	tref A = ap::prepare_terms<node_t>(wff("x & a = 0"));
+	tref B = ap::prepare_terms<node_t>(wff("x & b = 0"));
 	tref U = wff("ex y (x & y = 0)");                     // a unit: opaque to prepare_terms
-	tref C = wff("c = 0");
+	// x-free, and backed all the same
+	tref C = ap::prepare_terms<node_t>(wff("c = 0"));
 	REQUIRE(th::is_bdd_backed(sides(A).first));
 	REQUIRE(th::is_bdd_backed(sides(B).first));
-	CHECK(ap::prepare_terms<node_t>(U, P, o) == U);
+	CHECK(ap::prepare_terms<node_t>(U) == U);
 	tref chain = ap::canonical_and<node_t>(trefs{ A, U, C, B });
 	CHECK(chain == ap::canonical_and<node_t>(trefs{ B, C, U, A }));
 	CHECK(chain == ap::canonical_and<node_t>(trefs{ A, A, U, C, B, U }));
@@ -496,13 +482,13 @@ TEST_CASE("canonical chains over prepared atoms and a unit: one node, members as
 	CHECK(!ap::is_negative_tree<node_t>(ap::canonical_or<node_t>(trefs{ neg(A), U })));
 	tref nested = ap::canonical_or<node_t>(trefs{
 		ap::canonical_and<node_t>(trefs{ neg(A), neg(B) }),
-		neg(ap::prepare_terms<node_t>(wff("x & c = 0"), P, o)) });
+		neg(ap::prepare_terms<node_t>(wff("x & c = 0"))) });
 	CHECK(ap::is_negative_tree<node_t>(nested));
 	CHECK(!ap::is_flat_tree<node_t>(nested));
 	// The component closes and re-opens on the same chain node.
 	tref fin = th::convert_to_tau_terms(chain);
 	CHECK(!has_bdd_id(fin));
-	CHECK(ap::prepare_terms<node_t>(fin, P, o) == chain);
+	CHECK(ap::prepare_terms<node_t>(fin) == chain);
 }
 
 // --- claim 3: package C and the module's call of the library substitution ------------------
@@ -555,8 +541,8 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	// §1/§4: substitution is the one rewrite that reaches inside a
 	// reference; every argument it touches is re-emitted through the hook,
 	// once per touched argument. This is the
-	// MODULE's call of `tree<node>::substitute`: the live order and
-	// a hook that sends a `bf` argument to SIMPLIFY_TERM. A `wff` argument
+	// MODULE's call of `tree<node>::substitute`: a hook that sends a `bf`
+	// argument to SIMPLIFY_TERM. A `wff` argument
 	// gets the identity here because SIMPLIFY is layer 1 and does not
 	// exist yet; layer 1 replaces that identity by SIMPLIFY.
 	auto resimplify = [](tref a) {
@@ -565,7 +551,7 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	tref x = vr("x"), z = vr("z");
 	tref phi = wff("f(x) && x & u1 = 0");
 	REQUIRE(ap::members<node_t>(phi).size() == 2);
-	tref res = tau::get(phi).substitute(bf("x"), bf("z"), {}, resimplify);
+	tref res = tau::get(phi).substitute(bf("x"), bf("z"), resimplify);
 	CHECK(res != phi);
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
 	CHECK(ap::fv_meets<node_t>(res, { z }));
@@ -575,18 +561,18 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	// is SIMPLIFY_TERM's own output (per-path contradiction, u1′ under
 	// u1), the function u1·u2, the symbol untouched.
 	tref t2 = bf("u1 & (u1' | u2)");
-	tref res2 = tau::get(phi).substitute(bf("x"), t2, {}, resimplify);
+	tref res2 = tau::get(phi).substitute(bf("x"), t2, resimplify);
 	tref ref2 = member_where(res2, is_child<node_t, tau::wff_ref>);
 	REQUIRE(ref2 != nullptr);
 	tref arg2 = find_kind(ref2, tau::ref_arg);
 	REQUIRE(arg2 != nullptr);
 	tref a2 = tau::trim_right_sibling(tau::get(arg2).first());
 	CHECK(same(a2, ap::simplify_term<node_t>(t2)));
-	CHECK(same_function(a2, bf("u1 & u2"), { vr("u1"), vr("u2") }));
+	CHECK(same_function(a2, bf("u1 & u2")));
 	CHECK(find_kind(a2, tau::bf_neg) == nullptr);
 	CHECK(same(find_kind(ref2, tau::sym), find_kind(phi, tau::sym)));
 	// A reference whose arguments do not hold the variable is the same node.
-	CHECK(tau::get(wff("f(u1)")).substitute(bf("x"), bf("z"), {}, resimplify)
+	CHECK(tau::get(wff("f(u1)")).substitute(bf("x"), bf("z"), resimplify)
 		== wff("f(u1)"));
 }
 
@@ -595,9 +581,8 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and their values") {
 	tref x = vr("x"), y = vr("y");
 	ap::block P{ x, y };
-	order_t o = order_for(P);
 	tref body = wff("x & y & a = 0 && b = 0");
-	tref prepared = ap::prepare_terms<node_t>(body, P, o);
+	tref prepared = ap::prepare_terms<node_t>(body);
 	tref r = ap::rewrap<node_t>(prepared, P);
 	const size_t sz = ap::formula_size<node_t>(r);
 	CHECK(sz == 5);
@@ -638,7 +623,7 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	tref l = sides(member_touching(ap::binder_body<node_t>(ap::binder_body<node_t>(r)), P, {})).first;
 	CHECK(th::key_of(l) == key_before);      // the same BDD_ID node, so the same entry
 	CHECK(th::is_bdd_backed(l));
-	CHECK(ap::prepare_terms<node_t>(th::convert_to_tau_terms(prepared), P, o) == prepared);
+	CHECK(ap::prepare_terms<node_t>(th::convert_to_tau_terms(prepared)) == prepared);
 	CHECK(keep.get() != nullptr);
 }
 

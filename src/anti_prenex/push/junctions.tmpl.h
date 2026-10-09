@@ -87,8 +87,8 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		for (tref m : cs)
 			(fv_meets<node>(m, inc.settled) ? A : others)
 				.push_back(m);
-		// A SUB-BLOCK of the component, eliminated under the
-		// component's live order. Under `keep_functional` its emission
+		// A SUB-BLOCK of the component, eliminated like a block of
+		// its own. Under `keep_functional` its emission
 		// hides the variables of `X ∖ Xs` it carries (§7 `DISCHARGE`,
 		// §1 the leaf hazard), and they ride on as a dependent
 		// conjunct.
@@ -158,7 +158,7 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 			// (§3), and the copy is simplified where it is built.
 			const tref b = simplify<node>(subst_var<node>(
 				simplified_and_join<node>({ d, cw->rest }),
-				x, t, c.order), c.order, c.P);
+				x, t, regime::backed), regime::backed, c.P);
 			if (acc.insert(push_block<node>(b, rest_of_X, c)))
 				break;
 		}

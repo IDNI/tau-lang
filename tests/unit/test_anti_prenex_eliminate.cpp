@@ -139,7 +139,7 @@ fixture make(const char* src, bool keep = false) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), keep);
-	f.clause = ap::prepare_terms<node_t>(n, f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(n);
 	return f;
 }
 
@@ -373,25 +373,24 @@ TEST_CASE("E10: a reference freezes its component and nothing else") {
 TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 	// A settled sub-block's KEEP emission (§7 DISCHARGE) is a functional
 	// quantifier over a stored BDD, and the block variables that body
-	// still carries are HIDDEN from then on (§1 leaf hazard): under the
-	// live order the chain is ONE LEAF, so no cofactor reaches the `x`
-	// inside it and `DISCHARGE` would emit it free. The atom is therefore
-	// opaque, and its component is re-wrapped.
+	// still carries are HIDDEN from then on (§1 leaf hazard): the chain is
+	// ONE LEAF, so no cofactor reaches the `x` inside it and `DISCHARGE`
+	// would emit it free. The atom is therefore opaque, and its component
+	// is re-wrapped.
 	const tref x = tvar("x"), y = tvar("y"), z = tvar("z");
-	// The COMPONENT is `{x, y, z}` — the order's keys — while the block
-	// still being pushed is `{x, z}`: `y` is the settled sub-block, which
-	// the emission below has already quantified.
+	// The COMPONENT is `{x, y, z}` while the block still being pushed is
+	// `{x, z}`: `y` is the settled sub-block, which the emission below has
+	// already quantified.
 	const ap::block component{ x, y, z };
 	auto c = ap::ctx<node_t>::for_component(component,
 		tau_type_id<node_t>(), false);
 	const ap::block X{ x, z };
 	const tref body = sides(ap::prepare_terms<node_t>(
-		eq0(lor(tbf("x"), tbf("y"))), component, c.order)).first;
+		eq0(lor(tbf("x"), tbf("y"))))).first;
 	REQUIRE(th::is_bdd_backed(body));
-	// The constructor wraps a body holding a stored BDD and never folds
-	// it, so `x` stays inside, and under the live order the whole chain is
-	// one leaf: its subscript `y` is a key, and a chain binding a key is
-	// no decision variable of anything built from it.
+	// `x` stays free in the body, so the constructor wraps it rather than
+	// folding, and `x` stays inside: the whole chain is one leaf of
+	// anything built from it.
 	tb::quants qs;
 	qs.emplace_back(y, tb::all);
 	const tref emission = eq0(tb::build_functional_quantifiers(qs, body));
@@ -399,7 +398,7 @@ TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 
 	const tref clause = ap::prepare_terms<node_t>(
 		conj(emission, conj(eq0(land(tbf("x"), tbf("a"))),
-			eq0(land(tbf("z"), tbf("b"))))), component, c.order);
+			eq0(land(tbf("z"), tbf("b"))))));
 	const trefs conjuncts = ap::members<node_t>(clause);
 	REQUIRE(conjuncts.size() == 3);
 	// EXACTLY ONE conjunct is opaque, and it is the one holding the hidden
@@ -407,7 +406,7 @@ TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 	// variables, where cofactoring reaches them.
 	trefs opaque;
 	for (tref m : conjuncts)
-		if (ap::atomless_opaque<node_t>(m, X, c.order))
+		if (ap::atomless_opaque<node_t>(m, X))
 			opaque.push_back(m);
 	REQUIRE(opaque.size() == 1);
 	CHECK(ap::fv_meets<node_t>(opaque[0], ap::block{ x }));

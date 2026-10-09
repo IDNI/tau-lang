@@ -135,7 +135,7 @@ fixture make(const char* src) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), false);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 

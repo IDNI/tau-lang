@@ -42,25 +42,14 @@ TEST_SUITE("anti_prenex/foundations/ctx") {
 
 // --- ctx (§5 PUSH_EX_BLOCK's setup) ---------------------------------------------
 
-TEST_CASE("for_component: the two rank maps run opposite over 1..|P|") {
-	// §5: P[0] is the OUTERMOST variable; order ← {P[i] ↦ |P|-i} (inner →
-	// LOWER), prio ← {P[i] ↦ i+1} (inner → HIGHER).
+TEST_CASE("for_component: prio runs inner → higher over 1..|P|") {
+	// §5: P[0] is the OUTERMOST variable; prio ← {P[i] ↦ i+1}.
 	ap::block P{ mk_var("o1"), mk_var("o2"), mk_var("o3") };
 	auto c = ap::ctx<node_t>::for_component(P, 1, false);
-
-	CHECK(c.order.at(P[0]) == 3);
-	CHECK(c.order.at(P[1]) == 2);
-	CHECK(c.order.at(P[2]) == 1);
 
 	CHECK(c.prio.at(P[0]) == 1);
 	CHECK(c.prio.at(P[1]) == 2);
 	CHECK(c.prio.at(P[2]) == 3);
-
-	// The conventions are opposite, and each covers exactly 1..|P|.
-	for (size_t i = 0; i < P.size(); ++i)
-		CHECK(c.order.at(P[i]) + c.prio.at(P[i])
-			== static_cast<int_t>(P.size()) + 1);
-	CHECK(c.order.size() == P.size());
 	CHECK(c.prio.size() == P.size());
 }
 
@@ -75,7 +64,6 @@ TEST_CASE("for_component: type, keep_functional, empty block") {
 	CHECK(fresh.type == 0);
 
 	auto empty = ap::ctx<node_t>::for_component(ap::block{}, 0, false);
-	CHECK(empty.order.empty());
 	CHECK(empty.prio.empty());
 }
 

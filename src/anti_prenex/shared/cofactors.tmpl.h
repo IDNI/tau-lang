@@ -20,7 +20,7 @@
 namespace idni::tau_lang::anti_prenexing {
 
 template <NodeType node>
-cof_entry cof(tref f, tref x, ctx<node>& c) {
+cof_entry cof(tref f, tref x) {
 	// `x` free in `f`: `free_in` (simplify.tmpl.h) is the binary search
 	// over `get_free_vars`' sorted set, the cheapest form of the test.
 	DBG(assert(detail::free_in<node>(f, x) && "cof: x is not free in f");)
@@ -28,15 +28,16 @@ cof_entry cof(tref f, tref x, ctx<node>& c) {
 		// CHILD SELECTION, then `SIMPLIFY_TERM` (§6): `cofactor` is
 		// canonical over the decision variables but leaves the leaves
 		// alone, and the pin test compares terms syntactically.
-		const tref f0 = simplify_term<node>(
-			cofactor<node>(f, x, false, c.order), c.order);
-		const tref f1 = simplify_term<node>(
-			cofactor<node>(f, x, true, c.order), c.order);
-		cof_entry e = pin_from_cofactors<node>(f0, f1, x, c.order);
+		const tref f0 = simplify_term<node>(cofactor<node>(f, x, false),
+			regime::backed);
+		const tref f1 = simplify_term<node>(cofactor<node>(f, x, true),
+			regime::backed);
+		cof_entry e = pin_from_cofactors<node>(f0, f1, x, regime::backed);
 		// A non-pin's residual, left unbuilt there, is still part of the
 		// record this table promises for every usable entry.
 		if (e.usable && !e.pin)
-			e.p = simplify_term<node>(build_bf_and<node>(f0, f1), c.order);
+			e.p = simplify_term<node>(build_bf_and<node>(f0, f1),
+				regime::backed);
 		return e;
 	});
 }
@@ -48,8 +49,8 @@ tref discharge(tref term, bool negative, const block& X, ctx<node>& c) {
 	const quantifier<node> kind = negative ? tbdd::ex : tbdd::all;
 	tref q;
 	if (!c.keep_functional) {
-		// ONE BDD quantification under the live order, whatever |X| is.
-		q = quantify_over<node>(kind, term, X, c.order);
+		// ONE BDD quantification, whatever |X| is.
+		q = quantify_over<node>(kind, term, X);
 	} else {
 		// KEPT INSTEAD OF DISCHARGED: the canonical chain over `term`,
 		// `X` outermost first as the constructor takes it. The
@@ -68,7 +69,7 @@ tref discharge(tref term, bool negative, const block& X, ctx<node>& c) {
 	// `simplify_atom` folds through the one `¬`.
 	const tref atom = build_bf_eq_0<node>(q);
 	return simplify_atom<node>(
-		negative ? build_wff_neg<node>(atom) : atom, c.order);
+		negative ? build_wff_neg<node>(atom) : atom, regime::backed);
 }
 
 } // namespace idni::tau_lang::anti_prenexing

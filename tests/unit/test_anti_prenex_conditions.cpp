@@ -26,7 +26,6 @@ namespace {
 
 using tb = tau_term_bdd<node_t>;
 using th = term_handle<node_t>;
-using order_t = ap::var_order<node_t>;
 
 tref bf(const char* s) {
 	tref t = tau::get(s, parse_bf());
@@ -38,7 +37,7 @@ tref wff(const char* s) {
 	REQUIRE(t != nullptr);
 	return t;
 }
-/// The trimmed `variable` node of a one-variable term — the shape order keys,
+/// The trimmed `variable` node of a one-variable term — the shape
 /// blocks and free-variable sets hold.
 tref vr(const char* s) { return tau::trim(bf(s)); }
 
@@ -76,14 +75,11 @@ std::pair<tref, tref> sides(tref atom) {
 		tau::trim_right_sibling(t[0].second()) };
 }
 
-/// Semantic equality of two terms over the variables `vs`: equal ROBDDs under
-/// one order over all of them (leaves opaque), both finished first.
-bool same_function(tref a, tref b, const ap::block& vs) {
-	order_t o;
-	for (size_t i = 0; i < vs.size(); ++i)
-		o.emplace(vs[i], int_t(vs.size() - i));
-	return tb::build_bdd(th::convert_to_tau_terms(a), o)
-		== tb::build_bdd(th::convert_to_tau_terms(b), o);
+/// Semantic equality of two terms: equal ROBDDs (leaves opaque), both
+/// finished first.
+bool same_function(tref a, tref b) {
+	return tb::build_bdd(th::convert_to_tau_terms(a))
+		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
 /// The formula with every stored BDD spelled out, which is what the oracle
@@ -112,7 +108,7 @@ struct prepared_clause {
 	trefs conjuncts;
 	prepared_clause(const ap::block& block, tref body)
 		: P(block), c(ap::ctx<node_t>::for_component(block, 0, false)),
-		psi(ap::prepare_terms<node_t>(body, block, c.order)),
+		psi(ap::prepare_terms<node_t>(body)),
 		conjuncts(ap::members<node_t>(psi)) {}
 };
 
@@ -123,12 +119,11 @@ struct prepared_clause {
 /// here needs that reading.
 struct opaque_test {
 	ap::block X;
-	order_t order;
 	bool operator()(tref c) const {
 		if (!is_child<node_t>(c, tau::bf_eq)
 			&& !ap::is_negated_equation<node_t>(c)) return true;
 		const trefs leaves =
-			ap::leaf_fv<node_t>(ap::term_of<node_t>(c, order));
+			ap::leaf_fv<node_t>(ap::term_of<node_t>(c));
 		for (tref x : X)
 			if (std::binary_search(leaves.begin(), leaves.end(), x,
 				tau::subtree_less)) return true;
@@ -162,7 +157,7 @@ TEST_CASE("F1: every shape this engine cannot use freezes its component") {
 	for (tref o : opaque_shapes) {
 		prepared_clause k({ x, y }, conj(o, transparent));
 		REQUIRE(k.conjuncts.size() == 2);
-		const opaque_test opaque{ k.P, k.c.order };
+		const opaque_test opaque{ k.P };
 		REQUIRE(opaque(k.conjuncts[0]));
 		REQUIRE(!opaque(k.conjuncts[1]));
 
@@ -191,7 +186,7 @@ TEST_CASE("F2: a component is frozen whole, and a disjoint one is not") {
 	const tref apart = eq0(lor(bf("y"), bf("b")));
 	prepared_clause k({ x, y }, conj(unit, conj(shared, apart)));
 	REQUIRE(k.conjuncts.size() == 3);
-	const opaque_test opaque{ k.P, k.c.order };
+	const opaque_test opaque{ k.P };
 	REQUIRE(!opaque(k.conjuncts[1]));
 
 	auto r = ap::freeze_opaque_components<node_t>(k.conjuncts, k.P, opaque);
@@ -214,7 +209,7 @@ TEST_CASE("F3: no opaque conjunct freezes nothing") {
 		eq0(lor(bf("y"), bf("b")))));
 	REQUIRE(k.conjuncts.size() == 2);
 	auto r = ap::freeze_opaque_components<node_t>(k.conjuncts, k.P,
-		opaque_test{ k.P, k.c.order });
+		opaque_test{ k.P });
 	// `T`, so that a caller can conjoin the frozen part unconditionally.
 	CHECK(tau::get(r.frozen).equals_T());
 	REQUIRE(r.conjuncts.size() == 2);
@@ -228,19 +223,19 @@ TEST_CASE("F3: no opaque conjunct freezes nothing") {
 // --- SQUEEZE ------------------------------------------------------------------------
 
 TEST_CASE("S1: the zero form, the component and the negatives") {
-	tref x = vr("x"), a = vr("a"), b = vr("b");
+	tref x = vr("x");
 	prepared_clause k({ x }, conj(eq(bf("x"), bf("a")),
 		neg(eq(bf("x"), bf("b")))));
 	REQUIRE(k.conjuncts.size() == 2);
 
-	auto r = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto r = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(!r.decided_false);
 	REQUIRE(r.conjuncts.size() == 2);
 	// `l = r` became `l + r = 0`, at both polarities.
 	REQUIRE(is_child<node_t>(r.conjuncts[0], tau::bf_eq));
 	CHECK(tau::get(sides(r.conjuncts[0]).second).equals_0());
 	CHECK(same_function(sides(r.conjuncts[0]).first,
-		lxor(bf("x"), bf("a")), { x, a }));
+		lxor(bf("x"), bf("a"))));
 	REQUIRE(ap::is_negated_equation<node_t>(r.conjuncts[1]));
 	CHECK(tau::get(sides(ap::atom_of<node_t>(r.conjuncts[1])).second)
 		.equals_0());
@@ -248,31 +243,30 @@ TEST_CASE("S1: the zero form, the component and the negatives") {
 	REQUIRE(r.comps.size() == 1);
 	REQUIRE(r.comps[0].vars.size() == 1);
 	CHECK(same(r.comps[0].vars[0], x));
-	CHECK(same_function(r.comps[0].F, lxor(bf("x"), bf("a")), { x, a }));
+	CHECK(same_function(r.comps[0].F, lxor(bf("x"), bf("a"))));
 	CHECK(same(r.f, r.comps[0].F));
 	// the negative conjuncts, in the clause's order
 	REQUIRE(r.negatives.size() == 1);
 	CHECK(same(r.negatives[0], r.conjuncts[1]));
-	CHECK(same_function(ap::term_of<node_t>(r.negatives[0], k.c.order),
-		lxor(bf("x"), bf("b")), { x, b }));
+	CHECK(same_function(ap::term_of<node_t>(r.negatives[0]),
+		lxor(bf("x"), bf("b"))));
 }
 
 TEST_CASE("S2: an atom that folds while it is rewritten") {
 	tref x = vr("x");
 	const ap::block P{ x };
-	auto c = ap::ctx<node_t>::for_component(P, 0, false);
 	// The two sides denote the same function and are spelled differently —
 	// one prepared, one not — so the atom does not fold when it is built.
 	// The RING SUM is what sees the equality, which is why the rewritten
 	// atom has to be simplified again (invariant 6).
 	const tref prepared = sides(ap::prepare_terms<node_t>(
-		eq0(lor(bf("x"), bf("a"))), P, c.order)).first;
+		eq0(lor(bf("x"), bf("a"))))).first;
 	const tref folding = eq(prepared, lor(bf("a"), bf("x")));
 	REQUIRE(is_child<node_t>(folding, tau::bf_eq));
 	const tref rides = eq0(land(bf("x"), bf("b")));
 
 	// `T` says nothing about the clause and is dropped.
-	auto dropped = ap::squeeze<node_t>(trefs{ folding, rides }, P, c.order);
+	auto dropped = ap::squeeze<node_t>(trefs{ folding, rides }, P);
 	REQUIRE(!dropped.decided_false);
 	REQUIRE(dropped.conjuncts.size() == 1);
 	CHECK(is_child<node_t>(dropped.conjuncts[0], tau::bf_eq));
@@ -282,15 +276,14 @@ TEST_CASE("S2: an atom that folds while it is rewritten") {
 	// two sides are complementary, so the ring sum is `1` and the zero
 	// form is `1 = 0`.
 	const tref unsatisfiable = eq(sides(ap::prepare_terms<node_t>(
-		eq0(bf("x")), P, c.order)).first, lneg(bf("x")));
+		eq0(bf("x")))).first, lneg(bf("x")));
 	REQUIRE(is_child<node_t>(unsatisfiable, tau::bf_eq));
-	auto decided = ap::squeeze<node_t>(trefs{ unsatisfiable, rides }, P,
-		c.order);
+	auto decided = ap::squeeze<node_t>(trefs{ unsatisfiable, rides }, P);
 	CHECK(decided.decided_false);
 }
 
 TEST_CASE("S3: the components are the parts of the POSITIVES alone") {
-	tref x = vr("x"), y = vr("y"), a = vr("a"), b = vr("b");
+	tref x = vr("x"), y = vr("y");
 	// The negative holds both block variables, so the push's own incidence
 	// pass sees one component; this grouping ignores it and sees two.
 	prepared_clause k({ x, y }, conj(eq0(lor(bf("x"), bf("a"))),
@@ -298,29 +291,29 @@ TEST_CASE("S3: the components are the parts of the POSITIVES alone") {
 			neg(eq0(land(bf("x"), bf("y")))))));
 	REQUIRE(k.conjuncts.size() == 3);
 
-	auto r = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto r = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(!r.decided_false);
 	REQUIRE(r.comps.size() == 2);
 	REQUIRE(r.comps[0].vars.size() == 1);
 	CHECK(same(r.comps[0].vars[0], x));
-	CHECK(same_function(r.comps[0].F, lor(bf("x"), bf("a")), { x, a }));
+	CHECK(same_function(r.comps[0].F, lor(bf("x"), bf("a"))));
 	REQUIRE(r.comps[1].vars.size() == 1);
 	CHECK(same(r.comps[1].vars[0], y));
-	CHECK(same_function(r.comps[1].F, lor(bf("y"), bf("b")), { y, b }));
+	CHECK(same_function(r.comps[1].F, lor(bf("y"), bf("b"))));
 	// `f` is the whole positive part, `⋃_k F_k` over disjoint `X_k`.
 	CHECK(same_function(r.f, lor(lor(bf("x"), bf("a")),
-		lor(bf("y"), bf("b"))), { x, y, a, b }));
+		lor(bf("y"), bf("b")))));
 	REQUIRE(r.negatives.size() == 1);
 	CHECK(ap::is_negated_equation<node_t>(r.negatives[0]));
 }
 
 TEST_CASE("S4: a negative tree is rewritten at its literals, and kept") {
-	tref x = vr("x"), b = vr("b"), cc = vr("c");
+	tref x = vr("x");
 	prepared_clause k({ x }, conj(eq0(lor(bf("x"), bf("a"))),
 		disj(neg(eq(bf("x"), bf("b"))), neg(eq(bf("x"), bf("c"))))));
 	REQUIRE(k.conjuncts.size() == 2);
 
-	auto r = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto r = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(!r.decided_false);
 	// The tree is a negative conjunct like a literal, and its own ∨/∧
 	// structure is left as it stands.
@@ -334,41 +327,39 @@ TEST_CASE("S4: a negative tree is rewritten at its literals, and kept") {
 		CHECK(tau::get(sides(ap::atom_of<node_t>(l)).second).equals_0());
 	}
 	// the literals' terms are the ring sums of the sides they had
-	CHECK(same_function(ap::term_of<node_t>(leaves[0], k.c.order),
-		lxor(bf("x"), bf("b")), { x, b }));
-	CHECK(same_function(ap::term_of<node_t>(leaves[1], k.c.order),
-		lxor(bf("x"), bf("c")), { x, cc }));
+	CHECK(same_function(ap::term_of<node_t>(leaves[0]),
+		lxor(bf("x"), bf("b"))));
+	CHECK(same_function(ap::term_of<node_t>(leaves[1]),
+		lxor(bf("x"), bf("c"))));
 	// the positive is the only component; the tree gives none
 	REQUIRE(r.comps.size() == 1);
 }
 
 TEST_CASE("S5: a positive whose zero form loses its last block variable") {
-	tref x = vr("x"), b = vr("b"), cc = vr("c");
+	tref x = vr("x");
 	const ap::block P{ x };
-	auto c0 = ap::ctx<node_t>::for_component(P, 0, false);
 	// `x + b = x + c`: both sides are prepared over `{x}`, so they are
 	// spelled differently and the atom does not fold when it is built, and
 	// the side-wise atom simplifier — which never puts two sides together —
 	// leaves it as it stands. The RING SUM of the zero form cancels `x` and
 	// leaves `b + c = 0`, an atom over no block variable at all.
 	const tref left = sides(ap::prepare_terms<node_t>(
-		eq0(lxor(bf("x"), bf("b"))), P, c0.order)).first;
+		eq0(lxor(bf("x"), bf("b"))))).first;
 	const tref right = sides(ap::prepare_terms<node_t>(
-		eq0(lxor(bf("x"), bf("c"))), P, c0.order)).first;
+		eq0(lxor(bf("x"), bf("c"))))).first;
 	const tref stripped = eq(left, right);
 	REQUIRE(is_child<node_t>(stripped, tau::bf_eq));
 	prepared_clause k({ x }, conj(stripped, eq0(lor(bf("x"), bf("a")))));
 	REQUIRE(k.conjuncts.size() == 2);
 
-	auto r = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto r = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(!r.decided_false);
 	// It is a part of its own over NO variable, beside the component of
 	// the ordinary positive.
 	REQUIRE(r.comps.size() == 2);
 	const size_t free_k = r.comps[0].vars.empty() ? 0 : 1;
 	REQUIRE(r.comps[free_k].vars.empty());
-	CHECK(same_function(r.comps[free_k].F, lxor(bf("b"), bf("c")),
-		{ b, cc }));
+	CHECK(same_function(r.comps[free_k].F, lxor(bf("b"), bf("c"))));
 	REQUIRE(r.comps[1 - free_k].vars.size() == 1);
 	CHECK(same(r.comps[1 - free_k].vars[0], x));
 
@@ -379,25 +370,26 @@ TEST_CASE("S5: a positive whose zero form loses its last block variable") {
 	REQUIRE(is_child<node_t>(pos, tau::wff_and));
 	REQUIRE(ap::members<node_t>(pos).size() == 2);
 	CHECK(has_member(pos, ap::simplify_atom<node_t>(
-		eq0(r.comps[free_k].F), k.c.order)));
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")),
-		k.c.order)));
+		eq0(r.comps[free_k].F), ap::regime::backed)));
+	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")), ap::regime::backed)));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
 		ex("x", finished(k.psi))));
 }
 
 TEST_CASE("S6: a tree that collapses while it is rewritten keeps its members") {
 	tref b = vr("b");
-	// `(a ∪ p)·p′·a′` is 0, so its literal folds to `F` and the tree collapses
-	// to the conjunction `¬(a = 0) ∧ ¬(b = 0)`, whose members are negatives.
+	// `(r(a) ∪ r(p))·r(p)′·r(a)′` is 0, which only the sweep of the zero
+	// form sees in its one leaf, so its literal folds to `F` there and the
+	// tree collapses to the conjunction `¬(a = 0) ∧ ¬(b = 0)`, whose members
+	// are negatives.
 	prepared_clause k({ b }, conj(neg(eq0(bf("b"))),
 		disj(conj(neg(eq0(bf("a"))), neg(eq0(bf("b")))),
-			neg(eq0(bf("(a|p)&p'&a'"))))));
+			neg(eq0(bf("(r(a)|r(p))&r(p)'&r(a)'"))))));
 	REQUIRE(k.conjuncts.size() == 2);
 	REQUIRE(std::any_of(k.conjuncts.begin(), k.conjuncts.end(),
 		ap::is_negative_tree<node_t>));
 
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(!s.decided_false);
 	CHECK(s.comps.empty());
 	CHECK(s.negatives.size() == s.conjuncts.size());
@@ -406,7 +398,7 @@ TEST_CASE("S6: a tree that collapses while it is rewritten keeps its members") {
 		conds.push_back(ap::is_negative_tree<node_t>(n)
 			? ap::tree_condition<node_t>(n, s.comps, k.P, k.c)
 			: ap::negative_condition<node_t>(
-				ap::term_of<node_t>(n, k.c.order), s.comps, k.P,
+				ap::term_of<node_t>(n), s.comps, k.P,
 				k.c));
 	CHECK(are_nso_equivalent<node_t>(
 		finished(ap::simplified_and_join<node_t>(conds)),
@@ -419,7 +411,7 @@ TEST_CASE("PC1: one atom per component, each over its own variables") {
 	tref x = vr("x"), y = vr("y");
 	prepared_clause k({ x, y }, conj(eq0(lor(bf("x"), bf("a"))),
 		eq0(lor(bf("y"), bf("b")))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 2);
 
 	// `∀_X f = ⋃_k ∀_{X_k} F_k`, so `∀_X f = 0` is one discharged atom per
@@ -427,8 +419,8 @@ TEST_CASE("PC1: one atom per component, each over its own variables") {
 	const tref pos = ap::positive_condition<node_t>(s.comps, k.c);
 	REQUIRE(is_child<node_t>(pos, tau::wff_and));
 	CHECK(ap::members<node_t>(pos).size() == 2);
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")), k.c.order)));
-	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("b")), k.c.order)));
+	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")), ap::regime::backed)));
+	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("b")), ap::regime::backed)));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
 		conj(eq0(bf("a")), eq0(bf("b")))));
 	CHECK(are_nso_equivalent<node_t>(finished(pos),
@@ -443,7 +435,7 @@ TEST_CASE("PC2: a component with no common zero decides F") {
 	// `x = 0 ∧ x′ = 0` is one component whose term is `x ∪ x′ = 1`, and
 	// `∀_x 1 = 0` is `F`: no value of `x` satisfies both.
 	prepared_clause k({ x }, conj(eq0(bf("x")), eq0(lneg(bf("x")))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	CHECK(tau::get(s.comps[0].F).equals_1());
 	CHECK(tau::get(ap::positive_condition<node_t>(s.comps, k.c)).equals_F());
@@ -454,11 +446,11 @@ TEST_CASE("PC2: a component with no common zero decides F") {
 TEST_CASE("NC1: O1 — a negative whose term is 1 says nothing beyond pos") {
 	tref x = vr("x");
 	prepared_clause k({ x }, eq0(lor(bf("x"), bf("a"))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	// The term of `¬(x = x′)`: the ring sum of the two sides is `1`.
 	const tref g = ap::simplify_term<node_t>(
-		lxor(bf("x"), lneg(bf("x"))), k.c.order);
+		lxor(bf("x"), lneg(bf("x"))), ap::regime::backed);
 	REQUIRE(tau::get(g).equals_1());
 	CHECK(tau::get(ap::negative_condition<node_t>(g, s.comps, k.P, k.c))
 		.equals_T());
@@ -470,44 +462,44 @@ TEST_CASE("NC2: O2 — no component touches the negative") {
 	// absorbs against `y`, and `∃_y y ≠ 0` is `T`.
 	prepared_clause k({ x, y }, conj(eq0(lor(bf("x"), bf("a"))),
 		neg(eq0(bf("y")))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
-	const tref g = ap::term_of<node_t>(s.negatives[0], k.c.order);
+	const tref g = ap::term_of<node_t>(s.negatives[0]);
 	CHECK(tau::get(ap::negative_condition<node_t>(g, s.comps, k.P, k.c))
 		.equals_T());
 
 	// An `X`-FREE `g` lands in the same case with an empty `X_g` and emits
-	// `¬(g = 0)` itself — under a formula negation, never a fused `≠`
-	// (invariant 4).
+	// `¬(g = 0)` itself, `g` backed — under a formula negation, never a
+	// fused `≠` (invariant 4).
 	const tref free = ap::negative_condition<node_t>(bf("a"), s.comps,
 		k.P, k.c);
 	REQUIRE(ap::is_negated_equation<node_t>(free));
 	CHECK(!holds(free, tau::bf_neq));
 	const auto [l, r] = sides(ap::atom_of<node_t>(free));
-	CHECK(same(l, bf("a")));
+	CHECK(same_function(l, bf("a")));
 	CHECK(tau::get(r).equals_0());
 	CHECK(!ap::fv_meets<node_t>(free, k.P));
 }
 
 TEST_CASE("NC3: the absorption against the components the negative touches") {
-	tref x = vr("x"), a = vr("a"), b = vr("b");
+	tref x = vr("x");
 	// `x = a ∧ ¬(x·b = 0)`: the condition is `∃_x (x + a)′·x·b ≠ 0`,
 	// i.e. `a·b ≠ 0`, and with `pos` it is the whole answer.
 	prepared_clause k({ x }, conj(eq(bf("x"), bf("a")),
 		neg(eq0(land(bf("x"), bf("b"))))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
 
 	const tref pos = ap::positive_condition<node_t>(s.comps, k.c);
 	const tref cond = ap::negative_condition<node_t>(
-		ap::term_of<node_t>(s.negatives[0], k.c.order), s.comps, k.P,
+		ap::term_of<node_t>(s.negatives[0]), s.comps, k.P,
 		k.c);
 	REQUIRE(ap::is_negated_equation<node_t>(cond));
 	CHECK(!ap::fv_meets<node_t>(cond, k.P));
 	CHECK(same_function(sides(ap::atom_of<node_t>(cond)).first,
-		land(bf("a"), bf("b")), { a, b }));
+		land(bf("a"), bf("b"))));
 	CHECK(are_nso_equivalent<node_t>(
 		finished(ap::simplified_and_join<node_t>(trefs{ pos, cond })),
 		ex("x", finished(k.psi))));
@@ -523,7 +515,7 @@ TEST_CASE("TC1: a flat tree beside a positive") {
 	prepared_clause k({ x }, conj(eq0(land(bf("x"), bf("a"))),
 		disj(neg(eq0(land(bf("x"), bf("c")))),
 			neg(eq0(land(bf("x"), bf("d")))))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
 
@@ -552,7 +544,7 @@ TEST_CASE("TC2: a nested tree keeps its own ∧") {
 		disj(neg(eq0(land(bf("x"), bf("c")))),
 			conj(neg(eq0(land(bf("x"), bf("d")))),
 				neg(eq0(land(bf("x"), bf("e"))))))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
 	REQUIRE(!ap::is_flat_tree<node_t>(s.negatives[0]));
@@ -576,7 +568,7 @@ TEST_CASE("TC3: a repeated literal is paid for once") {
 				neg(eq0(land(bf("x"), bf("d"))))),
 			conj(neg(eq0(land(bf("x"), bf("c")))),
 				neg(eq0(land(bf("x"), bf("e"))))))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
 
@@ -587,7 +579,7 @@ TEST_CASE("TC3: a repeated literal is paid for once") {
 	// the shared literal's condition, computed here the way the walk
 	// computes it, is a member of both branches — one node, twice
 	const tref shared = ap::negative_condition<node_t>(
-		ap::simplify_term<node_t>(land(bf("x"), bf("c")), k.c.order),
+		ap::simplify_term<node_t>(land(bf("x"), bf("c")), ap::regime::backed),
 		s.comps, k.P, k.c);
 	CHECK(has_member(branches[0], shared));
 	CHECK(has_member(branches[1], shared));
@@ -599,7 +591,7 @@ TEST_CASE("TC4: a subtree that folds to T folds the tree") {
 	// ∨-join decides before the other literal is looked at.
 	prepared_clause k({ x, y }, conj(eq0(land(bf("x"), bf("a"))),
 		disj(neg(eq0(bf("y"))), neg(eq0(land(bf("x"), bf("c")))))));
-	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P);
 	REQUIRE(s.comps.size() == 1);
 	REQUIRE(s.negatives.size() == 1);
 	CHECK(tau::get(ap::tree_condition<node_t>(s.negatives[0], s.comps,

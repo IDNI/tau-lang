@@ -157,7 +157,7 @@ fixture make(const char* src, bool keep = false, size_t vars = 0) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), keep);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 
@@ -170,7 +170,7 @@ tref pushed(fixture& f, tref* emitted = nullptr) {
 	const tref r = ap::push_block<node_t>(f.clause, f.P, f.c);
 	if (emitted) *emitted = r;
 	if (!f.c.keep_functional) return r;
-	return ap::resolve_functional_quantifiers_bdd<node_t>(r, f.c.order,
+	return ap::resolve_functional_quantifiers_bdd<node_t>(r,
 		ap::keep_no_functional<node_t>);
 }
 
@@ -452,7 +452,7 @@ TEST_CASE("P17: an order atom is a literal, and comes back re-wrapped") {
 	auto c = ap::ctx<node_t>::for_component(P, tau_type_id<node_t>(),
 		false);
 	const tref plain = order_atom(tbf("x"), tbf("b"));
-	const tref clause = ap::prepare_terms<node_t>(plain, P, c.order);
+	const tref clause = ap::prepare_terms<node_t>(plain);
 	const tref source = ap::rewrap<node_t>(plain, P);
 	REQUIRE(ap::is_literal<node_t>(clause));
 

@@ -39,7 +39,6 @@ namespace {
 
 using tb = tau_term_bdd<node_t>;
 using th = term_handle<node_t>;
-using order_t = ap::var_order<node_t>;
 
 tref parse(const char* sample) {
 	auto rr = get_nso_rr(sample);
@@ -90,15 +89,11 @@ size_t binder_count(tref n) {
 /// reads.
 tref finished(tref n) { return th::convert_to_tau_terms(n); }
 
-/// Semantic equality of two terms over the variables `vs`: equal ROBDDs under
-/// one order over all of them (leaves opaque). Both are finished first, since
-/// a BDD-backed term's own ref belongs to its own order.
-bool same_function(tref a, tref b, const ap::block& vs) {
-	order_t o;
-	for (size_t i = 0; i < vs.size(); ++i)
-		o.emplace(vs[i], int_t(vs.size() - i));
-	return tb::build_bdd(th::convert_to_tau_terms(a), o)
-		== tb::build_bdd(th::convert_to_tau_terms(b), o);
+/// Semantic equality of two terms: equal ROBDDs (leaves opaque), both
+/// finished first.
+bool same_function(tref a, tref b) {
+	return tb::build_bdd(th::convert_to_tau_terms(a))
+		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
 /// NO FREE VARIABLE ESCAPED: `FV(out) ⊆ FV(in)`.
@@ -167,7 +162,7 @@ fixture make(const char* src, bool keep = false, size_t vars = 0) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), keep);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 
@@ -369,7 +364,7 @@ TEST_CASE("B1: 2b squeezes a positive skeleton on terms") {
 	REQUIRE(k.neg == 0);
 	REQUIRE(k.free == 0);
 	REQUIRE(k.other == 0);
-	CHECK(ap::squeeze_positives<node_t>(f.clause, f.c.order).size() == 4);
+	CHECK(ap::squeeze_positives<node_t>(f.clause).size() == 4);
 	auto got = ap::try_fast_paths<node_t>(f.clause, f.P, f.c);
 	REQUIRE(got.has_value());
 	check_against_source(*got, f);
@@ -430,22 +425,22 @@ TEST_CASE("D2: a literal that decided folds through the skeleton") {
 TEST_CASE("Q1: a conjunction squeezes to the union, a disjunction to the list") {
 	// `(a = 0 ∨ b = 0) ∧ c = 0` is `a ∪ c = 0 ∨ b ∪ c = 0`.
 	fixture f = make("ex a ex b ex c ((a = 0 || b = 0) && c = 0).");
-	const trefs ts = ap::squeeze_positives<node_t>(f.clause, f.c.order);
+	const trefs ts = ap::squeeze_positives<node_t>(f.clause);
 	REQUIRE(ts.size() == 2);
 	REQUIRE(f.P.size() == 3);
 	const tref ac = build_bf_or<node_t>(as_bf(f.P[0]), as_bf(f.P[2]));
 	const tref bc = build_bf_or<node_t>(as_bf(f.P[1]), as_bf(f.P[2]));
-	CHECK((same_function(ts[0], ac, f.P) || same_function(ts[0], bc, f.P)));
-	CHECK((same_function(ts[1], ac, f.P) || same_function(ts[1], bc, f.P)));
-	CHECK(!same_function(ts[0], ts[1], f.P));
+	CHECK((same_function(ts[0], ac) || same_function(ts[0], bc)));
+	CHECK((same_function(ts[1], ac) || same_function(ts[1], bc)));
+	CHECK(!same_function(ts[0], ts[1]));
 }
 
 TEST_CASE("Q2: a single equation squeezes to its own term") {
 	fixture f = make("ex a (a c = 0).");
-	const trefs ts = ap::squeeze_positives<node_t>(f.clause, f.c.order);
+	const trefs ts = ap::squeeze_positives<node_t>(f.clause);
 	REQUIRE(ts.size() == 1);
 	CHECK(same_function(ts[0],
-		ap::term_of<node_t>(f.clause, f.c.order), f.P));
+		ap::term_of<node_t>(f.clause)));
 }
 
 TEST_CASE("Q3: the list is as long as the skeleton has DNF clauses") {
@@ -453,7 +448,7 @@ TEST_CASE("Q3: the list is as long as the skeleton has DNF clauses") {
 	// (invariant 8).
 	fixture f = make("ex a ex b ex c ex d ex e ex g "
 		"((a = 0 || b = 0) && (c = 0 || d = 0) && (e = 0 || g = 0)).");
-	CHECK(ap::squeeze_positives<node_t>(f.clause, f.c.order).size() == 8);
+	CHECK(ap::squeeze_positives<node_t>(f.clause).size() == 8);
 }
 
 } // TEST_SUITE

@@ -27,10 +27,10 @@ namespace idni::tau_lang::anti_prenexing {
 
 /**
  * @brief §6 `COF(f, x, ctx)`: the record of cofactoring the term `f` by the
- * block variable `x`, memoised in §1 `cof_memo`.
+ * block variable `x`, memoised in §1 `cof_memo`. Of the ctx it reads nothing.
  *
  * `f₀` and `f₁` are `SIMPLIFY_TERM` of the two cofactors, taken by CHILD
- * SELECTION in `f`'s BDD under `ctx.order`; the rest of the `cof_entry`
+ * SELECTION in `f`'s BDD; the rest of the `cof_entry`
  * (fwd.h) is the pin test `pin_from_cofactors` (simplify.h) applied to them,
  * with `p` filled in here too for a usable non-pin record — this table's own
  * promise, `pin_from_cofactors`'s alone stopping at the pin. There is no
@@ -39,9 +39,9 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * `f` IS THE KEY, exactly as it arrives (§1 cache scope): pass `TERM_OF` of
  * the atom, not the atom. `cof_memo` is GLOBAL: the entry is a pure function
- * of `(f, x)`, and nothing of the component beyond the order that `f` was
- * built under enters it. The table is a cache, absent in Debug builds, so
- * nothing here may depend on a hit.
+ * of `(f, x)`, and nothing of the component enters it, every BDD being built
+ * under the one global order. The table is a cache, absent in Debug builds,
+ * so nothing here may depend on a hit.
  *
  * `x` must be free in `f` (Debug-asserted): an `x`-free term pins nothing.
  * `x` need not be a DECISION variable — when it is not, child selection
@@ -49,7 +49,7 @@ namespace idni::tau_lang::anti_prenexing {
  * which is exactly what the leaf hazard means.
  */
 template <NodeType node>
-cof_entry cof(tref f, tref x, ctx<node>& c);
+cof_entry cof(tref f, tref x);
 
 /**
  * @brief §7 `DISCHARGE(∃X.atom, ctx)`: the atom a whole quantified block
@@ -61,8 +61,7 @@ cof_entry cof(tref f, tref x, ctx<node>& c);
  * An empty `X` is legal and quantifies nothing.
  *
  * TWO MODES. In the ordinary one the block is discharged: ONE BDD
- * quantification of `term` under `ctx.order`, no expansion into `2^|X|`
- * terms. Under `ctx.keep_functional` it is kept instead, emitted as the
+ * quantification of `term`, no expansion into `2^|X|` terms. Under `ctx.keep_functional` it is kept instead, emitted as the
  * canonical functional-quantifier chain over `term` (§1) — the same block,
  * spelled rather than solved. Either way the atom is `SIMPLIFY_ATOM`'d before
  * it goes out, and a negative one is `¬(h = 0)`, never `h ≠ 0` (invariant 4).

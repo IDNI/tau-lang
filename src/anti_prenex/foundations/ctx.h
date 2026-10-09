@@ -80,11 +80,9 @@ struct ctx {
 	/// The component's block `P`, outermost first: the block in scope that the
 	/// phase 4 `SIMPLIFY` calls bind (§3 orientation).
 	block P;
-	/// §1 `order`: BDD variable order, inner → LOWER rank; §5 `P[i] ↦ |P| - i`.
-	var_order<node> order;
 	/// §1 `prio`: variable priority, inner → HIGHER rank; §5 `P[i] ↦ i + 1`.
-	/// The two conventions are opposite and cannot be merged (§1).
-	var_order<node> prio;
+	/// §1 `order` is the BDD library's own, the same for every component.
+	prio_map<node> prio;
 	/// The five knobs (§1 ctx table), copied from options.h at setup.
 	size_t subsume_max   = anti_prenexing::subsume_max;
 	size_t qbf_node_max  = anti_prenexing::qbf_node_max;
@@ -96,9 +94,9 @@ struct ctx {
 	bool keep_functional = false;
 
 	/**
-	 * @brief §5 setup for one component: `type`, `P` itself, the two rank maps
-	 * over `P` (`P[0]` outermost), the knobs read from options.h AT THIS CALL,
-	 * and `keep_functional`.
+	 * @brief §5 setup for one component: `type`, `P` itself, `prio` over `P`
+	 * (`P[0]` outermost), the knobs read from options.h AT THIS CALL, and
+	 * `keep_functional`.
 	 */
 	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };

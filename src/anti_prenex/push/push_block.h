@@ -8,8 +8,7 @@
  *
  * WHAT ARRIVES: a block `X` — a component's, or a sub-block a step has
  * narrowed — scoping a formula `φ` whose terms are in §1's representation
- * under the COMPONENT's order (`ctx.order`), which stays the live order
- * however narrow `X` gets.
+ * under the library's one global order, however narrow `X` gets.
  *
  * WHAT GOES OUT: a formula equivalent to `∃X.φ`, pushed as far inward as the
  * steps reach. What no step reaches is RE-WRAPPED, never answered `F`

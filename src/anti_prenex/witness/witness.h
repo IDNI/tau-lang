@@ -18,8 +18,8 @@
  * NO BDD IN THE SPELLED MODE (§3). The entries WITHOUT a `ctx` — phase 2's —
  * Debug-assert that their formula carries no `BDD_ID` anywhere; a backed
  * term reaching one is a caller bug. The entries WITH a `ctx` work on
- * conjuncts whose terms are BDD-backed under `ctx.order`, and the BDD
- * primitives assert the order themselves. Nothing here spells a term out.
+ * conjuncts whose terms are BDD-backed, and the BDD primitives assert the
+ * order themselves. Nothing here spells a term out.
  *
  * WHAT MAY TOUCH A UNIT (§4) — a surviving binder, opaque to every step: the
  * substitution of `x` DESCENDS into its body, because the pinning conjunct
@@ -72,8 +72,7 @@ std::optional<tref> try_witness(tref x, tref psi);
 
 /**
  * @brief §3 `TRY_WITNESS(x, ψ, ctx)`, COF mode: the witnessed BODY of
- * `∃x.ψ` for a `ψ` whose terms are BDD-backed under `ctx.order`, or
- * `nullopt`.
+ * `∃x.ψ` for a `ψ` whose terms are BDD-backed, or `nullopt`.
  *
  * The top-level conjuncts that are POSITIVE equations are scanned — an
  * equation under `¬` pins nothing in the ∃ sense and an order atom never
@@ -96,7 +95,7 @@ std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c);
  * equation.
  */
 template <NodeType node>
-std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c);
+std::optional<pin<node>> cof_pin(tref m, tref x);
 
 /**
  * @brief §3 `TRY_WITNESS_DEEP(Q, x, Φ)`, phase 2's deep pass: the body of
@@ -167,7 +166,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi);
 
 /**
  * @brief §3 `TRY_CASE_WITNESS(x, ψ, ctx)`, COF mode: the same MATCH on a `ψ`
- * whose terms are BDD-backed under `ctx.order`, or `nullopt`.
+ * whose terms are BDD-backed, or `nullopt`.
  *
  * A branch `dᵢ` qualifies when one of its conjuncts is a positive equation
  * whose term pins `x` by `COF` (§6) — the match `try_witness`'s COF mode

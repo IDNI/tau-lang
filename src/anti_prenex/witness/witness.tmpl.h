@@ -12,7 +12,7 @@
  * conjuncts by `TRY_WITNESS` and of a branch's by `TRY_CASE_WITNESS`.
  *
  * THE TWO REWRITES of the deep pass are the library's: `φ[x ← t]` is
- * `subst_var` (foundations/subst.h) under the empty order, phase 2 holding
+ * `subst_var` (foundations/subst.h) in the plain regime, phase 2 holding
  * no BDD-backed term, and the spine's replacement is `rewriter::replace`, a
  * CONTENT match with a hooked rebuild of the path above it. Replacing every
  * occurrence of the spine is sound because the descent enforces confinement
@@ -75,16 +75,16 @@ std::optional<pin<node>> best_pin(const trefs& cs, Match&& match) {
 /// witness in EVERY conjunct, THE PINNING ONE INCLUDED — its image is the
 /// residual `p = 0`, `T` for a strict pin, so no site emits a residual of its
 /// own — and the result is SIMPLIFIED (invariant 6). One substitution over
-/// `ψ` reaches every conjunct. `order` and `X` are the mode's: empty for the
-/// spelled one, `ctx.order` and `ctx.P` for the COF one.
+/// `ψ` reaches every conjunct. The regime and `X` are the mode's: plain and
+/// empty for the spelled one, backed and `ctx.P` for the COF one.
 template <NodeType node, typename Search>
-std::optional<tref> witness_with(tref x, tref psi,
-	const var_order<node>& order, const block& X, Search&& search)
+std::optional<tref> witness_with(tref x, tref psi, regime rg, const block& X,
+	Search&& search)
 {
 	const std::optional<pin<node>> best = search(get_cnf_wff_clauses<node>(psi));
 	if (!best) return {};
 	return simplify<node>(
-		subst_var<node>(psi, x, best->witness, order), order, X);
+		subst_var<node>(psi, x, best->witness, rg), rg, X);
 }
 
 /// The POSITIVE EQUATION the pin match reads off a spine member, in `Q`'s
@@ -112,7 +112,7 @@ tref pin_equation(tref m, quantifier<node> Q) {
 /// The STRICT pin of `x` in one member, in `Q`'s form, or `nullopt` (§3). A
 /// weak pin is NO pin for the deep pass: the member is dropped, so the
 /// residual `p = 0` it keeps would be lost. `find_pin_for` (simplify.h) is
-/// the match itself; the empty order is phase 2's.
+/// the match itself; the plain regime is phase 2's.
 template <NodeType node>
 std::optional<pin<node>> strict_pin_of(tref m, tref x, quantifier<node> Q) {
 	const tref eq = pin_equation<node>(m, Q);
@@ -189,9 +189,9 @@ std::optional<std::vector<case_branch<node>>> case_pin_of(tref m, tref x,
 /// `TRY_WITNESS` runs over `ψ`'s conjuncts, and the one `TRY_CASE_WITNESS`
 /// runs over a branch's.
 template <NodeType node>
-std::optional<pin<node>> cof_pin_in(const trefs& cs, tref x, ctx<node>& c) {
+std::optional<pin<node>> cof_pin_in(const trefs& cs, tref x) {
 	return best_pin<node>(cs,
-		[x, &c](tref m) { return cof_pin<node>(m, x, c); });
+		[x](tref m) { return cof_pin<node>(m, x); });
 }
 
 /**
@@ -221,7 +221,7 @@ std::optional<std::vector<std::pair<tref, tref>>> cof_case_pin_of(tref m,
 	for (tref b : bs) {
 		b = tau::trim_right_sibling(b);
 		const std::optional<pin<node>> hit =
-			cof_pin_in<node>(members<node>(b), x, c);
+			cof_pin_in<node>(members<node>(b), x);
 		if (!hit) return {};      // ALL-OR-NOTHING (§3)
 		// `x ∉ FV(tᵢ)` comes with `usable` (§1, the leaf hazard).
 		DBG(assert(!fv_meets<node>(hit->witness, block{ x }));)
@@ -241,7 +241,7 @@ bool holds(tref n, tref x) {
 // --- the COF pin test ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c) {
+std::optional<pin<node>> cof_pin(tref m, tref x) {
 	using tau = tree<node>;
 	// Only a POSITIVE equation is asked: an equation under `¬` pins nothing
 	// in the ∃ sense, and an order atom is no equation.
@@ -251,19 +251,19 @@ std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c) {
 	if (!detail::free_in<node>(m, x)) return {};
 	// `TERM_OF(m)` as it arrives IS `cof_memo`'s key (§1), so this site
 	// forms it itself.
-	const tref f = term_of<node>(m, c.order);
+	const tref f = term_of<node>(m);
 	if (f == nullptr) return {};
 	// A term not mentioning `x` pins nothing, and `COF` Debug-asserts
 	// against such a vacuous entry. The binary search over the cached
 	// free-variable set (simplify.tmpl.h).
 	if (!detail::free_in<node>(f, x)) return {};
-	const cof_entry e = cof<node>(f, x, c);
+	const cof_entry e = cof<node>(f, x);
 	if (!e.pin) return {};
 	// THE WITNESS IS THE LOWER END `f₁′` (§3): it carries the residual into
 	// every sibling's terms, where `p = 0` then folds. The record carries
 	// neither the witness nor the STRICT verdict, so both are read off here.
 	const tref witness =
-		simplify_term<node>(build_bf_neg<node>(e.f1), c.order);
+		simplify_term<node>(build_bf_neg<node>(e.f1), regime::backed);
 	return pin<node>{ x, witness, tau::get(e.p).equals_0() };
 }
 
@@ -274,9 +274,9 @@ std::optional<tref> try_witness(tref x, tref psi) {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
 	DBG(assert(!holds_bdd_term<node>(psi));)
-	// The SPELLED match on every conjunct, under the empty order: phase 2 is
-	// the plain regime, where nothing is BDD-backed.
-	return witness_with<node>(x, psi, {}, {}, [x](const trefs& cs) {
+	// The SPELLED match on every conjunct: phase 2 is the plain regime,
+	// where nothing is BDD-backed.
+	return witness_with<node>(x, psi, regime::plain, {}, [x](const trefs& cs) {
 		return best_pin<node>(cs,
 			[x](tref m) { return find_pin_for<node>(m, x); });
 	});
@@ -288,11 +288,11 @@ template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c) {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
-	// The same tail over the COF match (§6), under the component's order:
-	// the substitution rewrites a BDD-backed conjunct through the library's
+	// The same tail over the COF match (§6), in the backed regime: the
+	// substitution rewrites a BDD-backed conjunct through the library's
 	// compose, and the pinning conjunct's image is the residual `p = 0`.
-	return witness_with<node>(x, psi, c.order, c.P,
-		[x, &c](const trefs& cs) { return cof_pin_in<node>(cs, x, c); });
+	return witness_with<node>(x, psi, regime::backed, c.P,
+		[x](const trefs& cs) { return cof_pin_in<node>(cs, x); });
 }
 
 // --- TRY_WITNESS_DEEP, phase 2's deep pass ---------------------------------------

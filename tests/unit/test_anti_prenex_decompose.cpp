@@ -129,7 +129,7 @@ fixture make(const char* src) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), false);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 
@@ -301,7 +301,7 @@ TEST_CASE("C6: the pin arm deletes its binder") {
 	fixture f = make("ex x ((x = a || y = 0) && (x != a || z = 0)).");
 	const tref a = negated_top(f);
 	REQUIRE(member_tops(f, a) == std::pair<size_t, size_t>{ 1, 1 });
-	REQUIRE(ap::cof_pin<node_t>(a, f.P[0], f.c).has_value());
+	REQUIRE(ap::cof_pin<node_t>(a, f.P[0]).has_value());
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
 	check_against_source(*got, f);

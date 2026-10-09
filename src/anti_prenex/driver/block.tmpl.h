@@ -93,12 +93,11 @@ tref push_ex_block(tref body, const block& X,
 		// narrowed block over the body AS IT STANDS — a throwaway
 		// node, never a memo key.
 		const bool keep = kf(rewrap<node>(body, Xc));
-		// `for_component` is §5's whole ctx setup: the two rank maps
-		// over `P` and the knobs. The type is the component's by
-		// invariant 2.
+		// `for_component` is §5's whole ctx setup: `prio` over `P` and
+		// the knobs. The type is the component's by invariant 2.
 		ctx<node> c = ctx<node>::for_component(P,
 			find_ba_type<node>(P[0]), keep);
-		body = prepare_terms<node>(body, P, c.order);
+		body = prepare_terms<node>(body);
 		const tref prev = body;
 		body = push_block<node>(body, P, c);
 		// SIZE ACCEPTANCE: a result cheap to build and ruinous to
@@ -132,8 +131,7 @@ tref push_ex_block(tref body, const block& X,
 		// the plain regime's normal form, the one phase 1 gives every
 		// atom, so what leaves a component is spelled as the plain
 		// phases spell it (§3 `FINISH_TERMS`).
-		body = resolve_functional_quantifiers_bdd<node>(body, c.order,
-			kf);
+		body = resolve_functional_quantifiers_bdd<node>(body, kf);
 		body = finish_terms<node>(body);
 	}
 	// The close is total, so nothing of §1's term representation leaves.

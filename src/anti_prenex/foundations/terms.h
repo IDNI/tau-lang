@@ -5,37 +5,33 @@
  * @brief Anti-prenexing foundations: TERM BDDs and the term-level primitives
  * of §3.
  *
- * THE §1 TERM REPRESENTATION, one per component: the decision variables of
- * the BDD are exactly the component's block `P`, and everything else sits in
- * the leaves. Cofactoring is child selection; `∀_P` and `∃_P` are the meet
- * and the join of the leaves; substitution is a BDD compose plus a rewrite of
- * the leaves; functional quantifiers are transparent. What the BDD cannot see
- * is the LEAF HAZARD: a variable of `P` may also occur inside a leaf, where
- * no quantification reaches it.
+ * THE §1 TERM REPRESENTATION: every variable met at a Boolean position is a
+ * decision variable of the BDD, and everything else sits in the leaves.
+ * Cofactoring is child selection; `∀_P` and `∃_P` are the meet and the join
+ * of what hangs at `P`'s levels; substitution is a BDD compose plus a rewrite
+ * of the leaves. What the BDD cannot see is the LEAF HAZARD: a variable may
+ * also occur inside a leaf, where no quantification reaches it.
  *
  * THE LIBRARY UNDERNEATH is `tau_term_bdd_handle<node>` (aliased
- * `term_handle`) and `tau_term_bdd<node>` below it (tau_bdd.h).
- * `build(term, order)` treats exactly the order's keys as decision variables
- * and everything else as a leaf, which IS this representation. A BDD-backed
- * term is stored as a `bf(BDD_ID)` node, interned per type, so the same BDD
- * is the same Tau node everywhere.
+ * `term_handle`) and `tau_term_bdd<node>` below it (tau_bdd.h). `build(term)`
+ * makes every variable at a Boolean position a decision variable and
+ * everything else a leaf, which IS this representation. A BDD-backed term is
+ * stored as a `bf(BDD_ID)` node, interned per type, so the same BDD is the
+ * same Tau node everywhere.
  *
- * THE LIVE ORDER IS THE CALLER'S. Every BDD primitive here takes the order as
- * an explicit parameter — the component's `ctx.order` (§5) — and nothing in
- * this file stores one. A `BDD_ID` node belongs to ONE order, so a component
- * converts its terms back (`convert_to_tau_terms`) before another
- * `prepare_terms`. The two simplifiers default to the empty order, the plain
- * regime of phases 1, 2 and 5, where nothing is BDD-backed (§3). Debug
- * builds check at every BDD primitive's entry that the reference passed in
- * is a reduced ordered BDD under `order` (`tau_term_bdd::is_ordered`).
+ * ONE ORDER, THE LIBRARY'S global comparator, for every call (§1): nothing
+ * here takes or stores an order. The two simplifiers take the REGIME instead
+ * (fwd.h), `plain` by default, the regime of phases 1, 2 and 5, where nothing
+ * is BDD-backed (§3). Debug builds check at every BDD primitive's entry that
+ * the reference passed in is a reduced ordered BDD
+ * (`tau_term_bdd::is_ordered`).
  *
- * WHEN A TERM IS BDD-BACKED: exactly when it has a decision variable, that
- * is, when it touches `P`. A BDD that has become a single leaf or a terminal
- * comes back as its plain term, so a `P`-free term never carries a `BDD_ID`
- * — with one exception: a functional-quantifier chain over a stored BDD,
- * which `discharge` (cofactors.h) emits in keep mode. It is `P`-free, keeps
- * its BDD body until the component's close, and the simplifiers treat it as
- * BDD-backed.
+ * WHEN A TERM IS BDD-BACKED: exactly when its BDD branches. A BDD that has
+ * become a single leaf or a terminal comes back as its plain term, so a term
+ * with no variable at a Boolean position never carries a `BDD_ID` — with one
+ * exception: a functional-quantifier chain over a stored BDD, which
+ * `discharge` (cofactors.h) emits in keep mode. It keeps its BDD body until
+ * the component's close, and the simplifiers treat it as BDD-backed.
  *
  * `term_of` and `norm_equation` live here because both are term operations
  * (`l + r` is a ring sum). NAME CLASH: inside this namespace `norm_equation`
@@ -57,15 +53,15 @@ namespace idni::tau_lang::anti_prenexing {
 //
 //   BDD-backed term        term_handle<node>::is_bdd_backed(t)
 //   the library's spelling  term_handle<node>::convert_to_tau_terms(phi)
-//   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X, order)
+//   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
 //   RESOLVE_FUNCTIONAL_*   resolve_functional_quantifiers_plain / _bdd (below)
-//   φ[x ← t]  /  f[x ← t]  tree<node>::substitute(φ, bf(x), t, order, hook)
+//   φ[x ← t]  /  f[x ← t]  tree<node>::substitute(φ, bf(x), t, hook)
 //
-// BDD-BACKED: the term is a `bf(BDD_ID)` node — backed by a BDD under the
-// live order, with at least one decision variable. The `bf` WRAPPER is the
-// form that counts; a bare `BDD_ID` node is not one.
+// BDD-BACKED: the term is a `bf(BDD_ID)` node — backed by a BDD with at
+// least one decision variable. The `bf` WRAPPER is the form that counts; a
+// bare `BDD_ID` node is not one.
 //
 // THE LIBRARY'S SPELLING: every `BDD_ID` term of `phi` converted back to a
 // plain `bf`, wherever it sits. One memoised walk with no node kind
@@ -78,38 +74,33 @@ namespace idni::tau_lang::anti_prenexing {
 // SYMBOLIC ∀_Y / ∃_Y: the library's chain constructor takes `quants`
 // outermost first. It is canonical — absent subscripts dropped, each
 // same-kind run in content order, an adjoining run of the body merged — and
-// it folds a chain that binds every free variable of a plain body to its
-// constant.
+// it folds a chain that binds every free variable of its body, plain or
+// backed, to its constant, unless a subscript hides in a leaf.
 
 // --- the representation boundary (PREPARE_TERMS) ---------------------------------
 
 /**
- * @brief §3 primitive `PREPARE_TERMS(body, P, order)`: put `body` into §1's
- * term representation over `P`.
+ * @brief §3 primitive `PREPARE_TERMS`, per component: put `body` into §1's
+ * term representation.
  *
- * Both sides of every EQUATION that touches `P` — one cached free-variable
- * test each — are rebuilt as BDD-backed terms whose decision variables are
- * `P` in the given order, everything else going into the leaves. An atom that
- * does not touch `P` is left untouched. An ORDER ATOM is left plain whatever
+ * Both sides of every EQUATION holding a variable — one cached free-variable
+ * test each — are rebuilt as terms backed by a BDD under the library's one
+ * order, everything not at a Boolean position going into the leaves; a side
+ * whose BDD does not branch stays plain. An ORDER ATOM is left plain whatever
  * it touches: it is never cofactored (`cof_memo` keys are `TERM_OF` of
  * equations) and the solver path consumes it as written.
  *
  * A formula-level binder, a reference and a temporal operator are opaque and
- * not entered. A term-level functional quantifier `∀_Y` / `∃_Y` is slid onto
- * its body's leaves by the LIBRARY's own chain case (§1): the chain is
- * collected whole, its body built over the live order minus the subscripts,
- * and the chain wrapped onto every leaf; a chain touching no decision
- * variable stays one leaf as it is.
+ * not entered. A term-level functional quantifier chain is ONE LEAF, put
+ * through the library's chain constructor (§1).
  *
  * Memoised per term within the call. Idempotent: an already prepared term is
  * returned as it is.
  *
- * @param body  the component's body, a `wff`
- * @param P     the component's block, in binder order
- * @param order `ctx.order`: `P[i] ↦ |P| - i` (inner → LOWER, §5)
+ * @param body the component's body, a `wff`
  */
 template <NodeType node>
-tref prepare_terms(tref body, const block& P, const var_order<node>& order);
+tref prepare_terms(tref body);
 
 /**
  * @brief §3 primitive `FINISH_TERMS(φ)`: `PREPARE_TERMS`' inverse, run at a
@@ -119,8 +110,8 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order);
  * ONE WALK over the formula skeleton. An ATOM carrying a stored BDD anywhere
  * — on a side, or in the body of a functional-quantifier chain `DISCHARGE`
  * emitted in keep mode — is spelled out by the library and then put through
- * `simplify_atom` in the PLAIN REGIME, the empty order: exactly what phase 1
- * does to every atom. A junction the walk closes is re-emitted canonically,
+ * `simplify_atom` in the PLAIN REGIME: exactly what phase 1 does to every
+ * atom. A junction the walk closes is re-emitted canonically,
  * because a spelled atom may sort elsewhere among its siblings or fold to a
  * constant, which then decides the junction. A `¬` over an atom is rebuilt
  * over the spelled one, the hooks folding `¬T` and `¬F`. Nothing else is
@@ -147,25 +138,24 @@ tref finish_terms(tref phi);
 
 /**
  * @brief §1 cofactor by CHILD SELECTION: `f[x ← bit]` for a BDD-backed `f`
- * and a DECISION variable `x` at any depth. It is the library's
- * `bdd_cofactor`, with the result emitted through
- * `convert_to_tau_node_or_term`. Canonical over the decision variables, and
- * NOT run through `simplify_term`; `cof` (cofactors.h) does that. Returns `f`
- * itself when `x` is not one of its decision variables, or when `f` is plain.
+ * and a variable `x` at any depth. It is the library's `bdd_cofactor`, with
+ * the result emitted through `convert_to_tau_node_or_term`. Canonical over
+ * the decision variables, and NOT run through `simplify_term`; `cof`
+ * (cofactors.h) does that. Returns `f` itself when `x` is not one of its
+ * decision variables, or when `f` is plain.
  */
 template <NodeType node>
-tref cofactor(tref f, tref x, bool bit, const var_order<node>& order);
+tref cofactor(tref f, tref x, bool bit);
 
 /**
  * @brief §1 `∀_X f = f₀·f₁` (`kind == tbdd::all`) and `∃_X f = f₀ ∪ f₁`
  * (`tbdd::ex`) over a whole block: ONE BDD quantification, never expanded to
  * 2^|X| terms. When `X` covers all decision variables this is the meet (the
- * join) of the leaves in a single traversal. `order` is the live order.
- * Returns `f` itself for a plain `f` or an empty `X`.
+ * join) of the leaves in a single traversal. Returns `f` itself for a plain
+ * `f` or an empty `X`.
  */
 template <NodeType node>
-tref quantify_over(quantifier<node> kind, tref f, const block& X,
-	const var_order<node>& order);
+tref quantify_over(quantifier<node> kind, tref f, const block& X);
 
 /// Does the term carry a functional quantifier anywhere, a BDD-backed term's
 /// leaves included?
@@ -185,7 +175,8 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
 // --- the two resolvers (RESOLVE_FUNCTIONAL_PLAIN, RESOLVE_FUNCTIONAL_BDD) --------
 //
 // THE UNIT OF WORK IS THE MAXIMAL CHAIN, any mix of `∀` and `∃`, taken at its
-// top and quantified in ONE pass. Both resolvers canonicalise its prefix
+// top and quantified by `bdd_quant`, one same-kind run at a time, innermost
+// run first. Both resolvers canonicalise its prefix
 // through the library's constructor and then ask `keep` ONCE, on that
 // canonical chain's node (`strip_chain` reads prefix and body off it). A yes
 // keeps the whole chain, and nothing inside it is looked at again.
@@ -209,18 +200,18 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
 /**
  * @brief §3 `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)`: resolve the
  * functional-quantifier chains of `n` that `keep` does not keep, at ENTRY
- * (phase 1), before any order is live.
+ * (phase 1).
  *
  * `n` may be a `bf` term or a `wff` formula, and nothing in it is BDD-backed
  * (Debug-asserted). Chains are found everywhere — under binders, in reference
  * arguments, in chain bodies — and what is resolved before a chain is what sits
  * NESTED inside it, never an adjacent binder.
  *
- * The body of a chain to resolve is built as a BDD over the CHAIN'S OWN order,
- * its innermost subscript lowest, and what comes back is spelled PLAIN before
- * the pass moves on: a node minted under a chain's order belongs to no live
- * order. A body whose BDD does not branch holds every subscript in a leaf, and
- * that chain stays as it is.
+ * The body of a chain to resolve is built as a BDD under the global order,
+ * phase 0's canonical ids putting its subscripts, innermost lowest, at the
+ * bottom, and what comes back is spelled PLAIN before the pass moves on, phase
+ * 1 being the plain regime. A body whose BDD does not branch holds every
+ * subscript in a leaf, and that chain stays as it is.
  *
  * After this pass a chain is a kept one or a stuck one, and both stay: no later
  * step resolves a chain it finds in a leaf.
@@ -230,19 +221,18 @@ tref resolve_functional_quantifiers_plain(tref n,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
 /**
- * @brief §3 `RESOLVE_FUNCTIONAL_BDD(φ, order, kf)`: the same at a component's
- * CLOSE (§5), where `order` is the LIVE order and every BDD-backed term of `n`
- * belongs to it (Debug-asserted).
+ * @brief §3 `RESOLVE_FUNCTIONAL_BDD(φ, kf)`: the same at a component's CLOSE
+ * (§5).
  *
  * A chain met here sits over a BDD-backed body with its subscripts among the
  * decision variables (a keep-mode emission of `discharge`), so ONE
- * quantification of the STORED BDD under the live order settles it where it
- * lies, and the result is emitted like every other term: plain when nothing
- * branches. A chain over a PLAIN body has every subscript in a leaf and stays
- * as it is. Leaves are never entered: a chain in a leaf is decided already.
+ * quantification of the STORED BDD settles it where it lies, and the result is
+ * emitted like every other term: plain when nothing branches. A chain over a
+ * PLAIN body has every subscript in a leaf and stays as it is. Leaves are
+ * never entered: a chain in a leaf is decided already.
  */
 template <NodeType node>
-tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
+tref resolve_functional_quantifiers_bdd(tref n,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------
@@ -250,7 +240,8 @@ tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
 /**
  * @brief §3 `SIMPLIFY_TERM(t, order = ∅)`: constant folding, complement
  * laws, per-path contradiction, the cofactor check, and reduction to the
- * canonical form of the BDD backing `t`.
+ * canonical form of the BDD backing `t`. The spec's empty order is the
+ * `plain` regime, its global one the `backed` regime (fwd.h).
  *
  * Per-path contradiction is the rule `prop:xfx` — `x·f(x) = x·f(1)` and
  * `x′·f(x) = x′·f(0)` — so a subterm under a literal is reduced by that
@@ -258,19 +249,19 @@ tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
  * a compound one (`ab ∪ ab·c`) stays as written.
  *
  * The first three laws are THE SWEEP, the existing
- * `syntactic_path_simplification` (heuristics/). A plain term goes through it
- * whole. A term in the BDD regime — BDD-backed, a plain combination of
- * BDD-backed subterms, or a term carrying a stored BDD anywhere — is first
- * (re)built over the order, then every leaf goes through the sweep and the
- * BDD is rebuilt, so leaves that became equal merge. A term that neither
- * touches the order nor carries a stored BDD is in the plain regime whatever
- * the order says.
+ * `syntactic_path_simplification` (heuristics/). In the plain regime a term
+ * goes through it whole. In the backed regime a term holding a variable or a
+ * stored BDD — BDD-backed, a plain combination of BDD-backed subterms, or a
+ * term carrying a stored BDD anywhere — is first (re)built, then every leaf
+ * goes through the sweep and the BDD is rebuilt, so leaves that became equal
+ * merge; a term holding neither is swept whole.
  *
- * THE COFACTOR CHECK is one-level Shannon reduction of the WHOLE term over
- * every free variable of `t` that is no variable of `order`: an order
- * variable is one the BDD has decided already, and one still free in a leaf
- * sits where the expansion is not licensed (§1's leaf hazard). For each such
- * `y`, `f₀ = t[y←0]` and `f₁ = t[y←1]`, the substitution reaching BOOLEAN
+ * THE COFACTOR CHECK runs in the plain regime alone: in the backed one every
+ * variable is a variable of the order, decided by the BDD already or sitting
+ * in a leaf, where the expansion is not licensed (§1's leaf hazard). It is
+ * one-level Shannon reduction of the WHOLE term over every free variable of
+ * `t`. For each `y`, `f₀ = t[y←0]` and `f₁ = t[y←1]`, the substitution
+ * reaching BOOLEAN
  * POSITIONS only — under `∪ · ′ +` and the functional quantifiers, never
  * under an arithmetic operator, a reference or a foreign-typed subterm, where
  * no Shannon expansion holds — with constants folding through the
@@ -287,7 +278,7 @@ tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
  * incompleteness behind every syntactic test of the spec.
  */
 template <NodeType node>
-tref simplify_term(tref t, const var_order<node>& order = {});
+tref simplify_term(tref t, regime rg = regime::plain);
 
 /**
  * @brief §3 `SIMPLIFY_ATOM(a, order = ∅)`: ONE recipe in both regimes.
@@ -306,22 +297,22 @@ tref simplify_term(tref t, const var_order<node>& order = {});
  * NOT IDEMPOTENT, like `simplify_term`.
  */
 template <NodeType node>
-tref simplify_atom(tref a, const var_order<node>& order = {});
+tref simplify_atom(tref a, regime rg = regime::plain);
 
 // --- reading and rewriting equations ---------------------------------------------
 
 /// §3 `TERM_OF(atom)`: for an equation `l = r` or `l ≠ r`, seen through one
 /// optional `¬`, the term `l + r`. Read off without touching the atom
-/// (invariant 4). `order` is the live order: the ring sum of two BDD-backed
-/// sides is a BDD operation, and a plain side is a leaf under it. `nullptr`
-/// on anything else, which is a caller bug and is Debug-asserted.
+/// (invariant 4). The ring sum is a BDD operation when a side is
+/// BDD-backed, the other side built alongside it. `nullptr` on anything
+/// else, which is a caller bug and is Debug-asserted.
 template <NodeType node>
-tref term_of(tref atom, const var_order<node>& order);
+tref term_of(tref atom);
 
 /// §3 `NORM_EQUATION`: `l = r ↦ l + r = 0`, descending through one `¬`.
 /// Anything that is no equation comes back as it is.
 template <NodeType node>
-tref norm_equation(tref atom, const var_order<node>& order);
+tref norm_equation(tref atom);
 
 // --- in-memory size and the leaf hazard -------------------------------------------
 

@@ -4,12 +4,12 @@
 // Spec: anti_prenex.md §1 (atoms_memo), §3 (`[atm ↦ T/F]`, `[x ← t]`), §4
 // (what may touch a unit), §10 (occurrence guards).
 //
-// `φ[x ← t]` is `subst_var`: the library's `tree<node>::substitute` under the
-// live order, with the key formed from the variable and the re-simplifying
-// argument hook. The library's substitution has its own suite
-// (tests/unit/test_tau_tree.cpp) and a hand-built hook is exercised in
-// test_anti_prenex_layer0.cpp, so the cases here are about what the wrapper
-// adds: the key, the hook and the order it hands on.
+// `φ[x ← t]` is `subst_var`: the library's `tree<node>::substitute`, with
+// the key formed from the variable and the re-simplifying argument hook. The
+// library's substitution has its own suite (tests/unit/test_tau_tree.cpp)
+// and a hand-built hook is exercised in test_anti_prenex_layer0.cpp, so the
+// cases here are about what the wrapper adds: the key, the hook and the
+// regime it hands on.
 //
 // Conventions. Every substitution takes the `wff` WRAPPER. A member of a chain
 // that is not the last child of its operator node carries a right sibling, so
@@ -262,22 +262,19 @@ TEST_CASE("subst_var: an occurrence a binder below binds is left alone") {
 	CHECK(same(u, inner));
 }
 
-TEST_CASE("subst_var: under a live order the rewrite reaches a stored BDD's leaves") {
-	tref x = vr("x"), y = vr("y");
-	const ap::block P{ x };
-	const ap::var_order<node_t> o =
-		ap::ctx<node_t>::for_component(P, 0, false).order;
-	tref phi = ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"), P, o);
+TEST_CASE("subst_var: in the backed regime the rewrite composes a stored BDD") {
+	tref y = vr("y");
+	tref phi = ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"));
 	REQUIRE(has_bdd_id(phi));
-	// `y` sits in a leaf, so the rewrite is one inside the BDD and the term
-	// keeps its decision variable — and with it its backing.
-	tref res = ap::subst_var<node_t>(phi, y, bf("a"), o);
+	// `y` is a decision variable, so the rewrite is a compose inside the
+	// BDD, and the term keeps its backing.
+	tref res = ap::subst_var<node_t>(phi, y, bf("a"), ap::regime::backed);
 	CHECK(has_bdd_id(res));
 	CHECK(!in_fv(res, y));
 	CHECK(in_fv(res, vr("a")));
 	// The order is the library's, so the result is the BDD the same formula
 	// prepares to: one node, by interning.
-	CHECK(res == ap::prepare_terms<node_t>(wff("x & a | x' & z = 0"), P, o));
+	CHECK(res == ap::prepare_terms<node_t>(wff("x & a | x' & z = 0")));
 }
 
 } // TEST_SUITE

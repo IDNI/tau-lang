@@ -131,7 +131,9 @@ template <NodeType node>
 tref process_all_blocks(tref phi, const keep_functional_fn<node>& kf) {
 	DBG(assert(phi != nullptr);)
 	driver_detail::pass<node> p{ kf };
-	return p.process_node(phi);
+	// Undoes phase 2's renames apart: every block's variables are the
+	// lowest levels of the global order below their scope (§1).
+	return p.process_node(canonicalise_binder_ids<node>(phi));
 }
 
 } // namespace idni::tau_lang::anti_prenexing

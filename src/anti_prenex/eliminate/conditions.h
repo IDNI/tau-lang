@@ -16,9 +16,8 @@
  * A CLAUSE TRAVELS AS ITS CONJUNCT LIST. The member view of the clause is
  * taken once, by the caller, and a formula is assembled again only where one
  * is emitted, through the result joins (joins.h); the spec's `⋀ { … }`
- * groupings are lists here. `ctx.order` is the live order of the component
- * (§5), which every term operation needs, so `SQUEEZE` — which has no ctx —
- * takes it as its own parameter.
+ * groupings are lists here. `SQUEEZE` has no ctx: its term operations run in
+ * the backed regime under the library's one global order.
  *
  * INVARIANT 4 holds throughout: an equation is rewritten in `SQUEEZE` and
  * nowhere else, an order atom is never rewritten at all, and a negative atom
@@ -134,13 +133,9 @@ struct squeeze_result {
  * disjoint variable sets distribute over `∪` and `·`, so nothing of one
  * component ever enters another's term, and that is what every condition
  * below is exact over.
- *
- * @param order the component's live order, which `TERM_OF` and the term
- *        simplifier both require
  */
 template <NodeType node>
-squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
-	const var_order<node>& order);
+squeeze_result<node> squeeze(const trefs& conjuncts, const block& X);
 
 // --- the three conditions ---------------------------------------------------------
 

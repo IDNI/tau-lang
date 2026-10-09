@@ -59,12 +59,9 @@ namespace idni::tau_lang::anti_prenexing {
  * ANYTHING ELSE is opaque — a reference, an ORDER ATOM, EVERY binder unit, a
  * temporal operator: this engine answers no queries, so it can swallow none
  * of them.
- *
- * @param order the component's live order, which `TERM_OF` requires
  */
 template <NodeType node>
-bool atomless_opaque(tref conjunct, const block& X,
-	const var_order<node>& order);
+bool atomless_opaque(tref conjunct, const block& X);
 
 /**
  * @brief §7 `ELIMINATE_ATOMLESS_CLAUSE(clause, X, ctx)`: a formula equivalent

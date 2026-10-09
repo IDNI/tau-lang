@@ -36,25 +36,23 @@ bool leaf_hides(tref t, const block& X) {
 } // namespace atomless_detail
 
 template <NodeType node>
-bool atomless_opaque(tref conjunct, const block& X,
-	const var_order<node>& order)
-{
+bool atomless_opaque(tref conjunct, const block& X) {
 	using tau = tree<node>;
 	using namespace atomless_detail;
 	// A (¬)EQUATION, at either polarity: usable unless its term hides a
 	// block variable in a leaf. An order atom is no equation and falls
 	// through to the last line.
 	if (is_child<node>(atom_of<node>(conjunct), tau::bf_eq))
-		return leaf_hides<node>(term_of<node>(conjunct, order), X);
+		return leaf_hides<node>(term_of<node>(conjunct), X);
 	if (is_negative_tree<node>(conjunct)) {
 		// LITERAL-WISE: one walk down to the negated equations, each of
 		// them once, stopping at the first hidden one. Every leaf of a
 		// negative tree is a negated equation (§1), and the descent
 		// stops at the terms, so nothing below a literal is entered.
 		bool hidden = false;
-		auto check = [&hidden, &X, &order](tref m) {
+		auto check = [&hidden, &X](tref m) {
 			if (!is_negated_equation<node>(m)) return true;
-			if (!leaf_hides<node>(term_of<node>(m, order), X))
+			if (!leaf_hides<node>(term_of<node>(m), X))
 				return true;
 			return hidden = true, false;
 		};
@@ -76,8 +74,7 @@ tref eliminate_atomless_clause(const trefs& conjuncts, const block& X,
 	// 1. FREEZE, by connected component: what is left is a clause this
 	// engine can read through its terms alone.
 	const freeze_result<node> fr = freeze_opaque_components<node>(conjuncts,
-		X, [&X, &c](tref n) {
-			return atomless_opaque<node>(n, X, c.order); });
+		X, [&X](tref n) { return atomless_opaque<node>(n, X); });
 	// Every conjunct mentions some `x ∈ X` (the method contract), so an
 	// empty block means every component was frozen and `frozen` is the
 	// whole clause, re-wrapped.
@@ -85,8 +82,7 @@ tref eliminate_atomless_clause(const trefs& conjuncts, const block& X,
 	// 2. SQUEEZE, then the conditions. `O1` and `O2` inside
 	// `NEGATIVE_CONDITION` reason under `pos` as a sibling assumption, so
 	// `pos` is computed first and its `F` ends the clause.
-	const squeeze_result<node> s = squeeze<node>(fr.conjuncts, fr.X,
-		c.order);
+	const squeeze_result<node> s = squeeze<node>(fr.conjuncts, fr.X);
 	if (s.decided_false) return _F<node>();
 	const tref pos = positive_condition<node>(s.comps, c);
 	if (tau::get(pos).equals_F()) return _F<node>();
@@ -98,7 +94,7 @@ tref eliminate_atomless_clause(const trefs& conjuncts, const block& X,
 	for (tref n : s.negatives)
 		if (neg.insert(is_negative_tree<node>(n)
 			? tree_condition<node>(n, s.comps, fr.X, c)
-			: negative_condition<node>(term_of<node>(n, c.order),
+			: negative_condition<node>(term_of<node>(n),
 				s.comps, fr.X, c)))
 			return _F<node>();
 	return simplified_and_join<node>(trefs{ fr.frozen, pos, neg.result() });

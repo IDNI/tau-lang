@@ -40,7 +40,6 @@ namespace {
 
 using tb = tau_term_bdd<node_t>;
 using th = term_handle<node_t>;
-using order_t = ap::var_order<node_t>;
 
 tref parse(const char* sample) {
 	auto rr = get_nso_rr(sample);
@@ -103,14 +102,11 @@ size_t binder_count(tref n) {
 /// reads.
 tref finished(tref n) { return th::convert_to_tau_terms(n); }
 
-/// Semantic equality of two TERMS over the variables `vs`: equal ROBDDs
-/// under one order over all of them (leaves opaque), both finished first.
-bool same_function(tref a, tref b, const ap::block& vs) {
-	order_t o;
-	for (size_t i = 0; i < vs.size(); ++i)
-		o.emplace(vs[i], int_t(vs.size() - i));
-	return tb::build_bdd(th::convert_to_tau_terms(a), o)
-		== tb::build_bdd(th::convert_to_tau_terms(b), o);
+/// Semantic equality of two terms: equal ROBDDs (leaves opaque), both
+/// finished first.
+bool same_function(tref a, tref b) {
+	return tb::build_bdd(th::convert_to_tau_terms(a))
+		== tb::build_bdd(th::convert_to_tau_terms(b));
 }
 
 /// NO FREE VARIABLE ESCAPED: `FV(out) ⊆ FV(in)`.
@@ -176,7 +172,7 @@ fixture make(const char* src, bool keep = false) {
 	REQUIRE(!f.P.empty());
 	f.c = ap::ctx<node_t>::for_component(f.P,
 		find_ba_type<node_t>(f.P[0]), keep);
-	f.clause = ap::prepare_terms<node_t>(normalised(n), f.P, f.c.order);
+	f.clause = ap::prepare_terms<node_t>(normalised(n));
 	return f;
 }
 
@@ -188,7 +184,7 @@ tref eliminated(fixture& f, tref* emitted = nullptr) {
 	const tref r = ap::eliminate_block<node_t>(f.clause, f.P, f.c);
 	if (emitted) *emitted = r;
 	if (!f.c.keep_functional) return r;
-	return ap::resolve_functional_quantifiers_bdd<node_t>(r, f.c.order,
+	return ap::resolve_functional_quantifiers_bdd<node_t>(r,
 		ap::keep_no_functional<node_t>);
 }
 
@@ -413,8 +409,7 @@ TEST_CASE("L14: a negative whose zero form is 1 never reaches the method") {
 	fixture f = make("ex x (x = 0 && !(x = x')).");
 	const trefs ms = ap::members<node_t>(f.clause);
 	CHECK(ms.size() == 1);
-	const ap::squeeze_result<node_t> s = ap::squeeze<node_t>(ms, f.P,
-		f.c.order);
+	const ap::squeeze_result<node_t> s = ap::squeeze<node_t>(ms, f.P);
 	CHECK(s.negatives.empty());
 	CHECK(!s.decided_false);
 	const tref got = eliminated(f);
@@ -435,7 +430,7 @@ TEST_CASE("L15: an order atom freezes its component") {
 	const tref plain = conj(conj(eq0(land(tbf("x"), tbf("a"))),
 		order_atom(tbf("x"), tbf("b"))),
 		eq0(land(tbf("y"), tbf("b"))));
-	const tref clause = ap::prepare_terms<node_t>(plain, P, c.order);
+	const tref clause = ap::prepare_terms<node_t>(plain);
 	const tref source = ap::rewrap<node_t>(plain, P);
 
 	const tref got = ap::eliminate_block<node_t>(clause, P, c);
@@ -475,7 +470,7 @@ TEST_CASE("L17: a block variable hidden in a leaf freezes its component") {
 	REQUIRE(ms.size() == 2);
 	size_t opaque = 0;
 	for (tref m : ms)
-		if (ap::atomless_opaque<node_t>(m, f.P, f.c.order)) ++opaque;
+		if (ap::atomless_opaque<node_t>(m, f.P)) ++opaque;
 	CHECK(opaque == 1);
 	const tref got = eliminated(f);
 	check_against_source(got, f);
@@ -530,8 +525,8 @@ TEST_CASE("L19: the squeeze's hidden pin is read back by the weak test") {
 	tref positive = nullptr;
 	for (tref m : ms) if (is_child<node_t>(m, tau::bf_eq)) positive = m;
 	REQUIRE(positive != nullptr);
-	const tref term = ap::term_of<node_t>(positive, f.c.order);
-	const ap::cof_entry e = ap::cof<node_t>(term, y, f.c);
+	const tref term = ap::term_of<node_t>(positive);
+	const ap::cof_entry e = ap::cof<node_t>(term, y);
 	CHECK(e.usable);
 	CHECK(e.pin);
 	REQUIRE(e.p != nullptr);
@@ -540,12 +535,11 @@ TEST_CASE("L19: the squeeze's hidden pin is read back by the weak test") {
 	const tref b = var_of(f.quantified, "b");
 	const tref cv = var_of(f.quantified, "c");
 	REQUIRE(a != nullptr); REQUIRE(b != nullptr); REQUIRE(cv != nullptr);
-	const ap::block vs{ x, y, a, b, cv };
 	// the residual is `G = x·b` and the witness is `t·G′ = a·(x·b)′`
 	const tref G = land(as_bf(x), as_bf(b));
-	CHECK(same_function(e.p, G, vs));
-	CHECK(same_function(ap::simplify_term<node_t>(lneg(e.f1), f.c.order),
-		land(as_bf(a), lneg(G)), vs));
+	CHECK(same_function(e.p, G));
+	CHECK(same_function(ap::simplify_term<node_t>(lneg(e.f1), ap::regime::backed),
+		land(as_bf(a), lneg(G))));
 	// The pass fires on it, and the block resolves: `∃x∃y.((y + a) ∪ x·b =
 	// 0 ∧ y·c ≠ 0)` is `a·c ≠ 0`.
 	CHECK(ap::try_witness<node_t>(y, f.clause, f.c).has_value());

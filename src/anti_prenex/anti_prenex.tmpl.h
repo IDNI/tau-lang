@@ -6,9 +6,8 @@
  * `ANTI_PRENEX`, each one call into the module below, in the order the spec
  * fixes.
  *
- * Phases 1, 2 and 5 pass the EMPTY order: nothing is BDD-backed outside a
- * component (§3), so `simplify`'s propagation guard is vacuous and the plain
- * chain resolver takes no order at all.
+ * Phases 1, 2 and 5 run in the PLAIN regime: nothing is BDD-backed outside a
+ * component (§3), so `simplify`'s propagation guard is vacuous.
  *
  * The phases run under the call's `time_limit_scope` (ctx.h), and the abort
  * a check point throws is caught here alone, so every frame between a check
@@ -64,7 +63,7 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf,
 		//    (§3).
 		phi = resolve_functional_quantifiers_plain<node>(phi, kf);
 		phi = to_canonically_factored_nnf<node>(phi);
-		phi = simplify<node>(phi, {}, {}, true);
+		phi = simplify<node>(phi, regime::plain, {}, true);
 		// 2. The deep witness pass, then the global simplification it
 		//    leaves to its caller (§3, `TRY_WITNESS_DEEP`).
 		const tref pre_witness = phi;

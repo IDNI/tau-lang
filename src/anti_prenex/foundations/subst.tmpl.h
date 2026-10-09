@@ -11,7 +11,7 @@
  * a chain in place.
  *
  * `[x ← t]` IS the library's `tree<node>::substitute`, which is where the
- * order, the capture rules and the rename-apart live. What is added here is
+ * compose, the capture rules and the rename-apart live. What is added here is
  * the key — the variable's `bf` term — the hook, and the atoms named for it.
  *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
@@ -64,8 +64,8 @@ namespace detail {
 /// The argument hook of every variable substitution in the module (§1,
 /// invariant 6): a reference argument the substitution changed is
 /// re-simplified once, in the PLAIN regime — an argument is the inside of a
-/// leaf, never BDD-backed, whatever the live order. One `std::function`,
-/// built once.
+/// leaf, never BDD-backed, whatever the regime around it. One
+/// `std::function`, built once.
 template <NodeType node>
 const typename tree<node>::argument_hook& resimplify_argument() {
 	static const typename tree<node>::argument_hook hook =
@@ -172,18 +172,18 @@ bool has_atom(tref n, tref atm) {
 // --- φ[x ← t] ------------------------------------------------------------------------
 
 template <NodeType node>
-tref subst_var(tref phi, tref x, tref t, const var_order<node>& order) {
+tref subst_var(tref phi, tref x, tref t, regime rg) {
 	using tau = tree<node>;
 	// One hook for both kinds the library hands it: a reference argument
 	// is a `bf` term, a rewritten atom a `wff`.
-	const typename tau::argument_hook resimplify = [&order](tref n) {
-		return tau::get(n).is(tau::wff) ? simplify_atom<node>(n, order)
+	const typename tau::argument_hook resimplify = [rg](tref n) {
+		return tau::get(n).is(tau::wff) ? simplify_atom<node>(n, rg)
 			: detail::resimplify_argument<node>()(n);
 	};
 	// The rewrite happens inside `phi`, so a right sibling it carries as a
 	// chain member is not part of it.
 	return tau::get(tau::trim_right_sibling(phi))
-		.substitute(tau::get(tau::bf, x), t, order, resimplify, {},
+		.substitute(tau::get(tau::bf, x), t, resimplify, {},
 			is_atomic_fm<node>);
 }
 

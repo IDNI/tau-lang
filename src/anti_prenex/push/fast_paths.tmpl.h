@@ -138,11 +138,11 @@ std::optional<tref> try_fast_paths(tref phi, const block& X, ctx<node>& c) {
 		// Eager `T` (invariant 7): a `T` among the eliminations
 		// stops the rest of the list from being eliminated at all.
 		join_builder<node, false> acc;
-		for (tref t : squeeze_positives<node>(phi, c.order)) {
+		for (tref t : squeeze_positives<node>(phi)) {
 			// An atom built here is simplified as it is built
 			// (invariant 6).
 			const tref a = simplify_atom<node>(
-				build_bf_eq_0<node>(t), c.order);
+				build_bf_eq_0<node>(t), regime::backed);
 			if (acc.insert(eliminate_block<node>(a, X, c))) break;
 		}
 		return acc.result();
@@ -198,7 +198,7 @@ tref distribute_to_atoms(tref phi, const block& X, ctx<node>& c,
 // --- the squeeze ---------------------------------------------------------------------
 
 template <NodeType node>
-trefs squeeze_positives(tref phi, const var_order<node>& order) {
+trefs squeeze_positives(tref phi) {
 	using tau = tree<node>;
 	using namespace fast_paths_detail;
 	DBG(assert(phi != nullptr);)
@@ -210,7 +210,7 @@ trefs squeeze_positives(tref phi, const var_order<node>& order) {
 		if (const auto it = lists.find(n); it != lists.end())
 			return it->second;
 		DBG(assert(is_child<node>(n, tau::bf_eq));)
-		return trefs{ term_of<node>(n, order) };
+		return trefs{ term_of<node>(n) };
 	};
 	// Over the operator node's OWN children, not the flattened member view:
 	// a chain's spine then holds partial products its parent goes on with,

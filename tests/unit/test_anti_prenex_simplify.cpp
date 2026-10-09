@@ -4,9 +4,9 @@
 // Spec: anti_prenex.md §3 SIMPLIFY and "Equality propagation", §4 "What may
 // touch a unit", §10, and TRY_WITNESS's pin match (§3).
 //
-// Everything here runs in the PLAIN regime — the empty order, which is what
-// phases 1, 2 and 5 pass — so no term is BDD-backed and the `X` guard is
-// vacuous unless a case builds a block of its own.
+// Everything here runs in the PLAIN regime — what phases 1, 2 and 5 pass —
+// so no term is BDD-backed and the `X` guard is vacuous unless a case builds
+// a block of its own.
 //
 // Two facts the cases are built around. An equation is SYMMETRIC: `y = a`
 // pins `y` with witness `a` AND `a` with witness `y`, both strictly and with
@@ -205,7 +205,7 @@ TEST_CASE("S5: the spec's example — the pin folds `x·y ∪ x′·t` to `t`") 
 	for (tref m : members(rest))
 		if (ap::is_literal<node_t>(m)
 			&& is_child<node_t>(m, tau::bf_eq)
-			&& same(ap::term_of<node_t>(m, {}), t)) folded = true;
+			&& same(ap::term_of<node_t>(m), t)) folded = true;
 	CHECK(folded);
 }
 
@@ -225,7 +225,7 @@ TEST_CASE("S5b: an EQUATION sibling is rewritten too, whatever the content "
 	tref rest = other_member(got, pinning);
 	REQUIRE(rest != nullptr);
 	CHECK(!holds_var(rest, "y"));
-	CHECK(same(ap::term_of<node_t>(rest, {}), t));
+	CHECK(same(ap::term_of<node_t>(rest), t));
 	// The pinning conjunct is still there, as written.
 	bool kept = false;
 	for (tref m : members(got)) if (same(m, pinning)) kept = true;
@@ -311,7 +311,7 @@ TEST_CASE("S8: pins chain within one pass") {
 	// The chained equation itself: `z = (a·b)·c`, the form the normalised
 	// environment holds for `z`.
 	const tref expected = ap::simplify_atom<node_t>(
-		eq(z, land(t, c)), {});
+		eq(z, land(t, c)), ap::regime::plain);
 	bool chained = false;
 	for (tref m : members(got)) if (same(m, expected)) chained = true;
 	CHECK(chained);
@@ -353,7 +353,7 @@ TEST_CASE("S8c: a pinning conjunct IS rewritten by every other pin") {
 	// `y`'s conjunct is untouched by its own pin; `z`'s carries `y`'s
 	// witness, which is the same form the environment holds for `z`.
 	const tref expected = ap::simplify_atom<node_t>(
-		eq(z, land(land(a, b), c)), {});
+		eq(z, land(land(a, b), c)), ap::regime::plain);
 	bool kept_y = false, rewritten_z = false;
 	for (tref m : members(got)) {
 		if (same(m, p1)) kept_y = true;
@@ -385,7 +385,7 @@ TEST_CASE("S8d: an admission that re-normalises a range denies the shortcut") {
 	// Both equations come out fully folded: `z`'s by every pin but its
 	// own, `y`'s untouched by its own.
 	const tref folded_z = ap::simplify_atom<node_t>(
-		eq(z, land(land(a, b), c)), {});
+		eq(z, land(land(a, b), c)), ap::regime::plain);
 	bool kept_w = false, folded = false;
 	for (tref m : members(got)) {
 		if (same(m, second_eq)) kept_w = true;
@@ -500,7 +500,7 @@ TEST_CASE("S12: reference arguments only under `ref_args`") {
 	// Opaque by default.
 	CHECK(ap::simplify<node_t>(ref) == ref);
 	// In phase 1's entry state the argument goes through SIMPLIFY_TERM.
-	tref got = ap::simplify<node_t>(ref, {}, {}, true);
+	tref got = ap::simplify<node_t>(ref, ap::regime::plain, {}, true);
 	INFO("ref_args: ", tau::get(got).to_str());
 	CHECK(is_child<node_t>(got, tau::wff_ref));
 	CHECK(got != ref);
@@ -519,7 +519,7 @@ TEST_CASE("S12a: a reference INSIDE an atom's terms has its arguments "
 	REQUIRE(holds_parsed_var(atom, "y"));
 	// Opaque by default: the same node.
 	CHECK(ap::simplify<node_t>(atom) == atom);
-	tref got = ap::simplify<node_t>(atom, {}, {}, true);
+	tref got = ap::simplify<node_t>(atom, ap::regime::plain, {}, true);
 	INFO("ref_args: ", tau::get(got).to_str());
 	CHECK(got != atom);
 	CHECK(is_child<node_t>(got, tau::bf_eq));
@@ -529,13 +529,13 @@ TEST_CASE("S12a: a reference INSIDE an atom's terms has its arguments "
 	// argument.
 	tref negated = tau::get("!(f(x & (x | y)) = 0)", parse_wff());
 	REQUIRE(negated != nullptr);
-	tref ngot = ap::simplify<node_t>(negated, {}, {}, true);
+	tref ngot = ap::simplify<node_t>(negated, ap::regime::plain, {}, true);
 	INFO("negated: ", tau::get(ngot).to_str());
 	CHECK(is_child<node_t>(ngot, tau::wff_neg));
 	CHECK(!holds_parsed_var(ngot, "y"));
 	tref nested = tau::get("g(f(x & (x | y))) = 0", parse_wff());
 	REQUIRE(nested != nullptr);
-	tref nested_got = ap::simplify<node_t>(nested, {}, {}, true);
+	tref nested_got = ap::simplify<node_t>(nested, ap::regime::plain, {}, true);
 	INFO("nested: ", tau::get(nested_got).to_str());
 	CHECK(!holds_parsed_var(nested_got, "y"));
 }

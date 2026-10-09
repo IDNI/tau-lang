@@ -75,8 +75,8 @@ tref eliminate_block_uncached(tref clause, const block& X, ctx<node>& c) {
 	for (tref x : X) {
 		if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
 			break;
-		// COF mode: the conjuncts' terms are BDD-backed under
-		// `ctx.order`, and the pin is read off their cofactors (§3).
+		// COF mode: the conjuncts' terms are BDD-backed, and the pin is
+		// read off their cofactors (§3).
 		const std::optional<tref> witnessed =
 			try_witness<node>(x, clause, c);
 		if (!witnessed) continue;   // `x` stays, the clause is untouched
