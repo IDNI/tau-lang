@@ -48,10 +48,6 @@ const COUNT_SETTERS = {
 	set_ba_decision_pins: 4096,
 };
 
-// What each getter reads after its setter took the restore value: the same
-// value, except the QE cap, whose 0 falls back to its default 2.
-const READ_BACK = { set_ltl_qe_max_vars: 2 };
-
 // The flag setters and their default.
 const FLAG_SETTERS = {
 	set_preprocessing: true, set_ba_component_factoring: true,
@@ -84,8 +80,7 @@ function runEverySetter(tau) {
 		check(tau[name](7) === undefined, `${name}(7) accepted`);
 		check(tau[getter]() === 7, `${getter}() reads 7`);
 		tau[name](restore);
-		const back = READ_BACK[name] ?? restore;
-		check(tau[getter]() === back, `${getter}() reads ${back} again`);
+		check(tau[getter]() === restore, `${getter}() reads ${restore} again`);
 	}
 	verdictsIntact(tau, 'every count setter');
 	for (const [name, dflt] of Object.entries(FLAG_SETTERS)) {

@@ -47,10 +47,6 @@ COUNT_DEFAULTS = {
 	"set_bf_dependence_max_nodes": 65536,
 }
 
-# What a getter reads after its setter took the restore value, where that
-# differs: the QE cap's 0 falls back to its default 2.
-READ_BACK = { "set_ltl_qe_max_vars": 2 }
-
 FLAG_SETTERS = {
 	"set_preprocessing": True, "set_ba_component_factoring": True,
 	"set_pwr_semantic_fallback": False,
@@ -71,7 +67,7 @@ def test_every_setter_takes_a_value():
 		assert getter() == 7, name
 		restore = COUNT_DEFAULTS.get(name, 0)
 		setter(restore)
-		assert getter() == READ_BACK.get(name, restore), name
+		assert getter() == restore, name
 	for name, default in FLAG_SETTERS.items():
 		getattr(tau, name)(not default)
 		getattr(tau, name)(default)
