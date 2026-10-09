@@ -33,26 +33,6 @@ _dep_cvc5_gmp_header() {
 	return 0
 }
 
-# A real python for cvc5's FindPython: Git Bash PATH can carry the
-# WindowsApps store stub, which imports nothing useful.
-_dep_cvc5_python() {
-	local c d
-	for d in python3 python; do
-		c="$(command -v "$d" 2>/dev/null || true)"
-		[ -n "$c" ] || continue
-		case "$c" in *WindowsApps*) continue ;; esac
-		if "$c" -c "import sys" > /dev/null 2>&1; then
-			if command -v cygpath > /dev/null 2>&1; then
-				cygpath -m "$c"
-			else
-				printf '%s' "$c"
-			fi
-			return 0
-		fi
-	done
-	return 1
-}
-
 # The clang-cl of the Visual Studio install, not the first one on PATH: a
 # standalone LLVM changes with the runner image, and the VS copy matches the
 # STL headers that cl.exe uses.
@@ -71,7 +51,7 @@ _dep_cvc5_vs_clang_cl() {
 }
 
 _dep_cvc5_target_setup() {
-	local _py _clang_cl
+	local _clang_cl
 	if [ -n "$CVC5_CMAKE_PREFIX" ]; then
 		echo "dep-cvc5: windows-x86_64-msvc builds its own CaDiCaL and GMP; remove -DCVC5_CMAKE_PREFIX" >&2
 		exit 2
@@ -95,10 +75,7 @@ _dep_cvc5_target_setup() {
 	# The try_run version checks of cvc5 link the Release CaDiCaL and GMP, so
 	# they build in Release too.
 	_DEP_CVC5_TARGET_ARGS=(--ninja production -DCMAKE_TRY_COMPILE_CONFIGURATION=Release)
-	_py="$(_dep_cvc5_python || true)"
-	if [ -n "$_py" ]; then
-		_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$_py")
-	fi
+	_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$(cygpath -m "$DEP_PYTHON")")
 	_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
 }
 
@@ -138,7 +115,7 @@ _dep_cvc5_msvc_short_dir() {
 # the long one.
 _dep_cvc5_msvc_mask_path() {
 	local root="$1" dir="$2"
-	python3 - "$dir" "$root" "$(cygpath -w "$root")" "$(cygpath -m "$root")" \
+	"$DEP_PYTHON" - "$dir" "$root" "$(cygpath -w "$root")" "$(cygpath -m "$root")" \
 		"$(cygpath -wl "$root")" "$(cygpath -ml "$root")" <<'PY'
 import os
 import sys

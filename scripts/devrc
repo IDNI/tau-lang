@@ -6,3 +6,21 @@
 # the parser producers use. The shim does not change which devrc the helper
 # hashes name: the parser's devrc sets __devrc_dir to its own directory.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../external/parser/scripts" && pwd)/devrc"
+
+# A python3 that runs. On Windows the first python3 on PATH can be the
+# WindowsApps stub, so the dep-python-venv interpreter is the fallback.
+dep_python() {
+	local c prefix="${TAU_SHARED_PREFIX:-${HOME}/.tau}"
+	for c in "$(command -v python3 2>/dev/null)" "$(command -v python 2>/dev/null)" \
+			"${TAU_PYTHON:-}" "${prefix}/py312/Scripts/python.exe" \
+			"${prefix}/py312/bin/python3"; do
+		[ -n "$c" ] || continue
+		case "$c" in *WindowsApps*) continue ;; esac
+		if "$c" -c 'import sys' > /dev/null 2>&1; then
+			printf '%s' "$c"
+			return 0
+		fi
+	done
+	echo "dep: no python3 that runs; run ./dev dep-python-venv" >&2
+	return 1
+}

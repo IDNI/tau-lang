@@ -123,7 +123,7 @@ _dep_curl_producer() {
 		|| { echo "dep-curl: install failed" >&2; rm -rf "$work"; return 1; }
 	# curl-config and libcurl.pc bake the staging prefix; rewrite every baked
 	# path to an equal-length placeholder so none is published.
-	if ! python3 - "$staging_prefix" "$staging" "$work" "$build" <<'PY'
+	if ! "$DEP_PYTHON" - "$staging_prefix" "$staging" "$work" "$build" <<'PY'
 import os
 import sys
 root, *old_paths = sys.argv[1:]
@@ -172,6 +172,7 @@ PY
 }
 
 dep_entry "$@"
+DEP_PYTHON="$(dep_python)" || exit 2
 
 dep_require_file_target curl
 dep_require_target_host dep-curl "${DEP_TARGET:-$(dep_host_target)}"

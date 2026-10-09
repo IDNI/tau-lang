@@ -138,7 +138,7 @@ _dep_spot_producer() {
 
 	# The configure prefix is baked into the tools; rewrite every baked build
 	# path to an equal-length placeholder so none is published.
-	if ! python3 - "$staging_prefix" "$staging" "$work" "$src" <<'PY'
+	if ! "$DEP_PYTHON" - "$staging_prefix" "$staging" "$work" "$src" <<'PY'
 import os
 import sys
 root, *old_paths = sys.argv[1:]
@@ -191,6 +191,7 @@ PY
 }
 
 dep_entry "$@"
+DEP_PYTHON="$(dep_python)" || exit 2
 
 SPOT_VERSION="$(dep_var SPOT_VERSION 2.16)"
 SPOT_URL="$(dep_var SPOT_URL \

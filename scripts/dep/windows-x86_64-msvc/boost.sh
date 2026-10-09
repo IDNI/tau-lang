@@ -32,7 +32,7 @@ _dep_boost_msvc_mask_paths() {
 		spellings+=("$dir" "$(cygpath -w "$dir")" "$(cygpath -m "$dir")"
 			"$(cygpath -wl "$dir")" "$(cygpath -ml "$dir")")
 	done
-	python3 - "$prefix" "${spellings[@]}" <<'PY'
+	"$DEP_PYTHON" - "$prefix" "${spellings[@]}" <<'PY'
 import os
 import sys
 top, *roots = sys.argv[1:]

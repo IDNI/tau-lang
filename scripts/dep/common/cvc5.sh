@@ -282,7 +282,7 @@ _dep_cvc5_target_install() {
 # The exported target files of <dir> without cvc5::cvc5parser. find_package
 # refuses a package whose target names a library that is not installed.
 _dep_cvc5_drop_parser_target() {
-	python3 - "$1" <<'PY'
+	"$DEP_PYTHON" - "$1" <<'PY'
 import glob
 import os
 import re
@@ -418,7 +418,7 @@ _dep_cvc5_producer() {
 	# library, dll, .la and .pc files bake those paths in. Rewrite each to an
 	# equal-length placeholder so no build path enters the published package.
 	# A Windows compiler writes the same paths with backslashes.
-	if ! python3 - "$staging_prefix" "$staging" "$work" "$build" <<'PY'
+	if ! "$DEP_PYTHON" - "$staging_prefix" "$staging" "$work" "$build" <<'PY'
 import os
 import sys
 root, *old_paths = sys.argv[1:]
@@ -454,6 +454,7 @@ PY
 }
 
 dep_entry "$@"
+DEP_PYTHON="$(dep_python)" || exit 2
 
 dep_require_file_target cvc5
 for _hook in _dep_cvc5_gmp_header _dep_cvc5_target_setup; do

@@ -257,7 +257,7 @@ _dep_boost_producer() {
 	# Resolve the depinst closure inside the work tree, never a shared source.
 	git -C "$work" submodule update --init tools/boostdep tools/build tools/cmake libs/log \
 		|| { echo "dep-boost: cannot init boostdep/build/cmake/log" >&2; rm -rf "$work"; return 1; }
-	( cd "$work" && python3 tools/boostdep/depinst/depinst.py log ) \
+	( cd "$work" && "$DEP_PYTHON" tools/boostdep/depinst/depinst.py log ) \
 		|| { echo "dep-boost: depinst.py log failed" >&2; rm -rf "$work"; return 1; }
 	_dep_boost_verify_closure "$work" || { rm -rf "$work"; return 1; }
 	echo "dep-boost: resolved closure has $(printf '%s\n' "${BOOST_EXPECTED_CLOSURE[@]}" | wc -l) submodules" >&2
@@ -286,6 +286,7 @@ _dep_boost_producer() {
 }
 
 dep_entry "$@"
+DEP_PYTHON="$(dep_python)" || exit 2
 
 dep_require_file_target boost
 dep_require_target_host dep-boost "${DEP_TARGET:-$(dep_host_target)}"
