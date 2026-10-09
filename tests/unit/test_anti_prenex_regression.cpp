@@ -222,7 +222,8 @@ TEST_CASE("R7: a pin under a disjunction still witnesses") {
 TEST_CASE("R8: a mixed block — one variable pins, the other needs the push") {
 	// AntiPrenexBlock0Arg / "trivial_skolem wiring: mixed block falls back
 	// safely": phase 2's deep witness takes `x` through the disjunction (§3),
-	// and fast path 2b squeezes what is left, `∃y(y·z = 0 ∨ y·w = 0)`, to T.
+	// and in what is left, `∃y(y·z = 0 ∨ y·w = 0)`, `y` only lowers the
+	// truth and leaves at block entry with `y := 0`: T.
 	tref got = anti_prenexed(
 		parse("ex x ex y ((x = c || z = 0) && (yz = 0 || yw = 0))."));
 	CHECK(!holds_var(got, "x"));
@@ -277,12 +278,12 @@ TEST_CASE("R11: no block variable escapes its scope") {
 TEST_CASE("R12: a pure-BA scope over bitvector variables is eliminated") {
 	// PureBaBvEliminability / "pure-BA bv scope is eliminated in Tau":
 	// `∃x.(x ∪ y = 0)` is `y = 0` in ANY BA, so the bitvector type is no
-	// reason to keep the binder. The pin of `x ∪ y = 0` on `x` is WEAK, its
-	// residual `y = 0`, and phase 2 takes strict pins alone; phase 4's
-	// elimination pre-step, the witness pass, takes the weak pin (`x ← 0`)
-	// and leaves `y = 0`. Checked STRUCTURALLY: `are_nso_equivalent` is
-	// undecidable on bitvector content and the ground-truth substitution
-	// needs a one-variable result, which this is not.
+	// reason to keep the binder. The pin of `x ∪ y = 0` on `x` is WEAK and
+	// phase 2 takes strict pins alone; at phase 4 `x` only lowers the truth
+	// and leaves at block entry with `x := 0`, which leaves `y = 0`.
+	// Checked STRUCTURALLY: `are_nso_equivalent` is undecidable on
+	// bitvector content and the ground-truth substitution needs a
+	// one-variable result, which this is not.
 	tref got = anti_prenexed(
 		parse("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2])."),
 		meaning::structural);

@@ -136,11 +136,11 @@ TEST_SUITE("anti_prenex/layer5") {
 // --- 1. 2a: the block distributed to every negated atom -----------------------------
 
 TEST_CASE("L1: an all-negated formula is distributed in one pass") {
-	// test_antiprenexing.cpp:169. The fast paths are tried before the
-	// negative-tree arm and before 2d (§6): `P` is empty, the census
-	// counts two negated leaves and nothing else, so 2a distributes `∃x`
-	// to each of them — `∃_x x·y ≠ 0` is `y ≠ 0`.
-	const tref got = anti_prenexed(parse("ex x (xy != 0 || xw != 0)."));
+	// test_antiprenexing.cpp:169 with `x` made binate. The fast paths are
+	// tried before the negative-tree arm and before 2d (§6): `P` is empty,
+	// the census counts two negated leaves and nothing else, so 2a
+	// distributes `∃x` to each of them — `∃_x x·y ≠ 0` is `y ≠ 0`.
+	const tref got = anti_prenexed(parse("ex x (xy != 0 || x'w != 0)."));
 	resolved(got);
 	CHECK(are_nso_equivalent<node_t>(got, parse("!(y = 0) || !(w = 0).")));
 }
@@ -150,7 +150,7 @@ TEST_CASE("L2: an X-free conjunct rides outside, and 2a takes the rest") {
 	// wrapper's strip hoists it out of the block (§6) and what is pushed
 	// is L1's formula.
 	const tref got = anti_prenexed(
-		parse("ex x (z = 0 && (xy != 0 || xw != 0))."));
+		parse("ex x (z = 0 && (xy != 0 || x'w != 0))."));
 	resolved(got);
 	CHECK(are_nso_equivalent<node_t>(got,
 		parse("z = 0 && (!(y = 0) || !(w = 0)).")));
@@ -159,41 +159,43 @@ TEST_CASE("L2: an X-free conjunct rides outside, and 2a takes the rest") {
 // --- 2. 2b: the positive skeleton squeezed on terms ---------------------------------
 
 TEST_CASE("L3: a disjunction of positives is squeezed, not distributed") {
-	// test_antiprenexing.cpp:64. Every leaf is a positive equation and
-	// none is X-free, so the census lets 2b through before the `∨` arm is
-	// ever reached: the skeleton squeezes on TERMS to `{x·y, x·w}`, and
-	// each one-atom clause is discharged at `x := 0`.
-	const tref got = anti_prenexed(parse("ex x (xy = 0 || xw = 0)."));
+	// test_antiprenexing.cpp:64 with `x` made binate. Every leaf is a
+	// positive equation and none is X-free, so the census lets 2b through
+	// before the `∨` arm is ever reached: the skeleton squeezes on TERMS
+	// to `{x·y, x′·w}`, and the first one-atom clause is discharged at
+	// `x := 0`.
+	const tref got = anti_prenexed(parse("ex x (xy = 0 || x'w = 0)."));
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("L4: a positive clause with a disjunctive conjunct squeezes") {
-	// test_antiprenexing.cpp:206. `x` touches a disjunctive conjunct, so
-	// neither move of the scope narrowing fires and the fast paths are
-	// asked on the whole clause: `{x(y ∪ z), x(w ∪ z)}`, both `T` at
-	// `x := 0`.
+	// test_antiprenexing.cpp:206 with `x` made binate. `x` touches a
+	// disjunctive conjunct, so neither move of the scope narrowing fires
+	// and the fast paths are asked on the whole clause:
+	// `{x(y ∪ z), x′w ∪ xz}`, the first `T` at `x := 0`.
 	const tref got = anti_prenexed(
-		parse("ex x ((xy = 0 || xw = 0) && xz = 0)."));
+		parse("ex x ((xy = 0 || x'w = 0) && xz = 0)."));
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("L5: 2b's cross product is the DNF clause count") {
-	// test_antiprenexing.cpp:733. Two binary disjunctions give four
-	// terms — the honest cost of 2b (invariant 8) — and each is
-	// discharged at `x := 0`.
+	// test_antiprenexing.cpp:733 with `x` made binate. Two binary
+	// disjunctions give four terms — the honest cost of 2b (invariant 8)
+	// — and the first is discharged at `x := 0`.
 	const tref got = anti_prenexed(
-		parse("ex x ((xa = 0 || xb = 0) && (xc = 0 || xd = 0))."));
+		parse("ex x ((xa = 0 || x'b = 0) && (xc = 0 || xd = 0))."));
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("L6: a wider cross product is taken all the same") {
-	// test_antiprenexing.cpp:804. Three ternary disjunctions: 27 terms,
-	// and no cap refuses them — the spec sets none (§6, 2b).
+	// test_antiprenexing.cpp:804 with `x` made binate. Three ternary
+	// disjunctions: 27 terms, and no cap refuses them — the spec sets
+	// none (§6, 2b).
 	const tref got = anti_prenexed(
-		parse("ex x ((xa = 0 || xb = 0 || xc = 0) "
+		parse("ex x ((xa = 0 || xb = 0 || x'c = 0) "
 			"&& (xd = 0 || xe = 0 || xf = 0) "
 			"&& (xg = 0 || xh = 0 || xi = 0))."));
 	resolved(got);
@@ -205,19 +207,19 @@ TEST_CASE("L7: the strip leaves a positive skeleton for 2b") {
 	// disjunction is squeezed to `T`, and a `T` leaves the ∧-join
 	// (invariant 6): what is left is `z = 0` alone.
 	const tref got = anti_prenexed(
-		parse("ex x (z = 0 && (xy = 0 || xw = 0))."));
+		parse("ex x (z = 0 && (xy = 0 || x'w = 0))."));
 	resolved(got);
 	CHECK(holds_var(got, "z"));
 	CHECK(are_nso_equivalent<node_t>(got, parse("z = 0.")));
 }
 
 TEST_CASE("L8: a top-level positive rides into the squeeze") {
-	// test_antiprenexing.cpp:128. After the strip the clause is
-	// `(x·y = 0 ∨ x·w = 0) ∧ x·k = 0`: 2a is refused — the census counts
-	// three positive leaves against one top-level literal — and 2b takes
-	// it, `{x(y ∪ k), x(w ∪ k)}`, both `T` at `x := 0`.
+	// test_antiprenexing.cpp:128 with `x` made binate. After the strip the
+	// clause is `(x·y = 0 ∨ x′·w = 0) ∧ x·k = 0`: 2a is refused — the
+	// census counts three positive leaves against one top-level literal —
+	// and 2b takes it, `{x(y ∪ k), x′w ∪ xk}`, the first `T` at `x := 0`.
 	const tref got = anti_prenexed(
-		parse("ex x (z = 0 && (xy = 0 || xw = 0) && xk = 0)."));
+		parse("ex x (z = 0 && (xy = 0 || x'w = 0) && xk = 0)."));
 	resolved(got);
 	CHECK(are_nso_equivalent<node_t>(got, parse("z = 0.")));
 }
@@ -225,13 +227,13 @@ TEST_CASE("L8: a top-level positive rides into the squeeze") {
 // --- 3. 2d: the block pushed per disjunct -------------------------------------------
 
 TEST_CASE("L9: an X-free disjunct refuses both fast paths, and 2d answers") {
-	// test_antiprenexing.cpp:215. `z = 0` is stripped; in what is left,
-	// `w = 0` is a maximal X-FREE subtree, which the census counts in
-	// `free` — that refuses 2b, and the positive leaf refuses 2a — so the
-	// `∨` arm pushes per disjunct, where `∃x(x·y = 0)` is `T` and decides
-	// the join.
+	// test_antiprenexing.cpp:215 with a third disjunct that makes `x`
+	// binate. `z = 0` is stripped; in what is left, `w = 0` is a maximal
+	// X-FREE subtree, which the census counts in `free` — that refuses 2b,
+	// and the positive leaves refuse 2a — so the `∨` arm pushes per
+	// disjunct, where an `x` disjunct is `T` and decides the join.
 	const tref got = anti_prenexed(
-		parse("ex x ((xy = 0 || w = 0) && z = 0)."));
+		parse("ex x ((xy = 0 || w = 0 || x'v = 0) && z = 0)."));
 	resolved(got);
 	CHECK(are_nso_equivalent<node_t>(got, parse("z = 0.")));
 }
@@ -264,10 +266,11 @@ TEST_CASE("L11: a mixed-sign clause settles and is pushed home") {
 }
 
 TEST_CASE("L12: a conjunction of negated equations settles too") {
-	// test_antiprenexing.cpp:184. A negative tree is an ∨-NODE (§1), so
-	// this is not one; it is a clause with no disjunctive conjunct, which
-	// the narrowing settles whole. `x := 1` witnesses it.
-	const tref got = anti_prenexed(parse("ex x (xy != 0 && xw != 0)."));
+	// test_antiprenexing.cpp:184 with `x` made binate. A negative tree is
+	// an ∨-NODE (§1), so this is not one; it is a clause with no
+	// disjunctive conjunct, which the narrowing settles whole, the leaf
+	// answering `y ≠ 0 ∧ w ≠ 0` in an atomless algebra.
+	const tref got = anti_prenexed(parse("ex x (xy != 0 && x'w != 0)."));
 	resolved(got);
 	CHECK(are_nso_equivalent<node_t>(got, parse("!(y = 0) && !(w = 0).")));
 }
@@ -311,9 +314,9 @@ TEST_CASE("L15: a pivot that is identically 1 kills its disjunct") {
 TEST_CASE("L16: a pin under a disjunct is taken by phase 2, not by the push") {
 	// test_antiprenexing.cpp:302. `x ⊕ y = 0` pins `y`, and phase 2's DEEP
 	// witness reaches it through the disjunction (§3) and rewrites that
-	// disjunct to `T` — so the disjunction is gone before phase 4, and the
-	// block that is left, `∃x(x·w ≠ 0)`, is a one-literal clause for the
-	// leaf.
+	// disjunct to `T` — so the disjunction is gone before phase 4, and in
+	// the block that is left, `∃x(x·w ≠ 0)`, `x` only raises the truth and
+	// leaves at block entry with `x := 1`.
 	const tref got = anti_prenexed(
 		parse("ex x ex y ((x ^ y = 0 || z = 0) && xw != 0)."));
 	resolved(got);
@@ -397,14 +400,16 @@ TEST_CASE("L22: a pin under a disjunct with a free variable is a case") {
 }
 
 TEST_CASE("L23: a block of three one-variable components resolves") {
-	// test_antiprenexing.cpp:1143. No atom mentions two block variables,
-	// so §5's partition gives THREE components, pushed one after the
-	// other. For `x`, the first, the other components' atoms are maximal
-	// X-FREE subtrees, which refuse 2b, and its positive leaves refuse 2a;
-	// no variable settles and nothing pins `x`, so the floor expands, and
+	// test_antiprenexing.cpp:1143 with a third conjunct that makes every
+	// variable binate. No atom mentions two block variables, so §5's
+	// partition gives THREE components, pushed one after the other. For
+	// `x`, the first, the other components' atoms are maximal X-FREE
+	// subtrees, which refuse 2b, and its positive leaves refuse 2a; no
+	// variable settles and nothing pins `x`, so the floor expands, and
 	// its cases resolve `x`; what is left of `y` and `z` resolves in turn.
 	const tref got = anti_prenexed(parse(
-		"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x d = 0))."));
+		"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x' d = 0) "
+		"&& (y' e = 0 || z' g = 0))."));
 	resolved(got);
 }
 
@@ -428,11 +433,11 @@ TEST_CASE("L24: a bitvector run under a reference leaves its two ∀y units") {
 // --- 7. a ∀ run reaches the ladder through its dual ---------------------------------
 
 TEST_CASE("L25: a ∀ run whose dual is a negative tree resolves") {
-	// `∀x(x·y = 0 ∧ x·w = 0)` is dualised at the block boundary (§5) into
-	// `∃x(x·y ≠ 0 ∨ x·w ≠ 0)`, a negative tree that 2a distributes to its
+	// `∀x(x·y = 0 ∧ x′·w = 0)` is dualised at the block boundary (§5) into
+	// `∃x(x·y ≠ 0 ∨ x′·w ≠ 0)`, a negative tree that 2a distributes to its
 	// two leaves; the outbound negation turns `y ≠ 0 ∨ w ≠ 0` back into
-	// `y = 0 ∧ w = 0` — the answer `x := 1` gives.
-	const tref got = anti_prenexed(parse("all x (xy = 0 && xw = 0)."));
+	// `y = 0 ∧ w = 0` — the answers `x := 1` and `x := 0` give.
+	const tref got = anti_prenexed(parse("all x (xy = 0 && x'w = 0)."));
 	resolved(got);
 	CHECK(!holds(got, tau::wff_all));
 	CHECK(are_nso_equivalent<node_t>(got, parse("y = 0 && w = 0.")));

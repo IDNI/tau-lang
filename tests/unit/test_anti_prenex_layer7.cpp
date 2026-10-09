@@ -181,20 +181,24 @@ TEST_CASE("N1: a spent sweep budget hands the query to the solver, untainted") {
 
 // --- the pure side ----------------------------------------------------------------
 
-TEST_CASE("N2: R12's shape resolves before the method dispatch") {
+TEST_CASE("N2: a weak pin like R12's resolves before the method dispatch") {
 	// Phase 2 takes a strict spelled pin alone, so the atom reaches the
-	// push, where 2b hands the one-atom clause to ELIMINATE_BLOCK. Its
-	// witness pass reads the cofactors of `x ∪ y` on `x`, `y` and `1`, whose
-	// union is `1`: a pin, witness `0`, residual `y = 0` (§3 TRY_WITNESS).
+	// push — `x` is binate, so it does not leave at block entry — where 2b
+	// hands the one-atom clause to ELIMINATE_BLOCK. Its witness pass reads
+	// the cofactors of `x·a ∪ x′·(a′ ∪ y)` on `x`, `a′ ∪ y` and `a`, whose
+	// union is `1`: a pin, witness `a′`, residual `a·y = 0` (§3
+	// TRY_WITNESS).
 	const tref got = bv_anti_prenexed(
-		parse("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2])."));
+		parse("ex x ((x:bv[2] & a:bv[2]) "
+			"| (x:bv[2]' & (a:bv[2]' | y:bv[2])) = { 0 }:bv[2])."));
 	resolved(got);
 	CHECK(!holds_var(got, "x"));
-	CHECK(bv_equivalent(got, parse("y:bv[2] = { 0 }:bv[2].")));
+	CHECK(bv_equivalent(got, parse("a:bv[2] & y:bv[2] = { 0 }:bv[2].")));
 }
 
 TEST_CASE("N3: the finite method's tiers 0 and 1 resolve end to end") {
-	// F2 is R12's shape, resolved as in N2. F3 and F4 pin nothing: no
+	// F2 is R12's shape, whose `x` only lowers its truth, so it leaves at
+	// block entry (§5). F3 and F4 pin nothing: no
 	// conjunct is disjunctive but a negative tree, so the settle move takes
 	// the block home (§6), the router hands the pure clause to the finite
 	// side, and tier 1 emits `pos` — here `∀_x x·a = 0`, i.e. `T` — and one
@@ -268,15 +272,16 @@ TEST_CASE("N6: F8's open tier-2 queries, closed both ways") {
 }
 
 TEST_CASE("N7: F10's unit is swallowed into the query") {
-	// The `∀y` block goes first (§4, post-order): its dual `∃y (y·x ≠ 0 ∧
-	// y ≠ 0)` is a tier-2 query open in `x`, neither valid nor
+	// F10's input with `y′` in its last atom, so that `y` is binate. The
+	// `∀y` block goes first (§4, post-order): its dual `∃y (y·x ≠ 0 ∧
+	// y′ ≠ 0)` is a tier-2 query open in `x`, neither valid nor
 	// unsatisfiable, so its unit stands. The `∃x` block's clause is pure:
 	// the router hands it to the finite method, which swallows the unit
 	// into its tier-2 query, unsatisfiable since the unit forces `x = 0`.
 	const tref got = bv_anti_prenexed(parse(
 		"ex x (!(x:bv[2] & a:bv[2] = { 0 }:bv[2]) "
 		"&& all y (y:bv[2] & x:bv[2] = { 0 }:bv[2] "
-		"|| y:bv[2] = { 0 }:bv[2]))."));
+		"|| y:bv[2]' = { 0 }:bv[2]))."));
 	resolved(got);
 	CHECK(tau::get(got).equals_F());
 }

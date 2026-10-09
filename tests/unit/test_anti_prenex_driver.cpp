@@ -343,11 +343,12 @@ TEST_CASE("B2: two components are pushed one after the other") {
 }
 
 TEST_CASE("B3: the second component is pushed into what the first left") {
-	// Two components again, the second one DISJUNCTIVE. `∃x` strips the
-	// disjunction outside its block and discharges its own atom to `T`;
-	// `∃y` then meets that disjunction alone, where 2b squeezes the two
-	// positives on terms and both discharge at `y := 0`.
-	fixture f = split("ex x ex y (x a = 0 && (y b = 0 || y c = 0)).");
+	// Two components again, the second one DISJUNCTIVE, and both variables
+	// binate. `∃x` strips the disjunction outside its block and discharges
+	// its own atom, a pin, to `T`; `∃y` then meets that disjunction alone,
+	// where 2b squeezes the two positives on terms and `∃y(y·b = 0)`
+	// discharges at `y := 0`.
+	fixture f = split("ex x ex y (x ^ a = 0 && (y b = 0 || y' c = 0)).");
 	const tref got = ap::push_ex_block<node_t>(f.blk.matrix, f.blk.vars,
 		ap::keep_no_functional<node_t>);
 	check_claims(got, f);
@@ -577,8 +578,9 @@ TEST_CASE("D1: a ∀ run is pushed by dualisation") {
 }
 
 TEST_CASE("D2: what the ∃ push resolves comes back negated") {
-	// `∀x. x·y = 0` dualises to `∃x. ¬(x·y = 0)`, which the leaf
-	// discharges to `¬(y = 0)`; negated again, that is `y = 0`.
+	// `∀x. x·y = 0` dualises to `∃x. ¬(x·y = 0)`, where `x` only raises
+	// the truth and leaves at block entry with `x := 1`, giving `¬(y = 0)`;
+	// negated again, that is `y = 0`.
 	fixture f = split("all x (x y = 0).");
 	const tref got = ap::process_block<node_t>(f.blk,
 		ap::keep_no_functional<node_t>);
@@ -729,7 +731,8 @@ TEST_CASE("A5: a shared run head is processed once") {
 
 TEST_CASE("A6: a run under a temporal operator is processed") {
 	// The walk enters a temporal operator like any other formula node, so
-	// the block below one is reached and discharged.
+	// the block below one is reached, and its `x`, which only lowers the
+	// truth, leaves at block entry with `x := 0`.
 	tref phi = parse("always ex x (x y = 0).");
 	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
 		ap::keep_no_functional<node_t>);

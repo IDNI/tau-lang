@@ -156,7 +156,8 @@ TEST_CASE("M1: the inputs that reach the conjunction's floor resolve") {
 			"(xe = 0 || xf != 0) && (xg = 0 || xh != 0)).", true },
 		{ "L22", "ex x ((x ^ y = 0 || z = 0) && xw != 0).", false },
 		{ "L23", "ex x, y, z ((x a = 0 || y b = 0) "
-			"&& (z c = 0 || x d = 0)).", false },
+			"&& (z c = 0 || x' d = 0) && (y' e = 0 || z' g = 0)).",
+			false },
 		{ "L26", "all x ((xy != 0 && xw != 0) || xz = 0).", false },
 	};
 	for (const row& r : rows) {
@@ -185,14 +186,14 @@ TEST_CASE("M2: an exclusive expansion over an X-free member resolves") {
 }
 
 TEST_CASE("M3: a spanning atom is decomposed, and its arms decide T") {
-	// C1's clause. The X-free `a = 0` refuses 2b and the negated one 2a,
-	// nothing pins `x`, and neither disjunct is a case pin. `a = 0` sits at
-	// a member top of each disjunctive conjunct, once per sign, and its
-	// cofactors weigh 4 against 7, so TRY_DECOMPOSE takes it: the arms
-	// `a = 0 ∧ x·z = 0` and `¬(a = 0) ∧ x·y = 0` push to `a = 0` and
-	// `¬(a = 0)`, whose ∨-join is `T`.
+	// C1's clause with `x` made binate. The X-free `a = 0` refuses 2b and
+	// the negated one 2a, nothing pins `x`, and neither disjunct is a case
+	// pin. `a = 0` sits at a member top of each disjunctive conjunct, once
+	// per sign, and its cofactors weigh 4 against 7, so TRY_DECOMPOSE
+	// takes it: the arms `a = 0 ∧ x′·z = 0` and `¬(a = 0) ∧ x·y = 0` push
+	// to `a = 0` and `¬(a = 0)`, whose ∨-join is `T`.
 	const tref got = anti_prenexed(
-		parse("ex x ((a = 0 || xy = 0) && (a != 0 || xz = 0))."));
+		parse("ex x ((a = 0 || xy = 0) && (a != 0 || x'z = 0))."));
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
 }
