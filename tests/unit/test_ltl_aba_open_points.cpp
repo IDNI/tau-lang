@@ -76,7 +76,7 @@ double seconds_since(std::chrono::steady_clock::time_point t0) {
 }
 
 // The path of `tool` where tau finds it: on the current PATH, else in
-// TAU_SPOT_BIN, the bin folder of the Spot store package. Empty when it is in
+// spot-bin, the bin folder of the Spot store package. Empty when it is in
 // neither.
 std::string tool_path(const std::string& tool) {
 	std::string out;
@@ -88,8 +88,8 @@ std::string tool_path(const std::string& tool) {
 	while (!out.empty() && (out.back() == '\n' || out.back() == '\r'))
 		out.pop_back();
 	if (!out.empty()) return out;
-	if (const char* bin = std::getenv("TAU_SPOT_BIN"); bin && *bin) {
-		const std::string full = std::string(bin) + "/" + tool;
+	if (!spot_bin_param.empty()) {
+		const std::string full = spot_bin_param + "/" + tool;
 		if (access(full.c_str(), X_OK) == 0) return full;
 	}
 	return out;

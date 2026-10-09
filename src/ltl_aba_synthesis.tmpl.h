@@ -26,7 +26,7 @@ inline bool ltlsynt_available() { return available(); }
 
 // ── stderr side channels (opt-in debug output; no report, no return value) ─
 
-// TAU_LTL_WITNESS set and not "0": on UNREALIZABLE, print the environment's winning
+// ltl-witness: on UNREALIZABLE, print the environment's winning
 // strategy. By determinacy of ω-regular two-player games, UNREAL means
 // ∃env.∀sys.¬φ, so swapping ins/outs and negating the formula turns the
 // environment into "sys" of a new, REALIZABLE-iff-witness game.
@@ -36,8 +36,7 @@ inline void print_env_counter_strategy_witness(
 	const std::vector<std::string>& output_props,
 	int timeout_sec)
 {
-	const char* w = std::getenv("TAU_LTL_WITNESS");
-	if (!w || !*w || std::string(w) == "0") return;
+	if (!ltl_witness_param) return;
 	auto neg = synthesize("!(" + ltl_formula + ")",
 		output_props, input_props, timeout_sec);
 	if (neg.has_value() && neg.value().realizable)
@@ -46,20 +45,20 @@ inline void print_env_counter_strategy_witness(
 		    neg.value().hoa.c_str());
 }
 
-// TAU_LTL_EXPORT_STRATEGY=hoa|dot: print the winning strategy to stderr.
-// TAU_LTL_EXPORT_STRATEGY_FILE=<path>: also write the HOA text to that
+// ltl-export-strategy hoa|dot: print the winning strategy to stderr.
+// ltl-export-strategy-file <path>: also write the HOA text to that
 // (persistent, user-named) path; a write failure is a report warning, not
 // a silently dropped error.
 inline void export_strategy(report& rep, const std::string& hoa,
 	int timeout_sec)
 {
-	const char* fmt  = std::getenv("TAU_LTL_EXPORT_STRATEGY");
-	const char* path = std::getenv("TAU_LTL_EXPORT_STRATEGY_FILE");
+	const std::string& fmt = ltl_export_strategy_param;
+	const std::string& path = ltl_export_strategy_file_param;
 
-	if (fmt && !hoa.empty()) {
-		if (std::string(fmt) == "hoa") {
+	if (!hoa.empty()) {
+		if (fmt == "hoa") {
 			std::fprintf(stderr, "=== STRATEGY HOA ===\n%s\n", hoa.c_str());
-		} else if (std::string(fmt) == "dot") {
+		} else if (fmt == "dot") {
 			auto dot = to_dot(hoa, timeout_sec);
 			if (dot.has_value())
 				std::fprintf(stderr, "=== STRATEGY DOT ===\n%s\n",
@@ -70,8 +69,14 @@ inline void export_strategy(report& rep, const std::string& hoa,
 					hoa.c_str());
 		}
 	}
-	if (path && *path) {
-		FILE* f = std::fopen(path, "w");
+	if (!path.empty()) {
+#ifdef _MSC_VER
+		// the MSVC CRT marks fopen unsafe and asks for fopen_s
+		FILE* f = nullptr;
+		if (fopen_s(&f, path.c_str(), "w") != 0) f = nullptr;
+#else
+		FILE* f = std::fopen(path.c_str(), "w");
+#endif
 		// fwrite buffers, so a write failure can surface only at the
 		// flush that fclose does.
 		bool ok = f

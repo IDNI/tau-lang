@@ -507,30 +507,14 @@ TEST_SUITE("Strategy execution: semantic self-verification") {
 
 // ── Q40-SQ1 strategy export tests ─────────────────────────────────────────────
 
-TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
+TEST_SUITE("Strategy export: ltl-export-strategy-file writes HOA") {
 
-	struct env_guard {
-		std::string key;
-		std::string old_val;
-		bool had;
-		env_guard(const char* k, const char* v) : key(k) {
-			const char* c = std::getenv(k);
-			had = c != nullptr;
-			if (had) old_val = c;
-			setenv(k, v, 1);
-		}
-		~env_guard() {
-			if (had) setenv(key.c_str(), old_val.c_str(), 1);
-			else unsetenv(key.c_str());
-		}
-	};
-
-	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to TAU_LTL_EXPORT_STRATEGY_FILE" * doctest::skip(!ltlsynt_available())) {
+	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to ltl-export-strategy-file" * doctest::skip(!ltlsynt_available())) {
 		const std::filesystem::path tmp =
 			tau_test_tmp("strategy_export") / "strategy.hoa";
 		{
-			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE",
-				tmp.string().c_str());
+			option_text_guard g("ltl-export-strategy-file",
+				tmp.string());
 			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0)).").value_or(nullptr));
 			REQUIRE(fm.has_value());
 			tref f = fm.value().main->get();

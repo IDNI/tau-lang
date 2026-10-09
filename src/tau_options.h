@@ -80,6 +80,23 @@ struct ltl_algorithm_codec {
 	}
 };
 
+/// The format word of `ltl-export-strategy`: empty, `hoa` or `dot`.
+struct ltl_export_strategy_codec {
+	option_value to_value(const std::string& fmt) const { return fmt; }
+	result<std::string> from_value(const option_value& v) const {
+		result<std::string> r;
+		const std::string* text =
+			idni::detail::option_text_of(v, r.report());
+		if (!text) return r;
+		if (!text->empty() && *text != "hoa" && *text != "dot")
+			return r.with_error(code::invalid_argument,
+				parser_strings::messages::option_bad_value,
+				{ { label::name, "ltl-export-strategy" },
+				  { label::value, *text } });
+		return r.with_value(*text);
+	}
+};
+
 /// `ltl-max-observations` stores the cap the skeleton reads: 0 and a value
 /// above @ref ltl_max_observations_hard are that bound.
 struct ltl_observations_codec {
@@ -150,6 +167,9 @@ inline const option_set tau_core_option_set{ {
 	{ "max-constant-size", "solver", std::size_t{ max_constant_size },
 		"largest region of fresh values, in tree nodes, a run keeps "
 		"across steps (0 = unlimited)" },
+	{ "lean-decide-crosscheck", "solver", false,
+		"re-decide the lean constant tests through the full "
+		"normalization and report a disagreement" },
 	// ltl
 	{ "max-consistency-subsets", "ltl",
 		std::size_t{ max_consistency_subsets_param },
@@ -209,6 +229,21 @@ inline const option_set tau_core_option_set{ {
 	{ "ltl-mealy-max-edges", "ltl", std::size_t{ data_game_mealy_max_edges },
 		"most edges of the Mealy view a data-game strategy is played "
 		"through (0 = no view)" },
+	{ "ltl-witness", "ltl", false,
+		"on UNREALIZABLE, print the environment's winning strategy "
+		"(HOA) to stderr" },
+	{ "ltl-export-strategy", "ltl", std::string(),
+		"print the winning strategy to stderr: hoa or dot "
+		"(empty = off)" },
+	{ "ltl-export-strategy-file", "ltl", std::string(),
+		"also write the winning strategy (HOA) to this file "
+		"(empty = off)" },
+	{ "phi-delta-crosscheck", "ltl", false,
+		"compare the closed form of Phi_Delta against the solver on "
+		"matching shapes and log a disagreement" },
+	{ "spot-bin", "ltl", std::string(),
+		"directory searched for ltlsynt, autfilt and ltlfilt after "
+		"PATH (empty = off)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -299,6 +334,8 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("max-enum-steps", max_enum_steps, hook));
 	TAU_TRY_VOID(repo.bind("max-rewrite-rounds", max_rewrite_rounds, hook));
 	TAU_TRY_VOID(repo.bind("max-constant-size", max_constant_size, hook));
+	TAU_TRY_VOID(repo.bind("lean-decide-crosscheck",
+		lean_decide_crosscheck_param, hook));
 	TAU_TRY_VOID(repo.bind("max-consistency-subsets",
 		max_consistency_subsets_param, hook));
 	TAU_TRY_VOID(repo.bind("max-cover-products", max_cover_products_param,
@@ -330,6 +367,14 @@ result<void> bind_core_options(options_repository& repo) {
 		data_game_mealy_max_states, hook));
 	TAU_TRY_VOID(repo.bind("ltl-mealy-max-edges", data_game_mealy_max_edges,
 		hook));
+	TAU_TRY_VOID(repo.bind("ltl-witness", ltl_witness_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-export-strategy", ltl_export_strategy_param,
+		ltl_export_strategy_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("ltl-export-strategy-file",
+		ltl_export_strategy_file_param, hook));
+	TAU_TRY_VOID(repo.bind("phi-delta-crosscheck",
+		phi_delta_crosscheck_param, hook));
+	TAU_TRY_VOID(repo.bind("spot-bin", spot_bin_param, hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));

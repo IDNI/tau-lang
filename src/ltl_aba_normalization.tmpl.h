@@ -177,18 +177,14 @@ inline ocltl_swap_counters& ocltl_swap_stats() {
 	return c;
 }
 
-// Env-gated (TAU_PHI_DELTA_CROSSCHECK=1): on a shape match, compares the
+// Gated by phi-delta-crosscheck: on a shape match, compares the
 // closed form against the solver's result and logs any disagreement (LOG
 // channel, never stdout, see AGENTS.md) -- never changes the returned value.
 // A match that could not be decided counts as ineligible; its report is
 // returned as warnings, since the shadow check is not the answer.
 template <NodeType node>
 static report ocltl_swap_crosscheck(tref fm, bool solver_result) {
-	static const bool enabled = [] {
-		const char* v = std::getenv("TAU_PHI_DELTA_CROSSCHECK");
-		return v && *v && v[0] != '0';
-	}();
-	if (!enabled) return {};
+	if (!phi_delta_crosscheck_param) return {};
 	auto matched = match_ocltl_swap_shape<node>(fm);
 	if (!matched.has_value() || !matched.value()) {
 		ocltl_swap_stats().ineligible.fetch_add(1, std::memory_order_relaxed);

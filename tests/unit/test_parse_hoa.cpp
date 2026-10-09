@@ -186,7 +186,7 @@ TEST_SUITE("spawn_capture") {
 	// returns a result<T> error instead of answering {false, ""} (= UNREALIZABLE).
 	TEST_CASE("[SPAWN-03] call_ltlsynt without Spot returns an error result") {
 		EnvGuard g_path("PATH", "C:\\nonexistent_tau_spot_path");
-		EnvGuard g_bin("TAU_SPOT_BIN", "C:\\nonexistent_tau_spot_bin");
+		option_text_guard g_bin("spot-bin", "C:\\nonexistent_tau_spot_bin");
 		EnvGuard g_pfx("TAU_SHARED_PREFIX", "C:\\nonexistent_tau_prefix");
 		EnvGuard g_up("USERPROFILE", "C:\\nonexistent_tau_home");
 		EnvGuard g_home("HOME", "C:\\nonexistent_tau_home");

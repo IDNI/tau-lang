@@ -291,7 +291,7 @@ bool is_pure_input_atom(tref atom);
  *
  * The result carries an error (code::solver_error) when the subprocess
  * produced no verdict, and when ltlsynt cannot be found (PATH, then
- * `TAU_SPOT_BIN`, then the Spot folder of a package).
+ * `spot-bin`, then the Spot folder of a package).
  * Every caller merges that error into its own result rather than reading it
  * as a definite UNREALIZABLE.
  * @param ltl_formula Propositional LTL formula in Spot syntax.

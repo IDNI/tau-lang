@@ -15,6 +15,10 @@
 
 namespace idni::tau_lang {
 
+/// `spot-bin`: a directory searched for the Spot tools after PATH. Empty
+/// skips it.
+inline std::string spot_bin_param;
+
 /// Extras for `spawn_capture`. The defaults keep the tool-facing contract:
 /// the child reads this process's stdin, and its stderr is dropped so a
 /// noisy tool cannot corrupt the parsed stdout.
@@ -38,7 +42,7 @@ struct spawn_options {
 /// reported as a signal death with `label::timeout` attached. A failed
 /// report carries the captured output as `label::value`.
 ///
-/// A bare `argv[0]` is looked up on PATH, then in `TAU_SPOT_BIN`, then in
+/// A bare `argv[0]` is looked up on PATH, then in `spot-bin`, then in
 /// the Spot folder of an installed package (`libexec/tau/spot`); a tool
 /// found nowhere is a `code::not_found` error. An empty `argv` is a
 /// `code::invalid_argument` error. Under Emscripten every call is a

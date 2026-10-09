@@ -5496,15 +5496,15 @@ TEST_SUITE("Cross-step window oracle") {
 }
 
 
-// Opt-in (TAU_PHI_DELTA_CROSSCHECK=1): reports the Mechanism 1(a) shadow
+// Opt-in (phi-delta-crosscheck, TAU_PHI_DELTA_CROSSCHECK=1): reports the Mechanism 1(a) shadow
 // crosscheck's aggregate counters (ocltl_swap_stats()) accumulated over
 // every aba_existential_feasible call this test binary made. Placed last
 // (source order) so it reads totals after every other test case has run.
 // Informational only -- does not assert zero disagreements.
 TEST_SUITE("ocltl phi_delta swap: aggregate crosscheck report (opt-in)") {
 	TEST_CASE("report ocltl_swap_stats() accumulated over this binary's run") {
-		if (!std::getenv("TAU_PHI_DELTA_CROSSCHECK")) {
-			MESSAGE("TAU_PHI_DELTA_CROSSCHECK not set; skipping");
+		if (!phi_delta_crosscheck_param) {
+			MESSAGE("phi-delta-crosscheck is off; skipping");
 			return;
 		}
 		auto& s = ocltl_swap_stats();

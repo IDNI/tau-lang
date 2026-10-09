@@ -902,14 +902,6 @@ std::optional<bool> lean_capture_conjunction_sat(tref n) {
 	return true;
 }
 
-// Cached getenv("TAU_LEAN_DECIDE_CROSSCHECK") -- read once per process. When
-// set, is_non_temp_nso_satisfiable runs the full normalization even where
-// lean_capture_conjunction_sat answers, and reports an error on disagreement.
-inline bool lean_decide_crosscheck_enabled() {
-	static const bool on = std::getenv("TAU_LEAN_DECIDE_CROSSCHECK") != nullptr;
-	return on;
-}
-
 /** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
 result<bool> is_non_temp_nso_satisfiable(tref n) {
@@ -924,7 +916,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	auto lean = lean_capture_conjunction_sat<node>(n);
-	if (lean && !lean_decide_crosscheck_enabled()) {
+	if (lean && !lean_decide_crosscheck_param) {
 		return r.with_assert_check_value(*lean);
 	}
 

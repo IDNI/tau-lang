@@ -197,6 +197,22 @@ inline std::string ltl_algorithm_param = "auto";
  */
 inline size_t ltl_qe_max_vars_param = 2;
 
+/// `ltl-witness`: on UNREALIZABLE, print the environment's winning
+/// strategy (HOA) to stderr.
+inline bool ltl_witness_param = false;
+
+/// `ltl-export-strategy`: `hoa` or `dot` prints the winning strategy to
+/// stderr. Empty prints nothing.
+inline std::string ltl_export_strategy_param;
+
+/// `ltl-export-strategy-file`: a path that also receives the HOA strategy.
+/// Empty writes no file.
+inline std::string ltl_export_strategy_file_param;
+
+/// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
+/// solver on matching shapes. It changes logging only, never a verdict.
+inline bool phi_delta_crosscheck_param = false;
+
 
 /**
  * @brief Effective `ltlsynt` watchdog in seconds (0 = disabled).

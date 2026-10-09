@@ -54,6 +54,26 @@ using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
 
+/// Sets an option by name for one scope and restores its previous text. The
+/// environment is read once at start, so a case sets the option instead.
+struct option_text_guard {
+	std::string name;
+	std::string saved;
+	option_text_guard(std::string n, std::string_view text)
+		: name(std::move(n))
+	{
+		auto old = idni::options().get_text(name);
+		REQUIRE(old.has_value());
+		saved = old.value();
+		REQUIRE(idni::options().set_text(name, text).has_value());
+	}
+	~option_text_guard() {
+		CHECK(idni::options().set_text(name, saved).has_value());
+	}
+	option_text_guard(const option_text_guard&) = delete;
+	option_text_guard& operator=(const option_text_guard&) = delete;
+};
+
 inline tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;

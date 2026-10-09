@@ -951,18 +951,19 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-max-observations` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks. Beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. |
 | `ltl-mealy-max-states` | 4096 | States of the Mealy view a data-game strategy is played through. Past it the moves are played directly (0 = no view). |
 | `ltl-mealy-max-edges` | 65536 | Edges of that Mealy view (0 = no view). |
+| `ltl-witness` | off | On UNREALIZABLE, print an environment counter-strategy (HOA) to stderr. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
+| `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
+| `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
+| `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
-**LTL synthesis environment variables.** These variables are not options. tau
-reads them when it calls the synthesis tools:
+**LTL synthesis environment variable.** This variable is not an option. tau
+reads it when it calls the synthesis tools:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TAU_LTL_EXPORT_STRATEGY` | _unset_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. |
-| `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | A path. tau also writes the HOA strategy to that file on success. |
 | `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
-| `TAU_LTL_WITNESS` | _unset_ | `1` prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
 
 ### Options and the environment
 
@@ -1059,11 +1060,13 @@ later. The nlang oracle takes
 `TAU_NLANG_MODEL`, `TAU_NLANG_EFFORT`, `TAU_NLANG_MAX_TOKENS` and
 `TAU_NLANG_FALLBACK` into its `nlang-*` options at start, and it reads the
 provider's own `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` when no key is given.
-Two diagnostic gates change logging
-only, never a verdict: `TAU_LEAN_DECIDE_CROSSCHECK` re-decides the lean
-constant tests through the full path and reports disagreements, and
-`TAU_PHI_DELTA_CROSSCHECK=1` shadows the ABA oracle with the closed-form
-Φ_Δ of the atomless algebra on matching shapes. `TAU_SPOT_BIN` names a directory searched for `ltlsynt`, `autfilt` and
+Two diagnostic flags change logging
+only, never a verdict: `lean-decide-crosscheck`
+(`TAU_LEAN_DECIDE_CROSSCHECK=1`) re-decides the lean constant tests through
+the full path and reports disagreements, and `phi-delta-crosscheck`
+(`TAU_PHI_DELTA_CROSSCHECK=1`) shadows the ABA oracle with the closed-form
+Φ_Δ of the atomless algebra on matching shapes. `spot-bin`
+(`TAU_SPOT_BIN`) names a directory searched for `ltlsynt`, `autfilt` and
 `ltlfilt` after `PATH` and before the Spot folder of an installed package.
 `TAU_CODEGEN_RUN_SDK_LINK_TEST`
 opts the codegen test suite into a minutes-long real `cmake` build.
@@ -3155,9 +3158,15 @@ over the variable:
 |     --ltl-max-observations    | cap the observation props whose impossible joint values the synthesis skeleton assumes away (default 8; at most 30, 0 = 30) |
 |     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default 4096; 0 = no view) |
 |     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default 65536; 0 = no view) |
+|     --ltl-witness             | on UNREALIZABLE, print the environment's winning strategy (HOA) to stderr |
+|     --ltl-export-strategy     | print the winning strategy to stderr: `hoa` or `dot` (empty = off) |
+|     --ltl-export-strategy-file | also write the winning strategy (HOA) to this file (empty = off) |
+|     --phi-delta-crosscheck    | compare the closed form of Phi_Delta against the solver on matching shapes and log a disagreement |
+|     --spot-bin                | directory searched for ltlsynt, autfilt and ltlfilt after PATH (empty = off) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
+|     --lean-decide-crosscheck  | re-decide the lean constant tests through the full normalization and report a disagreement |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -3530,6 +3539,14 @@ leaves the environment moves no data produces.
 * `ltl-mealy-max-states`, `ltl-mealy-max-edges`: the states and edges of the
 Mealy view a data-game strategy is played through. 4096 and 65536 by default.
 Past either the moves are played directly, and 0 builds no view.
+
+* `ltl-witness`, `ltl-export-strategy`, `ltl-export-strategy-file`,
+`spot-bin`: the LTL synthesis outputs and the Spot directory, as in the
+table of LTL synthesis options. Off or empty by default.
+
+* `lean-decide-crosscheck`, `phi-delta-crosscheck`: the two diagnostic flags
+of [Options and the environment](#options-and-the-environment). Off by
+default.
 
 * `compile-max-table-edges`: the edges of a Mealy view `tau gen` /
 `tau compile` carries as a table. 400 by default. A larger strategy is solved

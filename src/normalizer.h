@@ -29,6 +29,10 @@
 
 namespace idni::tau_lang {
 
+/// `lean-decide-crosscheck`: re-decide the lean constant tests through the
+/// full normalization and report a disagreement. It never changes a verdict.
+inline bool lean_decide_crosscheck_param = false;
+
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
@@ -242,8 +246,8 @@ result<bool> has_no_boolean_combs_of_models(tref n);
  * Wraps all free variables of `n` with existential quantifiers, normalizes via
  * `normalize_non_temp`, and returns `true` if the result is `T`. A
  * conjunction of `capture = 0` / `capture != 0` atoms, one free capture each,
- * is decided directly without normalization; setting the environment
- * variable `TAU_LEAN_DECIDE_CROSSCHECK` runs the normalization as well and
+ * is decided directly without normalization; the option
+ * `lean-decide-crosscheck` runs the normalization as well and
  * reports an `internal_error` if the two disagree.
  * @tparam node Tree node type.
  * @param n Non-temporal formula to test (must not contain `always`/`sometimes`).
