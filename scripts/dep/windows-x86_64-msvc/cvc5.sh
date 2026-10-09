@@ -141,9 +141,12 @@ _dep_cvc5_msvc_short_dir() {
 
 # Overwrite <root> in every file under <dir> with '@' of the same length. The
 # install step masks the staging paths the same way, but <root> is outside them.
+# A temporary folder can reach here under its 8.3 name, and the tools write
+# the long one.
 _dep_cvc5_msvc_mask_path() {
 	local root="$1" dir="$2"
-	python3 - "$dir" "$root" "$(cygpath -w "$root")" "$(cygpath -m "$root")" <<'PY'
+	python3 - "$dir" "$root" "$(cygpath -w "$root")" "$(cygpath -m "$root")" \
+		"$(cygpath -wl "$root")" "$(cygpath -ml "$root")" <<'PY'
 import os
 import sys
 top, *roots = sys.argv[1:]
@@ -176,9 +179,10 @@ _dep_cvc5_msvc_gmp() {
 	( cd "$vcpkg" && cmd.exe //c "$(cygpath -w "${vcpkg}/bootstrap-vcpkg.bat")" -disableMetrics ) \
 		|| { echo "dep-cvc5: vcpkg bootstrap failed" >&2; return 1; }
 	# The runner's own VCPKG_ROOT must not redirect this pinned checkout, and
-	# Git Bash must not rewrite the port:triplet argument as a path list.
+	# Git Bash must not rewrite the port:triplet argument as a path list. A
+	# GMP from vcpkg's binary cache carries the paths of the build that made it.
 	( cd "$vcpkg" && env -u VCPKG_ROOT VCPKG_DISABLE_METRICS=1 MSYS2_ARG_CONV_EXCL='*' \
-		./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" ) \
+		VCPKG_BINARY_SOURCES=clear ./vcpkg.exe install "$CVC5_MSVC_GMP_PORT" ) \
 		|| { echo "dep-cvc5: vcpkg install ${CVC5_MSVC_GMP_PORT} failed" >&2; return 1; }
 	installed="${vcpkg}/installed/${CVC5_MSVC_GMP_PORT#*:}"
 	mkdir -p "${deps}/include" "${deps}/lib" "${deps}/bin" || return 1
@@ -254,21 +258,22 @@ _dep_cvc5_msvc_cadical() {
 # CMAKE_PREFIX_PATH and CL carry the checkout and staging paths, so they travel
 # in the environment of the configure and the build, not in the id.
 _dep_cvc5_target_prebuild() {
-	local work="$1" build="$2" deps="${1}/msvc-deps" short rc exit_trap outer=""
+	local work="$1" build="$2" deps="${1}/msvc-deps" short rc
 	short="$(_dep_cvc5_msvc_short_dir)" \
 		|| { echo "dep-cvc5: cannot create a short build folder" >&2; return 1; }
-	# The trap holds the path itself, as the local is gone when the trap runs,
-	# and it keeps the command of an outer EXIT trap.
-	exit_trap="$(trap -p EXIT)"
-	[ -n "$exit_trap" ] && outer="$(eval "set -- $exit_trap"; printf '%s' "$3")"
-	trap "rm -rf $(printf '%q' "$short")${outer:+; $outer}" EXIT
-	_dep_cvc5_msvc_gmp "${short}/vcpkg" "$deps" \
-		&& _dep_cvc5_msvc_cadical "$work" "$build" "$deps" "${short}/cadical" \
-		&& { _dep_cvc5_msvc_mask_path "$short" "$deps" \
-			|| { echo "dep-cvc5: cannot mask ${short} in ${deps}" >&2; false; }; }
+	# A subshell of its own holds the trap that removes the folder when a step
+	# exits. The EXIT trap this shell shows belongs to its caller: setting it
+	# here again would run the caller's cleanup, which removes the staging
+	# entry, when the producer's own subshell ends.
+	(
+		trap "rm -rf $(printf '%q' "$short")" EXIT
+		_dep_cvc5_msvc_gmp "${short}/vcpkg" "$deps" \
+			&& _dep_cvc5_msvc_cadical "$work" "$build" "$deps" "${short}/cadical" \
+			&& { _dep_cvc5_msvc_mask_path "$short" "$deps" \
+				|| { echo "dep-cvc5: cannot mask ${short} in ${deps}" >&2; false; }; }
+	)
 	rc=$?
 	rm -rf "$short"
-	eval "${exit_trap:-trap - EXIT}"
 	[ "$rc" -eq 0 ] || return 1
 	export CMAKE_PREFIX_PATH
 	CMAKE_PREFIX_PATH="$(cygpath -m "$deps")"

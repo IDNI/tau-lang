@@ -363,11 +363,13 @@ _dep_cvc5_producer() {
 	# The cross GMP is built under the staging tree and its library, import
 	# library, dll, .la and .pc files bake those paths in. Rewrite each to an
 	# equal-length placeholder so no build path enters the published package.
+	# A Windows compiler writes the same paths with backslashes.
 	if ! python3 - "$staging_prefix" "$staging" "$work" "$build" <<'PY'
 import os
 import sys
 root, *old_paths = sys.argv[1:]
-olds = sorted({p.encode() for p in old_paths if p}, key=len, reverse=True)
+olds = sorted({s.encode() for p in old_paths if p
+	for s in (p, p.replace('/', '\\'))}, key=len, reverse=True)
 for dirpath, _dirs, files in os.walk(root):
 	for name in files:
 		path = os.path.join(dirpath, name)
