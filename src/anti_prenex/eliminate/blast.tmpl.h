@@ -18,8 +18,9 @@
  * scope shadows another.
  *
  * THE BUDGET: the universe `V` is append-only, so its growth since the
- * sweep began is the sweep's allocation count. Past `ctx.qbf_node_max` the
- * walk unwinds and the sweep returns nothing.
+ * sweep began is the sweep's allocation count. The universe's node cap
+ * stops it at `ctx.qbf_node_max` inside the operation that would pass it;
+ * the walk unwinds and the sweep returns nothing.
  *
  * TWO MEMOS local to the call, formula node → BDD and term node → its
  * slices, so a shared subformula is blasted once: a node's BDD is a function
@@ -48,9 +49,12 @@ using sweep_bdd = hbdd<Bool, sweep_options>;
 /// A term's BDDs, slice `i` for its bit `i`.
 using slices    = std::vector<sweep_bdd>;
 
-/// Unwinds the walk once the sweep outgrows its budget: an abandoned sweep
-/// has no partial answer.
-struct over_budget {};
+/// The universe's node cap for one sweep, the previous cap restored after.
+struct node_cap_scope {
+	const size_t saved = engine::node_cap;
+	explicit node_cap_scope(size_t cap) { engine::node_cap = cap; }
+	~node_cap_scope() { engine::node_cap = saved; }
+};
 
 /// `BIT_BLAST`'s `FAIL` (§7).
 [[noreturn]] inline void fail() {
@@ -58,29 +62,21 @@ struct over_budget {};
 		"BIT_BLAST: the query holds a node outside the pure fragment");
 }
 
-/// One sweep: its enumeration, its budget, and the blast's rules, each
-/// memoised per node.
+/// One sweep: its enumeration and the blast's rules, each memoised per
+/// node.
 template <NodeType node>
 struct sweeper {
 	using tau = tree<node>;
 
 	const ba_type_id type;
 	const size_t width;
-	const size_t budget;
 	const subtree_unordered_map<node, size_t>& rank;
-	const size_t start = engine::V.size();
 	subtree_unordered_map<node, sweep_bdd> formulas;
 	subtree_unordered_map<node, slices> terms;
 
-	sweeper(ba_type_id type, size_t width, size_t budget,
+	sweeper(ba_type_id type, size_t width,
 		const subtree_unordered_map<node, size_t>& rank)
-		: type(type), width(width), budget(budget), rank(rank) {}
-
-	/// `r`, once the universe's growth is checked against the budget.
-	sweep_bdd note(sweep_bdd r) const {
-		if (engine::V.size() - start > budget) throw over_budget{};
-		return r;
-	}
+		: type(type), width(width), rank(rank) {}
 
 	/// A node carrying a BA type of its own that is not the query's; the
 	/// untyped id `0` is of it, as `is_pure_term` reads it.
@@ -107,20 +103,20 @@ sweep_bdd sweeper<node>::formula(tref n) {
 	sweep_bdd r;
 	if (t.equals_T()) r = handle::one();
 	else if (t.equals_F()) r = handle::zero();
-	else if (t.child_is(tau::wff_neg)) r = note(~formula(t[0].first()));
+	else if (t.child_is(tau::wff_neg)) r = ~formula(t[0].first());
 	else if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
 		const bool conj = t.child_is(tau::wff_and);
 		for (tref m : t[0].children()) {
 			const sweep_bdd b = formula(m);
-			r = !r ? b : note(conj ? r & b : r | b);
+			r = !r ? b : (conj ? r & b : r | b);
 		}
 	} else if (is_child_quantifier<node>(n)) {
 		const tref v = binder_var<node>(n);
 		if (foreign(v)) fail();
 		std::vector<uint_t> bits(width);
 		for (size_t i = 0; i < width; ++i) bits[i] = id(v, i);
-		r = note(formula(binder_body<node>(n))->quantify(std::move(bits),
-			binder_kind<node>(n) == tau_term_bdd<node>::all));
+		r = formula(binder_body<node>(n))->quantify(std::move(bits),
+			binder_kind<node>(n) == tau_term_bdd<node>::all);
 	} else if (t.child_is(tau::bf_eq)) {
 		// The general form `⋀ᵢ (⟦l⟧ᵢ ↔ ⟦r⟧ᵢ)`: a swallowed unit's body is
 		// not in zero form (§7).
@@ -128,8 +124,8 @@ sweep_bdd sweeper<node>::formula(tref n) {
 		const slices& rs = term(t[0].second());
 		slices eqs(width);
 		for (size_t i = 0; i < width; ++i)
-			eqs[i] = note(~(ls[i] ^ rs[i]));
-		r = note(handle::and_many(eqs));
+			eqs[i] = ~(ls[i] ^ rs[i]);
+		r = handle::and_many(eqs);
 	} else fail();
 	return formulas.emplace(n, r).first->second;
 }
@@ -143,8 +139,8 @@ const slices& sweeper<node>::term(tref n) {
 	slices s(width);
 	if (a.is(tau::variable)) {
 		for (size_t i = 0; i < width; ++i)
-			s[i] = note(handle::get(engine::add(id(t.first(), i),
-				engine::T, engine::F)));
+			s[i] = handle::get(engine::add(id(t.first(), i),
+				engine::T, engine::F));
 	} else if (a.is(tau::bf_t) || a.is(tau::bf_f)) {
 		s.assign(width, a.is(tau::bf_t) ? handle::one() : handle::zero());
 	} else if (a.is_ba_constant()) {
@@ -158,7 +154,7 @@ const slices& sweeper<node>::term(tref n) {
 				? handle::one() : handle::zero();
 	} else if (a.is(tau::bf_neg)) {
 		const slices& x = term(a.first());
-		for (size_t i = 0; i < width; ++i) s[i] = note(~x[i]);
+		for (size_t i = 0; i < width; ++i) s[i] = ~x[i];
 	} else if (a.is(tau::bf_and) || a.is(tau::bf_or) || a.is(tau::bf_xor)) {
 		const bool conj = a.is(tau::bf_and), disj = a.is(tau::bf_or);
 		auto op = [conj, disj](const sweep_bdd& l, const sweep_bdd& r) {
@@ -168,7 +164,7 @@ const slices& sweeper<node>::term(tref n) {
 		for (tref m : a.children()) {
 			const slices& x = term(m);
 			for (size_t i = 0; i < width; ++i)
-				s[i] = first ? x[i] : note(op(s[i], x[i]));
+				s[i] = first ? x[i] : op(s[i], x[i]);
 			first = false;
 		}
 	} else if (a.is(tau::bf_fall) || a.is(tau::bf_fex)) {
@@ -186,8 +182,8 @@ const slices& sweeper<node>::term(tref n) {
 				std::vector<uint_t> ids;
 				for (; q != prefix.rend() && q->second == kind; ++q)
 					ids.push_back(id(q->first, i));
-				b = note(b->quantify(std::move(ids),
-					kind == tau_term_bdd<node>::all));
+				b = b->quantify(std::move(ids),
+					kind == tau_term_bdd<node>::all);
 			}
 			s[i] = b;
 		}
@@ -215,12 +211,13 @@ std::optional<bool> sweep(tref k, const ctx<node>& c) {
 	// The library checks an id against the shift width in Debug alone.
 	if (width * rank.size() >= size_t(1) << sweep_options.shiftW)
 		return std::nullopt;
-	sweeper<node> s(c.type, width, c.qbf_node_max, rank);
+	sweeper<node> s(c.type, width, rank);
+	const node_cap_scope cap(engine::V.size() + c.qbf_node_max);
 	try {
 		const sweep_bdd r = s.formula(k);
 		DBG(assert(r->is_one() || r->is_zero());)
 		return r->is_one();
-	} catch (const over_budget&) {
+	} catch (const bdd_node_cap_reached&) {
 		return std::nullopt;
 	}
 }

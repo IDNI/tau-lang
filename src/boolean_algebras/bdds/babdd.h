@@ -43,13 +43,18 @@ inline size_t fpairing(size_t x, size_t y) {
  * - use of input inverters
  * - use of output inverters
  * - use of variable shifters
+ * - a cap on the universe's size (Bool universe only), see node_cap
  */
 enum bdd_params {
 	INV_IN = (1u << 0),
 	INV_OUT = (1u << 1),
 	VARSHIFT = (1u << 2),
-	INV_ORDER = (1u << 3)
+	INV_ORDER = (1u << 3),
+	NODE_CAP = (1u << 4)
 };
+
+// Thrown by a universe with NODE_CAP when a new node would pass its cap.
+struct bdd_node_cap_reached {};
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
  * between parameters. Create by static functions bdd_options::create.
@@ -92,6 +97,9 @@ public:
 	}
 	constexpr bool has_inv_order() const {
 		return params & static_cast<uint8_t>(INV_ORDER);
+	}
+	constexpr bool has_node_cap() const {
+		return params & static_cast<uint8_t>(NODE_CAP);
 	}
 };
 
@@ -341,6 +349,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::variant<bdd_node_t, B> base;
+	static_assert(!o.has_node_cap(), "NODE_CAP is implemented for Bool only");
 
 	// This class is placed into the bdd universe if variable shifters are used
 	struct bdd_skeleton : std::variant<node_skeleton<bdd_ref>, B> {
@@ -1040,6 +1049,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		std::unordered_map<bdd_node_t, size_t>>::type Mn;
 	inline static bdd_ref T, F;
 	inline static initializer I;
+	// With NODE_CAP: the size V may reach. Adding a node past it throws
+	// bdd_node_cap_reached before anything is stored, so the universe and
+	// the caches stay consistent and an operation unwinds mid-way.
+	inline static size_t node_cap = SIZE_MAX;
 
 	// Constant test by universe id: with output inverters T and F
 	// share sentinel entry 0, otherwise they are entries 0 and 1
@@ -1219,6 +1232,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		bdd_node_t n(v, h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, it->second);
+		if constexpr (o.has_node_cap())
+			if (V.size() >= node_cap) throw bdd_node_cap_reached{};
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, V.size() - 1);
@@ -1231,6 +1246,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		node_skeleton<bdd_ref> n(h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, v, it->second);
+		if constexpr (o.has_node_cap())
+			if (V.size() >= node_cap) throw bdd_node_cap_reached{};
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, v, V.size() - 1);

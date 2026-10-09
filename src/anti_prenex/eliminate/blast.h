@@ -38,9 +38,11 @@ namespace idni::tau_lang::anti_prenexing {
 
 /// The sweep's BDD universe: variable shifters on, since under slice-major
 /// ids the slices of one pure term are shifted copies of one skeleton, which
-/// the shifters store once; 2^40 nodes, so that the node budget is the only
-/// limit; 2^22 variable ids.
-inline constexpr auto sweep_options = bdd_options<>::create(40, 22);
+/// the shifters store once; the node cap on, so that the node budget stops
+/// an operation as it allocates; 2^40 nodes, so that the node budget is the
+/// only limit; 2^22 variable ids.
+inline constexpr auto sweep_options =
+	bdd_options<INV_IN | INV_OUT | VARSHIFT | NODE_CAP>::create(40, 22);
 
 /**
  * @brief §7 `DECIDE_FINITE(q, ctx)`: the truth of the CLOSED pure query

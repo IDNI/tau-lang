@@ -140,6 +140,27 @@ TEST_CASE("B8: a spent budget and a solver that cannot read the query taint") {
 	CHECK(ap::taint_count<node_t>() == before + 1);
 }
 
+TEST_CASE("B13: the budget stops a sweep inside the operation that would pass it") {
+	using engine = ap::blast_detail::engine;
+	const tref q = ap::canonicalise_binder_ids<node_t>(parse(
+		"ex x, y, z (x:bv[4] & y:bv[4] = z:bv[4] "
+		"&& !(x:bv[4] | y:bv[4] = z:bv[4]) && !(z:bv[4] = { 0 }:bv[4]))."));
+	// The process's first sweep seeds the universe outside any budget.
+	REQUIRE(decide(parse("ex x (x:bv[2] = { 0 }:bv[2]).")) == true);
+	// Each budget resumes on the nodes the previous one left, so some budget
+	// is met inside an operation that needs several new nodes.
+	std::optional<bool> r;
+	for (size_t budget = 0; !r && budget < 1000; ++budget) {
+		qbf_node_max_guard g(budget);
+		auto c = ctx_of(q);
+		const size_t before = engine::V.size();
+		r = ap::blast_detail::sweep<node_t>(q, c);
+		CHECK(engine::V.size() - before <= budget);
+	}
+	REQUIRE(r.has_value());
+	CHECK(*r == true);
+}
+
 // --- the sweep ------------------------------------------------------------------
 
 TEST_CASE("B1: a closed existential is true") {
