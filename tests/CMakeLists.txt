@@ -271,7 +271,10 @@ function(_tau_add_test_target N src work_dir)
 		target_link_options(${N} PRIVATE
 			"SHELL:-s STACK_SIZE=16777216"
 			"SHELL:-s INITIAL_MEMORY=33554432"
-			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1"
+			# Growable buffers where the engine has them. =2 needs Node 26.
+			"SHELL:-s GROWABLE_ARRAYBUFFERS=1"
+			"-Wno-pthreads-mem-growth")
 	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;

@@ -20,6 +20,8 @@ set(TAU_JS_LINK_OPTIONS_COMMON "--bind --no-entry -s STACK_SIZE=16777216")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s EXPORT_NAME='tau'")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s MODULARIZE=1")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s ALLOW_MEMORY_GROWTH=1")
+# Growable buffers where the engine has them. =2 needs Node 26.
+string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s GROWABLE_ARRAYBUFFERS=1 -Wno-pthreads-mem-growth")
 # Shared memory cannot grow to cover the stack at startup, so INITIAL_MEMORY
 # must already fit static data plus STACK_SIZE.
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s INITIAL_MEMORY=33554432")

@@ -49,6 +49,8 @@ add_dependencies(tau_repl tau_header)
 # emscripten_sleep() unconditionally in the sleep model, which aborts at
 # runtime without it. JSPI coexists with -fwasm-exceptions, unlike ASYNCIFY.
 set(TAU_REPL_LINK_FLAGS "-s PROXY_TO_PTHREAD -s STACK_SIZE=16777216 -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1 -s ASSERTIONS=1")
+# Growable buffers where the engine has them. =2 needs Node 26.
+set(TAU_REPL_LINK_FLAGS "${TAU_REPL_LINK_FLAGS} -s GROWABLE_ARRAYBUFFERS=1 -Wno-pthreads-mem-growth")
 if(TAU_WASM_REPL_MODEL STREQUAL "sleep")
 	set(TAU_REPL_LINK_FLAGS "${TAU_REPL_LINK_FLAGS} -s JSPI")
 endif()

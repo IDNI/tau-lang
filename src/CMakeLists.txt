@@ -514,7 +514,10 @@ if(TAU_BUILD_EXECUTABLE)
 		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
 			"SHELL:-s STACK_SIZE=16777216"
 			"SHELL:-s INITIAL_MEMORY=33554432"
-			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1"
+			# Growable buffers where the engine has them. =2 needs Node 26.
+			"SHELL:-s GROWABLE_ARRAYBUFFERS=1"
+			"-Wno-pthreads-mem-growth")
 		# NODEFS backs the full-root /host mount tau_stdin_node.pre.js installs,
 		# so a wasm REPL test under the node emulator can open host files.
 		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
