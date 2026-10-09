@@ -26,13 +26,19 @@ _dep_spot_msys_root() {
 
 _dep_spot_target_setup() {
 	DEP_SPOT_BUILDER="msys2"
-	if ! DEP_SPOT_MSYS_ROOT="$(_dep_spot_msys_root)"; then
-		echo "dep-spot: MSYS2 UCRT64 g++ not found; install MSYS2 and" >&2
-		echo "  pacman -S mingw-w64-ucrt-x86_64-gcc make" >&2
-		exit 2
+	DEP_SPOT_MSYS_ROOT="$(_dep_spot_msys_root)" || DEP_SPOT_MSYS_ROOT=""
+	if [ -n "$DEP_SPOT_MSYS_ROOT" ]; then
+		DEP_SPOT_BUILDER_CXX="${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/g++.exe"
 	fi
-	DEP_SPOT_BUILDER_CXX="${DEP_SPOT_MSYS_ROOT}/ucrt64/bin/g++.exe"
 	DEP_SPOT_EXE="ltlsynt.exe"
+}
+
+# A lookup must work without the toolchain, so the id names it and asks no g++.
+_dep_spot_target_compiler_fields() {
+	printf '%s\n' \
+		"compiler_id=GNU" \
+		"compiler_version=msys2-ucrt64" \
+		"target_triple=x86_64-w64-mingw32"
 }
 
 # Git Bash rewrites `/c` and `/d` on cmd/bash command lines as
@@ -41,6 +47,11 @@ _dep_spot_target_setup() {
 _dep_spot_target_build() {
 	local src="$1" staging_prefix="$2"
 	local build_script
+	if [ -z "$DEP_SPOT_MSYS_ROOT" ]; then
+		echo "dep-spot: MSYS2 UCRT64 g++ not found; install MSYS2 and" >&2
+		echo "  pacman -S mingw-w64-ucrt-x86_64-gcc make" >&2
+		return 1
+	fi
 	build_script="$(dirname "$src")/build.sh"
 	cat > "$build_script" <<EOF
 #!/bin/bash

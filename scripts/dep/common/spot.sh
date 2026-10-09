@@ -52,6 +52,17 @@ fi
 # _dep_spot_target_finish <staging prefix> completes the installed tools.
 declare -F _dep_spot_target_finish > /dev/null || _dep_spot_target_finish() { :; }
 
+# _dep_spot_target_compiler_fields prints the compiler_id, compiler_version and
+# target_triple fields of the id.
+if ! declare -F _dep_spot_target_compiler_fields > /dev/null; then
+	_dep_spot_target_compiler_fields() {
+		printf '%s\n' \
+			"compiler_id=$(dep_compiler_id "$DEP_SPOT_BUILDER_CXX")" \
+			"compiler_version=$(dep_compiler_version "$DEP_SPOT_BUILDER_CXX")" \
+			"target_triple=$(dep_compiler_triple "$DEP_SPOT_BUILDER_CXX" "${DEP_SPOT_TARGET:-$(dep_host_target)}")"
+	}
+fi
+
 _dep_spot_field_block() {
 	local build_helper publish_helper manifest store
 	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
@@ -80,10 +91,9 @@ _dep_spot_field_block() {
 		"configure_args=${_DEP_SPOT_CONFIGURE_ARGS[*]}" \
 		"cflags=${DEP_SPOT_CFLAGS}" \
 		"cxxflags=${DEP_SPOT_CXXFLAGS}" \
-		"builder=${DEP_SPOT_BUILDER}" \
-		"compiler_id=$(dep_compiler_id "$DEP_SPOT_BUILDER_CXX")" \
-		"compiler_version=$(dep_compiler_version "$DEP_SPOT_BUILDER_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_SPOT_BUILDER_CXX" "${DEP_SPOT_TARGET:-$(dep_host_target)}")" \
+		"builder=${DEP_SPOT_BUILDER}"
+	_dep_spot_target_compiler_fields
+	printf '%s\n' \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"build_type=Release" \
