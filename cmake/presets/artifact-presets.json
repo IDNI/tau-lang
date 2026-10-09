@@ -152,7 +152,7 @@
 			"name": "release-msvc",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-release"
 			],
 			"binaryDir": "${sourceDir}/build/release-msvc",
@@ -164,7 +164,7 @@
 			"name": "devel-msvc",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-devel"
 			],
 			"binaryDir": "${sourceDir}/build/devel-msvc",
@@ -176,7 +176,7 @@
 			"name": "debug-msvc",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-debug"
 			],
 			"binaryDir": "${sourceDir}/build/debug-msvc",
@@ -185,39 +185,39 @@
 			}
 		},
 		{
-			"name": "release-msvc-clang-cl",
+			"name": "release-msvc-cl",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-clang-cl",
+				"_toolchain-msvc",
 				"_build-type-release"
 			],
-			"binaryDir": "${sourceDir}/build/release-msvc-clang-cl",
+			"binaryDir": "${sourceDir}/build/release-msvc-cl",
 			"cacheVariables": {
-				"TAU_PLATFORM": "release-msvc-clang-cl"
+				"TAU_PLATFORM": "release-msvc-cl"
 			}
 		},
 		{
-			"name": "devel-msvc-clang-cl",
+			"name": "devel-msvc-cl",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-clang-cl",
+				"_toolchain-msvc",
 				"_build-type-devel"
 			],
-			"binaryDir": "${sourceDir}/build/devel-msvc-clang-cl",
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl",
 			"cacheVariables": {
-				"TAU_PLATFORM": "devel-msvc-clang-cl"
+				"TAU_PLATFORM": "devel-msvc-cl"
 			}
 		},
 		{
-			"name": "debug-msvc-clang-cl",
+			"name": "debug-msvc-cl",
 			"inherits": [
 				"_generator-ninja",
-				"_toolchain-clang-cl",
+				"_toolchain-msvc",
 				"_build-type-debug"
 			],
-			"binaryDir": "${sourceDir}/build/debug-msvc-clang-cl",
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl",
 			"cacheVariables": {
-				"TAU_PLATFORM": "debug-msvc-clang-cl"
+				"TAU_PLATFORM": "debug-msvc-cl"
 			}
 		},
 		{

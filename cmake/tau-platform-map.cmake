@@ -77,7 +77,7 @@ function(tau_collect_platform_map)
 		endif()
 		string(REPLACE "\${sourceDir}/build/" "" _platform "${_bd}")
 		if(NOT _platform MATCHES
-			"^(release|devel|debug)(-gcc|-w64|-arm64|-msvc|-msvc-clang-cl|-wasm|-wasm-nothreads)?$")
+			"^(release|devel|debug)(-gcc|-w64|-arm64|-msvc|-msvc-cl|-wasm|-wasm-nothreads)?$")
 			continue()
 		endif()
 		list(APPEND _entries "${_name}|${_platform}")

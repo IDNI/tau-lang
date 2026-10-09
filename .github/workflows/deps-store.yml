@@ -138,7 +138,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The MSVC packages are cl.exe-built and cannot come from the Linux job.
+  # clang-cl builds the MSVC packages, so they cannot come from the Linux job.
   publish-windows:
     runs-on: windows-latest
     timeout-minutes: 240
