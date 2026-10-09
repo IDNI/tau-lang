@@ -66,7 +66,7 @@ static result<propositional_synthesis<Node>> pack_try_propositional_synthesis(
 
 
 // X^n(inner), used by append_step_guard_drivers.
-static std::string nest_x(std::string inner, int_t n) {
+inline std::string nest_x(std::string inner, int_t n) {
 	for (int_t i = 0; i < n; ++i) inner = "X(" + inner + ")";
 	return inner;
 }

@@ -827,7 +827,7 @@ static std::optional<code_window> make_code_window(
 
 // Points p and q of `w` in relation r: -1 p below q, 0 equal, 1 above. A
 // variable `known` gives a value (0 or 1) is read as that value.
-static data_bdd::id order_literal(const code_window& w, data_bdd& bdd,
+inline data_bdd::id order_literal(const code_window& w, data_bdd& bdd,
 	size_t p, size_t q, int r, const std::vector<int>* known = nullptr)
 {
 	if (p == q) return r == 0 ? data_bdd::T : data_bdd::F;
@@ -852,7 +852,7 @@ static data_bdd::id order_literal(const code_window& w, data_bdd& bdd,
 // relations are a weak order, it holds exactly when the relations of the
 // flagged points extend that order to a weak order: every weak order of a
 // subset extends to one of the whole, so no other point constrains them.
-static data_bdd::id order_consistent(const code_window& w, data_bdd& bdd,
+inline data_bdd::id order_consistent(const code_window& w, data_bdd& bdd,
 	const std::vector<size_t>& pts, const std::vector<bool>& in_x,
 	const std::vector<int>* known = nullptr)
 {

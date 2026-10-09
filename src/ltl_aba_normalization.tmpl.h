@@ -847,7 +847,7 @@ static std::optional<std::pair<std::string, bool>> name_literal(
 }
 
 // ltlsynt text of one product, e.g. `(p1 && !p3)`; "" for an empty product.
-static std::string product_clause_text(
+inline std::string product_clause_text(
     const std::vector<std::pair<std::string, bool>>& product)
 {
 	std::string ptxt;

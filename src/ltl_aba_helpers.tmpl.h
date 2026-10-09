@@ -7,7 +7,7 @@ namespace idni::tau_lang {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // Operators the safety pipeline cannot decide satisfiability for.
-static inline bool sat_needs_ltl_pipeline(size_t nt) {
+inline bool sat_needs_ltl_pipeline(size_t nt) {
 	return nt == tau_parser::wff_until || nt == tau_parser::wff_release
 	    || nt == tau_parser::wff_weak_until || nt == tau_parser::wff_since
 	    || nt == tau_parser::wff_trigger;
@@ -16,7 +16,7 @@ static inline bool sat_needs_ltl_pipeline(size_t nt) {
 // Operators whose realizability needs the game. The safety pipeline
 // answers satisfiability, and that is a different question once the
 // environment can control an eventuality.
-static inline bool realizability_needs_game(size_t nt) {
+inline bool realizability_needs_game(size_t nt) {
 	return nt == tau_parser::wff_sometimes || sat_needs_ltl_pipeline(nt);
 }
 
@@ -498,7 +498,7 @@ result<std::string> ltl_skeleton(
 // The proposition "step >= k", driven by append_step_guard_drivers; it
 // keeps a lookback-k rule from witnessing or being enforced before the
 // past it reads exists (see step_guarded).
-static std::string step_guard_prop(int_t k) {
+inline std::string step_guard_prop(int_t k) {
 	return "__step_ge" + std::to_string(k);
 }
 
@@ -507,7 +507,7 @@ static std::string step_guard_prop(int_t k) {
 // vacuously before step k, as a witness it cannot fire there. The atom's
 // text sits under the literal's negation, so the guard is chosen for the
 // effective literal: `g -> p` when polarity and mode agree, `g & p` else.
-static std::string step_guarded(int_t k, const std::string& p,
+inline std::string step_guarded(int_t k, const std::string& p,
 	const skel_ctx& c)
 {
 	if (k <= 0 || !c.temporal) return p;
