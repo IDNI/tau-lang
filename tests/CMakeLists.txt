@@ -457,11 +457,11 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 			message(FATAL_ERROR
 				"js_parity is required by this preset, but no native tau is at "
 				"${TAU_PARITY_NATIVE_BIN} (build it first: "
-				"./dev preset release-tau -DTAU_BAS=sbf,tau)")
+				"./dev preset release-tau)")
 		endif()
 		message(STATUS
 			"js_parity not registered: no native tau at ${TAU_PARITY_NATIVE_BIN} "
-			"(build it with ./dev preset release-tau -DTAU_BAS=sbf,tau)")
+			"(build it with ./dev preset release-tau)")
 	else()
 		# The native tau is the parity ground truth, so a stale one from another
 		# commit would compare the wasm module against the wrong build.
@@ -485,7 +485,7 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 						"js_parity: native tau at ${TAU_PARITY_NATIVE_BIN} reports "
 						"'${_tau_parity_native_version}', not this commit "
 						"(${TAU_GIT_COMMIT_HASH}); rebuild it with "
-						"./dev preset release-tau -DTAU_BAS=sbf,tau")
+						"./dev preset release-tau")
 				endif()
 			endif()
 		endif()

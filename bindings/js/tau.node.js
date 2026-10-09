@@ -4,8 +4,10 @@
 // any FAIL so it is usable as a CI gate.
 //
 // Independent ground truth for the assertions below was taken from the
-// native `tau` CLI, built from this same source tree with the same
-// -DTAU_BAS=sbf,tau pack (`./build/scratch-sbftau/tau -e '<cmd>' -q`):
+// native `tau` CLI, built from this same source tree with the default pack.
+// The wasm default pack skips bv and hsb (cvc5 links GMP) and nlang (curl
+// has no wasm port), so the queries use only what both packs hold. The
+// commands (`tau -e '<cmd>' -q`):
 //   sat  x = 0                                           -> T
 //   sat  x = 0 && x = 1                                  -> F
 //   valid x = x                                          -> T

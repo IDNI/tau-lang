@@ -731,15 +731,17 @@ ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
-# wasm configure below. Its own store packages resolve in this layer.
+# wasm configure below. The wasm default pack skips bv and hsb (cvc5 links
+# GMP) and nlang (curl has no wasm port), so the queries use only what both
+# packs hold. Its own store packages resolve in this layer.
 # The store_publish secret makes configure publish each entry right after it
 # builds it. A secret, unlike a build argument, stays out of the layer cache
 # key, so a test job that does not publish still hits this layer.
 RUN --mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Building native tau (sbf,tau pack) for parity" && \
-	scripts/with-gh-token ./dev preset release-tau -DTAU_BAS=sbf,tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	echo "(BUILD) -- Building native tau for parity" && \
+	scripts/with-gh-token ./dev preset release-tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 # Resolve the wasm store packages, and nothing else: the wasm compile lives in

@@ -1,5 +1,7 @@
-// Shells out to a native `tau` CLI (same source tree, same -DTAU_BAS=sbf,tau
-// pack) to get independent ground truth for the wasm parity tests. See
+// Shells out to a native `tau` CLI (same source tree, the default pack)
+// to get independent ground truth for the wasm parity tests. The wasm
+// default pack skips bv and hsb (cvc5 links GMP) and nlang (curl has no
+// wasm port), so the queries use only what both packs hold. See
 // parity.js for the query set and the normalizations applied to compare
 // the two output formats.
 

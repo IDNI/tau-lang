@@ -2,8 +2,11 @@
 
 // Parity test for the D5 wasm embind surface: every query runs through
 // both the wasm module and a native `tau` CLI built from this same source
-// tree with the identical -DTAU_BAS=sbf,tau pack, and the two results are
-// diffed. Exits non-zero on any divergence, so it can gate CI.
+// tree with the default pack, and the two results are diffed. The wasm
+// default pack skips the algebras whose packages are nondistributable
+// (bv and hsb: cvc5 links GMP) and nlang (curl has no wasm port), so the
+// queries use only what both packs hold. Exits non-zero on any
+// divergence, so it can gate CI.
 //
 // tau.node.js is the quick load smoke test; this is the deeper one, added
 // after a bug (sat() returning false for every well-formed formula, valid()
