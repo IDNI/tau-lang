@@ -20,6 +20,10 @@ using int128_t_ = std::_Signed128;
 __extension__ typedef __int128 int128_t_;
 #endif
 
+// The MSVC STL has no numeric_limits for __int128, which clang-cl uses.
+constexpr int128_t_ int128_max =
+	((int128_t_) 1 << 126) - 1 + ((int128_t_) 1 << 126);
+
 namespace {
 
 // |v|; v must not be the minimum int128.
@@ -66,7 +70,7 @@ std::optional<qint_rational> midpoint(const qint_rational& a,
 	int128_t_ l = (int128_t_) a.q / g * b.q;
 	int128_t_ num = (int128_t_) a.p * (l / a.q) + (int128_t_) b.p * (l / b.q);
 	if (num % 2 == 0) return make_rational(num / 2, l);
-	if (l > std::numeric_limits<int128_t_>::max() / 2) return std::nullopt;
+	if (l > int128_max / 2) return std::nullopt;
 	return make_rational(num, l * 2);
 }
 
