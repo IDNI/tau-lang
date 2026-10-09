@@ -99,7 +99,9 @@ _dep_boost_target_build() {
 		printf 'set "TEMP=%s"\r\nset "TMP=%s"\r\n' "$_tmp_win" "$_tmp_win"
 		printf 'cd /d "%s"\r\n' "$_boost_win"
 		printf 'if errorlevel 1 exit /b 1\r\n'
-		printf 'call bootstrap.bat --with-libraries=log\r\n'
+		# build.bat guesses no toolset for a Visual Studio it does not know,
+		# so name msvc, which takes the cl of the vcvars shell.
+		printf 'call bootstrap.bat msvc\r\n'
 		printf 'if errorlevel 1 exit /b 1\r\n'
 		printf 'b2.exe --user-config=./user-config.jam'
 		printf ' --prefix="%s" --build-dir="%s"' \
