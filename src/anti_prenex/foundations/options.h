@@ -68,6 +68,12 @@ inline size_t propagate_growth = 4;
 /// knob: read bare, here. Precision, never soundness.
 inline size_t absorb_occ_max = 32;
 
+/// §1 `guard_size_max`: size limit `|g|` of a COMPOUND GUARD, an ∧- or ∨-node
+/// the result joins, `SIMPLIFY`'s path sweep and `TRY_DECOMPOSE`'s unit census
+/// treat as one unit with its `neg(g)`. Not a component knob: read bare,
+/// here. Precision, never soundness.
+inline size_t guard_size_max = 32;
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #endif // __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__OPTIONS_H__

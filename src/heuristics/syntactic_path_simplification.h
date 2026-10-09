@@ -93,9 +93,10 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm);
  * It is the second pass of the anti-prenexing module's `SIMPLIFY`
  * (anti_prenex.md §3), whose invariant 4 forbids the rewrites the plain entry
  * does on the way in; binder bodies are entered under the keys in force,
- * which is that spec's §4 rule for `SIMPLIFY`. A term input takes the same
- * route as in `syntactic_path_simplification`, having no negated atoms to
- * preserve.
+ * which is that spec's §4 rule for `SIMPLIFY`. `compound_neg`, when given,
+ * makes a compound member a key as well (`path_sweep_options`). A term input
+ * takes the same route as in `syntactic_path_simplification`, having no
+ * negated atoms to preserve.
  *
  * @tparam node Tree node type.
  * @param fm Formula or boolean term to simplify.
@@ -109,7 +110,8 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm);
  * @endcode
  */
 template <NodeType node>
-tref syntactic_path_simplification_unchanged_negations(tref fm);
+tref syntactic_path_simplification_unchanged_negations(tref fm,
+	tref (*compound_neg)(tref) = nullptr);
 
 } // namespace idni::tau_lang
 

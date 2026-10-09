@@ -42,6 +42,7 @@
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
 #include "../foundations/options.h"
+#include "nnf.h"
 
 namespace idni::tau_lang::anti_prenexing {
 

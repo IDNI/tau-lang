@@ -65,6 +65,11 @@ tref to_canonically_factored_nnf(tref phi);
 template <NodeType node>
 tref canonically_factored_neg(tref psi);
 
+/// `NEG(m)` when `m` is a compound guard (joins.h `is_guard`), else `nullptr`:
+/// what `SIMPLIFY`'s path sweep and `TRY_DECOMPOSE`'s unit census demand.
+template <NodeType node>
+tref guard_neg(tref m);
+
 /**
  * @brief §3 `NORMALIZE_OPERATORS(φ)`: `f ≠ 0 ↦ ¬(f = 0)` for every type, and
  * the six comparison rewrites (`≰ ≮ ≥ > ≱ ≯`) only where the operator denotes

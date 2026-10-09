@@ -101,6 +101,10 @@ struct path_sweep_options {
 	/// layer 1). By default binder bodies are entered under the keys in
 	/// force, with the capture guard.
 	bool units_opaque = false;
+	/// Formula level only: a junction member of the dual connective is a
+	/// key too, assumed with its complement `compound_neg(member)` in its
+	/// siblings; `nullptr` from the callback, or no callback, makes none.
+	tref (*compound_neg)(tref) = nullptr;
 };
 
 /**
@@ -330,6 +334,8 @@ private:
 		size_t undo_mark = 0;
 		uint64_t version_before = 0;                // scope
 		std::unordered_set<tref> literal_positions; // join
+		/// join: a compound member's position -> the keys it suspends
+		std::unordered_map<tref, trefs> compound_positions;
 		std::unordered_set<tref> spine;             // join: inner wrappers
 		subtree_unordered_map<node, bool> pushed;   // join: its keys
 		trefs literal_results;                      // join
@@ -415,6 +421,9 @@ private:
 		static cache_t& c01 = tau::template create_cache<cache_t>();
 		static cache_t& c10 = tau::template create_cache<cache_t>();
 		static cache_t& c11 = tau::template create_cache<cache_t>();
+		// Compound keys fold more, so their results are kept apart.
+		static cache_t& cg = tau::template create_cache<cache_t>();
+		if (o.compound_neg) return &cg;
 		return o.tautologies ? (o.units_opaque ? &c11 : &c10)
 				     : (o.units_opaque ? &c01 : &c00);
 #else
@@ -525,6 +534,13 @@ private:
 				m.kind = spine;
 				return markers.push_back(m), n;
 			}
+			// A compound key is not assumed inside its own member.
+			if (const auto it = fr->compound_positions.find(n);
+				it != fr->compound_positions.end())
+			{
+				open_scope(it->second);
+				m.scoped = true;
+			}
 		}
 		if (const canon_t k = L::canon(n); const entry* e = find_active(k.key))
 			return finish(m, L::constant(e->value != k.flipped, n));
@@ -547,7 +563,13 @@ private:
 			const tau& lt = tau::get(l);
 			if (!lt.is(L::top)) continue;
 			const tau& lc = lt[0];
-			if (lc.is(L::land) || L::is_or_like(lc)) continue;
+			if (lc.is(L::land) || L::is_or_like(lc)) {
+				if (push_compound(l, conj, fr)) {
+					pop_keys_to(fr.undo_mark);
+					return finish(m, L::constant(!conj, n));
+				}
+				continue;
+			}
 			if (L::is_true(l) || L::is_false(l)) continue;
 			const canon_t k = L::canon(l);
 			const tref key = k.key;
@@ -568,6 +590,30 @@ private:
 		frames.push_back(std::move(fr));
 		m.kind = join_top;
 		return markers.push_back(m), n;
+	}
+
+	/// A compound member `l` and its complement as keys, `l` holding its
+	/// frame's value; `true` when a key in force contradicts them, which
+	/// decides the join.
+	bool push_compound(tref l, bool conj, frame& fr) {
+		if constexpr (!is_wff) return false;
+		if (opts.compound_neg == nullptr) return false;
+		const tref nl = opts.compound_neg(l);
+		if (nl == nullptr) return false;
+		trefs own;
+		for (const auto& [key, value] : { std::pair{ l, conj },
+			std::pair{ nl, !conj } })
+		{
+			if (const entry* e = find_active(key)) {
+				if (e->value != value) return true;
+				continue;
+			}
+			push_key(key, value);
+			own.push_back(key);
+		}
+		if (!own.empty() && tau::subtree_equals(own.front(), l))
+			fr.compound_positions.emplace(l, std::move(own));
+		return false;
 	}
 
 	tref enter_binder(tref n, marker m) {
@@ -617,10 +663,13 @@ private:
 		markers.pop_back();
 		switch (m.kind) {
 		case final_:
+			if (m.scoped) close_scope();
+			return r;
 		case spine: return r;
 		case plain: {
 			tref res = post_check(fold_binder(r), m);
-			if (tau::get(m.orig).is(L::top)) memo_store(m, res);
+			if (m.scoped) close_scope();
+			else if (tau::get(m.orig).is(L::top)) memo_store(m, res);
 			return res;
 		}
 		case binder_: {
@@ -658,7 +707,8 @@ private:
 				if (exposes_new_literal(r, fr)) res = sweep(res);
 			}
 			res = post_check(res, m);
-			memo_store(m, res);
+			if (m.scoped) close_scope();
+			else memo_store(m, res);
 			return res;
 		}
 		}
@@ -777,7 +827,9 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 }
 
 template <NodeType node>
-tref syntactic_path_simplification_unchanged_negations(tref fm) {
+tref syntactic_path_simplification_unchanged_negations(tref fm,
+	tref (*compound_neg)(tref))
+{
 	using tau = tree<node>;
 	// Both kinds of assumption, and `units_opaque` false, so a binder body
 	// is entered under the keys in force. What the plain entry runs BEFORE
@@ -786,6 +838,7 @@ tref syntactic_path_simplification_unchanged_negations(tref fm) {
 	// fuse a negation into an atom.
 	path_sweep_options opts;
 	opts.tautologies = true;
+	opts.compound_neg = compound_neg;
 	if (tau::get(fm).is_term()) {
 		if (tau::get(fm).equals_0() || tau::get(fm).equals_1()) return fm;
 		// A term has no negated atoms to preserve, so it takes the

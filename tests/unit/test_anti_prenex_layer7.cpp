@@ -362,4 +362,18 @@ TEST_CASE("N12: a bv variable that only lowers the truth leaves at block entry")
 	resolved(bv_anti_prenexed(phi));
 }
 
+TEST_CASE("N13: a compound guard is split on as one unit") {
+	// No atom is both-signed at the member tops of the two disjunctive
+	// conjuncts, but the guard `a = 0 ∧ b = 0` is, its neg the group
+	// `¬(a = 0) ∨ ¬(b = 0)` of the second: TRY_DECOMPOSE splits on the unit,
+	// the arms push to the guard and its neg, and their ∨-join is `T`.
+	const tref got = bv_anti_prenexed(parse(
+		"ex x (((a:bv[2] = { 0 }:bv[2] && b:bv[2] = { 0 }:bv[2]) "
+		"|| x:bv[2] & y:bv[2] = { 0 }:bv[2]) "
+		"&& (!(a:bv[2] = { 0 }:bv[2]) || !(b:bv[2] = { 0 }:bv[2]) "
+		"|| x:bv[2]' & z:bv[2] = { 0 }:bv[2]))."));
+	resolved(got);
+	CHECK(tau::get(got).equals_T());
+}
+
 } // TEST_SUITE

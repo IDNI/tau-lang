@@ -15,6 +15,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "anti_prenex/normalisers/joins.h"
+#include "anti_prenex/normalisers/nnf.h"
 
 using namespace idni::tau_lang;
 namespace ap = idni::tau_lang::anti_prenexing;
@@ -273,6 +274,28 @@ TEST_CASE("J11: joining a canonical chain's members gives the chain back") {
 	tref once = ap::simplified_and_join<node_t>(trefs{ conj(b, a), c, a });
 	CHECK(ap::simplified_and_join<node_t>(ap::members<node_t>(once)) == once);
 	CHECK(same(once, chain));
+}
+
+TEST_CASE("J12: a compound guard and its cached neg decide, neg spread over "
+	"members") {
+	tref x = atom("gx"), y = atom("gy"), u = atom("gu"), w = atom("gw");
+	// Canonical members, as every join operand is (invariant 6).
+	tref xy = ap::simplified_and_join<node_t>(trefs{ x, y });
+	tref uw = ap::simplified_and_join<node_t>(trefs{ u, w });
+	tref g = ap::simplified_or_join<node_t>(trefs{ xy, uw });
+	// `(¬x ∨ ¬y) ∧ (¬u ∨ ¬w)`; its own slot is still empty, and a join only
+	// looks a neg up: `g`'s members with it stay open.
+	tref ng = ap::canonically_factored_neg<node_t>(g);
+	CHECK(member_count(ap::simplified_or_join<node_t>(
+		trefs{ xy, uw, ng })) == 3);
+	// Once `neg(ng)` is demanded, `xy ∨ uw ∨ ng` is `g ∨ neg(g)`, `g` the
+	// group of two members, in either insertion order.
+	CHECK(same(ap::canonically_factored_neg<node_t>(ng), g));
+	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ xy, uw, ng })));
+	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ ng, uw, xy })));
+	// The dual, from `g`'s slot: `ng` with `g` as a member is `F`.
+	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ ng, g })));
+	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ g, ng })));
 }
 
 }

@@ -399,4 +399,19 @@ TEST_CASE("C9: an arm that folds to a constant charges nothing") {
 	check_resolved(*got, f);
 }
 
+TEST_CASE("C10: a compound guard is split on as one unit") {
+	// `a = 0 ∧ b = 0` is an X-free ∧-member of the first disjunctive
+	// conjunct and its neg is the group `¬(a = 0) ∨ ¬(b = 0)` of the second:
+	// no atom is both-signed at member tops, so the census has no candidate
+	// and the unit is split on. The arms push to the guard and its neg,
+	// whose ∨-join folds to `T`: two arms charged.
+	fixture f = make("ex x (((a = 0 && b = 0) || xy = 0) "
+		"&& (a != 0 || b != 0 || xz = 0)).");
+	const std::optional<tref> got = decomposed(f);
+	REQUIRE(got.has_value());
+	CHECK(f.c.expand_count == 2);
+	CHECK(tau::get(*got).equals_T());
+	check_against_source(*got, f);
+}
+
 } // TEST_SUITE
