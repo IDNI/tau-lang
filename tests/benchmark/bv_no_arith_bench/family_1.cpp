@@ -67,14 +67,6 @@ std::string w2(unsigned n, unsigned m, unsigned T) {
 	return p.formula(T);
 }
 
-// `widths` plus a - 1, a and a + 1, without 0.
-std::vector<unsigned> around(std::vector<unsigned> widths, unsigned a) {
-	for (unsigned n = a < 2 ? 1 : a - 1; n <= a + 1; ++n) widths.push_back(n);
-	std::ranges::sort(widths);
-	widths.erase(std::ranges::unique(widths).begin(), widths.end());
-	return widths;
-}
-
 } // namespace
 
 std::vector<instance> family_1(const grid& g) {

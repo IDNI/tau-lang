@@ -311,13 +311,6 @@ std::string bf(const term& e, const stream_ids& s, instance_writer& w) {
 		+ bf(e.args[1], s, w) + ")";
 }
 
-// a <= b in the Boolean-algebra order.
-std::string included(const std::string& a, const std::string& b,
-	instance_writer& w)
-{
-	return "(" + a + " & (" + b + ")' = " + w.constant(0) + ")";
-}
-
 std::string relation(rel r, const std::string& a, const std::string& b,
 	instance_writer& w)
 {

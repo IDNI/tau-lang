@@ -56,6 +56,13 @@ using rule_body = std::function<std::string(instance_writer&)>;
 /// `all x (x & h' = 0 -> (x = 0 || x = h))` with a fresh x.
 std::string at_most_one(instance_writer& w, const std::string& h);
 
+/// a <= b in the Boolean-algebra order: `(a & (b)' = 0)`.
+std::string included(const std::string& a, const std::string& b,
+	const instance_writer& w);
+
+/// `(s[t-d] | ... | s[t])`.
+std::string window(instance_writer& w, stream_id s, unsigned d);
+
 class program {
 public:
 	explicit program(unsigned width);

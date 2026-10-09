@@ -8,6 +8,7 @@
 #ifndef __IDNI__TAU__BV_NO_ARITH_BENCH__FAMILIES_H__
 #define __IDNI__TAU__BV_NO_ARITH_BENCH__FAMILIES_H__
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -39,6 +40,14 @@ struct grid {
 	}
 };
 
+/// `widths` plus a - 1, a and a + 1, without 0, sorted.
+inline std::vector<unsigned> around(std::vector<unsigned> widths, unsigned a) {
+	for (unsigned n = a < 2 ? 1 : a - 1; n <= a + 1; ++n) widths.push_back(n);
+	std::ranges::sort(widths);
+	widths.erase(std::ranges::unique(widths).begin(), widths.end());
+	return widths;
+}
+
 /// Family 7, prediction; knobs `k` (lookback) and `m` (streams).
 std::vector<instance> family_7(const grid& g);
 /// Family 8, round-robin arbiter; knobs `k` (clients) and `d` (lookback).
@@ -51,6 +60,9 @@ std::vector<instance> family_2(const grid& g);
 /// grid row), `inputs`, `outputs`, `lookback`, `lags`, `depth`, `params` and
 /// `sabotage`.
 std::vector<instance> family_4a(const grid& g);
+/// Family 4b, hand-written templates; knobs `template`, `variant`, `copies`
+/// and `d` (the queue's lookback).
+std::vector<instance> family_4b(const grid& g);
 
 } // namespace bv_bench
 

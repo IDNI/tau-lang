@@ -20,13 +20,6 @@ namespace bv_bench {
 
 namespace {
 
-// `(s[t-d] | ... | s[t])`
-std::string window(instance_writer& w, stream_id s, unsigned d) {
-	std::string u = "(" + w.at(s, d);
-	for (unsigned back = d; back-- > 0;) u += " | " + w.at(s, back);
-	return u + ")";
-}
-
 // T (d + 1 >= k): at step t, client (t mod k) + 1 gets everything (plain) or
 // the requests of its window (pending), the others nothing; every window of
 // d + 1 steps holds a turn of every client.

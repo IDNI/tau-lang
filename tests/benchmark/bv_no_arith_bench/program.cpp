@@ -76,6 +76,18 @@ std::string at_most_one(instance_writer& w, const std::string& h) {
 		+ ") -> ((" + x + " = " + zero + ") || (" + x + " = " + h + "))))";
 }
 
+std::string included(const std::string& a, const std::string& b,
+	const instance_writer& w)
+{
+	return "(" + a + " & (" + b + ")' = " + w.constant(0) + ")";
+}
+
+std::string window(instance_writer& w, stream_id s, unsigned d) {
+	std::string u = "(" + w.at(s, d);
+	for (unsigned back = d; back-- > 0;) u += " | " + w.at(s, back);
+	return u + ")";
+}
+
 program::program(unsigned width) : type(":bv[" + std::to_string(width) + "]") {
 	if (width == 0) throw std::invalid_argument("bv width must be at least 1");
 }

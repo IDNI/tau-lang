@@ -31,7 +31,7 @@ struct family_entry {
 	const char* id;
 	const char* name;
 	std::vector<knob> knobs;
-	std::vector<instance> (*instances)(const grid&);  // null: not built yet
+	std::vector<instance> (*instances)(const grid&);
 };
 
 const std::vector<family_entry> families = {
@@ -51,13 +51,19 @@ const std::vector<family_entry> families = {
 		  { "params", "free parameters" },
 		  { "sabotage", "0 none (T); 1 input (F); 2 conflict (F)" } },
 		family_4a },
-	{ "4b", "templates",           {}, nullptr },
+	{ "4b", "templates",
+		{ { "template", "0 access control; 1 accumulator; 2 work queue" },
+		  { "variant", "0 T; 1 F; the work queue keeps the widths with "
+			"that verdict" },
+		  { "copies", "independent copies side by side" },
+		  { "d", "work-queue lookback" } },
+		family_4b },
 };
 
 const char* const usage =
 R"(usage: bv_no_arith_bench [options]
   --family LIST          families to run, from 7,8,1,2,4a,4b
-                         (default: every implemented one)
+                         (default: all of them)
   --widths LIST          bv widths n
   --steps LIST           horizons T; a formula covers the steps 0..T
   --knob NAME=LIST       a family knob, e.g. --knob k=1,2 (repeatable)
@@ -77,7 +83,6 @@ the family's full default, or its smoke default under --smoke.
 void print_usage(std::ostream& os) {
 	os << usage;
 	for (const family_entry& f : families) {
-		if (!f.instances) continue;
 		os << "Family " << f.id << " knobs:";
 		const char* sep = " ";
 		for (const knob& k : f.knobs) {
@@ -165,13 +170,8 @@ options parse_options(int argc, char** argv) {
 	}
 	if (opt.lim.mem_mb == 0) usage_error("--mem must be at least 1");
 
-	std::string implemented;
-	for (const family_entry& f : families)
-		if (f.instances) implemented += (implemented.empty() ? "" : ",")
-			+ std::string(f.id);
 	if (family_list.empty()) {
-		for (const family_entry& f : families)
-			if (f.instances) opt.selected.push_back(&f);
+		for (const family_entry& f : families) opt.selected.push_back(&f);
 	} else {
 		std::istringstream is(family_list);
 		for (std::string id; std::getline(is, id, ',');) {
@@ -179,9 +179,6 @@ options parse_options(int argc, char** argv) {
 			for (const family_entry& f : families)
 				if (id == f.id) found = &f;
 			if (!found) usage_error("unknown family '" + id + "'");
-			if (!found->instances) usage_error("family " + id + " ("
-				+ found->name + ") is not implemented yet; implemented: "
-				+ implemented);
 			opt.selected.push_back(found);
 		}
 	}
