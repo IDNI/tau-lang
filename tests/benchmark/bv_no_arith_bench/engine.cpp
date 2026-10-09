@@ -10,6 +10,8 @@
 
 #include <stdexcept>
 
+#include <malloc.h>
+
 namespace bv_bench {
 
 using namespace idni::tau_lang;
@@ -24,6 +26,11 @@ tref parse(const std::string& text) {
 	const auto spec = get_nso_rr<node_t>(tau::get(text));
 	if (!spec || !spec->main) throw std::runtime_error(
 		"the formula does not parse");
+	// The parser keeps its Earley state until its next parse; a trivial one
+	// frees it for the question to reuse under the cap.
+	tau::get(std::string("T"));
+	malloc_trim(0);
+	cap_memory();
 	return spec->main->get();
 }
 

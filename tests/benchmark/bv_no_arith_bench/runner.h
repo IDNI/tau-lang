@@ -2,7 +2,8 @@
 
 // Runs one question in a forked child under a wall-clock limit and an
 // address-space cap (setrlimit), so a hang, a blow-up or a crash costs only
-// that instance. The child's stdout goes to stderr, keeping stdout for the
+// that instance. The question arms the cap itself once its input is parsed
+// (cap_memory). The child's stdout goes to stderr, keeping stdout for the
 // CSV; its verdict comes back through a pipe.
 
 #ifndef __IDNI__TAU__BV_NO_ARITH_BENCH__RUNNER_H__
@@ -37,6 +38,11 @@ struct child_run {
 };
 
 child_run run_in_child(const limits& lim, const std::function<verdict()>& question);
+
+/// In a child of run_in_child: caps its address space at the present size
+/// plus `mem_mb`. A question calls it after the parse, which a large formula
+/// would otherwise spend the whole cap on.
+void cap_memory();
 
 double ms_since(std::chrono::steady_clock::time_point start);
 

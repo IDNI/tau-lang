@@ -12,6 +12,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <new>
 #include <sstream>
@@ -29,6 +30,9 @@ using steady = std::chrono::steady_clock;
 
 // The child's end of the pipe; the new handler takes no argument.
 int answer_fd = -1;
+
+// The child's `mem_mb` in bytes, for cap_memory.
+rlim_t mem_cap = 0;
 
 void write_all(int fd, const std::string& s) {
 	const char* p = s.data();
@@ -76,6 +80,18 @@ child_run error(const std::string& reason, double ms) {
 
 } // namespace
 
+void cap_memory() {
+	// The first field of statm is the address space in pages, which is what
+	// RLIMIT_AS counts.
+	std::ifstream statm("/proc/self/statm");
+	rlim_t pages = 0;
+	statm >> pages;
+	const rlim_t cap = pages * static_cast<rlim_t>(sysconf(_SC_PAGESIZE))
+		+ mem_cap;
+	const rlimit as{ cap, cap };
+	setrlimit(RLIMIT_AS, &as);
+}
+
 double ms_since(steady::time_point start) {
 	return std::chrono::duration<double, std::milli>(
 		steady::now() - start).count();
@@ -101,9 +117,7 @@ child_run run_in_child(const limits& lim,
 		close(fds[0]);
 		answer_fd = fds[1];
 		dup2(STDERR_FILENO, STDOUT_FILENO);
-		const rlim_t cap = static_cast<rlim_t>(lim.mem_mb) << 20;
-		const rlimit as{ cap, cap };
-		setrlimit(RLIMIT_AS, &as);
+		mem_cap = static_cast<rlim_t>(lim.mem_mb) << 20;
 		std::set_new_handler(out_of_memory);
 		answer_and_exit(question);
 	}

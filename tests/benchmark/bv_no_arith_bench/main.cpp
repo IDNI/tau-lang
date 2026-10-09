@@ -68,7 +68,7 @@ R"(usage: bv_no_arith_bench [options]
   --steps LIST           horizons T; a formula covers the steps 0..T
   --knob NAME=LIST       a family knob, e.g. --knob k=1,2 (repeatable)
   --timeout SECONDS      wall-clock limit per child (default 60)
-  --mem MB               address-space cap per child (default 4096)
+  --mem MB               memory per child beyond its parsed input (default 4096)
   --check-max-width N    the solver checks the expected answer up to this
                          width (default 4)
   --check-timeout SECONDS
