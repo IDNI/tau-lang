@@ -114,7 +114,7 @@ add_repl_test(cli-max_revision_alts_flag
 
 # -K is --ba-component-factoring alone; the closed-regions timeout has no
 # short form.
-add_raw_repl_test(cli-help_short_k_is_factoring
+add_raw_repl_test(cli-help_short_k_is_ba_component_factoring
 	"${TAU_RUN} --help"
 	"--ba-component-factoring\t-K" FAIL_REGEX "--ltl-closed-regions-timeout\t-K")
 

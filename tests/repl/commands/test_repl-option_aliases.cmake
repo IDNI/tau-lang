@@ -59,5 +59,5 @@ foreach(_opt ltl-timeout ltl-qe-max-vars ltl-hoa-max-states
 		"enable ${_opt}" "takes a count, not a flag" NO_FAIL_REGEX)
 endforeach()
 # ltl-alg takes a word, not a count and not a flag.
-add_repl_test(option_word-enable_ltlalg_refused
+add_repl_test(option_word-enable_ltl_alg_refused
 	"enable ltl-alg" "takes a value, not a flag" NO_FAIL_REGEX)

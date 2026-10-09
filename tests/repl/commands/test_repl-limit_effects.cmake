@@ -18,11 +18,11 @@ include(tau_repl_pack)
 # a cap of 1 must give up (loudly) and still terminate. A give-up is no
 # verdict: the query must end in an error, never print `%1: T` or `%1: F`
 # (the partial phi used to be decided as if it were the continuation).
-add_repl_test(limit_effect-fixpointsteps_giveup
+add_repl_test(limit_effect-max_fixpoint_steps_giveup
 	"sat always o1[t] = o1[t-2]"
 	"find_fixpoint_phi: exceeded 1 steps" NO_TRACE
 	FLAGS --max-fixpoint-steps 1 FAIL_REGEX ": T|: F")
-add_repl_test(limit_effect-fixpointsteps_giveup_is_an_error
+add_repl_test(limit_effect-max_fixpoint_steps_giveup_is_an_error
 	"sat always o1[t] = o1[t-2]"
 	"gave up before reaching a result" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-fixpoint-steps 1)
@@ -31,33 +31,33 @@ add_repl_test(limit_effect-fixpointsteps_giveup_is_an_error
 # queries must drop it. With the cap raised back to unlimited the same
 # spec, asked again in the same session, must be decided (`: T`) instead
 # of answered from the first query's give-up.
-add_repl_test(limit_effect-fixpointsteps_memo_dropped_on_change
+add_repl_test(limit_effect-max_fixpoint_steps_memo_dropped_on_change
 	"set max-fixpoint-steps 1. sat always o1[t] = o1[t-2]. set max-fixpoint-steps 0. sat always o1[t] = o1[t-2]"
 	": T" NO_FAIL_REGEX NO_TRACE)
 
 # This workload needs a handful of steps, so it completes under the
 # shipped cap of 500 without ever reaching it.
-add_repl_test(limit_effect-fixpointsteps_default_completes
+add_repl_test(limit_effect-max_fixpoint_steps_default_completes
 	"sat always o1[t] = o1[t-2]"
 	": T" NO_TRACE FAIL_REGEX "exceeded")
-add_repl_test(limit_effect-fixpointsteps_cli_zero_unlimited
+add_repl_test(limit_effect-max_fixpoint_steps_cli_zero_unlimited
 	"get max-fixpoint-steps"
 	"max-fixpoint-steps: *0" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-fixpoint-steps 0)
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
-add_repl_test(limit_effect-fixpointsteps_via_set
+add_repl_test(limit_effect-max_fixpoint_steps_via_set
 	"set max-fixpoint-steps 1. sat always o1[t] = o1[t-2]"
 	"find_fixpoint_phi: exceeded 1 steps" NO_FAIL_REGEX NO_TRACE)
 
 # Definition expansion: g needs one pass per nesting level forever.
-add_repl_test(limit_effect-defpasses_giveup
+add_repl_test(limit_effect-max_def_passes_giveup
 	"g(x) := h(g(x)). h(x) := x'. normalize g(0)"
 	"definition expansion did not settle within the pass cap.*limit=1" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-def-passes 1)
 
 # Fixed-point enumeration: the recurrence converges, but not within 1 step.
-add_repl_test(limit_effect-enumsteps_giveup
+add_repl_test(limit_effect-max_enum_steps_giveup
 	"g[n](x) := g[n-1](x) || x = 0. g[0](x) := F. normalize g(y)"
 	"no fixed point and no loop after 1 enumeration steps" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-enum-steps 1)
@@ -89,7 +89,7 @@ add_multiline_repl_test(limit_effect-specsizewarn_off_by_default
 # leaves an UNREALIZABLE verdict undecided, never an error). Needs a live
 # ltlsynt on PATH
 # (same as the other `sat`-on-full-LTL tests).
-add_repl_test(limit_effect-maxsubsets_giveup
+add_repl_test(limit_effect-max_consistency_subsets_giveup
 	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
@@ -97,7 +97,7 @@ add_repl_test(limit_effect-maxsubsets_giveup
 # The cap only skips eager forbids; the per-edge oracle still refines the
 # chosen strategy afterward, so the verdict stays the true T even on the
 # spec that used to hit the capped-walk worst case.
-add_repl_test(limit_effect-maxsubsets_capped_verdict_recovered
+add_repl_test(limit_effect-max_consistency_subsets_capped_verdict_recovered
 	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	": T" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
@@ -106,23 +106,23 @@ add_repl_test(limit_effect-maxsubsets_capped_verdict_recovered
 # forbid to miss, so the capped verdict is provably unchanged -- the warning
 # fires and the answer is still T. Two tests on the same command line: a
 # single regex bridging both markers is the pinned ctest-backtracking trap.
-add_repl_test(limit_effect-maxsubsets_capped_verdict_correct
+add_repl_test(limit_effect-max_consistency_subsets_capped_verdict_correct
 	"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))"
 	": T" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
-add_repl_test(limit_effect-maxsubsets_capped_verdict_correct_warns
+add_repl_test(limit_effect-max_consistency_subsets_capped_verdict_correct_warns
 	"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))"
 	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
 	FLAGS --max-consistency-subsets 1 REQUIRES ltlsynt)
 
 # Under the shipped default (4096) the same workload completes silently
 # with the same verdict.
-add_repl_test(limit_effect-maxsubsets_default_completes
+add_repl_test(limit_effect-max_consistency_subsets_default_completes
 	"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	": T" NO_TRACE FAIL_REGEX "consistency walk capped" REQUIRES ltlsynt)
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
-add_repl_test(limit_effect-maxsubsets_via_set
+add_repl_test(limit_effect-max_consistency_subsets_via_set
 	"set max-consistency-subsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
 	REQUIRES ltlsynt)

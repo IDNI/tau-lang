@@ -10,7 +10,7 @@
 // budget is also observed through what it changes: the tree-node budget
 // refuses a call, and the fixpoint-step cap makes a query that needs more
 // steps give up instead of answering. The give-up workload is the one of the
-// REPL test test_repl-limit_effect-fixpointsteps_giveup; the constant size
+// REPL test test_repl-limit_effect-max_fixpoint_steps_giveup; the constant size
 // budget's is the one of
 // test_repl-run_cmd-value_past_constant_size_budget.
 //
