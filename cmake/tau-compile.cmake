@@ -209,14 +209,23 @@ if(NOT _native)
 		tau_exit(2)
 	endif()
 
-	# An MSVC platform cannot configure without the developer environment that
-	# puts cl on PATH; the child inherits only what this process has.
+	# Only the MSVC developer shell puts cl on PATH, so cl proves that shell.
+	# A clang-cl platform needs clang-cl from the same shell too.
 	string(FIND "${_platform}" "msvc" _msvc_pos)
 	if(NOT _msvc_pos EQUAL -1)
-		find_program(_tau_cl cl)
-		if(NOT _tau_cl)
+		set(_tau_msvc_missing "")
+		find_program(_tau_msvc_cl cl)
+		if(NOT _tau_msvc_cl)
+			set(_tau_msvc_missing cl)
+		elseif(NOT _platform MATCHES "-msvc-cl$")
+			find_program(_tau_msvc_clang_cl clang-cl)
+			if(NOT _tau_msvc_clang_cl)
+				set(_tau_msvc_missing clang-cl)
+			endif()
+		endif()
+		if(_tau_msvc_missing)
 			message("tau-compile: open the MSVC developer shell for "
-				"${_platform}; cl is not on PATH")
+				"${_platform}; ${_tau_msvc_missing} is not on PATH")
 			tau_exit(3)
 		endif()
 	endif()
