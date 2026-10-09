@@ -16,9 +16,11 @@
 #define __IDNI__TAU__TAU_OPTIONS_H__
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -42,11 +44,13 @@ struct real_codec {
 		const std::string* text =
 			idni::detail::option_text_of(v, r.report());
 		if (!text) return r;
-		double d = 0;
-		const char* first = text->data();
-		const char* last = first + text->size();
-		auto [end, ec] = std::from_chars(first, last, d);
-		if (ec != std::errc{} || end != last || !std::isfinite(d))
+		// libc++ has no std::from_chars for a floating type
+		const char* first = text->c_str();
+		char* end = nullptr;
+		errno = 0;
+		const double d = std::strtod(first, &end);
+		if (text->empty() || errno == ERANGE
+			|| end != first + text->size() || !std::isfinite(d))
 			return r.with_error(code::invalid_argument,
 				parser_strings::messages::option_bad_value,
 				{ { label::name, name },
