@@ -71,7 +71,7 @@ result<tref> repeat_each<node, step_t>::operator()(tref n) const {
 			visited.insert(nn);
 		}
 		if (!settled)
-			return error<tref>(code::runtime_error,
+			return result<tref>().with_error(code::runtime_error,
 				rewrite_rounds_message());
 	}
 	return result<tref>(nn);
@@ -103,7 +103,8 @@ result<tref> repeat_all<node, step_t>::operator()(tref n) const {
 	}
 	// A partially rewritten formula would read as a real result; a
 	// rewrite that never settles has none.
-	return error<tref>(code::runtime_error, rewrite_rounds_message());
+	return result<tref>().with_error(code::runtime_error,
+		rewrite_rounds_message());
 }
 
 // -----------------------------------------------------------------------------

@@ -25,7 +25,7 @@
 #include <utility>
 #include <limits>
 #include <vector>
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #	include <__msvc_int128.hpp>
 #endif
 
@@ -47,7 +47,9 @@ struct rational {
 };
 
 /// @brief 128-bit integer used for overflow-free cross-multiplication.
-#if defined(_MSC_VER) && !defined(__clang__)
+/// clang-cl has __int128, but dividing one calls helpers of compiler-rt that
+/// a link for the MSVC ABI does not carry, so it takes the type of the STL.
+#if defined(_MSC_VER)
 using omcat_int128_ = std::_Signed128;
 #else
 __extension__ typedef __int128 omcat_int128_;

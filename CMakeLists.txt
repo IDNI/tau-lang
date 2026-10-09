@@ -95,6 +95,16 @@ tau_shared_helpers_check_provenance()
 # How cvc5 and Boost are provided: a store package the platform builds with
 # this preset's compiler.
 option(TAU_LTO "Build the library and the executables with link time optimization" ON)
+# A build for the MSVC ABI has no LTO. An artifact links the archives of the
+# SDK, and link.exe aborts while it generates code from /GL archives of this
+# size; /GL has no fat objects that would let the artifact link without it.
+# clang-cl rejects -flto=auto and has no fat objects either.
+if(TAU_LTO AND MSVC)
+	message(STATUS "LTO off: not used with cl.exe or clang-cl")
+	set(TAU_LTO OFF CACHE BOOL
+		"Build the library and the executables with link time optimization"
+		FORCE)
+endif()
 set(TAU_STORE_KEEP "2" CACHE STRING
 	"Store entries to keep per dependency and variant (target, compiler, flags), by last use (0 disables eviction)")
 
@@ -521,6 +531,8 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 			message(FATAL_ERROR "no cvc5 DLL under ${CVC5_STORE_PREFIX}/bin")
 		endif()
 		file(COPY ${_cvc5_dlls} DESTINATION "${CMAKE_BINARY_DIR}")
+		# `tau compile` puts them beside the program it builds, too.
+		set(TAU_SDK_RUNTIME_DLLS ${_cvc5_dlls})
 	endif()
 else()
 	message(STATUS "cvc5 not required by TAU_BAS=${TAU_BAS}; skipping")
@@ -709,6 +721,14 @@ if(TAU_ADDRESS_SANITIZER)
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 		set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+	elseif(MSVC)
+		# /Zi and /DEBUG give a report its file names and line numbers. The
+		# container annotations are off: the store packages are built
+		# without them, and the linker refuses to mix the two.
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address /Zi")
+		add_compile_definitions(_DISABLE_VECTOR_ANNOTATION
+			_DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION)
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
 	else()
 		message(WARNING
 			"TAU_ADDRESS_SANITIZER is ignored on ${CMAKE_CXX_COMPILER_ID}")

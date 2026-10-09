@@ -156,7 +156,9 @@ tref bv_case_split_quantifiers(tref formula) {
 			}
 			return res;
 		};
-		auto eliminate = [&](auto& self, tref body) -> tref {
+		// A std::function, not a lambda handed to itself: cl overflows its
+		// stack on that generic lambda inside this template.
+		std::function<tref(tref)> eliminate = [&](tref body) -> tref {
 			if (!contains<node>(body, var)) return body;
 			const tau& tb = tau::get(body);
 			if (tb.is(tau::wff) && (tb.child_is(tau::wff_and) || tb.child_is(tau::wff_or))) {
@@ -173,7 +175,7 @@ tref bv_case_split_quantifiers(tref formula) {
 				if (!ind.empty()) {
 					tref d = dep.size() == 1 ? dep[0]
 						: (is_and ? tau::build_wff_and(dep) : tau::build_wff_or(dep));
-					std::vector<tref> parts{self(self, d)};
+					std::vector<tref> parts{eliminate(d)};
 					parts.insert(parts.end(), ind.begin(), ind.end());
 					return is_and ? tau::build_wff_and(parts) : tau::build_wff_or(parts);
 				}
@@ -182,13 +184,13 @@ tref bv_case_split_quantifiers(tref formula) {
 				&& tb.child_is(is_ex ? tau::wff_ex : tau::wff_all)
 				&& !(tau::get(tb[0].first()) == tau::get(var))) {
 				tref y = tb[0].first(), sc = tb[0].second();
-				tref inner = self(self, sc);
+				tref inner = eliminate(sc);
 				return is_ex ? tau::build_wff_ex(y, inner, false)
 					: tau::build_wff_all(y, inner, false);
 			}
 			return cases(body);
 		};
-		return eliminate(eliminate, scope);
+		return eliminate(scope);
 	};
 	auto visit = [](tref x) { return while_is_formula<node>(x); };
 	return post_order<node>(formula).apply_unique(step, visit);

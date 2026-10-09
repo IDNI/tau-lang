@@ -13,7 +13,12 @@ namespace idni::tau_lang {
 // =============================================================================
 
 // Pedantic-clean 128-bit alias: products of two 64-bit parts are exact in it.
+#if defined(_MSC_VER)
+#	include <__msvc_int128.hpp>
+using int128_t_ = std::_Signed128;
+#else
 __extension__ typedef __int128 int128_t_;
+#endif
 
 namespace {
 

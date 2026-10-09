@@ -99,7 +99,10 @@ _dep_boost_target_build() {
 		printf 'set "TEMP=%s"\r\nset "TMP=%s"\r\n' "$_tmp_win" "$_tmp_win"
 		printf 'cd /d "%s"\r\n' "$_boost_win"
 		printf 'if errorlevel 1 exit /b 1\r\n'
-		printf 'call bootstrap.bat --with-libraries=log\r\n'
+		# The toolset is named: the bootstrap of this Boost does not know a
+		# Visual Studio newer than 2022 and fails to guess one. msvc takes
+		# the cl of the environment.
+		printf 'call bootstrap.bat msvc --with-libraries=log\r\n'
 		printf 'if errorlevel 1 exit /b 1\r\n'
 		printf 'b2.exe --user-config=./user-config.jam'
 		printf ' --prefix="%s" --build-dir="%s"' \
