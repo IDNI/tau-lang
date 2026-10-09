@@ -113,7 +113,8 @@ _dep_spot_producer() {
 		rm -rf "$work"
 		return 1
 	fi
-	tar -xzf "$tarball" -C "$work" \
+	# From stdin: GNU tar takes a file name with a drive letter for a host.
+	tar -xzf - -C "$work" < "$tarball" \
 		|| { echo "dep-spot: extract failed" >&2; rm -rf "$work"; return 1; }
 	if [ ! -d "$src" ]; then
 		echo "dep-spot: extracted tree not found: '$src'" >&2
@@ -137,7 +138,9 @@ _dep_spot_producer() {
 import os
 import sys
 root, *old_paths = sys.argv[1:]
-olds = sorted({p.encode() for p in old_paths if p}, key=len, reverse=True)
+# A Windows compiler writes the same paths with backslashes.
+olds = sorted({s.encode() for p in old_paths if p
+	for s in (p, p.replace('/', '\\'))}, key=len, reverse=True)
 for dirpath, _dirs, files in os.walk(root):
 	for name in files:
 		path = os.path.join(dirpath, name)

@@ -91,7 +91,8 @@ _dep_curl_producer() {
 		rm -rf "$work"
 		return 1
 	fi
-	tar -xzf "${work}/curl.tar.gz" -C "$work" \
+	# From stdin: GNU tar takes a file name with a drive letter for a host.
+	tar -xzf - -C "$work" < "${work}/curl.tar.gz" \
 		|| { echo "dep-curl: extract failed" >&2; rm -rf "$work"; return 1; }
 	if [ ! -d "$src" ]; then
 		echo "dep-curl: extracted tree not found: '$src'" >&2
@@ -126,7 +127,9 @@ _dep_curl_producer() {
 import os
 import sys
 root, *old_paths = sys.argv[1:]
-olds = sorted({p.encode() for p in old_paths if p}, key=len, reverse=True)
+# A Windows compiler writes the same paths with backslashes.
+olds = sorted({s.encode() for p in old_paths if p
+	for s in (p, p.replace('/', '\\'))}, key=len, reverse=True)
 for dirpath, _dirs, files in os.walk(root):
 	for name in files:
 		path = os.path.join(dirpath, name)
