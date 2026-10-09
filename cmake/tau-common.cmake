@@ -64,7 +64,8 @@ if (TAU_LTO AND (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 		set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
 		set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 		set(TAU_LTO_LINK "-flto=auto")
-	elseif(MSVC)
+	# clang-cl sets MSVC too, but it ignores /GL with a warning.
+	elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 		set(TAU_LTO_COMPILE_FLAGS "/GL")
 		set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 		set(TAU_LTO_LINK "/LTCG")
