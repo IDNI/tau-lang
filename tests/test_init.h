@@ -19,6 +19,8 @@
 // backends/cvc5/cvc5_options.h are dependency-free.
 #include "heuristics/preprocess_placement.h"
 #include "backends/cvc5/cvc5_options.h"
+// dependency-free as well: main() starts a bounded child of the suite
+#include "bounded_call.h"
 
 using namespace std;
 
@@ -98,6 +100,8 @@ inline int (*test_child_hook)(int argc, char** argv) = nullptr;
 int main(int argc, char** argv) {
 	// ctest reads a pipe, which stdio buffers, and a crash loses that buffer
 	std::setvbuf(stdout, nullptr, _IONBF, 0);
+	if (int rc = bounded_child_main(argc, argv); rc >= 0) return rc;
+	enable_bounded_children();
 	apply_tau_experiment_env();
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
 #ifdef TAU_LOG_TRACE_TESTS

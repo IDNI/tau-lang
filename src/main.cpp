@@ -167,6 +167,8 @@ void welcome() {
 /// the REPL's code (0 done, 1 quit or error with error-quits, 2 incomplete
 /// input).
 int main(int argc, char** argv) {
+	if (int rc = bounded_child_main(argc, argv); rc >= 0) return rc;
+	enable_bounded_children();
 	auto& repo = idni::options();
 	auto init = tau_init<node_t>();
 	init.print_pending();

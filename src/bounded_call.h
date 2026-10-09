@@ -19,8 +19,10 @@
  * A caller that reads a missing answer as "undecided" and nothing else can
  * keep its result with @ref time_budget_handled.
  *
- * Without a process model (wasm, Windows) the work runs in the process,
- * unbounded.
+ * Without fork (Windows) a program that runs itself as a child
+ * (@ref enable_bounded_children) sends a registered job as text to a new
+ * process of itself instead (bounded_child.h). Without either (wasm, a
+ * library in another program) the work runs in the process, unbounded.
  */
 
 #ifndef __IDNI__TAU__BOUNDED_CALL_H__
@@ -30,8 +32,19 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <iostream>
+#include <iterator>
+#include <map>
 #include <optional>
 #include <string>
+#include <string_view>
+
+#include "self_exe_path.h"
+
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 #define TAU_HAS_BOUNDED_CALL 1
@@ -149,6 +162,68 @@ inline bounded_outcome run_bounded(const std::function<uint8_t()>& work,
 	out.value = work();
 	return finish(bounded_outcome::done);
 #endif
+}
+
+/// The hidden first argument that makes a program a bounded child.
+inline constexpr std::string_view bounded_child_verb = "--tau-bounded-child";
+
+/// A job a bounded child runs: the request text in, the one-byte answer out;
+/// nullopt when the request is not one the job reads.
+using bounded_child_job = std::optional<uint8_t> (*)(const std::string&);
+
+/// The jobs a bounded child of this program knows, by kind.
+inline std::map<std::string, bounded_child_job, std::less<>>&
+	bounded_child_jobs()
+{
+	static std::map<std::string, bounded_child_job, std::less<>> jobs;
+	return jobs;
+}
+
+/// Makes @p job known to a bounded child as @p kind.
+inline void register_bounded_child(std::string kind, bounded_child_job job) {
+	bounded_child_jobs()[std::move(kind)] = job;
+}
+
+/// The program a bounded child runs; empty when none is known.
+inline std::string& bounded_child_program() {
+	static std::string program;
+	return program;
+}
+
+/// Lets this program run itself as a bounded child. Only a program whose
+/// main() first calls @ref bounded_child_main may call it.
+inline void enable_bounded_children() {
+	bounded_child_program() = self_exe_path();
+}
+
+/// Whether a job can run in a bounded child of this program.
+inline bool bounded_children_available() {
+	return !bounded_child_program().empty();
+}
+
+/**
+ * @brief Runs the job a bounded child was started for, when it was.
+ *
+ * With @ref bounded_child_verb and a kind as the arguments, the job of that
+ * kind reads stdin and its answer goes to stdout as a number.
+ * @return -1 when @p argv does not start a bounded child; else the exit
+ * code: 0 with an answer, 2 for an unknown kind or a refused request.
+ */
+inline int bounded_child_main(int argc, char** argv) {
+	if (argc < 2 || argv[1] != bounded_child_verb) return -1;
+	if (argc != 3) return 2;
+	auto it = bounded_child_jobs().find(std::string_view(argv[2]));
+	if (it == bounded_child_jobs().end()) return 2;
+#if defined(_WIN32)
+	// text mode would turn CR LF into LF and stop at a Ctrl-Z byte
+	_setmode(_fileno(stdin), _O_BINARY);
+#endif
+	const std::string request((std::istreambuf_iterator<char>(std::cin)),
+		std::istreambuf_iterator<char>());
+	const auto answer = it->second(request);
+	if (!answer) return 2;
+	std::cout << static_cast<unsigned>(*answer) << '\n' << std::flush;
+	return 0;
 }
 
 /// The message of the last budget that ran out in the current unit of work;
