@@ -865,7 +865,7 @@ TEST_CASE("node_test: the classes of a terminal and a constant") {
 	CHECK(!c.is(ap::node_question::one));
 }
 
-TEST_CASE("node_test: the spec's open example decides T") {
+TEST_CASE("node_test: a product the leaf product cannot see is open, and its sweep decides T") {
 	tref x = vr("x");
 	const ap::block X{ x };
 	// ∃x. x·(r ∪ s) ∪ x′·r′·s′ = 0 discharges to (r ∪ s)·r′·s′ = 0

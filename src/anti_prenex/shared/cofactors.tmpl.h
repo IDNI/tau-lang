@@ -54,7 +54,6 @@ bool lowest_levels(tref term, const block& X) {
 
 template <NodeType node>
 cof_entry cof(tref f, tref x) {
-	using tau = tree<node>;
 	using tbdd = tau_term_bdd<node>;
 	using thandle = term_handle<node>;
 	DBG(assert(free_in<node>(f, x) && "cof: x is not free in f");)
@@ -92,7 +91,7 @@ cof_entry cof(tref f, tref x) {
 			e.p = z.term;
 			e.strict = z.is(node_question::zero);
 		}
-		DBG(assert(!e.pin || tau::get(u.term).equals_1());)
+		DBG(assert(!e.pin || tree<node>::get(u.term).equals_1());)
 		DBG(assert(!e.pin
 			|| tbdd::build_bdd(e.witness) == tbdd::bdd_not(b1));)
 		return e;

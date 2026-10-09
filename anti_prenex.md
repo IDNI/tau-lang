@@ -217,6 +217,9 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
 | `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF` alone, which `SIMPLIFY`'s equality propagation calls on backed terms (§3) under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, where every other caller asks about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
 | `plain_cof_memo` | `(term, y) → (f₀, f₁, p, usable, pin)`, GLOBAL. The plain regime's pin records: `SIMPLIFY`'s equality propagation in phases 1 and 2 (§3) records its match under `(TERM_OF(c), y)`, the cofactors taken by substitution. Apart from `cof_memo`: a term with no decision variable is one node in both regimes, and the two recipes record different cofactors — a substitution reaches into a leaf, a restrict does not. Read BARE — `SIMPLIFY` has no ctx. Pure functions of the key |
+| `term_of_memo` | `equation → TERM_OF(equation)` (§3), the ring sum `l + r` as a BDD-backed term, the `¬` stripped from the key — GLOBAL. Not consulted in the plain regime when neither side is BDD-backed: the sum is then one XOR node built directly. Read BARE — `TERM_OF` has no ctx. Pure function of the key |
+| `mem_size_memo` | `term → ‖term‖` (§1), GLOBAL. Read by `TRY_WITNESS`'s tie-break and by `SIMPLIFY`'s `propagate_growth` bound. Read BARE. Pure function of the key |
+| `simplify_term_memo` | `plain term → SIMPLIFY_TERM(term)` (§3), GLOBAL. A backed term is the identity and a constant returns at once, so neither is recorded. Read BARE — `SIMPLIFY_TERM` has no ctx. Pure function of the key |
 | `atoms_memo` | `formula node → the atoms reachable in it through ∧, ∨ and ¬ alone` — units, references and temporal operators are opaque (§4), so a reference's formula argument contributes none — GLOBAL, purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query's terms in `FINISH_TERMS`' spelling (§3), so its keys are canonical. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
@@ -229,7 +232,7 @@ COMPONENT STATE — `type`, `prio`, the five component knobs and
 lives for that component alone. PHASE STATE — `order` and the callback `kf` —
 is the same for every component of phase 4: the global order (§1), read
 again by phase 5's `SIMPLIFY` (§3), and the caller's callback. GLOBAL —
-`taint_count` and the seven tables — outlives the call (cache scope, below).
+`taint_count` and the ten tables — outlives the call (cache scope, below).
 The component knobs are read from the process-wide defaults at setup, so a
 changed one applies from the next component on; `propagate_growth` and
 `absorb_occ_max` belong to `SIMPLIFY` and the joins, which run in every
@@ -248,7 +251,8 @@ shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its ke
 names everything its entries depend on. The variable set is explicit: the
 ordered `X` of `push_memo`/`elim_memo` fixes the type, every atom's block
 subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
-and `plain_cof_memo` carry their variable; `atoms_memo` is purely structural;
+and `plain_cof_memo` carry their variable; `atoms_memo`, `term_of_memo`,
+`mem_size_memo` and `simplify_term_memo` are purely structural;
 `solver_memo` and `qbf_memo` involve none. `keep_functional` joins `push_memo`'s and
 `elim_memo`'s keys alone — their entries embed `DISCHARGE`'s output, which
 the flag switches, with `kf`'s answer on each chain it emits (§7), a pure
@@ -256,7 +260,7 @@ function of the chain because the callback never changes once set (§1 ctx
 table) — while `cof_memo`'s key is the term as it arrives, a kept chain
 included. Every tie-break is the content order (§1), so no entry embeds
 construction history, and every BDD is built under the one global order
-(§1), so a BDD-valued entry — `push_memo`, `elim_memo`, `cof_memo` — holds
+(§1), so a BDD-valued entry — `push_memo`, `elim_memo`, `cof_memo`, `term_of_memo` — holds
 in every call. Five knobs sit in no key — the solver configuration,
 `qbf_node_max`, `accept_growth`, `accept_floor` and the call's `time_limit`
 — and are handled four ways. TAINT: a computation that hit a budget — a
@@ -2466,7 +2470,8 @@ algorithm's:
   later one reads the memo. That is what makes the acceptance comparison, the
   sort keys, and every `X ∩ FV` test in this document O(1).
 - **The result tables are caches, never premises.** `push_memo`, `elim_memo`,
-  `cof_memo`, `plain_cof_memo`, `solver_memo` and `qbf_memo` (§1) may be
+  `cof_memo`, `plain_cof_memo`, `solver_memo`, `qbf_memo`, `term_of_memo`,
+  `mem_size_memo` and `simplify_term_memo` (§1) may be
   absent altogether — a build without caching, the Debug build — so no result may
   depend on a hit: a miss costs time and nothing else. The structural facets
   are not caches and always exist: `|·|`, `neg`, the negative-tree flag, and
