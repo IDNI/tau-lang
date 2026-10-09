@@ -279,8 +279,9 @@ _dep_cvc5_target_prebuild() {
 	CMAKE_PREFIX_PATH="$(cygpath -m "$deps")"
 	# clang-cl reads extra options from CL. The compat header goes into every
 	# file, because ssize_t reaches files that do not include unistd.h.
+	# cvc5's -Wall is -Weverything for clang-cl, so -w drops its warnings.
 	export CL
-	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
+	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\" -w"
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
 }
 
