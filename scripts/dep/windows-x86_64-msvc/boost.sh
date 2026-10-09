@@ -9,10 +9,16 @@ DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOU
 
 # b2's msvc toolset finds cl through the developer environment the
 # runner set up; naming the compiler path here would freeze a version.
+# clang-cl is b2's clang-win toolset, which takes the path of the compiler:
+# b2's plain clang toolset drives clang with GCC options and builds nothing
+# from the MSVC flags of this target.
 _dep_boost_user_config() {
-	cat > "${1}/user-config.jam" <<EOF
-using msvc ;
-EOF
+	if [ "$(dep_compiler_id "$2")" = MSVC ]; then
+		printf 'using msvc ;\n' > "${1}/user-config.jam"
+	else
+		printf 'using clang-win : : "%s" ;\n' "$(cygpath -m "$2")" \
+			> "${1}/user-config.jam"
+	fi
 }
 
 # Overwrite each <folder> in every file under <prefix> with '@' of the same
@@ -119,10 +125,16 @@ _dep_boost_target_build() {
 	rm -rf "$_short"
 	[ "$_rc" -eq 0 ] \
 		|| { echo "dep-boost: MSVC bootstrap+b2 failed" >&2; return 1; }
+	# b2 succeeds when a toolset it does not understand builds nothing.
+	[ -f "${staging_prefix}/lib/libboost_log.lib" ] \
+		|| { echo "dep-boost: b2 installed no libboost_log.lib" >&2; return 1; }
 }
 
 _dep_boost_target_setup() {
 	DEP_BOOST_TARGET_OS="windows"
+	if [ "$(dep_compiler_id "$DEP_BOOST_CXX")" != MSVC ]; then
+		DEP_BOOST_B2_TOOLSET="clang-win"
+	fi
 	DEP_BOOST_B2_PIC=""
 	# --layout=system names the static and the shared library identically,
 	# so install static only (Tau links Boost statically).
