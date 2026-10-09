@@ -272,10 +272,14 @@ TEST_SUITE("spawn_capture") {
 		CHECK(!timeout_from_env(""));
 		CHECK(ltl_timeout_sec() == 60);
 	}
-	// SY-R5: 2^32 used to truncate to 0 (watchdog silently off) and 2^31
-	// to a negative; both are clamped to the one-day maximum now.
+	// A value past the one-day maximum is clamped. A value that does not fit
+	// size_t is an error.
 	TEST_CASE("[TIMEOUT-04] range garbage is clamped, never truncated to 0") {
-		CHECK(timeout_from_env("4294967296") == (int)ltl_timeout_sec_max);
+		if constexpr (sizeof(std::size_t) < 8) {
+			CHECK(!timeout_from_env("4294967296"));
+		} else {
+			CHECK(timeout_from_env("4294967296") == (int)ltl_timeout_sec_max);
+		}
 		CHECK(timeout_from_env("2147483648") == (int)ltl_timeout_sec_max);
 		CHECK(!timeout_from_env("99999999999999999999"));
 		CHECK(timeout_from_env("86400") == 86400);
