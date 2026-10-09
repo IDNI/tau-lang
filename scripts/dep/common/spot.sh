@@ -133,6 +133,8 @@ _dep_spot_producer() {
 	fi
 
 	_dep_spot_target_finish "$staging_prefix" || { rm -rf "$work"; return 1; }
+	# install-exec also installs the static libraries. Tau only execs the tools.
+	rm -rf "${staging_prefix}/lib" "${staging_prefix}/include"
 
 	# The configure prefix is baked into the tools; rewrite every baked build
 	# path to an equal-length placeholder so none is published.
