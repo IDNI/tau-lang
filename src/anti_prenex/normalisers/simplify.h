@@ -77,9 +77,9 @@ struct pin {
  * STRICT flag, `p` folding to `0`; a record that is no pin has none of them.
  *
  * The plain half of the one pin match: `find_pin` / `find_pin_for` take the
- * cofactors by SUBSTITUTION in the plain regime and hand them here; on
- * backed terms the match is `COF`'s recipe (cofactors.h), and both record
- * the result in `cof_memo` (§1).
+ * cofactors by SUBSTITUTION in the plain regime and hand them here, the
+ * record memoised in `plain_cof_memo` (§1); on backed terms the match is
+ * `COF`'s recipe (cofactors.h), memoised in `cof_memo`.
  */
 template <NodeType node>
 cof_entry pin_from_cofactors(tref f0, tref f1, tref y);

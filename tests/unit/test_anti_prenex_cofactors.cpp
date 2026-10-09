@@ -229,6 +229,31 @@ TEST_CASE("C6: ONE pin recipe — the plain regime's match agrees (D9)") {
 	CHECK(same_function(be.witness, weak->witness));
 }
 
+#ifdef TAU_CACHE
+TEST_CASE("C7: the plain match and COF keep apart records under one key (Release)") {
+	tref x = vr("x");
+	// `r(x) = 0`: its term is the single leaf `r(x)`, one node in both
+	// regimes. The plain match substitutes into the reference, so `x` is
+	// gone from both cofactors and its record is usable, with no pin.
+	const tref f = bf("r(x)");
+	CHECK(!ap::find_pin_for<node_t>(eq0(f), x).has_value());
+	const ap::cof_entry* plain =
+		ap::find<node_t, ap::table::plain_cof_memo>({ f, x });
+	REQUIRE(plain != nullptr);
+	CHECK(plain->usable);
+	CHECK(!plain->pin);
+	// COF on the same key: a restrict never reaches into a leaf, so `x`
+	// hides there and COF's own record is not usable.
+	const ap::cof_entry e = ap::cof<node_t>(f, x);
+	CHECK(!e.usable);
+	CHECK(e.p == nullptr);
+	const ap::cof_entry* backed =
+		ap::find<node_t, ap::table::cof_memo>({ f, x });
+	REQUIRE(backed != nullptr);
+	CHECK(!backed->usable);
+}
+#endif
+
 // --- DISCHARGE, discharging mode ---------------------------------------------------
 
 TEST_CASE("D1: ∀_X f = 0 and ∃_X h ≠ 0 for one variable") {

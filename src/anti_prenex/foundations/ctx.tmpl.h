@@ -53,9 +53,9 @@ size_t& taint_counter() {
 }
 
 /// Debug-only check that a key names real nodes: a bare `tref` key IS the
-/// node, a `(tref, bool)` key holds one, and `cof_memo`'s `(tref, tref)`
-/// holds one in EACH half. A null in either half would be dereferenced by
-/// `hash_lcrs_tref` in every build type.
+/// node, a `(tref, bool)` key holds one, and the cofactor tables'
+/// `(tref, tref)` holds one in EACH half. A null in either half would be
+/// dereferenced by `hash_lcrs_tref` in every build type.
 template <typename key_t>
 bool key_is_nonnull(const key_t& key) {
 	if constexpr (std::is_same_v<key_t, tref>)

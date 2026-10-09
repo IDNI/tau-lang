@@ -3,13 +3,13 @@
 /**
  * @file ctx.h
  * @brief Anti-prenexing foundations: `ctx` (the §1 ctx table), the call's
- * time limit (§3), the memo tables — the five §1 result tables and the
+ * time limit (§3), the memo tables — the six §1 result tables and the
  * structural per-node facet tables — the memo wrapper with its taint rule
  * (§1 cache scope), and the flush.
  *
  * Every table is an entry of `enum class table` with a `table_traits`
  * specialisation and a static GC-registered `create_cache` instance. A
- * `gated` table — one of the five §1 result tables — exists under
+ * `gated` table — one of the six §1 result tables — exists under
  * `#ifdef TAU_CACHE` only, which is off in Debug, and no result may depend on
  * a hit. An unconditional table — a structural facet — always exists, so its
  * accessors may return references: `store` and `memoised` return a reference
@@ -149,13 +149,14 @@ inline void check_time_limit();
 
 // --- the tables -------------------------------------------------------------------
 
-/// Every table of the module: the five §1 result tables (gated caches) and the
+/// Every table of the module: the six §1 result tables (gated caches) and the
 /// structural per-node facet tables (unconditional).
 enum class table {
 	// §1 result tables — gated
 	push_memo,     ///< `(REWRAP(φ, X), keep_functional) → formula`; also EXPAND's state memo
 	elim_memo,     ///< `(REWRAP(clause, X), keep_functional) → formula`
 	cof_memo,      ///< `(term, x) → cof_entry`; filled and read by COF
+	plain_cof_memo, ///< `(term, y) → cof_entry`; the plain regime's pin match
 	solver_memo,   ///< canonical closed query → sat / unsat / unknown
 	qbf_memo,      ///< canonical closed pure-Boolean query → T / F; never flushed
 	// structural per-node facets — unconditional
@@ -175,8 +176,9 @@ enum class table {
 inline constexpr std::array<table, static_cast<size_t>(table::count_)>
 all_tables = {
 	table::push_memo, table::elim_memo, table::cof_memo,
-	table::solver_memo, table::qbf_memo, table::atoms_memo,
-	table::size_memo, table::neg_memo, table::negative_tree_memo
+	table::plain_cof_memo, table::solver_memo, table::qbf_memo,
+	table::atoms_memo, table::size_memo, table::neg_memo,
+	table::negative_tree_memo
 };
 static_assert([] {
 		for (size_t i = 0; i < all_tables.size(); ++i)
@@ -252,6 +254,13 @@ struct table_traits<node, table::cof_memo> {
 	static constexpr bool taint_aware    = false;
 	static constexpr bool solver_flushed = false;
 };
+
+/// The plain regime's records apart from `COF`'s: a term with no decision
+/// variable is one node in both regimes, and a substitution reaches into a
+/// leaf where a restrict does not.
+template <NodeType node>
+struct table_traits<node, table::plain_cof_memo>
+	: table_traits<node, table::cof_memo> {};
 
 template <NodeType node>
 struct table_traits<node, table::solver_memo> {

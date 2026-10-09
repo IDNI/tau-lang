@@ -11,7 +11,7 @@
  * build-type behaviour and garbage collection.
  *
  * CACHE GATING, the rule the whole module follows. Every memo table is an
- * entry of ctx.h's `enum class table`. The five §1 result tables are caches:
+ * entry of ctx.h's `enum class table`. The six §1 result tables are caches:
  * they exist under `#ifdef TAU_CACHE` only, which is off in Debug builds, so
  * no result may depend on a hit. The structural per-node tables
  * (`atoms_memo`, `size_memo`, `neg_memo`, `negative_tree_memo`) hold facets
@@ -104,8 +104,8 @@ struct tref_set {
 };
 
 /**
- * @brief §1 `cof_memo` entry: the value of `COF(f, x)`, the record of
- * cofactoring the term `f` by the variable `x`.
+ * @brief §1 `cof_memo` and `plain_cof_memo` entry: the value of `COF(f, x)`,
+ * the record of cofactoring the term `f` by the variable `x`.
  *
  * `f0` and `f1` are the cofactors `f[x ← 0]` and `f[x ← 1]`: on a backed
  * term the RESTRICTS `COF` takes (§1), canonical as built and simplified no

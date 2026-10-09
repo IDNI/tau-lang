@@ -19,8 +19,8 @@
  * The pieces come from the foundations: `term_of`, `simplify_term`,
  * `simplify_atom`, `mem_size` (terms.h); `fv_meets`, `free_in`, `is_literal`,
  * `binder_var` (dag.h); `cof` (cofactors.h) for the backed pin match, and
- * `memoised` over `cof_memo` (ctx.h) for the plain one's cofactor records;
- * `tree::substitute` with the argument hook
+ * `memoised` over `plain_cof_memo` (ctx.h) for the plain one's cofactor
+ * records; `tree::substitute` with the argument hook
  * `resimplify_argument` (subst.h) for every rewrite;
  * `get_leaves` for the member view of an open conjunction, with its spine.
  */
@@ -87,15 +87,15 @@ tref pin_term(tref atom, const block& X, regime rg) {
 /// ONE MATCH, two recipes by regime. On backed terms it is `COF`'s
 /// (cofactors.h): restricts, the record holding the witness and the
 /// strictness. In the plain regime the cofactors are taken by SUBSTITUTION
-/// and tested by `pin_from_cofactors`, the record MEMOISED in `cof_memo` (§1)
-/// under `(f, y)` as `COF`'s is. The table is a cache, absent in Debug
-/// builds, so nothing here depends on a hit.
+/// and tested by `pin_from_cofactors`, the record MEMOISED in
+/// `plain_cof_memo` (§1) under `(f, y)`. The table is a cache, absent in
+/// Debug builds, so nothing here depends on a hit.
 template <NodeType node>
 std::optional<pin<node>> pin_of_var(tref f, tref y, regime rg) {
 	using tau = tree<node>;
 	cof_entry e;
 	if (rg == regime::backed) e = cof<node>(f, y);
-	else e = memoised<node, table::cof_memo>({ f, y }, [&] {
+	else e = memoised<node, table::plain_cof_memo>({ f, y }, [&] {
 		const size_t type = find_ba_type<node>(f);
 		const tref key = tau::get(tau::bf, y);
 		const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
