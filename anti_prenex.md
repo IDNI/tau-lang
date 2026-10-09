@@ -1112,22 +1112,26 @@ DELETE_UNATE_BINDERS(body, X):
     // drags every smaller one along, so 0 satisfies φ whenever anything
     // does — and ∃x.φ ≡ φ[x ← 1] when φ is UPWARD CLOSED. Valid in any BA:
     // the witness is an end of the order, so no pin is needed. Closure is
-    // read off the literals of the NNF body, syntactically, in ONE walk:
-    //   POLARITY in a term: an occurrence of x is POSITIVE under an even
-    //     number of ′, NEGATIVE under an odd one; · and ∪ keep it. f is
-    //     MONOTONE in x when every occurrence is positive, ANTITONE when
-    //     every one is negative.
+    // read off the literals of the NNF body, in ONE walk:
+    //   f is MONOTONE in x when f[x ← 0] ≤ f[x ← 1] (f₀·f₁′ = 0), ANTITONE
+    //     when f₁ ≤ f₀.
     //   A literal mentioning x is x-LOW — growing x can only make it false —
-    //     when it is f = 0 with f monotone in x, or ¬(f = 0) with f
-    //     antitone; x-HIGH in the mirror cases. `f = 0` is an equation with
-    //     one side syntactically 0: equations are not zero-normalised
-    //     (inv. 4).
+    //     when it is l = r with l + r monotone in x, or ¬(l = r) with l + r
+    //     antitone; x-HIGH in the mirror cases.
     //   ∧ and ∨ preserve both closures: x-LOW in every literal mentioning x
     //     makes body downward closed in x, x-HIGH in every one upward closed.
-    //   Anything else mentioning x makes x BINATE, and x stays: x under +
-    //     or any other term operator, a functional quantifier included; an
-    //     equation with no syntactic 0 side; an order atom; a unit; a
-    //     reference; a temporal operator.
+    //   Any other literal mentioning x — an order atom, a unit, a reference,
+    //     a temporal operator — makes x BINATE, and x stays.
+    // The test may be any SUFFICIENT check, one-way: what it cannot read is
+    //   binate. The SYNTACTIC reading is one: an occurrence of x under an
+    //   even number of ′ is POSITIVE, under an odd one NEGATIVE, · and ∪
+    //   keep it, and f is monotone when every occurrence is positive,
+    //   antitone when every one is negative; x under + or any other term
+    //   operator, a functional quantifier included, reads binate; l + r is
+    //   read as the other side when one side is syntactically 0 (equations
+    //   are not zero-normalised, inv. 4), as binate otherwise. On a
+    //   BDD-backed term the cofactor test is exact, and x ← 0, x ← 1 are
+    //   restricts.
     // The walk is post-order and memoised per node: a node's summary — the
     //   variables of X it moves up, down, or both ways — is a function of
     //   the node alone, ¬ and ′ swap up and down, and a subtree whose FV
