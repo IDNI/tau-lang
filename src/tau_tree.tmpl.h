@@ -443,15 +443,17 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
+	// The hook is called directly below: the installed one is this same
+	// `get_hook`, which `base_t::get` would fetch again under the hook lock.
 	// We only propagate the type information up
 	// Do not propagate bool type as it is reserved for predicate definitions
 	// Use literal 4 instead of bool_type_id<node>() to avoid infinite recursion
 	// (bool_type_id calls this get method, creating a circular dependency)
 	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
-		return base_t::get(v.ba_retype(ba_type), ch, len, r);
+		return hook(v.ba_retype(ba_type), ch, len, r);
 	}
-	return base_t::get(v, ch, len, r);
+	return hook(v, ch, len, r);
 }
 
 template <NodeType node>
