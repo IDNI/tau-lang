@@ -55,6 +55,14 @@ const seven = load_with('7');
 check(seven !== null && seven.option === '7' && seven.error === '',
 	'TAU_MAX_FIXPOINT_STEPS=7 sets the option: ' + JSON.stringify(seven));
 
+// A bad value does not stop the load: the module keeps the reason, in plain
+// text, and refuses every later call.
+const bad = load_with('abc');
+check(bad !== null && bad.option === null
+		&& bad.error.includes('TAU_MAX_FIXPOINT_STEPS')
+		&& !bad.error.includes('\u001b'),
+	'TAU_MAX_FIXPOINT_STEPS=abc gives a plain error: ' + JSON.stringify(bad));
+
 if (failed) {
 	console.error('ENV TEST FAILED');
 	process.exit(1);

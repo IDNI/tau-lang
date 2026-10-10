@@ -320,6 +320,8 @@ constexpr flag_setter flag_setters[] = {
 
 EMSCRIPTEN_BINDINGS(tau) {
 	disable_logging();
+	// get_last_error() is data for a JS caller, so it holds no ANSI codes.
+	tau_api::set_colors(false);
 	// get_last_error() after the load shows the warnings of a successful init
 	auto init = tau_init<node_t>();
 	if (init.has_value()) init.merge(idni::options().load_env("TAU_"));
