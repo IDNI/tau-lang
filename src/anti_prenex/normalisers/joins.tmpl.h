@@ -7,7 +7,8 @@
  *
  * The pieces come from the foundations: `members` for the flattening and for
  * the parts of a member, `is_literal` and `complement_of` for the unit
- * elimination, `canonical_and`/`canonical_or` for the emission, and
+ * elimination, `term_of` for the spellings of one backed equation,
+ * `canonical_and`/`canonical_or` for the emission, and
  * `subtree_unordered_set`/`subtree_unordered_map` for every set and index —
  * all keyed by CONTENT, which is what a member carrying a right sibling
  * needs.
@@ -116,6 +117,22 @@ trefs absorb(const trefs& ms) {
 	return survivors;
 }
 
+/// `TERM_OF` of a literal over an equation of an atomless type with a
+/// BDD-backed side, or `nullptr` for any other member.
+template <NodeType node>
+tref backed_sum(tref m) {
+	using tau = tree<node>;
+	using th = term_handle<node>;
+	const tau& a = tau::get(atom_of<node>(m));
+	if (!a.child_is(tau::bf_eq)) return nullptr;
+	const tref l = a[0].first(), r = a[0].second();
+	const tref backed = th::is_bdd_backed(l) ? l : r;
+	if (!th::is_bdd_backed(backed)) return nullptr;
+	const size_t type = find_ba_type<node>(backed);
+	if (!is_tau_type<node>(type) && !is_sbf_type<node>(type)) return nullptr;
+	return term_of<node>(m, regime::backed);
+}
+
 } // namespace detail
 
 template <NodeType node>
@@ -160,6 +177,14 @@ bool join_builder<node, conj>::insert_member(tref m) {
 	// complemented here.
 	if (is_literal<node>(m) && present.contains(complement_of<node>(m)))
 		return is_decided = true;
+	// Rules 4 and 5 once more on `TERM_OF`: the backed regime keeps the
+	// sides as they stand, so one equation has many spellings.
+	if (const tref s = detail::backed_sum<node>(m)) {
+		const bool negated = is_negated_atom<node>(m);
+		const auto [it, fresh] = sums.try_emplace(s, negated);
+		if (!fresh && it->second == negated) return false;
+		if (!fresh) return is_decided = true;
+	}
 	// Rule 6.
 	ms.push_back(m);
 	present.insert(m);

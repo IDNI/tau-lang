@@ -14,6 +14,7 @@
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
+#include "anti_prenex/foundations/terms.h"
 #include "anti_prenex/normalisers/joins.h"
 #include "anti_prenex/normalisers/nnf.h"
 
@@ -25,6 +26,12 @@ namespace {
 /// The atom `<name> = 0`.
 tref atom(const char* name) {
 	return tau::build_bf_eq_0(tau::build_bf_variable(name, 0));
+}
+
+/// A `tau`-typed variable: only an equation over an atomless type is
+/// compared by its `TERM_OF` as well.
+tref tbf(const char* name) {
+	return tau::build_bf_variable(name, tau_type_id<node_t>());
 }
 
 tref neg(tref n)          { return tau::build_wff_neg(n); }
@@ -296,6 +303,30 @@ TEST_CASE("J12: a compound guard and its cached neg decide, neg spread over "
 	// The dual, from `g`'s slot: `ng` with `g` as a member is `F`.
 	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ ng, g })));
 	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ g, ng })));
+}
+
+// --- the spellings of one backed equation ---------------------------------------
+
+TEST_CASE("J13: rules 4 and 5 compare a backed atomless equation by its "
+	"TERM_OF") {
+	tref a = tbf("ja"), b = tbf("jb");
+	// `a·b = 0` and `a′ ∪ b′ = 1` are one equation whose prepared sides
+	// stand as written: two nodes, one `TERM_OF`.
+	tref ab = ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(
+		build_bf_and<node_t>(a, b)));
+	tref nab = ap::prepare_terms<node_t>(build_bf_eq<node_t>(
+		build_bf_or<node_t>(build_bf_neg<node_t>(a), build_bf_neg<node_t>(b)),
+		tau::_1(tau_type_id<node_t>())));
+	REQUIRE(ab != nab);
+	// Rule 5: a literal against its complement spelled the other way.
+	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ neg(ab), nab })));
+	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ nab, neg(ab) })));
+	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ ab, neg(nab) })));
+	// Rule 4: the other spelling is a duplicate, and the first one stays.
+	CHECK(ap::simplified_and_join<node_t>(trefs{ ab, nab }) == ab);
+	CHECK(ap::simplified_or_join<node_t>(trefs{ nab, ab }) == nab);
+	CHECK(ap::simplified_or_join<node_t>(trefs{ neg(nab), neg(ab) })
+		== neg(nab));
 }
 
 }

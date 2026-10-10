@@ -19,6 +19,8 @@
  * node is a function of the member SET — flattening gives associativity, the
  * content-order emission of `canonical_and`/`canonical_or` (dag.h) gives
  * commutativity — so equal member sets build equal nodes and equal memo keys.
+ * Two spellings of one backed equation are the exception: the first one
+ * inserted stays.
  *
  * The construction hooks fold `T`/`F`, `X ∧ X` and `X ∧ ¬X`; the insert rules
  * are those same facts one step earlier, where they can still stop an operand
@@ -34,6 +36,7 @@
 #include "../foundations/fwd.h"
 #include "../foundations/options.h"
 #include "../foundations/dag.h"
+#include "../foundations/terms.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -62,7 +65,9 @@ struct join_builder {
 	 * contributes its members, flattened; an operand that is already a
 	 * member is skipped; a LITERAL whose complement is a member decides;
 	 * anything else is added, and decides when it is a compound guard that
-	 * meets its cached `neg`.
+	 * meets its cached `neg`. A backed equation of an atomless type is
+	 * compared by its `TERM_OF` as well, so its other spellings count as
+	 * the member and its complement.
 	 *
 	 * @return `true` when the join is DECIDED (`F` for ∧, `T` for ∨).
 	 * Later inserts are no-ops; invariant 7 asks the caller not to build
@@ -96,6 +101,8 @@ private:
 
 	trefs ms;                             ///< the members, insertion order
 	subtree_unordered_set<node> present;  ///< the same members, by content
+	/// `TERM_OF` of each backed atomless member, and whether it is negated
+	subtree_unordered_map<node, bool> sums;
 	bool is_decided = false;
 };
 
