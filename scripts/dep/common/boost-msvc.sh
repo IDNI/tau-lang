@@ -1,0 +1,182 @@
+#!/bin/bash
+# The MSVC body of the Boost producer. A scripts/dep/windows-*-msvc/boost.sh
+# sets DEP_BOOST_MSVC_VCVARS (the vcvars script of its arch) and
+# DEP_BOOST_MSVC_B2_ARCH (the b2 architecture), sources this file, then
+# scripts/dep/common/boost.sh.
+
+if [ -z "${DEP_BOOST_MSVC_VCVARS:-}" ] || [ -z "${DEP_BOOST_MSVC_B2_ARCH:-}" ]; then
+	echo "dep-boost: the target script sets no DEP_BOOST_MSVC_VCVARS or DEP_BOOST_MSVC_B2_ARCH" >&2
+	exit 2
+fi
+
+DEP_RECIPE_MSVC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+# The vcvars script of the developer shell. VSINSTALLDIR is a Windows path,
+# often with a trailing backslash.
+_dep_boost_vcvars() {
+	[ -n "${VSINSTALLDIR:-}" ] || return 1
+	local _dir
+	_dir="$(cygpath -u "$VSINSTALLDIR")" || return 1
+	[ -f "${_dir%/}/VC/Auxiliary/Build/${DEP_BOOST_MSVC_VCVARS}" ] || return 1
+	printf '%s\n' "${_dir%/}/VC/Auxiliary/Build/${DEP_BOOST_MSVC_VCVARS}"
+}
+
+# b2's msvc toolset takes the cl of this build by its path. Left to detect
+# one, the b2 of this Boost knows no Visual Studio newer than 2022: it picks
+# an older installation when one exists and configures nothing usable (a
+# 32-bit arm "msvc-6.0") when none does. 14.3 is the newest version it has
+# flags for. Its setup script is an empty one: b2 finds none for this
+# compiler, and the build already runs in the developer environment.
+_dep_boost_user_config() {
+	printf '@exit /b 0\r\n' > "${1}/tau-msvc-setup.bat"
+	printf 'using msvc : 14.3 : "%s" : <setup>"%s" ;\n' \
+		"$(cygpath -m "$2")" \
+		"$(cygpath -m "${1}/tau-msvc-setup.bat")" \
+		> "${1}/user-config.jam"
+}
+
+# Overwrite each <folder> in every file under <prefix> with '@' of the same
+# length: MSVC has no flag that maps a path, and each library keeps the path
+# of its objects and sources. A folder is masked under each of its spellings,
+# with either slash and with its long and its 8.3 name.
+_dep_boost_msvc_mask_paths() {
+	local prefix="$1" dir spellings=()
+	shift
+	for dir in "$@"; do
+		spellings+=("$dir" "$(cygpath -w "$dir")" "$(cygpath -m "$dir")"
+			"$(cygpath -wl "$dir")" "$(cygpath -ml "$dir")")
+	done
+	"$DEP_PYTHON" - "$prefix" "${spellings[@]}" <<'PY'
+import os
+import sys
+top, *roots = sys.argv[1:]
+olds = sorted({r.encode() for r in roots if r}, key=len, reverse=True)
+for dirpath, _dirs, files in os.walk(top):
+	for name in files:
+		path = os.path.join(dirpath, name)
+		with open(path, 'rb') as fh:
+			data = fh.read()
+		new = data
+		for old in olds:
+			new = new.replace(old, b'@' * len(old))
+		if new != data:
+			with open(path, 'wb') as fh:
+				fh.write(new)
+PY
+}
+
+# bootstrap.bat + b2 in one cmd session, so both inherit the vcvars
+# environment. Git Bash rewrites `/c`, `/d` and `--`-switches on a
+# cmd.exe command line as filesystem paths; keeping them in a .bat
+# lets cmd parse them itself. The vcvars script is a local fallback only:
+# CI gets the MSVC shell from an action, so cl is already on PATH and
+# a missing vcvars is not fatal.
+#
+# b2 builds in a folder with a short path: under the staging folder, the
+# paths of its objects and of the cmake files it writes pass the 260
+# characters cl.exe and cmd accept.
+_dep_boost_target_build() {
+	local work="$1" staging_prefix="$2"
+	local _boost_win _prefix_win _build_win _tmp_win _vcvars _v _a _short _rc
+	local _base="${TMPDIR:-/tmp}"
+	if [ -n "${RUNNER_TEMP:-}" ]; then
+		_base="$(cygpath -u "$RUNNER_TEMP")" || return 1
+	fi
+	_short="$(mktemp -d "${_base}/boost.XXXXXX")" \
+		|| { echo "dep-boost: cannot create a short build folder" >&2; return 1; }
+	_boost_win="$(cygpath -w "$work")"
+	_prefix_win="$(cygpath -w "$staging_prefix")"
+	_build_win="$(cygpath -w "$_short")"
+	mkdir -p "${_short}/tmp" || return 1
+	_tmp_win="$(cygpath -w "${_short}/tmp")"
+	_vcvars=""
+	for _v in \
+		"$(_dep_boost_vcvars)" \
+		"/c/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/${DEP_BOOST_MSVC_VCVARS}" \
+		"/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/${DEP_BOOST_MSVC_VCVARS}" \
+		"/c/Program Files/Microsoft Visual Studio/2022/Professional/VC/Auxiliary/Build/${DEP_BOOST_MSVC_VCVARS}"
+	do
+		[ -f "$_v" ] || continue
+		_vcvars="$(cygpath -w "$_v" 2>/dev/null || echo "$_v")"
+		break
+	done
+	local _bat="${work}/_tau_msvc_build.bat"
+	{
+		printf '@echo off\r\n'
+		if [ -n "$_vcvars" ]; then
+			echo "dep-boost: using vcvars $_vcvars" >&2
+			printf 'call "%s"\r\n' "$_vcvars"
+			printf 'if errorlevel 1 exit /b 1\r\n'
+		fi
+		# The librarian names a member it converts after a file in TEMP,
+		# so TEMP is under the short folder, whose path is masked.
+		printf 'set "TEMP=%s"\r\nset "TMP=%s"\r\n' "$_tmp_win" "$_tmp_win"
+		printf 'cd /d "%s"\r\n' "$_boost_win"
+		printf 'if errorlevel 1 exit /b 1\r\n'
+		# The toolset is named: the bootstrap of this Boost does not know a
+		# Visual Studio newer than 2022 and fails to guess one. msvc takes
+		# the cl of the environment.
+		printf 'call bootstrap.bat msvc --with-libraries=log\r\n'
+		printf 'if errorlevel 1 exit /b 1\r\n'
+		printf 'b2.exe --user-config=./user-config.jam'
+		printf ' --prefix="%s" --build-dir="%s"' \
+			"$_prefix_win" "$_build_win"
+		printf ' --with-log --layout=system -j%s' "$DEP_BOOST_JOBS"
+		# An argument with a space, as a cxxflags list, stays one argument
+		# of b2 only between quotes.
+		for _a in "${_DEP_BOOST_B2_ARGS[@]}"; do
+			case "$_a" in
+				*[[:space:]]*) printf ' "%s"' "$_a" ;;
+				*) printf ' %s' "$_a" ;;
+			esac
+		done
+		printf ' install\r\n'
+	} > "$_bat"
+	timeout 5400 cmd.exe //c "$(cygpath -w "$_bat")"
+	_rc=$?
+	[ "$_rc" -ne 124 ] || echo "dep-boost: b2 timed out" >&2
+	if [ "$_rc" -eq 0 ]; then
+		_dep_boost_msvc_mask_paths "$staging_prefix" "$_short" \
+				"$(dirname "$staging_prefix")" \
+			|| { echo "dep-boost: cannot mask the build paths" >&2; _rc=1; }
+	fi
+	rm -rf "$_short"
+	[ "$_rc" -eq 0 ] \
+		|| { echo "dep-boost: MSVC bootstrap+b2 failed" >&2; return 1; }
+	# b2 succeeds when a toolset it does not understand builds nothing.
+	[ -f "${staging_prefix}/lib/libboost_log.lib" ] \
+		|| { echo "dep-boost: b2 installed no libboost_log.lib" >&2; return 1; }
+}
+
+_dep_boost_target_setup() {
+	local _cl _n="${GIT_CONFIG_COUNT:-0}"
+	# A Boost doc path under the staging folder passes the 260 characters git
+	# writes by default. The environment carries the setting to the submodules
+	# depinst.py clones, after any entry the caller gave.
+	export "GIT_CONFIG_KEY_${_n}=core.longpaths" "GIT_CONFIG_VALUE_${_n}=true"
+	export GIT_CONFIG_COUNT=$((_n + 1))
+	# b2 takes clang-cl for clang on Linux, so every MSVC preset builds with cl.
+	_cl="$(command -v cl.exe 2>/dev/null)" || {
+		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2
+		exit 2
+	}
+	if [ "$(dep_compiler_id "$_cl")" != MSVC ]; then
+		echo "dep-boost: '${_cl}' is not the MSVC cl.exe. Start the MSVC developer shell." >&2
+		exit 2
+	fi
+	DEP_BOOST_CC="$_cl"
+	DEP_BOOST_CXX="$_cl"
+	# The cl release flags, so a clang-cl preset does not fork a second Boost id.
+	DEP_BOOST_CFLAGS="/DWIN32 /D_WINDOWS /O2 /Ob2 /DNDEBUG"
+	DEP_BOOST_CXXFLAGS="/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG"
+	BOOST_TOOLSET="msvc"
+	DEP_BOOST_B2_TOOLSET="msvc"
+	DEP_BOOST_TARGET_OS="windows"
+	DEP_BOOST_B2_ARCH="$DEP_BOOST_MSVC_B2_ARCH"
+	DEP_BOOST_B2_PIC=""
+	DEP_BOOST_B2_DEFINE="BOOST_LOG_WITHOUT_SYSLOG"
+}
+
+_dep_boost_target_fields() {
+	printf '%s\n' "builder=msvc"
+}
