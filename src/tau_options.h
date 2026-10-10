@@ -244,6 +244,9 @@ inline const option_set tau_core_option_set{ {
 	{ "spot-bin", "ltl", std::string(),
 		"directory searched for ltlsynt, autfilt and ltlfilt after "
 		"PATH (empty = off)" },
+	{ "ltl-simplification", "ltl", std::string(),
+		"ltlsynt --simplification: bwoa, sat, bisim-sat or none "
+		"(empty = the ltlsynt default)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -375,6 +378,8 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("phi-delta-crosscheck",
 		phi_delta_crosscheck_param, hook));
 	TAU_TRY_VOID(repo.bind("spot-bin", spot_bin_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-simplification", ltl_simplification_param,
+		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));

@@ -5,6 +5,7 @@
 
 #include "boolean_algebras/nlang/nlang_llm.h"
 #include "format/json/json.h"
+#include "read_env.h"
 
 namespace idni::tau_lang {
 
@@ -35,8 +36,11 @@ namespace {
 
 // Empty when unset or empty, so a blank variable reads as "not given".
 std::string env_text(const char* var) {
-	const char* v = std::getenv(var);
-	return v ? v : "";
+	auto v = read_env(var);
+	// TODO (HIGH) dropped error: a failed read reads as unset --
+	// llm_config_from_env returns a plain llm_config, with no report.
+	if (!v.has_value() || !v.value()) return "";
+	return *v.value();
 }
 
 std::string quoted(std::string_view text) {

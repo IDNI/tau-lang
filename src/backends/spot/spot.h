@@ -20,6 +20,10 @@
 
 namespace idni::tau_lang {
 
+/// `ltl-simplification`: the value of `ltlsynt --simplification=`. Empty
+/// keeps the default of ltlsynt.
+inline std::string ltl_simplification_param;
+
 /// Verdict of an `ltlsynt` synthesis call. `hoa` is non-empty only when
 /// `realizable` is true.
 struct synthesis_verdict {
@@ -35,8 +39,8 @@ struct synthesis_verdict {
 /// output carrying neither a REALIZABLE nor an UNREALIZABLE line -- and
 /// must never be read as a definitive UNREALIZABLE. `timeout_sec <= 0`
 /// disables the watchdog. The formula goes to ltlsynt through a temporary
-/// file; a non-empty `TAU_LTL_SIMPLIFICATION` environment variable is passed
-/// as `--simplification=`.
+/// file; a non-empty `ltl-simplification` option is passed as
+/// `--simplification=`.
 ///
 /// @param formula LTL formula in Spot syntax.
 /// @param ins Input proposition names (`--ins=`, omitted when empty).

@@ -149,7 +149,12 @@ add_raw_repl_test(compile_verb-stdin_empty_with_output
 # SDK resolution failures: none of these spawns a build
 add_raw_repl_test(compile_verb-sdk_dir_env_missing
 	"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && TAU_SDK_DIR=$d/no_sdk ${TAU_RUN} compile $d/s.tau -o $d/prog; r=$?; rm -rf $d; exit $r"
-	"tau SDK not found at TAU_SDK_DIR=.*no_sdk" NO_FAIL_REGEX
+	"tau SDK not found at --sdk-dir / TAU_SDK_DIR: .*no_sdk" NO_FAIL_REGEX
+	REQUIRES hostfs subprocess)
+# the flag wins over the variable
+add_raw_repl_test(compile_verb-sdk_dir_flag_wins
+	"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && TAU_SDK_DIR=$d/env_sdk ${TAU_RUN} compile --sdk-dir $d/flag_sdk $d/s.tau -o $d/prog; r=$?; rm -rf $d; exit $r"
+	"tau SDK not found at --sdk-dir / TAU_SDK_DIR: .*flag_sdk" NO_FAIL_REGEX
 	REQUIRES hostfs subprocess)
 # a platform with no SDK names the package to install
 foreach(_case "debug-arm64|-linux-arm64" "debug-wasm-nothreads|-wasm32-emscripten"

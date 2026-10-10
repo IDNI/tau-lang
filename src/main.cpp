@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
 		TAU_LOG_INFO << "tau compile: " << spec_file;
 		auto res = compile_spec<node_t>(src, out_exe, build_dir,
 			repo.get<std::string>("cxx"), repo.get<std::string>("preset"),
-			configure_args);
+			configure_args, repo.get<std::string>("sdk-dir"));
 		if (!res.has_value()) {
 			res.print();
 			return 1;

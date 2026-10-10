@@ -65,8 +65,8 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
 	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
 	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
-	if (const char* simp = std::getenv("TAU_LTL_SIMPLIFICATION"); simp && *simp)
-		argv.push_back("--simplification=" + std::string(simp));
+	if (!ltl_simplification_param.empty())
+		argv.push_back("--simplification=" + ltl_simplification_param);
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);

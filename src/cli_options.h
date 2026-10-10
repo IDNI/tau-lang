@@ -55,9 +55,9 @@ struct severity_codec {
 };
 
 /// The options of the tau executable that no library field holds. The first
-/// seven are the options of a compiled artifact. The command line alone
-/// writes them, so none reads the environment. The REPL evaluator binds
-/// seven of them to its own fields.
+/// seven are the options of a compiled artifact. Only `cxx` and `sdk-dir`
+/// read the environment, and the command line wins over it. The REPL
+/// evaluator binds seven of them to its own fields.
 inline const option_set tau_cli_option_set{
 	{
 		{ "help", "global", false, "detailed information about options",
@@ -96,9 +96,11 @@ inline const option_set tau_cli_option_set{
 			"output executable path (default: spec file path without "
 			"extension)", {}, false },
 		{ "cxx", "cli", std::string(),
-			"C++ compiler for the emitted project (default: TAU_CXX, "
-			"else cmake's compiler, or the compiler of the --preset "
-			"platform)", {}, false },
+			"C++ compiler for the emitted project (default: cmake's "
+			"compiler, or the compiler of the --preset platform)" },
+		{ "sdk-dir", "cli", std::string(),
+			"directory of the tau SDK that builds the emitted project "
+			"(default: the SDK found beside this tau)" },
 		{ "preset", "cli", std::string(),
 			"target platform or ./dev preset name; without it tau "
 			"compiles for this machine", {}, false },
@@ -133,6 +135,7 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "experimental", { "", 'x' } },
 	{ "output-dir", { "gen", 'o' } }, { "output-dir", { "codegen", 'o' } },
 	{ "output", { "compile", 'o' } }, { "cxx", { "compile", 'c' } },
+	{ "sdk-dir", { "compile" } },
 	{ "preset", { "compile" } }, { "define", { "compile", 'D' } },
 	{ "generator", { "compile", 'G' } },
 	// core

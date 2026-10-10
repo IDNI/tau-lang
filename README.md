@@ -327,6 +327,7 @@ artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 | `-o, --output <path>` | executable path. The default is the spec file path without extension, or `a.out` / `a.exe` for stdin |
 | `-c, --cxx <compiler>` | C++ compiler for the emitted project. The default is `TAU_CXX`, else cmake's compiler, or the compiler of the `--preset` platform; `--cxx` wins over `TAU_CXX` |
 | `--preset <name>` | target platform or `./dev preset` name. Without it the build is native and uses the SDK of the running tau |
+| `--sdk-dir <dir>` | directory of the tau SDK, the directory that holds `TauConfig.cmake`. The default is `TAU_SDK_DIR`, else the SDK found beside the running tau; `--sdk-dir` wins over `TAU_SDK_DIR` |
 | `-D NAME=VALUE` | cmake cache variable for the emitted project configure (repeat as needed). A value wins over the preset |
 | `-G <generator>` | cmake generator for the emitted project configure |
 
@@ -955,15 +956,9 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
 | `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
 | `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
+| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
-
-**LTL synthesis environment variable.** This variable is not an option. tau
-reads it when it calls the synthesis tools:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 
 ### Options and the environment
 

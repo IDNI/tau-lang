@@ -601,20 +601,23 @@ inline std::string platform_sdk_dir(const std::string& platform) {
 } // namespace compile_detail
 
 /** @internal @copydoc resolve_sdk_dir @endinternal */
-inline result<std::string> resolve_sdk_dir(const std::string& platform) {
+inline result<std::string> resolve_sdk_dir(const std::string& platform,
+	const std::string& sdk_dir)
+{
 	result<std::string> r;
 #if defined(__EMSCRIPTEN__)
 	(void)platform;
+	(void)sdk_dir;
 	return r.with_error(code::unsupported_operation,
 		"gen/compile need a process model, unavailable in this build");
 #else
 	namespace fs = std::filesystem;
-	if (const char* env = std::getenv("TAU_SDK_DIR"); env && *env) {
-		fs::path dir(env);
+	if (!sdk_dir.empty()) {
+		fs::path dir(sdk_dir);
 		if (compile_detail::has_sdk_config(dir))
 			return r.with_value(dir.string());
 		return r.with_error(code::not_found,
-			std::string("tau SDK not found at TAU_SDK_DIR=") + env);
+			"tau SDK not found at --sdk-dir / TAU_SDK_DIR: " + sdk_dir);
 	}
 	// A source tree keeps every platform's SDK under <exe_dir>/../<platform>.
 	if (!platform.empty()) {
@@ -625,7 +628,7 @@ inline result<std::string> resolve_sdk_dir(const std::string& platform) {
 	if (self.empty())
 		return r.with_error(code::not_found,
 			"tau SDK not found and the executable path is unknown; "
-			"set TAU_SDK_DIR");
+			"set --sdk-dir or TAU_SDK_DIR");
 	fs::path exe_dir = fs::path(self).parent_path();
 
 	// One box per platform under the lib dir of the install prefix, so a box
@@ -897,7 +900,8 @@ result<codegen_result> compile_spec(
 	const std::string& build_dir,
 	const std::string& cxx,
 	const std::string& preset,
-	const std::vector<std::string>& extra_args)
+	const std::vector<std::string>& extra_args,
+	const std::string& sdk_dir)
 {
 	namespace stdfs = std::filesystem;
 	result<codegen_result> r;
@@ -915,34 +919,26 @@ result<codegen_result> compile_spec(
 	std::string dest = out_exe.empty()
 		? (stdfs::path(gen.exe_path) / "program").string()
 		: out_exe;
-	// The flag wins over the environment variable.
-	std::string cc = cxx;
-	if (cc.empty())
-		if (const char* env = std::getenv("TAU_CXX"); env && *env)
-			cc = env;
-
 	if (preset.empty()) {
-		TAU_TRY(std::string sdk_dir, resolve_sdk_dir());
+		TAU_TRY(std::string found, resolve_sdk_dir("", sdk_dir));
 		TAU_TRY(std::string built, compile_detail::run_compile_script(
-			sdk_dir, gen.exe_path, dest, cc, "", extra_args, sdk_dir,
+			found, gen.exe_path, dest, cxx, "", extra_args, found,
 			true));
 		codegen_result res;
 		res.exe_path = std::move(built);
 		return r.with_assert_check_value(std::move(res));
 	}
 	TAU_TRY(std::string platform, compile_detail::preset_platform(preset));
-	TAU_TRY(std::string sdk_dir, resolve_sdk_dir(platform));
+	TAU_TRY(std::string found, resolve_sdk_dir(platform, sdk_dir));
 	// The SDK the configure resolves dependencies from is the platform's box
 	// when this tree has it, else the box that was found.
-	std::string target_sdk;
-	if (const char* env = std::getenv("TAU_SDK_DIR"); env && *env)
-		target_sdk = env;
-	else {
+	std::string target_sdk = sdk_dir;
+	if (target_sdk.empty()) {
 		target_sdk = compile_detail::platform_sdk_dir(platform);
-		if (target_sdk.empty()) target_sdk = sdk_dir;
+		if (target_sdk.empty()) target_sdk = found;
 	}
 	TAU_TRY(std::string built, compile_detail::run_compile_script(
-		sdk_dir, gen.exe_path, dest, cc, platform, extra_args, target_sdk,
+		found, gen.exe_path, dest, cxx, platform, extra_args, target_sdk,
 		false));
 
 	codegen_result res;

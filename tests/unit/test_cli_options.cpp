@@ -170,6 +170,28 @@ TEST_SUITE("cli_options") {
 		CHECK_FALSE(parse(repo, { "tau", "gen", "-q" }).has_value());
 	}
 
+	TEST_CASE("cxx and sdk-dir read the environment, and the flag wins") {
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		REQUIRE(declare_program_options(repo, tau_cli_option_set,
+			tau_surfaces).has_value());
+		REQUIRE(setenv("TAU_CXX", "env-cc", 1) == 0);
+		REQUIRE(setenv("TAU_SDK_DIR", "env-sdk", 1) == 0);
+		REQUIRE(setenv("TAU_OUTPUT", "env-out", 1) == 0);
+		auto env = repo.load_env("TAU_");
+		unsetenv("TAU_CXX");
+		unsetenv("TAU_SDK_DIR");
+		unsetenv("TAU_OUTPUT");
+		REQUIRE(env.has_value());
+		CHECK(repo.get<std::string>("cxx") == "env-cc");
+		CHECK(repo.get<std::string>("sdk-dir") == "env-sdk");
+		CHECK(repo.get<std::string>("output").empty());
+		REQUIRE(parse(repo, { "tau", "compile", "-c", "flag-cc",
+			"--sdk-dir", "flag-sdk" }).has_value());
+		CHECK(repo.get<std::string>("cxx") == "flag-cc");
+		CHECK(repo.get<std::string>("sdk-dir") == "flag-sdk");
+	}
+
 	TEST_CASE("-o is the output directory of gen and codegen") {
 		for (const char* verb : { "gen", "codegen" }) {
 			CAPTURE(verb);

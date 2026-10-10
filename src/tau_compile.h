@@ -39,7 +39,7 @@ struct codegen_result {
  * @brief Find the SDK directory holding TauConfig.cmake,
  * cmake/tau-compile.cmake and the artifact template.
  *
- * The search is `$TAU_SDK_DIR`, then `<exe_dir>/../<platform>/sdk` for a
+ * The search is @p sdk_dir, then `<exe_dir>/../<platform>/sdk` for a
  * source tree, then one box per platform under the emitting binary's lib,
  * lib64 and multiarch lib dirs (`<prefix>/lib/tau/sdk/<platform>/lib/cmake/Tau`),
  * then `<exe_dir>/sdk` and the flat Windows zip's `<exe_dir>/cmake/Tau`, each
@@ -50,11 +50,13 @@ struct codegen_result {
  *
  * @param platform A platform name, never a preset name: compile_spec maps a
  * preset with the table compiled into tau first. Empty for this platform.
+ * @param sdk_dir The SDK the caller names, from `sdk-dir`; empty searches.
  * @return The SDK directory; a `not_found` error naming the package to
- * install when none matches or TAU_SDK_DIR holds no SDK, and an
+ * install when none matches or @p sdk_dir holds no SDK, and an
  * `unsupported_operation` error on wasm.
  */
-inline result<std::string> resolve_sdk_dir(const std::string& platform = "");
+inline result<std::string> resolve_sdk_dir(const std::string& platform = "",
+	const std::string& sdk_dir = "");
 
 /**
  * @brief Parse, synthesize and emit the artifact for @p spec_src.
@@ -98,7 +100,7 @@ result<codegen_result> gen_spec(
  * `<artifact dir>/program`. A wasm build writes `<out_exe>.js` and its .wasm.
  * @param build_dir The artifact directory; empty for
  * `<current dir>/spec.build`.
- * @param cxx The compiler; empty takes TAU_CXX, else cmake's default for a
+ * @param cxx The compiler, from `cxx`; empty takes cmake's default for a
  * native build, else the compiler of the platform preset.
  * @param preset Empty for a native build: the running tau's own SDK, cmake's
  * compiler and a Release build type unless a -DCMAKE_BUILD_TYPE is given. A
@@ -106,6 +108,8 @@ result<codegen_result> gen_spec(
  * artifact.
  * @param extra_args `-D...` and `-G <gen>` items forwarded to the configure; a
  * -D value wins over the preset.
+ * @param sdk_dir The SDK, from `sdk-dir`; empty for @ref resolve_sdk_dir's
+ * search.
  * @return The executable's path in @ref codegen_result::exe_path; an error
  * from gen_spec, an unknown preset, a missing SDK, or a failed build (with
  * the end of compile.log).
@@ -117,7 +121,8 @@ result<codegen_result> compile_spec(
 	const std::string& build_dir = "",
 	const std::string& cxx = "",
 	const std::string& preset = "",
-	const std::vector<std::string>& extra_args = {});
+	const std::vector<std::string>& extra_args = {},
+	const std::string& sdk_dir = "");
 
 } // namespace idni::tau_lang
 
