@@ -122,19 +122,19 @@ public:
 
 	/// True iff variable shifters are enabled.
 	constexpr bool has_varshift() const {
-		return params & static_cast<uint8_t>(VARSHIFT);
+		return (params & static_cast<uint8_t>(VARSHIFT)) != 0;
 	}
 	/// True iff input inverters are enabled.
 	constexpr bool has_inv_in() const {
-		return params & static_cast<uint8_t>(INV_IN);
+		return (params & static_cast<uint8_t>(INV_IN)) != 0;
 	}
 	/// True iff output inverters are enabled.
 	constexpr bool has_inv_out() const {
-		return params & static_cast<uint8_t>(INV_OUT);
+		return (params & static_cast<uint8_t>(INV_OUT)) != 0;
 	}
 	/// True iff the variable order is descending.
 	constexpr bool has_inv_order() const {
-		return params & static_cast<uint8_t>(INV_ORDER);
+		return (params & static_cast<uint8_t>(INV_ORDER)) != 0;
 	}
 };
 
@@ -786,18 +786,20 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// a memoized recursion negating the leaves in B
 	static bdd_ref bdd_not(bdd_ref x) {
 		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
-		if (x == T) return F;
-		if (x == F) return T;
-		if (check_cache(x, not_memo)) return x;
+		else {
+			if (x == T) return F;
+			if (x == F) return T;
+			if (check_cache(x, not_memo)) return x;
 
-		const bdd& xx = get(x);
-		if(xx.leaf()) {
-			auto r = add(~std::get<B>(xx));
+			const bdd& xx = get(x);
+			if(xx.leaf()) {
+				auto r = add(~std::get<B>(xx));
+				return update_cache(x, r, not_memo), r;
+			}
+			const bdd_node_t &nx = std::get<bdd_node_t>(xx);
+			auto r = add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
 			return update_cache(x, r, not_memo), r;
 		}
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		auto r = add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
-		return update_cache(x, r, not_memo), r;
 	}
 
 	// Conjunction with a constant of B, pushed down into the leaves
@@ -864,26 +866,28 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_inv_out())
 			return bdd_ref::flip_out(
 				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
-		if (x == T || y == T) return T;
-		if (x == F) return y;
-		if (y == F) return x;
-		if (negation_of(x, y)) return T;
-		mk_order_canonical(x,y);
-		if (check_cache(x, y, or_memo)) return x;
-		const bdd &xx = get(x), &yy = get(y);
-		if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
-		if (yy.leaf()) return bdd_or(x, std::get<B>(yy));
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		const bdd_node_t &ny = std::get<bdd_node_t>(yy);
-		bdd_ref r;
-		if (nx.v == ny.v)
-			r =	add(nx.v,
-				       bdd_or(nx.h, ny.h),
-				       bdd_or(nx.l, ny.l));
-		else if (var_cmp(nx.v, ny.v))
-			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
-		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
-		return update_cache(x, y, r, or_memo), r;
+		else {
+			if (x == T || y == T) return T;
+			if (x == F) return y;
+			if (y == F) return x;
+			if (negation_of(x, y)) return T;
+			mk_order_canonical(x,y);
+			if (check_cache(x, y, or_memo)) return x;
+			const bdd &xx = get(x), &yy = get(y);
+			if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
+			if (yy.leaf()) return bdd_or(x, std::get<B>(yy));
+			const bdd_node_t &nx = std::get<bdd_node_t>(xx);
+			const bdd_node_t &ny = std::get<bdd_node_t>(yy);
+			bdd_ref r;
+			if (nx.v == ny.v)
+				r =	add(nx.v,
+					       bdd_or(nx.h, ny.h),
+					       bdd_or(nx.l, ny.l));
+			else if (var_cmp(nx.v, ny.v))
+				r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
+			else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+			return update_cache(x, y, r, or_memo), r;
+		}
 	}
 
 	// Existential quantification of variable v: the v node is
@@ -1391,12 +1395,14 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bdd_not(bdd_ref x) {
 		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
-		if (x == T) return F;
-		if (x == F) return T;
-		if (check_cache(x, not_memo)) return x;
-		const bdd& xx = get(x);
-		auto r = add(xx.v, bdd_not(xx.h), bdd_not(xx.l));
-		return update_cache(x, r, not_memo), r;
+		else {
+			if (x == T) return F;
+			if (x == F) return T;
+			if (check_cache(x, not_memo)) return x;
+			const bdd& xx = get(x);
+			auto r = add(xx.v, bdd_not(xx.h), bdd_not(xx.l));
+			return update_cache(x, r, not_memo), r;
+		}
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y) {
@@ -1553,22 +1559,24 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_inv_out())
 			return bdd_ref::flip_out(
 				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
-		if (x == T || y == T) return T;
-		if (x == F) return y;
-		if (y == F) return x;
-		if (negation_of(x, y)) return T;
-		mk_order_canonical(x,y);
-		if (check_cache(x, y, or_memo)) return x;
-		const bdd &nx = get(x), &ny = get(y);
-		bdd_ref r;
-		if (nx.v == ny.v)
-			r =	add(nx.v,
-				       bdd_or(nx.h, ny.h),
-				       bdd_or(nx.l, ny.l));
-		else if (var_cmp(nx.v, ny.v))
-			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
-		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
-		return update_cache(x, y, r, or_memo), r;
+		else {
+			if (x == T || y == T) return T;
+			if (x == F) return y;
+			if (y == F) return x;
+			if (negation_of(x, y)) return T;
+			mk_order_canonical(x,y);
+			if (check_cache(x, y, or_memo)) return x;
+			const bdd &nx = get(x), &ny = get(y);
+			bdd_ref r;
+			if (nx.v == ny.v)
+				r =	add(nx.v,
+					       bdd_or(nx.h, ny.h),
+					       bdd_or(nx.l, ny.l));
+			else if (var_cmp(nx.v, ny.v))
+				r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
+			else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+			return update_cache(x, y, r, or_memo), r;
+		}
 	}
 
 	// Existential quantification; unlike the primary template it is
@@ -1577,15 +1585,17 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bdd_ref ex(bdd_ref x, uint_t v) {
 		if constexpr (o.has_inv_out())
 			return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
-		if (check_cache(x, v, ex_memo)) return x;
-		if (leaf(x)) return x;
-		const bdd &nx = get(x);
-		bdd_ref r;
-		if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
-		else if (var_cmp(v, nx.v)) r = x;
-		else r = bdd_or(nx.h, nx.l);
-		update_cache(x, v, r, ex_memo);
-		return r;
+		else {
+			if (check_cache(x, v, ex_memo)) return x;
+			if (leaf(x)) return x;
+			const bdd &nx = get(x);
+			bdd_ref r;
+			if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
+			else if (var_cmp(v, nx.v)) r = x;
+			else r = bdd_or(nx.h, nx.l);
+			update_cache(x, v, r, ex_memo);
+			return r;
+		}
 	}
 
 	static bdd_ref all(bdd_ref x, uint_t v) {
