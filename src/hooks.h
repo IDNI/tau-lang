@@ -67,6 +67,9 @@ private:
 	static inline const tree<node>& arg2(const tref* ch);
 	/// @brief Return the raw child at argument position 3.
 	static inline const tree<node>& arg3(const tref* ch);
+	/// @brief The first @p b child of the first @p a child of @p t, or
+	/// `nullptr`: `t() | a | b` without the traverser's vectors.
+	static inline tref grandchild(const tree<node>& t, size_t a, size_t b);
 	/// @brief Return the logic-operator child from @p ch.
 	static inline const tree<node>& logic_operator(const tref* ch);
 	/// @brief Return the quantifier child from @p ch.
