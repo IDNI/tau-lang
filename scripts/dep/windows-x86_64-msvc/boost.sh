@@ -7,6 +7,11 @@ set -u
 DEP_FILE_TARGET=windows-x86_64-msvc
 DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
+# A file of Boost's documentation lies deeper under the staging folder than
+# the 260 characters git writes by default. The setting comes from the
+# environment, so it reaches the submodules depinst.py clones.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.longpaths GIT_CONFIG_VALUE_0=true
+
 # b2's msvc toolset finds cl through the developer environment the
 # runner set up; naming the compiler path here would freeze a version.
 # clang-cl is b2's clang-win toolset, which takes the path of the compiler:
