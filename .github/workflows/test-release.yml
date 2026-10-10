@@ -850,9 +850,9 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # Only a store miss builds the Spot package, which needs this toolchain.
+      # This toolchain builds the Spot package and is part of what identifies
+      # it, so resolving the package needs it on a store hit too.
       - name: Install the MSYS2 UCRT64 toolchain
-        if: steps.cache-store.outputs.cache-hit != 'true'
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
