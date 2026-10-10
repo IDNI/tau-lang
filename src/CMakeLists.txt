@@ -58,11 +58,10 @@ set(TAU_CORE_HEADERS
 # core plus the configured pack: what the build depends on and installs
 set(TAU_HEADERS ${TAU_CORE_HEADERS} ${TAU_BA_HEADERS})
 
-# Grammar tables are mostly data and optimizing them takes too long. Every
-# parser of this build -- core's and the pack's BAs' -- is generated, so the
-# list comes from the generation rules rather than being named here.
+# Every parser of this build -- core's and the pack's BAs' -- is generated, so
+# the list comes from the generation rules rather than being named here.
 set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
-	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+	PROPERTIES COMPILE_OPTIONS "${TAU_GENERATED_PARSER_OPTIONS}")
 
 # Only what every pack has. A BA's own translation units are declared by its
 # ba.cmake and arrive via TAU_BA_SOURCES_EXTRA; TAU_PACK_CORE_SOURCES is the

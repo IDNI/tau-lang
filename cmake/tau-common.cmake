@@ -92,6 +92,15 @@ else()
 	set(TAU_COVERAGE_OPTIONS "-O0;-DDEBUG;-ggdb3")
 endif()
 
+# Grammar tables are data, so their sources build without optimization. cl
+# keeps its /O2: a /Od of one source over it is a D9025 warning.
+set(TAU_GENERATED_PARSER_OPTIONS "")
+if(TAU_IS_GNU_OR_CLANG)
+	set(TAU_GENERATED_PARSER_OPTIONS "-O0;-fno-lto")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	set(TAU_GENERATED_PARSER_OPTIONS "/Od")
+endif()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(COMPILE_OPTIONS "${TAU_DEBUG_OPTIONS}")
 	set(TAU_LINK_OPTIONS "")
