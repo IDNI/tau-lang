@@ -198,8 +198,14 @@ template <NodeType node>
 std::optional<bool> sweep(tref k, const ctx<node>& c) {
 	using tau = tree<node>;
 	DBG(assert(is_bv_type_family<node>(c.type));)
-	[[maybe_unused]] static const bool initialised =
-		(bdd_init<Bool, sweep_options>(), true);
+	[[maybe_unused]] static const bool initialised = [] {
+		bdd_init<Bool, sweep_options>();
+		// Both tables grow to millions of entries, where every node a
+		// lookup passes is a cache miss; sparser buckets pass fewer.
+		engine::Mn.max_load_factor(0.5f);
+		engine::and_memo.max_load_factor(0.5f);
+		return true;
+	}();
 	subtree_unordered_map<node, size_t> rank;
 	auto enumerate = [&rank](tref m) {
 		if (is_logical_or_functional_quant<node>(m))
