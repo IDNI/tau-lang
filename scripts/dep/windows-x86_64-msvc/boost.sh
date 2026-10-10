@@ -17,11 +17,6 @@ _dep_boost_vcvars() {
 	printf '%s\n' "${_dir%/}/VC/Auxiliary/Build/vcvars64.bat"
 }
 
-# A file of Boost's documentation lies deeper under the staging folder than
-# the 260 characters git writes by default. The setting comes from the
-# environment, so it reaches the submodules depinst.py clones.
-export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.longpaths GIT_CONFIG_VALUE_0=true
-
 # b2's msvc toolset takes the cl of this build by its path. Left to detect
 # one, the b2 of this Boost knows no Visual Studio newer than 2022: it picks
 # an older installation when one exists and configures nothing usable (a
@@ -150,7 +145,12 @@ _dep_boost_target_build() {
 }
 
 _dep_boost_target_setup() {
-	local _cl
+	local _cl _n="${GIT_CONFIG_COUNT:-0}"
+	# A Boost doc path under the staging folder passes the 260 characters git
+	# writes by default. The environment carries the setting to the submodules
+	# depinst.py clones, after any entry the caller gave.
+	export "GIT_CONFIG_KEY_${_n}=core.longpaths" "GIT_CONFIG_VALUE_${_n}=true"
+	export GIT_CONFIG_COUNT=$((_n + 1))
 	# b2 takes clang-cl for clang on Linux, so every MSVC preset builds with cl.
 	_cl="$(command -v cl.exe 2>/dev/null)" || {
 		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2
