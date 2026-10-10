@@ -81,8 +81,12 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  * occurs in one junction and its `neg` in another; the best covers the most
  * junctions, ties going to the larger weaker side, then to content order.
  * `ψ[g ↦ v]` turns a junction holding `g` or `neg(g)` into a
- * constant or drops the group from it. No licence: the material separates.
- * `nullopt` when no unit qualifies.
+ * constant or drops the group from it.
+ *
+ * THE LICENCE is `TRY_DECOMPOSE`'s on the disjunctive conjuncts, each one the
+ * split leaves unchanged counted once per arm, since both arms copy it. A
+ * split that changes every disjunctive conjunct is not tested. `nullopt` when
+ * no unit qualifies or the licence fails.
  */
 template <NodeType node>
 std::optional<tref> try_guard_split(const trefs& cs, const block& X,

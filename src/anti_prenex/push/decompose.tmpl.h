@@ -228,6 +228,7 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 	// becomes `F` in one arm and loses the group in the other, then the
 	// conjunct itself the same way, with its cases replaced.
 	trefs on_T, on_F;
+	size_t touched_arms = 0, touched = 0, copied = 0;
 	size_t k = 0;
 	for (size_t i = 0; i < cs.size(); ++i) {
 		if (k == js.size() || js[k].conjunct != i) {
@@ -245,12 +246,14 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 					guard_remove<node>(best_neg, j)) });
 		}
 		const guard_junction<node>& top = js[k++];
+		const bool pos = guard_occurs<node>(best, top);
+		const bool neg = !pos && guard_occurs<node>(best_neg, top);
 		for (const bool v : { true, false }) {
 			trefs ms;
-			if (guard_occurs<node>(best, top)) {
+			if (pos) {
 				if (v) continue;
 				ms = guard_remove<node>(best, top);
-			} else if (guard_occurs<node>(best_neg, top)) {
+			} else if (neg) {
 				if (!v) continue;
 				ms = guard_remove<node>(best_neg, top);
 			} else ms = top.ms;
@@ -259,7 +262,23 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 					m = v ? it->second.first : it->second.second;
 			(v ? on_T : on_F).push_back(simplified_or_join<node>(ms));
 		}
+		// By content: rebuilding the members may change the conjunct too.
+		if (!pos && !neg && tau::subtree_equals(on_T.back(), cs[i])
+			&& tau::subtree_equals(on_F.back(), cs[i]))
+		{
+			copied += formula_size<node>(cs[i]);
+			continue;
+		}
+		touched += formula_size<node>(cs[i]);
+		if (!pos) touched_arms += formula_size<node>(on_T.back());
+		if (!neg) touched_arms += formula_size<node>(on_F.back());
 	}
+	// TRY_DECOMPOSE's licence with the copied conjuncts counted once per
+	// arm: a split grows only by what both arms copy, so one that touches
+	// every disjunctive conjunct needs none.
+	if (copied > 0
+		&& 4 * (touched_arms + 2 * copied) > 5 * (touched + copied))
+		return std::nullopt;
 	return decompose_arms<node>(best, simplified_and_join<node>(on_T),
 		simplified_and_join<node>(on_F), X, c, best_neg);
 }

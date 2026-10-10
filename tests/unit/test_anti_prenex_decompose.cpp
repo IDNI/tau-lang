@@ -165,6 +165,14 @@ trefs disjunctive(const fixture& f) {
 	return out;
 }
 
+/// The sizes of the clause's disjunctive conjuncts, ascending.
+std::vector<size_t> disjunctive_sizes(const fixture& f) {
+	std::vector<size_t> sizes;
+	for (tref s : disjunctive(f)) sizes.push_back(ap::formula_size<node_t>(s));
+	std::ranges::sort(sizes);
+	return sizes;
+}
+
 /// The atom under the one negated literal at a member top of the clause's
 /// disjunctive conjuncts: the atom each case splits on.
 tref negated_top(const fixture& f) {
@@ -375,6 +383,40 @@ TEST_CASE("C11: a compound guard is split on as one unit") {
 	const std::optional<tref> census_only = decomposed(f);
 	ap::guard_size_max = guard_max;
 	CHECK(!census_only.has_value());
+}
+
+TEST_CASE("C12: the guard split's licence refuses a split that copies bulk") {
+	// The guard `a = 0 ∨ b = 0` sits in a case of each of the first two
+	// disjunctive conjuncts, its neg in the second. Those weigh 7 + 9 = 16
+	// and their arms 4 + 4 = 8; a third conjunct of size `u` is copied into
+	// both arms, so the split passes iff `4·(8 + 2u) ≤ 5·(16 + u)`, u ≤ 16.
+	const std::string touched = "ex x ((((a = 0 || b = 0) && xy = 0) "
+		"|| xc = 0) && ((a != 0 && b != 0 && xz = 0) || xc = 0) && ";
+	fixture small = make((touched + "(xd = 0 || xe = 0)).").c_str());
+	fixture big = make((touched + "((xd = 0 && xe = 0 && xg = 0 && xh = 0) "
+		"|| (xd = 0 && xe = 0 && xk = 0 && xm = 0) "
+		"|| (xg = 0 && xh = 0 && xk = 0 && xm = 0))).").c_str());
+	REQUIRE(disjunctive_sizes(small) == std::vector<size_t>{ 3, 7, 9 });
+	REQUIRE(disjunctive_sizes(big) == std::vector<size_t>{ 7, 9, 23 });
+	const std::optional<tref> got = decomposed(small);
+	REQUIRE(got.has_value());
+	check_against_source(*got, small);
+	CHECK(!decomposed(big).has_value());
+}
+
+TEST_CASE("C13: a guard split that changes every conjunct needs no licence") {
+	// Both disjunctive conjuncts hold a case of the guard and keep the seven
+	// atoms after it in both arms: they weigh 19 + 21 = 40 and their arms
+	// 15 + 13 + 13 + 15 = 56, and `4·56 > 5·40`. Nothing is copied, so the
+	// split is taken.
+	fixture f = make("ex x ((((a = 0 || b = 0) && xy = 0) || xc = 0 "
+		"|| xd = 0 || xe = 0 || xg = 0 || xh = 0 || xk = 0 || xm = 0) "
+		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0 || xd = 0 || xe = 0 "
+		"|| xg = 0 || xh = 0 || xk = 0 || xm = 0)).");
+	REQUIRE(disjunctive_sizes(f) == std::vector<size_t>{ 19, 21 });
+	const std::optional<tref> got = decomposed(f);
+	REQUIRE(got.has_value());
+	check_against_source(*got, f);
 }
 
 } // TEST_SUITE
