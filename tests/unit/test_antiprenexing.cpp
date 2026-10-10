@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <utility>
+
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "normal_forms.h"
@@ -16,8 +18,11 @@ TEST_SUITE("AntiPrenexBlock") {
 			block.push_back(tau::get(fm)[0].first());
 			fm = tau::get(fm)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
+		for (size_t i = 0; i < block.size(); ++i) {
+			const size_t pos = block.size() - 1 - i;
+			REQUIRE(std::in_range<int_t>(pos));
+			order.emplace(block[i], static_cast<int_t>(pos));
+		}
 		return {fm, block, order};
 	}
 
@@ -969,8 +974,11 @@ TEST_SUITE("Gamma4Guard") {
 			block.push_back(tau::get(body)[0].first());
 			body = tau::get(body)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
+		for (size_t i = 0; i < block.size(); ++i) {
+			const size_t pos = block.size() - 1 - i;
+			REQUIRE(std::in_range<int_t>(pos));
+			order.emplace(block[i], static_cast<int_t>(pos));
+		}
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
 		for (size_t i = 0; i < block.size(); ++i)
@@ -1161,8 +1169,11 @@ TEST_SUITE("Gamma1NegatedBranch") {
 			block.push_back(tau::get(body)[0].first());
 			body = tau::get(body)[0].second();
 		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
+		for (size_t i = 0; i < block.size(); ++i) {
+			const size_t pos = block.size() - 1 - i;
+			REQUIRE(std::in_range<int_t>(pos));
+			order.emplace(block[i], static_cast<int_t>(pos));
+		}
 		body = normalize_atomic_formula_operators<node_t>(body);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> qp;

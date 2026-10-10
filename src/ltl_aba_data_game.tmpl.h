@@ -82,7 +82,7 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 	const size_t n = game.num_states;
 	const size_t sys_sink = n, env_sink = n + 1;
 	// one vertex per coloured target: it reads its target's region
-	std::map<std::pair<int, int>, size_t> colored;
+	std::map<std::pair<size_t, int>, size_t> colored;
 	a.v.resize(n + 2);
 	a.init = game.init;
 	a.v[sys_sink] = { 0, 1, chooser::none, { { tau::_T(), sys_sink, false } } };

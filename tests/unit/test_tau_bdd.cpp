@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include <algorithm>
+#include <utility>
 
 #include "test_init.h"
 // the bv fixture, not test_bool_only_helpers.h: "BDD and many" pins a conjunct
@@ -731,7 +732,8 @@ TEST_SUITE("BDD build over shared subterms") {
 			tref v = tau::get(name.c_str(), opts).value_or(nullptr);
 			REQUIRE(v != nullptr);
 			vars.push_back(v);
-			o.emplace(tau::trim(v), k);
+			REQUIRE(std::in_range<int_t>(k));
+			o.emplace(tau::trim(v), static_cast<int_t>(k));
 		}
 		tref p = vars[0], q = vars[0];
 		for (size_t k = 1; k <= n; ++k) {

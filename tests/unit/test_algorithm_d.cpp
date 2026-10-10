@@ -618,12 +618,12 @@ TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
 
 	using alg_d::hoa_guard::to_dnf;
 
-	static std::set<std::vector<std::pair<int,bool>>> as_set(
+	static std::set<std::vector<std::pair<size_t,bool>>> as_set(
 		const std::vector<alg_d::hoa_guard::cube>& d)
 	{
-		std::set<std::vector<std::pair<int,bool>>> out;
+		std::set<std::vector<std::pair<size_t,bool>>> out;
 		for (const auto& c : d) {
-			std::vector<std::pair<int,bool>> v;
+			std::vector<std::pair<size_t,bool>> v;
 			for (const auto& l : c) v.emplace_back(l.ap, l.pos);
 			out.insert(v);
 		}
