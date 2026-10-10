@@ -12,6 +12,8 @@
 #ifndef TAU_UNION_FIND_WITH_SETS_H
 #define TAU_UNION_FIND_WITH_SETS_H
 
+#include <type_traits>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -31,16 +33,19 @@ template <typename comp, NodeType node>
 struct union_find_with_sets {
 	/// The tree type of @p node.
 	using tau = tree<node>;
+	/// A reference to the comparator. const means nothing on a function type.
+	using comp_ref = std::conditional_t<std::is_function_v<comp>,
+		comp&, const comp&>;
 private:
 	subtree_unordered_map<node, tref> parent;
 	subtree_unordered_map<node, tref> next;
 	// The comparator used in order to decide the new root of a merged set
 	// The smaller root is chosen
-	const comp& _comp;
+	comp_ref _comp;
 
 public:
 	/** @brief Construct using comparator @p c for root selection on merge. */
-	explicit union_find_with_sets(const comp& c) : _comp(c) {}
+	explicit union_find_with_sets(comp_ref c) : _comp(c) {}
 
 	/** @brief Copy-construct, sharing the same comparator reference. */
 	explicit union_find_with_sets(const union_find_with_sets& other) :

@@ -456,9 +456,11 @@ private:
 		while (!exhausted) {
 			// update the choices from right to left
 			size_t last_changed_value = choices.size();
-			while (last_changed_value > 0)
-				if (choices[--last_changed_value].value ^= true)
-					break;
+			while (last_changed_value > 0) {
+				bool& value = choices[--last_changed_value].value;
+				value = !value;
+				if (value) break;
+			}
 			// if all choices are exhausted, we are done
 			if (last_changed_value == 0
 				&& choices[0].value == false) {
