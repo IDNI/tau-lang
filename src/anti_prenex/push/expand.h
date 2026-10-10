@@ -3,9 +3,8 @@
 /**
  * @file expand.h
  * @brief §6 `EXPAND`, the floor of the conjunction's ladder — `∃X` distributed
- * over ONE disjunctive conjunct in exclusive cases — with `FOLD_DECIDED`, the
- * probe that folds a (¬)equation its cofactors prove `F`, and the CONJOINABLE
- * test that decides which complements the later cases carry.
+ * over ONE disjunctive conjunct, one case per member — with `FOLD_DECIDED`,
+ * the probe that folds a (¬)equation its cofactors prove `F`.
  *
  * WHAT ARRIVES is what the ladder leaves: a conjunction under a non-empty `X`
  * narrowed to `X ∩ FV(ψ)`, every conjunct touching `X`, at least one of them
@@ -26,7 +25,6 @@
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
 #include "../normalisers/joins.h"
-#include "../normalisers/nnf.h"
 #include "../normalisers/simplify.h"
 #include "../shared/cofactors.h"
 
@@ -49,28 +47,19 @@ std::optional<trefs> fold_decided(const trefs& C, const block& X,
 	ctx<node>& c);
 
 /**
- * @brief §6 CONJOINABLE: a complement that holds no disjunction with a
- * positive member — every ∨-node in it is a negative tree (§1). A literal, a
- * conjunction of positives and a negative tree are; a disjunction of
- * positives would add positive case structure and is not.
- */
-template <NodeType node>
-bool is_conjoinable(tref e);
-
-/**
  * @brief §6 `EXPAND(ψ, X, ctx)`: `∃X` distributed over ONE disjunctive
- * conjunct `D` in exclusive cases, each handed back to `PUSH_BLOCK`; the
+ * conjunct `D`, one case per member, each handed back to `PUSH_BLOCK`; the
  * floor of the conjunction's ladder.
  *
  * `E` is the plain conjuncts through `FOLD_DECIDED`, whose `F` is the answer.
  * `D` minimises (the prio of its innermost block variable, its member count,
  * content order), so the expansion order is fixed by content and converging
  * states build equal memo keys. Its members are taken smallest first; each
- * case is `SIMPLIFY`d over `E`, the exclusions so far and the member alone,
- * and the cases after a member carry its complement when that is
- * CONJOINABLE. A dead case builds nothing and excludes nothing; a member
- * proven `T` makes `D` `T`; a case deciding `T` ends the expansion. Each
- * case reads the clock first (§3 time limit).
+ * case is `SIMPLIFY`d over `E` and the member alone. The cases need not be
+ * disjoint, since `∃X` distributes over `∨`, so none carries the complement
+ * of another. A dead case builds nothing; a member proven `T` makes `D` `T`;
+ * a case deciding `T` ends the expansion. Each case reads the clock first
+ * (§3 time limit).
  */
 template <NodeType node>
 tref expand(tref psi, const block& X, ctx<node>& c);

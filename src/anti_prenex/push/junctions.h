@@ -89,7 +89,7 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  *    atom whose two signs span sibling disjunctive conjuncts, taken when its
  *    cofactors separate material rather than copy it; then THE FLOOR, the
  *    expansion (`push/expand.h`), `∃X` distributed over one disjunctive
- *    conjunct in exclusive cases.
+ *    conjunct, one case per member.
  */
 template <NodeType node>
 tref push_over_conjunction(tref psi, const block& X, ctx<node>& c);

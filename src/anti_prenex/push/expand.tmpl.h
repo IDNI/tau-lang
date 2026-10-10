@@ -12,10 +12,9 @@
  * (foundations/terms.h) with `cof` (shared/cofactors.h) for the probe,
  * `atoms` and `subst_atom` (foundations/subst.h) for a tree's literal-wise
  * fold, the result joins (normalisers/joins.h) for every assembly, `simplify`
- * (normalisers/simplify.h) at the case edge, `canonically_factored_neg` with
- * `holds_fused_operator` (normalisers/nnf.h) for a complement,
- * `check_time_limit` (foundations/ctx.h) per case, and `push_block` — the
- * hub, `push/push_block.h` — for every case.
+ * (normalisers/simplify.h) at the case edge, `check_time_limit`
+ * (foundations/ctx.h) per case, and `push_block` — the hub,
+ * `push/push_block.h` — for every case.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__EXPAND_TMPL_H__
@@ -87,19 +86,6 @@ std::optional<trefs> fold_decided(const trefs& C, const block& X,
 	return out;
 }
 
-// --- CONJOINABLE ------------------------------------------------------------------
-
-template <NodeType node>
-bool is_conjoinable(tref e) {
-	using tau = tree<node>;
-	// The member view of anything but an ∨-node reaches every ∨-node that
-	// is not inside another one; a negative tree's inner ∨-nodes are trees.
-	if (is_child<node>(e, tau::wff_or)) return is_negative_tree<node>(e);
-	return std::ranges::all_of(members<node>(e), [](tref m) {
-		return !is_child<node>(m, tau::wff_or) || is_negative_tree<node>(m);
-	});
-}
-
 // --- EXPAND -----------------------------------------------------------------------
 
 template <NodeType node>
@@ -141,22 +127,21 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 	std::stable_sort(ds.begin(), ds.end(), [](tref a, tref b) {
 		return formula_size<node>(a) < formula_size<node>(b); });
 	join_builder<node, false> acc;
-	trefs excl;
 	for (tref d : ds) {
 		// Work multiplies per case, so the clock is read here (§3).
 		check_time_limit();
 		const std::optional<trefs> dc =
 			fold_decided<node>(members<node>(d), X, c);
-		// A dead case: no copy, and its complement is implied.
+		// A dead case: no copy.
 		if (!dc) continue;
 		// A member proven `T` makes `D` `T`, which subsumes every case.
 		if (dc->empty())
 			return push_block<node>(
 				simplified_and_join<node>(concat(*E, rest)), X, c);
-		// DEEP over `E`, the exclusions and the member alone: the other
-		// disjunctive conjuncts meet the exclusions at their own expansion.
+		// DEEP over `E` and the member alone: the other disjunctive
+		// conjuncts are simplified at their own expansion.
 		const tref cc = simplify<node>(
-			simplified_and_join<node>(concat(*E, excl, *dc)),
+			simplified_and_join<node>(concat(*E, *dc)),
 			regime::backed, c.P);
 		if (tau::get(cc).equals_F()) continue;
 		// The wrapper narrows `X` and strips what the case decided about
@@ -164,12 +149,6 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 		if (acc.insert(push_block<node>(
 			simplified_and_join<node>(concat(trefs{ cc }, rest)), X, c)))
 				break;
-		// The later cases exclude `d`'s worlds, unless its complement
-		// would add positive case structure.
-		const tref e = canonically_factored_neg<node>(
-			tau::trim_right_sibling(d));
-		DBG(assert(!holds_fused_operator<node>(e));)
-		if (is_conjoinable<node>(e)) excl.push_back(e);
 	}
 	// Every case dead is the empty join, `F`.
 	return acc.result();

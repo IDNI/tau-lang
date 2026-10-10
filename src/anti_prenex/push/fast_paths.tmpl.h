@@ -118,7 +118,7 @@ std::optional<tref> try_fast_paths(tref phi, const block& X, ctx<node>& c) {
 	// through the ∧/∨ skeleton. The `∀_X f = 0` half is emitted ONCE at
 	// the top, however many leaves carry `P`: an X-free clause needs it and
 	// every other clause implies it. This is why a top-level positive —
-	// what a decomposition's positive arm and an exclusive case leave
+	// what a decomposition's positive arm and an expansion's case leave
 	// behind — does not refute the path.
 	if (k.pos == P.size() && k.neg > 0) {
 		if (!ex_distributes_over_negatives<node>(c.type))

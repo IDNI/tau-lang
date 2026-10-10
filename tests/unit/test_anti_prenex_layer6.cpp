@@ -2,7 +2,7 @@
 
 // THE WHOLE PIPELINE with the conjunction's LICENSED DECOMPOSITION and its
 // floor, the EXPANSION, in it. Spec: anti_prenex.md §6 (TRY_DECOMPOSE with
-// FOLD_DECIDED's probe, DECOMPOSE_ARMS, EXPAND with its exclusive cases), §7
+// FOLD_DECIDED's probe, DECOMPOSE_ARMS, EXPAND), §7
 // (the leaves, DISCHARGE under `keep_functional`), §3 (the phases around the
 // push, the time limit), invariant 5.
 //
@@ -157,12 +157,11 @@ TEST_CASE("M1: the inputs that reach the conjunction's floor resolve") {
 	}
 }
 
-TEST_CASE("M2: an exclusive expansion over an X-free member resolves") {
+TEST_CASE("M2: an expansion over an X-free member resolves") {
 	// L19's clause. The X-free `v = 0` refuses 2b and the positive beside
 	// it 2a, nothing pins `x`, and no atom is both-signed, so the floor
 	// expands `x·y = 0 ∨ v = 0`: the case `v = 0` strips `v = 0` out of the
-	// block, the case `x·y = 0` settles, and the later case carries the
-	// earlier member's complement, a literal. The members tie in size and
+	// block and the case `x·y = 0` settles. The members tie in size and
 	// content order picks the first; either way the answer is an ∨ of the
 	// two cases.
 	const tref got = anti_prenexed(

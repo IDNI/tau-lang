@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Unit tests for src/anti_prenex/push/expand.h: §6's FOLD_DECIDED, the
-// CONJOINABLE test and EXPAND, the floor of the conjunction's ladder. Spec:
+// Unit tests for src/anti_prenex/push/expand.h: §6's FOLD_DECIDED and
+// EXPAND, the floor of the conjunction's ladder. Spec:
 // anti_prenex.md §6 (FOLD_DECIDED, EXPAND), §1 (`prio`), §3 (the result
 // joins), invariant 7.
 //
@@ -176,14 +176,6 @@ trefs disjunctive(const fixture& f) {
 	return out;
 }
 
-// Untyped atoms for the structural CONJOINABLE cases.
-tref atom(const char* name) {
-	return tau::build_bf_eq_0(tau::build_bf_variable(name, 0));
-}
-tref neg(tref n)          { return tau::build_wff_neg(n); }
-tref conj(tref l, tref r) { return tau::build_wff_and(l, r); }
-tref disj(tref l, tref r) { return tau::build_wff_or(l, r); }
-
 } // namespace
 
 
@@ -303,65 +295,23 @@ TEST_CASE("FD6: an open probe sweeps a residual the leaf product cannot see") {
 	CHECK(!folded(f).has_value());
 }
 
-// --- CONJOINABLE --------------------------------------------------------------------
-
-TEST_CASE("CJ1: a literal is conjoinable") {
-	CHECK(ap::is_conjoinable<node_t>(atom("a")));
-	CHECK(ap::is_conjoinable<node_t>(neg(atom("a"))));
-}
-
-TEST_CASE("CJ2: a flat negative tree is conjoinable") {
-	const tref t = disj(neg(atom("a")), neg(atom("b")));
-	REQUIRE(ap::is_flat_tree<node_t>(t));
-	CHECK(ap::is_conjoinable<node_t>(t));
-}
-
-TEST_CASE("CJ3: a nested negative tree is conjoinable") {
-	const tref t = disj(conj(neg(atom("a")), neg(atom("b"))),
-		neg(atom("c")));
-	REQUIRE(ap::is_negative_tree<node_t>(t));
-	REQUIRE(!ap::is_flat_tree<node_t>(t));
-	CHECK(ap::is_conjoinable<node_t>(t));
-}
-
-TEST_CASE("CJ4: a conjunction of positives is conjoinable, and so is one "
-	"with a negative tree") {
-	const tref ab = conj(atom("a"), atom("b"));
-	REQUIRE(is_child<node_t>(ab, tau::wff_and));
-	CHECK(ap::is_conjoinable<node_t>(ab));
-	CHECK(ap::is_conjoinable<node_t>(conj(atom("a"),
-		disj(neg(atom("b")), neg(atom("c"))))));
-}
-
-TEST_CASE("CJ5: a disjunction with a positive member is not conjoinable") {
-	CHECK(!ap::is_conjoinable<node_t>(disj(atom("a"), neg(atom("b")))));
-	CHECK(!ap::is_conjoinable<node_t>(disj(atom("a"), atom("b"))));
-}
-
-TEST_CASE("CJ6: a conjunction holding such a disjunction is not "
-	"conjoinable") {
-	const tref e = conj(atom("c"), disj(atom("a"), neg(atom("b"))));
-	REQUIRE(is_child<node_t>(e, tau::wff_and));
-	CHECK(!ap::is_conjoinable<node_t>(e));
-}
-
 // --- EXPAND -------------------------------------------------------------------------
 
 TEST_CASE("X1: L17's clause resolves through two cases") {
 	// `E = ¬(x·z = 0)` and `D = x·y = 0 ∨ x·w = 0`. Each case is a
-	// conjunction of literals, so `x` settles and the leaf takes it; the
-	// second case carries the first member's complement.
+	// conjunction of literals, so `x` settles and the leaf takes it.
 	fixture f = make("ex x ((xy = 0 || xw = 0) && xz != 0).");
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
 }
 
-TEST_CASE("X2: the cases are exclusive — a later case carries the complement "
-	"of an earlier member") {
+TEST_CASE("X2: the cases need not be exclusive — a later case carries no "
+	"complement of an earlier member") {
 	// L19's clause. `v = 0` and `x·y = 0` have one size, and the chain puts
 	// the X-free `v = 0` first: its case is `v = 0 ∧ ∃x(x·k ≠ 0)`, and the
-	// second case is built under `¬(v = 0)`.
+	// second case is built without `¬(v = 0)`, since `∃x` distributes over
+	// the cases' `∨` whether they overlap or not.
 	fixture f = make("ex x ((xy = 0 || v = 0) && xk != 0).");
 	REQUIRE(disjunctive(f).size() == 1);
 	const trefs ds = ap::members<node_t>(disjunctive(f)[0]);
@@ -371,12 +321,14 @@ TEST_CASE("X2: the cases are exclusive — a later case carries the complement "
 	check_against_source(got, f);
 	check_resolved(got, f);
 	REQUIRE(is_child<node_t>(got, tau::wff_or));
-	const tref excluded = ap::complement_of<node_t>(ds[0]);
-	CHECK(std::ranges::any_of(ap::members<node_t>(got),
-		[excluded](tref m) { return has_member(m, excluded); }));
+	const tref complement = ap::complement_of<node_t>(ds[0]);
+	CHECK(std::ranges::none_of(ap::members<node_t>(got),
+		[complement](tref m) {
+			return same(m, complement) || has_member(m, complement);
+		}));
 }
 
-TEST_CASE("X3: a dead case builds no copy and no exclusion") {
+TEST_CASE("X3: a dead case builds no copy") {
 	// Unsimplified by the fixture, `x·z = 0` sits in `D` beside the
 	// conjunct `¬(x·z = 0)`: its case meets its complement in the ∧-join
 	// and dies unbuilt. The result is the second case's alone,
@@ -454,11 +406,12 @@ TEST_CASE("X6: every member of the disjunct is expanded, and the block "
 	check_resolved(got, f);
 }
 
-TEST_CASE("X7: a complement that is not conjoinable is no exclusion") {
+TEST_CASE("X7: a member whose complement holds a positive disjunct expands "
+	"into cases that resolve") {
 	// The smaller member `¬(x·a = 0) ∧ x·b = 0` has the complement
-	// `x·a = 0 ∨ ¬(x·b = 0)`, a disjunction with a positive member. The
-	// second case is built without it, so its variable settles and the
-	// case resolves.
+	// `x·a = 0 ∨ ¬(x·b = 0)`, a disjunction with a positive member, which
+	// no case carries: each case is a conjunction of literals, so its
+	// variable settles and the case resolves.
 	fixture f = make("ex x (((xa != 0 && xb = 0) "
 		"|| (xc != 0 && xd = 0 && xe = 0)) && xf != 0).");
 	REQUIRE(disjunctive(f).size() == 1);
@@ -469,7 +422,6 @@ TEST_CASE("X7: a complement that is not conjoinable is no exclusion") {
 		ap::canonically_factored_neg<node_t>(tau::trim_right_sibling(ds[0])));
 	REQUIRE(is_child<node_t>(e, tau::wff_or));
 	CHECK(!ap::is_negative_tree<node_t>(e));
-	CHECK(!ap::is_conjoinable<node_t>(e));
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
