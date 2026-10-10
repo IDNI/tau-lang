@@ -150,7 +150,7 @@ TEST_CASE("B13: the budget stops a sweep inside the operation that would pass it
 	REQUIRE(decide(parse("ex x (x:bv[2] = { 0 }:bv[2]).")) == true);
 	// Each budget resumes on the nodes the previous one left, so some budget
 	// is met inside an operation that needs several new nodes.
-	std::optional<bool> r;
+	std::optional<ap::blast_detail::swept> r;
 	for (size_t budget = 0; !r && budget < 1000; ++budget) {
 		qbf_node_max_guard g(budget);
 		auto c = ctx_of(q);
@@ -159,7 +159,7 @@ TEST_CASE("B13: the budget stops a sweep inside the operation that would pass it
 		CHECK(engine::V.size() - before <= budget);
 	}
 	REQUIRE(r.has_value());
-	CHECK(*r == true);
+	CHECK(r->truth);
 }
 
 // --- the sweep ------------------------------------------------------------------

@@ -204,11 +204,18 @@ const slices& sweeper<node>::term(tref n) {
 	return terms.emplace(n, std::move(s)).first->second;
 }
 
-/// The sweep over the canonical query `k`: its truth, or nothing when its
-/// bits need more ids than the universe has or it outgrew
-/// `ctx.qbf_node_max`.
+/// A sweep's verdict on its query, and on the query's DUAL: the query with
+/// its outermost run of one binder kind flipped, null when it has none.
+struct swept {
+	bool truth;
+	tref dual;
+	bool dual_truth;
+};
+
+/// The sweep over the canonical query `k`, or nothing when its bits need
+/// more ids than the universe has or it outgrew `ctx.qbf_node_max`.
 template <NodeType node>
-std::optional<bool> sweep(tref k, const ctx<node>& c) {
+std::optional<swept> sweep(tref k, const ctx<node>& c) {
 	using tau = tree<node>;
 	DBG(assert(is_bv_type_family<node>(c.type));)
 	[[maybe_unused]] static const bool initialised = [] {
@@ -233,19 +240,25 @@ std::optional<bool> sweep(tref k, const ctx<node>& c) {
 	sweeper<node> s(c.type, width, rank);
 	// `k` is closed, so its outermost run of one binder kind needs no
 	// abstraction: under ∀ it holds iff the run's body is 1, under ∃
-	// unless the body is 0.
-	auto is_all = [](tref q) {
-		return binder_kind<node>(q) == tau_term_bdd<node>::all; };
+	// unless the body is 0. The same body decides the dual.
+	using tbdd = tau_term_bdd<node>;
+	auto is_all = [](tref q) { return binder_kind<node>(q) == tbdd::all; };
 	const bool universal = is_child_quantifier<node>(k) && is_all(k);
+	block run;
 	tref body = k;
 	while (is_child_quantifier<node>(body) && is_all(body) == universal) {
 		if (s.foreign(binder_var<node>(body))) fail();
-		body = binder_body<node>(body);
+		run.push_back(tau::trim_right_sibling(binder_var<node>(body)));
+		body = tau::trim_right_sibling(binder_body<node>(body));
 	}
 	const node_cap_scope cap(engine::V.size() + c.qbf_node_max);
 	try {
 		const sweep_bdd r = s.formula(body);
-		return universal ? r->is_one() : !r->is_zero();
+		const bool one = r->is_one(), nonzero = !r->is_zero();
+		if (run.empty()) return swept{ one, nullptr, one };
+		return swept{ universal ? one : nonzero,
+			rewrap<node>(body, run, universal ? tbdd::ex : tbdd::all),
+			universal ? nonzero : one };
 	} catch (const bdd_node_cap_reached&) {
 		return std::nullopt;
 	}
@@ -263,8 +276,12 @@ std::optional<bool> decide_finite(tref k, ctx<node>& c) {
 		a && *a != answer::unknown) return *a == answer::sat;
 	check_time_limit();
 	if (const auto r = blast_detail::sweep<node>(k, c)) {
-		store<node, table::qbf_memo>(k, *r);
-		return r;
+		store<node, table::qbf_memo>(k, r->truth);
+		// The key is the dual itself and the value its own truth, so no
+		// lookup can read a wrong answer; it is the `∃` key that
+		// `query_or_rewrap` builds for the closing it asks next.
+		if (r->dual) store<node, table::qbf_memo>(r->dual, r->dual_truth);
+		return r->truth;
 	}
 	const answer a = ask<node>(k);
 	if (a != answer::unknown) return a == answer::sat;
