@@ -184,8 +184,11 @@ function(target_setup target)
 	else()
 		# /utf-8: the sources carry UTF-8 in comments and string literals.
 		# NOMINMAX: windows.h's min/max macros would break std::min/std::max.
+		# /wd4456 to /wd4459 are the shadowing warnings. A local that repeats a
+		# member, a parameter or a namespace-level name such as tau, all or none
+		# is the style here, and gcc and clang do not warn on it without -Wshadow.
 		target_compile_options(${target} PRIVATE
-			/W4 /EHsc /utf-8 /bigobj)
+			/W4 /EHsc /utf-8 /bigobj /wd4456 /wd4457 /wd4458 /wd4459)
 		target_compile_definitions(${target} PRIVATE
 			NOMINMAX
 			WIN32_LEAN_AND_MEAN
