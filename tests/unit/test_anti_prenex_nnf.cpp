@@ -170,6 +170,18 @@ TEST_CASE("N6: a member equal to C drops the residue") {
 	CHECK(are_nso_equivalent<node_t>(got2, neg(disj(C, conj(C, r1)))));
 }
 
+TEST_CASE("N6b: a factoring left with one `¬c` over a junction is pushed on") {
+	tref a = atom("a"), b = atom("b"), c = atom("c");
+	tref X = disj(b, c);
+	// ¬((¬a ∧ X) ∨ (a ∧ X)): C = {X}, the residues ¬a and a join to T, so
+	// the factoring is the single `¬X`, which must still become ¬b ∧ ¬c.
+	tref in = neg(disj(conj(neg(a), X), conj(a, X)));
+	tref got = nnf(in);
+	CHECK(got == ap::canonical_and<node_t>(trefs{ neg(b), neg(c) }));
+	CHECK(are_nso_equivalent<node_t>(got, in));
+	CHECK(nnf(got) == got);
+}
+
 // --- binders, temporal operators, references -------------------------------------
 
 TEST_CASE("N7: a binder flips without renaming, a temporal operator dualises") {

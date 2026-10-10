@@ -112,22 +112,27 @@ tref nnf_down(tref n) {
 	// `neg(ψ)` IS the NNF of `¬ψ` (§1), so a hit ends this subtree: the
 	// walk descends into a formula that is already normalised.
 	if (const tref hit = neg_of<node>(psi); hit != nullptr) return hit;
+	tref r;
 	// A chain handed to the walk is raw: the n-ary builder folds left
 	// through the hooks (the neutral seed folds away on the first step),
 	// neither sorting nor deduplicating — that is `up`'s join, once the
 	// members are normalised.
 	if (is_child<node>(psi, tau::wff_and))
-		return build_wff_or<node>(
+		r = build_wff_or<node>(
 			negated_members<node>(members<node>(psi)));
-	if (is_child<node>(psi, tau::wff_or))
-		return factored_neg_of_disjunction<node>(members<node>(psi));
+	else if (is_child<node>(psi, tau::wff_or))
+		r = factored_neg_of_disjunction<node>(members<node>(psi));
 	// The rest is one level of the existing push: `¬¬` folds, a binder
 	// flips (never renaming — its builders pass `calculate_quant_id =
 	// false`), `always` / `sometimes` dualise, a sugar connective
 	// dualises. With `fuse_atoms = false` an ATOM comes back unchanged,
 	// which is invariant 4: no `bf_neq`, no negated or mirrored order
 	// operator is ever built here. A reference falls through the same way.
-	return push_negation_one_in<node, true, false>(n);
+	else r = push_negation_one_in<node, true, false>(n);
+	// The walk descends below what `down` returns but never rewrites it, so
+	// a rewrite that folds to a lone negation (a factoring left with one
+	// `¬c`) is rewritten here; its operand is a strict part of `ψ`.
+	return r != n && is_child<node>(r, tau::wff_neg) ? nnf_down<node>(r) : r;
 }
 
 /// §3 `TO_NNF`'s `up`: every `wff_and`/`wff_or` the walk closes re-emitted
