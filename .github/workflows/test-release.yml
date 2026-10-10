@@ -787,7 +787,22 @@ jobs:
         run: ./dev preset release-msvc-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Resolve the clang-cl store packages
-        run: ./dev preset release-msvc-all-clang-cl --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        shell: bash
+        run: |
+          ./dev preset release-msvc-all-clang-cl --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} &
+          pid=$!
+          for i in $(seq 60); do sleep 20; kill -0 $pid 2>/dev/null || break; done
+          if kill -0 $pid 2>/dev/null; then
+            echo "==== stalled: processes"
+            powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.Name -notmatch '^(svchost|System|Registry|csrss|wininit|services|lsass|smss|fontdrvhost|dwm|conhost)' } | ForEach-Object { '{0} <- {1} {2} :: {3}' -f \$_.ProcessId, \$_.ParentProcessId, \$_.Name, \$_.CommandLine }"
+            echo "==== stalled: tgf store logs"
+            for f in ~/.tau/store/tgf/*.log; do echo "-- $f"; tail -n 60 "$f"; done
+            echo "==== stalled: temp folders"
+            ls -la "${TMP:-/tmp}" /tmp 2>/dev/null | tail -n 40
+            for f in /tmp/tmp.*/*.log "${TMP:-/tmp}"/tmp.*/*.log; do [ -f "$f" ] && { echo "-- $f"; tail -n 30 "$f"; }; done
+            exit 1
+          fi
+          wait $pid
 
       # Saved even after a failure, so the next run keeps what did resolve.
       - name: Save the dependency store (~/.tau/store)
