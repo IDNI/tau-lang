@@ -41,6 +41,12 @@ struct coverage {
 /// §6 the number of census candidates the licence tries.
 inline constexpr size_t census_top = 3;
 
+/// §6 THE LICENCE: arms of size @p arms may replace a region of size
+/// @p region when `arms ≤ region + region/4`, multiplied out by 4.
+inline bool licensed(size_t arms, size_t region) {
+	return 4 * arms <= 5 * region;
+}
+
 /// §6 a JUNCTION a guard unit may occur in: a disjunctive conjunct of `ψ`,
 /// or one of its ∧-members, with its members as a list and by content.
 template <NodeType node>
@@ -136,8 +142,8 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 				X, c);
 
 	// THE LICENCE on BUILT cofactors of the touched region,
-	// `Σ|m[a ↦ T]| + |m[a ↦ F]| ≤ Σ|m| + Σ|m|/4` multiplied out by 4: the
-	// untouched conjuncts are one shared subtree in both arms.
+	// `Σ|m[a ↦ T]| + |m[a ↦ F]| ≤ Σ|m| + Σ|m|/4`: the untouched conjuncts
+	// are one shared subtree in both arms.
 	for (tref a : cands) {
 		trefs on_T, on_F, untouched;
 		size_t lhs = 0, rhs = 0;
@@ -152,7 +158,7 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 			lhs += formula_size<node>(on_T.back())
 				+ formula_size<node>(on_F.back());
 		}
-		if (4 * lhs > 5 * rhs) continue;
+		if (!licensed(lhs, rhs)) continue;
 		return decompose_arms<node>(a,
 			simplified_and_join<node>(concat(on_T, untouched)),
 			simplified_and_join<node>(concat(on_F, untouched)),
@@ -277,7 +283,7 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 	// With one block variable EXPAND cannot settle anything first, so a
 	// refused split comes back in every case and nests EXPANDs.
 	if (X.size() >= 2 && copied > 0
-		&& 4 * (touched_arms + 2 * copied) > 5 * (touched + copied))
+		&& !licensed(touched_arms + 2 * copied, touched + copied))
 		return std::nullopt;
 	return decompose_arms<node>(best, simplified_and_join<node>(on_T),
 		simplified_and_join<node>(on_F), X, c, best_neg);

@@ -60,6 +60,11 @@ struct node_cap_scope {
 /// fold's memoised pairs.
 inline constexpr size_t pairwise_and_max = 4;
 
+/// The load factor of the engine's node and conjunction tables, half the
+/// default: both grow to millions of entries, where every node a lookup
+/// passes is a cache miss, so sparser buckets pass fewer.
+inline constexpr float sweep_table_load_factor = 0.5f;
+
 /// `BIT_BLAST`'s `FAIL` (§7).
 [[noreturn]] inline void fail() {
 	throw std::logic_error(
@@ -220,10 +225,8 @@ std::optional<swept> sweep(tref k, const ctx<node>& c) {
 	DBG(assert(is_bv_type_family<node>(c.type));)
 	[[maybe_unused]] static const bool initialised = [] {
 		bdd_init<Bool, sweep_options>();
-		// Both tables grow to millions of entries, where every node a
-		// lookup passes is a cache miss; sparser buckets pass fewer.
-		engine::Mn.max_load_factor(0.5f);
-		engine::and_memo.max_load_factor(0.5f);
+		engine::Mn.max_load_factor(sweep_table_load_factor);
+		engine::and_memo.max_load_factor(sweep_table_load_factor);
 		return true;
 	}();
 	subtree_unordered_map<node, size_t> rank;
