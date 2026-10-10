@@ -7,7 +7,9 @@
 # A case whose need the spec text does not show declares it on its helper
 # call: `REQUIRES ltlsynt` for a live ltlsynt on PATH, `REQUIRES hostfs` for a
 # real host file, `REQUIRES subprocess` for a host compiler the case spawns,
-# and `REQUIRES <ba-id>` for an algebra the text does not name.
+# `REQUIRES bounded` for a time budget only a child process can enforce
+# (src/bounded_call.h), `REQUIRES shstub` for a shell script standing in for
+# ltlsynt, and `REQUIRES <ba-id>` for an algebra the text does not name.
 #
 # Skipped names are recorded in a global property per reason and summarised
 # once, so a build reports what it dropped and why instead of quietly running
@@ -60,14 +62,17 @@ else()
 	set(TAU_REPL_NODEFS_HOSTFS FALSE)
 endif()
 
-# Every skip reason, and the summary line it prints. A HOSTFS or SUBPROCESS
-# case registers disabled, so ctest lists it as not run instead of missing.
-set(TAU_REPL_SKIP_REASONS PACK LTLSYNT HOSTFS SUBPROCESS SDK)
-set(TAU_REPL_DISABLED_REASONS HOSTFS SUBPROCESS)
+# Every skip reason, and the summary line it prints. A HOSTFS, SUBPROCESS,
+# BOUNDED or SHSTUB case registers disabled, so ctest lists it as not run
+# instead of missing.
+set(TAU_REPL_SKIP_REASONS PACK LTLSYNT HOSTFS SUBPROCESS BOUNDED SHSTUB SDK)
+set(TAU_REPL_DISABLED_REASONS HOSTFS SUBPROCESS BOUNDED SHSTUB)
 set(TAU_REPL_SKIP_WHY_PACK "naming a BA outside TAU_BAS=${TAU_BAS}")
 set(TAU_REPL_SKIP_WHY_LTLSYNT "needing ltlsynt, which this build cannot find or a wasm module or tau.exe under wine cannot start")
 set(TAU_REPL_SKIP_WHY_HOSTFS "opening a host file this build's filesystem cannot reach")
 set(TAU_REPL_SKIP_WHY_SUBPROCESS "spawning a host compiler, which a wasm module or tau.exe under wine cannot run")
+set(TAU_REPL_SKIP_WHY_BOUNDED "needing a time budget enforced on a child process, which a wasm module or a Windows build does not start")
+set(TAU_REPL_SKIP_WHY_SHSTUB "standing a shell script in for ltlsynt, where a Windows build starts only ltlsynt.exe")
 set(TAU_REPL_SKIP_WHY_SDK "needing a platform SDK this build tree does not hold")
 
 # Sets <out> to the reason a case cannot run, or to an empty string. hostfs
@@ -85,6 +90,10 @@ function(tau_repl_skip_reason out cmd requires)
 	if("subprocess" IN_LIST requires
 			AND (EMSCRIPTEN OR (WIN32 AND NOT CMAKE_HOST_WIN32)))
 		set(${out} SUBPROCESS PARENT_SCOPE)
+	elseif("bounded" IN_LIST requires AND (EMSCRIPTEN OR WIN32))
+		set(${out} BOUNDED PARENT_SCOPE)
+	elseif("shstub" IN_LIST requires AND WIN32)
+		set(${out} SHSTUB PARENT_SCOPE)
 	elseif(_pack)
 		set(${out} PACK PARENT_SCOPE)
 	elseif("ltlsynt" IN_LIST requires AND NOT TAU_REPL_LTLSYNT_USABLE)
@@ -106,10 +115,10 @@ macro(tau_repl_gate_case test cmd_var)
 			"${test}: unexpected argument(s) ${_tau_UNPARSED_ARGUMENTS}")
 	endif()
 	foreach(_tau_need ${_tau_REQUIRES})
-		if(NOT _tau_need MATCHES "^(ltlsynt|hostfs|subprocess)$"
+		if(NOT _tau_need MATCHES "^(ltlsynt|hostfs|subprocess|bounded|shstub)$"
 		   AND NOT _tau_need IN_LIST TAU_REGISTERED_BA_IDS)
 			message(FATAL_ERROR "${test}: unknown need '${_tau_need}' "
-				"(expected ltlsynt, hostfs, subprocess or a registered BA id)")
+				"(expected ltlsynt, hostfs, subprocess, bounded, shstub or a registered BA id)")
 		endif()
 	endforeach()
 	tau_repl_skip_reason(_tau_reason "${${cmd_var}}" "${_tau_REQUIRES}")

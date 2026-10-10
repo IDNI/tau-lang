@@ -20,13 +20,17 @@ set(TAU_CODEGEN_CLI_CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_codegen_cli.cmak
 # `tau compile` writes its spec to a host path and spawns a host compiler
 # (src/tau_compile.tmpl.h), so a wasm node host cannot run these even with the
 # NODEFS filesystem. NO_LTLSYNT points PATH and TAU_SPOT_BIN at an empty folder.
-# STUB_PATH puts a stub in front of PATH. TAU_FLAGS goes before the verb, so a
+# STUB_PATH puts a stub in front of PATH; the stubs are shell scripts, so the
+# case needs a build that starts one. TAU_FLAGS goes before the verb, so a
 # budget option reaches the synthesis. PROGRAM_STDIN feeds the built program.
 function(add_codegen_cli_test test_name spec_text scratch_stem pass_regex)
 	cmake_parse_arguments(PARSE_ARGV 4 _tau "NO_FAIL_REGEX;RUN_SERIAL"
 		"NO_LTLSYNT;STUB_PATH;TAU_FLAGS;PROGRAM_STDIN;TIMEOUT"
 		"FAIL_REGEX;REQUIRES;ENV")
 	list(APPEND _tau_REQUIRES subprocess)
+	if(_tau_STUB_PATH)
+		list(APPEND _tau_REQUIRES shstub)
+	endif()
 	tau_repl_gate_case("${test_name}" spec_text)
 	set(_args "-DTAU=${TAU_LAUNCHER}" "-DSPEC_TEXT=${spec_text}"
 		"-DEXE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}")

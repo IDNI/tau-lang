@@ -23,6 +23,7 @@
 #  include "interpreter.h"
 #endif
 
+#include <filesystem>
 #include <fstream>
 
 using namespace idni::tau_lang;

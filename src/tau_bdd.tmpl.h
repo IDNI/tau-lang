@@ -1265,7 +1265,10 @@ size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
 	std::uint64_t seed = 0;
-	idni::hash_combine(seed, idni::hash_tref<T>()(r.b), r.inv);
+	// r.b is a node of the BDD store, not of the Tau tree. The two node types
+	// differ in size, so the hash of the Tau tree would read past the node.
+	idni::hash_combine(seed,
+		idni::hash_tref<idni::tau_lang::tau_bdd_node<T>>()(r.b), r.inv);
 	return static_cast<size_t>(seed);
 }
 
@@ -1289,7 +1292,9 @@ size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto
 template<typename T>
 size_t std::hash<idni::tau_lang::term_handle<T>>::operator()(auto& th) const {
 	std::uint64_t seed = 0;
-	idni::hash_combine(seed, idni::hash_htree<T>()(th.h), th.inv);
+	// th.h holds a node of the BDD store, as tau_bdd_ref::b does.
+	idni::hash_combine(seed,
+		idni::hash_htree<idni::tau_lang::tau_bdd_node<T>>()(th.h), th.inv);
 	return static_cast<size_t>(seed);
 }
 

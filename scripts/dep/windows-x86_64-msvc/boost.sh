@@ -17,16 +17,22 @@ _dep_boost_vcvars() {
 	printf '%s\n' "${_dir%/}/VC/Auxiliary/Build/vcvars64.bat"
 }
 
-# b2 maps an unknown cl to msvc-6.0, so name 14.3, its newest version, with
-# the cl of PATH. b2 finds no vcvars64.bat beside a cl newer than 14.4x.
+# A file of Boost's documentation lies deeper under the staging folder than
+# the 260 characters git writes by default. The setting comes from the
+# environment, so it reaches the submodules depinst.py clones.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.longpaths GIT_CONFIG_VALUE_0=true
+
+# b2's msvc toolset takes the cl of this build by its path. Left to detect
+# one, the b2 of this Boost knows no Visual Studio newer than 2022: it picks
+# an older installation when one exists and configures nothing usable (a
+# 32-bit arm "msvc-6.0") when none does. 14.3 is the newest version it has
+# flags for. Its setup script is an empty one: b2 finds none for this
+# compiler, and the build already runs in the developer environment.
 _dep_boost_user_config() {
-	local _vcvars
-	_vcvars="$(_dep_boost_vcvars)" || {
-		echo "dep-boost: no VC/Auxiliary/Build/vcvars64.bat under VSINSTALLDIR='${VSINSTALLDIR:-}'. Start the MSVC developer shell." >&2
-		return 1
-	}
-	printf 'using msvc : 14.3 : "%s" : <setup-amd64>"%s" ;\n' \
-		"$(cygpath -m "$2")" "$(cygpath -m "$_vcvars")" \
+	printf '@exit /b 0\r\n' > "${1}/tau-msvc-setup.bat"
+	printf 'using msvc : 14.3 : "%s" : <setup>"%s" ;\n' \
+		"$(cygpath -m "$2")" \
+		"$(cygpath -m "${1}/tau-msvc-setup.bat")" \
 		> "${1}/user-config.jam"
 }
 
@@ -108,9 +114,10 @@ _dep_boost_target_build() {
 		printf 'set "TEMP=%s"\r\nset "TMP=%s"\r\n' "$_tmp_win" "$_tmp_win"
 		printf 'cd /d "%s"\r\n' "$_boost_win"
 		printf 'if errorlevel 1 exit /b 1\r\n'
-		# build.bat guesses no toolset for a Visual Studio it does not know,
-		# so name msvc, which takes the cl of the vcvars shell.
-		printf 'call bootstrap.bat msvc\r\n'
+		# The toolset is named: the bootstrap of this Boost does not know a
+		# Visual Studio newer than 2022 and fails to guess one. msvc takes
+		# the cl of the environment.
+		printf 'call bootstrap.bat msvc --with-libraries=log\r\n'
 		printf 'if errorlevel 1 exit /b 1\r\n'
 		printf 'b2.exe --user-config=./user-config.jam'
 		printf ' --prefix="%s" --build-dir="%s"' \
@@ -143,10 +150,7 @@ _dep_boost_target_build() {
 }
 
 _dep_boost_target_setup() {
-	local _cl _n="${GIT_CONFIG_COUNT:-0}"
-	# A submodule doc path under the staging folder passes 260 characters.
-	export "GIT_CONFIG_KEY_${_n}=core.longpaths" "GIT_CONFIG_VALUE_${_n}=true"
-	export GIT_CONFIG_COUNT=$((_n + 1))
+	local _cl
 	# b2 takes clang-cl for clang on Linux, so every MSVC preset builds with cl.
 	_cl="$(command -v cl.exe 2>/dev/null)" || {
 		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2

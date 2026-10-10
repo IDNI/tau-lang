@@ -13,16 +13,12 @@ namespace idni::tau_lang {
 // =============================================================================
 
 // Pedantic-clean 128-bit alias: products of two 64-bit parts are exact in it.
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #	include <__msvc_int128.hpp>
 using int128_t_ = std::_Signed128;
 #else
 __extension__ typedef __int128 int128_t_;
 #endif
-
-// The MSVC STL has no numeric_limits for __int128, which clang-cl uses.
-constexpr int128_t_ int128_max =
-	((int128_t_) 1 << 126) - 1 + ((int128_t_) 1 << 126);
 
 namespace {
 
@@ -70,7 +66,7 @@ std::optional<qint_rational> midpoint(const qint_rational& a,
 	int128_t_ l = (int128_t_) a.q / g * b.q;
 	int128_t_ num = (int128_t_) a.p * (l / a.q) + (int128_t_) b.p * (l / b.q);
 	if (num % 2 == 0) return make_rational(num / 2, l);
-	if (l > int128_max / 2) return std::nullopt;
+	if (l > std::numeric_limits<int128_t_>::max() / 2) return std::nullopt;
 	return make_rational(num, l * 2);
 }
 

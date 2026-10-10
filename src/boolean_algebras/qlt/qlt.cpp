@@ -7,7 +7,7 @@
 namespace idni::tau_lang {
 
 // Pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #	include <__msvc_int128.hpp>
 using int128_t_ = std::_Signed128;
 #else

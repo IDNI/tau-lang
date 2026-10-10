@@ -16,6 +16,16 @@ namespace bv_defelim_detail {
 // atoms; the shift below would overflow past it.
 inline constexpr size_t hard_atom_cap = 30;
 
+// An atom of a propositional skeleton by its index, plain or negated.
+struct lit { size_t v; bool neg; };
+
+// One step of a compiled propositional skeleton: a constant, the atom `a` or
+// its negation, or the conjunction or disjunction of the gates `a` and `b`.
+struct gate {
+	enum { top, bottom, atom, negated, conj, disj } kind;
+	size_t a, b;
+};
+
 // The effective caps: the option values, the atom cap clamped to
 // hard_atom_cap.
 inline size_t clause_cap() { return bv_defelim_max_clauses; }
@@ -199,7 +209,6 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 	auto prop_unsat_raw = [&](const std::vector<tref>& Ds) -> bool {
 		std::vector<tref> atoms;
 		subtree_unordered_map<node, size_t> index;   // canonical positive atom -> index
-		struct lit { size_t v; bool neg; };
 		auto atom_of = [&](tref a) -> std::optional<lit> {
 			tref ca = canon(a);
 			const tau& t = tau::get(ca);
@@ -212,37 +221,50 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 			index.emplace(pos, atoms.size()); atoms.push_back(pos);
 			return lit{ atoms.size() - 1, neg };
 		};
-		using eval_t = std::function<bool(uint32_t)>;
-		std::function<std::optional<eval_t>(tref)> compile =
-			[&](tref f) -> std::optional<eval_t> {
-				const tau& t = tau::get(f);
-				if (t.is(tau::wff) && (t.child_is(tau::wff_and) || t.child_is(tau::wff_or))) {
-					auto a = compile(lhs(f)), b = compile(rhs(f));
-					if (!a || !b) return std::nullopt;
-					const bool is_and = t.child_is(tau::wff_and);
-					return eval_t([a, b, is_and](uint32_t m) {
-						return is_and ? ((*a)(m) && (*b)(m)) : ((*a)(m) || (*b)(m)); });
-				}
-				if (t.equals_T()) return eval_t([](uint32_t) { return true; });
-				if (t.equals_F()) return eval_t([](uint32_t) { return false; });
-				if (!is_atomic_fm<node>(f)
-					&& !(t.is(tau::wff) && t.child_is(tau::wff_neg))) return std::nullopt;
-				auto l = atom_of(f);
-				if (!l) return std::nullopt;
-				const size_t v = l->v; const bool neg = l->neg;
-				return eval_t([v, neg](uint32_t m) {
-					const bool b = (m >> v) & 1u; return neg ? !b : b; });
-			};
-		std::vector<eval_t> fs;
+		// Each formula compiles to gates, every gate after the gates it
+		// reads. They are data and not closures over closures: cl overflows
+		// its stack on a std::function here that builds evaluators from
+		// captured evaluators.
+		std::vector<gate> gates;
+		const size_t undecided = SIZE_MAX;
+		std::function<size_t(tref)> compile = [&](tref f) -> size_t {
+			const tau& t = tau::get(f);
+			auto add = [&](gate g) { gates.push_back(g); return gates.size() - 1; };
+			if (t.is(tau::wff) && (t.child_is(tau::wff_and) || t.child_is(tau::wff_or))) {
+				const size_t a = compile(lhs(f)), b = compile(rhs(f));
+				if (a == undecided || b == undecided) return undecided;
+				return add({ t.child_is(tau::wff_and) ? gate::conj : gate::disj, a, b });
+			}
+			if (t.equals_T()) return add({ gate::top, 0, 0 });
+			if (t.equals_F()) return add({ gate::bottom, 0, 0 });
+			if (!is_atomic_fm<node>(f)
+				&& !(t.is(tau::wff) && t.child_is(tau::wff_neg))) return undecided;
+			auto l = atom_of(f);
+			if (!l) return undecided;
+			return add({ l->neg ? gate::negated : gate::atom, l->v, 0 });
+		};
+		std::vector<size_t> fs;
 		for (tref D : Ds) {
-			auto c = compile(D);
-			if (!c) return false;   // not decided: not refuted
-			fs.push_back(*c);
+			const size_t c = compile(D);
+			if (c == undecided) return false;   // not decided: not refuted
+			fs.push_back(c);
 		}
 		const uint32_t n = static_cast<uint32_t>(atoms.size());
+		std::vector<char> value(gates.size());
 		for (uint32_t m = 0; m < (1u << n); ++m) {
+			for (size_t g = 0; g < gates.size(); ++g) {
+				const gate& x = gates[g];
+				switch (x.kind) {
+					case gate::top: value[g] = 1; break;
+					case gate::bottom: value[g] = 0; break;
+					case gate::atom: value[g] = (m >> x.a) & 1u; break;
+					case gate::negated: value[g] = !((m >> x.a) & 1u); break;
+					case gate::conj: value[g] = value[x.a] && value[x.b]; break;
+					case gate::disj: value[g] = value[x.a] || value[x.b]; break;
+				}
+			}
 			bool all = true;
-			for (auto& f : fs) if (!f(m)) { all = false; break; }
+			for (size_t f : fs) if (!value[f]) { all = false; break; }
 			if (all) return false;   // a satisfying assignment: not refuted
 		}
 		return true;

@@ -48,16 +48,27 @@ static tref bv_constant(size_t bitwidth, size_t value) {
 }
 
 // Bitvector type-id shorthands. These live here rather than in core: nothing
-// in src/ reads them, only the type-inference integration tests.
+// in src/ reads them, only the type-inference integration tests. Each id is
+// computed at its first call: building a type tree needs the parser tables,
+// which a variable initialized before main may not find built yet.
 /** @brief Cached type id for bitvector-8 under node @p node. */
 template<NodeType node>
-static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
+static size_t bv8_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(8));
+	return id;
+}
 /** @brief Cached type id for bitvector-16 under node @p node. */
 template<NodeType node>
-static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
+static size_t bv16_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(16));
+	return id;
+}
 /** @brief Cached type id for bitvector-32 under node @p node. */
 template<NodeType node>
-static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
+static size_t bv32_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(32));
+	return id;
+}
 
 #endif // TAU_PACK_HAS_BA_BV
 

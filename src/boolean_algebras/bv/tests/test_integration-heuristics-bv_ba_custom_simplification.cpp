@@ -517,11 +517,11 @@ TEST_SUITE("max_simplify_rounds") {
 // identity, so the bf_mul identity must be the numeric one.
 TEST_SUITE("identity_of") {
 	TEST_CASE("bf_add identity is zero") {
-		CHECK(identity_of<node_t>(tree<node_t>::bf_add, bv8_type_id<node_t>).value()
+		CHECK(identity_of<node_t>(tree<node_t>::bf_add, bv8_type_id<node_t>()).value()
 			== parse_bf("0:bv[8]"));
 	}
 	TEST_CASE("bf_mul identity is the numeric one, not the top element") {
-		CHECK(identity_of<node_t>(tree<node_t>::bf_mul, bv8_type_id<node_t>).value()
+		CHECK(identity_of<node_t>(tree<node_t>::bf_mul, bv8_type_id<node_t>()).value()
 			== parse_bf("{1}:bv[8]"));
 	}
 }

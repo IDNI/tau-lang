@@ -1337,7 +1337,7 @@ TEST_SUITE("tree builder wrappers") {
 
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("bitvector arithmetic builders") {
-		const size_t ty = bv8_type_id<node_t>;
+		const size_t ty = bv8_type_id<node_t>();
 		tref x = tau::build_bf_variable(std::string("x"), ty);
 		tref y = tau::build_bf_variable(std::string("y"), ty);
 		CHECK( tau::get(tau::build_bf_shl(x, y)).to_str() == "x<<y" );

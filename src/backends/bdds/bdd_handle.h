@@ -111,8 +111,11 @@ struct bdd_handle {
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
 	typedef std::map<B, std::shared_ptr<bdd_handle>> mb_type;
-	inline static std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> Mn;
-	inline static std::map<B, std::shared_ptr<bdd_handle>> Mb;
+	// Built on first use: the engine's static initializer reads the tables,
+	// and the statics of two class templates are initialized in no fixed
+	// order.
+	static mn_type& Mn() { static mn_type m; return m; }
+	static mb_type& Mb() { static mb_type m; return m; }
 	inline static hbdd<B, o> htrue, hfalse;
 
 	// Initialization happens via bdd<B, o>::initializer.
@@ -128,7 +131,7 @@ struct bdd_handle {
 
 	/// Handle for a decoded decision node, keyed in Mn
 	static hbdd<B, o> get(const bdd_node_t& x) {
-		if (auto it = Mn.find(x); it != Mn.end())
+		if (auto it = Mn().find(x); it != Mn().end())
 			return it->second;//.lock();
 		bdd_ref r = bdd<B, o>::add(x);
 		// a full table gave F for x; hfalse is null only while
@@ -136,19 +139,19 @@ struct bdd_handle {
 		if (r == bdd<B, o>::F && hfalse) return hfalse;
 		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
 		h->b = r;
-		Mn.emplace(x, h);
+		Mn().emplace(x, h);
 		return h;
 	}
 
 	/// Handle for a leaf constant of B, keyed in Mb
 	static hbdd<B, o> get(const B& x) {
-		if (auto it = Mb.find(x); it != Mb.end())
+		if (auto it = Mb().find(x); it != Mb().end())
 			return it->second;//.lock();
 		bdd_ref r = bdd<B, o>::add(x);
 		if (r == bdd<B, o>::F && hfalse) return hfalse;
 		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
 		h->b = r;
-		Mb.emplace(x, h);
+		Mb().emplace(x, h);
 		return h;
 	}
 
@@ -413,8 +416,11 @@ struct bdd_handle<Bool, o> {
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
 	typedef std::map<Bool, std::shared_ptr<bdd_handle>> mb_type;
-	inline static std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> Mn;
-	inline static std::map<Bool, std::shared_ptr<bdd_handle>> Mb;
+	// Built on first use: the engine's static initializer reads the tables,
+	// and the statics of two class templates are initialized in no fixed
+	// order.
+	static mn_type& Mn() { static mn_type m; return m; }
+	static mb_type& Mb() { static mb_type m; return m; }
 	inline static hbdd<Bool, o> htrue, hfalse;
 
 	// Initialization happens via bdd<B, o>::initializer.
@@ -424,14 +430,14 @@ struct bdd_handle<Bool, o> {
 
 	/// Handle for a decoded decision node, keyed in Mn
 	static hbdd<Bool, o> get(const bdd_node_t& x) {
-		if (auto it = Mn.find(x); it != Mn.end())
+		if (auto it = Mn().find(x); it != Mn().end())
 			return it->second;//.lock();
 		bdd_ref r = bdd<Bool, o>::add(x);
 		// a full table gave F for x (see the primary template)
 		if (r == bdd<Bool, o>::F && hfalse) return hfalse;
 		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>();
 		h->b = r;
-		Mn.emplace(x, h);
+		Mn().emplace(x, h);
 		return h;
 	}
 

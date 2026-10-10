@@ -75,10 +75,11 @@ bool compile_and_run_echo(const std::string& header_src) {
 	}
 
 	// The header is found through -I<scratch dir>, matching the #include.
-	if (!tau_test_compile(exe_path, { main_path }, cg_tmp_dir(), 17,
-		/*ndebug=*/false, /*lto=*/true).ok) return false;
+	auto built = tau_test_compile(exe_path, { main_path }, cg_tmp_dir(), 17,
+		/*ndebug=*/false, /*lto=*/true);
+	if (!built.ok) { MESSAGE(built.out); return false; }
 	auto run = tau_test_run({ exe_path });
-	if (run.exit_code != 0) return false;
+	if (run.exit_code != 0) { MESSAGE(run.out << run.err); return false; }
 	std::istringstream out(run.out);
 	std::string line; std::getline(out, line);
 	return line == "OK";

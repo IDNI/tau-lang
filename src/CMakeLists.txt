@@ -203,6 +203,17 @@ if(CMAKE_BUILD_TYPE MATCHES "^(Debug|Devel|Coverage)$")
 		target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE "-UNDEBUG")
 	endif()
 endif()
+if(MSVC)
+	# An artifact compiles the headers the archive compiled, so it takes the
+	# options they need: they pass the section count of a plain object file,
+	# carry UTF-8 literals and use std::min and std::max.
+	target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE
+		/EHsc /utf-8 /bigobj)
+	target_compile_definitions(${TAU_STATIC_LIB_NAME} INTERFACE
+		NOMINMAX
+		WIN32_LEAN_AND_MEAN
+		_CRT_DECLARE_NONSTDC_NAMES=0)
+endif()
 if(EMSCRIPTEN)
 	# Every linked object must agree on the exception encoding and on -pthread;
 	# the archive and the artifact TU would otherwise fail wasm-ld.
@@ -320,8 +331,16 @@ if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
 	if(DEFINED tauparser_DIR AND NOT "${tauparser_DIR}" MATCHES "NOTFOUND$")
 		list(APPEND _tau_sdk_dep_args "-Dtauparser_DIR=${tauparser_DIR}")
 	endif()
+	# The Windows targets link the static curl of the store, which no
+	# default search path of the consumer holds.
+	if(DEFINED TAU_CURL_PREFIX
+			AND EXISTS "${TAU_CURL_PREFIX}/lib/cmake/CURL/CURLConfig.cmake")
+		list(APPEND _tau_sdk_dep_args
+			"-DCURL_DIR=${TAU_CURL_PREFIX}/lib/cmake/CURL")
+	endif()
 	file(WRITE "${TAU_SDK_DIR}/tau-sdk-deps.cmake"
-		"set(TAU_SDK_CONFIGURE_ARGS \"${_tau_sdk_dep_args}\")\n")
+		"set(TAU_SDK_CONFIGURE_ARGS \"${_tau_sdk_dep_args}\")\n"
+		"set(TAU_SDK_RUNTIME_DLLS \"${TAU_SDK_RUNTIME_DLLS}\")\n")
 endif()
 
 #

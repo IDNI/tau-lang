@@ -270,6 +270,7 @@ if(NOT _build_dir)
 endif()
 
 set(_configure_log "${TAU_ARTIFACT_DIR}/configure.log")
+set(_config "Release")
 if(_native)
 	# The SDK of the running tau builds for this machine, with cmake's default
 	# compiler and a Release build type unless the caller names another.
@@ -280,15 +281,18 @@ if(_native)
 		"-DTAU_ARTIFACT_EXE_NAME:STRING=${TAU_EXE_NAME}")
 	set(_has_build_type FALSE)
 	foreach(_arg IN LISTS TAU_EXTRA_ARGS)
-		if(_arg MATCHES "^-DCMAKE_BUILD_TYPE(:[A-Za-z]+)?=")
+		if(_arg MATCHES "^-DCMAKE_BUILD_TYPE(:[A-Za-z]+)?=(.*)$")
 			set(_has_build_type TRUE)
+			set(_config "${CMAKE_MATCH_2}")
 		endif()
 	endforeach()
 	if(NOT _has_build_type)
 		list(APPEND _configure_invocation
 			"-DCMAKE_BUILD_TYPE:STRING=Release")
 	endif()
-	set(_build_invocation --build "${_build_dir}")
+	# A multi-config generator, as Visual Studio, ignores CMAKE_BUILD_TYPE
+	# and builds Debug unless the build names the configuration.
+	set(_build_invocation --build "${_build_dir}" --config "${_config}")
 elseif(EXISTS "${TAU_ARTIFACT_DIR}/CMakePresets.json")
 	# The preset decides the generator, the compiler and the build type.
 	set(_configure_invocation
@@ -319,6 +323,18 @@ if(TAU_SDK_DEPS AND EXISTS "${TAU_SDK_DEPS}")
 		list(APPEND _extra_args_configure ${TAU_SDK_CONFIGURE_ARGS})
 	endif()
 endif()
+if(TAU_CXX AND NOT EXISTS "${TAU_CXX}")
+	# A Visual Studio generator ignores CMAKE_CXX_COMPILER and builds with
+	# its own compiler, so a compiler that does not exist is refused here.
+	find_program(_tau_cxx_program NAMES "${TAU_CXX}" NO_CACHE)
+	if(NOT _tau_cxx_program)
+		file(WRITE "${_configure_log}"
+			"the C++ compiler ${TAU_CXX} was not found\n")
+		message("tau-compile: configure failed")
+		tau_print_log_tail("${_configure_log}")
+		tau_exit(3)
+	endif()
+endif()
 if(NOT TAU_CXX AND _native AND EXISTS "${_sdk}/tau-toolchain.txt")
 	# A native artifact links the SDK's archive, whose explicit
 	# instantiations mangle C++20 constrained templates per compiler. Only
@@ -332,6 +348,28 @@ endif()
 if(TAU_CXX)
 	list(APPEND _extra_args_configure
 		"-DCMAKE_CXX_COMPILER:PATH=${TAU_CXX}")
+endif()
+# The Visual Studio generator, cmake's default on Windows, builds with cl
+# unless a toolset is named, whatever CMAKE_CXX_COMPILER says. An SDK built by
+# clang-cl links only what clang-cl compiles. Unless the caller chose a
+# generator or a toolset, Ninja builds with the compiler named above; without
+# Ninja the ClangCL toolset of Visual Studio is named.
+if(_native AND CMAKE_HOST_WIN32 AND TAU_CXX MATCHES "clang-cl(\\.exe)?$"
+		AND NOT DEFINED ENV{CMAKE_GENERATOR})
+	set(_names_generator FALSE)
+	foreach(_arg IN LISTS TAU_EXTRA_ARGS)
+		if(_arg MATCHES "^-[GT]")
+			set(_names_generator TRUE)
+		endif()
+	endforeach()
+	if(NOT _names_generator)
+		find_program(_tau_ninja_program NAMES ninja NO_CACHE)
+		if(_tau_ninja_program)
+			list(APPEND _extra_args_configure -G Ninja)
+		else()
+			list(APPEND _extra_args_configure -T ClangCL)
+		endif()
+	endif()
 endif()
 
 execute_process(COMMAND "${CMAKE_COMMAND}" ${_configure_invocation}
@@ -371,8 +409,8 @@ else()
 	set(_candidates
 		"${_build_dir}/${TAU_EXE_NAME}"
 		"${_build_dir}/${TAU_EXE_NAME}.exe"
-		"${_build_dir}/Release/${TAU_EXE_NAME}"
-		"${_build_dir}/Release/${TAU_EXE_NAME}.exe")
+		"${_build_dir}/${_config}/${TAU_EXE_NAME}"
+		"${_build_dir}/${_config}/${TAU_EXE_NAME}.exe")
 endif()
 foreach(_candidate IN LISTS _candidates)
 	if(EXISTS "${_candidate}")
@@ -411,6 +449,21 @@ else()
 	if(NOT _rc EQUAL 0)
 		message("tau-compile: cannot copy ${_built} to ${TAU_OUTPUT}\n${_out}${_err}")
 		tau_exit(6)
+	endif()
+	# Windows loads a DLL from the folder of the program, so the DLLs the
+	# SDK links go beside it.
+	if(TAU_SDK_RUNTIME_DLLS)
+		if(NOT _output_dir)
+			set(_output_dir ".")
+		endif()
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+				${TAU_SDK_RUNTIME_DLLS} "${_output_dir}"
+			RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
+		if(NOT _rc EQUAL 0)
+			message("tau-compile: cannot copy the runtime DLLs to "
+				"${_output_dir}\n${_out}${_err}")
+			tau_exit(6)
+		endif()
 	endif()
 endif()
 

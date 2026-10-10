@@ -748,6 +748,11 @@ inline tau_test_compile_result tau_test_compile(const std::string& exe,
 	} else {
 		argv.push_back(lto ? "-O3" : "-O2");
 		if (lto) argv.push_back("-flto");
+#ifdef _WIN32
+		// clang++ for the MSVC target links LTO objects only with lld.
+		if (lto && cxx.find("clang") != std::string::npos)
+			argv.push_back("-fuse-ld=lld");
+#endif
 		argv.push_back("-std=c++" + std::to_string(std_year));
 		if (ndebug) argv.push_back("-DNDEBUG");
 		if (!include_dir.empty()) argv.push_back("-I" + include_dir);
