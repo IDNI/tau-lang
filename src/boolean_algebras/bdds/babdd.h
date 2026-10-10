@@ -246,21 +246,19 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 };
 
 /* A BDD decision node: variable v with high child h (taken when v is
- * true) and low child l (v false), plus a precomputed hash. R is the
- * reference type. Stored directly in the universe when shifters are
- * off; with shifters it is the decoded, absolute-variable view that
- * bdd::get() reconstructs from a stored node_skeleton.
+ * true) and low child l (v false). R is the reference type. Stored
+ * directly in the universe when shifters are off; with shifters it is
+ * the decoded, absolute-variable view that bdd::get() reconstructs
+ * from a stored node_skeleton. Its hash is computed when a table asks:
+ * decoding runs far more often than hashing.
  */
 template<typename R>
 struct bdd_node {
-	bdd_node(uint_t v, R h, R l) :
-		v(v), h(h), l(l),
-		hash(hash_utri(v, R::hash(h), R::hash(l))) {}
+	bdd_node(uint_t v, R h, R l) : v(v), h(h), l(l) {}
 	uint_t v;
 	R h, l;
-	size_t hash;
 	bool operator==(const auto& x) const {
-		return hash == x.hash && v == x.v && h == x.h && l == x.l;
+		return v == x.v && h == x.h && l == x.l;
 	}
 };
 
@@ -269,12 +267,10 @@ struct bdd_node {
  */
 template<typename R>
 struct node_skeleton {
-	node_skeleton(R h, R l) :
-		h(h), l(l), hash(hash_upair(R::hash(h), R::hash(l))) {}
+	node_skeleton(R h, R l) : h(h), l(l) {}
 	R h, l;
-	size_t hash;
 	bool operator==(const auto& x) const {
-		return hash == x.hash && h == x.h && l == x.l;
+		return h == x.h && l == x.l;
 	}
 };
 
@@ -284,12 +280,18 @@ namespace std {
 
 template<typename R>
 struct hash<idni::tau_lang::bdd_node<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
+	size_t operator()(auto& n) const {
+		// The macro expands to an unqualified `fpairing`.
+		using idni::tau_lang::fpairing;
+		return hash_utri(n.v, R::hash(n.h), R::hash(n.l));
+	}
 };
 
 template<typename R>
 struct hash<idni::tau_lang::node_skeleton<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
+	size_t operator()(auto& n) const {
+		return idni::tau_lang::hash_upair(R::hash(n.h), R::hash(n.l));
+	}
 };
 
 template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
