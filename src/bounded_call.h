@@ -167,8 +167,11 @@ inline bounded_outcome run_bounded(const std::function<uint8_t()>& work,
 	while (::waitpid(pid, &st, 0) < 0 && errno == EINTR) {}
 	if (answered) return finish(bounded_outcome::done);
 	if (timed_out) {
+		// attr_in takes size_t, and uint64_t is another type on macOS
+		static_assert(sizeof(size_t) >= sizeof(uint64_t));
 		out.rep.error(code::runtime_error, "the bounded child was killed "
-			"at its bound (ms)", {{ label::timeout, timeout_ms }});
+			"at its bound (ms)",
+			{{ label::timeout, static_cast<size_t>(timeout_ms) }});
 		return finish(bounded_outcome::timed_out);
 	}
 	// a shell's convention: a signal shows as 128 plus its number
