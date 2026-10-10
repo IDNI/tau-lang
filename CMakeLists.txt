@@ -65,6 +65,18 @@ elseif(WIN32 AND MSVC)
 	else()
 		set(TAU_DEPS_TARGET "windows-x86_64-msvc")
 	endif()
+	# An MSVC preset names its arch, and no MSVC preset cross builds.
+	if(TAU_MSVC_ARCH STREQUAL "arm64"
+			AND NOT TAU_DEPS_TARGET STREQUAL "windows-arm64-msvc")
+		message(FATAL_ERROR "the preset builds for arm64, but this host runs "
+			"${CMAKE_SYSTEM_PROCESSOR}. The arm64 MSVC presets build on an arm64 "
+			"Windows host only.")
+	elseif(TAU_MSVC_ARCH STREQUAL "x64"
+			AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+		message(FATAL_ERROR "the preset builds for x64, but this host runs "
+			"${CMAKE_SYSTEM_PROCESSOR}. Use an arm64 MSVC preset, for example "
+			"release-msvc-arm64.")
+	endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	# The target names the machine arch the package runs on, so a cross build
 	# from x86 and a native arm64 build share one target.

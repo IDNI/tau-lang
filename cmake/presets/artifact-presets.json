@@ -221,6 +221,78 @@
 			}
 		},
 		{
+			"name": "release-msvc-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-msvc-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-msvc-arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-msvc-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-msvc-arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-msvc-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-msvc-arm64"
+			}
+		},
+		{
+			"name": "release-msvc-cl-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_build-type-release"
+			],
+			"binaryDir": "${sourceDir}/build/release-msvc-cl-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "release-msvc-cl-arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-cl-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_build-type-devel"
+			],
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "devel-msvc-cl-arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-cl-arm64",
+			"inherits": [
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_build-type-debug"
+			],
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl-arm64",
+			"cacheVariables": {
+				"TAU_PLATFORM": "debug-msvc-cl-arm64"
+			}
+		},
+		{
 			"name": "release-wasm",
 			"inherits": [
 				"_generator-make",

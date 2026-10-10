@@ -104,9 +104,14 @@ only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-package
 `{release,devel,debug}-msvc-clang-cl`, `{release,devel,debug}-msvc-all-clang-cl`,
 `{release,devel,debug}-msvc-cl` and `{release,devel,debug}-msvc-cl-{tau,tests,all}` (cl.exe),
 `release-msvc-packages` (NSIS installer with the SDK box), `release-msvc-packages-zip`,
+`{release,devel,debug}-msvc-arm64` and `{release,devel,debug}-msvc-arm64-{tau,tests,all,binding-python}`
+(clang-cl, arm64), `{release,devel,debug}-msvc-cl-arm64` and
+`{release,devel,debug}-msvc-cl-arm64-{tau,tests,all}` (cl.exe, arm64),
+`release-msvc-arm64-packages`, `release-msvc-arm64-packages-zip`,
 `{release,devel,debug}-binding-python`,
 `{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
-`release-all`), `msvc-all` (alias of `release-msvc-all`).
+`release-all`), `msvc-all` (alias of `release-msvc-all`). The arm64 MSVC presets
+build on an arm64 Windows host only.
 Every preset has its `release-`, `devel-` and `debug-` twins — the
 `-DTAU_BAS` variants and the MSVC, w64, python and ninja-test families included.
 Default preset is `release` if omitted. macOS uses the `release`/`debug` family as-is,
@@ -135,7 +140,7 @@ wins. `--preset` takes a platform name or any `./dev preset` name, which maps
 to the platform of its build folder, and builds with that platform's SDK box
 and toolchain. A **platform** is the build folder name `./dev preset`
 uses: `release`, `devel`, `debug` and their `-gcc`, `-w64`, `-arm64`, `-msvc`,
-`-msvc-cl`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
+`-msvc-cl`, `-msvc-arm64`, `-msvc-cl-arm64`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
 at `build/<platform>/sdk/`, so a cross-platform artifact needs that platform
 built first. `-D NAME=VALUE` and `-G <generator>` go to the emitted project
 configure, and a `-D` value wins over the preset.

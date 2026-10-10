@@ -53,6 +53,14 @@
 			}
 		},
 		{
+			"name": "_toolchain-msvc-arm64",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "cl",
+				"CMAKE_CXX_COMPILER": "cl"
+			}
+		},
+		{
 			"name": "_toolchain-clang-cl",
 			"hidden": true,
 			"generator": "Ninja",
@@ -67,6 +75,24 @@
 			"vendor": {
 				"microsoft.com/VisualStudioSettings/CMake/1.0": {
 					"intelliSenseMode": "windows-clang-x64"
+				}
+			}
+		},
+		{
+			"name": "_toolchain-clang-cl-arm64",
+			"hidden": true,
+			"generator": "Ninja",
+			"architecture": {
+				"value": "arm64",
+				"strategy": "external"
+			},
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang-cl",
+				"CMAKE_CXX_COMPILER": "clang-cl"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"intelliSenseMode": "windows-clang-arm64"
 				}
 			}
 		},

@@ -150,6 +150,36 @@
 			"binaryDir": "${sourceDir}/build/devel-msvc"
 		},
 		{
+			"name": "_build_dir-release-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-debug-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-devel-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-release-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc-arm64"
+		},
+		{
+			"name": "_build_dir-debug-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-arm64"
+		},
+		{
+			"name": "_build_dir-devel-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-arm64"
+		},
+		{
 			"name": "_build_dir-coverage-gcc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/coverage-gcc"
@@ -567,7 +597,8 @@
 				"_build-type-release"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -580,7 +611,8 @@
 				"_build-type-debug"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -593,7 +625,8 @@
 				"_build-type-devel"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -686,7 +719,8 @@
 				"_build-type-release"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -699,7 +733,8 @@
 				"_build-type-debug"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -712,7 +747,8 @@
 				"_build-type-devel"
 			],
 			"cacheVariables": {
-				"TAU_USE_CCACHE": "OFF"
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
 			}
 		},
 		{
@@ -753,6 +789,180 @@
 			"name": "devel-msvc-cl-all",
 			"displayName": "Devel tests + tau (MSVC cl)",
 			"inherits": ["devel-msvc-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "release-msvc-arm64",
+			"inherits": [
+				"_build_dir-release-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-arm64",
+			"inherits": [
+				"_build_dir-debug-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-arm64",
+			"inherits": [
+				"_build_dir-devel-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "release-msvc-arm64-tau",
+			"inherits": ["release-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-arm64-tau",
+			"inherits": ["debug-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-arm64-tau",
+			"inherits": ["devel-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"inherits": ["release-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"inherits": ["debug-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"inherits": ["devel-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-arm64-binding-python",
+			"inherits": ["release-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "debug-msvc-arm64-binding-python",
+			"inherits": ["debug-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "devel-msvc-arm64-binding-python",
+			"inherits": ["devel-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"displayName": "Release tests + tau (clang-cl, arm64)",
+			"inherits": ["release-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"displayName": "Debug tests + tau (clang-cl, arm64)",
+			"inherits": ["debug-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"displayName": "Devel tests + tau (clang-cl, arm64)",
+			"inherits": ["devel-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "release-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-release-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-debug-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-devel-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "release-msvc-cl-arm64-tau",
+			"inherits": ["release-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tau",
+			"inherits": ["debug-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tau",
+			"inherits": ["devel-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"inherits": ["release-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"inherits": ["debug-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"inherits": ["devel-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"displayName": "Release tests + tau (MSVC cl, arm64)",
+			"inherits": ["release-msvc-cl-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"displayName": "Debug tests + tau (MSVC cl, arm64)",
+			"inherits": ["debug-msvc-cl-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"displayName": "Devel tests + tau (MSVC cl, arm64)",
+			"inherits": ["devel-msvc-cl-arm64", "_build-msvc-all"]
 		},
 		{
 			"name": "release-wasm",
@@ -1287,6 +1497,28 @@
 			}
 		},
 		{
+			"name": "release-msvc-arm64-packages",
+			"displayName": "MSVC arm64 NSIS installer with the SDK box",
+			"inherits": [
+				"release-msvc-arm64",
+				"_windows-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-msvc-arm64-packages-zip",
+			"displayName": "MSVC arm64 zip package with the SDK box",
+			"inherits": [
+				"release-msvc-arm64",
+				"_windows-zip-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
 			"name": "release-w64-sdk-packages-deb",
 			"displayName": "w64 SDK box, DEB package (no executable)",
 			"inherits": ["release-w64", "_sdk-deb-package"]
@@ -1697,6 +1929,114 @@
 			"configurePreset": "devel-msvc-cl-all"
 		},
 		{
+			"name": "release-msvc-arm64",
+			"configurePreset": "release-msvc-arm64"
+		},
+		{
+			"name": "debug-msvc-arm64",
+			"configurePreset": "debug-msvc-arm64"
+		},
+		{
+			"name": "devel-msvc-arm64",
+			"configurePreset": "devel-msvc-arm64"
+		},
+		{
+			"name": "release-msvc-arm64-tau",
+			"configurePreset": "release-msvc-arm64-tau"
+		},
+		{
+			"name": "debug-msvc-arm64-tau",
+			"configurePreset": "debug-msvc-arm64-tau"
+		},
+		{
+			"name": "devel-msvc-arm64-tau",
+			"configurePreset": "devel-msvc-arm64-tau"
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"configurePreset": "release-msvc-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"configurePreset": "debug-msvc-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"configurePreset": "devel-msvc-arm64-tests"
+		},
+		{
+			"name": "release-msvc-arm64-binding-python",
+			"configurePreset": "release-msvc-arm64-binding-python"
+		},
+		{
+			"name": "debug-msvc-arm64-binding-python",
+			"configurePreset": "debug-msvc-arm64-binding-python"
+		},
+		{
+			"name": "devel-msvc-arm64-binding-python",
+			"configurePreset": "devel-msvc-arm64-binding-python"
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"configurePreset": "release-msvc-arm64-all"
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"configurePreset": "debug-msvc-arm64-all"
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"configurePreset": "devel-msvc-arm64-all"
+		},
+		{
+			"name": "release-msvc-cl-arm64",
+			"configurePreset": "release-msvc-cl-arm64"
+		},
+		{
+			"name": "debug-msvc-cl-arm64",
+			"configurePreset": "debug-msvc-cl-arm64"
+		},
+		{
+			"name": "devel-msvc-cl-arm64",
+			"configurePreset": "devel-msvc-cl-arm64"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tau",
+			"configurePreset": "release-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tau",
+			"configurePreset": "debug-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tau",
+			"configurePreset": "devel-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"configurePreset": "release-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"configurePreset": "debug-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"configurePreset": "devel-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"configurePreset": "release-msvc-cl-arm64-all"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"configurePreset": "debug-msvc-cl-arm64-all"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"configurePreset": "devel-msvc-cl-arm64-all"
+		},
+		{
 			"name": "release-wasm",
 			"configurePreset": "release-wasm"
 		},
@@ -1887,6 +2227,14 @@
 		{
 			"name": "release-msvc-packages-zip",
 			"configurePreset": "release-msvc-packages-zip"
+		},
+		{
+			"name": "release-msvc-arm64-packages",
+			"configurePreset": "release-msvc-arm64-packages"
+		},
+		{
+			"name": "release-msvc-arm64-packages-zip",
+			"configurePreset": "release-msvc-arm64-packages-zip"
 		},
 		{
 			"name": "release-w64-sdk-packages-deb",
@@ -2208,6 +2556,54 @@
 		{
 			"name": "devel-msvc-cl-all",
 			"configurePreset": "devel-msvc-cl-all"
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"configurePreset": "release-msvc-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"configurePreset": "debug-msvc-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"configurePreset": "devel-msvc-arm64-tests"
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"configurePreset": "release-msvc-arm64-all"
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"configurePreset": "debug-msvc-arm64-all"
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"configurePreset": "devel-msvc-arm64-all"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"configurePreset": "release-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"configurePreset": "debug-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"configurePreset": "devel-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"configurePreset": "release-msvc-cl-arm64-all"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"configurePreset": "debug-msvc-cl-arm64-all"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"configurePreset": "devel-msvc-cl-arm64-all"
 		},
 		{
 			"name": "release-msvc-all-clang-cl",

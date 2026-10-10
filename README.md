@@ -344,10 +344,12 @@ the artifact. The build type is `Release`, unless a
 
 With `--preset <name>`, `tau compile` targets another platform. A platform is
 the build folder name `./dev preset` uses: `release`, `devel`, `debug`, and
-their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`, `-wasm` and
-`-wasm-nothreads` twins. `-msvc` is the clang-cl build, the default MSVC
-toolchain. `-msvc-cl` is the cl.exe build. The `*-msvc-cl` presets use the
-default pack.
+their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`, `-msvc-arm64`,
+`-msvc-cl-arm64`, `-wasm` and `-wasm-nothreads` twins. `-msvc` is the clang-cl
+build, the default MSVC toolchain. `-msvc-cl` is the cl.exe build. The
+`*-msvc-cl` presets use the default pack. `-msvc-arm64` and `-msvc-cl-arm64`
+are the same two builds for Windows arm64, and they build on an arm64 Windows
+host only.
 
 Any other `./dev preset` name maps to the platform of its build folder, so
 `--preset release-msvc-all` builds with the `release-msvc` platform, and

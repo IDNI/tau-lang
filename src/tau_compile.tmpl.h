@@ -550,6 +550,8 @@ inline std::string box_platform(const std::filesystem::path& sdk_dir) {
 // cross one `tau-sdk-windows-x86_64-mingw`, `tau-sdk-wasm32-emscripten` or
 // `tau-sdk-linux-arm64`, named by the store target.
 inline std::string sdk_package_suffix(const std::string& platform) {
+	// A native MSVC box needs no suffix, on x86_64 and on arm64 alike.
+	if (platform.find("-msvc") != std::string::npos) return {};
 	if (platform.size() >= 4
 		&& platform.compare(platform.size() - 4, 4, "-w64") == 0)
 		return "-windows-x86_64-mingw";
