@@ -410,12 +410,13 @@ TEST_CASE("C12: the guard split's licence refuses a split that copies bulk") {
 TEST_CASE("C13: a guard split that changes every conjunct needs no licence") {
 	// Both disjunctive conjuncts hold a case of the guard and keep the seven
 	// atoms after it in both arms: they weigh 19 + 21 = 40 and their arms
-	// 15 + 13 + 13 + 15 = 56, and `4·56 > 5·40`. Nothing is copied, so the
-	// split is taken.
-	fixture f = make("ex x ((((a = 0 || b = 0) && xy = 0) || xc = 0 "
-		"|| xd = 0 || xe = 0 || xg = 0 || xh = 0 || xk = 0 || xm = 0) "
-		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0 || xd = 0 || xe = 0 "
+	// 15 + 13 + 13 + 15 = 56, and `4·56 > 5·40`. Nothing is copied, so even
+	// under a block of two the split is taken.
+	fixture f = make("ex x ex v ((((a = 0 || b = 0) && xy = 0) || xc = 0 "
+		"|| xd = 0 || ve = 0 || xg = 0 || xh = 0 || xk = 0 || xm = 0) "
+		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0 || xd = 0 || ve = 0 "
 		"|| xg = 0 || xh = 0 || xk = 0 || xm = 0)).");
+	REQUIRE(f.P.size() == 2);
 	REQUIRE(disjunctive_sizes(f) == std::vector<size_t>{ 19, 21 });
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());

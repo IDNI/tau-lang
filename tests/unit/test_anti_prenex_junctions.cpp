@@ -536,7 +536,7 @@ TEST_CASE("S1: a disjunct meeting the block that two ∨-conjuncts share is "
 	check_resolved(got, f);
 }
 
-TEST_CASE("S2: a shared disjunct free of the block is not factored") {
+TEST_CASE("S2: a shared disjunct free of the block is never the one factored") {
 	fixture f = make("ex x ((a = 0 || x z = 0) && (a = 0 || x w = 0)).");
 	CHECK(!ap::junctions_detail::factor_shared_disjunct<node_t>(
 		ap::members<node_t>(f.clause), f.P).has_value());

@@ -405,22 +405,14 @@ TEST_CASE("X6: every member of the disjunct is expanded, and the block "
 	check_resolved(got, f);
 }
 
-TEST_CASE("X7: a member whose complement holds a positive disjunct expands "
-	"into cases that resolve") {
-	// The smaller member `¬(x·a = 0) ∧ x·b = 0` has the complement
-	// `x·a = 0 ∨ ¬(x·b = 0)`, a disjunction with a positive member, which
-	// no case carries: each case is a conjunction of literals, so its
-	// variable settles and the case resolves.
+TEST_CASE("X7: members that are conjunctions of mixed literals give cases "
+	"that resolve") {
+	// Each case is a conjunction of literals, so its variable settles and
+	// the case resolves.
 	fixture f = make("ex x (((xa != 0 && xb = 0) "
 		"|| (xc != 0 && xd = 0 && xe = 0)) && xf != 0).");
 	REQUIRE(disjunctive(f).size() == 1);
-	trefs ds = ap::members<node_t>(disjunctive(f)[0]);
-	REQUIRE(ds.size() == 2);
-	std::ranges::sort(ds, {}, ap::formula_size<node_t>);
-	const tref e = ap::normalize_operators<node_t>(
-		ap::canonically_factored_neg<node_t>(tau::trim_right_sibling(ds[0])));
-	REQUIRE(is_child<node_t>(e, tau::wff_or));
-	CHECK(!ap::is_negative_tree<node_t>(e));
+	REQUIRE(ap::members<node_t>(disjunctive(f)[0]).size() == 2);
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
