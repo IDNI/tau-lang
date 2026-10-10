@@ -93,17 +93,4 @@ if (typeof process !== 'undefined' && process.versions && process.versions.node)
       }
     };
   });
-
-  // Emscripten's node shell starts ENV empty and never reads process.env, so
-  // getenv() in the module sees none of the TAU_LTL_* variables and falls
-  // back to compiled defaults. Seed ENV from the node environment before main
-  // runs; preRun runs after the module scope has assigned ENV, before
-  // callMain, so getEnvStrings() picks the values up.
-  Module['preRun'].push(function () {
-    if (typeof ENV === 'undefined' || !process.env) return;
-    for (var tau_env in process.env) {
-      if (typeof process.env[tau_env] === 'string' && !(tau_env in ENV))
-        ENV[tau_env] = process.env[tau_env];
-    }
-  });
 }

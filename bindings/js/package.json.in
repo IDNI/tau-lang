@@ -32,13 +32,15 @@
 		"LICENSE.md",
 		"tests/parity.js",
 		"tests/budgets.js",
-		"tests/native.js"
+		"tests/native.js",
+		"tests/env.js"
 	],
 	"scripts": {
 		"test:smoke": "node tau.node.js",
 		"test:smoke:esm": "node tau.node.mjs",
 		"test:parity": "node tests/parity.js",
 		"test:budgets": "node tests/budgets.js",
-		"test": "npm run test:smoke && npm run test:smoke:esm && npm run test:budgets && npm run test:parity"
+		"test:env": "node tests/env.js",
+		"test": "npm run test:smoke && npm run test:smoke:esm && npm run test:budgets && npm run test:env && npm run test:parity"
 	}
 }

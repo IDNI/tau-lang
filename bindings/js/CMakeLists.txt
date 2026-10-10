@@ -28,6 +28,9 @@ string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s INITIAL_MEMORY=33554432")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s WASM=1")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s ERROR_ON_UNDEFINED_SYMBOLS=1")
 string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s ASSERTIONS=1")
+# getenv sees the variables of node, so the TAU_ options reach the module. A
+# browser keeps the fixed Emscripten values.
+string(APPEND TAU_JS_LINK_OPTIONS_COMMON " -s NODE_HOST_ENV=1")
 
 # target: cmake target name; output_name/suffix: OUTPUT_NAME/SUFFIX target
 # properties, which is what emscripten derives the sibling .wasm name from;
@@ -80,6 +83,7 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/parity.js
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/budgets.js
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/native.js
+		${CMAKE_CURRENT_SOURCE_DIR}/tests/env.js
 		${CMAKE_BINARY_DIR}/tests/
 	COMMENT "Copying JS bindings package assets (LICENSE, tests)")
 

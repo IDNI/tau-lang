@@ -517,7 +517,9 @@ if(TAU_BUILD_EXECUTABLE)
 			"SHELL:-s ALLOW_MEMORY_GROWTH=1"
 			# Growable buffers where the engine has them. =2 needs Node 26.
 			"SHELL:-s GROWABLE_ARRAYBUFFERS=1"
-			"-Wno-pthreads-mem-growth")
+			"-Wno-pthreads-mem-growth"
+			# getenv sees the variables of node, so the TAU_ options reach the CLI.
+			"SHELL:-s NODE_HOST_ENV=1")
 		# NODEFS backs the full-root /host mount tau_stdin_node.pre.js installs,
 		# so a wasm REPL test under the node emulator can open host files.
 		target_link_options(${TAU_EXECUTABLE_NAME} PRIVATE
