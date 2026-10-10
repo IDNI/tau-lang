@@ -355,10 +355,12 @@ TEST_CASE("N11: keep mode on F3's input decides its chains at emission") {
 
 TEST_CASE("N12: a bv variable that only lowers the truth leaves at block entry") {
 	// x·a = 0 falls as x grows and so does ¬(x′·b = 0): §5 deletes x at
-	// x := 0 before any component, which leaves ¬(b = 0).
+	// x := 0 before any component, which leaves ¬(b = 0). The matrix is
+	// converted (`PREPARE_TERMS`) as phase 4's start does.
 	const tref phi = parse("ex x (x:bv[8] & a:bv[8] = { 0 }:bv[8] "
 		"&& !(x:bv[8]' & b:bv[8] = { 0 }:bv[8])).");
-	const tref matrix = tau::trim_right_sibling(ap::binder_body<node_t>(phi));
+	const tref matrix = ap::prepare_terms<node_t>(tau::trim_right_sibling(
+		ap::binder_body<node_t>(phi)));
 	const ap::block X{ tau::trim_right_sibling(ap::binder_var<node_t>(phi)) };
 	const tref got = ap::delete_unate_binders<node_t>(matrix, X);
 	CHECK(!ap::fv_meets<node_t>(got, X));

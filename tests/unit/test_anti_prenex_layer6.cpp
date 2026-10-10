@@ -267,7 +267,7 @@ TEST_CASE("T1: past a zero limit an input that reaches the floor comes back "
 	// L17 reaches EXPAND (M1) and M3's clause DECOMPOSE_ARMS: the first case
 	// or arm reads the clock past the limit, and the call aborts whole.
 	for (const char* src : { l17,
-		"ex x ((a = 0 || xy = 0) && (a != 0 || xz = 0))." })
+		"ex x ((a = 0 || xy = 0) && (a != 0 || x'z = 0))." })
 	{
 		CAPTURE(src);
 		ap::flush_solver_dependent<node_t>();

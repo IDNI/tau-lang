@@ -196,6 +196,12 @@ tref processed(const fixture& f, const ap::keep_functional_fn<node_t>& kf) {
 	return finished(ap::process_block<node_t>(blk, kf));
 }
 
+/// §5 `DELETE_UNATE_BINDERS` over the converted matrix, the result spelled.
+tref deleted(const fixture& f) {
+	return finished(ap::delete_unate_binders<node_t>(
+		ap::prepare_terms<node_t>(f.blk.matrix), f.blk.vars));
+}
+
 /// What every result claims against the formula it came from: equivalence, no
 /// free variable escaped, invariant 4, and no stored BDD left anywhere.
 void check_claims(tref got, tref source) {
@@ -403,14 +409,16 @@ TEST_CASE("B6: two components may be answered differently") {
 	// tells a BLOCK node from a CHAIN node by the prefix `strip_chain`
 	// reads off, and keeps every chain. A piece holding a free variable in
 	// a reference stays a chain under the slide, so only the first
-	// component's emission survives as one.
+	// component's emission survives as one. Both variables are binate, so
+	// neither leaves at block entry.
 	size_t blocks = 0;
 	auto mixed = [&blocks](tref n) {
 		if (ap::strip_chain<node_t>(n).first.empty())
 			return blocks++ == 0;
 		return true;
 	};
-	fixture f = split("ex x ex y ((q(a) x) = 0 && (q(b) y) = 0).");
+	fixture f = split("ex x ex y ((q(a) x | q(c) x') = 0 "
+		"&& (q(b) y | q(d) y') = 0).");
 	const tref got = pushed(f, mixed);
 	CHECK(blocks == 2);
 	CHECK(functional_count(got) == 1);
@@ -420,7 +428,7 @@ TEST_CASE("B6: two components may be answered differently") {
 	// On pure terms every piece is closed and folds, whatever the callback
 	// says: both components resolve, which the checker reads.
 	blocks = 0;
-	fixture p = split("ex x ex y (x a = 0 && y b = 0).");
+	fixture p = split("ex x ex y (x a | x' c = 0 && y b | y' d = 0).");
 	const tref pg = pushed(p, mixed);
 	CHECK(blocks == 2);
 	CHECK(functional_count(pg) == 0);
@@ -430,11 +438,12 @@ TEST_CASE("B6: two components may be answered differently") {
 TEST_CASE("B7: keep mode emits the chain, and the spelling leaves it plain") {
 	// `DISCHARGE` under `ctx.keep_functional` asks the callback on the
 	// block's chain and keeps it SLID to the block's levels. Its piece holds
-	// `y` free in a reference, so it stays a chain, and `FINISH_TERMS`
-	// leaves it plain: `∃x. q(y)·x = 0` comes back as the one atom
-	// `(∀_x x·q(y)) = 0`.
+	// `y` and `w` free in references, so it stays a chain, and
+	// `FINISH_TERMS` leaves it plain: `∃x. x·q(y) ∪ x′·q(w) = 0` comes back
+	// as the one atom `(∀_x x·q(y) ∪ x′·q(w)) = 0`. `x` is binate, so it
+	// does not leave at block entry.
 	auto keep_all = [](tref) { return true; };
-	fixture f = split("ex x ((q(y) x) = 0).");
+	fixture f = split("ex x ((q(y) x | q(w) x') = 0).");
 	const tref got = pushed(f, keep_all);
 	REQUIRE(is_child<node_t>(got, tau::bf_eq));
 	auto [prefix, body] = ap::strip_chain<node_t>(sides(got).first);
@@ -444,19 +453,20 @@ TEST_CASE("B7: keep mode emits the chain, and the spelling leaves it plain") {
 	CHECK(!holds(got, tau::BDD_ID));
 	CHECK(binder_count(got) == 0);
 	CHECK(no_escape(got, f.quantified));
-	// On a pure term the piece is closed and folds: `∃x. x·y = 0` is `T`,
-	// which the checker reads.
-	fixture p = split("ex x (x y = 0).");
+	// On a pure term the piece is closed and folds:
+	// `∃x. x·y ∪ x′·w = 0` is `y·w = 0`, which the checker reads.
+	fixture p = split("ex x (x y | x' w = 0).");
 	const tref pg = pushed(p, keep_all);
-	CHECK(tau::get(pg).equals_T());
+	CHECK(are_nso_equivalent<node_t>(pg, parse("y w = 0.")));
 	CHECK(functional_count(pg) == 0);
 	check_claims(pg, p);
 }
 
 TEST_CASE("B8: a callback keeping blocks but no chain quantifies at the emission") {
 	// The chain is built and the callback declines it, so `DISCHARGE`
-	// quantifies at once: the answer the non-keep run gives directly.
-	fixture f = split("ex x (x y = 0).");
+	// quantifies at once: the answer the non-keep run gives directly. `x`
+	// is binate, so the block reaches the emission.
+	fixture f = split("ex x (x y | x' w = 0).");
 	auto keep_blocks = [](tref n) {
 		return ap::strip_chain<node_t>(n).first.empty();
 	};
@@ -471,8 +481,9 @@ TEST_CASE("B9: a push past the acceptance bound is discarded for its input") {
 	// With both knobs at zero every push is rejected, and what comes back
 	// is the component's INPUT re-wrapped (invariant 3) with the
 	// component-free conjuncts left outside the wrap. The same input under
-	// the real knobs is accepted and resolves.
-	fixture f = split("ex x (x y = 0 && w = 0).");
+	// the real knobs is accepted and resolves. `x` is binate, so the
+	// component reaches the push.
+	fixture f = split("ex x (x y | x' v = 0 && w = 0).");
 	// The input is the converted matrix, and the result is compared once
 	// spelled.
 	const tref input = ap::prepare_terms<node_t>(f.blk.matrix);
@@ -504,8 +515,7 @@ TEST_CASE("U1: unate binders leave in one substitution, a binate one stays") {
 	// to 1, `z` moves it both ways and stays.
 	fixture f = split("ex x ex y ex z ((x a = 0) && (b x' != 0) "
 		"&& (y' c = 0) && (d y != 0) && (z e = 0) && (z' g = 0)).");
-	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
-		f.blk.vars);
+	const tref got = deleted(f);
 	const ap::block left = ap::fv_intersect<node_t>(got, f.blk.vars);
 	REQUIRE(left.size() == 1);
 	CHECK(same(left[0], f.blk.vars[2]));
@@ -515,25 +525,26 @@ TEST_CASE("U1: unate binders leave in one substitution, a binate one stays") {
 }
 
 TEST_CASE("U2: a binate variable comes back as it is") {
-	// x ≠ 0 rises with x and x·a′ = 0 falls with it; an equation with no 0
-	// side, a ring sum, two opposite literals and a unit are binate too.
+	// x ≠ 0 rises with x and x·a′ = 0 falls with it; an equation whose
+	// ring sum is neither monotone nor antitone, two opposite literals and
+	// a unit are binate too.
 	for (const char* src : { "ex x ((x != 0) && (x a' = 0)).",
 		"ex x ((x = a) && (b x != 0)).",
 		"ex x ((x ^ a = 0) && (b x != 0)).",
 		"ex x ((x a = 0) && (b x' = 0)).",
 		"ex x ((x a = 0) && all w (x w != 0))." })
 	{
+		CAPTURE(src);
 		fixture f = split(src);
-		CHECK(ap::delete_unate_binders<node_t>(f.blk.matrix, f.blk.vars)
-			== f.blk.matrix);
+		const tref m = ap::prepare_terms<node_t>(f.blk.matrix);
+		CHECK(ap::delete_unate_binders<node_t>(m, f.blk.vars) == m);
 	}
 }
 
 TEST_CASE("U3: a variable that only raises the truth goes to 1") {
 	// ∃x (x ≠ 0 ∧ y·x ≠ 0) is y ≠ 0, at x := 1.
 	fixture f = split("ex x ((x != 0) && (y x != 0)).");
-	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
-		f.blk.vars);
+	const tref got = deleted(f);
 	CHECK(!ap::fv_meets<node_t>(got, f.blk.vars));
 	check_claims(got, f);
 	CHECK(are_nso_equivalent<node_t>(got, parse("y != 0.")));
@@ -542,8 +553,7 @@ TEST_CASE("U3: a variable that only raises the truth goes to 1") {
 TEST_CASE("U4: a variable that only lowers the truth goes to 0") {
 	// ∃x (x·a = 0 ∧ x′·b ≠ 0) is b ≠ 0, at x := 0.
 	fixture f = split("ex x ((x a = 0) && (x' b != 0)).");
-	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
-		f.blk.vars);
+	const tref got = deleted(f);
 	CHECK(!ap::fv_meets<node_t>(got, f.blk.vars));
 	check_claims(got, f);
 	CHECK(are_nso_equivalent<node_t>(got, parse("b != 0.")));
@@ -560,8 +570,7 @@ TEST_CASE("U5: a block of more than 64 variables is read whole") {
 	src += "(" + body + " && (x67' b = 0)).";
 	fixture f = split(src.c_str());
 	REQUIRE(f.blk.vars.size() == 70);
-	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
-		f.blk.vars);
+	const tref got = deleted(f);
 	const ap::block left = ap::fv_intersect<node_t>(got, f.blk.vars);
 	REQUIRE(left.size() == 1);
 	CHECK(same(left[0], f.blk.vars[67]));
@@ -574,14 +583,14 @@ TEST_CASE("U6: a ∀ run deletes its unate binder on the dualised matrix") {
 	// x := 0 leaves ¬(b = 0), negated back to b = 0.
 	fixture f = split("all x ((x a != 0) || (b = 0)).");
 	const tref dual = ap::normalize_operators<node_t>(
-		ap::canonically_factored_neg<node_t>(f.blk.matrix));
+		ap::canonically_factored_neg<node_t>(
+			ap::prepare_terms<node_t>(f.blk.matrix)));
 	CHECK(!ap::fv_meets<node_t>(ap::delete_unate_binders<node_t>(dual,
 		f.blk.vars), f.blk.vars));
-	const tref got = ap::process_block<node_t>(f.blk,
-		ap::keep_no_functional<node_t>);
+	const tref got = processed(f, ap::keep_no_functional<node_t>);
 	check_claims(got, f);
 	CHECK(binder_count(got) == 0);
-	CHECK(are_nso_equivalent<node_t>(finished(got), parse("b = 0.")));
+	CHECK(are_nso_equivalent<node_t>(got, parse("b = 0.")));
 }
 
 // --- §5 PROCESS_BLOCK -----------------------------------------------------------------

@@ -14,7 +14,9 @@
  * (foundations/dag.h) with `simplified_and_join` (normalisers/joins.h) and
  * `rewrap` (foundations/prims.h) for the size acceptance, and
  * `canonically_factored_neg` with `holds_fused_operator` (normalisers/nnf.h)
- * for the dualisation.
+ * for the dualisation. The unate deletion reads `cof` (shared/cofactors.h)
+ * and `node_test` (foundations/terms.h) and rewrites by `subst_var`
+ * (foundations/subst.h) and `simplify` (normalisers/simplify.h).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__DRIVER__BLOCK_TMPL_H__
@@ -79,102 +81,71 @@ std::vector<block> connected_components(const block& X, tref body) {
 template <NodeType node>
 tref delete_unate_binders(tref body, const block& X) {
 	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
 	const block Y = fv_intersect<node>(body, X);
 	if (Y.empty()) return body;
-	subtree_unordered_map<node, size_t> bit;
-	for (size_t i = 0; i < Y.size(); ++i) bit.emplace(Y[i], i);
-	// A node's summary is three bitsets over `Y` — the variables whose
-	// growth raises its value, lowers it, or moves it both ways — W words
-	// each, side by side in one arena, so a summary costs no allocation.
-	const size_t W = (Y.size() + 63) / 64;
-	enum part : size_t { rising, falling, either };
-	std::vector<uint64_t> words;
-	subtree_unordered_map<node, size_t> at;
-	auto open = [&](tref m) {
-		const size_t o = words.size();
-		words.resize(o + 3 * W);
-		at.emplace(m, o);
-		return o;
+	// Per variable of `Y`, the closures some literal breaks: one that is
+	// not x-LOW breaks the downward closure, one not x-HIGH the upward.
+	enum : unsigned char { not_low = 1, not_high = 2, binate = 3 };
+	subtree_unordered_map<node, unsigned char> broken;
+	for (tref y : Y) broken.emplace(y, 0);
+	// `f₀·f₁′` and `f₁·f₀′` are derived, so their node tests' sweeps are
+	// dropped.
+	auto below = [](const auto& a, const auto& b, size_t type) {
+		return node_test<node>(thandle::convert_to_tau_node_or_term(
+			thandle(tbdd::bdd_and(a, tbdd::bdd_not(b))), type),
+			node_question::zero).is(node_question::zero);
 	};
-	auto word = [&](size_t o, part p, size_t i) -> uint64_t& {
-		return words[o + p * W + i];
-	};
-	auto set = [&](size_t o, part p, tref x) {
-		const size_t i = bit.at(x);
-		word(o, p, i / 64) |= uint64_t(1) << (i % 64);
-	};
-	// `¬` and `′` swap up and down; `f = 0` falls as `f` rises.
-	auto copy = [&](size_t o, size_t c, bool swap) {
-		for (size_t i = 0; i < W; ++i) {
-			word(o, rising, i) = word(c, swap ? falling : rising, i);
-			word(o, falling, i) = word(c, swap ? rising : falling, i);
-			word(o, either, i) = word(c, either, i);
+	// `f` monotone in `y` makes `f = 0` y-LOW and `¬(f = 0)` y-HIGH;
+	// antitone, the mirror.
+	auto literal = [&](tref lit, bool negative) {
+		const tref f = term_of<node>(lit, regime::backed);
+		const size_t type = find_ba_type<node>(f);
+		for (tref y : fv_intersect<node>(lit, Y)) {
+			if (!free_in<node>(f, y)) continue;
+			const cof_entry e = cof<node>(f, y);
+			// The leaf hazard: `y` hidden in a leaf reads binate.
+			if (!e.usable) { broken.at(y) = binate; continue; }
+			const auto b0 = tbdd::build_bdd(e.f0);
+			const auto b1 = tbdd::build_bdd(e.f1);
+			const bool mono = below(b0, b1, type);
+			const bool anti = below(b1, b0, type);
+			if (!(negative ? anti : mono)) broken.at(y) |= not_low;
+			if (!(negative ? mono : anti)) broken.at(y) |= not_high;
 		}
 	};
-	auto join = [&](size_t o, size_t c) {
-		for (size_t k = 0; k < 3 * W; ++k) words[o + k] |= words[c + k];
-	};
-	auto covered = [](const tau& op) {
-		return op.is(tau::wff_and) || op.is(tau::wff_or)
-			|| op.is(tau::wff_neg) || op.is(tau::bf_eq)
-			|| op.is(tau::bf_and) || op.is(tau::bf_or)
-			|| op.is(tau::bf_neg);
-	};
-	// Pre-order: a leaf or a node the rules do not cover gets its summary
-	// here and is not entered; a spine node is entered unasked, as it has
-	// no FV row of its own.
+	// ONE walk through ∧ and ∨ to the literals; anything else mentioning
+	// `Y` makes what it mentions binate. A spine node is entered unasked,
+	// as it has no FV row of its own.
 	auto visit = [&](tref m, tref parent) {
 		const tau& t = tau::get(m);
-		if (!t.is(tau::wff) && !t.is(tau::bf)) return true;
-		if (t.is(tau::wff) && !subst_detail::is_spine<node>(m, parent)
-			&& !fv_meets<node>(m, Y))
-		{
-			open(m);
-			return false;
-		}
-		const tau& op = t[0];
-		if (covered(op)) return true;
-		const size_t o = open(m);
-		if (op.is(tau::variable)) {
-			if (bit.contains(t.first())) set(o, rising, t.first());
-		} else for (tref x : fv_intersect<node>(m, Y)) set(o, either, x);
+		if (!t.is(tau::wff))
+			return t.is(tau::wff_and) || t.is(tau::wff_or);
+		if (!subst_detail::is_spine<node>(m, parent)
+			&& !fv_meets<node>(m, Y)) return false;
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or))
+			return true;
+		if (t.child_is(tau::bf_eq)) literal(m, false);
+		else if (is_negated_equation<node>(m)) literal(m, true);
+		else for (tref y : fv_intersect<node>(m, Y))
+			broken.at(y) = binate;
 		return false;
 	};
 	auto all_nodes = [](tref) { return true; };
-	auto up = [&](tref m) {
-		const tau& t = tau::get(m);
-		if ((!t.is(tau::wff) && !t.is(tau::bf)) || at.contains(m)) return;
-		const tau& op = t[0];
-		const size_t o = open(m);
-		if (op.is(tau::wff_neg) || op.is(tau::bf_neg))
-			copy(o, at.at(op.first()), true);
-		else if (op.is(tau::bf_eq)) {
-			if (tau::get(op.first()).equals_0())
-				copy(o, at.at(op.second()), true);
-			else if (tau::get(op.second()).equals_0())
-				copy(o, at.at(op.first()), true);
-			else for (tref c : op.children()) {
-				const size_t s = at.at(c);
-				for (size_t i = 0; i < W; ++i)
-					word(o, either, i) |= word(s, rising, i)
-						| word(s, falling, i) | word(s, either, i);
-			}
-		} else for (tref c : op.children()) join(o, at.at(c));
-	};
+	auto up = [](tref) {};
 	pre_order<node>(body).visit_unique(visit, all_nodes, up);
-	const size_t root = at.at(body);
+	// A variable no literal constrains is in both `L` and `H`; it takes 0.
 	subtree_map<node, tref> by_var;
-	for (size_t i = 0; i < Y.size(); ++i) {
-		const uint64_t b = uint64_t(1) << (i % 64);
-		if (word(root, either, i / 64) & b) continue;
-		const bool rises = word(root, rising, i / 64) & b;
-		const bool falls = word(root, falling, i / 64) & b;
-		if (rises == falls) continue;
-		const size_t ba = find_ba_type<node>(Y[i]);
-		by_var.emplace(Y[i], falls ? _0<node>(ba) : _1<node>(ba));
+	for (tref y : Y) {
+		const unsigned char b = broken.at(y);
+		if (b == binate) continue;
+		const size_t ba = find_ba_type<node>(y);
+		by_var.emplace(y, b & not_low ? _1<node>(ba) : _0<node>(ba));
 	}
 	if (by_var.empty()) return body;
-	return simplify<node>(subst_var<node>(body, by_var));
+	return simplify<node>(subst_var<node>(body, by_var, regime::backed),
+		regime::backed, X);
 }
 
 // --- the ∃ push over the components -----------------------------------------------

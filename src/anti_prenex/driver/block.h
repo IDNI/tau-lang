@@ -28,6 +28,7 @@
 #include "../normalisers/nnf.h"
 #include "../normalisers/simplify.h"
 #include "../push/push_block.h"
+#include "../shared/cofactors.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -59,15 +60,14 @@ std::vector<block> connected_components(const block& X, tref body);
  * the truth of @p body one way only, substituted by the end of the order that
  * witnesses `∃x` — `0` when growing it can only make each literal mentioning
  * it false, `1` when only true — in one simultaneous `φ[x ← t]`, then
- * `SIMPLIFY`.
+ * `SIMPLIFY` with `X` in scope, both in the backed regime.
  *
- * The polarity is read by §5's sufficient syntactic check: a term occurrence
- * under an even number of `′` is positive, `·` and `∪` keep it, and a literal
- * counts only as `f = 0` or `¬(f = 0)` with one side syntactically `0`. `+`,
- * any other term operator, an equation with no `0` side, an order atom, a
- * unit, a reference and a temporal operator make every variable of `X` they
- * mention binate, and a binate variable stays. @p body comes back as it is
- * when nothing is deleted.
+ * The polarity is the COFACTOR TEST on each (¬)equation's `TERM_OF`: `COF`'s
+ * restricts `f₀, f₁`, monotone when the node test finds `f₀·f₁′` zero,
+ * antitone when it finds `f₁·f₀′` zero. An unusable record — the variable
+ * hidden in a leaf — and an order atom, a unit, a reference or a temporal
+ * operator make every variable of `X` they mention binate, and a binate
+ * variable stays. @p body comes back as it is when nothing is deleted.
  */
 template <NodeType node>
 tref delete_unate_binders(tref body, const block& X);

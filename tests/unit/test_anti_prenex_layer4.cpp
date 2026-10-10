@@ -190,8 +190,9 @@ TEST_CASE("M5: nested same-kind runs are shared between phases 2 and 4") {
 
 TEST_CASE("M6: an alternation is eliminated innermost first") {
 	// `∀b. a·b = 0` is `a = 0` — the run is dualised into `∃b. ¬(a·b = 0)`,
-	// one literal, discharged to `¬(a = 0)`, and negated back. The ∃ run
-	// above it then meets that literal and discharges it to `T`.
+	// where `b` only raises the truth and leaves at block entry with
+	// `b := 1`, giving `¬(a = 0)`, negated back. The ∃ run above it then
+	// meets that literal, where `a := 0` leaves at block entry too: `T`.
 	const tref phi = parse("ex a all b (a b = 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);
@@ -270,14 +271,16 @@ TEST_CASE("M11: both spellings of a disequation give the same node") {
 
 TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	// `DISCHARGE` under `ctx.keep_functional` keeps the block's chain, SLID
-	// to its levels, where the callback allows it. Its piece holds `y` free
-	// in a reference, so it stays a chain: `∃x. q(y)·x = 0` comes back as
-	// the one atom `(∀_x x·q(y)) = 0`, with no formula binder left.
+	// to its levels, where the callback allows it. Its piece holds `y` and
+	// `w` free in references, so it stays a chain:
+	// `∃x. x·q(y) ∪ x′·q(w) = 0` comes back as the one atom
+	// `(∀_x x·q(y) ∪ x′·q(w)) = 0`, with no formula binder left. `x` is
+	// binate, so it does not leave at block entry.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
 	// what this case pins is the KEPT shape, under its own callback, and
 	// the checker does not read a reference.
-	const tref phi = parse("ex x ((q(y) x) = 0).");
+	const tref phi = parse("ex x ((q(y) x | q(w) x') = 0).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
 	CHECK(holds(got, tau::bf_fall));
@@ -287,15 +290,17 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	CHECK(!holds(got, tau::BDD_ID));
 	// Handed back to the default callback, phase 1's
 	// `RESOLVE_FUNCTIONAL_PLAIN` resolves the chain, and what is left is
-	// the answer the plain run gives directly: `T`, as `x := 0` satisfies
-	// the body.
-	CHECK(ap::anti_prenex<node_t>(got) == ap::anti_prenex<node_t>(phi));
-	CHECK(tau::get(ap::anti_prenex<node_t>(phi)).equals_T());
+	// the answer the plain run gives directly, `q(y)·q(w) = 0`, binder-free
+	// and chain-free.
+	const tref plain = ap::anti_prenex<node_t>(phi);
+	CHECK(ap::anti_prenex<node_t>(got) == plain);
+	CHECK(binder_count(plain) == 0);
+	CHECK(!holds(plain, tau::bf_fall));
 	// On a pure term the piece is closed and folds under the same callback:
-	// `∃x. x·y = 0` comes back `T`, which the checker reads.
-	const tref pure = parse("ex x (xy = 0).");
+	// `∃x. x·y ∪ x′·w = 0` comes back `y·w = 0`, which the checker reads.
+	const tref pure = parse("ex x (xy | x'w = 0).");
 	const tref pg = ap::anti_prenex<node_t>(pure, keep_all);
-	CHECK(tau::get(pg).equals_T());
+	CHECK(are_nso_equivalent<node_t>(pg, parse("yw = 0.")));
 	CHECK(are_nso_equivalent<node_t>(pg, pure));
 }
 
@@ -303,7 +308,8 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 
 TEST_CASE("M13: a block inside a temporal operator is pushed too") {
 	// The pass enters a temporal operator like any other formula node, so
-	// the run below one is collected and discharged.
+	// the run below one is collected, and its `x`, which only lowers the
+	// truth, leaves at block entry with `x := 0`.
 	const tref phi = parse("always ex x (xy = 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);

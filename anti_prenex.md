@@ -1228,27 +1228,22 @@ DELETE_UNATE_BINDERS(body, X):
     //     makes body downward closed in x, x-HIGH in every one upward closed.
     //   Any other literal mentioning x — an order atom, a unit, a reference,
     //     a temporal operator — makes x BINATE, and x stays.
-    // The test may be any SUFFICIENT check, one-way: what it cannot read is
-    //   binate. The SYNTACTIC reading is one: an occurrence of x under an
-    //   even number of ′ is POSITIVE, under an odd one NEGATIVE, · and ∪
-    //   keep it, and f is monotone when every occurrence is positive,
-    //   antitone when every one is negative; x under + or any other term
-    //   operator, a functional quantifier included, reads binate; l + r is
-    //   read as the other side when one side is syntactically 0 (equations
-    //   are not zero-normalised, inv. 4), as binate otherwise. On a
-    //   BDD-backed term the cofactor test is exact, and x ← 0, x ← 1 are
-    //   restricts.
-    // The walk is post-order and memoised per node: a node's summary — the
-    //   variables of X it moves up, down, or both ways — is a function of
-    //   the node alone, ¬ and ′ swap up and down, and a subtree whose FV
-    //   misses X is not entered.
+    // The test is THE COFACTOR TEST: in phase 4 every side is BDD-backed,
+    //   so for l + r = TERM_OF(literal) it takes
+    //   COF(l + r, x)'s restricts f₀, f₁ and asks the node test "zero" of
+    //   f₀·f₁′ (monotone) and f₁·f₀′ (antitone), both derived terms whose
+    //   sweep is dropped. It is one-way: an unusable record — x hidden in a
+    //   leaf — reads binate, and so does a node test that cannot answer.
+    // The walk enters ∧ and ∨ only; a subtree whose FV misses X is not
+    //   entered.
     L ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-LOW }
     H ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-HIGH }
     if L ∪ H = ∅: return body
-    return SIMPLIFY(body[x ← 0 for x ∈ L, x ← 1 for x ∈ H])
+    return SIMPLIFY(body[x ← 0 for x ∈ L, x ← 1 for x ∈ H ∖ L])
         // one simultaneous substitution, 0 and 1 of x's own type: a constant
         //   leaves every other variable's polarity as it was, so L ∪ H goes
-        //   together; simplified at construction (inv. 6)
+        //   together; the backed substitution restricts each BDD, and
+        //   SIMPLIFY runs in the backed regime with X in scope (inv. 6)
 ```
 
 **Unate binders.** The deletion is the cheapest binder kill there is — one

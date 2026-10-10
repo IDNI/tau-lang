@@ -303,8 +303,8 @@ TEST_CASE("L14: a pivot that is identically 0 folds before any block") {
 TEST_CASE("L15: a pivot that is identically 1 kills its disjunct") {
 	// test_antiprenexing.cpp:372. `(x ∪ y′) ∪ (x′ ∪ y)` is `1`, so its
 	// equation folds to `F` at phase 1 and the disjunct dies; what is left
-	// is `x·k = 0 ∧ z = 0`, where the strip hoists `z = 0` and the
-	// one-atom block is discharged at `x := 0`.
+	// is `x·k = 0 ∧ z = 0`, where `x` only lowers the truth and leaves at
+	// block entry with `x := 0`.
 	const tref got = anti_prenexed(
 		parse("ex x (((x|y')|(x'|y) = 0 || xk = 0) && z = 0)."));
 	resolved(got);
@@ -469,12 +469,14 @@ TEST_CASE("L27: a kept emission rides into the next step's terms") {
 		return std::ranges::any_of(q, [v](const auto& yk) {
 			return tau::subtree_equals(yk.first, v); });
 	};
-	// `∃x(x·y = 0)` out of `ex x ex y …`: the inner `y` sits BELOW x's
-	// levels, still pending, so the sub-block is quantified at once, the
-	// callback never asked about it, and the answer is the plain one, `T`.
-	// A push the tables answer asks no callback, hence the flushes.
+	// `∃x(x·y ∪ x′·c = 0)` out of `ex x ex y …`: the inner `y` sits BELOW
+	// x's levels, still pending, so the sub-block is quantified at once,
+	// the callback never asked about it, and the answer is the plain one,
+	// `T`. Both variables are binate, so neither leaves at block entry. A
+	// push the tables answer asks no callback, hence the flushes.
 	ap::flush_solver_dependent<node_t>();
-	const tref phi = parse("ex x ex y (xy = 0 && (ya = 0 || yb = 0)).");
+	const tref phi = parse(
+		"ex x ex y (xy | x'c = 0 && (ya = 0 || y'b = 0)).");
 	const tref x = tau::trim_right_sibling(ap::binder_var<node_t>(phi));
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
 	CHECK(std::ranges::none_of(asked,
@@ -484,14 +486,15 @@ TEST_CASE("L27: a kept emission rides into the next step's terms") {
 	CHECK(tau::get(anti_prenexed(phi)).equals_T());
 	// The other nesting puts the settled `x` innermost, and its piece holds
 	// `y` free in a reference, so the callback keeps the chain:
-	// `(∀_x x·q(y)) = 0` rides on as a conjunct of the smaller block, where
-	// `y` hides in its leaf (§1 leaf hazard), so `∃y` is re-wrapped around
-	// it rather than discharged (invariant 3). The checker does not read a
-	// reference, so these claims are structural.
+	// `(∀_x x·q(y) ∪ x′·q(c)) = 0` rides on as a conjunct of the smaller
+	// block, where `y` hides in its leaf (§1 leaf hazard), so `∃y` is
+	// re-wrapped around it rather than discharged (invariant 3). `x` is
+	// binate, so it does not leave at block entry. The checker does not
+	// read a reference, so these claims are structural.
 	ap::flush_solver_dependent<node_t>();
 	asked.clear();
 	const tref psi = parse(
-		"ex y ex x ((q(y) x) = 0 && (ya = 0 || yb = 0)).");
+		"ex y ex x ((q(y) x | q(c) x') = 0 && (ya = 0 || yb = 0)).");
 	const tref xi = tau::trim_right_sibling(ap::binder_var<node_t>(
 		tau::trim_right_sibling(ap::binder_body<node_t>(psi))));
 	const tref kept = ap::anti_prenex<node_t>(psi, keep_all);
@@ -504,8 +507,16 @@ TEST_CASE("L27: a kept emission rides into the next step's terms") {
 	CHECK(!holds(kept, tau::BDD_ID));
 	// Handed back to the DEFAULT callback, the kept answer gives what the
 	// plain run gives directly: phase 1's `RESOLVE_FUNCTIONAL_PLAIN` takes
-	// the chain and the blocks are pushed with nothing kept.
-	CHECK(ap::anti_prenex<node_t>(kept) == ap::anti_prenex<node_t>(psi));
+	// the chain and the blocks are pushed with nothing kept. Compared as
+	// ∨-member sets: the join orders its members while they are backed,
+	// before the close spells them and renumbers their binders.
+	auto member_set = [](tref n) {
+		trefs ms = ap::members<node_t>(n);
+		std::ranges::sort(ms, tau::subtree_less);
+		return ms;
+	};
+	CHECK(std::ranges::equal(member_set(ap::anti_prenex<node_t>(kept)),
+		member_set(ap::anti_prenex<node_t>(psi)), tau::subtree_equals));
 }
 
 } // TEST_SUITE
