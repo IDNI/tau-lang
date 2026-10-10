@@ -93,20 +93,21 @@ struct growth_guard {
 
 TEST_SUITE("anti_prenex/normalisers/simplify") {
 
-// --- find_pin ---------------------------------------------------------------------
+// --- find_strict_pin --------------------------------------------------------------
 
 TEST_CASE("S1: the spelled pin is strict, with the other side as witness") {
 	tref y = bvar("y"), a = bvar("a"), b = bvar("b");
 	// `y = a·b` pins ONLY `y`: cofactoring by `a` leaves `y ∪ b`, whose
 	// union with `y·b′ ∪ y′·b` is not 1.
-	auto p = ap::find_pin<node_t>(eq(y, land(a, b)), ap::block{});
+	auto p = ap::find_strict_pin<node_t>(eq(y, land(a, b)), ap::block{});
 	REQUIRE(p.has_value());
 	CHECK(same(p->var, fvar("y")));
 	CHECK(p->strict);
 	CHECK(same(p->witness, land(a, b)));
 	// The zero-normalised spelling of the same equation pins alike: the
 	// match reads `TERM_OF`, which is `l + r` either way.
-	auto q = ap::find_pin<node_t>(eq0(lxor(y, land(a, b))), ap::block{});
+	auto q = ap::find_strict_pin<node_t>(eq0(lxor(y, land(a, b))),
+		ap::block{});
 	REQUIRE(q.has_value());
 	CHECK(same(q->var, fvar("y")));
 	CHECK(q->strict);
@@ -114,7 +115,7 @@ TEST_CASE("S1: the spelled pin is strict, with the other side as witness") {
 	// `y = a` pins BOTH variables, each strictly and each with a witness
 	// of size one, so the match takes whichever comes first in content
 	// order — the spec's tie-break does not separate them.
-	auto sym = ap::find_pin<node_t>(eq(y, a), ap::block{});
+	auto sym = ap::find_strict_pin<node_t>(eq(y, a), ap::block{});
 	REQUIRE(sym.has_value());
 	CHECK(sym->strict);
 	CHECK((same(sym->var, fvar("y")) || same(sym->var, fvar("a"))));
@@ -134,7 +135,7 @@ TEST_CASE("S2: a weak pin keeps its residual, and propagation takes none") {
 	CHECK(!p->strict);
 	CHECK(same(p->witness, ap::simplify_term<node_t>(land(t, lneg(G)))));
 	// Propagation's match admits strict pins only, and the atom has none.
-	CHECK(!ap::find_pin<node_t>(atom, ap::block{}).has_value());
+	CHECK(!ap::find_strict_pin<node_t>(atom, ap::block{}).has_value());
 	// A variable of the residue pins too when it is alone in it: `G = g`
 	// gives `g` the witness `0`, weakly all the same.
 	tref g = bvar("g");
@@ -143,23 +144,25 @@ TEST_CASE("S2: a weak pin keeps its residual, and propagation takes none") {
 	REQUIRE(q.has_value());
 	CHECK(!q->strict);
 	CHECK(tau::get(q->witness).equals_0());
-	CHECK(!ap::find_pin<node_t>(atom2, ap::block{}).has_value());
+	CHECK(!ap::find_strict_pin<node_t>(atom2, ap::block{}).has_value());
 }
 
 TEST_CASE("S3: what does not pin") {
 	tref y = bvar("y"), a = bvar("a");
 	// `y·a = 0` leaves the cofactors `0` and `a`, whose union is not 1.
-	CHECK(!ap::find_pin<node_t>(eq0(land(y, a)), ap::block{}).has_value());
+	CHECK(!ap::find_strict_pin<node_t>(eq0(land(y, a)),
+		ap::block{}).has_value());
 	// An equation under `¬` pins nothing.
-	CHECK(!ap::find_pin<node_t>(neg(eq(y, a)), ap::block{}).has_value());
+	CHECK(!ap::find_strict_pin<node_t>(neg(eq(y, a)),
+		ap::block{}).has_value());
 	// Neither does anything that is not a positive equation.
-	CHECK(!ap::find_pin<node_t>(conj(eq(y, a), eq0(a)),
+	CHECK(!ap::find_strict_pin<node_t>(conj(eq(y, a), eq0(a)),
 		ap::block{}).has_value());
 	// An atom meeting `X` is `TRY_WITNESS`'s business, not propagation's:
 	// the whole atom is refused, whichever side the block variable is on.
-	CHECK(!ap::find_pin<node_t>(eq(y, a),
+	CHECK(!ap::find_strict_pin<node_t>(eq(y, a),
 		ap::block{ fvar("y") }).has_value());
-	CHECK(!ap::find_pin<node_t>(eq(y, a),
+	CHECK(!ap::find_strict_pin<node_t>(eq(y, a),
 		ap::block{ fvar("a") }).has_value());
 }
 
@@ -171,9 +174,9 @@ TEST_CASE("S4: the match takes a strict pin and refuses a weak one") {
 	auto wp = ap::find_pin_for<node_t>(weak, fvar("y"));
 	REQUIRE(wp.has_value());
 	CHECK(!wp->strict);
-	CHECK(!ap::find_pin<node_t>(weak, ap::block{}).has_value());
+	CHECK(!ap::find_strict_pin<node_t>(weak, ap::block{}).has_value());
 	// With the residual gone the same shape is strict.
-	auto strict = ap::find_pin<node_t>(eq0(lxor(y, land(a, b))),
+	auto strict = ap::find_strict_pin<node_t>(eq0(lxor(y, land(a, b))),
 		ap::block{});
 	REQUIRE(strict.has_value());
 	CHECK(strict->strict);

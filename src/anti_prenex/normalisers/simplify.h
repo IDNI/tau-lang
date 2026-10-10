@@ -79,9 +79,9 @@ struct pin {
  * `p = SIMPLIFY_TERM(f₀·f₁)`, the witness `SIMPLIFY_TERM(f₁′)` and the
  * STRICT flag, `p` folding to `0`; a record that is no pin has none of them.
  *
- * The plain half of the one pin match: `find_pin` / `find_pin_for` take the
- * cofactors by SUBSTITUTION in the plain regime and hand them here, the
- * record memoised in `plain_cof_memo` (§1); on backed terms the match is
+ * The plain half of the one pin match: `find_strict_pin` / `find_pin_for`
+ * take the cofactors by SUBSTITUTION in the plain regime and hand them here,
+ * the record memoised in `plain_cof_memo` (§1); on backed terms the match is
  * `COF`'s recipe (cofactors.h), memoised in `cof_memo`.
  */
 template <NodeType node>
@@ -106,20 +106,20 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y);
  * by restricts.
  */
 template <NodeType node>
-std::optional<pin<node>> find_pin(tref atom, const block& X,
+std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 	regime rg = regime::plain);
 
 /**
  * @brief §3 `TRY_WITNESS`'s pin match asked about ONE variable: the pin `x`
  * has in `atom`, or `nullopt`.
  *
- * The same match as `find_pin`, asked about a GIVEN variable instead of
- * scanning the atom's free variables. There is nothing to choose: an atom
+ * The same match as `find_strict_pin`, asked about a GIVEN variable instead
+ * of scanning the atom's free variables. There is nothing to choose: an atom
  * pins a given variable at most one way. `atom` must be a POSITIVE equation.
- * The block guard of `find_pin` is not repeated: a caller with a block hands
- * in an atom its own guard already found block-free. `nullopt` when the atom
- * is no positive equation, when `x` is not free in its term, and when `x` is
- * not pinned.
+ * The block guard of `find_strict_pin` is not repeated: a caller with a
+ * block hands in an atom its own guard already found block-free. `nullopt`
+ * when the atom is no positive equation, when `x` is not free in its term,
+ * and when `x` is not pinned.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin_for(tref atom, tref x,

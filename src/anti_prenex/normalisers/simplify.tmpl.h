@@ -81,8 +81,8 @@ tref pin_term(tref atom, const block& X, regime rg) {
 }
 
 /// The pin a FREE variable `y` has in the term `f`, or `nullopt` (§3): the
-/// per-variable half of the match, which `find_pin` asks of every free
-/// variable and `find_pin_for` of one.
+/// per-variable half of the match, which `find_strict_pin` asks of every
+/// free variable and `find_pin_for` of one.
 ///
 /// ONE MATCH, two recipes by regime. On backed terms it is `COF`'s
 /// (cofactors.h): restricts, the record holding the witness and the
@@ -136,7 +136,9 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y) {
 }
 
 template <NodeType node>
-std::optional<pin<node>> find_pin(tref atom, const block& X, regime rg) {
+std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
+	regime rg)
+{
 	const tref f = detail::pin_term<node>(atom, X, rg);
 	if (f == nullptr) return {};
 	// By value: the loop builds nodes, and a reference into
@@ -157,8 +159,9 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x, regime rg) {
 	// caller hands in an atom its own guard already found `X`-free.
 	const tref f = detail::pin_term<node>(atom, {}, rg);
 	if (f == nullptr) return {};
-	// `find_pin` asks only about free variables, so the per-variable half
-	// may assume it; a variable that does not occur is no pin of the atom.
+	// `find_strict_pin` asks only about free variables, so the per-variable
+	// half may assume it; a variable that does not occur is no pin of the
+	// atom.
 	if (!free_in<node>(f, x)) return {};
 	return detail::pin_of_var<node>(f, x, rg);
 }
@@ -364,8 +367,8 @@ private:
 	 * variable", which is what the bar reproduces.
 	 *
 	 * Cost: one re-derivation per pinning leaf the shortcut does not
-	 * cover. `find_pin` is memoised per atom for the whole call, so a
-	 * candidate whose rewritten form is unchanged is a lookup.
+	 * cover. `find_strict_pin` is memoised per atom for the whole call, so
+	 * a candidate whose rewritten form is unchanged is a lookup.
 	 */
 	tref rewrite_atom_excluding(const environment& before,
 		const trefs& candidates, tref leaf, tref own_key)
@@ -425,7 +428,7 @@ private:
 		if (auto it = pin_memo.find(atom); it != pin_memo.end())
 			return it->second;
 		return pin_memo.emplace(atom,
-			find_pin<node>(atom, X, rg)).first->second;
+			find_strict_pin<node>(atom, X, rg)).first->second;
 	}
 
 	/**
