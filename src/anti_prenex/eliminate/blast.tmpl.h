@@ -218,11 +218,21 @@ std::optional<bool> sweep(tref k, const ctx<node>& c) {
 	if (width * rank.size() >= size_t(1) << sweep_options.shiftW)
 		return std::nullopt;
 	sweeper<node> s(c.type, width, rank);
+	// `k` is closed, so its outermost run of one binder kind needs no
+	// abstraction: under ∀ it holds iff the run's body is 1, under ∃
+	// unless the body is 0.
+	auto is_all = [](tref q) {
+		return binder_kind<node>(q) == tau_term_bdd<node>::all; };
+	const bool universal = is_child_quantifier<node>(k) && is_all(k);
+	tref body = k;
+	while (is_child_quantifier<node>(body) && is_all(body) == universal) {
+		if (s.foreign(binder_var<node>(body))) fail();
+		body = binder_body<node>(body);
+	}
 	const node_cap_scope cap(engine::V.size() + c.qbf_node_max);
 	try {
-		const sweep_bdd r = s.formula(k);
-		DBG(assert(r->is_one() || r->is_zero());)
-		return r->is_one();
+		const sweep_bdd r = s.formula(body);
+		return universal ? r->is_one() : !r->is_zero();
 	} catch (const bdd_node_cap_reached&) {
 		return std::nullopt;
 	}
