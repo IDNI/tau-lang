@@ -389,13 +389,16 @@ TEST_CASE("C12: the guard split's licence refuses a split that copies bulk") {
 	// The guard `a = 0 ∨ b = 0` sits in a case of each of the first two
 	// disjunctive conjuncts, its neg in the second. Those weigh 7 + 9 = 16
 	// and their arms 4 + 4 = 8; a third conjunct of size `u` is copied into
-	// both arms, so the split passes iff `4·(8 + 2u) ≤ 5·(16 + u)`, u ≤ 16.
-	const std::string touched = "ex x ((((a = 0 || b = 0) && xy = 0) "
+	// both arms, so under a block of two the split passes iff
+	// `4·(8 + 2u) ≤ 5·(16 + u)`, u ≤ 16.
+	const std::string touched = "ex x ex v ((((a = 0 || b = 0) && xy = 0) "
 		"|| xc = 0) && ((a != 0 && b != 0 && xz = 0) || xc = 0) && ";
-	fixture small = make((touched + "(xd = 0 || xe = 0)).").c_str());
-	fixture big = make((touched + "((xd = 0 && xe = 0 && xg = 0 && xh = 0) "
-		"|| (xd = 0 && xe = 0 && xk = 0 && xm = 0) "
-		"|| (xg = 0 && xh = 0 && xk = 0 && xm = 0))).").c_str());
+	fixture small = make((touched + "(xd = 0 || ve = 0)).").c_str());
+	fixture big = make((touched + "((xd = 0 && ve = 0 && xg = 0 && vh = 0) "
+		"|| (xd = 0 && ve = 0 && xk = 0 && vm = 0) "
+		"|| (xg = 0 && vh = 0 && xk = 0 && vm = 0))).").c_str());
+	REQUIRE(small.P.size() == 2);
+	REQUIRE(big.P.size() == 2);
 	REQUIRE(disjunctive_sizes(small) == std::vector<size_t>{ 3, 7, 9 });
 	REQUIRE(disjunctive_sizes(big) == std::vector<size_t>{ 7, 9, 23 });
 	const std::optional<tref> got = decomposed(small);
@@ -414,6 +417,21 @@ TEST_CASE("C13: a guard split that changes every conjunct needs no licence") {
 		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0 || xd = 0 || xe = 0 "
 		"|| xg = 0 || xh = 0 || xk = 0 || xm = 0)).");
 	REQUIRE(disjunctive_sizes(f) == std::vector<size_t>{ 19, 21 });
+	const std::optional<tref> got = decomposed(f);
+	REQUIRE(got.has_value());
+	check_against_source(*got, f);
+}
+
+TEST_CASE("C14: under one block variable a split that copies bulk is taken") {
+	// C12's refused clause with `v` spelled `x`: EXPAND could settle
+	// nothing first, so the split is not licensed.
+	fixture f = make("ex x ((((a = 0 || b = 0) && xy = 0) || xc = 0) "
+		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0) "
+		"&& ((xd = 0 && xe = 0 && xg = 0 && xh = 0) "
+		"|| (xd = 0 && xe = 0 && xk = 0 && xm = 0) "
+		"|| (xg = 0 && xh = 0 && xk = 0 && xm = 0))).");
+	REQUIRE(f.P.size() == 1);
+	REQUIRE(disjunctive_sizes(f) == std::vector<size_t>{ 7, 9, 23 });
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
 	check_against_source(*got, f);

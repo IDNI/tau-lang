@@ -85,8 +85,9 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  *
  * THE LICENCE is `TRY_DECOMPOSE`'s on the disjunctive conjuncts, each one the
  * split leaves unchanged counted once per arm, since both arms copy it. A
- * split that changes every disjunctive conjunct is not tested. `nullopt` when
- * no unit qualifies or the licence fails.
+ * split that changes every disjunctive conjunct is not tested, and neither is
+ * one under a single block variable. `nullopt` when no unit qualifies or the
+ * licence fails.
  */
 template <NodeType node>
 std::optional<tref> try_guard_split(const trefs& cs, const block& X,

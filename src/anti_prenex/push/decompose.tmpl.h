@@ -273,10 +273,10 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 		if (!pos) touched_arms += formula_size<node>(on_T.back());
 		if (!neg) touched_arms += formula_size<node>(on_F.back());
 	}
-	// TRY_DECOMPOSE's licence with the copied conjuncts counted once per
-	// arm: a split grows only by what both arms copy, so one that touches
-	// every disjunctive conjunct needs none.
-	if (copied > 0
+	// TRY_DECOMPOSE's licence with the copied conjuncts counted once per arm.
+	// With one block variable EXPAND cannot settle anything first, so a
+	// refused split comes back in every case and nests EXPANDs.
+	if (X.size() >= 2 && copied > 0
 		&& 4 * (touched_arms + 2 * copied) > 5 * (touched + copied))
 		return std::nullopt;
 	return decompose_arms<node>(best, simplified_and_join<node>(on_T),
