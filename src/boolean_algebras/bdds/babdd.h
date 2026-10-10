@@ -1389,25 +1389,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return 0;
 	}
 
-	// n-ary conjunction: repeatedly collapses operand pairs already
-	// in the binary and_memo, normalizes via am_sort, then Shannon-
-	// expands on the smallest top variable via bdd_and_many_iter;
-	// results are memoized per operand list in and_many_memo
+	// n-ary conjunction: normalizes via am_sort, then Shannon-expands
+	// on the smallest top variable via bdd_and_many_iter; results are
+	// memoized per operand list in and_many_memo
 	static bdd_ref bdd_and_many(std::vector<bdd_ref> v) {
-		if (v.empty()) return T;
-		if (v.size() == 1) return v[0];
-
-		for (size_t n = 0; n < v.size(); ++n)
-			for (size_t k = 0; k < n; ++k) {
-				bdd_ref x = v[n], y = v[k];
-				mk_order_canonical(x, y);
-				if (check_cache(x, y, and_memo)) {
-					v.erase(v.begin()+k), v.erase(v.begin()+n-1);
-					v.push_back(x);
-					n = k = 0;
-					break;
-				}
-			}
 		am_sort(v);
 		if (v.empty()) return T;
 		if (v.size() == 1) return v[0];
