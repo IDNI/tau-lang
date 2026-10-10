@@ -305,14 +305,13 @@ function(tau_deps_resolve_parser)
 endfunction()
 
 # Curl is a system package on native Linux and macOS, which both ship
-# libcurl. The Windows targets have none, so they build the pinned static curl
-# and define CURL::libcurl for nlang.
+# libcurl. The three Windows targets have none, so they build the pinned static
+# curl and define CURL::libcurl for nlang.
 function(tau_deps_resolve_curl)
 	if(NOT "CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		return()
 	endif()
-	if(NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
-			AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+	if(NOT TAU_DEPS_TARGET MATCHES "^windows-")
 		return()
 	endif()
 	tau_deps_producer_script(_curl_producer "${PROJECT_SOURCE_DIR}" curl)
@@ -321,7 +320,7 @@ function(tau_deps_resolve_curl)
 		add_library(CURL::libcurl STATIC IMPORTED)
 		# MSVC names its import/static library .lib; MinGW names it .a.
 		set(_curl_lib "${TAU_CURL_PREFIX}/lib/libcurl.a")
-		if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+		if(TAU_DEPS_TARGET MATCHES "^windows-.*-msvc$")
 			set(_curl_lib "${TAU_CURL_PREFIX}/lib/libcurl.lib")
 		endif()
 		set_target_properties(CURL::libcurl PROPERTIES
@@ -338,15 +337,16 @@ endfunction()
 # Spot is a host tool Tau only execs (ltlsynt, autfilt, ltlfilt); nothing
 # links it. A host that already has ltlsynt on PATH -- apt, brew, conda --
 # uses that, except in a package build. Otherwise the store package supplies
-# the tools, and configure publishes its bin directory as TAU_SPOT_BIN. Both Windows targets always take
+# the tools, and configure publishes its bin directory as TAU_SPOT_BIN. The Windows targets always take
 # the package: a host PATH tool cannot carry the runtime DLLs of the PE, and wine
 # cannot load an ELF.
 #
-# windows-x86_64-mingw takes the windows-x86_64-msvc entry, the Windows PE a
-# MinGW tau execs. Under that id the producer applies the msvc host guard
-# before it reads any store, so a configure on a Linux host always misses. A
-# miss warns and leaves TAU_SPOT_BIN empty, and the LTL suites skip, because
-# spot is an optional test-time tool. Do not fall back to a host ltlsynt: an ELF under an .exe name
+# windows-arm64-msvc takes the windows-x86_64-msvc entry: Windows 11 on arm64
+# runs the x64 tools under emulation. windows-x86_64-mingw takes the same
+# entry, the Windows PE a MinGW tau execs. Under that id the producer applies
+# the msvc host guard before it reads any store, so a configure on a Linux
+# host always misses. A miss warns and leaves TAU_SPOT_BIN empty, and the LTL
+# suites skip, because spot is an optional test-time tool. Do not fall back to a host ltlsynt: an ELF under an .exe name
 # would make the suites run and fail instead of skip.
 function(tau_deps_resolve_spot)
 	# A wasm module cannot exec a host process, so no spot package serves it.
@@ -355,7 +355,8 @@ function(tau_deps_resolve_spot)
 		message(STATUS "Spot not used on ${TAU_DEPS_TARGET}")
 		return()
 	endif()
-	set(_windows_targets "windows-x86_64-msvc" "windows-x86_64-mingw")
+	set(_windows_targets "windows-x86_64-msvc" "windows-arm64-msvc"
+		"windows-x86_64-mingw")
 	# A package ships the store tools: a host ltlsynt loads the host's Spot
 	# libraries, which a package cannot carry.
 	set(_package_ships_spot OFF)
@@ -369,7 +370,8 @@ function(tau_deps_resolve_spot)
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()
-	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
+	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
+			OR TAU_DEPS_TARGET STREQUAL "windows-arm64-msvc")
 		tau_deps_producer_script(_spot_producer "${PROJECT_SOURCE_DIR}" spot
 			"windows-x86_64-msvc")
 		tau_deps_ensure_prefix_as(spot "${_spot_producer}"

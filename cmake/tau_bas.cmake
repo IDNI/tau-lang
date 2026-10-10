@@ -20,7 +20,8 @@ endif()
 # The store targets a manifest may name in TAU_BA_UNSUPPORTED_TARGETS.
 set(TAU_BA_KNOWN_TARGETS
 	linux-x86_64 linux-arm64 darwin-arm64 darwin-x86_64
-	windows-x86_64-mingw windows-x86_64-msvc wasm32-emscripten)
+	windows-x86_64-mingw windows-x86_64-msvc windows-arm64-msvc
+	wasm32-emscripten)
 
 # Ordered preference for the Boolean carrier — the BA whose type core builds a
 # plain 0/1 in. Passed through to the compile-time fold rather than resolved

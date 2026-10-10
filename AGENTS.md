@@ -49,7 +49,8 @@ The target in the id names the platform the package runs on: `linux-x86_64`
 (Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),
 `windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
 `darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (clang-cl, with
-Boost from cl.exe and cvc5 from the Visual Studio clang-cl). The
+Boost from cl.exe and cvc5 from the Visual Studio clang-cl),
+`windows-arm64-msvc` (Windows arm64, MSVC, native on an arm64 host). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
 keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and

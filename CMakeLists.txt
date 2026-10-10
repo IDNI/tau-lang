@@ -59,7 +59,12 @@ elseif(APPLE)
 elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	set(TAU_DEPS_TARGET "windows-x86_64-mingw")
 elseif(WIN32 AND MSVC)
-	set(TAU_DEPS_TARGET "windows-x86_64-msvc")
+	string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _tau_proc)
+	if(_tau_proc MATCHES "^(arm64|aarch64)$")
+		set(TAU_DEPS_TARGET "windows-arm64-msvc")
+	else()
+		set(TAU_DEPS_TARGET "windows-x86_64-msvc")
+	endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	# The target names the machine arch the package runs on, so a cross build
 	# from x86 and a native arm64 build share one target.
@@ -526,7 +531,7 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	message(STATUS "cvc5 version: ${cvc5_VERSION}")
 	# Windows loads a DLL from the folder of the executable, and every
 	# executable of this build lands in the build root.
-	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+	if(TAU_DEPS_TARGET MATCHES "^windows-.*-msvc$")
 		file(GLOB _cvc5_dlls "${CVC5_STORE_PREFIX}/bin/*.dll")
 		if(NOT _cvc5_dlls)
 			message(FATAL_ERROR "no cvc5 DLL under ${CVC5_STORE_PREFIX}/bin")

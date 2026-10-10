@@ -54,8 +54,8 @@ set(TAU_BA_UNSUPPORTED_REASON_wasm32-emscripten "nondistributable: cvc5 links GM
 ```
 
 The target names are `linux-x86_64`, `linux-arm64`, `darwin-arm64`,
-`darwin-x86_64`, `windows-x86_64-mingw`, `windows-x86_64-msvc` and
-`wasm32-emscripten`. When `-DTAU_BAS` is unset, every BA whose
+`darwin-x86_64`, `windows-x86_64-mingw`, `windows-x86_64-msvc`,
+`windows-arm64-msvc` and `wasm32-emscripten`. When `-DTAU_BAS` is unset, every BA whose
 manifest names the current target is dropped from the default pack and its
 reason is printed:
 
