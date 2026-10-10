@@ -157,6 +157,12 @@ _dep_cvc5_field_block() {
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
 	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
 	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
+	# A change of the MSVC body must move the id of every MSVC target.
+	local recipe_msvc_field=""
+	if [ -n "${DEP_CVC5_MSVC_LLVM_ARCH:-}" ]; then
+		recipe_msvc_field="recipe_msvc_hash=$(dep_sha256 "$DEP_RECIPE_MSVC")" \
+			|| return 1
+	fi
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -179,6 +185,7 @@ _dep_cvc5_field_block() {
 		"commit=${CVC5_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
 		"recipe_common_hash=${recipe_common_hash}" \
+		${recipe_msvc_field:+"$recipe_msvc_field"} \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \

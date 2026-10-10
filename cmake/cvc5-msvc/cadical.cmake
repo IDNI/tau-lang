@@ -1,6 +1,6 @@
 # To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-# The static CaDiCaL library for the windows-x86_64-msvc cvc5 package, built
+# The static CaDiCaL library for the MSVC cvc5 packages, built
 # with clang-cl. The producer copies this file into the CaDiCaL source tree as
 # its CMakeLists.txt, so the CaDiCaL source stays unpatched. CaDiCaL's own
 # build expects a Unix compiler and ar, which the MSVC shell does not have.
