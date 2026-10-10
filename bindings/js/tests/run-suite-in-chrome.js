@@ -84,10 +84,11 @@ function loadCtestTests(buildDir) {
 		const timeoutMs = typeof props.TIMEOUT === 'number'
 			? Math.round(props.TIMEOUT * 1000)
 			: DEFAULT_TIMEOUT_MS;
-		// TAU_NODE_ONLY marks a ctest entry that runs under node itself and
-		// must not be re-run through this batch (js_parity, repl_browser_suite
-		// -- both commands end in .js but are not emscripten test pairs).
-		const nodeOnly = props.TAU_NODE_ONLY === true || props.TAU_NODE_ONLY === 'TRUE';
+		// The label node_only marks a ctest entry that runs under node itself
+		// (js_env, js_budgets, js_parity, repl_browser_suite): its command ends
+		// in .js, but it is not an emscripten test pair. A label, because ctest
+		// 3.x exports only its own properties to --show-only=json-v1.
+		const nodeOnly = Array.isArray(props.LABELS) && props.LABELS.includes('node_only');
 		return { name: t.name, jsPath, timeoutMs, nodeOnly };
 	// TAU_BUILD_BROWSER_TESTS registers this script itself as the
 	// `browser_suite` entry, whose last argument is a build directory rather

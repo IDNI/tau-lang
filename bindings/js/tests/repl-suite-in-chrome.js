@@ -11,8 +11,9 @@
 // with the node targets, so the case list and the page are two directories.
 //
 // A case the page cannot replay is skipped, never failed: no `-e`, echo or
-// printf input to extract, an extra CLI flag, or the TAU_BROWSER_SKIP property
-// tests/repl/add_repl_test.cmake sets for hostfs and ltlsynt cases.
+// printf input to extract, an extra CLI flag, or the ctest label browser_skip
+// tests/repl/add_repl_test.cmake sets for ENV, hostfs and ltlsynt cases. A
+// label, because ctest 3.x exports only its own properties to json-v1.
 //
 // The regexes match the rendered xterm buffer, which the runner widens to 1000
 // columns first; a marker that wraps mid-pattern cannot be matched.
@@ -156,9 +157,10 @@ function loadReplCases(testsDir) {
 				pass: asArray(props.PASS_REGULAR_EXPRESSION),
 				fail: asArray(props.FAIL_REGULAR_EXPRESSION),
 				timeoutMs,
-				// Set by tests/repl/add_repl_test.cmake for a case whose
-				// REQUIREs the page cannot satisfy (hostfs, ltlsynt).
-				browserSkip: props.TAU_BROWSER_SKIP !== undefined,
+				// Set by tests/repl/add_repl_test.cmake for an ENV case and
+				// a case whose REQUIREs the page cannot satisfy (hostfs, ltlsynt).
+				browserSkip: Array.isArray(props.LABELS)
+					&& props.LABELS.includes('browser_skip'),
 			};
 		});
 }

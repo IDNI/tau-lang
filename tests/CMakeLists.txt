@@ -461,7 +461,7 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 	set_tests_properties(js_env PROPERTIES
 		ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js"
 		TIMEOUT 120
-		TAU_NODE_ONLY TRUE)
+		LABELS node_only)
 endif ()
 
 #
@@ -476,7 +476,7 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 	set_tests_properties(js_budgets PROPERTIES
 		ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js"
 		TIMEOUT 120
-		TAU_NODE_ONLY TRUE)
+		LABELS node_only)
 endif ()
 
 #
@@ -529,7 +529,7 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 		set_tests_properties(js_parity PROPERTIES
 			ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js;TAU_NATIVE_BIN=${TAU_PARITY_NATIVE_BIN}"
 			TIMEOUT 600
-			TAU_NODE_ONLY TRUE)
+			LABELS node_only)
 	endif()
 endif ()
 
@@ -550,7 +550,7 @@ if (TAU_BUILD_REPL_BROWSER_TESTS)
 	# the browser reloads a ~20 MB module each time.
 	set_tests_properties(repl_browser_suite PROPERTIES
 		TIMEOUT 7200
-		TAU_NODE_ONLY TRUE)
+		LABELS node_only)
 endif ()
 
 include(tau-cross-test-environment)

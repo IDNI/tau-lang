@@ -24,20 +24,13 @@ function(tau_repl_check_case test regex)
 		set_tests_properties("${test}" PROPERTIES TIMEOUT "${_tau_TIMEOUT}")
 	endif()
 	# The browser suite reads the node build's registration, where a ltlsynt
-	# or hostfs case is present, so the property carries its skip over. It
+	# or hostfs case is present, so the label carries its skip over. It
 	# cannot reproduce the process environment of an ENV case either.
-	set(_browser_skip "")
 	if(_tau_ENV)
 		set_tests_properties("${test}" PROPERTIES ENVIRONMENT "${_tau_ENV}")
-		list(APPEND _browser_skip env)
 	endif()
-	foreach(_need ${_tau_REQUIRES})
-		if(_need MATCHES "^(ltlsynt|hostfs)$")
-			list(APPEND _browser_skip ${_need})
-		endif()
-	endforeach()
-	if(_browser_skip)
-		set_tests_properties("${test}" PROPERTIES TAU_BROWSER_SKIP "${_browser_skip}")
+	if(_tau_ENV OR "${_tau_REQUIRES}" MATCHES "(^|;)(ltlsynt|hostfs)(;|$)")
+		set_tests_properties("${test}" PROPERTIES LABELS browser_skip)
 	endif()
 	tau_repl_disable_skipped("${test}")
 endfunction()
