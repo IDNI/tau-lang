@@ -173,20 +173,20 @@ option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legac
 # matter here.
 include(tau-shared-resolve)
 
-# Windows ships a WSL bash.exe ahead of Git's on PATH; cmake execute_process
-# must not pick that (it remaps drive letters and cannot see Windows cmake).
-find_program(TAU_BASH NAMES bash
-	PATHS
-		"C:/Program Files/Git/bin"
-		"C:/Program Files/Git/usr/bin"
-		"C:/Program Files (x86)/Git/bin"
-	NO_DEFAULT_PATH
-	NO_CACHE)
+include("${CMAKE_CURRENT_SOURCE_DIR}/external/parser/cmake/parser-bash.cmake")
 if(NOT TAU_BASH)
-	find_program(TAU_BASH NAMES bash NO_CACHE)
-endif()
-if(NOT TAU_BASH)
-	set(TAU_BASH bash)
+	set(TAU_BASH "${TAU_PARSER_BASH}")
+	# a 32-bit Git for Windows also beats a bash on PATH
+	if(CMAKE_HOST_WIN32 AND NOT TAU_BASH MATCHES "/Git/")
+		find_program(_tau_x86_git_bash NAMES bash
+			PATHS "C:/Program Files (x86)/Git/bin" NO_DEFAULT_PATH NO_CACHE)
+		if(_tau_x86_git_bash)
+			set(TAU_BASH "${_tau_x86_git_bash}")
+		endif()
+	endif()
+	if(NOT TAU_BASH)
+		set(TAU_BASH bash)
+	endif()
 endif()
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
