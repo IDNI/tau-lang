@@ -20,8 +20,8 @@ set(TAU_SHARED_HELPER_PROVENANCE
 # guard catches a change a package identity would miss. Each entry is
 # "<repo-relative path>|<sha256>".
 set(TAU_SHIM_PROVENANCE
-	"external/parser/scripts/devrc|2857ea1e205f03cbc1d6a0c52d056cb93e520c1b932d6d447745bf90d2b17a6a"
-	"scripts/devrc|1a31e751f7dfaa5a65c83612c7429cf89a35dcda74b2890fbecdd69624b62eb6"
+	"external/parser/scripts/devrc|fdb41dc219cd795ff7870b9c4d42bb09358eb321e811566a57a1e93a5c8f6a42"
+	"scripts/devrc|b3a85661ee33abb7359a89a450915177ed96bb7da87f259d11e5b0e15281b056"
 )
 
 # Check the vendored helpers against a parser cmake directory. Defaults to the
