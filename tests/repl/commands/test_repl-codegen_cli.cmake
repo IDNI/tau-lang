@@ -20,17 +20,13 @@ set(TAU_CODEGEN_CLI_CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_codegen_cli.cmak
 # `tau compile` writes its spec to a host path and spawns a host compiler
 # (src/tau_compile.tmpl.h), so a wasm node host cannot run these even with the
 # NODEFS filesystem. NO_LTLSYNT points PATH and TAU_SPOT_BIN at an empty folder.
-# STUB_PATH puts a stub in front of PATH; the stubs are shell scripts, so the
-# case needs a build that starts one. TAU_FLAGS goes before the verb, so a
+# STUB_PATH puts a stub in front of PATH. TAU_FLAGS goes before the verb, so a
 # budget option reaches the synthesis. PROGRAM_STDIN feeds the built program.
 function(add_codegen_cli_test test_name spec_text scratch_stem pass_regex)
 	cmake_parse_arguments(PARSE_ARGV 4 _tau "NO_FAIL_REGEX;RUN_SERIAL"
 		"NO_LTLSYNT;STUB_PATH;TAU_FLAGS;PROGRAM_STDIN;TIMEOUT"
 		"FAIL_REGEX;REQUIRES;ENV")
 	list(APPEND _tau_REQUIRES subprocess)
-	if(_tau_STUB_PATH)
-		list(APPEND _tau_REQUIRES shstub)
-	endif()
 	tau_repl_gate_case("${test_name}" spec_text)
 	set(_args "-DTAU=${TAU_LAUNCHER}" "-DSPEC_TEXT=${spec_text}"
 		"-DEXE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}")
@@ -76,22 +72,35 @@ add_codegen_cli_test(test_codegen_cli-unrealizable_full_ltl
 
 # ...and one it leaves undecided is UNKNOWN, with the budget that stopped it.
 # The stub answers UNREALIZABLE for the abstraction and outlasts the 1 s
-# ltl-timeout on the data game (tests/repl/stubs/slow_game/ltlsynt); the input
-# atom reads two steps, so no other check decides the spec.
+# ltl-timeout on the data game (tests/repl/stubs/slow_game/ltlsynt.cpp); the
+# input atom reads two steps, so no other check decides the spec.
+# The output folder holds the stub alone, with no folder per configuration.
+set(TAU_SLOW_GAME_STUB_DIR "${CMAKE_BINARY_DIR}/stubs/slow_game")
+if(NOT EMSCRIPTEN)
+	add_executable(tau_stub_slow_game_ltlsynt
+		"${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game/ltlsynt.cpp")
+	set_target_properties(tau_stub_slow_game_ltlsynt PROPERTIES
+		OUTPUT_NAME ltlsynt
+		RUNTIME_OUTPUT_DIRECTORY "${TAU_SLOW_GAME_STUB_DIR}$<0:>")
+	# PATH of the case holds no MinGW runtime DLL
+	if(MINGW)
+		target_link_options(tau_stub_slow_game_ltlsynt PRIVATE -static)
+	endif()
+endif()
 add_codegen_cli_test(test_codegen_cli-unknown_is_not_unrealizable
 	"F (o1[t] = 1 && i1[t] != i1[t-1])"
 	"test_codegen_cli-unknown_is_not_unrealizable.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	FAIL_REGEX "UNREALIZABLE"
 	ENV "TAU_LTL_TIMEOUT=1"
-	STUB_PATH "${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game")
+	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}")
 
 add_codegen_cli_test(test_codegen_cli-unknown_names_the_budget
 	"F (o1[t] = 1 && i1[t] != i1[t-1])"
 	"test_codegen_cli-unknown_names_the_budget.scratch"
 	"killed by the ltl-timeout watchdog"
 	ENV "TAU_LTL_TIMEOUT=1"
-	STUB_PATH "${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game")
+	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}")
 
 # The same budget given as the option: the verb reads the global options
 # (without them each stubbed game call waits out the 60 s default).
@@ -100,7 +109,7 @@ add_codegen_cli_test(test_codegen_cli-compile_reads_the_ltl_timeout_option
 	"test_codegen_cli-compile_reads_the_ltl_timeout_option.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	TAU_FLAGS "--ltl-timeout 1"
-	STUB_PATH "${CMAKE_CURRENT_LIST_DIR}/../stubs/slow_game"
+	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}"
 	TIMEOUT 30)
 
 # With no synthesis backend the verb must fail. It must not claim
