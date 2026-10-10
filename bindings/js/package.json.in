@@ -30,6 +30,7 @@
 		"tau.node.js",
 		"tau.node.mjs",
 		"LICENSE.md",
+		"README.md",
 		"tests/parity.js",
 		"tests/budgets.js",
 		"tests/native.js",

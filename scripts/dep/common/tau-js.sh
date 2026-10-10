@@ -94,7 +94,7 @@ _dep_tau_js_field_block() {
 _dep_tau_js_producer() {
 	local staging_prefix="$1" package_dir="$2"
 	local rel
-	local files="package.json tau.js tau.wasm tau.esm.mjs tau.esm.wasm tau.node.js tau.node.mjs LICENSE.md tests/parity.js tests/native.js"
+	local files="package.json tau.js tau.wasm tau.esm.mjs tau.esm.wasm tau.node.js tau.node.mjs LICENSE.md README.md tests/parity.js tests/budgets.js tests/native.js tests/env.js"
 	if [ ! -d "$package_dir" ]; then
 		echo "dep-tau-js: package directory not found: '$package_dir'" >&2
 		return 1

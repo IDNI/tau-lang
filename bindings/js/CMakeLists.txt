@@ -71,12 +71,15 @@ configure_file(
 	${CMAKE_BINARY_DIR}/package.json
 	@ONLY)
 
-# LICENSE.md and the smoke/parity test scripts the package.json "files" list
+# LICENSE.md, README.md and the test scripts the package.json "files" list
 # and "test" scripts reference, copied flat alongside package.json.
 add_custom_target(tau_js_package_assets ALL
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		${CMAKE_SOURCE_DIR}/LICENSE.md
 		${CMAKE_BINARY_DIR}/LICENSE.md
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		${CMAKE_CURRENT_SOURCE_DIR}/README.md
+		${CMAKE_BINARY_DIR}/README.md
 	COMMAND ${CMAKE_COMMAND} -E make_directory
 		${CMAKE_BINARY_DIR}/tests
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -85,7 +88,7 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/native.js
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/env.js
 		${CMAKE_BINARY_DIR}/tests/
-	COMMENT "Copying JS bindings package assets (LICENSE, tests)")
+	COMMENT "Copying JS bindings package assets (LICENSE, README, tests)")
 
 # The store producer publishes exactly the files package.json's "files"
 # list names, taken from this build directory (which is the installable
