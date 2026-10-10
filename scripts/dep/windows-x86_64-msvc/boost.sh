@@ -12,14 +12,22 @@ DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOU
 # environment, so it reaches the submodules depinst.py clones.
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.longpaths GIT_CONFIG_VALUE_0=true
 
-# b2's msvc toolset finds cl through the developer environment the
-# runner set up; naming the compiler path here would freeze a version.
+# b2's msvc toolset takes the cl of this build by its path. Left to detect
+# one, the b2 of this Boost knows no Visual Studio newer than 2022: it picks
+# an older installation when one exists and configures nothing usable (a
+# 32-bit arm "msvc-6.0") when none does. 14.3 is the newest version it has
+# flags for. Its setup script is an empty one: b2 finds none for this
+# compiler, and the build already runs in the developer environment.
 # clang-cl is b2's clang-win toolset, which takes the path of the compiler:
 # b2's plain clang toolset drives clang with GCC options and builds nothing
 # from the MSVC flags of this target.
 _dep_boost_user_config() {
 	if [ "$(dep_compiler_id "$2")" = MSVC ]; then
-		printf 'using msvc ;\n' > "${1}/user-config.jam"
+		printf '@exit /b 0\r\n' > "${1}/tau-msvc-setup.bat"
+		printf 'using msvc : 14.3 : "%s" : <setup>"%s" ;\n' \
+			"$(cygpath -m "$2")" \
+			"$(cygpath -m "${1}/tau-msvc-setup.bat")" \
+			> "${1}/user-config.jam"
 	else
 		printf 'using clang-win : : "%s" ;\n' "$(cygpath -m "$2")" \
 			> "${1}/user-config.jam"
@@ -140,6 +148,7 @@ _dep_boost_target_build() {
 
 _dep_boost_target_setup() {
 	DEP_BOOST_TARGET_OS="windows"
+	DEP_BOOST_B2_ARCH="x86"
 	if [ "$(dep_compiler_id "$DEP_BOOST_CXX")" != MSVC ]; then
 		DEP_BOOST_B2_TOOLSET="clang-win"
 	fi
