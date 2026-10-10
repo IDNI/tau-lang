@@ -437,8 +437,8 @@ TEST_CASE("V8: keep mode folds the pure side's chain, and the joint ask "
 	"decides F") {
 	// The callback is asked on the pure side's `pos`, `∀_y (y·a′) = 0`, and
 	// keeps it SLID to y's levels, where every piece is closed and folds
-	// (§1). No chain is left, so the joint ask runs; each side alone is
-	// open (V7), so only that ask can answer `F`.
+	// (§1). No chain is left, and each side alone is open (V7), so only the
+	// joint ask can answer `F`.
 	fixture f = make(joint, true);
 	size_t chains = 0;
 	const ap::keep_functional_fn<node_t> keep_all = [&chains](tref n) {
@@ -456,10 +456,11 @@ TEST_CASE("V8: keep mode folds the pure side's chain, and the joint ask "
 	check_against_source(got, f);
 }
 
-TEST_CASE("V9: a solver side holding a chain re-wraps whole") {
-	// `∃x (x + a = 0 ∧ ∀_y (x·y·r(w)) = 0)`: the chain equation shares `x`
-	// with the arithmetic atom, so both re-wrap as one unit over `x`. The
-	// chain's piece holds `w` free in a reference, so it stays a chain.
+TEST_CASE("V9: a chain's conjunct freezes the arithmetic atom sharing its "
+	"variable") {
+	// `∃x (x + a = 0 ∧ ∀_y (x·y·r(w)) = 0)`: the chain's piece holds `w` free
+	// in a reference, so it stays a chain and its conjunct freezes, taking
+	// the arithmetic atom that shares `x`: both re-wrap as one unit over `x`.
 	const size_t bv2 = bv_type_id<node_t>(2);
 	const tref x = tau::build_bf_variable("x", bv2);
 	const tref vx = tau::build_variable("x", bv2);

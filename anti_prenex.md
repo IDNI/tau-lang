@@ -2128,8 +2128,9 @@ ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx):
     // foreign type or a functional quantifier inside), or an IMPURE conjunct
     // carrying a functional quantifier — a chain reaching this point is a
     // kept or a stuck one (§3), and the solver has no term-level binder.
-    // No query below resolves anything: a PURE conjunct carrying a chain is
-    // the finite side's (step 3), and the solver path never sees one.
+    // A chain in an equation side was SLID (§1 transparency), every closed
+    // piece folded, so one left holds a reference, arithmetic or foreign-typed
+    // leaf: every chain sits in an impure conjunct or a unit, and freezes.
     // A binder unit with a translatable body is swallowed whole into a query
     // below — how a clause that re-wrapped open gets decided once enclosing
     // blocks close it (§4).
@@ -2159,21 +2160,17 @@ ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx):
     // UNSATISFIABILITY does not distribute — the sides may share free
     // variables satisfiable only under incompatible assignments, and one
     // joint ask restores the pre-split single-query precision. frozen is
-    // excluded: unsat of a sub-conjunction already decides. Skipped when b
-    // carries a functional quantifier — a kept or a stuck chain (§3), and
-    // the solver has no term-level binder.
-    if a is a surviving binder and b ∉ {T, F} and FV(a) ∩ FV(b) ≠ ∅
-       and b carries no functional quantifier:
+    // excluded: unsat of a sub-conjunction already decides.
+    if a is a surviving binder and b ∉ {T, F} and FV(a) ∩ FV(b) ≠ ∅:
         if ASK(∃Z.(a ∧ b), ctx) = unsat: return F
  7. return SIMPLIFIED_AND_JOIN(frozen, b, a)
 ```
 
 ```
 SOLVE_ARITHMETIC(clause, X, ctx):                     // the solver path
- 1. q ← ∃X.clause     // no functional quantifier is present: step 1 froze
-                      //   every impure conjunct carrying one and step 3 sent
-                      //   every pure one to the finite side; one here is a
-                      //   caller mistake, asserted.
+ 1. q ← ∃X.clause     // no functional quantifier is present: the router's
+                      //   step 1 froze every conjunct carrying one; one here
+                      //   is a caller mistake, asserted.
                       // binder units enter q as written — the solver accepts
                       //   quantified bv formulas; alternation depth = how many
                       //   enclosing blocks re-wrapped (§4)

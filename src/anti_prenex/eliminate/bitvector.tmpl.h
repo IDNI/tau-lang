@@ -76,6 +76,12 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 	const freeze_result<node> fr = freeze_opaque_components<node>(conjuncts,
 		X, [&c](tref m) { return bitvector_opaque<node>(m, c.type); });
 	if (fr.X.empty()) return fr.frozen;
+	// The slide folds every closed piece of a chain (§1), so a chain left
+	// holds an impure leaf or sits in an impure conjunct or a unit: it froze
+	// above, and neither the solver side nor the joint ask meets one.
+	DBG(assert(std::ranges::none_of(fr.conjuncts, [](tref m) {
+		return holds_anywhere<node>(m, is_functional_quantifier<node>);
+	}));)
 	// 3. §7 SPLIT_ARITHMETIC: the parts holding an impure conjunct are the
 	// solver's side `A` over `X_A`, the rest the finite side `B` over `X_B`.
 	const parts_partition<node> sp = partition_parts<node>(fr.conjuncts,
@@ -85,19 +91,13 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		: eliminate_finite_clause<node>(sp.rest, sp.rest_vars, c);
 	if (tau::get(b).equals_F()) return _F<node>();
 	// 5. §7 SOLVE_ARITHMETIC: `∃X_A.A` as one query, binder units entering
-	// it as written. The solver has no term-level binder, and a chain comes
-	// here through the split's closure alone: that side re-wraps whole.
+	// it as written.
 	auto solver = [](tref q) -> std::optional<bool> {
 		const answer r = ask<node>(q);
 		if (r == answer::unknown) return std::nullopt;
 		return r == answer::sat;
 	};
-	const bool chain = std::ranges::any_of(sp.hit, [](tref m) {
-		return holds_anywhere<node>(m,
-			is_functional_quantifier<node>); });
 	const tref a = sp.hit.empty() ? _T<node>()
-		: chain ? rewrap<node>(simplified_and_join<node>(sp.hit),
-			sp.hit_vars)
 		: query_or_rewrap<node>(sp.hit, sp.hit_vars, solver);
 	// 6. THE JOINT ASK over two open sides that share a free variable.
 	// `frozen` stays out: a sub-conjunction's unsatisfiability decides.
@@ -108,10 +108,7 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		const trefs Z = get_free_vars<node>(ab);
 		const tref j = term_handle<node>::convert_to_tau_terms(
 			rewrap<node>(ab, Z));
-		// A chain on either side, kept or stuck, is out of the solver's
-		// reach.
-		if (tau::get(j).find_top(is_functional_quantifier<node>) == nullptr
-			&& ask<node>(canonicalise_binder_ids<node>(j)) == answer::unsat)
+		if (ask<node>(canonicalise_binder_ids<node>(j)) == answer::unsat)
 			return _F<node>();
 	}
 	return simplified_and_join<node>(trefs{ fr.frozen, b, a });
