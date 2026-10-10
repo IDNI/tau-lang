@@ -93,9 +93,11 @@ _dep_spot_field_block() {
 		"cxxflags=${DEP_SPOT_CXXFLAGS}" \
 		"builder=${DEP_SPOT_BUILDER}"
 	_dep_spot_target_compiler_fields
+	# A target whose package other targets reuse names the platform of the
+	# package, not the builder.
 	printf '%s\n' \
-		"os=$(uname -s)" \
-		"arch=$(uname -m)" \
+		"os=${DEP_SPOT_ID_OS:-$(uname -s)}" \
+		"arch=${DEP_SPOT_ID_ARCH:-$(uname -m)}" \
 		"build_type=Release" \
 		"shared=OFF" \
 		"python=OFF"
