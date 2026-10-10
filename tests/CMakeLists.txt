@@ -465,6 +465,21 @@ if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
 endif ()
 
 #
+# The budgets, switches and BA options of the wasm library
+# (bindings/js/tests/budgets.js). Needs no native tau.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
+	enable_testing()
+	add_test(NAME js_budgets
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/budgets.js")
+	set_tests_properties(js_budgets PROPERTIES
+		ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js"
+		TIMEOUT 120
+		TAU_NODE_ONLY TRUE)
+endif ()
+
+#
 # The JavaScript parity check: the wasm module against a native tau from this
 # same source and pack (bindings/js/tests/parity.js). A preset that promises
 # this gate sets TAU_PARITY_REQUIRE_NATIVE, which fails on a missing or stale one.
