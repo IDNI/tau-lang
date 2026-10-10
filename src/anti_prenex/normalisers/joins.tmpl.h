@@ -78,14 +78,18 @@ trefs absorb(const trefs& ms) {
 	// candidate).
 	std::vector<trefs> parts(ms.size());
 	subtree_unordered_map<node, std::vector<size_t>> occ;
-	subtree_unordered_set<node> seen;
 	for (size_t i = 0; i < ms.size(); ++i) {
-		seen.clear();
-		for (tref p : parts_of<node, conj>(ms[i]))
-			if (seen.insert(p).second) {
-				parts[i].push_back(p);
-				occ[p].push_back(i);
-			}
+		trefs& own = parts[i] = parts_of<node, conj>(ms[i]);
+		// Deduplicated in place: occurrence lists grow in member order,
+		// so a part repeated within this member already ends in `i`.
+		size_t kept = 0;
+		for (tref p : own) {
+			std::vector<size_t>& o = occ[p];
+			if (!o.empty() && o.back() == i) continue;
+			o.push_back(i);
+			own[kept++] = p;
+		}
+		own.resize(kept);
 	}
 	std::vector<bool> absorbed(ms.size(), false);
 	for (size_t d = 0; d < ms.size(); ++d) {
