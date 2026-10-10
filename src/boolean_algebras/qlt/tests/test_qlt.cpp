@@ -49,11 +49,6 @@ static qlt neg_inf_open(long long b) { // (-inf, b)
 		qlt_rational::make_neg_inf(), qlt_bound::OPEN,
 		qlt_rational(b, 1),           qlt_bound::OPEN);
 }
-static qlt neg_inf_closed(long long b) { // (-inf, b]
-	return make_interval(
-		qlt_rational::make_neg_inf(), qlt_bound::OPEN,
-		qlt_rational(b, 1),           qlt_bound::CLOSED);
-}
 static qlt open_pos_inf(long long a) { // (a, +inf)
 	return make_interval(
 		qlt_rational(a, 1),            qlt_bound::OPEN,

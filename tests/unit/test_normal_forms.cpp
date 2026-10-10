@@ -115,19 +115,16 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 
 }
 
-TEST_SUITE("normal forms: reduce_bf") {
-
-	/*TEST_CASE("uninterpreted constants") {
-		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		auto src = make_tau_source(sample);
-		auto statement = (make_statement(src)
-			| tau::spec
-			| tau::main
-			| tau::wff).value();
-		auto result = statement | reduce_bf<Bool>;
-		CHECK( result == _F<Bool> );
-	}*/
-}
+/*TEST_CASE("uninterpreted constants") {
+	const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
+	auto src = make_tau_source(sample);
+	auto statement = (make_statement(src)
+		| tau::spec
+		| tau::main
+		| tau::wff).value();
+	auto result = statement | reduce_bf<Bool>;
+	CHECK( result == _F<Bool> );
+}*/
 
 TEST_SUITE("normal forms: dnf_bf") {
 

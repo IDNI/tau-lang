@@ -473,14 +473,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	}
 }
 
-TEST_SUITE("parsing variables") {
-	// done inderectly
-}
-
-TEST_SUITE("parsing captures") {
-	// done inderectly
-}
-
 TEST_SUITE("parsing inputs") {
 
 	TEST_CASE("fix lookback") {
@@ -535,10 +527,6 @@ TEST_SUITE("parsing outputs") {
 		const char* sample = "( o1[t - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
-}
-
-TEST_SUITE("parsing offsets"){
-	// done inderectly
 }
 
 TEST_SUITE("parsing wwf formulas ") {

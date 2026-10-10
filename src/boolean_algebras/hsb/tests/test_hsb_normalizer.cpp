@@ -34,14 +34,6 @@ static hsb_halfspace make_raw_hs(std::vector<double> w, double b) {
 	return h;
 }
 
-// Count top-level OR clauses in a formula (1 if not an or_ node).
-static size_t count_top_clauses(const hsb& f) {
-	if (!f.root_ref()) return 0;
-	if (f.root_kind() != hsb::kind::or_) return 1;
-	return 1 + count_top_clauses(f.rhs())
-	         + count_top_clauses(f.lhs()) - 1;
-}
-
 // Return true iff the formula tree contains any kind::not_ node.
 static bool has_negation(const hsb& n) {
 	if (!n.root_ref()) return false;

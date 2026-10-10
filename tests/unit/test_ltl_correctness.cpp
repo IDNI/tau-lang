@@ -55,19 +55,6 @@ static strings run_with_i1(const char* formula, const strings& i1_vals, size_t n
 	return o1->get_values();
 }
 
-// Run formula with no inputs for N steps, return o1 values.
-static strings run_no_input(const char* formula, size_t n) {
-	io_context<node_t> ctx;
-	auto o1 = std::make_shared<vector_output_stream>();
-	ctx.add_output("o1", tau_type_id<node_t>(), o1);
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
-	if (!nso.has_value()) return {};
-	tref fm = nso.value().main->get();
-	if (!fm) return {};
-	run<node_t>(fm, ctx, n);
-	return o1->get_values();
-}
-
 // Run a qlt-typed formula with no inputs for N steps, return o1 values.
 static strings run_qlt_no_input(const char* formula, size_t n) {
 	io_context<node_t> ctx;

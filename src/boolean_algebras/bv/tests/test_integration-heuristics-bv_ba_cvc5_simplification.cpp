@@ -372,10 +372,6 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	}
 }
 
-TEST_SUITE("ba bv cvc5 power of 2/variable simplification") {
-
-}
-
 TEST_SUITE("cvc5 back-translation correctness") {
 
 	// Regression tests: the cvc5 -> tau back-translator

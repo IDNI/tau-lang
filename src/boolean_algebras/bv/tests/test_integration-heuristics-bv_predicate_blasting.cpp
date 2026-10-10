@@ -1182,15 +1182,6 @@ TEST_SUITE("more complex formulas") {
 
 }
 
-// Runs blast_normalize with a temporary bv size, then restores the original.
-static std::string blast_normalize_with_size(size_t size, const std::string& sample) {
-	auto prev = default_bv_size;
-	default_bv_size = size;
-	auto result = blast_normalize(sample);
-	default_bv_size = prev;
-	return result;
-}
-
 //
 // bvadd: augend + addend = sum (mod 2^N)
 //

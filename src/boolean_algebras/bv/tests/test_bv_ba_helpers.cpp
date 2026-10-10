@@ -29,11 +29,6 @@ tref parse(const std::string& sample) {
 	return src;
 }
 
-TEST_SUITE("bv to tau tree translation") {
-
-
-}
-
 // SO-2. is_bv_solvable_formula gates every solver shortcut in the normalizer
 // and in anti-prenexing. It used to inspect `variable` nodes only, so a
 // formula whose untranslatable part was something else -- an unresolved

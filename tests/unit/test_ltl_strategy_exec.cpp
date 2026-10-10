@@ -30,12 +30,6 @@ using namespace idni::tau_lang;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static tref spec_exec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 // Run formula with no inputs for N steps, return o1 stream.
 static std::shared_ptr<vector_output_stream>
 run_no_input(const char* formula, size_t steps, size_t ba_type = 0) {
