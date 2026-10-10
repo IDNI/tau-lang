@@ -667,11 +667,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The Windows MSVC environment: the windows-x86_64-msvc store of the
-  # clang-cl build. This job resolves it once and saves it. The test job
-  # below restores that store.
+  # The Windows MSVC environment: the windows-x86_64-msvc store. cl.exe and
+  # clang-cl record a different compiler in the curl package id, so this job
+  # resolves both id sets once and saves the store. The test matrix below
+  # restores that store.
   windows-msvc-store:
-    name: Windows MSVC · environment
+    name: Windows x86_64 · environment
     needs: guard
     runs-on: windows-latest
     timeout-minutes: 240
@@ -699,7 +700,7 @@ jobs:
       - name: Create the binding venv
         run: ./dev dep-python-venv
 
-      # clang-cl uses the MSVC headers and libraries.
+      # cl.exe and clang-cl use the MSVC headers and libraries.
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -730,6 +731,9 @@ jobs:
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
+      - name: Resolve the cl.exe store packages
+        run: ./dev preset release-msvc-cl-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
       - name: Resolve the clang-cl store packages
         run: ./dev preset release-msvc-all-clang-cl --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
@@ -744,10 +748,10 @@ jobs:
             !~/.tau/store/*/*.staging-*
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
-  # The name holds no matrix value: GitHub appends (clang-cl) itself, and a
-  # skipped job shows no unexpanded template.
+  # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
+  # and a skipped job shows no unexpanded template.
   windows-msvc:
-    name: Windows MSVC · tests
+    name: Windows x86_64 · tests
     needs: windows-msvc-store
     runs-on: windows-latest
     timeout-minutes: 240
@@ -757,11 +761,12 @@ jobs:
     env:
       # windows-latest runners are 4-core
       TAU_BUILD_JOBS: 4
-      PRESET: release-msvc-all-clang-cl
+      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-cl-all' }}
+      BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc' || 'build/release-msvc-cl' }}
     strategy:
       fail-fast: false
       matrix:
-        compiler: [clang-cl]
+        compiler: [cl, clang-cl]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -773,14 +778,14 @@ jobs:
       - name: Create the binding venv
         run: ./dev dep-python-venv
 
-      # clang-cl uses the MSVC headers and libraries.
+      # cl.exe and clang-cl use the MSVC headers and libraries.
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       # The environment job saved this key for the same commit. Only that job
-      # saves it.
+      # saves it, so the two matrix entries do not race on one key.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
@@ -838,7 +843,7 @@ jobs:
           shopt -s nullglob
           for d in crash-dumps/*.dmp; do
             exe="$(basename "$d")"
-            pdb="build/release-msvc/${exe%%.exe.*}.pdb"
+            pdb="${BUILD_DIR}/${exe%%.exe.*}.pdb"
             [ -f "$pdb" ] && cp -n "$pdb" crash-dumps/
           done
           ls -la crash-dumps || true
@@ -847,7 +852,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: windows-msvc-crash-dumps
+          name: windows-msvc-crash-dumps-${{ matrix.compiler }}
           path: crash-dumps/
           if-no-files-found: ignore
           retention-days: 7

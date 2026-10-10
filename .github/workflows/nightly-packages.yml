@@ -584,7 +584,7 @@ jobs:
   # The MSVC wheel needs the developer command prompt for cl.exe and the MSVC
   # dependency store. delvewheel bundles the cvc5 DLLs into the wheel.
   windows-msvc-wheel:
-    name: Windows MSVC · wheel
+    name: Windows x86_64 · wheel
     needs: [ check_date, check_tests ]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: windows-latest
@@ -870,7 +870,7 @@ jobs:
   # tau.exe with its DLLs and licenses, as an NSIS installer with the SDK box
   # and as a zip. Both presets build in build/release-msvc.
   windows-msvc:
-    name: Windows MSVC · package
+    name: Windows x86_64 · package
     needs: [ check_date, check_tests ]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: windows-latest
