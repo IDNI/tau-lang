@@ -54,7 +54,7 @@ endfunction()
 
 # add_repl_test(<name> <cmd> <regex> [FLAGS <arg>...] [NO_TRACE]
 #     [ENV <VAR=value>...] [TIMEOUT <sec>] [FAIL_REGEX <re>] [NO_FAIL_REGEX]
-#     [REQUIRES ltlsynt|hostfs|bounded|<ba-id> ...])
+#     [REQUIRES ltlsynt|hostfs|<ba-id> ...])
 #
 # Runs `tau <flags> -e "<cmd>" -S trace`. NO_TRACE drops `-S trace`.
 function(add_repl_test test_name test_cmd test_regex)
