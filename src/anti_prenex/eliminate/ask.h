@@ -39,6 +39,9 @@ namespace idni::tau_lang::anti_prenexing {
  * component-scoped is read. A free variable in @p q is a caller bug,
  * Debug-asserted. The caller canonicalises @p q (`canonicalise_binder_ids`):
  * it is the memo key as it stands.
+ *
+ * The clock is read before the solver is asked (§3 time limit); a cached
+ * verdict reads none. The query itself runs unbounded once posed.
  */
 template <NodeType node>
 answer ask(tref q);

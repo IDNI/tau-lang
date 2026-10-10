@@ -436,10 +436,10 @@ null node — the timeout, told apart from every formula; the caller still
 holds `φ`, sound as it stands (inv. 3). A partly pushed formula is of no use
 to the caller, so nothing partial is returned. The clock is read wherever work
 multiplies — each case `EXPAND` builds, each arm `DECOMPOSE_ARMS` pushes,
-each branch the case witness emits — and every solver query (`ASK`) runs
-under the time that remains. The abort writes no table entry (§1, cache
-scope). Termination does not rest on the limit: without one, every call
-ends (§8).
+each branch the case witness emits — and before each `ASK` and each
+`DECIDE_FINITE` sweep. No bound reaches inside cvc5: a query once posed runs
+to its end. The abort writes no table entry (§1, cache scope). Termination
+does not rest on the limit: without one, every call ends (§8).
 
 ```
 ELIMINATE_BY_SUBSTITUTION(φ):                        // one global pass

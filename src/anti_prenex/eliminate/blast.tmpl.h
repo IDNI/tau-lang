@@ -232,6 +232,7 @@ std::optional<bool> decide_finite(tref k, ctx<node>& c) {
 	// the sweep may still succeed.
 	if (const auto a = lookup<node, table::solver_memo>(k);
 		a && *a != answer::unknown) return *a == answer::sat;
+	check_time_limit();
 	if (const auto r = blast_detail::sweep<node>(k, c)) {
 		store<node, table::qbf_memo>(k, *r);
 		return r;

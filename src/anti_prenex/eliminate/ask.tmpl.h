@@ -18,6 +18,9 @@ answer ask(tref k) {
 	// `solver_memo` is not taint-aware: the wrapper records every verdict,
 	// `unknown` included, and only the flush retires one (§1).
 	return memoised<node, table::solver_memo>(k, [k] {
+		// A CHECK POINT (§3): past the limit the query is never posed,
+		// and the abort writes no entry.
+		check_time_limit();
 		const std::optional<bv_sat_status> r =
 			bv_formula_sat_status<node>(k);
 		if (r == bv_sat_status::sat) return answer::sat;

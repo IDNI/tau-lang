@@ -55,7 +55,8 @@ inline constexpr auto sweep_options =
  * then `ASK`. Nothing comes back only when the sweep did not finish and the
  * solver answered `unknown` — the one taint source of the elimination (§1
  * cache scope). A query whose bits exceed the universe's 2^22 variable ids
- * is not swept at all, and goes to `ASK`.
+ * is not swept at all, and goes to `ASK`. The clock is read before the
+ * sweep and again in `ASK` (§3 time limit); a cached verdict reads none.
  *
  * `BIT_BLAST`'s `FAIL`: a node the sweep has no rule for — an order atom, a
  * `bf_neq`, an arithmetic operator or a width cast, a reference, a temporal

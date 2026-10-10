@@ -26,6 +26,7 @@
 #include "test_Bool_helpers.h"
 #include "anti_prenex/eliminate/blast.h"
 
+#include <chrono>
 #include <optional>
 #include <stdexcept>
 
@@ -246,6 +247,29 @@ TEST_CASE("B12: a constant folded from two constants is read by its value") {
 	CHECK(decide(parse("ex s (!(s:bv[8] & ({ 2 }:bv[8] | { 4 }:bv[8]) "
 		"= { 0 }:bv[8]) && s:bv[8] & ({ 1 }:bv[8] | { 6 }:bv[8]) "
 		"= { 0 }:bv[8]).")) == false);
+}
+
+// --- the time limit (§3) -----------------------------------------------------------
+
+TEST_CASE("T1: past a zero limit neither the sweep nor the solver runs") {
+	// A query no other case asks, so no table answers it and the clock is
+	// read. The abort writes no entry, and the same query decides once the
+	// limit is gone.
+	const tref k = ap::canonicalise_binder_ids<node_t>(parse(
+		"ex x (!(x:bv[3] = { 5 }:bv[3]) && !(x:bv[3] = { 2 }:bv[3]))."));
+	{
+		const ap::time_limit_scope limit(
+			std::chrono::steady_clock::duration::zero());
+		auto c = ctx_of(k);
+		CHECK_THROWS_AS(ap::decide_finite<node_t>(k, c),
+			ap::time_limit_exceeded);
+		CHECK_THROWS_AS(ap::ask<node_t>(k), ap::time_limit_exceeded);
+	}
+#ifdef TAU_CACHE
+	CHECK(!ap::lookup<node_t, ap::table::qbf_memo>(k).has_value());
+	CHECK(!ap::lookup<node_t, ap::table::solver_memo>(k).has_value());
+#endif
+	CHECK(decide(k) == true);
 }
 
 } // TEST_SUITE
