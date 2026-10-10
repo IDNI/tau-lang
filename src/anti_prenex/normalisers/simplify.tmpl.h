@@ -144,7 +144,14 @@ std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 	// By value: the loop builds nodes, and a reference into
 	// `get_free_vars`' table does not survive a collection (dag.h).
 	const trefs vars = get_free_vars<node>(f);
+	// A strict pin makes the cofactors complements, a Boolean identity that
+	// holds under every assignment of the leaves: one assignment breaking it
+	// rules `y` out before its plain record costs a sweep per cofactor.
+	std::optional<terms_detail::cofactor_refuter<node>> refuter;
+	if (rg == regime::plain) refuter.emplace(f);
 	for (tref y : vars) {
+		if (refuter && !refuter->complementary(
+			tree<node>::get(tree<node>::bf, y))) continue;
 		std::optional<pin<node>> p = detail::pin_of_var<node>(f, y, rg);
 		if (p && p->strict) return p;
 	}

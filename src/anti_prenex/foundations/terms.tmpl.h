@@ -237,9 +237,9 @@ bool is_open(bref<node> r, unsigned char asked) {
 	return bdd::visit_nodes(r, at_node) && compound;
 }
 
-/// Refutes the cofactor check on 64 content-derived assignments at once: the
-/// hooks folding a cofactor are Boolean identities, so cofactors whose words
-/// differ are never one node. A skeleton node the hooks interpret is refused.
+/// Refutes the cofactor check and the strict pin on 64 content-derived
+/// assignments at once: the hooks and `SIMPLIFY_TERM` use Boolean identities
+/// only. A skeleton node the hooks interpret is refused.
 template <NodeType node>
 struct cofactor_refuter {
 	explicit cofactor_refuter(tref t) {
@@ -251,8 +251,34 @@ struct cofactor_refuter {
 	/// Do `t[key←0]` and `t[key←1]` differ under one of the 64 assignments?
 	/// `false` decides nothing.
 	bool differ(tref key) {
-		using tau = tree<node>;
 		if (!ok) return false;
+		evaluate(key);
+		return w0[root] != w1[root];
+	}
+
+	/// Are `t[key←0]` and `t[key←1]` complements under all 64 assignments?
+	/// `true` decides nothing.
+	bool complementary(tref key) {
+		if (!ok) return true;
+		evaluate(key);
+		return w0[root] == ~w1[root];
+	}
+
+private:
+	enum class op : unsigned char { leaf, conj, disj, sum, neg };
+	// A leaf's `n` is set on a variable alone, the only leaf a key can be.
+	struct step { op o; uint32_t a, b; uint64_t w; tref n; };
+	// The step of each `bf` node met so far.
+	using index_t = subtree_unordered_map<node, uint32_t>;
+	std::vector<step> steps;
+	std::vector<uint64_t> w0, w1;
+	uint32_t root = 0;
+	bool ok = true;
+
+	/// Fills `w0` and `w1` with every step's words under `key ← 0` and
+	/// `key ← 1`.
+	void evaluate(tref key) {
+		using tau = tree<node>;
 		const tau& k = tau::get(key);
 		for (size_t i = 0; i < steps.size(); ++i) {
 			const step& s = steps[i];
@@ -272,19 +298,7 @@ struct cofactor_refuter {
 			case op::neg: w0[i] = ~w0[s.a], w1[i] = ~w1[s.a]; break;
 			}
 		}
-		return w0[root] != w1[root];
 	}
-
-private:
-	enum class op : unsigned char { leaf, conj, disj, sum, neg };
-	// A leaf's `n` is set on a variable alone, the only leaf a key can be.
-	struct step { op o; uint32_t a, b; uint64_t w; tref n; };
-	// The step of each `bf` node met so far.
-	using index_t = subtree_unordered_map<node, uint32_t>;
-	std::vector<step> steps;
-	std::vector<uint64_t> w0, w1;
-	uint32_t root = 0;
-	bool ok = true;
 
 	// splitmix64's finaliser: the node hash alone spreads too few of its bits
 	// to make 64 independent assignments. Taken from the atom under its `bf`.
