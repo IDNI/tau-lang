@@ -48,6 +48,24 @@ tau.set_option('max-fixpoint-steps', '1000');
 console.log(tau.get_option('max-fixpoint-steps')); // '1000'
 ```
 
+Under Node.js the module reads the `TAU_` environment variables when it loads.
+The variable of an option is `TAU_` plus the option name in upper case, with
+`_` for `-` (`max-fixpoint-steps` reads `TAU_MAX_FIXPOINT_STEPS`). A bad value
+does not stop the load. The module keeps the reason in `get_last_error()`, and
+then every engine call fails with that reason. So check `get_last_error()`
+once, right after the load. The text is empty after a clean load, and it can
+also hold the warnings of a load that succeeds:
+
+```js
+tauModule().then((tau) => {
+	const why = tau.get_last_error();
+	if (why !== '') throw new Error(why);
+	// ...
+});
+```
+
+A browser has no such variables, so a page uses `set_option` instead.
+
 `tau.node.js` and `tau.node.mjs` are the CommonJS/ESM smoke-test
 wrappers; a consumer needs only the entry points named in `package.json`.
 

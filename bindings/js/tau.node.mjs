@@ -18,6 +18,12 @@ function check(cond, label) {
 try {
 	const tau = await tauModule();
 
+	// A bad TAU_ variable does not stop the load. The module reports it in
+	// get_last_error(), so a caller checks it before the first call.
+	const loadError = tau.get_last_error();
+	check(loadError === '',
+		`get_last_error() after the load -> ${JSON.stringify(loadError)}`);
+
 	const spec = tau.get_spec('o[t] = i[t].');
 	check(typeof spec === 'string'
 		&& spec.includes('o[t]') && spec.includes('i[t]'),
