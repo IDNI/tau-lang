@@ -57,6 +57,7 @@ case "${HOST_OS}-${HOST_ARCH}" in
 	macos-x86_64)    UV_ASSET="uv-x86_64-apple-darwin.tar.gz" ;;
 	macos-aarch64)   UV_ASSET="uv-aarch64-apple-darwin.tar.gz" ;;
 	windows-x86_64)  UV_ASSET="uv-x86_64-pc-windows-msvc.zip" ;;
+	windows-aarch64) UV_ASSET="uv-aarch64-pc-windows-msvc.zip" ;;
 	*) UV_ASSET="" ;;
 esac
 # From the .sha256 files of the uv release. A version bump needs new digests,
@@ -67,6 +68,7 @@ case "${UV_VERSION} ${UV_ASSET}" in
 	"0.12.13 uv-x86_64-apple-darwin.tar.gz")       UV_SHA="5e287ef61cb6a9b61b3a83fef124fd143e400468a7dac794230147a810e17119" ;;
 	"0.12.13 uv-aarch64-apple-darwin.tar.gz")      UV_SHA="7e6ddb9316acc00f2296c82ff4d99977870ee34b2f0ddcae9444d714db9364ed" ;;
 	"0.12.13 uv-x86_64-pc-windows-msvc.zip")       UV_SHA="a86c9dc7bad9b03f388583b7187c05fe9951c2e0d392217e8fd43d97787f6ec2" ;;
+	"0.12.13 uv-aarch64-pc-windows-msvc.zip")      UV_SHA="1efb2654b06e7063d4ac1fc9d49a9bda9a6704d82f035b589a2751a592f14151" ;;
 	*) UV_SHA="" ;;
 esac
 
