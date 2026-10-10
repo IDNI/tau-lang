@@ -91,7 +91,7 @@ TEST_SUITE("minterm_range") {
 		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
-		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
+		size_t count = 0; for ([[maybe_unused]] const auto& i : rng) count++;
 		CHECK ( count == 3 );
 	}
 
@@ -100,7 +100,7 @@ TEST_SUITE("minterm_range") {
 		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
-		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
+		size_t count = 0; for ([[maybe_unused]] const auto& i : rng) count++;
 		CHECK ( count == 7 );
 	}
 
@@ -114,7 +114,7 @@ TEST_SUITE("minterm_range") {
 		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
-		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
+		size_t count = 0; for ([[maybe_unused]] const auto& i : rng) count++;
 		CHECK ( count == 1 );
 	}
 }
@@ -211,7 +211,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("no inequality") {
 		inequality_system<node_t> sys;
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 0 );
 	}
 
@@ -221,7 +221,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 1 );
 	}
 
@@ -231,7 +231,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 3 );
 	}
 
@@ -241,7 +241,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 7 );
 	}
 
@@ -254,7 +254,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 1 );
 	}
 
@@ -267,7 +267,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 9 );
 	}
 
@@ -280,7 +280,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
-		size_t count = 0; for ([[gnu::unused]] auto& i : range) count++;
+		size_t count = 0; for ([[maybe_unused]] auto& i : range) count++;
 		CHECK ( count == 49 );
 	}
 }

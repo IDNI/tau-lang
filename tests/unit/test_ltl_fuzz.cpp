@@ -22,7 +22,9 @@
 
 // GCC fires -Wstrict-overflow on loop-with-break patterns at -O2; all counters here
 // are clearly bounded so this is a false positive.
+#if defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
