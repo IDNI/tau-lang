@@ -142,19 +142,11 @@ std::optional<pin<node>> find_pin(tref atom, const block& X, regime rg) {
 	// By value: the loop builds nodes, and a reference into
 	// `get_free_vars`' table does not survive a collection (dag.h).
 	const trefs vars = get_free_vars<node>(f);
-	std::optional<pin<node>> best;
-	size_t best_size = 0;
 	for (tref y : vars) {
 		std::optional<pin<node>> p = detail::pin_of_var<node>(f, y, rg);
-		if (!p) continue;
-		// A STRICT pin ends the scan: §3 takes one without comparing
-		// witnesses.
-		if (p->strict) return p;
-		if (const size_t size = mem_size<node>(p->witness);
-			!best || size < best_size)
-				best = p, best_size = size;
+		if (p && p->strict) return p;
 	}
-	return best;
+	return {};
 }
 
 template <NodeType node>
@@ -350,9 +342,8 @@ private:
 
 	/**
 	 * @brief §3: a PINNING conjunct rewritten by every pin but its OWN.
-	 * Its own would erase it — `f[y ← f₁′]` IS the residual `p = 0`, so a
-	 * strict pin folds the conjunct to `T`, taking the constraint on `y`
-	 * with it, a weak pin's residual included.
+	 * Its own would erase it — `f[y ← f₁′]` IS the residual `p = 0`, which
+	 * a strict pin folds to `T`, taking the constraint on `y` with it.
 	 *
 	 * The exclusion is a RE-DERIVATION, not a mask: stage 1 runs again
 	 * over `candidates`, in the same content order and from the same
@@ -367,7 +358,7 @@ private:
 	 * BARRING THE KEY is the other half. Without the leaf, a sibling may
 	 * pin the SAME variable with a different witness, and rewriting the
 	 * leaf by that pin erases the leaf's own constraint just as its own
-	 * pin would — in `y = a·b ∧ y ∪ z = 0` it would leave neither conjunct
+	 * pin would — in `y = a·b ∧ y = c·d` it would leave neither conjunct
 	 * mentioning `y`. In the live environment a variable is pinned once,
 	 * so "every pin but its own" is exactly "every pin on another
 	 * variable", which is what the bar reproduces.

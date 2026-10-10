@@ -121,31 +121,29 @@ TEST_CASE("S1: the spelled pin is strict, with the other side as witness") {
 	CHECK(same(sym->witness, same(sym->var, fvar("y")) ? a : y));
 }
 
-TEST_CASE("S2: a weak pin keeps its residual") {
+TEST_CASE("S2: a weak pin keeps its residual, and propagation takes none") {
 	tref y = bvar("y"), t = bvar("t"), c = bvar("c"), d = bvar("d");
 	const tref G = land(c, d);
 	// `(y + t) ∪ G = 0`, the shape the squeeze produces (§3): the
 	// cofactors of `y` are `t ∪ G` and `t′ ∪ G`, complementary only where
 	// `G = 0`, so the pin is WEAK with witness `t·G′` and residual `G`.
 	// `G` is a product here so that no variable of it pins on its own.
-	auto p = ap::find_pin<node_t>(eq0(lor(lxor(y, t), G)), ap::block{});
+	const tref atom = eq0(lor(lxor(y, t), G));
+	auto p = ap::find_pin_for<node_t>(atom, fvar("y"));
 	REQUIRE(p.has_value());
 	CHECK(!p->strict);
-	// `y` and `t` pin each other symmetrically, so the content order
-	// picks; either way the witness is "the other side times `G′`".
-	REQUIRE((same(p->var, fvar("y")) || same(p->var, fvar("t"))));
-	const tref other = same(p->var, fvar("y")) ? t : y;
-	CHECK(same(p->witness,
-		ap::simplify_term<node_t>(land(other, lneg(G)))));
+	CHECK(same(p->witness, ap::simplify_term<node_t>(land(t, lneg(G)))));
+	// Propagation's match admits strict pins only, and the atom has none.
+	CHECK(!ap::find_pin<node_t>(atom, ap::block{}).has_value());
 	// A variable of the residue pins too when it is alone in it: `G = g`
-	// gives `g` the witness `0`, the smallest of the atom, which is what
-	// the tie-break then takes.
+	// gives `g` the witness `0`, weakly all the same.
 	tref g = bvar("g");
-	auto q = ap::find_pin<node_t>(eq0(lor(lxor(y, t), g)), ap::block{});
+	const tref atom2 = eq0(lor(lxor(y, t), g));
+	auto q = ap::find_pin_for<node_t>(atom2, fvar("g"));
 	REQUIRE(q.has_value());
 	CHECK(!q->strict);
-	CHECK(same(q->var, fvar("g")));
 	CHECK(tau::get(q->witness).equals_0());
+	CHECK(!ap::find_pin<node_t>(atom2, ap::block{}).has_value());
 }
 
 TEST_CASE("S3: what does not pin") {
@@ -165,15 +163,15 @@ TEST_CASE("S3: what does not pin") {
 		ap::block{ fvar("a") }).has_value());
 }
 
-TEST_CASE("S4: a strict pin wins over a weak one") {
+TEST_CASE("S4: the match takes a strict pin and refuses a weak one") {
 	tref y = bvar("y"), a = bvar("a"), b = bvar("b"), g = bvar("g");
-	// `(y + a·b) ∪ G = 0` pins `y` weakly (residual `G`), and nothing
-	// strictly, so the match returns a weak pin.
-	auto weak = ap::find_pin<node_t>(
-		eq0(lor(lxor(y, land(a, b)), g)), ap::block{});
-	REQUIRE(weak.has_value());
-	CHECK(!weak->strict);
-	CHECK(ap::mem_size<node_t>(weak->witness) > 0);
+	// `(y + a·b) ∪ g = 0` pins `y` weakly (residual `g`), and nothing
+	// strictly, so the match returns no pin.
+	const tref weak = eq0(lor(lxor(y, land(a, b)), g));
+	auto wp = ap::find_pin_for<node_t>(weak, fvar("y"));
+	REQUIRE(wp.has_value());
+	CHECK(!wp->strict);
+	CHECK(!ap::find_pin<node_t>(weak, ap::block{}).has_value());
 	// With the residual gone the same shape is strict.
 	auto strict = ap::find_pin<node_t>(eq0(lxor(y, land(a, b))),
 		ap::block{});
@@ -331,14 +329,15 @@ TEST_CASE("S8b: a pinning conjunct is never rewritten by its OWN pin") {
 	for (tref m : members(got)) if (same(m, strict)) kept = true;
 	CHECK(kept);
 	CHECK(are_nso_equivalent<node_t>(got, conj(strict, psi)));
-	// WEAK: the residual `c·d = 0` is what the pinning conjunct keeps in
-	// place (§3), so dropping it would lose a constraint outright.
+	// WEAK: no pin for propagation, so the conjunct stays as written with
+	// its residual `c·d = 0`, and `ψ` keeps `y`.
 	tref weak = eq0(lor(lxor(y, t), land(c, d)));
 	tref got2 = simp(conj(weak, psi));
 	INFO("weak: ", tau::get(got2).to_str());
 	bool kept2 = false;
 	for (tref m : members(got2)) if (same(m, weak)) kept2 = true;
 	CHECK(kept2);
+	CHECK(holds_var(other_member(got2, weak), "y"));
 	CHECK(are_nso_equivalent<node_t>(got2, conj(weak, psi)));
 }
 
@@ -419,11 +418,10 @@ TEST_CASE("S8e: the same equation at two positions of one chain") {
 	CHECK(kept);
 	CHECK(members(got).size() == 2);
 	CHECK(!holds_var(other_member(got, strict), "y"));
-	// A WEAK pin leaves a residual rather than `T`, so both positions
-	// stay, each in its own form: the one that pinned as written, the
-	// other with the witness substituted in. The third member is no
-	// candidate — an equation under `¬` pins nothing — so these two are
-	// all the frame matches.
+	// A WEAK pin is no pin for propagation, so neither position rewrites
+	// the other, and the sweep folds the second copy against the first.
+	// The third member is no candidate — an equation under `¬` pins
+	// nothing — and stays as written.
 	const tref weak = eq0(lor(lxor(y, t), land(c, d)));
 	const tref opaque = neg(eq0(bvar("g")));
 	const tref phi2 = conj(conj(weak, opaque), weak);
@@ -431,14 +429,31 @@ TEST_CASE("S8e: the same equation at two positions of one chain") {
 	INFO("weak twice: ", tau::get(got2).to_str());
 	CHECK(are_nso_equivalent<node_t>(got2, phi2));
 	CHECK(no_fused_atoms(got2));
-	CHECK(members(got2).size() == 3);
-	bool kept2 = false, rewritten = false;
+	CHECK(members(got2).size() == 2);
+	bool kept2 = false, kept_opaque = false;
 	for (tref m : members(got2)) {
 		if (same(m, weak)) kept2 = true;
-		else if (is_child<node_t>(m, tau::bf_eq)) rewritten = true;
+		if (same(m, opaque)) kept_opaque = true;
 	}
 	CHECK(kept2);
-	CHECK(rewritten);
+	CHECK(kept_opaque);
+}
+
+TEST_CASE("S8f: a weak pin never takes the variable of a strict one") {
+	tref a = bvar("a"), b = bvar("b"), x = bvar("x");
+	// `x ↦ 0` turns the first conjunct into `1 = 0`, so the conjunction is
+	// `F`. The first conjunct pins `x` too, but only weakly, with witness
+	// `(a·b)′`; matched first, it would rewrite `x = 0` into an atom that
+	// pins `x` no more, and the conjunction would stay two atoms.
+	const tref weak = eq0(lor(land(a, lor(b, lneg(x))),
+		land(lneg(a), lneg(x))));
+	const tref strict = eq0(x);
+	// The names put the weak conjunct first in the content order.
+	REQUIRE(tau::subtree_less(weak, strict));
+	const tref phi = conj(weak, strict);
+	const tref got = simp(phi);
+	INFO("got: ", tau::get(got).to_str());
+	CHECK(tau::get(got).equals_F());
 }
 
 TEST_CASE("S9: the cap refuses a pin") {

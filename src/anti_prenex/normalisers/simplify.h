@@ -27,8 +27,11 @@
  * re-simplifies the argument it changed through `SIMPLIFY_TERM` (invariant
  * 6); under `ref_args` every argument goes through `SIMPLIFY_TERM`, changed
  * or not. The pinning conjunct STAYS, rewritten by every pin but its OWN: it
- * still constrains its variable, and for a weak pin it is what keeps the
- * residual `p = 0`, while its own pin would fold it to `T`.
+ * still constrains its variable, while its own pin would fold it to `T`.
+ *
+ * ONLY A STRICT PIN PROPAGATES, where §3 admits weak ones too: a weak pin's
+ * witness can rewrite a sibling that pins the same variable strictly into an
+ * atom that pins nothing, and the fold the strict pin brings is lost.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_H__
@@ -54,8 +57,7 @@ namespace idni::tau_lang::anti_prenexing {
  * `var` is a free variable of the equation's term, `witness` is `f₁′` — the
  * lower end of the interval the one-point rule leaves — and `strict` says
  * that the residual `p = f₀f₁` folds to `0`, i.e. that the pin is the spelled
- * shape `y + t = 0`. A WEAK pin keeps its residual in the pinning conjunct,
- * which is why that conjunct is never dropped here.
+ * shape `y + t = 0`. A WEAK pin keeps its residual in the pinning conjunct.
  */
 template <NodeType node>
 struct pin {
@@ -86,8 +88,8 @@ template <NodeType node>
 cof_entry pin_from_cofactors(tref f0, tref f1, tref y);
 
 /**
- * @brief §3 `TRY_WITNESS`'s pin match on an `X`-free atom: the best pin of
- * `atom`, or `nullopt`.
+ * @brief §3 equality propagation's pin match on an `X`-free atom: the STRICT
+ * pin of `atom`, or `nullopt`.
  *
  * `atom` must be a POSITIVE equation — an equation under `¬` pins nothing —
  * and must be free of every variable of `X`: pushing a block variable into a
@@ -95,8 +97,8 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y);
  * the guard. On
  * `f = TERM_OF(atom)` a free `y` is pinned iff `usable ∧ f₀ ∪ f₁ = 1` on the
  * cofactors `f₀ = f[y←0]` and `f₁ = f[y←1]`, where `usable` is
- * `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a STRICT one first,
- * else the smallest `‖f₁′‖` (`mem_size`).
+ * `y ∉ FV(f₀) ∪ FV(f₁)`. A WEAK pin counts as none (the file header says
+ * why); among several strict pins the first free variable scanned wins.
  *
  * @p rg is the regime (fwd.h). In the plain one (phases 1 and 2) nothing
  * is BDD-backed, the cofactors are substitutions and the `X` guard is
