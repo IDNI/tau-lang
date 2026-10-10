@@ -56,6 +56,10 @@ struct node_cap_scope {
 	~node_cap_scope() { engine::node_cap = saved; }
 };
 
+/// The longest ∧-chain the sweep folds pairwise: a short chain keeps the
+/// fold's memoised pairs.
+inline constexpr size_t pairwise_and_max = 4;
+
 /// `BIT_BLAST`'s `FAIL` (§7).
 [[noreturn]] inline void fail() {
 	throw std::logic_error(
@@ -104,11 +108,20 @@ sweep_bdd sweeper<node>::formula(tref n) {
 	if (t.equals_T()) r = handle::one();
 	else if (t.equals_F()) r = handle::zero();
 	else if (t.child_is(tau::wff_neg)) r = ~formula(t[0].first());
-	else if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
-		const bool conj = t.child_is(tau::wff_and);
+	else if (t.child_is(tau::wff_and)) {
+		// A pairwise fold over a long chain can build intermediate
+		// conjunctions far larger than the result, which the n-ary
+		// conjunction never builds.
+		const trefs ms = members<node>(n);
+		std::vector<sweep_bdd> bs;
+		bs.reserve(ms.size());
+		for (tref m : ms) bs.push_back(formula(m));
+		if (bs.size() > pairwise_and_max) r = handle::and_many(bs);
+		else for (const sweep_bdd& b : bs) r = !r ? b : r & b;
+	} else if (t.child_is(tau::wff_or)) {
 		for (tref m : t[0].children()) {
 			const sweep_bdd b = formula(m);
-			r = !r ? b : (conj ? r & b : r | b);
+			r = !r ? b : r | b;
 		}
 	} else if (is_child_quantifier<node>(n)) {
 		const tref v = binder_var<node>(n);

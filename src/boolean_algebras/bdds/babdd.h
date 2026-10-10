@@ -1307,6 +1307,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return update_cache(x, y, r, and_memo), r;
 	}
 
+	// The top variable of a non-constant x, read without decoding x
+	static uint_t top_var(bdd_ref x) {
+		if constexpr (o.has_varshift()) return x.shift;
+		else return V[x.id].v;
+	}
+
 	// Normalize a conjunction operand list: sort by am_cmp, drop T
 	// and duplicates; collapse to {F} on any F or complement pair
 	static void am_sort(std::vector<bdd_ref>& b) {
@@ -1338,35 +1344,33 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	 * - 3: the high branch is F -- the result is
 	 *      add(m, F, bdd_and_many(l))
 	 */
-	static size_t bdd_and_many_iter(std::vector<bdd_ref> v,
+	static size_t bdd_and_many_iter(const std::vector<bdd_ref>& v,
 		std::vector<bdd_ref> &h, std::vector<bdd_ref> &l, bdd_ref &res,
 		uint_t &m)
 	{
-		size_t i;
-		bool flag = false;
-		m = get(v[0]).v;
-		for (i = 1; i != v.size(); ++i)
+		m = top_var(v[0]);
+		for (size_t i = 1; i != v.size(); ++i)
 			if (!leaf(v[i])) {
-				if (get(v[i]).v < m) m = get(v[i]).v;
+				if (top_var(v[i]) < m) m = top_var(v[i]);
 			} else if (v[i] == F) return res = F, 1;
+		bool high_false = false, low_false = false;
 		h.reserve(v.size()), l.reserve(v.size());
-		for (i = 0; i != v.size(); ++i) {
-			const auto& b = get(v[i]);
-			if (b.v != m) h.push_back(v[i]);
-			else if (!leaf(b.h)) h.push_back(b.h);
-			else if (b.h == F) { flag = true; break; }
+		for (const bdd_ref x : v) {
+			if (top_var(x) != m) {
+				h.push_back(x), l.push_back(x);
+				continue;
+			}
+			const bdd b = get(x);
+			if (!leaf(b.h)) h.push_back(b.h);
+			else high_false = high_false || b.h == F;
+			if (!leaf(b.l)) l.push_back(b.l);
+			else low_false = low_false || b.l == F;
 		}
-		if (!flag) am_sort(h);
-		for (i = 0; i != v.size(); ++i) {
-			const auto& b = get(v[i]);
-			if (b.v != m) l.push_back(v[i]);
-			else if (!leaf(b.l)) l.push_back(b.l);
-			else if (b.l == F) return flag ? res = F, 1 : 2;
-		}
-		am_sort(l);
-		if (!flag) { if (h.size() && h[0] == F) flag = true; }
-		if (l.size() && l[0] == F) return flag ? 3 : 2;
-		if (flag) return 3;
+		if (low_false) return high_false ? res = F, 1 : 2;
+		am_sort(h), am_sort(l);
+		high_false = high_false || (h.size() && h[0] == F);
+		if (l.size() && l[0] == F) return high_false ? 3 : 2;
+		if (high_false) return 3;
 		std::vector<bdd_ref> x;
 		set_intersection(h.begin(), h.end(), l.begin(), l.end(),
 						back_inserter(x), am_cmp);
@@ -1391,15 +1395,15 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	// n-ary conjunction: normalizes via am_sort, then Shannon-expands
 	// on the smallest top variable via bdd_and_many_iter; results are
-	// memoized per operand list in and_many_memo
+	// memoized per operand list of three or more in and_many_memo
 	static bdd_ref bdd_and_many(std::vector<bdd_ref> v) {
 		am_sort(v);
 		if (v.empty()) return T;
 		if (v.size() == 1) return v[0];
+		// bdd_and memoises a pair already.
+		if (v.size() == 2) return bdd_and(v[0], v[1]);
 		auto it = and_many_memo.find(v);
 		if (it != and_many_memo.end()) return it->second;
-		if (v.size() == 2)
-			return and_many_memo.emplace(v, bdd_and(v[0], v[1])).first->second;
 		bdd_ref res = F, h, l;
 		uint_t m = 0;
 		std::vector<bdd_ref> vh, vl;
