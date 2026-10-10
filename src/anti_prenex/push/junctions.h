@@ -86,10 +86,10 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  *    share, the most shared one, is factored out by distributivity and the
  *    result simplified and pushed on.
  * 7. THE LICENSED DECOMPOSITION (`push/decompose.h`), one Boole split on an
- *    atom whose two signs span sibling disjunctive conjuncts, taken when its
- *    cofactors separate material rather than copy it; then THE FLOOR, the
- *    expansion (`push/expand.h`), `∃X` distributed over one disjunctive
- *    conjunct, one case per member.
+ *    atom whose two signs span sibling disjunctive conjuncts, or else on a
+ *    compound guard, taken when its cofactors separate material rather than
+ *    copy it; then THE FLOOR, the expansion (`push/expand.h`), `∃X`
+ *    distributed over one disjunctive conjunct, one case per member.
  */
 template <NodeType node>
 tref push_over_conjunction(tref psi, const block& X, ctx<node>& c);

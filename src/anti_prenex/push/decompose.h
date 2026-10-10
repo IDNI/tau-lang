@@ -6,7 +6,7 @@
  * two signs span sibling disjunctive conjuncts, and `DECOMPOSE_ARMS`, its two
  * arms — the step of the conjunction's ladder above the expansion.
  *
- * WHAT ARRIVES is what the ladder leaves below the case witness: a
+ * WHAT ARRIVES is what the ladder leaves below the shared disjunct: a
  * conjunction under a non-empty `X` narrowed to `X ∩ FV(ψ)`, every conjunct
  * touching `X`, and no cheaper step having taken it.
  *

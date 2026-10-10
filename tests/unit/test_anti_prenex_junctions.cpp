@@ -2,10 +2,11 @@
 
 // Unit tests for src/anti_prenex/push/junctions.h: §6's push over a
 // disjunction (2d) and the conjunction's ladder — scope narrowing, the fast
-// paths, the consistency check, the witness step, the case witness and the
-// floor. Spec: anti_prenex.md §6 (PUSH_OVER_DISJUNCTION,
-// PUSH_OVER_CONJUNCTION, INCIDENCE), §3 (TRY_WITNESS, TRY_CASE_WITNESS, the
-// result joins), §7 (ELIMINATE_BLOCK), invariants 1, 3, 6, 7 and 8.
+// paths, the consistency check, the witness step, the case witness, the
+// shared disjunct and the floor. Spec: anti_prenex.md §6
+// (PUSH_OVER_DISJUNCTION, PUSH_OVER_CONJUNCTION, INCIDENCE), §3 (TRY_WITNESS,
+// TRY_CASE_WITNESS, the result joins), §7 (ELIMINATE_BLOCK), invariants 1, 3,
+// 6, 7 and 8.
 //
 // The harness is the push suite's: parse `∃P.ψ`, normalise `ψ` the way phases
 // 1 and 3 leave it, put it into §1's term representation and hand the block

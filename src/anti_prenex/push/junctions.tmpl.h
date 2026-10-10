@@ -213,9 +213,9 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		return acc.result();
 	}
 
-	// 6. THE SHARED DISJUNCT, factored out: `∃X` then distributes over
-	// `d ∨ (r₁ ∧ … ∧ rₖ)` (2d) instead of splitting on `d` per conjunct.
-	// A factoring removes at least one ∨-conjunct, so re-entry terminates.
+	// 6. THE SHARED DISJUNCT, factored out so that 2d pushes `d` once:
+	// `∃X` distributes over `d ∨ (r₁ ∧ … ∧ rₖ)`. A factoring removes at
+	// least one ∨-conjunct, so re-entry terminates.
 	if (const std::optional<tref> f =
 		junctions_detail::factor_shared_disjunct<node>(cs, X))
 		return push_block<node>(simplify<node>(*f, regime::backed, c.P),

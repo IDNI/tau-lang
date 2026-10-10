@@ -2,9 +2,9 @@
 
 // THE WHOLE PIPELINE with the conjunction's LICENSED DECOMPOSITION and its
 // floor, the EXPANSION, in it. Spec: anti_prenex.md §6 (TRY_DECOMPOSE with
-// FOLD_DECIDED's probe, DECOMPOSE_ARMS, EXPAND), §7
-// (the leaves, DISCHARGE under `keep_functional`), §3 (the phases around the
-// push, the time limit), invariant 5.
+// FOLD_DECIDED's probe, DECOMPOSE_ARMS, EXPAND), §7 (the leaves, DISCHARGE
+// under `keep_functional`), §3 (the phases around the push, the time limit),
+// invariant 5.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no

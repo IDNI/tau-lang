@@ -1,9 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Unit tests for src/anti_prenex/push/expand.h: §6's FOLD_DECIDED and
-// EXPAND, the floor of the conjunction's ladder. Spec:
-// anti_prenex.md §6 (FOLD_DECIDED, EXPAND), §1 (`prio`), §3 (the result
-// joins), invariant 7.
+// EXPAND, the floor of the conjunction's ladder. Spec: anti_prenex.md §6
+// (FOLD_DECIDED, EXPAND), §1 (`prio`), §3 (the result joins), invariant 7.
 //
 // The harness is the junctions suite's: parse `∃P.ψ`, normalise `ψ` the way
 // phases 1 and 3 leave it — no SIMPLIFY, so a shape phase 1 would fold still

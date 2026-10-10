@@ -17,7 +17,8 @@
  * one pass later.
  *
  * The pieces come from the foundations: `term_of`, `simplify_term`,
- * `simplify_atom`, `mem_size` (terms.h); `fv_meets`, `free_in`, `is_literal`,
+ * `simplify_atom`, `mem_size` and the `cofactor_refuter` that rules a
+ * variable out of a strict pin (terms.h); `fv_meets`, `free_in`, `is_literal`,
  * `binder_var` (dag.h); `cof` (cofactors.h) for the backed pin match, and
  * `memoised` over `plain_cof_memo` (ctx.h) for the plain one's cofactor
  * records; `tree::substitute` with the argument hook

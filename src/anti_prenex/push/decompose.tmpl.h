@@ -268,7 +268,8 @@ std::optional<tref> try_guard_split(const trefs& cs, const block& X,
 					m = v ? it->second.first : it->second.second;
 			(v ? on_T : on_F).push_back(simplified_or_join<node>(ms));
 		}
-		// By content: rebuilding the members may change the conjunct too.
+		// Copied when both arms rebuild it unchanged, its cases included;
+		// by content, since `cs[i]` may carry its right sibling.
 		if (!holds && !holds_neg && tau::subtree_equals(on_T.back(), cs[i])
 			&& tau::subtree_equals(on_F.back(), cs[i]))
 		{

@@ -424,7 +424,7 @@ TEST_CASE("C13: a guard split that changes every conjunct needs no licence") {
 
 TEST_CASE("C14: under one block variable a split that copies bulk is taken") {
 	// C12's refused clause with `v` spelled `x`: EXPAND could settle
-	// nothing first, so the split is not licensed.
+	// nothing first, so the licence is not applied.
 	fixture f = make("ex x ((((a = 0 || b = 0) && xy = 0) || xc = 0) "
 		"&& ((a != 0 && b != 0 && xz = 0) || xc = 0) "
 		"&& ((xd = 0 && xe = 0 && xg = 0 && xh = 0) "
