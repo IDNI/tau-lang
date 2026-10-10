@@ -872,7 +872,10 @@ The remaining primitives are defined by their contracts alone:
   everything else in the leaves, every chain kept or stuck at entry SLID to
   its subscripts' levels (§1 transparency); order atoms and reference
   arguments left plain. No binder unit exists yet: units are phase 4's own
-  re-wraps. One memoised walk.
+  re-wraps. Every ∧/∨ chain comes back in CANONICAL ORDER, re-joined in the
+  content order of its converted members as the joins emit it, so a
+  whole-node match against a canonical join — a guard's `neg` — holds after
+  the conversion. One memoised walk.
 - `FINISH_TERMS(φ)` — the call's ONE spelling, at phase 5, after `SIMPLIFY`
   (above): every BDD-backed term of `φ` spelled plain wherever it sits —
   under a binder, a re-wrap's included, under a temporal operator, inside a
@@ -1636,9 +1639,10 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
                                   //   licence's, already built
 
 TRY_GUARD_SPLIT(ψ, X, ctx) → formula | ⊥:
-    // The same separation on a COMPOUND unit: a guard built of several atoms
-    // and flattened next to other X-free members is invisible to the atom
-    // census, which needs one atom in both signs.
+    // The same separation on a COMPOUND unit, reached when the atom census
+    // has no candidate or licenses none. The census reads literals one ∧
+    // deep, so a guard whose atoms meet both signs only deeper — under an ∨
+    // inside an ∧-member — is split here, as a whole.
     //     ∃X ψ  =  ∃X (g ∧ ψ[g ↦ T])  ∨  ∃X (neg(g) ∧ ψ[g ↦ F])    — any BA
     // JUNCTIONS: the disjunctive conjuncts of ψ and the ∧-members of each.
     // UNITS, each X-free with |g| ≤ guard_size_max: a member of a junction

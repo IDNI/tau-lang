@@ -370,17 +370,43 @@ TEST_CASE("N12: a bv variable that only lowers the truth leaves at block entry")
 }
 
 TEST_CASE("N13: a compound guard is split on as one unit") {
-	// No atom is both-signed at the member tops of the two disjunctive
-	// conjuncts, but the guard `a = 0 ∧ b = 0` is, its neg the group
-	// `¬(a = 0) ∨ ¬(b = 0)` of the second: TRY_DECOMPOSE splits on the unit,
-	// the arms push to the guard and its neg, and their ∨-join is `T`.
-	const tref got = bv_anti_prenexed(parse(
-		"ex x (((a:bv[2] = { 0 }:bv[2] && b:bv[2] = { 0 }:bv[2]) "
+	// The guard `(a = 0 ∨ b = 0) ∧ (c = 0 ∨ d = 0)` is a member of the first
+	// disjunctive conjunct and its neg the group
+	// `(¬(a = 0) ∧ ¬(b = 0)) ∨ (¬(c = 0) ∧ ¬(d = 0))` of the second. The
+	// census reads literals one ∧ deep and meets every atom in one sign
+	// only, so TRY_DECOMPOSE hands the clause to TRY_GUARD_SPLIT: the arms
+	// push to the guard and its neg, and their ∨-join is `T`.
+	const tref phi = parse(
+		"ex x ((((a:bv[2] = { 0 }:bv[2] || b:bv[2] = { 0 }:bv[2]) "
+		"&& (c:bv[2] = { 0 }:bv[2] || d:bv[2] = { 0 }:bv[2])) "
 		"|| x:bv[2] & y:bv[2] = { 0 }:bv[2]) "
-		"&& (!(a:bv[2] = { 0 }:bv[2]) || !(b:bv[2] = { 0 }:bv[2]) "
-		"|| x:bv[2]' & z:bv[2] = { 0 }:bv[2]))."));
+		"&& ((!(a:bv[2] = { 0 }:bv[2]) && !(b:bv[2] = { 0 }:bv[2])) "
+		"|| (!(c:bv[2] = { 0 }:bv[2]) && !(d:bv[2] = { 0 }:bv[2])) "
+		"|| x:bv[2]' & z:bv[2] = { 0 }:bv[2])).");
+	const tref got = bv_anti_prenexed(phi);
 	resolved(got);
 	CHECK(tau::get(got).equals_T());
+	// The step on the clause as the push meets it: decided `T`, and with no
+	// compound guard admitted the atom census alone has nothing to
+	// decompose on.
+	const ap::block X{ tau::trim_right_sibling(ap::binder_var<node_t>(phi)) };
+	const tref clause = ap::prepare_terms<node_t>(
+		ap::normalize_operators<node_t>(
+			ap::to_canonically_factored_nnf<node_t>(
+				tau::trim_right_sibling(
+					ap::binder_body<node_t>(phi)))));
+	ap::ctx<node_t> c = ap::ctx<node_t>::for_component(X,
+		find_ba_type<node_t>(X[0]), false);
+	const std::optional<tref> split =
+		ap::try_decompose<node_t>(clause, X, c);
+	REQUIRE(split.has_value());
+	CHECK(tau::get(*split).equals_T());
+	const size_t guard_max = ap::guard_size_max;
+	ap::guard_size_max = 0;
+	const std::optional<tref> census_only =
+		ap::try_decompose<node_t>(clause, X, c);
+	ap::guard_size_max = guard_max;
+	CHECK(!census_only.has_value());
 }
 
 } // TEST_SUITE

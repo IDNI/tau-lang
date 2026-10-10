@@ -158,8 +158,11 @@ TEST_CASE("F1: every shape this engine cannot use freezes its component") {
 		prepared_clause k({ x, y }, conj(o, transparent));
 		REQUIRE(k.conjuncts.size() == 2);
 		const opaque_test opaque{ k.P };
-		REQUIRE(opaque(k.conjuncts[0]));
-		REQUIRE(!opaque(k.conjuncts[1]));
+		// The conversion leaves the clause in content order, so the
+		// opaque conjunct is found rather than indexed.
+		const size_t at = opaque(k.conjuncts[0]) ? 0 : 1;
+		REQUIRE(opaque(k.conjuncts[at]));
+		REQUIRE(!opaque(k.conjuncts[1 - at]));
 
 		auto r = ap::freeze_opaque_components<node_t>(k.conjuncts,
 			k.P, opaque);
@@ -167,9 +170,10 @@ TEST_CASE("F1: every shape this engine cannot use freezes its component") {
 		// and the other one is untouched
 		REQUIRE(is_child<node_t>(r.frozen, tau::wff_ex));
 		CHECK(same(ap::binder_var<node_t>(r.frozen), x));
-		CHECK(same(ap::binder_body<node_t>(r.frozen), k.conjuncts[0]));
+		CHECK(same(ap::binder_body<node_t>(r.frozen),
+			k.conjuncts[at]));
 		REQUIRE(r.conjuncts.size() == 1);
-		CHECK(same(r.conjuncts[0], k.conjuncts[1]));
+		CHECK(same(r.conjuncts[0], k.conjuncts[1 - at]));
 		REQUIRE(r.X.size() == 1);
 		CHECK(same(r.X[0], y));
 	}
@@ -187,18 +191,25 @@ TEST_CASE("F2: a component is frozen whole, and a disjoint one is not") {
 	prepared_clause k({ x, y }, conj(unit, conj(shared, apart)));
 	REQUIRE(k.conjuncts.size() == 3);
 	const opaque_test opaque{ k.P };
-	REQUIRE(!opaque(k.conjuncts[1]));
+	// The conversion leaves the clause in content order, so each conjunct
+	// is found by its shape rather than indexed.
+	tref pu = nullptr, ps = nullptr, pa = nullptr;
+	for (tref m : k.conjuncts)
+		(is_child<node_t>(m, tau::wff_ex) ? pu
+			: ap::fv_meets<node_t>(m, { x }) ? ps : pa) = m;
+	REQUIRE((pu && ps && pa));
+	REQUIRE(!opaque(ps));
 
 	auto r = ap::freeze_opaque_components<node_t>(k.conjuncts, k.P, opaque);
 	REQUIRE(is_child<node_t>(r.frozen, tau::wff_ex));
 	CHECK(same(ap::binder_var<node_t>(r.frozen), x));
 	const tref body = ap::binder_body<node_t>(r.frozen);
-	CHECK(has_member(body, k.conjuncts[0]));
-	CHECK(has_member(body, k.conjuncts[1]));
+	CHECK(has_member(body, pu));
+	CHECK(has_member(body, ps));
 	// What comes back is the rest of the clause and the rest of the block,
 	// each in its own input order.
 	REQUIRE(r.conjuncts.size() == 1);
-	CHECK(same(r.conjuncts[0], k.conjuncts[2]));
+	CHECK(same(r.conjuncts[0], pa));
 	REQUIRE(r.X.size() == 1);
 	CHECK(same(r.X[0], y));
 }
@@ -295,11 +306,14 @@ TEST_CASE("S3: the components are the parts of the POSITIVES alone") {
 	REQUIRE(!r.decided_false);
 	REQUIRE(r.comps.size() == 2);
 	REQUIRE(r.comps[0].vars.size() == 1);
-	CHECK(same(r.comps[0].vars[0], x));
-	CHECK(same_function(r.comps[0].F, lor(bf("x"), bf("a"))));
 	REQUIRE(r.comps[1].vars.size() == 1);
-	CHECK(same(r.comps[1].vars[0], y));
-	CHECK(same_function(r.comps[1].F, lor(bf("y"), bf("b"))));
+	// The components follow the clause, which the conversion leaves in
+	// content order: `x`'s is found rather than indexed.
+	const size_t at = same(r.comps[0].vars[0], x) ? 0 : 1;
+	CHECK(same(r.comps[at].vars[0], x));
+	CHECK(same_function(r.comps[at].F, lor(bf("x"), bf("a"))));
+	CHECK(same(r.comps[1 - at].vars[0], y));
+	CHECK(same_function(r.comps[1 - at].F, lor(bf("y"), bf("b"))));
 	// `f` is the whole positive part, `⋃_k F_k` over disjoint `X_k`.
 	CHECK(same_function(r.f, lor(lor(bf("x"), bf("a")),
 		lor(bf("y"), bf("b")))));

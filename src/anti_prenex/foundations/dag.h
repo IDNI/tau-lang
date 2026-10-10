@@ -159,6 +159,11 @@ trefs members(tref n);
 template <NodeType node>
 bool is_member(tref n, tref m);
 
+/// `n` is a SPINE node: a `wff` wrapping the same connective as its parent
+/// operator node `parent`, on either nesting side, as `members` flattens.
+template <NodeType node>
+bool is_spine(tref n, tref parent);
+
 /// The lists `ls` concatenated in argument order, duplicates kept; the result
 /// is reserved once, so no insertion reallocates.
 template <typename... Lists>

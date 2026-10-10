@@ -122,7 +122,7 @@ tref delete_unate_binders(tref body, const block& X) {
 		const tau& t = tau::get(m);
 		if (!t.is(tau::wff))
 			return t.is(tau::wff_and) || t.is(tau::wff_or);
-		if (!subst_detail::is_spine<node>(m, parent)
+		if (!is_spine<node>(m, parent)
 			&& !fv_meets<node>(m, Y)) return false;
 		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or))
 			return true;

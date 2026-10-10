@@ -100,6 +100,10 @@ namespace idni::tau_lang::anti_prenexing {
  * chain is SLID by the build (§1): the variables above its subscripts' levels
  * are decision variables like any other.
  *
+ * Every ∧/∨ chain comes back in CANONICAL ORDER, re-joined in the content
+ * order of its converted members as the joins emit it, so a whole-node match
+ * against a canonical join — a guard's `neg` — holds after the conversion.
+ *
  * One walk, memoised per node and per term. Idempotent: an already prepared
  * term is returned as it is.
  *

@@ -169,6 +169,16 @@ bool is_member(tref n, tref m) {
 	return subtree_vec_contains<node>(members<node>(n), m);
 }
 
+template <NodeType node>
+bool is_spine(tref n, tref parent) {
+	using tau = tree<node>;
+	if (!parent) return false;
+	const auto& p = tau::get(parent);
+	if (p.is(tau::wff_and)) return is_child<node>(n, tau::wff_and);
+	if (p.is(tau::wff_or))  return is_child<node>(n, tau::wff_or);
+	return false;
+}
+
 template <typename... Lists>
 trefs concat(const Lists&... ls) {
 	trefs out;

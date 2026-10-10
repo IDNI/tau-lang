@@ -355,17 +355,26 @@ TEST_CASE("C10: each arm pushed reads the clock first") {
 }
 
 TEST_CASE("C11: a compound guard is split on as one unit") {
-	// `a = 0 ∧ b = 0` is an X-free ∧-member of the first disjunctive
-	// conjunct and its neg is the group `¬(a = 0) ∨ ¬(b = 0)` of the second:
-	// no atom is both-signed at member tops, so the census has no candidate
-	// and the unit is split on. The arms push to the guard and its neg,
-	// whose ∨-join folds to `T`.
-	fixture f = make("ex x (((a = 0 && b = 0) || xy = 0) "
-		"&& (a != 0 || b != 0 || xz = 0)).");
+	// `(a = 0 ∨ b = 0) ∧ (c = 0 ∨ d = 0)` is an X-free member of the first
+	// disjunctive conjunct and its neg the group
+	// `(¬(a = 0) ∧ ¬(b = 0)) ∨ (¬(c = 0) ∧ ¬(d = 0))` of the second. The
+	// census reads literals one ∧ deep and meets every atom in one sign
+	// only, so TRY_GUARD_SPLIT takes the unit: the arms push to the guard
+	// and its neg, whose ∨-join folds to `T`.
+	fixture f = make("ex x ((((a = 0 || b = 0) && (c = 0 || d = 0)) "
+		"|| xy = 0) && ((a != 0 && b != 0) || (c != 0 && d != 0) "
+		"|| xz = 0)).");
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
 	CHECK(tau::get(*got).equals_T());
 	check_against_source(*got, f);
+	// The split decides: with no compound guard admitted, the atom census
+	// alone has nothing to decompose on.
+	const size_t guard_max = ap::guard_size_max;
+	ap::guard_size_max = 0;
+	const std::optional<tref> census_only = decomposed(f);
+	ap::guard_size_max = guard_max;
+	CHECK(!census_only.has_value());
 }
 
 } // TEST_SUITE

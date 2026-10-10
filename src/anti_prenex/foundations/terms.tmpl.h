@@ -420,10 +420,25 @@ tref prepare_terms(tref phi) {
 		if (l2 == l && r2 == r) return n;
 		return build_bf_eq<node>(l2, r2);
 	};
+	// Converted atoms sort differently, so every chain TOP is re-joined.
+	// `up` fires per occurrence with the parent, which tells a spine node
+	// from a top; the memo keeps one join per node.
+	subtree_unordered_map<node, tref> chain_memo;
+	auto up = [&chain_memo](tref n, tref parent) -> tref {
+		const tau& tn = tau::get(n);
+		const bool conj = tn.child_is(tau::wff_and);
+		if ((!conj && !tn.child_is(tau::wff_or))
+			|| is_spine<node>(n, parent)) return n;
+		if (auto it = chain_memo.find(n); it != chain_memo.end())
+			return it->second;
+		const tref r = conj ? canonical_and<node>(members<node>(n))
+			: canonical_or<node>(members<node>(n));
+		return chain_memo.emplace(n, r).first->second;
+	};
 	// `while_is_formula` enters binders and temporal operators and stops at
 	// a term, which leaves reference arguments plain.
 	const tref res = pre_order<node>(phi).apply_unique(f,
-		while_is_formula<node>);
+		while_is_formula<node>, up);
 	// Every equation, wherever it sits, has each side backed or not
 	// branching.
 	DBG(assert(tau::get(res).find_top([](tref n) {

@@ -46,18 +46,6 @@ bool reach_structural(tref n) {
 	return t.is(tau::wff_and) || t.is(tau::wff_or) || t.is(tau::wff_neg);
 }
 
-/// `n` is a SPINE node: a `wff` wrapping the same connective as its parent
-/// operator node `parent`, on either nesting side, as `members` flattens.
-template <NodeType node>
-bool is_spine(tref n, tref parent) {
-	using tau = tree<node>;
-	if (!parent) return false;
-	const auto& p = tau::get(parent);
-	if (p.is(tau::wff_and)) return is_child<node>(n, tau::wff_and);
-	if (p.is(tau::wff_or))  return is_child<node>(n, tau::wff_or);
-	return false;
-}
-
 } // namespace subst_detail
 
 namespace detail {

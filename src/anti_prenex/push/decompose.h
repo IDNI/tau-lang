@@ -68,7 +68,10 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
 /**
  * @brief §6 `TRY_GUARD_SPLIT(ψ, X, ctx)` on the conjuncts @p cs of `ψ`: the
  * same separation on a COMPOUND guard `g`,
- * `∃X ψ = ∃X (g ∧ ψ[g ↦ T]) ∨ ∃X (neg(g) ∧ ψ[g ↦ F])`.
+ * `∃X ψ = ∃X (g ∧ ψ[g ↦ T]) ∨ ∃X (neg(g) ∧ ψ[g ↦ F])`, reached when the atom
+ * census has no candidate or licenses none. The census reads literals one ∧
+ * deep, so a guard whose atoms meet both signs only deeper — under an ∨
+ * inside an ∧-member — is split here, as a whole.
  *
  * JUNCTIONS are the disjunctive conjuncts and their ∧-members. UNITS are
  * X-free compound guards: a non-literal member of a junction, the X-free
