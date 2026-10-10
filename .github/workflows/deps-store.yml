@@ -138,7 +138,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # clang-cl builds the MSVC packages, so they cannot come from the Linux job.
+  # cl.exe and clang-cl build the MSVC packages, so they cannot come from the
+  # Linux job. Both compilers share the Boost, cvc5 and Spot packages. Only the
+  # curl package records the compiler.
   publish-windows:
     runs-on: windows-latest
     timeout-minutes: 240
@@ -171,6 +173,7 @@ jobs:
 
       - name: Resolve and publish the MSVC store packages
         run: |
+          ./dev preset release-msvc-cl-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
           ./dev preset release-msvc-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
           ./dev store-publish
         env:
