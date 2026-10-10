@@ -19,21 +19,15 @@ _dep_boost_vcvars() {
 
 # b2 maps an unknown cl to msvc-6.0, so name 14.3, its newest version, with
 # the cl of PATH. b2 finds no vcvars64.bat beside a cl newer than 14.4x.
-# clang-win takes clang-cl: b2's clang toolset passes GCC options.
 _dep_boost_user_config() {
-	if [ "$(dep_compiler_id "$2")" = MSVC ]; then
-		local _vcvars
-		_vcvars="$(_dep_boost_vcvars)" || {
-			echo "dep-boost: no VC/Auxiliary/Build/vcvars64.bat under VSINSTALLDIR='${VSINSTALLDIR:-}'. Start the MSVC developer shell." >&2
-			return 1
-		}
-		printf 'using msvc : 14.3 : "%s" : <setup-amd64>"%s" ;\n' \
-			"$(cygpath -m "$2")" "$(cygpath -m "$_vcvars")" \
-			> "${1}/user-config.jam"
-	else
-		printf 'using clang-win : : "%s" ;\n' "$(cygpath -m "$2")" \
-			> "${1}/user-config.jam"
-	fi
+	local _vcvars
+	_vcvars="$(_dep_boost_vcvars)" || {
+		echo "dep-boost: no VC/Auxiliary/Build/vcvars64.bat under VSINSTALLDIR='${VSINSTALLDIR:-}'. Start the MSVC developer shell." >&2
+		return 1
+	}
+	printf 'using msvc : 14.3 : "%s" : <setup-amd64>"%s" ;\n' \
+		"$(cygpath -m "$2")" "$(cygpath -m "$_vcvars")" \
+		> "${1}/user-config.jam"
 }
 
 # Overwrite each <folder> in every file under <prefix> with '@' of the same
@@ -158,6 +152,10 @@ _dep_boost_target_setup() {
 		echo "dep-boost: cl.exe is not on PATH. Start the MSVC developer shell." >&2
 		exit 2
 	}
+	if [ "$(dep_compiler_id "$_cl")" != MSVC ]; then
+		echo "dep-boost: '${_cl}' is not the MSVC cl.exe. Start the MSVC developer shell." >&2
+		exit 2
+	fi
 	DEP_BOOST_CC="$_cl"
 	DEP_BOOST_CXX="$_cl"
 	# The cl release flags, so a clang-cl preset does not fork a second Boost id.
@@ -166,9 +164,6 @@ _dep_boost_target_setup() {
 	BOOST_TOOLSET="msvc"
 	DEP_BOOST_B2_TOOLSET="msvc"
 	DEP_BOOST_TARGET_OS="windows"
-	if [ "$(dep_compiler_id "$DEP_BOOST_CXX")" != MSVC ]; then
-		DEP_BOOST_B2_TOOLSET="clang-win"
-	fi
 	DEP_BOOST_B2_ARCH="x86"
 	DEP_BOOST_B2_PIC=""
 	DEP_BOOST_B2_DEFINE="BOOST_LOG_WITHOUT_SYSLOG"
