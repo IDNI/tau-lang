@@ -11,6 +11,7 @@ if(TAU_DEPS_FROM_STORE)
 	if(TAU_DONT_USE_FTXUI)
 		message(STATUS "FTXUI: disabled (TAU_DONT_USE_FTXUI=ON)")
 	else()
+		tau_deps_drop_stale_dirs("${TAU_FTXUI_PREFIX}" "^ftxui_DIR$")
 		find_package(ftxui CONFIG REQUIRED NO_CMAKE_FIND_ROOT_PATH)
 		set_target_properties(ftxui::screen ftxui::dom ftxui::component
 			PROPERTIES IMPORTED_GLOBAL TRUE)

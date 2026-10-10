@@ -508,6 +508,7 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
 	message(STATUS "cvc5 from store: CVC5_DIR=${CVC5_DIR}")
 
+	tau_deps_drop_stale_dirs("${CVC5_STORE_PREFIX}" "^cvc5_DIR$")
 	find_package(cvc5 CONFIG REQUIRED
 		PATHS ${CVC5_DIR}
 		NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
@@ -556,6 +557,7 @@ if(TAU_DEPS_FROM_STORE)
 	# lib, both inside the package prefix.
 	set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")
 	message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
+	tau_deps_drop_stale_dirs("${BOOST_STORE_PREFIX}" "^(Boost|boost_[a-z0-9_]+)_DIR$")
 endif()
 
 # Newer CMake drops the FindBoost module in favor of Boost's config package,

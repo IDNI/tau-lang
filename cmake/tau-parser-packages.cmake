@@ -11,6 +11,7 @@ include_guard(GLOBAL)
 # One exception: tau_deps_gcc_takes_clang_packages gives a gcc configure on Linux the clang SDK.
 
 list(PREPEND CMAKE_PREFIX_PATH "${TAU_PARSER_SDK_PREFIX}")
+tau_deps_drop_stale_dirs("${TAU_PARSER_SDK_PREFIX}" "^tauparser_DIR$")
 find_package(tauparser CONFIG REQUIRED NO_CMAKE_FIND_ROOT_PATH)
 
 if(NOT TARGET tauparser)

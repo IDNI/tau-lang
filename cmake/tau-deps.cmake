@@ -242,6 +242,20 @@ function(tau_deps_ensure_host_prefix dep script out_prefix)
 	set(${out_prefix} "${_prefix}" PARENT_SCOPE)
 endfunction()
 
+# find_package takes a cached <pkg>_DIR first, and a kept cache names an older package.
+function(tau_deps_drop_stale_dirs prefix regex)
+	get_cmake_property(_vars CACHE_VARIABLES)
+	foreach(_var IN LISTS _vars)
+		if(NOT _var MATCHES "${regex}")
+			continue()
+		endif()
+		cmake_path(IS_PREFIX prefix "$CACHE{${_var}}" NORMALIZE _inside)
+		if(NOT _inside)
+			unset(${_var} CACHE)
+		endif()
+	endforeach()
+endfunction()
+
 # Resolve the parser-side dependencies in order and publish the prefixes Tau
 # needs. unordered_dense and ftxui first: the parser SDK id embeds their ids.
 function(tau_deps_resolve_parser)
