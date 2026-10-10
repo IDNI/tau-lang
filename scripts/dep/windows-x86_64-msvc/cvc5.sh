@@ -75,7 +75,6 @@ _dep_cvc5_target_setup() {
 	# The try_run version checks of cvc5 link the Release CaDiCaL and GMP, so
 	# they build in Release too.
 	_DEP_CVC5_TARGET_ARGS=(--ninja production -DCMAKE_TRY_COMPILE_CONFIGURATION=Release)
-	_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=$(cygpath -m "$DEP_PYTHON")")
 	_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
 }
 
@@ -254,6 +253,17 @@ _dep_cvc5_target_prebuild() {
 	export CL
 	CL="-FI\"$(cygpath -m "${CVC5_MSVC_DIR}/compat.h")\" -I\"$(cygpath -m "${CVC5_MSVC_DIR}/include")\""
 	export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}CL;CMAKE_PREFIX_PATH"
+	# The interpreter joins the configure here, after the id is made, so a
+	# new interpreter path does not move the cvc5 id.
+	local python
+	python="$(cygpath -m "$DEP_PYTHON")"
+	case "$python" in
+		*" "*)
+			echo "dep-cvc5: cvc5's configure.sh cannot pass an option with a space: '-DPython_EXECUTABLE=${python}'" >&2
+			return 1
+			;;
+	esac
+	_DEP_CVC5_TARGET_ARGS+=("-DPython_EXECUTABLE=${python}")
 }
 
 # cvc5's configure.sh takes a prefix that starts with a drive letter for a
