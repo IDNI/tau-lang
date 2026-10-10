@@ -161,6 +161,22 @@ std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 }
 
 template <NodeType node>
+std::optional<pin<node>> find_weak_pin(tref atom, const block& X, regime rg) {
+	const tref f = detail::pin_term<node>(atom, X, rg);
+	if (f == nullptr) return {};
+	const trefs vars = get_free_vars<node>(f);
+	std::optional<pin<node>> best;
+	size_t best_size = 0;
+	for (tref y : vars) {
+		std::optional<pin<node>> p = detail::pin_of_var<node>(f, y, rg);
+		if (!p || p->strict) continue;
+		if (const size_t size = mem_size<node>(p->witness);
+			!best || size < best_size) best = p, best_size = size;
+	}
+	return best;
+}
+
+template <NodeType node>
 std::optional<pin<node>> find_pin_for(tref atom, tref x, regime rg) {
 	// A term built from the atom holds no variable the atom lacks.
 	if (!free_in<node>(atom, x)) return {};
@@ -197,8 +213,9 @@ template <NodeType node>
 struct propagation {
 	using tau = tree<node>;
 
-	propagation(regime rg, const block& X, bool ref_args)
-		: rg(rg), X(X), ref_args(ref_args) {}
+	propagation(regime rg, const block& X, bool ref_args,
+		pin_admission admit)
+		: rg(rg), X(X), ref_args(ref_args), admit(admit) {}
 
 	tref run(tref phi) {
 		root = phi;
@@ -289,6 +306,7 @@ private:
 	const regime rg;
 	const block& X;
 	const bool ref_args;
+	const pin_admission admit;
 
 	/// THE PIN ENVIRONMENT: the admitted pins, the active ones in
 	/// `substitute`'s own parameter form, and the two sums the cap
@@ -436,8 +454,10 @@ private:
 	const std::optional<pin<node>>& matched(tref atom) {
 		if (auto it = pin_memo.find(atom); it != pin_memo.end())
 			return it->second;
-		return pin_memo.emplace(atom,
-			find_strict_pin<node>(atom, X, rg)).first->second;
+		std::optional<pin<node>> p = find_strict_pin<node>(atom, X, rg);
+		if (!p && admit == pin_admission::weak_too)
+			p = find_weak_pin<node>(atom, X, rg);
+		return pin_memo.emplace(atom, std::move(p)).first->second;
 	}
 
 	/**
@@ -746,13 +766,15 @@ private:
 } // namespace detail
 
 template <NodeType node>
-tref simplify(tref phi, regime rg, const block& X, bool ref_args) {
+tref simplify(tref phi, regime rg, const block& X, bool ref_args,
+	pin_admission admit)
+{
 	DBG(assert(phi != nullptr);)
 	// A term input has nothing to propagate — the traversal's continuation
 	// predicate stops on it and hands it back — and goes straight to the
 	// sweep.
-	const tref propagated = detail::propagation<node>(rg, X, ref_args)
-		.run(phi);
+	const tref propagated = detail::propagation<node>(rg, X, ref_args,
+		admit).run(phi);
 	// A compound guard is a sweep key with its `neg`, like a literal.
 	return syntactic_path_simplification_unchanged_negations<node>(
 		propagated, [](tref m) { return guard_neg<node>(m); });

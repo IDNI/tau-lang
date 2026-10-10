@@ -82,6 +82,10 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf,
 		// 5. The close: simplify, the ONE spelling, drop the binders that
 		//    bind nothing, and canonicalise the ids again (§3).
 		phi = simplify<node>(phi, regime::backed);
+		// Inside the push a weak pin can block a strict fold, but on the
+		// final result nothing follows it.
+		phi = simplify<node>(phi, regime::backed, {}, false,
+			pin_admission::weak_too);
 		phi = term_handle<node>::convert_to_tau_terms(phi);
 		// The spelling is total: no stored BDD leaves the call.
 		DBG(assert(tree<node>::get(phi).find_top([](tref m) {

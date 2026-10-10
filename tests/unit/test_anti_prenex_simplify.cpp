@@ -459,6 +459,26 @@ TEST_CASE("S8f: a weak pin never takes the variable of a strict one") {
 	CHECK(tau::get(got).equals_F());
 }
 
+TEST_CASE("S8g: admitting weak pins folds what only a weak pin decides") {
+	tref y0 = bvar("y0"), y1 = bvar("y1");
+	// `y0 ∪ y1′ = 0` pins both variables, each weakly: `y0` with witness
+	// `0`, `y1` with `y0′`. Admitted, `y0 ↦ 0` turns `y0·y1 ≠ 0` into
+	// `0 ≠ 0`, so the conjunction is `F`; strict pins alone leave it open.
+	const tref phi = conj(conj(eq0(lor(y0, lneg(y1))), neg(eq0(y1))),
+		neg(eq0(land(y0, y1))));
+	REQUIRE(!ap::find_strict_pin<node_t>(eq0(lor(y0, lneg(y1))),
+		ap::block{}).has_value());
+	const std::optional<ap::pin<node_t>> weak = ap::find_weak_pin<node_t>(
+		eq0(lor(y0, lneg(y1))), ap::block{});
+	REQUIRE(weak.has_value());
+	CHECK(same(weak->var, fvar("y0")));
+	CHECK(!tau::get(simp(phi)).equals_F());
+	const tref got = ap::simplify<node_t>(phi, ap::regime::plain, {}, false,
+		ap::pin_admission::weak_too);
+	INFO("got: ", tau::get(got).to_str());
+	CHECK(tau::get(got).equals_F());
+}
+
 TEST_CASE("S9: the cap refuses a pin") {
 	tref y = bvar("y"), a = bvar("a"), b = bvar("b"), c = bvar("c");
 	tref pinning = eq(y, lor(lor(a, b), c));

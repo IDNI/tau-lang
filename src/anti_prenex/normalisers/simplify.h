@@ -31,7 +31,9 @@
  *
  * ONLY A STRICT PIN PROPAGATES, where §3 admits weak ones too: a weak pin's
  * witness can rewrite a sibling that pins the same variable strictly into an
- * atom that pins nothing, and the fold the strict pin brings is lost.
+ * atom that pins nothing, and the fold the strict pin brings is lost. A
+ * caller that admits weak pins (`pin_admission`) takes, for an atom without
+ * a strict pin, its weak pin with the smallest witness.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_H__
@@ -49,6 +51,10 @@
 #include "nnf.h"
 
 namespace idni::tau_lang::anti_prenexing {
+
+/// Which pins equality propagation substitutes: strict ones only, or also a
+/// weak one for an atom that has no strict pin.
+enum class pin_admission { strict_only, weak_too };
 
 /**
  * @brief §3 `TRY_WITNESS`'s match: the variable an equation pins, the
@@ -110,6 +116,15 @@ std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 	regime rg = regime::plain);
 
 /**
+ * @brief The WEAK pin of an `X`-free atom with the smallest witness (`‖·‖`,
+ * the first scanned on a tie), or `nullopt`: the match `find_strict_pin`
+ * makes, asked of weak pins.
+ */
+template <NodeType node>
+std::optional<pin<node>> find_weak_pin(tref atom, const block& X,
+	regime rg = regime::plain);
+
+/**
  * @brief §3 `TRY_WITNESS`'s pin match asked about ONE variable: the pin `x`
  * has in `atom`, or `nullopt`.
  *
@@ -140,12 +155,13 @@ std::optional<pin<node>> find_pin_for(tref atom, tref x,
  *                 atom goes through `SIMPLIFY_ATOM` whether the environment
  *                 changed it or not, and every reference argument through
  *                 `SIMPLIFY_TERM`
+ * @param admit    the pins propagation substitutes
  * @return the simplified formula; an untouched formula comes back as the same
  *         node
  */
 template <NodeType node>
 tref simplify(tref phi, regime rg = regime::plain, const block& X = {},
-	bool ref_args = false);
+	bool ref_args = false, pin_admission admit = pin_admission::strict_only);
 
 } // namespace idni::tau_lang::anti_prenexing
 
