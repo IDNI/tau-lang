@@ -28,7 +28,7 @@ inline std::optional<std::string> console_input_stream::get() {
 	term::disable_getline_mode();
 	// only the first line read from stdin can start the input
 	static bool first_line = true;
-	if (first_line) first_line = false, drop_utf8_bom(line);
+	if (first_line) first_line = false, term::drop_utf8_bom(line);
 	return line;
 }
 

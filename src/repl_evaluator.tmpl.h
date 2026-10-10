@@ -1929,7 +1929,7 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 {
 	if (!input_started_) {
 		std::string text = src;
-		drop_utf8_bom(text);
+		term::drop_utf8_bom(text);
 		input_started_ = true;
 		auto r = eval(text);
 		// only the first command, maybe over several lines, starts the input

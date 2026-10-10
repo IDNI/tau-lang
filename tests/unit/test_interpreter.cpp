@@ -463,18 +463,18 @@ TEST_SUITE("adt interpreter") {
 
 TEST_SUITE("repl input") {
 
-	TEST_CASE("drop_utf8_bom drops only a leading byte order mark") {
+	TEST_CASE("term::drop_utf8_bom drops only a leading byte order mark") {
 		std::string s = "\xEF\xBB\xBFq \xEF\xBB\xBF";
-		drop_utf8_bom(s);
+		idni::term::drop_utf8_bom(s);
 		CHECK( s == "q \xEF\xBB\xBF" );
 		std::string t = "q";
-		drop_utf8_bom(t);
+		idni::term::drop_utf8_bom(t);
 		CHECK( t == "q" );
 	}
 
-	TEST_CASE("drop_utf8_bom drops two marks before the first command") {
+	TEST_CASE("term::drop_utf8_bom drops two marks before the first command") {
 		std::string s = "\xEF\xBB\xBF\xEF\xBB\xBFp(X) := X = 0.";
-		drop_utf8_bom(s);
+		idni::term::drop_utf8_bom(s);
 		CHECK( s == "p(X) := X = 0." );
 	}
 

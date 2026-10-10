@@ -48,7 +48,7 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 	if (spec_file == "-") {
 		std::ostringstream oss;
 		oss << std::cin.rdbuf(), src = oss.str();
-		drop_utf8_bom(src);
+		term::drop_utf8_bom(src);
 		return true;
 	}
 	DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
@@ -60,7 +60,7 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 	// A successfully opened file's tellg is non-negative; resize takes a size_t.
 	src.resize(static_cast<size_t>(len));
 	if (len > 0) ifs.seekg(0), ifs.read(&src[0], len);
-	drop_utf8_bom(src);
+	term::drop_utf8_bom(src);
 	return true;
 }
 
