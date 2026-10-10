@@ -40,6 +40,20 @@ ctx<node> ctx<node>::for_component(const block& P, ba_type_id type,
 	return c;
 }
 
+template <NodeType node>
+int_t prio_of(tref x, const ctx<node>& c) {
+	const auto it = c.prio.find(x);
+	DBG(assert(it != c.prio.end());)
+	return it == c.prio.end() ? 0 : it->second;
+}
+
+template <NodeType node>
+tref innermost(const block& vs, const ctx<node>& c) {
+	DBG(assert(!vs.empty());)
+	return *std::max_element(vs.begin(), vs.end(), [&c](tref a, tref b) {
+		return prio_of<node>(a, c) < prio_of<node>(b, c); });
+}
+
 // --- taint ----------------------------------------------------------------------
 
 namespace detail {

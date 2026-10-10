@@ -210,6 +210,7 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): a pin whose admission would push `Σ‖witnesses‖` past this factor times `Σ‖TERM_OF(pinning conjunct)‖` is refused. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
+| `guard_size_max` | size limit `\|g\|` of a COMPOUND GUARD — an ∧- or ∨-node the result joins, `SIMPLIFY`'s path sweep and `TRY_DECOMPOSE`'s unit census treat as one unit with its `neg(g)` (§3, §6). `32`. Read BARE — the joins and `SIMPLIFY` have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
 | `time_limit` | `ANTI_PRENEX`'s parameter, set through the API, `∞` by default: the one cutoff on a call's total work. Past it the call ABORTS WHOLE and returns `⊥` (§3). Termination does not rest on it (§8). In no key: an aborted computation writes no entry (cache scope, below) |
 | `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it, held as `ctx.kf`: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body: every chain present at entry (`RESOLVE_FUNCTIONAL_PLAIN`, §3), and ONCE per chain `DISCHARGE` emits in keep mode (§7), a chain not kept quantified at once. A yes ALLOWS keeping, never forces it: a closed piece of the slid chain folds (§1 transparency), and a settled sub-block with block variables still pending below its levels is quantified at once (§7). It sees each emission as built, never a later merged or rewritten chain. It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. CONTRACT: the callback never changes once set — every call passes the same one. Two components of one block may be answered differently; every key carries its component's flag, and by the contract the flag alone, so the tables stay exact (cache scope, below) |
@@ -334,9 +335,11 @@ the same cold or warm, with or without them.
    decomposition takes the both-signed atom whose worlds span sibling
    conjuncts — both cofactors erase every reachable occurrence, and the
    guard left behind is one-signed, so the census never re-selects its
-   atom; a constant-false atom folds through `FOLD_DECIDED`, a finished
-   variable leaves through scope narrowing's settle move, and the rest is
-   decided at the leaves, where the clause methods are complete.
+   atom — and, past the atoms, the guard split takes a compound guard whose
+   `neg` the formula already holds too; a constant-false atom folds through
+   `FOLD_DECIDED`, a finished variable leaves through scope narrowing's
+   settle move, and the rest is decided at the leaves, where the clause
+   methods are complete.
 6. **Everything the algorithm builds is simplified at the point of
    construction** — an atom by `SIMPLIFY_ATOM`, a cofactor by `SIMPLIFY_TERM`
    (on a backed term a restrict, canonical as built, §3), a formula built by
@@ -369,7 +372,8 @@ the same cold or warm, with or without them.
    outside the workers, the dispatcher tries the fast paths before 2d and
    the expansion, `PUSH_OVER_DISJUNCTION` orders its disjuncts
    smallest-first, `PUSH_OVER_CONJUNCTION` narrows scopes and checks the
-   positives' consistency before anything multiplies, elimination tries
+   positives' consistency before anything multiplies, a block deletes its
+   unate binders before its partition (§5), elimination tries
    witnesses before methods, the push kills binders — pin, case pin — then
    decomposes licensed before expanding, and `EXPAND` queues cheap members
    first. A new branch joins the ladder at its cost class — never ahead of
@@ -674,7 +678,10 @@ NEG(ψ) → the NNF of ¬ψ:                      // neg(ψ): computed once per 
 PROPAGATION — see below — then the PATH SWEEP: per-path contradiction, unit
 elimination and the tautology dual, every literal of a junction applied to its
 siblings as ONE simultaneous environment (§10), constants folding through the
-construction hooks. Neither pass re-spells an atom (inv. 4). Absorption and
+construction hooks; a COMPOUND GUARD member of a junction (§1,
+`guard_size_max`) is a key like a literal — `g` holds its frame's value and
+`neg(g)`, demanded and cached, the opposite, each matched as a whole node.
+Neither pass re-spells an atom (inv. 4). Absorption and
 canonical assembly are NOT `SIMPLIFY`'s: they belong to the result joins at the
 construction sites; `SIMPLIFY` rewrites in place, and a chain keeps its nesting
 minus, or with, its rewritten members. One IMPLICIT parameter, the block `X`
@@ -909,6 +916,10 @@ SIMPLIFIED_OR_JOIN(r₁, …, rₙ):     // INCREMENTAL: a builder fed one opera
         r = ⋁ rⱼ                →  insert each rⱼ       // flatten one level
         r already a member      →  skip                 // O(1), hash-consed (asm. 1)
         r a literal whose complement is a member  →  the join is T   // unit elim
+        r a compound guard (§1) whose CACHED neg(r) is a member, or is an ∨
+          all of whose members are members        →  the join is T
+                                // unit elim on a guard, g ∨ neg(g); a group
+                                //   completed after r is caught at the result
         anything else           →  add r
     result: one top-level absorption pass (d ∨ (d ∧ e) = d) — indexed the
     way SAT subsumption is. A member's PARTS are its members when it is the
@@ -924,10 +935,15 @@ SIMPLIFIED_OR_JOIN(r₁, …, rₙ):     // INCREMENTAL: a builder fed one opera
     converging expansion states build EQUAL memo keys (§6).
 
 SIMPLIFIED_AND_JOIN — the dual: empty join T, T skipped, F decides, top-level ∧
-    flattened, duplicates skipped, literal vs complement member → F, absorption
-    d ∧ (d ∨ e) = d under the same index and limit, members emitted in the
-    content order.
+    flattened, duplicates skipped, literal vs complement member → F, a compound
+    guard against its cached neg as a member or an ∧-group of members → F,
+    absorption d ∧ (d ∨ e) = d under the same index and limit, members emitted
+    in the content order.
 ```
+
+The joins READ `neg(r)` and never demand it: a guard whose negation no one has
+computed takes no part. Negating every small member of every join costs more
+than its folds return.
 
 Shallow by design: every operand is already simplified (invariant 6), so only
 the members' top-level interaction is new — exactly what the insert rules and
@@ -1091,7 +1107,7 @@ licensed the substitution — dropped at phase 2, substituted into its `x`-free
 residual at phase 4 (§3) — so an untouched inner occurrence would
 desynchronise from the outer rewrite — and binder-id canonicalisation (§3,
 phase 0) makes the descent capture-safe. `SIMPLIFY`
-DESCENDS into a unit's body with both passes: a pin, or a literal key, of an
+DESCENDS into a unit's body with both passes: a pin, or a key, of an
 enclosing conjunction holds throughout that conjunction's scope, so rewriting
 or folding its occurrences inside the unit is sound; a pin or key is SUSPENDED
 under a binder over its variable, or over a variable of the pin's witness;
@@ -1125,6 +1141,10 @@ disjunction instead of a conjunction of one disjunction per member.
 
 ```
 PUSH_EX_BLOCK(body, X, kf):
+    body ← DELETE_UNATE_BINDERS(body, X)          // first, before the partition
+                                                  //   and the callback (below):
+                                                  //   a unate variable leaves
+                                                  //   by substitution
     // Partition at ENTRY: merge two block variables when some ATOM of `body`
     // mentions both — an atom inside a nested binder included: the walk
     // descends through every formula node, units and all, so the partition
@@ -1191,6 +1211,56 @@ the wrap, and the unit reaches enclosing blocks as an ordinary opaque leaf
 event (§1, cache scope): the verdict is a pure function of the completed
 pair, and the entries the discarded push wrote remain correct answers to
 their own keys.
+
+```
+DELETE_UNATE_BINDERS(body, X):
+    // ∃x.φ ≡ φ[x ← 0] when φ is DOWNWARD CLOSED in x — a value satisfying φ
+    // drags every smaller one along, so 0 satisfies φ whenever anything
+    // does — and ∃x.φ ≡ φ[x ← 1] when φ is UPWARD CLOSED. Valid in any BA:
+    // the witness is an end of the order, so no pin is needed. Closure is
+    // read off the literals of the NNF body, in ONE walk:
+    //   f is MONOTONE in x when f[x ← 0] ≤ f[x ← 1] (f₀·f₁′ = 0), ANTITONE
+    //     when f₁ ≤ f₀.
+    //   A literal mentioning x is x-LOW — growing x can only make it false —
+    //     when it is l = r with l + r monotone in x, or ¬(l = r) with l + r
+    //     antitone; x-HIGH in the mirror cases.
+    //   ∧ and ∨ preserve both closures: x-LOW in every literal mentioning x
+    //     makes body downward closed in x, x-HIGH in every one upward closed.
+    //   Any other literal mentioning x — an order atom, a unit, a reference,
+    //     a temporal operator — makes x BINATE, and x stays.
+    // The test may be any SUFFICIENT check, one-way: what it cannot read is
+    //   binate. The SYNTACTIC reading is one: an occurrence of x under an
+    //   even number of ′ is POSITIVE, under an odd one NEGATIVE, · and ∪
+    //   keep it, and f is monotone when every occurrence is positive,
+    //   antitone when every one is negative; x under + or any other term
+    //   operator, a functional quantifier included, reads binate; l + r is
+    //   read as the other side when one side is syntactically 0 (equations
+    //   are not zero-normalised, inv. 4), as binate otherwise. On a
+    //   BDD-backed term the cofactor test is exact, and x ← 0, x ← 1 are
+    //   restricts.
+    // The walk is post-order and memoised per node: a node's summary — the
+    //   variables of X it moves up, down, or both ways — is a function of
+    //   the node alone, ¬ and ′ swap up and down, and a subtree whose FV
+    //   misses X is not entered.
+    L ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-LOW }
+    H ← { x ∈ X ∩ FV(body) : every literal mentioning x is x-HIGH }
+    if L ∪ H = ∅: return body
+    return SIMPLIFY(body[x ← 0 for x ∈ L, x ← 1 for x ∈ H])
+        // one simultaneous substitution, 0 and 1 of x's own type: a constant
+        //   leaves every other variable's polarity as it was, so L ∪ H goes
+        //   together; simplified at construction (inv. 6)
+```
+
+**Unate binders.** The deletion is the cheapest binder kill there is — one
+walk and one substitution, no pin to find, no case to build — so it runs
+first, at block entry (inv. 8). It runs before the partition: a deleted
+variable no longer connects the atoms it shared, so the components can only
+get smaller. It runs before any component asks the callback, and it is
+unconditional: a unate binder leaves even where `kf` would keep functional
+quantifiers, since it never reaches the elimination `kf` governs, and the
+substituted body is equivalent. A `∀` run arrives dualised (`PROCESS_BLOCK`),
+so the one `∃` rule serves both kinds. A binate variable is left exactly as
+it was: the test is one-way (§3), it deletes or does nothing.
 
 ---
 
@@ -1547,7 +1617,8 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // coverage, ties by the weaker side, then content order. The rank
     // only orders the tries — the licence decides. Ranking by cofactor
     // size instead selects atoms that partition the LEAST structure.
-    cands ← the top 3 both-signed atoms by coverage ; if ∅: return ⊥
+    cands ← the top 3 both-signed atoms by coverage
+    if cands = ∅: return TRY_GUARD_SPLIT(ψ, X, ctx)
 
     // THE LICENCE, on BUILT cofactors of the TOUCHED region — the
     // conjuncts carrying the atom; the rest is one shared subtree in
@@ -1564,10 +1635,33 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     for a in cands:
         if FOLD_DECIDED([a], X, ctx) = F:
             b ← SIMPLIFY(ψ[a ↦ F]) ; return PUSH_BLOCK(b, X ∩ FV(b), ctx)
-    a ← first of cands passing ; if none: return ⊥
+    a ← first of cands passing ; if none: return TRY_GUARD_SPLIT(ψ, X, ctx)
     return DECOMPOSE_ARMS(a, ψ[a ↦ T], ψ[a ↦ F], X, ctx)
                                   // the touched conjuncts' cofactors are the
                                   //   licence's, already built
+
+TRY_GUARD_SPLIT(ψ, X, ctx) → formula | ⊥:
+    // The same separation on a COMPOUND unit: a guard built of several atoms
+    // and flattened next to other X-free members is invisible to the atom
+    // census, which needs one atom in both signs.
+    //     ∃X ψ  =  ∃X (g ∧ ψ[g ↦ T])  ∨  ∃X (neg(g) ∧ ψ[g ↦ F])    — any BA
+    // JUNCTIONS: the disjunctive conjuncts of ψ and the ∧-members of each.
+    // UNITS, each X-free with |g| ≤ guard_size_max: a member of a junction
+    //   that is no literal, the X-free members of a disjunctive conjunct as
+    //   one ∨, and the X-free conjuncts of an ∧-member as one ∧.
+    // A unit OCCURS in a junction as a member or, spelled with the
+    //   junction's connective, as a SUBSET of its members.
+    // A candidate g occurs in some junction and neg(g) — demanded and cached
+    //   — in another; rank by the junctions covered, ties by the weaker side,
+    //   then content order.
+    // ψ[g ↦ v] puts v for every occurrence of g and ¬v for every occurrence
+    //   of neg(g), each a whole member or a whole group, folded through its
+    //   junction. No licence: every junction the unit touches is a constant
+    //   in one arm and loses the group in the other, so material separates
+    //   and nothing is copied. The arms are DECOMPOSE_ARMS' with neg(g) for
+    //   ¬a; a unit is no equation, so there is no pin arm.
+    g ← the best candidate ; if none: return ⊥
+    return DECOMPOSE_ARMS(g, ψ[g ↦ T], ψ[g ↦ F], X, ctx)
 
 DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     // The two arms of ∃X ψ = ∃X (a ∧ C_T) ∨ ∃X (¬a ∧ C_F).
@@ -2345,6 +2439,7 @@ count its construction gave it.
 | `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK` — 2a's as one clause `⋀P ∧ l` per negative leaf plus the one clause `⋀P` — never back into `PUSH_BLOCK` |
 | the witness and case-witness steps (§6) | `X` strictly shrinks — the pin or case pin deletes its binder before re-entry; the residual it leaves is free of that binder |
 | `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant — strictly smaller in a pin atom's T-arm, whose binder is substituted away — while both arms lose every occurrence of the atom: each disjunctive conjunct carrying it strictly shrinks as the constant folds away, the others are untouched, and the guard is a literal, no disjunction — one-signed, invisible to the both-signs census; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
+| `TRY_DECOMPOSE`, a guard unit's arms (§6) | the multiset, at unchanged `|X|`: the unit and its `neg` sit in two different junctions, and in each arm every junction holding either folds to a constant or loses the group, so each disjunctive conjunct carrying one strictly shrinks or drops and the others are untouched; the guard and its `neg` are X-free and leave through `PUSH_BLOCK`'s strip, so the unit census never meets them again; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
 | `TRY_DECOMPOSE`'s fold (§6) | a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed: `|X|` constant, every occurrence of the atom erased — each disjunctive conjunct carrying it strictly shrinks, no arm |
 | `EXPAND` | the multiset, at unchanged `|X|`: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `D` — plus CONJOINABLE exclusions — literals, whose unit elimination only shrinks, and negative trees, each of the count of the member it complements and so smaller than `D`; the pending disjuncts `S ∖ {D}` are carried untouched, and the case-edge `SIMPLIFY` builds no disjunction node and grows none (the measure, above). A member proven `T` drops `D` outright |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks, an X-free conjunct is hoisted, or the clause is decided |
@@ -2458,7 +2553,9 @@ algorithm's:
   conjuncts' truth assignments bind DISTINCT atoms — a complement pair has
   already decided the junction — so they commute: apply them as one
   simultaneous environment in one sweep over the non-literal siblings, not
-  one literal at a time with a restart per change.
+  one literal at a time with a restart per change. A compound guard key
+  binds its node as a whole, met before any atom inside it, so it commutes
+  with them too.
 - **Both passes of `SIMPLIFY` are context-sensitive.** A node's result
   depends on the keys, or pins, in force on its path, so their memos are
   keyed by (node, environment version), and a shared subtree met under two

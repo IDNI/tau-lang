@@ -17,6 +17,7 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__SHARED__PARTS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__SHARED__PARTS_TMPL_H__
 
+#include <algorithm>
 #include <vector>
 
 #include "../../union_find_with_sets.h"
@@ -92,6 +93,29 @@ template <NodeType node>
 std::vector<part<node>> parts(const trefs& conjuncts, const block& X) {
 	std::vector<block> vars;
 	return detail::group_parts<node>(conjuncts, X, vars);
+}
+
+template <NodeType node, typename Hit>
+parts_partition<node> partition_parts(const trefs& conjuncts, const block& X,
+	Hit&& hit)
+{
+	using tau = tree<node>;
+	subtree_unordered_set<node> taken, taken_vars;
+	for (const part<node>& p : parts<node>(conjuncts, X)) {
+		if (std::ranges::none_of(p.conjuncts, [&hit](tref m) {
+			return hit(m); })) continue;
+		taken.insert(p.conjuncts.begin(), p.conjuncts.end());
+		taken_vars.insert(p.vars.begin(), p.vars.end());
+	}
+	// Both sides are read back off the inputs, so each keeps its order. A
+	// part's `vars` is already `X ∩ FV`, so `hit_vars` is `X ∩ FV(⋀hit)`.
+	parts_partition<node> r;
+	for (tref m : conjuncts)
+		(taken.contains(m) ? r.hit : r.rest).push_back(m);
+	for (tref x : X)
+		(taken_vars.contains(x) ? r.hit_vars : r.rest_vars).push_back(
+			tau::trim_right_sibling(x));
+	return r;
 }
 
 template <NodeType node>

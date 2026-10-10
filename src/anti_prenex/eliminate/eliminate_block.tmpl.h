@@ -9,8 +9,8 @@
  * for the table, `fv_intersect` / `fv_meets` (dag.h) for the pre-steps,
  * `try_witness` in its COF mode (witness/witness.h) for the witness pass,
  * `rewrap` (prims.h) for the key and for every graceful exit, `memoised`
- * (ctx.h) for the table, and `eliminate_atomless_clause` (atomless.h) for the
- * one method there is.
+ * (ctx.h) for the table, and the two methods, `eliminate_atomless_clause`
+ * (atomless.h) and `eliminate_bitvector_clause` (bitvector.h).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__ELIMINATE_BLOCK_TMPL_H__
@@ -109,7 +109,9 @@ tref eliminate_block_uncached(tref clause, const block& X, ctx<node>& c) {
 	case method_kind::atomless:
 		indep.push_back(eliminate_atomless_clause<node>(dep, Xd, c));
 		break;
-	case method_kind::bitvector:   // §7's router: no method is wired
+	case method_kind::bitvector:
+		indep.push_back(eliminate_bitvector_clause<node>(dep, Xd, c));
+		break;
 	case method_kind::none:
 		// No method for this type: the block comes back around the
 		// dependent conjuncts, undecided (invariant 3).

@@ -5,10 +5,10 @@
  * @brief Template implementations for conditions.h. conditions.h says what
  * each procedure means; the comments here say how it is built.
  *
- * The pieces come from the files below: `parts` (§6) for every grouping,
- * `norm_equation`, `term_of` and `simplify_atom` (§3) for the rewrite,
- * `discharge` (§7) for every quantified atom that goes out, the result joins
- * (§3) for every formula, and `rewrap` (§3) for what is frozen.
+ * The pieces come from the files below: `parts` and `partition_parts` (§6)
+ * for every grouping, `norm_equation`, `term_of` and `simplify_atom` (§3) for
+ * the rewrite, `discharge` (§7) for every quantified atom that goes out, the
+ * result joins (§3) for every formula, and `rewrap` (§3) for what is frozen.
  * Every term built here — a component's union, the whole positive part, the
  * absorption term — is the library's BDD operation on the terms' BDDs, and
  * what feeds `discharge` needs no leaf sweep on top.
@@ -79,36 +79,18 @@ template <NodeType node, typename Opaque>
 freeze_result<node> freeze_opaque_components(const trefs& conjuncts,
 	const block& X, Opaque&& opaque)
 {
-	using tau = tree<node>;
 	// Every conjunct touches `X` (§7 method contract), so the grouping is
 	// total and each conjunct lands in exactly one part.
-	const std::vector<part<node>> ps = parts<node>(conjuncts, X);
-	subtree_unordered_set<node> frozen_conjuncts, frozen_vars;
-	for (const part<node>& p : ps) {
-		bool any = false;
-		for (tref c : p.conjuncts)
-			if (opaque(c)) { any = true; break; }
-		if (!any) continue;
-		for (tref c : p.conjuncts) frozen_conjuncts.insert(c);
-		for (tref x : p.vars) frozen_vars.insert(x);
-	}
-	if (frozen_conjuncts.empty())
-		return freeze_result<node>{ _T<node>(), conjuncts, X };
-	// The two splits, each keeping its input's order: the conjuncts by the
-	// parts they belong to, `X` by `Xf`, the union of those parts' `vars`.
-	// A part's `vars` is already `X ∩ FV`, so `Xf` is `X ∩ FV(⋀O)`.
-	trefs frozen, rest;
-	for (tref c : conjuncts)
-		(frozen_conjuncts.contains(c) ? frozen : rest).push_back(c);
-	block Xf, left;
-	for (tref x : X)
-		(frozen_vars.contains(x) ? Xf : left).push_back(
-			tau::trim_right_sibling(x));
+	parts_partition<node> p = partition_parts<node>(conjuncts, X,
+		std::forward<Opaque>(opaque));
+	if (p.hit.empty())
+		return freeze_result<node>{ _T<node>(), std::move(p.rest),
+			std::move(p.rest_vars) };
 	// RE-WRAPPED, never decided (invariant 3). The BDD-backed terms inside
 	// stay as they are; phase 5's spelling reaches them under the binder.
 	return freeze_result<node>{
-		rewrap<node>(simplified_and_join<node>(frozen), Xf),
-		std::move(rest), std::move(left) };
+		rewrap<node>(simplified_and_join<node>(p.hit), p.hit_vars),
+		std::move(p.rest), std::move(p.rest_vars) };
 }
 
 // --- the squeeze ------------------------------------------------------------------

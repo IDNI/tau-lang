@@ -62,6 +62,7 @@ bool is_conjoinable(tref e);
  * conjunct `D` in exclusive cases, each handed back to `PUSH_BLOCK`; the
  * floor of the conjunction's ladder.
  *
+ * `E` is the plain conjuncts through `FOLD_DECIDED`, whose `F` is the answer.
  * `D` minimises (the prio of its innermost block variable, its member count,
  * content order), so the expansion order is fixed by content and converging
  * states build equal memo keys. Its members are taken smallest first; each

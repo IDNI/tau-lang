@@ -31,6 +31,7 @@
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
 #include "../normalisers/joins.h"
+#include "../normalisers/nnf.h"
 #include "../normalisers/simplify.h"
 #include "../witness/witness.h"
 #include "expand.h"
@@ -40,8 +41,9 @@ namespace idni::tau_lang::anti_prenexing {
 /**
  * @brief §6 `TRY_DECOMPOSE(ψ, X, ctx)`: one LICENSED Boole decomposition on a
  * census atom whose two signs sit at member tops of different disjunctive
- * conjuncts; a candidate the probe proves `F` is folded instead. `nullopt`
- * when no candidate is licensed.
+ * conjuncts; a candidate the probe proves `F` is folded instead. With no
+ * candidate, or none licensed, `try_guard_split` takes over. `nullopt` when
+ * that finds no unit either.
  *
  * THE CENSUS reads MEMBER TOPS only: a literal member of an ∨-conjunct of
  * `ψ`, a negative tree's included, or a literal conjunct of an ∧-member of
@@ -64,6 +66,26 @@ template <NodeType node>
 std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
 
 /**
+ * @brief §6 `TRY_GUARD_SPLIT(ψ, X, ctx)` on the conjuncts @p cs of `ψ`: the
+ * same separation on a COMPOUND guard `g`,
+ * `∃X ψ = ∃X (g ∧ ψ[g ↦ T]) ∨ ∃X (neg(g) ∧ ψ[g ↦ F])`.
+ *
+ * JUNCTIONS are the disjunctive conjuncts and their ∧-members. UNITS are
+ * X-free compound guards: a non-literal member of a junction, the X-free
+ * members of a disjunctive conjunct as one ∨, the X-free conjuncts of an
+ * ∧-member as one ∧. A unit occurs in a junction as a member or, spelled
+ * with the junction's connective, as a subset of its members. A candidate
+ * occurs in one junction and its `neg` in another; the best covers the most
+ * junctions, ties going to the larger weaker side, then to content order.
+ * `ψ[g ↦ v]` turns a junction holding `g` or `neg(g)` into a
+ * constant or drops the group from it. No licence: the material separates.
+ * `nullopt` when no unit qualifies.
+ */
+template <NodeType node>
+std::optional<tref> try_guard_split(const trefs& cs, const block& X,
+	ctx<node>& c);
+
+/**
  * @brief §6 `DECOMPOSE_ARMS(a, C_T, C_F, X, ctx)`:
  * `∃X (a ∧ C_T) ∨ ∃X (¬a ∧ C_F)`, smaller arm first; a pin atom's T-arm
  * substitutes its binder away.
@@ -76,9 +98,13 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  * An arm that simplifies to a constant is no case and is inserted as it
  * stands; an arm deciding `T` leaves the other unpushed. Each arm pushed
  * reads the clock first (§3 time limit).
+ *
+ * @param na the F-arm's guard, `¬a` when absent: a compound guard passes its
+ *        `neg`, and is no equation, so it has no pin arm
  */
 template <NodeType node>
-tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c);
+tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c,
+	tref na = nullptr);
 
 } // namespace idni::tau_lang::anti_prenexing
 

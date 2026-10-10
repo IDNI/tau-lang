@@ -159,6 +159,11 @@ trefs members(tref n);
 template <NodeType node>
 bool is_member(tref n, tref m);
 
+/// The lists `ls` concatenated in argument order, duplicates kept; the result
+/// is reserved once, so no insertion reallocates.
+template <typename... Lists>
+trefs concat(const Lists&... ls);
+
 /**
  * @brief RAW constructor of a canonical ∧-chain: the members sorted in
  * content order, deduplicated, then folded LEFT-NESTED through the BINARY

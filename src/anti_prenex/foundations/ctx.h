@@ -107,6 +107,14 @@ struct ctx {
 	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };
 
+/// `ctx.prio[x]`, inner → HIGHER (§1). Every block variable is ranked.
+template <NodeType node>
+int_t prio_of(tref x, const ctx<node>& c);
+
+/// The innermost variable of a non-empty `vs`: the highest `ctx.prio`.
+template <NodeType node>
+tref innermost(const block& vs, const ctx<node>& c);
+
 // --- taint ----------------------------------------------------------------------
 
 /// §1 `taint_count`: the number of budget hits so far. GLOBAL, never reset,

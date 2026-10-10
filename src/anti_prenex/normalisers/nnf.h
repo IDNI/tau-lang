@@ -65,6 +65,11 @@ tref to_canonically_factored_nnf(tref phi);
 template <NodeType node>
 tref canonically_factored_neg(tref psi);
 
+/// `NEG(m)` when `m` is a compound guard (joins.h `is_guard`), else `nullptr`:
+/// what `SIMPLIFY`'s path sweep and `TRY_DECOMPOSE`'s unit census demand.
+template <NodeType node>
+tref guard_neg(tref m);
+
 /**
  * @brief Does `phi` hold a `bf_neq`, or a negated or mirrored order operator
  * (`≰ ≮ ≥ > ≱ ≯`)? Invariant 4 forbids all of them in NEG's output, so a

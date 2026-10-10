@@ -169,6 +169,14 @@ bool is_member(tref n, tref m) {
 	return subtree_vec_contains<node>(members<node>(n), m);
 }
 
+template <typename... Lists>
+trefs concat(const Lists&... ls) {
+	trefs out;
+	out.reserve((ls.size() + ...));
+	(out.insert(out.end(), ls.begin(), ls.end()), ...);
+	return out;
+}
+
 namespace detail {
 
 /// The shared body of `canonical_and` and `canonical_or`: sort in content

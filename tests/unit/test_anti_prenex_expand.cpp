@@ -18,6 +18,9 @@
 // `{A}:sbf` — which is why this suite is built over the `tau` pack of BAs,
 // the one that carries `sbf`.
 //
+// A case naming `L`<n> shares its input with that case of
+// tests/unit/test_anti_prenex_layer5.cpp.
+//
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
 

@@ -640,4 +640,16 @@ TEST_CASE("S14: a formula with nothing to do comes back as the same node") {
 	CHECK(simp(binder) == binder);
 }
 
+TEST_CASE("S13: a compound guard member is a sweep key with its neg") {
+	// `a = 0 ∨ b = 0` holds in its conjunction, so its neg, the ∧-member
+	// `¬(a = 0) ∧ ¬(b = 0)` of the sibling, is false there and the sibling
+	// is left with `d = 0`.
+	tref a = eq0(bvar("a")), b = eq0(bvar("b")), d = eq0(bvar("d"));
+	tref g = ap::simplified_or_join<node_t>(trefs{ a, b });
+	tref ng = ap::simplified_and_join<node_t>(trefs{ neg(a), neg(b) });
+	tref got = simp(ap::simplified_and_join<node_t>(
+		trefs{ g, ap::simplified_or_join<node_t>(trefs{ ng, d }) }));
+	CHECK(same(got, ap::simplified_and_join<node_t>(trefs{ g, d })));
+}
+
 }

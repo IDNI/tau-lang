@@ -118,6 +118,13 @@ trefs absorb(const trefs& ms) {
 
 } // namespace detail
 
+template <NodeType node>
+bool is_guard(tref m) {
+	using tau = tree<node>;
+	return (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or))
+		&& formula_size<node>(m) <= guard_size_max;
+}
+
 // --- the builder ----------------------------------------------------------------
 
 template <NodeType node, bool conj>
@@ -156,7 +163,22 @@ bool join_builder<node, conj>::insert_member(tref m) {
 	// Rule 6.
 	ms.push_back(m);
 	present.insert(m);
-	return false;
+	return is_decided = meets_complement(m);
+}
+
+template <NodeType node, bool conj>
+bool join_builder<node, conj>::meets_complement(tref m) const {
+	using tau = tree<node>;
+	if (!is_guard<node>(m)) return false;
+	// A slot lookup only: negating every small member of every join costs
+	// more than its folds return (§3).
+	const tref n = neg_of<node>(m);
+	if (n == nullptr) return false;
+	if (present.contains(n)) return true;
+	constexpr auto own = conj ? tau::wff_and : tau::wff_or;
+	if (!is_child<node>(n, own)) return false;
+	for (tref p : members<node>(n)) if (!present.contains(p)) return false;
+	return true;
 }
 
 template <NodeType node, bool conj>
@@ -166,6 +188,13 @@ template <NodeType node, bool conj>
 tref join_builder<node, conj>::result() {
 	if (is_decided) return conj ? _F<node>() : _T<node>();
 	if (ms.empty())  return conj ? _T<node>() : _F<node>();
+	// A guard's `neg` group may have been completed after the guard.
+	if (std::ranges::any_of(ms, [this](tref m) {
+		return meets_complement(m); }))
+	{
+		is_decided = true;
+		return conj ? _F<node>() : _T<node>();
+	}
 	trefs survivors = detail::absorb<node, conj>(ms);
 	// The constructor sorts into content order, deduplicates and folds
 	// left-nested through the hooked binary builder; a single survivor

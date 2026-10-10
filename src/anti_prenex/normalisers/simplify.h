@@ -43,6 +43,7 @@
 #include "../foundations/subst.h"
 #include "../foundations/options.h"
 #include "../shared/cofactors.h"
+#include "nnf.h"
 
 namespace idni::tau_lang::anti_prenexing {
 

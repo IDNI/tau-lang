@@ -23,8 +23,10 @@
 #include "../foundations/ctx.h"
 #include "../foundations/dag.h"
 #include "../foundations/prims.h"
+#include "../foundations/subst.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/nnf.h"
+#include "../normalisers/simplify.h"
 #include "../push/push_block.h"
 
 namespace idni::tau_lang::anti_prenexing {
@@ -53,15 +55,34 @@ template <NodeType node>
 std::vector<block> connected_components(const block& X, tref body);
 
 /**
+ * @brief §5 `DELETE_UNATE_BINDERS(body, X)`: every variable of `X` that moves
+ * the truth of @p body one way only, substituted by the end of the order that
+ * witnesses `∃x` — `0` when growing it can only make each literal mentioning
+ * it false, `1` when only true — in one simultaneous `φ[x ← t]`, then
+ * `SIMPLIFY`.
+ *
+ * The polarity is read by §5's sufficient syntactic check: a term occurrence
+ * under an even number of `′` is positive, `·` and `∪` keep it, and a literal
+ * counts only as `f = 0` or `¬(f = 0)` with one side syntactically `0`. `+`,
+ * any other term operator, an equation with no `0` side, an order atom, a
+ * unit, a reference and a temporal operator make every variable of `X` they
+ * mention binate, and a binate variable stays. @p body comes back as it is
+ * when nothing is deleted.
+ */
+template <NodeType node>
+tref delete_unate_binders(tref body, const block& X);
+
+/**
  * @brief §5 `PUSH_EX_BLOCK(body, X, kf)`: `∃X.body` pushed inward, one
  * component at a time.
  *
  * @p body arrives in §1's term representation (`PREPARE_TERMS`, run once at
- * phase 4's start). `X` is narrowed to `X ∩ FV(body)` first — a variable the
- * body does not mention binds nothing and gets no component. Every component
- * of what is left is then set up (ctx.h `for_component`), pushed (§6) and
- * size-checked, and the next component starts from what the previous one
- * left.
+ * phase 4's start). Its unate variables leave first (`delete_unate_binders`),
+ * before the partition and the callback. `X` is then narrowed to
+ * `X ∩ FV(body)` — a variable the body does not mention binds nothing and
+ * gets no component. Every component of what is left is then set up (ctx.h
+ * `for_component`), pushed (§6) and size-checked, and the next component
+ * starts from what the previous one left.
  *
  * THE CALLBACK is asked PER COMPONENT, on `REWRAP(body, X)`: the ∃ wrap of
  * the whole narrowed block over the body as that component's setup finds it —

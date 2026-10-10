@@ -184,6 +184,12 @@ bool holds_fused_operator(tref phi) {
 }
 
 template <NodeType node>
+tref guard_neg(tref m) {
+	if (!is_guard<node>(m)) return nullptr;
+	return canonically_factored_neg<node>(tree<node>::trim_right_sibling(m));
+}
+
+template <NodeType node>
 tref normalize_operators(tref phi) {
 	DBG(assert(phi != nullptr);)
 	return normalize_atomic_formula_operators<node, true, true>(phi);

@@ -37,6 +37,10 @@
 
 namespace idni::tau_lang::anti_prenexing {
 
+/// §1 a COMPOUND GUARD: an ∧- or ∨-node of at most `guard_size_max`.
+template <NodeType node>
+bool is_guard(tref m);
+
 /**
  * @brief §3 the result joins as one incremental builder: `conj = true` is
  * `SIMPLIFIED_AND_JOIN`, `conj = false` is `SIMPLIFIED_OR_JOIN`, the dual
@@ -53,11 +57,12 @@ namespace idni::tau_lang::anti_prenexing {
 template <NodeType node, bool conj>
 struct join_builder {
 	/**
-	 * @brief The six insert rules of §3, in the ∧ form (the ∨ form is the
+	 * @brief The insert rules of §3, in the ∧ form (the ∨ form is the
 	 * dual): `T` is skipped; `F` decides; a same-connective operand
 	 * contributes its members, flattened; an operand that is already a
 	 * member is skipped; a LITERAL whose complement is a member decides;
-	 * anything else is added.
+	 * anything else is added, and decides when it is a compound guard that
+	 * meets its cached `neg`.
 	 *
 	 * @return `true` when the join is DECIDED (`F` for ∧, `T` for ∨).
 	 * Later inserts are no-ops; invariant 7 asks the caller not to build
@@ -69,10 +74,10 @@ struct join_builder {
 	bool decided() const;
 
 	/**
-	 * @brief The absorption pass, then the raw canonical constructor
-	 * (`canonical_and`/`canonical_or`, dag.h): the surviving members in
-	 * content order, deduplicated, folded through the hooked binary
-	 * builder.
+	 * @brief The guard check once more, then the absorption pass, then the
+	 * raw canonical constructor (`canonical_and`/`canonical_or`, dag.h):
+	 * the surviving members in content order, deduplicated, folded through
+	 * the hooked binary builder.
 	 *
 	 * A decided join is the deciding constant (`F` for ∧, `T` for ∨); an
 	 * empty join is the neutral one (`T` for ∧, `F` for ∨); one member is
@@ -84,6 +89,10 @@ private:
 	/// One operand that is not the join's own connective: rules 1, 2, 4, 5
 	/// and 6. Returns `decided()`.
 	bool insert_member(tref m);
+
+	/// A compound guard `m` whose CACHED `neg` is a member, or is a chain of
+	/// the join's own connective all of whose members are members.
+	bool meets_complement(tref m) const;
 
 	trefs ms;                             ///< the members, insertion order
 	subtree_unordered_set<node> present;  ///< the same members, by content

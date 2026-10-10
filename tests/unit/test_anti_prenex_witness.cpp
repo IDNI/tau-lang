@@ -28,6 +28,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "anti_prenex/witness/witness.h"
+#include "anti_prenex/anti_prenex.h"
 
 using namespace idni::tau_lang;
 namespace ap = idni::tau_lang::anti_prenexing;
@@ -761,6 +762,24 @@ TEST_CASE("WC13: every atom the witness rewrote is simplified, so a strict "
 	REQUIRE(r.has_value());
 	CHECK(tau::get(*r).equals_T());
 	CHECK(are_nso_equivalent<node_t>(finished(*r), ex("x", pin)));
+}
+
+TEST_CASE("WC14: a guarded assignment whose leaf has two variables is "
+	"eliminated whole") {
+	// A conditional, and the CNF spelling of one whose then-branch is
+	// `o = w`: either way a branch witnesses `o ← a ∪ c`, and the pinning
+	// conjunct's image must fold to T.
+	for (const char* src : {
+		"ex o ((x:bv[1] = { 0 }:bv[1]) ? (o:bv[1] = u:bv[1]) "
+			": (o:bv[1] = (a:bv[1] | c:bv[1]))).",
+		"ex o (((x:bv[1] = { 0 }:bv[1]) || (o:bv[1] = (a:bv[1] | c:bv[1]))) "
+			"&& ((x:bv[1] != { 0 }:bv[1]) || (o:bv[1] = w:bv[1]))).",
+	}) {
+		auto rr = get_nso_rr(src);
+		REQUIRE(rr.has_value());
+		CHECK(tau::get(ap::anti_prenex<node_t>(rr.value().main->get()))
+			.equals_T());
+	}
 }
 
 } // TEST_SUITE

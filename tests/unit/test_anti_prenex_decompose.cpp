@@ -22,6 +22,10 @@
 // `{A}:sbf` — which is why this suite is built over the `tau` pack of BAs,
 // the one that carries `sbf`.
 //
+// A case naming `L`<n> shares its input with that case of
+// tests/unit/test_anti_prenex_layer5.cpp, one naming `FD`<n> with that case
+// of tests/unit/test_anti_prenex_expand.cpp.
+//
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
 
@@ -348,6 +352,20 @@ TEST_CASE("C10: each arm pushed reads the clock first") {
 	const ap::time_limit_scope limit(
 		std::chrono::steady_clock::duration::zero());
 	CHECK_THROWS_AS(decomposed(f), ap::time_limit_exceeded);
+}
+
+TEST_CASE("C11: a compound guard is split on as one unit") {
+	// `a = 0 ∧ b = 0` is an X-free ∧-member of the first disjunctive
+	// conjunct and its neg is the group `¬(a = 0) ∨ ¬(b = 0)` of the second:
+	// no atom is both-signed at member tops, so the census has no candidate
+	// and the unit is split on. The arms push to the guard and its neg,
+	// whose ∨-join folds to `T`.
+	fixture f = make("ex x (((a = 0 && b = 0) || xy = 0) "
+		"&& (a != 0 || b != 0 || xz = 0)).");
+	const std::optional<tref> got = decomposed(f);
+	REQUIRE(got.has_value());
+	CHECK(tau::get(*got).equals_T());
+	check_against_source(*got, f);
 }
 
 } // TEST_SUITE

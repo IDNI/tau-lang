@@ -6,11 +6,12 @@
  * procedure means; the comments here say how it is built.
  *
  * The pieces come from the files below: `members`, `formula_size`,
- * `fv_intersect` and the shape predicates (foundations/dag.h) for the lists
- * and the keys, `term_of` and `node_test` (foundations/terms.h) with `cof`
- * (shared/cofactors.h) for the probe, `atoms` and `subst_atom`
- * (foundations/subst.h) for a tree's literal-wise fold, the result joins
- * (normalisers/joins.h) for every assembly, `simplify`
+ * `fv_intersect`, `concat` and the shape predicates (foundations/dag.h) for
+ * the lists and the keys, `prio_of` and `innermost` (foundations/ctx.h) for
+ * the probe variable and the disjunct key, `term_of` and `node_test`
+ * (foundations/terms.h) with `cof` (shared/cofactors.h) for the probe,
+ * `atoms` and `subst_atom` (foundations/subst.h) for a tree's literal-wise
+ * fold, the result joins (normalisers/joins.h) for every assembly, `simplify`
  * (normalisers/simplify.h) at the case edge, `canonically_factored_neg` with
  * `holds_fused_operator` (normalisers/nnf.h) for a complement,
  * `check_time_limit` (foundations/ctx.h) per case, and `push_block` — the
@@ -27,22 +28,6 @@
 namespace idni::tau_lang::anti_prenexing {
 
 namespace expand_detail {
-
-/// `ctx.prio[x]`, inner → HIGHER (§1). Every block variable is ranked.
-template <NodeType node>
-int_t prio_of(tref x, const ctx<node>& c) {
-	const auto it = c.prio.find(x);
-	DBG(assert(it != c.prio.end());)
-	return it == c.prio.end() ? 0 : it->second;
-}
-
-/// The innermost variable of a non-empty `vs`: the highest `ctx.prio`.
-template <NodeType node>
-tref innermost(const block& vs, const ctx<node>& c) {
-	DBG(assert(!vs.empty());)
-	return *std::max_element(vs.begin(), vs.end(), [&c](tref a, tref b) {
-		return prio_of<node>(a, c) < prio_of<node>(b, c); });
-}
 
 /// §6 `FOLD_DECIDED`'s probe: is the equation `atom` `F`? Its term's
 /// cofactors on the innermost block variable have a nonzero constant
@@ -71,15 +56,6 @@ tref fold_tree(tref t, const block& X, ctx<node>& c) {
 	for (tref a : as)
 		if (probe<node>(a, X, c)) t = subst_atom<node>(t, a, false);
 	return t;
-}
-
-/// The concatenation of conjunct lists: the operands of one join.
-template <typename... Lists>
-trefs concat(const Lists&... ls) {
-	trefs out;
-	out.reserve((ls.size() + ...));
-	(out.insert(out.end(), ls.begin(), ls.end()), ...);
-	return out;
 }
 
 } // namespace expand_detail
@@ -142,12 +118,13 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 	DBG(assert(!S.empty());)
 
 	// THE DISJUNCT whose innermost variable is outermost, then the fewest
-	// members, then content order — fixed by content, so converging states
-	// expand alike and their keys collide.
+	// members, then content order.
 	auto key = [&](tref d) {
 		const block vs = fv_intersect<node>(d, X);
-		return std::pair<int_t, size_t>{ vs.empty() ? 0
-			: prio_of<node>(innermost<node>(vs, c), c),
+		// The wrapper strips X-free conjuncts: every `d` meets `X`.
+		DBG(assert(!vs.empty());)
+		return std::pair<int_t, size_t>{
+			prio_of<node>(innermost<node>(vs, c), c),
 			members<node>(d).size() };
 	};
 	size_t at = 0;

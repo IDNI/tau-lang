@@ -15,6 +15,7 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <span>
 
 #include "boolean_algebras/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
@@ -42,13 +43,18 @@ inline size_t fpairing(size_t x, size_t y) {
  * - use of input inverters
  * - use of output inverters
  * - use of variable shifters
+ * - a cap on the universe's size (Bool universe only), see node_cap
  */
 enum bdd_params {
 	INV_IN = (1u << 0),
 	INV_OUT = (1u << 1),
 	VARSHIFT = (1u << 2),
-	INV_ORDER = (1u << 3)
+	INV_ORDER = (1u << 3),
+	NODE_CAP = (1u << 4)
 };
+
+// Thrown by a universe with NODE_CAP when a new node would pass its cap.
+struct bdd_node_cap_reached {};
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
  * between parameters. Create by static functions bdd_options::create.
@@ -91,6 +97,9 @@ public:
 	}
 	constexpr bool has_inv_order() const {
 		return params & static_cast<uint8_t>(INV_ORDER);
+	}
+	constexpr bool has_node_cap() const {
+		return params & static_cast<uint8_t>(NODE_CAP);
 	}
 };
 
@@ -340,6 +349,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::variant<bdd_node_t, B> base;
+	static_assert(!o.has_node_cap(), "NODE_CAP is implemented for Bool only");
 
 	// This class is placed into the bdd universe if variable shifters are used
 	struct bdd_skeleton : std::variant<node_skeleton<bdd_ref>, B> {
@@ -396,12 +406,13 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	 * every shifted instance; the cached result is stored rebased the
 	 * same way and is rebased back to the query's level on a hit.
 	 * Variants: (x) rebases by x's own top variable; (x, v) also
-	 * rebases the quantified variable v; (x, y) rebases both operands
-	 * by their common reference level d (the first variable in the
-	 * BDD order: max of the shifts with INV_ORDER, min otherwise), so
-	 * only the operands' relative offset is keyed. Without shifters
-	 * the keys are used as-is. check_cache returns true on a hit and
-	 * replaces x with the (rebased) cached result.
+	 * rebases the quantified variable v, in unsigned arithmetic so that
+	 * a v above the top wraps and keeps its own key; (x, y) rebases
+	 * both operands by their common reference level d (the first
+	 * variable in the BDD order: max of the shifts with INV_ORDER, min
+	 * otherwise), so only the operands' relative offset is keyed.
+	 * Without shifters the keys are used as-is. check_cache returns
+	 * true on a hit and replaces x with the (rebased) cached result.
 	 */
 	static bool check_cache(bdd_ref& x, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
@@ -426,7 +437,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -453,7 +464,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 					{bdd_ref::to_cache_node(x, x.shift),
-					 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
+					 x.shift + 1 - v}); it != cache.end()) {
 				x = bdd_ref::from_cache_node(it->second, x.shift);
 				return true;
 			} else return false;
@@ -476,8 +487,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(move(x), move(r));
@@ -487,10 +497,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_cache_node(x, x.shift),
-					      abs((int_t)v - x.shift - 1)},
+					      x.shift + 1 - v},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -500,13 +509,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_cache_node(x, d),
 					      bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			uint_t d = min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
@@ -1039,6 +1047,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		std::unordered_map<bdd_node_t, size_t>>::type Mn;
 	inline static bdd_ref T, F;
 	inline static initializer I;
+	// With NODE_CAP: the size V may reach. Adding a node past it throws
+	// bdd_node_cap_reached before anything is stored, so the universe and
+	// the caches stay consistent and an operation unwinds mid-way.
+	inline static size_t node_cap = SIZE_MAX;
 
 	// Constant test by universe id: with output inverters T and F
 	// share sentinel entry 0, otherwise they are entries 0 and 1
@@ -1048,9 +1060,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool (*var_cmp)(int, int);
-	// Coarse reference order for bdd_and_many operand lists: by id,
-	// with the out-inverted twin first, so duplicates and complement
-	// pairs end up adjacent after sorting (see am_sort)
+	// Strict reference order for bdd_and_many operand lists, agreeing
+	// with ==; the out-inverted twin sorts first, so duplicates and
+	// complement pairs end up adjacent after sorting (see am_sort)
 	static bool (*am_cmp)(const bdd_ref&, const bdd_ref&);
 
 	// Caches for bdd operations
@@ -1084,7 +1096,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -1111,7 +1123,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 				{bdd_ref::to_cache_node(x, x.shift),
-				 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
+				 x.shift + 1 - v}); it != cache.end()) {
 				x = bdd_ref::from_cache_node(it->second, x.shift);
 				return true;
 			} else return false;
@@ -1134,8 +1146,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
 		} else cache.emplace(move(x), move(r));
@@ -1145,10 +1156,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 				bdd_ref::to_cache_node(x, x.shift),
-				abs((int_t)v - x.shift - 1)},
+				x.shift + 1 - v},
 				      bdd_ref::to_cache_node(r, x.shift));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
@@ -1158,13 +1168,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 				bdd_ref::to_cache_node(x, d),
 				bdd_ref::to_cache_node(y, d)},
 				      bdd_ref::to_cache_node(r, d));
-		}
-		if constexpr (o.has_varshift()) {
+		} else if constexpr (o.has_varshift()) {
 			auto d = std::min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
@@ -1218,6 +1227,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		bdd_node_t n(v, h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, it->second);
+		if constexpr (o.has_node_cap())
+			if (V.size() >= node_cap) throw bdd_node_cap_reached{};
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, V.size() - 1);
@@ -1230,6 +1241,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		node_skeleton<bdd_ref> n(h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, v, it->second);
+		if constexpr (o.has_node_cap())
+			if (V.size() >= node_cap) throw bdd_node_cap_reached{};
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, v, V.size() - 1);
@@ -1469,6 +1482,42 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return r;
 	}
 
+	// Universal (or existential) quantification of every variable in vs in
+	// one pass; one variable at a time would rebuild everything above each
+	// variable again
+	static bdd_ref quantify(bdd_ref x, std::vector<uint_t> vs, bool universal) {
+		std::sort(vs.begin(), vs.end(), var_cmp);
+		std::unordered_map<bdd_ref, bdd_ref> memo;
+		return quantify(x, std::span<const uint_t>(vs), universal, memo);
+	}
+
+	// vs is sorted in the BDD order. The memo is keyed by x alone: the
+	// variables of vs left to quantify below x follow from x's top variable
+	static bdd_ref quantify(bdd_ref x, std::span<const uint_t> vs,
+		bool universal, std::unordered_map<bdd_ref, bdd_ref>& memo)
+	{
+		if (leaf(x)) return x;
+		const bdd &nx = get(x);
+		vs = vs.subspan(std::lower_bound(vs.begin(), vs.end(), nx.v,
+			var_cmp) - vs.begin());
+		if (vs.empty()) return x;
+		if (auto it = memo.find(x); it != memo.end()) return it->second;
+		bdd_ref r;
+		if (vs.front() != nx.v)
+			r = add(nx.v, quantify(nx.h, vs, universal, memo),
+				quantify(nx.l, vs, universal, memo));
+		else {
+			r = quantify(nx.h, vs.subspan(1), universal, memo);
+			if (r != (universal ? F : T)) {
+				const bdd_ref l =
+					quantify(nx.l, vs.subspan(1), universal, memo);
+				r = universal ? bdd_and(r, l) : bdd_or(r, l);
+			}
+		}
+		memo.emplace(x, r);
+		return r;
+	}
+
 	static Bool get_uelim(bdd_ref x) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) return std::get<Bool>(xx);
@@ -1666,8 +1715,13 @@ bool
 (*bdd<Bool, o>::am_cmp)(const bdd_ref &, const bdd_ref &) = [](const bdd_ref &x,
 							       const bdd_ref &y)
 {
-	bool s = x.out && !y.out;
-	return x.id < y.id || (x.id == y.id && s);
+	// A strict order that agrees with ==, or set_intersection merges distinct
+	// references.
+	if (x.id != y.id) return x.id < y.id;
+	if constexpr (o.has_varshift())
+		if (x.shift != y.shift) return x.shift < y.shift;
+	if (x.in != y.in) return x.in < y.in;
+	return x.out && !y.out;
 };
 
 } // namespace idni::tau_lang

@@ -88,6 +88,14 @@ bool has_bdd_id(tref n) {
 		return tree<node_t>::get(m).is(tau::BDD_ID); }) != nullptr;
 }
 
+/// A formula parsed with inference, which types a binder's variable as it
+/// types the variable's occurrences.
+tref typed(const char* sample) {
+	auto rr = get_nso_rr(sample);
+	REQUIRE(rr.has_value());
+	return rr.value().main->get();
+}
+
 } // namespace
 
 TEST_SUITE("anti_prenex/foundations/terms") {
@@ -1092,6 +1100,44 @@ TEST_CASE("is_pure_equation: an equation through one ¬, never an order atom") {
 	// and neither is anything that is no atom at all
 	CHECK(!ap::is_pure_equation<node_t>(wff("f(x)"), T));
 	CHECK(!ap::is_pure_equation<node_t>(wff("x = 0 && y = 0"), T));
+}
+
+TEST_CASE("is_pure_formula: pure literals, trees and units, through ∧, ∨, ¬ and binders") {
+	const ap::ba_type_id BV = bv_type_id<node_t>(2);
+	auto pure = [BV](tref n) { return ap::is_pure_formula<node_t>(n, BV); };
+	CHECK(pure(typed("x:bv[2] & y:bv[2] = { 0 }:bv[2].")));
+	CHECK(pure(typed("!(x:bv[2] & y:bv[2] = { 0 }:bv[2]).")));
+	tref flat = typed("!(x:bv[2] = { 0 }:bv[2]) || !(y:bv[2] = { 0 }:bv[2]).");
+	REQUIRE(ap::is_flat_tree<node_t>(flat));
+	CHECK(pure(flat));
+	tref nested = typed("!(x:bv[2] = { 0 }:bv[2]) "
+		"|| (!(y:bv[2] = { 0 }:bv[2]) && !(z:bv[2] = { 0 }:bv[2])).");
+	REQUIRE(ap::is_negative_tree<node_t>(nested));
+	REQUIRE(!ap::is_flat_tree<node_t>(nested));
+	CHECK(pure(nested));
+	tref unit = typed("ex y (x:bv[2] & y:bv[2] = { 0 }:bv[2]).");
+	REQUIRE(is_child_quantifier<node_t>(unit));
+	CHECK(pure(unit));
+	CHECK(pure(typed("x:bv[2] = { 0 }:bv[2] || !(y:bv[2] = { 0 }:bv[2]).")));
+	CHECK(pure(tau::_T()));
+}
+
+TEST_CASE("is_pure_formula: an order atom, arithmetic, a reference, an impure or foreign unit, a bf_neq") {
+	const ap::ba_type_id BV = bv_type_id<node_t>(2);
+	auto pure = [BV](tref n) { return ap::is_pure_formula<node_t>(n, BV); };
+	CHECK(!pure(typed("x:bv[2] <= y:bv[2].")));
+	CHECK(!pure(typed("x:bv[2] + y:bv[2] = { 0 }:bv[2].")));
+	CHECK(!pure(typed("x:bv[2] = { 0 }:bv[2] && q(y).")));
+	CHECK(!pure(typed("ex y (x:bv[2] + y:bv[2] = { 0 }:bv[2]).")));
+	// a binder over a variable of another type, around a pure body
+	tref eq = typed("x:bv[2] = { 0 }:bv[2].");
+	REQUIRE(pure(eq));
+	CHECK(!pure(tau::build_wff_ex(
+		tau::build_variable("w", bv_type_id<node_t>(4)), eq, false)));
+	// a `bf_neq` atom, as `wff` parses `!=`
+	tref neq = wff("x:bv[2] != { 0 }:bv[2]");
+	REQUIRE(is_child<node_t>(neq, tau::bf_neq));
+	CHECK(!pure(neq));
 }
 
 } // TEST_SUITE

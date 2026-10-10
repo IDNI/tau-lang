@@ -9,10 +9,10 @@
 // Every case is ONE formula through one harness: parse `∃P.ψ`, normalise `ψ`
 // the way phases 1 and 3 leave it, put it into §1's term representation and
 // push the block into it. What is claimed of every result: EQUIVALENT to
-// `∃P.ψ` (`are_nso_equivalent` on the finished formula, or structurally where
-// a reference puts that checker out of reach), no free variable ESCAPED, and
-// INVARIANT 4. Per case: the block is RESOLVED, or what came back is exactly
-// the RE-WRAP.
+// `∃P.ψ` (`are_nso_equivalent` on the finished formula, the solver
+// (`bv_equivalent`) on bitvector content, or structurally where a reference
+// puts both out of reach), no free variable ESCAPED, and INVARIANT 4. Per
+// case: the block is RESOLVED, or what came back is exactly the RE-WRAP.
 //
 // TYPES: §7's table has no row for an untyped block and `method`
 // Debug-asserts on one, so every fixture carries typed variables — a parsed
@@ -88,6 +88,17 @@ size_t binder_count(tref n) {
 /// The formula with every stored BDD spelled out, which is what the oracle
 /// reads.
 tref finished(tref n) { return th::convert_to_tau_terms(n); }
+
+/// THE BITVECTOR ORACLE: `a` and `b` agree on every assignment of their free
+/// variables, asked of the solver as the unsatisfiability of their
+/// exclusive-or.
+bool bv_equivalent(tref a, tref b) {
+	const tref A = finished(a), B = finished(b);
+	const tref differ = tau::build_wff_or(
+		tau::build_wff_and(A, tau::build_wff_neg(B)),
+		tau::build_wff_and(tau::build_wff_neg(A), B));
+	return bv_formula_sat_status<node_t>(differ) == bv_sat_status::unsat;
+}
 
 /// NO FREE VARIABLE ESCAPED: `FV(out) ⊆ FV(in)`.
 bool no_escape(tref out, tref in) {
@@ -518,9 +529,9 @@ TEST_CASE("P19: keep mode emits the chain, and a closed piece folds") {
 TEST_CASE("P20: a negative tree of a bitvector block goes whole to the leaf") {
 	// The one route to the dispatcher's negative-tree arm: fast path 2a is
 	// refused for a type whose `∃` does not distribute over negatives, so
-	// the tree is handed whole to the leaf, where the bitvector row has no
-	// method and re-wraps it exactly (invariant 3). The claim is structural:
-	// the equivalence checker does not read bitvector content.
+	// the tree is handed whole to the leaf. The router gives the pure tree
+	// to the finite side, where a flat tree is tier 1 (§7): one condition
+	// per literal, `∃_x x·y ≠ 0` and `∃_x x·w ≠ 0`, joined by `∨`.
 	fixture f = make(
 		"ex x (x:bv[2] & y:bv[2] != { 0 }:bv[2] || x:bv[2] & w:bv[2] != { 0 }:bv[2]).");
 	REQUIRE(is_bv_type_family<node_t>(f.c.type));
@@ -528,10 +539,11 @@ TEST_CASE("P20: a negative tree of a bitvector block goes whole to the leaf") {
 	REQUIRE(!ap::ex_distributes_over_negatives<node_t>(f.c.type));
 	CHECK(!ap::try_fast_paths<node_t>(f.clause, f.P, f.c).has_value());
 	const tref got = pushed(f);
+	CHECK(bv_equivalent(got, f.quantified));
 	check_structurally(got, f);
-	CHECK(same(got, rewrapped(f)));
-	REQUIRE(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.P[0]));
+	check_resolved(got, f);
+	CHECK(bv_equivalent(got, parse(
+		"!(y:bv[2] = { 0 }:bv[2]) || !(w:bv[2] = { 0 }:bv[2]).")));
 }
 
 } // TEST_SUITE

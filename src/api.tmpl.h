@@ -4,6 +4,7 @@
 
 #include "sbf_parser.generated.h"
 #include "tau_tree_builders.h"
+#include "anti_prenex/foundations/ctx.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -79,6 +80,9 @@ void api<node>::set_cvc5_options(int set) {
 		&& set <= static_cast<int>(cvc5_option_set::combined_best))
 			? static_cast<cvc5_option_set>(set)
 			: cvc5_option_set::ext_rewrite_no_models;
+	// The anti-prenexing tables that may embed a solver verdict hold for
+	// the option set just replaced (anti_prenex.md §1, cache scope).
+	anti_prenexing::flush_solver_dependent<node>();
 }
 
 // The two block budgets keep SIZE_MAX as their internal "unlimited" sentinel

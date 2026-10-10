@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 3 unit tests for src/anti_prenex/eliminate/atomless.h and
-// eliminate_block.h: §7's type table, ELIMINATE_BLOCK with its memo and its
-// two pre-steps, and the atomless method end to end. Spec: anti_prenex.md §7
-// (the table, the method contract, ELIMINATE_ATOMLESS_CLAUSE, DISCHARGE), §3
+// Unit tests for src/anti_prenex/eliminate/atomless.h and eliminate_block.h:
+// §7's type table, ELIMINATE_BLOCK with its memo, its two pre-steps and its
+// dispatch, and the atomless method end to end. Spec: anti_prenex.md §7 (the
+// table, the method contract, ELIMINATE_ATOMLESS_CLAUSE, DISCHARGE), §3
 // (TRY_WITNESS), §1 (the term representation, the leaf hazard, cache scope).
 //
 // TYPES: only the ATOMLESS types (`tau`, `sbf`) and the bitvector family are
@@ -15,11 +15,11 @@
 // representation with `prepare_terms`, the state a caller of ELIMINATE_BLOCK
 // hands over.
 //
-// A result is checked by `are_nso_equivalent` against `∃P.ψ` wherever the
-// content allows it — never against an output string, and never on
-// BDD-backed terms before `convert_to_tau_terms` has spelled them out — and
-// structurally where a reference, a bitvector or a kept functional quantifier
-// puts the checker out of reach.
+// A result is checked against `∃P.ψ` by `are_nso_equivalent` wherever the
+// content allows it, and by the solver (`bv_equivalent`) on bitvector
+// content — never against an output string, and never on BDD-backed terms
+// before `convert_to_tau_terms` has spelled them out — and structurally
+// where a reference or a kept functional quantifier puts both out of reach.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -91,6 +91,17 @@ size_t binder_count(tref n) {
 /// The formula with every stored BDD spelled out, which is what the oracle
 /// reads.
 tref finished(tref n) { return th::convert_to_tau_terms(n); }
+
+/// THE BITVECTOR ORACLE: `a` and `b` agree on every assignment of their free
+/// variables, asked of the solver as the unsatisfiability of their
+/// exclusive-or.
+bool bv_equivalent(tref a, tref b) {
+	const tref A = finished(a), B = finished(b);
+	const tref differ = tau::build_wff_or(
+		tau::build_wff_and(A, tau::build_wff_neg(B)),
+		tau::build_wff_and(tau::build_wff_neg(A), B));
+	return bv_formula_sat_status<node_t>(differ) == bv_sat_status::unsat;
+}
 
 /// NO FREE VARIABLE ESCAPED: `FV(out) ⊆ FV(in)`.
 bool no_escape(tref out, tref in) {
@@ -249,26 +260,68 @@ TEST_CASE("E3: the strip scopes out what no longer holds a block variable") {
 
 // --- the dispatch --------------------------------------------------------------------
 
-TEST_CASE("E4: a bitvector block is re-wrapped exactly, with the rest outside") {
-	// The bitvector router has no arm here, so the dependent conjuncts
-	// come back under the block and the independent ones stay outside it
-	// (invariant 3). `x·a = 0` pins nothing — its cofactors are `0` and
-	// `a` — so the witness pass leaves the block alone.
+TEST_CASE("E4: the bitvector router freezes a reference's component whole") {
+	// `q(x)` is opaque to both of the router's engines, and `x·a = 0`
+	// shares `x` with it: the component `{x·a = 0, q(x)}` comes back
+	// re-wrapped exactly (invariant 3), and the strip leaves `z·b = 0`
+	// outside. `x·a = 0` pins nothing — its cofactors are `0` and `a` — so
+	// the witness pass leaves the block alone.
 	fixture f = make("ex x (x:bv[2] a:bv[2] = { 0 }:bv[2] "
-		"&& z:bv[2] b:bv[2] = { 0 }:bv[2]).");
+		"&& q(x:bv[2]) && z:bv[2] b:bv[2] = { 0 }:bv[2]).");
 	REQUIRE(ap::method<node_t>(f.c.type) == ap::method_kind::bitvector);
 	trefs indep, dep;
 	for (tref m : ap::members<node_t>(f.clause))
 		(ap::fv_meets<node_t>(m, f.P) ? dep : indep).push_back(m);
-	REQUIRE(dep.size() == 1);
+	REQUIRE(dep.size() == 2);
 	REQUIRE(indep.size() == 1);
 
 	const tref got = ap::eliminate_block_uncached<node_t>(f.clause, f.P,
 		f.c);
 	CHECK(same(got, ap::simplified_and_join<node_t>(trefs{ indep[0],
-		ap::rewrap<node_t>(dep[0], f.P) })));
+		ap::rewrap<node_t>(ap::simplified_and_join<node_t>(dep), f.P) })));
 	CHECK(invariant_4(got));
 	CHECK(no_escape(finished(got), f.quantified));
+}
+
+TEST_CASE("E4b: a pure bitvector block is decided by the finite method") {
+	// The router hands `x·a = 0` to the finite side, whose `pos` is
+	// `∀_x x·a = 0`, i.e. `0 = 0`: the block is `T`, and the strip's
+	// `z·b = 0` is all that is left. The witness pass finds no pin, as in
+	// E4.
+	fixture f = make("ex x (x:bv[2] a:bv[2] = { 0 }:bv[2] "
+		"&& z:bv[2] b:bv[2] = { 0 }:bv[2]).");
+	trefs indep;
+	for (tref m : ap::members<node_t>(f.clause))
+		if (!ap::fv_meets<node_t>(m, f.P)) indep.push_back(m);
+	REQUIRE(indep.size() == 1);
+
+	const tref got = ap::eliminate_block_uncached<node_t>(f.clause, f.P,
+		f.c);
+	CHECK(same(got, indep[0]));
+	CHECK(bv_equivalent(got, f.quantified));
+	CHECK(no_escape(finished(got), f.quantified));
+	CHECK(invariant_4(got));
+}
+
+TEST_CASE("E4c: an arithmetic bitvector block is decided by the solver") {
+	// `x` sits under an arithmetic operator, so `x + a = 0` pins nothing
+	// (§1 leaf hazard) and the router hands it to the solver: the query
+	// `∃x (x + a = 0)` is open, and closed by `∀a` it is valid (`x = −a`),
+	// so the block is `T` and `z·b = 0` is all that is left.
+	fixture f = make("ex x (x:bv[2] + a:bv[2] = { 0 }:bv[2] "
+		"&& z:bv[2] b:bv[2] = { 0 }:bv[2]).");
+	REQUIRE(!ap::try_witness<node_t>(f.P[0], f.clause, f.c));
+	trefs indep;
+	for (tref m : ap::members<node_t>(f.clause))
+		if (!ap::fv_meets<node_t>(m, f.P)) indep.push_back(m);
+	REQUIRE(indep.size() == 1);
+
+	const tref got = ap::eliminate_block_uncached<node_t>(f.clause, f.P,
+		f.c);
+	CHECK(same(got, indep[0]));
+	CHECK(bv_equivalent(got, f.quantified));
+	CHECK(no_escape(finished(got), f.quantified));
+	CHECK(invariant_4(got));
 }
 
 // --- the atomless method, end to end -------------------------------------------------

@@ -321,8 +321,9 @@ TEST_CASE("C8: components and members come in X's order") {
 TEST_CASE("B1: a variable the body does not mention leaves at entry") {
 	// `X ← X ∩ FV(body)`: `z` binds nothing, so no component is set up for
 	// it — the callback is asked once — and no binder for it can come
-	// back. What is left is one atom, which the leaf discharges.
-	fixture f = split("ex x ex z (x = 0).");
+	// back. What is left is one atom, a pin on the binate `x`, which the
+	// witness discharges.
+	fixture f = split("ex x ex z (x ^ a = 0).");
 	size_t asked = 0;
 	auto count = [&asked](tref) { ++asked; return false; };
 	const tref got = pushed(f, count);
@@ -335,8 +336,8 @@ TEST_CASE("B1: a variable the body does not mention leaves at entry") {
 TEST_CASE("B2: two components are pushed one after the other") {
 	// The components share no atom: the first push strips the second's
 	// conjunct outside the block and discharges its own, and the second
-	// starts from what the first left.
-	fixture f = split("ex x ex y (x a = 0 && y b = 0).");
+	// starts from what the first left. Each variable is binate, a pin.
+	fixture f = split("ex x ex y (x ^ a = 0 && y ^ b = 0).");
 	size_t asked = 0;
 	auto count = [&asked](tref) { ++asked; return false; };
 	const tref got = pushed(f, count);
@@ -347,11 +348,12 @@ TEST_CASE("B2: two components are pushed one after the other") {
 }
 
 TEST_CASE("B3: the second component is pushed into what the first left") {
-	// Two components again, the second one DISJUNCTIVE. `∃x` strips the
-	// disjunction outside its block and discharges its own atom to `T`;
-	// `∃y` then meets that disjunction alone, where 2b squeezes the two
-	// positives on terms and both discharge at `y := 0`.
-	fixture f = split("ex x ex y (x a = 0 && (y b = 0 || y c = 0)).");
+	// Two components again, the second one DISJUNCTIVE, and both variables
+	// binate. `∃x` strips the disjunction outside its block and discharges
+	// its own atom, a pin, to `T`; `∃y` then meets that disjunction alone,
+	// where 2b squeezes the two positives on terms and `∃y(y·b = 0)`
+	// discharges at `y := 0`.
+	fixture f = split("ex x ex y (x ^ a = 0 && (y b = 0 || y' c = 0)).");
 	const tref got = pushed(f, ap::keep_no_functional<node_t>);
 	check_claims(got, f);
 	CHECK(binder_count(got) == 0);
@@ -363,7 +365,7 @@ TEST_CASE("B4: the callback is asked per component, on the block as it stands") 
 	// narrowed block over the body that component's setup finds — so the
 	// first component sees the body as it arrived and the second sees it
 	// with the first component's result in place.
-	fixture f = split("ex x ex y (x a = 0 && y b = 0).");
+	fixture f = split("ex x ex y (x ^ a = 0 && y ^ b = 0).");
 	trefs seen;
 	auto record = [&seen](tref n) { seen.push_back(n); return false; };
 	pushed(f, record);
@@ -495,6 +497,93 @@ TEST_CASE("B9: a push past the acceptance bound is discarded for its input") {
 	CHECK(binder_count(got) == 0);
 }
 
+// --- §5 DELETE_UNATE_BINDERS ----------------------------------------------------------
+
+TEST_CASE("U1: unate binders leave in one substitution, a binate one stays") {
+	// `x` only lowers the truth and goes to 0, `y` only raises it and goes
+	// to 1, `z` moves it both ways and stays.
+	fixture f = split("ex x ex y ex z ((x a = 0) && (b x' != 0) "
+		"&& (y' c = 0) && (d y != 0) && (z e = 0) && (z' g = 0)).");
+	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
+		f.blk.vars);
+	const ap::block left = ap::fv_intersect<node_t>(got, f.blk.vars);
+	REQUIRE(left.size() == 1);
+	CHECK(same(left[0], f.blk.vars[2]));
+	check_claims(ap::rewrap<node_t>(got, left), f);
+	CHECK(are_nso_equivalent<node_t>(ap::rewrap<node_t>(got, left),
+		parse("(b != 0) && (d != 0) && ex z ((z e = 0) && (z' g = 0)).")));
+}
+
+TEST_CASE("U2: a binate variable comes back as it is") {
+	// x ≠ 0 rises with x and x·a′ = 0 falls with it; an equation with no 0
+	// side, a ring sum, two opposite literals and a unit are binate too.
+	for (const char* src : { "ex x ((x != 0) && (x a' = 0)).",
+		"ex x ((x = a) && (b x != 0)).",
+		"ex x ((x ^ a = 0) && (b x != 0)).",
+		"ex x ((x a = 0) && (b x' = 0)).",
+		"ex x ((x a = 0) && all w (x w != 0))." })
+	{
+		fixture f = split(src);
+		CHECK(ap::delete_unate_binders<node_t>(f.blk.matrix, f.blk.vars)
+			== f.blk.matrix);
+	}
+}
+
+TEST_CASE("U3: a variable that only raises the truth goes to 1") {
+	// ∃x (x ≠ 0 ∧ y·x ≠ 0) is y ≠ 0, at x := 1.
+	fixture f = split("ex x ((x != 0) && (y x != 0)).");
+	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
+		f.blk.vars);
+	CHECK(!ap::fv_meets<node_t>(got, f.blk.vars));
+	check_claims(got, f);
+	CHECK(are_nso_equivalent<node_t>(got, parse("y != 0.")));
+}
+
+TEST_CASE("U4: a variable that only lowers the truth goes to 0") {
+	// ∃x (x·a = 0 ∧ x′·b ≠ 0) is b ≠ 0, at x := 0.
+	fixture f = split("ex x ((x a = 0) && (x' b != 0)).");
+	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
+		f.blk.vars);
+	CHECK(!ap::fv_meets<node_t>(got, f.blk.vars));
+	check_claims(got, f);
+	CHECK(are_nso_equivalent<node_t>(got, parse("b != 0.")));
+}
+
+TEST_CASE("U5: a block of more than 64 variables is read whole") {
+	// Seventy variables that only lower the truth, but x67 also raises it.
+	std::string src, body;
+	for (size_t i = 0; i < 70; ++i) {
+		src += "ex x" + std::to_string(i) + " ";
+		body += std::string(i ? " && " : "") + "(x" + std::to_string(i)
+			+ " a = 0)";
+	}
+	src += "(" + body + " && (x67' b = 0)).";
+	fixture f = split(src.c_str());
+	REQUIRE(f.blk.vars.size() == 70);
+	const tref got = ap::delete_unate_binders<node_t>(f.blk.matrix,
+		f.blk.vars);
+	const ap::block left = ap::fv_intersect<node_t>(got, f.blk.vars);
+	REQUIRE(left.size() == 1);
+	CHECK(same(left[0], f.blk.vars[67]));
+	CHECK(are_nso_equivalent<node_t>(ap::rewrap<node_t>(got, left),
+		f.quantified));
+}
+
+TEST_CASE("U6: a ∀ run deletes its unate binder on the dualised matrix") {
+	// ∀x (x·a ≠ 0 ∨ b = 0) dualises to ∃x (x·a = 0 ∧ ¬(b = 0)), where
+	// x := 0 leaves ¬(b = 0), negated back to b = 0.
+	fixture f = split("all x ((x a != 0) || (b = 0)).");
+	const tref dual = ap::normalize_operators<node_t>(
+		ap::canonically_factored_neg<node_t>(f.blk.matrix));
+	CHECK(!ap::fv_meets<node_t>(ap::delete_unate_binders<node_t>(dual,
+		f.blk.vars), f.blk.vars));
+	const tref got = ap::process_block<node_t>(f.blk,
+		ap::keep_no_functional<node_t>);
+	check_claims(got, f);
+	CHECK(binder_count(got) == 0);
+	CHECK(are_nso_equivalent<node_t>(finished(got), parse("b = 0.")));
+}
+
 // --- §5 PROCESS_BLOCK -----------------------------------------------------------------
 
 TEST_CASE("D1: a ∀ run is pushed by dualisation") {
@@ -507,8 +596,9 @@ TEST_CASE("D1: a ∀ run is pushed by dualisation") {
 }
 
 TEST_CASE("D2: what the ∃ push resolves comes back negated") {
-	// `∀x. x·y = 0` dualises to `∃x. ¬(x·y = 0)`, which the leaf
-	// discharges to `¬(y = 0)`; negated again, that is `y = 0`.
+	// `∀x. x·y = 0` dualises to `∃x. ¬(x·y = 0)`, where `x` only raises
+	// the truth and leaves at block entry with `x := 1`, giving `¬(y = 0)`;
+	// negated again, that is `y = 0`.
 	fixture f = split("all x (x y = 0).");
 	const tref got = processed(f, ap::keep_no_functional<node_t>);
 	check_claims(got, f);
@@ -637,7 +727,7 @@ TEST_CASE("A5: a shared run head is processed once") {
 	// would show up here as a second ask. The ∀ run adds none: 2b resolves
 	// `ψ` to `T`, which decides the disjunction it stands in, and a matrix
 	// that is a constant has no component to ask about.
-	const tref psi = parse("ex x (x a = 0 || x c = 0).");
+	const tref psi = parse("ex x (x a = 0 || x' c = 0).");
 	const tref borrowed = parse("all y (y b = 0).");
 	const tref phi = tau::build_wff_and(psi,
 		tau::build_wff_all(tau::trim_right_sibling(
@@ -655,7 +745,8 @@ TEST_CASE("A5: a shared run head is processed once") {
 
 TEST_CASE("A6: a run under a temporal operator is processed") {
 	// The walk enters a temporal operator like any other formula node, so
-	// the block below one is reached and discharged.
+	// the block below one is reached, and its `x`, which only lowers the
+	// truth, leaves at block entry with `x := 0`.
 	tref phi = parse("always ex x (x y = 0).");
 	const tref got = finished(ap::process_all_blocks<node_t>(normalised(phi),
 		ap::keep_no_functional<node_t>));
@@ -711,10 +802,10 @@ TEST_CASE("A9: an ∃ over ∀ over ∃ nest is walked innermost first") {
 	// The pass reaches the innermost run through both enclosing ones and
 	// answers it first: `∃c` is distributed over the disjunction (2d),
 	// where the `a·b = 0` disjunct is c-free and rides along while
-	// `∃c(c·d = 0)` is `T` at `c := 0` and decides the ∨-join. That `T`
+	// `∃c(c + d = 0)` is `T` at `c := d` and decides the ∨-join. That `T`
 	// is the matrix of both runs above, so neither has a component left
 	// to ask the callback about, and phase 5 drops their binders.
-	tref phi = parse("ex a (all b (ex c (a b = 0 || c d = 0))).");
+	tref phi = parse("ex a (all b (ex c (a b = 0 || c ^ d = 0))).");
 	size_t asked = 0;
 	auto count = [&asked](tref) { ++asked; return false; };
 	const tref got = finished(ap::process_all_blocks<node_t>(normalised(phi),

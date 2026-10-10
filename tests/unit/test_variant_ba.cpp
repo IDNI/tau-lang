@@ -33,12 +33,10 @@ V make_sbf(const char* src) {
 	return std::get<sbf_ba>(parsed.value().first);
 }
 
-// bv (cvc5::Term) operators build a new symbolic term (e.g. "bvand x y")
-// rather than eagerly computing a concrete value, so raw structural
-// equality against a bitvector constant only holds after running cvc5's
-// simplifier (normalize_bv, as used by base_ba_dispatcher::normalize).
+// The bv (cvc5::Term) Boolean operators return a value, so structural
+// equality against a bitvector constant holds directly.
 bool bv_equals(const V& v, bool top) {
-	return normalize_bv(std::get<bv>(v))
+	return std::get<bv>(v)
 		== (top ? make_bitvector_top_elem(4) : make_bitvector_bottom_elem(4));
 }
 

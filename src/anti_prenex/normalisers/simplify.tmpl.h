@@ -750,8 +750,9 @@ tref simplify(tref phi, regime rg, const block& X, bool ref_args) {
 	// sweep.
 	const tref propagated = detail::propagation<node>(rg, X, ref_args)
 		.run(phi);
+	// A compound guard is a sweep key with its `neg`, like a literal.
 	return syntactic_path_simplification_unchanged_negations<node>(
-		propagated);
+		propagated, [](tref m) { return guard_neg<node>(m); });
 }
 
 } // namespace idni::tau_lang::anti_prenexing

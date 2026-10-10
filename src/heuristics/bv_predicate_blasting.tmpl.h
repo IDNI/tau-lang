@@ -198,14 +198,7 @@ static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
 		}
 		case tau::ba_constant: {
 			if (!is_bv_constant<node>(t)) break;
-			auto cte = std::get<bv>(tau::get(t).get_ba_constant());
-			// A constant folded from a bf_and of two ba_constants (e.g. a
-			// mask AND a literal operand, as bit<node> builds for a
-			// constant leaf) can come back from the hooks as an
-			// un-evaluated cvc5 Term (e.g. "(bvand #b0101 #b0010)")
-			// instead of a literal -- normalize_bv (bv_ba.h) runs cvc5's
-			// own simplifier to fold it down before giving up.
-			if (!cte.isBitVectorValue()) cte = normalize_bv(cte);
+			const auto cte = std::get<bv>(tau::get(t).get_ba_constant());
 			if (!cte.isBitVectorValue()) break;
 			std::string bv_str = cte.getBitVectorValue();
 			if (i >= bv_str.size()) break;

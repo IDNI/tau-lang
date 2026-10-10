@@ -20,15 +20,17 @@
 // Then its own SHAPE claim: what the block driver does to that input, worked
 // out from the spec and spelled in the case's comment.
 //
-// WHAT RESOLVES: §6's cheap steps are all wired into the dispatcher, so a
+// WHAT RESOLVES: §6's push steps are all wired into the dispatcher, so a
 // block resolves wherever one of them reaches — a literal, a negative tree
 // (§1: an ∨-node all of whose leaves are negated equations) or a binder unit
 // at the leaf, the two fast paths, the push per disjunct, and the
-// conjunction's ladder of scope narrowing, fast paths, consistency check and
-// pin matches. What none of them takes re-wraps, after the strip of its
-// X-free conjuncts: an undecided block comes back wrapped rather than
-// answered (invariant 3). The cases here are the DRIVER's; the ladder's own
-// routes are claimed in tests/unit/test_anti_prenex_layer5.cpp.
+// conjunction's ladder of scope narrowing, fast paths, consistency check, pin
+// matches, licensed decomposition and expansion. What none of them decides
+// re-wraps, after the strip of its X-free conjuncts: an undecided block comes
+// back wrapped rather than answered (invariant 3). The cases here are the
+// DRIVER's; the ladder's own routes are claimed in
+// tests/unit/test_anti_prenex_layer5.cpp and
+// tests/unit/test_anti_prenex_layer6.cpp.
 //
 // Some cases take their INPUT STRING, and nothing else, from
 // tests/unit/test_antiprenexing.cpp; every expectation here is the spec's. A
@@ -129,8 +131,9 @@ TEST_SUITE("anti_prenex/layer4") {
 
 TEST_CASE("M1: a ∀ over an unsatisfiable body is F") {
 	// test_antiprenexing.cpp:423, the input of the corpus's R5. The run is
-	// dualised into `∃x. x·y = 0`, one literal, which the leaf discharges
-	// to `T`; the outbound negation makes that `F`.
+	// dualised into `∃x. x·y = 0`, where `x` only lowers the truth and
+	// leaves at block entry with `x := 0`, giving `T`; the outbound
+	// negation makes that `F`.
 	const tref phi = parse("all x xy != 0.");
 	const tref got = anti_prenexed(phi);
 	CHECK(tau::get(got).equals_F());
@@ -138,11 +141,11 @@ TEST_CASE("M1: a ∀ over an unsatisfiable body is F") {
 }
 
 TEST_CASE("M2: an independent conjunct leaves the block's scope") {
-	// test_antiprenexing.cpp:429, the input of the corpus's R6. `w·z = 0`
-	// does not touch `x`, so the strip hoists it outside the block (§6),
-	// and what is left is the single literal `x·y = 0`, which the leaf
-	// discharges to `T` (`x := 0`).
-	const tref phi = parse("ex x (xy = 0 && wz = 0).");
+	// test_antiprenexing.cpp:429, the input of the corpus's R6 with `x`
+	// made binate. `w·z = 0` does not touch `x`, so the strip hoists it
+	// outside the block (§6), and what is left is the single literal
+	// `x·y ∪ x′·u = 0`, which the leaf discharges to `y·u = 0`.
+	const tref phi = parse("ex x (xy | x'u = 0 && wz = 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(!holds_var(got, "x"));
@@ -151,9 +154,9 @@ TEST_CASE("M2: an independent conjunct leaves the block's scope") {
 }
 
 TEST_CASE("M3: the strip leaves a one-literal block behind") {
-	// The corpus's R23. The same shape as M2 with the independent conjunct
-	// written over one variable.
-	const tref phi = parse("ex x (x a = 0 && w = 0).");
+	// The corpus's R23 with `x` made binate. The same shape as M2 with the
+	// independent conjunct written over one variable.
+	const tref phi = parse("ex x (x a | x' b = 0 && w = 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(!holds_var(got, "x"));
@@ -177,8 +180,8 @@ TEST_CASE("M4: an alternating nest is answered innermost first") {
 
 TEST_CASE("M5: nested same-kind runs are shared between phases 2 and 4") {
 	// `x = w` is a pin, so phase 2's deep witness takes `x` before any
-	// block is pushed; what phase 4 meets is `∃y. w·y = 0`, one literal,
-	// which the leaf discharges to `T` (`y := 0`).
+	// block is pushed; what phase 4 meets is `∃y. w·y = 0`, where `y` only
+	// lowers the truth and leaves at block entry with `y := 0`: `T`.
 	const tref phi = parse("ex x ex y (xy = 0 && x = w).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);
@@ -200,10 +203,10 @@ TEST_CASE("M6: an alternation is eliminated innermost first") {
 TEST_CASE("M7: a ∀ matrix that is a negative tree is answered through its "
 	"dual") {
 	// The matrix is a negative tree, but the ∀ run is DUALISED before the
-	// push, so what the dispatcher sees is the conjunction `x·y = 0 ∧
-	// x·w = 0`: no member of it is disjunctive, the narrowing settles `x`
-	// whole, and the leaf answers `T` at `x := 0`. Negated back, the run
-	// is `F` — as it must be, `x := 0` refuting both disequations.
+	// push, so what the push meets is the conjunction `x·y = 0 ∧
+	// x·w = 0`, where `x` only lowers the truth and leaves at block entry
+	// with `x := 0`: `T`. Negated back, the run is `F` — as it must be,
+	// `x := 0` refuting both disequations.
 	const tref phi = parse("all x (xy != 0 || xw != 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(!holds(got, tau::wff_all));
@@ -215,8 +218,9 @@ TEST_CASE("M8: a disjunction of positives is squeezed to T") {
 	// Not a negative tree — its leaves are positive — and the fast paths
 	// are tried before the junction arms: every leaf is a positive
 	// equation and none is X-free, so 2b squeezes on TERMS into
-	// `{x·y, x·w}` and each one-atom clause discharges at `x := 0`.
-	const tref phi = parse("ex x (xy = 0 || xw = 0).");
+	// `{x·y, x′·w}` and the first one-atom clause discharges at `x := 0`.
+	// `x` is binate, so it reaches the push.
+	const tref phi = parse("ex x (xy = 0 || x'w = 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(binder_count(got) == 0);
@@ -231,7 +235,7 @@ TEST_CASE("M9: the strip hoists the X-free conjunct and the rest resolves") {
 	// The X-free conjunct is written over a variable OF ITS OWN: one the
 	// disjunction also mentions would pin that variable at phase 1 and
 	// dissolve the disjunct before any block is pushed.
-	const tref phi = parse("ex x (v = 0 && (xy = 0 || xw = 0)).");
+	const tref phi = parse("ex x (v = 0 && (xy = 0 || x'w = 0)).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);
 	CHECK(holds_var(got, "v"));
@@ -308,25 +312,25 @@ TEST_CASE("M13: a block inside a temporal operator is pushed too") {
 // --- 7. the seed corpus: single-block inputs of the old module's suite -------------
 
 TEST_CASE("M14: a negative tree under a block is resolved leaf by leaf") {
-	// test_antiprenexing.cpp:161. Phase 3 spells both disequations as
-	// formula negations, so the matrix is an ∨-node all of whose leaves
-	// are negated equations — a NEGATIVE TREE (§1), which the dispatcher
-	// classifies ahead of the junctions. The fast paths are tried above
-	// that classification, so 2a takes it, one clause per negated leaf.
-	// RESOLVED.
-	const tref phi = parse("ex x (xy != 0 || xw != 0).");
+	// test_antiprenexing.cpp:161 with `x` made binate. Phase 3 spells both
+	// disequations as formula negations, so the matrix is an ∨-node all of
+	// whose leaves are negated equations — a NEGATIVE TREE (§1), which the
+	// dispatcher classifies ahead of the junctions. The fast paths are
+	// tried above that classification, so 2a takes it, one clause per
+	// negated leaf. RESOLVED.
+	const tref phi = parse("ex x (xy != 0 || x'w != 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);
 	CHECK(!holds_var(got, "x"));
 }
 
 TEST_CASE("M15: a conjunction of negated equations is pushed home") {
-	// test_antiprenexing.cpp:178. A negative tree is an ∨-NODE (§1), so a
-	// conjunction of the same literals is not one: it takes the `∧` arm,
-	// where neither member is disjunctive — the narrowing settles `x`
-	// whole and the leaf answers the clause, `x := 1` witnessing
-	// `y ≠ 0 ∧ w ≠ 0`.
-	const tref phi = parse("ex x (xy != 0 && xw != 0).");
+	// test_antiprenexing.cpp:178 with `x` made binate. A negative tree is
+	// an ∨-NODE (§1), so a conjunction of the same literals is not one: it
+	// takes the `∧` arm, where neither member is disjunctive — the
+	// narrowing settles `x` whole and the leaf answers the clause with
+	// `y ≠ 0 ∧ w ≠ 0`, the algebra being atomless.
+	const tref phi = parse("ex x (xy != 0 && x'w != 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);
 	CHECK(!holds_var(got, "x"));

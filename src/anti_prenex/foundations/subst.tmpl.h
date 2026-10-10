@@ -74,6 +74,38 @@ const typename tree<node>::argument_hook& resimplify_argument() {
 	return hook;
 }
 
+/// The hook of `φ[x ← t]` in the regime of its atoms, and the `hook_target`
+/// naming the nodes it is handed.
+template <NodeType node>
+struct subst_var_hooks {
+	typename tree<node>::argument_hook resimplify;
+	typename tree<node>::hook_target named;
+};
+
+template <NodeType node>
+subst_var_hooks<node> resimplify_rewritten(regime rg) {
+	using tau = tree<node>;
+	auto is_chain = [](tref n) {
+		const tau& u = tau::get(n);
+		return u.child_is(tau::bf_fall) || u.child_is(tau::bf_fex);
+	};
+	// One hook for every kind the library hands it: a rewritten atom is a
+	// `wff`, a reference argument and a chain are `bf` terms. A chain goes
+	// through the constructor, which folds a piece the rewrite closed; the
+	// hook cannot tell a chain that IS an argument, so a chain is
+	// re-simplified as an argument first.
+	return {
+		[rg, is_chain](tref n) {
+			if (tau::get(n).is(tau::wff)) return simplify_atom<node>(n, rg);
+			const tref s = resimplify_argument<node>()(n);
+			if (!is_chain(s)) return s;
+			const auto [q, body] = strip_chain<node>(s);
+			return tau_term_bdd<node>::build_functional_quantifiers(q, body);
+		},
+		[is_chain](tref n) { return is_atomic_fm<node>(n) || is_chain(n); }
+	};
+}
+
 } // namespace detail
 
 // --- φ[atm ↦ T/F] ------------------------------------------------------------------
@@ -175,29 +207,21 @@ bool has_atom(tref n, tref atm) {
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, regime rg) {
 	using tau = tree<node>;
-	auto is_chain = [](tref n) {
-		const tau& u = tau::get(n);
-		return u.child_is(tau::bf_fall) || u.child_is(tau::bf_fex);
-	};
-	// One hook for every kind the library hands it: a rewritten atom is a
-	// `wff`, a reference argument and a chain are `bf` terms. A chain goes
-	// through the constructor, which folds a piece the rewrite closed; the
-	// hook cannot tell a chain that IS an argument, so a chain is
-	// re-simplified as an argument first.
-	const typename tau::argument_hook resimplify = [rg, is_chain](tref n) {
-		if (tau::get(n).is(tau::wff)) return simplify_atom<node>(n, rg);
-		const tref s = detail::resimplify_argument<node>()(n);
-		if (!is_chain(s)) return s;
-		const auto [q, body] = strip_chain<node>(s);
-		return tau_term_bdd<node>::build_functional_quantifiers(q, body);
-	};
-	const typename tau::hook_target named = [is_chain](tref n) {
-		return is_atomic_fm<node>(n) || is_chain(n);
-	};
+	const auto h = detail::resimplify_rewritten<node>(rg);
 	// The rewrite happens inside `phi`, so a right sibling it carries as a
 	// chain member is not part of it.
 	return tau::get(tau::trim_right_sibling(phi))
-		.substitute(tau::get(tau::bf, x), t, resimplify, {}, named);
+		.substitute(tau::get(tau::bf, x), t, h.resimplify, {}, h.named);
+}
+
+template <NodeType node>
+tref subst_var(tref phi, const subtree_map<node, tref>& by_var, regime rg) {
+	using tau = tree<node>;
+	subtree_map<node, tref> changes;
+	for (const auto& [x, t] : by_var) changes.emplace(tau::get(tau::bf, x), t);
+	const auto h = detail::resimplify_rewritten<node>(rg);
+	return tau::get(tau::trim_right_sibling(phi))
+		.substitute(changes, h.resimplify, {}, h.named);
 }
 
 } // namespace idni::tau_lang::anti_prenexing
