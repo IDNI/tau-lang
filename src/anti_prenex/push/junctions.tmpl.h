@@ -29,8 +29,57 @@
 #include <cassert>
 #include <optional>
 #include <utility>
+#include <vector>
 
 namespace idni::tau_lang::anti_prenexing {
+
+namespace junctions_detail {
+
+/**
+ * @brief The conjunction of @p cs with the disjunct `d` shared by the most
+ * ∨-conjuncts, two at least, factored out:
+ * `(d ∨ r₁) ∧ … ∧ (d ∨ rₖ) = d ∨ (r₁ ∧ … ∧ rₖ)`. `d` must meet @p X; a tie
+ * goes to the larger disjunct, then to the first counted. `nullopt` when no
+ * such disjunct is shared.
+ */
+template <NodeType node>
+std::optional<tref> factor_shared_disjunct(const trefs& cs, const block& X) {
+	using tau = tree<node>;
+	// Per disjunct, by content: the ∨-conjuncts holding it and the last one
+	// counted, so that a duplicate member counts once.
+	subtree_unordered_map<node, std::pair<size_t, size_t>> shared;
+	std::vector<trefs> ds(cs.size());
+	tref best = nullptr;
+	size_t best_n = 1;
+	for (size_t i = 0; i < cs.size(); ++i) {
+		if (!is_child<node>(cs[i], tau::wff_or)) continue;
+		ds[i] = members<node>(cs[i]);
+		for (tref d : ds[i]) {
+			if (!fv_meets<node>(d, X)) continue;
+			auto [it, fresh] = shared.try_emplace(d, 0, i);
+			auto& [n, last] = it->second;
+			if (!fresh && last == i) continue;
+			++n, last = i;
+			if (n > best_n || (best != nullptr && n == best_n
+				&& formula_size<node>(d) > formula_size<node>(best)))
+				best = d, best_n = n;
+		}
+	}
+	if (best == nullptr) return std::nullopt;
+	trefs kept, rs;
+	for (size_t i = 0; i < cs.size(); ++i) {
+		trefs others;
+		for (tref d : ds[i])
+			if (!tau::subtree_equals(d, best)) others.push_back(d);
+		if (others.size() == ds[i].size()) kept.push_back(cs[i]);
+		else rs.push_back(simplified_or_join<node>(others));
+	}
+	kept.push_back(simplified_or_join<node>(
+		{ best, simplified_and_join<node>(rs) }));
+	return simplified_and_join<node>(kept);
+}
+
+} // namespace junctions_detail
 
 // --- 2d ---------------------------------------------------------------------------
 
@@ -164,7 +213,15 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		return acc.result();
 	}
 
-	// 6. THE LICENSED DECOMPOSITION, then the expansion, the floor (§6).
+	// 6. THE SHARED DISJUNCT, factored out: `∃X` then distributes over
+	// `d ∨ (r₁ ∧ … ∧ rₖ)` (2d) instead of splitting on `d` per conjunct.
+	// A factoring removes at least one ∨-conjunct, so re-entry terminates.
+	if (const std::optional<tref> f =
+		junctions_detail::factor_shared_disjunct<node>(cs, X))
+		return push_block<node>(simplify<node>(*f, regime::backed, c.P),
+			X, c);
+
+	// 7. THE LICENSED DECOMPOSITION, then the expansion, the floor (§6).
 	if (const std::optional<tref> r = try_decompose<node>(psi, X, c))
 		return *r;
 	return expand<node>(psi, X, c);

@@ -82,7 +82,10 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  * 5. THE CASE WITNESS, whose rewrite is emitted branch by branch, so that a
  *    branch deciding `T` leaves every later copy unbuilt. Each branch reads
  *    the clock first (§3 time limit).
- * 6. THE LICENSED DECOMPOSITION (`push/decompose.h`), one Boole split on an
+ * 6. THE SHARED DISJUNCT: a disjunct meeting `X` that two ∨-conjuncts or more
+ *    share, the most shared one, is factored out by distributivity and the
+ *    result simplified and pushed on.
+ * 7. THE LICENSED DECOMPOSITION (`push/decompose.h`), one Boole split on an
  *    atom whose two signs span sibling disjunctive conjuncts, taken when its
  *    cofactors separate material rather than copy it; then THE FLOOR, the
  *    expansion (`push/expand.h`), `∃X` distributed over one disjunctive

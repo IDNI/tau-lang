@@ -506,6 +506,54 @@ TEST_CASE("K4: each case-witness branch reads the clock first") {
 	CHECK_THROWS_AS(pushed_and(f), ap::time_limit_exceeded);
 }
 
+// --- the shared disjunct ----------------------------------------------------------
+
+TEST_CASE("S1: a disjunct meeting the block that two ∨-conjuncts share is "
+	"factored out") {
+	// `(x·y = 0 ∨ x·z = 0) ∧ (x·y = 0 ∨ x·w = 0)` is
+	// `x·y = 0 ∨ (x·z = 0 ∧ x·w = 0)`, which 2d pushes disjunct by disjunct.
+	fixture f = make("ex x ((x y = 0 || x z = 0) && (x y = 0 || x w = 0)).");
+	const trefs cs = ap::members<node_t>(f.clause);
+	REQUIRE(cs.size() == 2);
+	tref d = nullptr;
+	for (tref m : ap::members<node_t>(cs[0]))
+		if (ap::is_member<node_t>(cs[1], m)) d = m;
+	REQUIRE(d != nullptr);
+	const std::optional<tref> factored =
+		ap::junctions_detail::factor_shared_disjunct<node_t>(cs, f.P);
+	REQUIRE(factored.has_value());
+	REQUIRE(is_child<node_t>(*factored, tau::wff_or));
+	const trefs ms = ap::members<node_t>(*factored);
+	REQUIRE(ms.size() == 2);
+	CHECK(ap::is_member<node_t>(*factored, d));
+	for (tref m : ms)
+		if (!same(m, d)) CHECK(ap::members<node_t>(m).size() == 2);
+	CHECK(are_nso_equivalent<node_t>(finished(*factored),
+		finished(f.clause)));
+	const tref got = pushed_and(f);
+	check_against_source(got, f);
+	check_resolved(got, f);
+}
+
+TEST_CASE("S2: a shared disjunct free of the block is not factored") {
+	fixture f = make("ex x ((a = 0 || x z = 0) && (a = 0 || x w = 0)).");
+	CHECK(!ap::junctions_detail::factor_shared_disjunct<node_t>(
+		ap::members<node_t>(f.clause), f.P).has_value());
+	// Shared by fewer conjuncts, the disjunct meeting the block is the one
+	// factored out: `(a = 0 ∨ x·v = 0) ∧ (x·y = 0 ∨ …)`, where factoring
+	// `a = 0` would have left a disjunction.
+	fixture g = make("ex x ((a = 0 || x y = 0 || x z = 0) "
+		"&& (a = 0 || x y = 0 || x w = 0) && (a = 0 || x v = 0)).");
+	const std::optional<tref> factored =
+		ap::junctions_detail::factor_shared_disjunct<node_t>(
+			ap::members<node_t>(g.clause), g.P);
+	REQUIRE(factored.has_value());
+	CHECK(are_nso_equivalent<node_t>(finished(*factored),
+		finished(g.clause)));
+	CHECK(is_child<node_t>(*factored, tau::wff_and));
+	CHECK(ap::members<node_t>(*factored).size() == 2);
+}
+
 // --- the floor: the expansion -----------------------------------------------------
 
 TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {
