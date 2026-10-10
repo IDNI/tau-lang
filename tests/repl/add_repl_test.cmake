@@ -42,6 +42,11 @@ function(tau_repl_check_case test regex)
 	tau_repl_disable_skipped("${test}")
 endfunction()
 
+# The start of every PowerShell block that pipes text into tau: PowerShell
+# writes a byte order mark ahead of the text when the console code page is
+# UTF-8, and tau would read it as the first character of the line.
+set(TAU_REPL_PS_NO_BOM "try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}; $OutputEncoding = New-Object System.Text.UTF8Encoding $false;")
+
 # Case strings escape quotes for `bash -c "..."` (`\"`). A direct argv must
 # see bare quotes, or Tau parses `file(\"` as a backslash.
 function(tau_repl_unescape_quotes out cmd)
@@ -100,7 +105,7 @@ function(add_echo_repl_test test_name test_cmd test_regex)
 		tau_repl_unescape_quotes(_cmd "${test_cmd}")
 		add_test(NAME "test_repl-${test_name}"
 			COMMAND powershell -NoProfile -Command
-				"& { '${_cmd}. q' | & '${TAU_LAUNCHER}' }")
+				"& { ${TAU_REPL_PS_NO_BOM} '${_cmd}. q' | & '${TAU_LAUNCHER}' }")
 	else()
 		add_test(NAME "test_repl-${test_name}"
 			COMMAND bash -c "echo \"${test_cmd}. q\" | ${TAU_RUN}")
@@ -163,7 +168,7 @@ function(add_multiline_repl_test test_name test_regex)
 		string(JOIN " " _ps_args ${_args})
 		add_test(NAME "test_repl-${test_name}"
 			COMMAND powershell -NoProfile -Command
-				"& { '${_ps_stdin}' | & '${TAU_LAUNCHER}' ${_ps_args} }")
+				"& { ${TAU_REPL_PS_NO_BOM} '${_ps_stdin}' | & '${TAU_LAUNCHER}' ${_ps_args} }")
 	else()
 		string(JOIN " " _line "printf '${_payload}' |" "${TAU_RUN}" ${_args})
 		add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${_line}")
