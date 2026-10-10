@@ -139,6 +139,7 @@ template <NodeType node>
 std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 	regime rg)
 {
+	using tau = tree<node>;
 	const tref f = detail::pin_term<node>(atom, X, rg);
 	if (f == nullptr) return {};
 	// By value: the loop builds nodes, and a reference into
@@ -150,8 +151,8 @@ std::optional<pin<node>> find_strict_pin(tref atom, const block& X,
 	std::optional<terms_detail::cofactor_refuter<node>> refuter;
 	if (rg == regime::plain) refuter.emplace(f);
 	for (tref y : vars) {
-		if (refuter && !refuter->complementary(
-			tree<node>::get(tree<node>::bf, y))) continue;
+		if (refuter && !refuter->complementary(tau::get(tau::bf, y)))
+			continue;
 		std::optional<pin<node>> p = detail::pin_of_var<node>(f, y, rg);
 		if (p && p->strict) return p;
 	}
