@@ -154,7 +154,7 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-arm64-sdk-packages-rpm
 ./dev preset release-arm64-tests run        # arm64 cross tests, under qemu
 ./dev preset release-msvc-all run            # clang-cl on the MSVC ABI, in build/release-msvc
-./dev preset release-msvc-cl-all run         # cl.exe, in build/release-msvc-cl; needs -DTAU_BAS without bv
+./dev preset release-msvc-cl-all run         # cl.exe, in build/release-msvc-cl
 ./dev preset debug-asan
 ./dev preset coverage
 ./dev preset release-wasm                        # wasm library (tau.js/.wasm/.esm.mjs)

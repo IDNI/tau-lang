@@ -138,13 +138,6 @@ else()
 	message(STATUS "linker: the default linker of the compiler")
 endif()
 
-set(TAU_CLANG_RT_BUILTINS "")
-if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	include("${CMAKE_CURRENT_LIST_DIR}/tau-clang-rt-builtins.cmake")
-	tau_find_clang_rt_builtins("${CMAKE_CXX_COMPILER}" TAU_CLANG_RT_BUILTINS)
-	message(STATUS "clang-cl builtins: ${TAU_CLANG_RT_BUILTINS}")
-endif()
-
 include(git-defs) # for ${TAU_GIT_DEFINITIONS}
 function(target_git_definitions target)
 	target_compile_definitions(${target} PRIVATE ${TAU_GIT_DEFINITIONS})
@@ -270,12 +263,6 @@ function(target_setup target)
 		endif()
 	endif()
 	target_link_options(${target} PRIVATE "${TAU_LINK_OPTIONS}" ${TAU_LINKER})
-	if(TAU_CLANG_RT_BUILTINS)
-		# Plain signature, as the threads link above: CMake refuses to mix forms.
-		# The installed TauConfig.cmake finds the builtins of the consumer.
-		target_link_libraries(${target}
-			"$<BUILD_INTERFACE:${TAU_CLANG_RT_BUILTINS}>")
-	endif()
 	# Windows default stack is 1 MiB; tau_ba splitters and ocltl decode on
 	# moderate k need more (Linux soft limit is typically 8 MiB). Match the
 	# wasm STACK_SIZE so MSVC builds do not SIGSEGV / 0xc0000409 on the

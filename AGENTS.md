@@ -66,19 +66,17 @@ the `-DTAU_DEP_TARGET` target, else of the host.
 `windows-x86_64-msvc` builds the full pack from the store, cvc5 included.
 clang-cl is the default MSVC toolchain. The `<type>-msvc` presets are aliases of
 `<type>-msvc-clang-cl` and build in `build/<type>-msvc`. The `<type>-msvc-cl`
-presets build with cl.exe in `build/<type>-msvc-cl` and use the default pack. With
-cl.exe a pack fails when it holds both `tau` (the tau_ba algebra) and `bv`, so a cl
-build needs a `-DTAU_BAS` without `bv`. CI builds
-MSVC with clang-cl only. It runs the C++ suite (`release-msvc-all-clang-cl`) with
-the MSVC shell from `ilammy/msvc-dev-cmd`; a producer's `vcvars64.bat` search is
+presets build with cl.exe in `build/<type>-msvc-cl` and use the default pack. CI
+builds MSVC with cl.exe (`release-msvc-cl-all`) and with clang-cl
+(`release-msvc-all-clang-cl`), both with the MSVC shell from
+`ilammy/msvc-dev-cmd`; a producer's `vcvars64.bat` search is
 only a local fallback. Boost builds with cl.exe for every MSVC preset. cvc5 does not
 build with cl.exe, so its producer builds it with the Visual Studio clang-cl for every
 MSVC preset, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
 That package holds the cvc5 library only: cvc5's parser library does not link as a DLL
 of its own there, and tau uses neither it nor the cvc5 binary.
 The ids record these builders, so the cl and clang-cl presets share one Boost package
-and one cvc5 package. An installed MSVC SDK with `bv` needs clang-cl as the compiler
-of the project that uses it.
+and one cvc5 package.
 Configure copies `cvc5.dll` into the build root, where the executables are. The suites
 carry no platform skip of their own: `tests/test_helpers.h` gives every
 platform a scratch directory, a host-compiler probe and `tau_test_run` over

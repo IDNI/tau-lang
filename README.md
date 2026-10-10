@@ -347,8 +347,7 @@ the build folder name `./dev preset` uses: `release`, `devel`, `debug`, and
 their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`, `-wasm` and
 `-wasm-nothreads` twins. `-msvc` is the clang-cl build, the default MSVC
 toolchain. `-msvc-cl` is the cl.exe build. The `*-msvc-cl` presets use the
-default pack. With cl.exe a pack fails when it holds both `tau` (the tau_ba
-algebra) and `bv`, so a cl build needs a `-DTAU_BAS` without `bv`.
+default pack.
 
 Any other `./dev preset` name maps to the platform of its build folder, so
 `--preset release-msvc-all` builds with the `release-msvc` platform, and
