@@ -384,9 +384,11 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves,
 			// The inner spine nodes, for a caller that must recognise
 			// them later (the path sweep marks them handled).
 			if (inner && m != n) inner->push_back(m);
-			const auto children = t.get_children();
-			for (auto it = children.rbegin(); it != children.rend(); ++it)
-				stack.push_back(*it);
+			// Reversed where they land, so the leftmost child is
+			// popped first.
+			const size_t pushed_from = stack.size();
+			for (tref c : t.children()) stack.push_back(c);
+			std::reverse(stack.begin() + pushed_from, stack.end());
 		} else {
 			LOG_TRACE << "adding leaf: " << LOG_FM(m);
 			leaves.push_back(m);
