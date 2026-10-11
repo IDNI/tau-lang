@@ -551,12 +551,15 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      # The stage copies the store of wasm-node-resolve, which without the switch
+      # resolves the no-thread ids that no job publishes.
       - name: Build and test
         run: |
           ./dev docker wasm-browser \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-wasm-browser-deps \
             --cache-from type=gha,scope=tau-wasm-deps \
