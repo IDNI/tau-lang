@@ -43,7 +43,7 @@ TEST_SUITE("bounded_call") {
 
 	TEST_CASE("a child that dies gives no answer") {
 		if (!bounded_calls_available()) return;
-		auto out = run_bounded([] { std::_Exit(3); return uint8_t{1}; },
+		auto out = run_bounded([]() -> uint8_t { std::_Exit(3); },
 			10'000);
 		CHECK( out.status == bounded_outcome::failed );
 		CHECK( out.rep.has_error() );
