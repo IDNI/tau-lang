@@ -6,6 +6,9 @@ come from Spot version @TAU_SPOT_VERSION@.
 Spot is free software under the GNU General Public License, version 3
 (GPLv3). The license text is in the file COPYING in this folder. Tau runs
 these tools as separate programs. Tau does not link Spot.
+The Windows packages also ship the runtime libraries of the build
+toolchain beside the tools. Their license texts are in the folders beside
+this one.
 
 The source of these tools is in the same GitHub release as this package:
 

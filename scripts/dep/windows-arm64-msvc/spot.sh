@@ -79,16 +79,60 @@ EOF
 		|| { echo "dep-spot: MSYS2 build failed" >&2; return 1; }
 }
 
+# The runtime DLLs ship with the tools, so their license texts ship too.
+# _dep_spot_runtime_licenses <staging prefix> <env dir> <msystem> <dll>...
+_dep_spot_runtime_licenses() {
+	local staging_prefix="$1" env_dir="$2" msystem="$3"
+	shift 3
+	local work script list dll path rel found
+	work="$(dirname "$staging_prefix")/work"
+	script="${work}/licenses.sh"
+	list="${work}/licenses.txt"
+	mkdir -p "$work"
+	cat > "$script" <<'EOF'
+#!/bin/bash
+set -uo pipefail
+out="$1" env_dir="$2"
+shift 2
+: > "$out"
+for dll in "$@"; do
+	owner="$(pacman -Qoq "/${env_dir}/bin/${dll}")" || continue
+	pacman -Qlq "$owner" | grep '/share/licenses/' | grep -v '/$' \
+		| sed "s|^|${dll} |" >> "$out"
+done
+EOF
+	MSYSTEM="$msystem" CHERE_INVOKING=1 \
+		"${DEP_SPOT_MSYS_ROOT}/usr/bin/bash.exe" --login "$script" "$list" "$env_dir" "$@" \
+		|| { echo "dep-spot: pacman license lookup failed" >&2; return 1; }
+	for dll in "$@"; do
+		found=0
+		while read -r path; do
+			rel="${path#*/share/licenses/}"
+			mkdir -p "$(dirname "${staging_prefix}/share/licenses/${rel}")"
+			cp -f "${DEP_SPOT_MSYS_ROOT}${path}" "${staging_prefix}/share/licenses/${rel}" \
+				|| { echo "dep-spot: cannot copy ${path}" >&2; return 1; }
+			found=1
+		done < <(sed -n "s|^${dll} ||p" "$list")
+		if [ "$found" = 0 ]; then
+			echo "dep-spot: no license files for ${dll}" >&2
+			return 1
+		fi
+	done
+}
+
 # CreateProcess loads DLLs from the executable's directory; the MSVC
 # test process has no CLANGARM64 on PATH the way an MSYS shell does.
 _dep_spot_target_finish() {
-	local staging_prefix="$1" dll strip
+	local staging_prefix="$1" dll strip copied=()
 	for dll in libc++.dll libunwind.dll libwinpthread-1.dll; do
 		if [ -f "${DEP_SPOT_MSYS_ROOT}/clangarm64/bin/${dll}" ]; then
 			cp -f "${DEP_SPOT_MSYS_ROOT}/clangarm64/bin/${dll}" \
 				"${staging_prefix}/bin/"
+			copied+=("$dll")
 		fi
 	done
+	_dep_spot_runtime_licenses "$staging_prefix" clangarm64 CLANGARM64 ${copied[@]+"${copied[@]}"} \
+		|| return 1
 	strip="${DEP_SPOT_MSYS_ROOT}/clangarm64/bin/strip.exe"
 	if [ ! -x "$strip" ]; then
 		strip="${DEP_SPOT_MSYS_ROOT}/clangarm64/bin/llvm-strip.exe"
