@@ -46,6 +46,8 @@ _dep_spot_target_compiler_fields() {
 # let it set CLANGARM64 up itself.
 # CPPFLAGS=-w drops the warnings of the Spot sources and keeps the
 # optimization flags that configure picks.
+# clang refuses the narrowing of a size to the 32-bit Windows unsigned long
+# in Spot.
 _dep_spot_target_build() {
 	local src="$1" staging_prefix="$2"
 	local build_script
@@ -69,7 +71,7 @@ _dep_spot_target_build() {
 set -euo pipefail
 export PATH=/clangarm64/bin:/usr/bin:\$PATH
 cd "${src}"
-./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS=-w
+./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS="-w -Wno-c++11-narrowing"
 make -j${DEP_SPOT_JOBS}
 make install-exec
 EOF
