@@ -51,9 +51,18 @@ _dep_spot_target_build() {
 	local build_script
 	if [ -z "$DEP_SPOT_MSYS_ROOT" ]; then
 		echo "dep-spot: MSYS2 CLANGARM64 clang++ not found; install MSYS2 and" >&2
-		echo "  pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make" >&2
+		echo "  pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils" >&2
 		return 1
 	fi
+	# clang refuses a dllexport template with a local type, and a static build exports nothing.
+	local common_hh="${src}/spot/misc/common.hh"
+	if ! grep -qx '  #define SPOT_DLL' "$common_hh"; then
+		echo "dep-spot: common.hh has no SPOT_DLL define" >&2
+		return 1
+	fi
+	sed -i 's|^  #define SPOT_DLL$|  // no SPOT_DLL: the static build exports nothing|' "$common_hh" \
+		&& ! grep -q '^  #define SPOT_DLL$' "$common_hh" \
+		|| { echo "dep-spot: cannot drop the SPOT_DLL define" >&2; return 1; }
 	build_script="$(dirname "$src")/build.sh"
 	cat > "$build_script" <<EOF
 #!/bin/bash
