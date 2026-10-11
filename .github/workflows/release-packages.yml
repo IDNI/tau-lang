@@ -552,6 +552,89 @@ jobs:
           name: packages-windows-x86_64-msvc-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
 
+  windows-arm64-msvc-wheel:
+    name: Windows arm64 · wheel
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # The venv carries the interpreter, nanobind and delvewheel, and the
+      # script appends TAU_PYTHON for the build and the wheel check.
+      - name: Create the wheel venv
+        run: ./dev dep-python-venv
+
+      # cl.exe is on PATH only inside a developer command prompt. The action
+      # passes arch to vcvarsall.bat, which selects the native arm64 tools.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-11-arm-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-11-arm-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+
+      # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
+      - name: Set the wheel time
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
+      - name: Build the MSVC wheel
+        run: |
+          ./dev preset release-msvc-arm64-binding-python --target tau_wheel \
+            -DPython_EXECUTABLE="$TAU_PYTHON" -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      - name: Locate the wheel
+        run: echo "WHEEL_DIR=$PWD/build/release-msvc-arm64/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+
+      # The repair step rewrites the wheel. Check the repaired artifact before
+      # upload: its tag, module, bundled cvc5 DLLs and paths.
+      - name: Check the wheel contents
+        run: |
+          TAU_WHEEL_PATH="$(ls build/release-msvc-arm64/bindings/python/nanobind/wheel/*.whl)"
+          export TAU_WHEEL_PATH
+          "$TAU_PYTHON" tests/bindings/python/test_wheel_contents.py "$TAU_WHEEL_PATH"
+
+      - name: Upload the MSVC wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-windows-arm64-msvc-wheel
+          path: ${{ env.WHEEL_DIR }}/*.whl
+
   # The Intel macOS package, on its own runner, as the arm64 one.
   macos-x86_64:
     name: macOS x86_64 · package
@@ -820,6 +903,89 @@ jobs:
             ${{ env.PKG_DIR }}/*.zip
           if-no-files-found: error
 
+  # tau.exe with its DLLs and licenses, as an NSIS installer with the SDK box
+  # and as a zip, for Windows arm64. Both presets build in
+  # build/release-msvc-arm64.
+  windows-arm64-msvc:
+    name: Windows arm64 · package
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-11-arm runners are 4-core
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # cl.exe is on PATH only inside a developer command prompt. The action
+      # passes arch to vcvarsall.bat, which selects the native arm64 tools.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      # CPack needs makensis. NSIS is an x86 program, which Windows 11 on arm64
+      # runs under emulation.
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          Add-Content $env:GITHUB_PATH "${env:ProgramFiles(x86)}\NSIS"
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-11-arm-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-11-arm-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+
+      - name: Build the NSIS installer
+        run: ./dev preset release-msvc-arm64-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build the zip package
+        run: ./dev preset release-msvc-arm64-packages-zip -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+      # upload-artifact reads a Windows path, not the Git Bash form of $HOME.
+      - name: Locate the Windows packages
+        run: echo "PKG_DIR=$(cygpath -m "$HOME")/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload the Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-windows-arm64-msvc
+          path: |
+            ${{ env.PKG_DIR }}/*.exe
+            ${{ env.PKG_DIR }}/*.zip
+          if-no-files-found: error
+
   # The npm package of the wasm library. The build folder is the package:
   # configure writes its package.json. No registry publish.
   wasm-npm:
@@ -867,7 +1033,7 @@ jobs:
     name: Publish
     needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
       macos, macos-wheel, macos-x86_64, macos-x86_64-wheel, windows-msvc,
-      windows-msvc-wheel, wasm-npm ]
+      windows-msvc-wheel, windows-arm64-msvc, windows-arm64-msvc-wheel, wasm-npm ]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Creating the release needs contents: write; the build jobs keep the
