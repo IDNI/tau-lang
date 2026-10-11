@@ -20,7 +20,7 @@ set(TAU_SHARED_HELPER_PROVENANCE
 # guard catches a change a package identity would miss. Each entry is
 # "<repo-relative path>|<sha256>".
 set(TAU_SHIM_PROVENANCE
-	"external/parser/scripts/devrc|fdb41dc219cd795ff7870b9c4d42bb09358eb321e811566a57a1e93a5c8f6a42"
+	"external/parser/scripts/devrc|7984749406329861cc72559bc7fdc8109b2b1c1ca2f9514890f8c2b8f1131509"
 	"scripts/devrc|b3a85661ee33abb7359a89a450915177ed96bb7da87f259d11e5b0e15281b056"
 )
 
