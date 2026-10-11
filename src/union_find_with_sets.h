@@ -12,8 +12,6 @@
 #ifndef TAU_UNION_FIND_WITH_SETS_H
 #define TAU_UNION_FIND_WITH_SETS_H
 
-#include <type_traits>
-
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -33,9 +31,11 @@ template <typename comp, NodeType node>
 struct union_find_with_sets {
 	/// The tree type of @p node.
 	using tau = tree<node>;
-	/// A reference to the comparator. const means nothing on a function type.
-	using comp_ref = std::conditional_t<std::is_function_v<comp>,
-		comp&, const comp&>;
+	/// A reference to the comparator: a function type takes no const.
+	template <typename T> struct comp_ref_of { using type = const T&; };
+	template <typename R, typename... A>
+	struct comp_ref_of<R(A...)> { using type = R (&)(A...); };
+	using comp_ref = typename comp_ref_of<comp>::type;
 private:
 	subtree_unordered_map<node, tref> parent;
 	subtree_unordered_map<node, tref> next;
