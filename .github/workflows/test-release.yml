@@ -804,8 +804,7 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # This toolchain builds the Spot package and is part of what identifies
-      # it, so resolving the package needs it on a store hit too.
+      # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 UCRT64 toolchain
         shell: cmd
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
@@ -860,12 +859,11 @@ jobs:
   # The Windows arm64 environment: the windows-arm64-msvc store. cl.exe and
   # clang-cl record a different compiler in the curl package id, so this job
   # resolves both id sets once and saves the store. The test matrix below
-  # restores that store. Boost, cvc5 and curl build from source in the first
-  # run on this runner.
+  # restores that store. Boost, cvc5, curl and Spot build from source in the
+  # first run on this runner.
   windows-arm64-msvc-store:
     name: Windows arm64 · environment
-    # The x86_64 job publishes the Spot package this job reuses.
-    needs: [guard, windows-msvc-store]
+    needs: guard
     runs-on: windows-11-arm
     timeout-minutes: 240
     permissions:
@@ -918,7 +916,11 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+      # The Spot package is a host tool built with the MSYS2 CLANGARM64 clang
+      # (nothing links it); the runner ships MSYS2 but not this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
 
       - name: Resolve the cl.exe store packages
         run: ./dev preset release-msvc-cl-arm64-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
@@ -994,7 +996,10 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+      # A store miss builds the Spot package with this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
 
       # A crashed test prints little, so Windows keeps a mini dump of it.
       - name: Keep a crash dump of each crashing program
