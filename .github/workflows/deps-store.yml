@@ -182,8 +182,6 @@ jobs:
   # The windows-arm64-msvc packages build on an arm64 host, so they cannot come
   # from the x86_64 job.
   publish-windows-arm64:
-    # The x86_64 job publishes the Spot package this job reuses.
-    needs: publish-windows
     runs-on: windows-11-arm
     timeout-minutes: 240
     defaults:
@@ -203,7 +201,12 @@ jobs:
         with:
           arch: arm64
 
-      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+      # The windows-arm64-msvc Spot package is a Windows host tool built by
+      # the MSYS2 CLANGARM64 clang, so its producer needs that toolchain on a
+      # Windows host.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
