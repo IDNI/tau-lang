@@ -719,7 +719,12 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+      # The Spot package is a host tool built with the MSYS2 CLANGARM64 clang
+      # (nothing links it); the runner ships MSYS2 but not this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        if: steps.cache-store.outputs.cache-hit != 'true'
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
 
       # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
       - name: Set the wheel time
@@ -1101,7 +1106,12 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+      # The Spot package is a host tool built with the MSYS2 CLANGARM64 clang
+      # (nothing links it); the runner ships MSYS2 but not this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        if: steps.cache-store.outputs.cache-hit != 'true'
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
 
       - name: Build the NSIS installer
         run: ./dev preset release-msvc-arm64-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
