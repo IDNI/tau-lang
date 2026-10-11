@@ -5,8 +5,7 @@
 set -u
 
 DEP_FILE_TARGET=windows-x86_64-msvc
-# The arm64 and MinGW targets reuse this package, under the x64 emulation of
-# Windows 11 and under wine.
+# The MinGW target reuses this package under wine.
 DEP_SPOT_ID_OS=Windows
 DEP_SPOT_ID_ARCH=x86_64
 DEP_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"

@@ -341,13 +341,13 @@ endfunction()
 # the package: a host PATH tool cannot carry the runtime DLLs of the PE, and wine
 # cannot load an ELF.
 #
-# windows-arm64-msvc takes the windows-x86_64-msvc entry: Windows 11 on arm64
-# runs the x64 tools under emulation. windows-x86_64-mingw takes the same
-# entry, the Windows PE a MinGW tau execs. Under that id the producer applies
-# the msvc host guard before it reads any store, so a configure on a Linux
-# host always misses. A miss warns and leaves TAU_SPOT_BIN empty, and the LTL
-# suites skip, because spot is an optional test-time tool. Do not fall back to a host ltlsynt: an ELF under an .exe name
-# would make the suites run and fail instead of skip.
+# windows-x86_64-mingw takes the windows-x86_64-msvc entry, the Windows PE a
+# MinGW tau execs. Every other target builds its own package. Under that id the
+# producer applies the msvc host guard before it reads any store, so a configure
+# on a Linux host always misses. A miss warns and leaves TAU_SPOT_BIN empty, and
+# the LTL suites skip, because spot is an optional test-time tool. Do not fall
+# back to a host ltlsynt: an ELF under an .exe name would make the suites run
+# and fail instead of skip.
 function(tau_deps_resolve_spot)
 	# A wasm module cannot exec a host process, so no spot package serves it.
 	# The LTL suites skip there through ltlsynt_available().
@@ -370,8 +370,7 @@ function(tau_deps_resolve_spot)
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()
-	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw"
-			OR TAU_DEPS_TARGET STREQUAL "windows-arm64-msvc")
+	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
 		tau_deps_producer_script(_spot_producer "${PROJECT_SOURCE_DIR}" spot
 			"windows-x86_64-msvc")
 		tau_deps_ensure_prefix_as(spot "${_spot_producer}"

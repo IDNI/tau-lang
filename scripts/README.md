@@ -106,7 +106,8 @@ Legacy wrappers are unchanged. Prefer presets for new work.
   without a script fails with the list of targets that have one. The id records
   `recipe_hash` of the target script and `recipe_common_hash` of the shared
   recipe. `dep-spot` builds the Spot CLI Tau execs, never
-  links: MSYS2 UCRT64 g++ on `windows-x86_64-msvc`, the preset's compiler elsewhere, and
+  links: MSYS2 UCRT64 g++ on `windows-x86_64-msvc`, MSYS2 CLANGARM64 clang++ on
+  `windows-arm64-msvc`, the preset's compiler elsewhere, and
   a host with `ltlsynt` on `PATH` skips it entirely. `dep-cvc5` on
   `windows-x86_64-msvc` builds with the Visual Studio clang-cl, not the preset's
   compiler, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a
