@@ -1372,7 +1372,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					auto canonized_io_var = canonize<node>(io_var);
 					for (auto c : io_def.get_children()) {
 						if (tau::get(c).is(tau::typed)) {
-							auto type_id = get_ba_type_id<node>(c);
+							// A child tref carries its right sibling, the stream,
+							// which the registry would keep in the type tree.
+							auto type_id = get_ba_type_id<node>(
+								tau::trim_right_sibling(c));
 							resolver.insert(canonized_io_var);
 							// An io var has no merge to complete a bare
 							// family from, unlike an atom's cast.
