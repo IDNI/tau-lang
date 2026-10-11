@@ -1098,14 +1098,14 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 	auto read_bound = [&](tref n) -> std::optional<bound> {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::wff) || !t.has_child()) return std::nullopt;
-		auto op = t[0].value.nt;
+		size_t op = t[0].value.get_nt();
 		bool negate = false;
 		const tree<node>* at = &t[0];
 		if (op == tau::wff_neg) {
 			const auto& ti = tau::get(t[0].first());
 			if (!ti.is(tau::wff) || !ti.has_child()) return std::nullopt;
 			at = &ti[0];
-			op = ti[0].value.nt;
+			op = ti[0].value.get_nt();
 			negate = true;
 		}
 		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
