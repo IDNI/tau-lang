@@ -1020,8 +1020,9 @@ result<std::optional<tref>> atomless_choose_value_ledger(
 {
 	using tau = tree<node>;
 	result<std::optional<tref>> r;
-	if (!options.ledger || options.ledger->exhausted || cofactors.empty())
-		return r.with_value(std::nullopt);
+	if (!options.ledger || options.ledger->exhausted.contains(type)
+		|| cofactors.empty())
+			return r.with_value(std::nullopt);
 
 	auto red_and = [&](tref a, tref b) {
 		return bf_reduce_canonical<node>()(
@@ -1054,8 +1055,9 @@ result<std::optional<tref>> atomless_choose_value_ledger(
 		external.push_back(c0);
 	}
 
-	tref region = options.ledger->fresh_region
-		? options.ledger->fresh_region->get() : nullptr;
+	auto fresh = options.ledger->fresh_regions.find(type);
+	tref region = fresh != options.ledger->fresh_regions.end()
+		? fresh->second->get() : nullptr;
 	if (!region) region = tau::_1(type);
 	for (tref v : external) {
 		if (exceeds_constant_size<node>(region, v))
@@ -1146,18 +1148,19 @@ result<void> ledger_commit_witness(fresh_element_ledger& ledger, tref value,
 	// the region already excludes a value committed before
 	if (ledger.is_committed(value)) return r.with_value();
 	ledger.register_committed(value);
-	if (ledger.exhausted) return r.with_value();
-	tref region = ledger.fresh_region
-		? ledger.fresh_region->get() : nullptr;
+	if (ledger.exhausted.contains(type)) return r.with_value();
+	auto fresh = ledger.fresh_regions.find(type);
+	tref region = fresh != ledger.fresh_regions.end()
+		? fresh->second->get() : nullptr;
 	if (!region) region = tau::_1(type);
 	if (exceeds_constant_size<node>(region, value)) {
-		ledger.exhausted = true;
-		ledger.fresh_region = nullptr;
+		ledger.exhausted.insert(type);
+		ledger.fresh_regions.erase(type);
 		return r.with_value();
 	}
 	TAU_TRY(tref next, bf_reduce_canonical<node>()(
 		(tau::get(region) & ~tau::get(value)).get()));
-	ledger.fresh_region = tau::geth(next);
+	ledger.fresh_regions[type] = tau::geth(next);
 	return r.with_value();
 }
 

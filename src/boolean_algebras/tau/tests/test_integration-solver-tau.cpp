@@ -285,10 +285,10 @@ TEST_SUITE("solve_inequality_system") {
 		tref v = tau::get(tau::get(eq).first()).second();
 		fresh_element_ledger ledger;
 		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
-		REQUIRE( ledger.fresh_region );
-		tref region = ledger.fresh_region->get();
+		REQUIRE( ledger.fresh_regions.contains(type_id) );
+		tref region = ledger.fresh_regions.at(type_id)->get();
 		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
-		CHECK( ledger.fresh_region->get() == region );
+		CHECK( ledger.fresh_regions.at(type_id)->get() == region );
 	}
 
 	// The region a commit leaves, and the one a second commit of the same

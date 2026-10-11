@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <set>
 
 #include "tau_tree.h"
 
@@ -203,18 +204,19 @@ struct fresh_element_ledger {
 		return it->second;
 	}
 
-	// The still-fully-fresh region, shrunk by every register_committed so a
-	// further split of it stays disjoint from everything committed
-	// (freeness); null until the first commit means "the whole carrier".
-	// Held as htref and reassigned (never mutated) on every shrink: each
-	// new region structurally contains every prior value, so rooting only
-	// the latest is enough -- no separate per-value pin needed.
-	htref fresh_region;
+	// The still-fully-fresh region of each BA type, shrunk by every
+	// register_committed so a further split of it stays disjoint from
+	// everything committed (freeness); no entry means "the whole carrier".
+	// A step commits outputs of several types, and a region holds only
+	// values of its own type. Held as htref and reassigned (never mutated)
+	// on every shrink: each new region structurally contains every prior
+	// value, so rooting only the latest is enough.
+	std::map<size_t, htref> fresh_regions;
 
-	// Set once the region outgrew `max_constant_size`: the region is no
-	// longer tracked, so no value counts as fresh and every choice goes
-	// to the general solver.
-	bool exhausted = false;
+	// The types whose region outgrew `max_constant_size`: their region is
+	// no longer tracked, so no value of them counts as fresh and every
+	// choice goes to the general solver.
+	std::set<size_t> exhausted;
 };
 
 /**
