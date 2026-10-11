@@ -395,3 +395,9 @@ add_repl_test(solver_cmd-issue181_max_tau
 	"solve --max (x = 0 || x = 1)" "x := \\{ T \\}:tau")
 add_repl_test(solver_cmd-issue181_min_sbf
 	"solve --min (x = {a}:sbf || x = {a & b}:sbf)" "x := \\{ a b \\}:sbf")
+
+# GitHub #148: the bounds pin x to 1 and a is fixed to another value, so x != a
+# has a witness
+add_repl_test(solver_cmd-qlt_neq-other_singleton
+	"solve a:qlt = {2}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))"
+	"a := \\{ 2 \\}:qlt")

@@ -490,3 +490,12 @@ add_repl_test(normalize_cmd-qlt_cells_max_params_zero_is_unlimited
 add_repl_test(normalize_cmd-qlt_cells_budget_spent
 	"set qlt-cells-budget 1. normalize ex x:qlt ((({3}:qlt & x) != 0) && (({5}:qlt & x) != 0))" "%[0-9]+[^%]*: ex ")
 
+
+# GitHub #148: an existential pinned to one point by non-strict bounds becomes
+# the disequality it must satisfy there
+add_repl_test(normalize_cmd-qlt_neq-constant_singleton
+	"normalize ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)"
+	": (a != \\{ 1 \\}:qlt|\\{ 1 \\}:qlt != a)")
+add_repl_test(normalize_cmd-qlt_neq-symbolic_singleton
+	"normalize ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)"
+	": (a != b|b != a)")
