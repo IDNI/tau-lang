@@ -86,3 +86,13 @@ add_repl_test(valid_cmd-issue144_sometimes_input_atom "valid sometimes i1[t] = 1
 add_repl_test(valid_cmd-issue144_sometimes_input_or_output "valid sometimes (o1[t] = 1 || i1[t] = 1)" ": F")
 add_repl_test(valid_cmd-issue144_sometimes_or_always_input "valid (sometimes i1[t] = 1) || (always i1[t] = 1)" ": F")
 add_repl_test(valid_cmd-issue144_input_excluded_middle "valid (sometimes i1[t] = 1) || (always i1[t] != 1)" ": T")
+
+# GitHub #148: a qlt disequality removes one point of a dense order, which
+# empties the set only when the other constraints pin the variable to that point
+add_repl_test(valid_cmd-qlt_neq-constant_singleton "valid ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)" ": F")
+add_repl_test(valid_cmd-qlt_neq-symbolic_singleton_equivalence "valid (ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)) <-> a:qlt != b:qlt" ": T")
+add_repl_test(valid_cmd-qlt_neq-constant_singleton_equivalence "valid (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)) <-> a:qlt != {1}:qlt" ": T")
+add_repl_test(valid_cmd-qlt_neq-open_constant_interval "valid ex x ({0}:qlt < x:qlt && x:qlt < {1}:qlt && x:qlt != a:qlt)" ": T")
+add_repl_test(valid_cmd-qlt_neq-closed_constant_interval "valid ex x ({0}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)" ": T")
+add_repl_test(valid_cmd-qlt_neq-open_symbolic_interval "valid a:qlt < b:qlt -> (ex x (a:qlt < x:qlt && x:qlt < b:qlt && x:qlt != c:qlt))" ": T")
+add_repl_test(valid_cmd-qlt_neq-closed_symbolic_interval "valid a:qlt < b:qlt -> (ex x (a:qlt <= x:qlt && x:qlt <= b:qlt && x:qlt != c:qlt))" ": T")
