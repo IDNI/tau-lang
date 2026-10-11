@@ -32,8 +32,10 @@ TEST_SUITE("AntiPrenexBlock") {
 		auto [body, block, order] = peel_block(fm);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
-		for (size_t i = 0; i < block.size(); ++i)
-			quant_pattern.emplace(block[i], i + 1);
+		for (size_t i = 0; i < block.size(); ++i) {
+			REQUIRE(std::in_range<int_t>(i + 1));
+			quant_pattern.emplace(block[i], static_cast<int_t>(i + 1));
+		}
 		tref res = anti_prenex_block<node_t>(body, block,
 			used_atms, quant_pattern, order, eliminability<node_t>::arith_only()).value();
 		return {res, used_atms.size()};
@@ -49,8 +51,10 @@ TEST_SUITE("AntiPrenexBlock") {
 		auto [body, block, order] = peel_block(fm);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
-		for (size_t i = 0; i < block.size(); ++i)
-			quant_pattern.emplace(block[i], i + 1);
+		for (size_t i = 0; i < block.size(); ++i) {
+			REQUIRE(std::in_range<int_t>(i + 1));
+			quant_pattern.emplace(block[i], static_cast<int_t>(i + 1));
+		}
 		tref res = anti_prenex_block<node_t>(body, block,
 			used_atms, quant_pattern, order,
 			eliminability<node_t>::arith_only()).value();
@@ -981,8 +985,10 @@ TEST_SUITE("Gamma4Guard") {
 		}
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> quant_pattern;
-		for (size_t i = 0; i < block.size(); ++i)
-			quant_pattern.emplace(block[i], i + 1);
+		for (size_t i = 0; i < block.size(); ++i) {
+			REQUIRE(std::in_range<int_t>(i + 1));
+			quant_pattern.emplace(block[i], static_cast<int_t>(i + 1));
+		}
 		tref res = anti_prenex_block<node_t>(body, block, used_atms,
 			quant_pattern, order, eliminability<node_t>::arith_only()).value();
 		const trefs& fv = get_free_vars<node_t>(res);
@@ -1177,8 +1183,10 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		body = normalize_atomic_formula_operators<node_t>(body);
 		subtree_unordered_set<node_t> used_atms;
 		subtree_unordered_map<node_t, int_t> qp;
-		for (size_t i = 0; i < block.size(); ++i)
-			qp.emplace(block[i], i + 1);
+		for (size_t i = 0; i < block.size(); ++i) {
+			REQUIRE(std::in_range<int_t>(i + 1));
+			qp.emplace(block[i], static_cast<int_t>(i + 1));
+		}
 		size_t sl = block_boole_max_splits;
 		analysis_context<node_t> ac;
 		const block_eliminability<node_t> elim = analyse_block<node_t>(
