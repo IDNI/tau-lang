@@ -206,7 +206,7 @@ jobs:
       # Windows host.
       - name: Install the MSYS2 CLANGARM64 toolchain
         shell: cmd
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras

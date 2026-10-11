@@ -13,5 +13,8 @@ The source of these tools is in the same GitHub release as this package:
 - `spot-build-scripts-@TAU_SPOT_VERSION@.tar.gz` holds the scripts that
   build the tools from that source.
 
+The Windows arm64 build script changes one line of `spot/misc/common.hh`
+before it builds. That script is in the build scripts archive.
+
 The Spot source release is also at @TAU_SPOT_URL@.
 The Spot home page is https://spot.lre.epita.fr/.

@@ -920,7 +920,7 @@ jobs:
       # (nothing links it); the runner ships MSYS2 but not this toolchain.
       - name: Install the MSYS2 CLANGARM64 toolchain
         shell: cmd
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       - name: Resolve the cl.exe store packages
         run: ./dev preset release-msvc-cl-arm64-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
@@ -999,7 +999,7 @@ jobs:
       # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 CLANGARM64 toolchain
         shell: cmd
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       # A crashed test prints little, so Windows keeps a mini dump of it.
       - name: Keep a crash dump of each crashing program

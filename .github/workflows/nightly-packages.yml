@@ -724,7 +724,7 @@ jobs:
       - name: Install the MSYS2 CLANGARM64 toolchain
         if: steps.cache-store.outputs.cache-hit != 'true'
         shell: cmd
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       # The wheel stamps its zip entries with this time, so a rebuild is byte-identical.
       - name: Set the wheel time
@@ -1111,7 +1111,7 @@ jobs:
       - name: Install the MSYS2 CLANGARM64 toolchain
         if: steps.cache-store.outputs.cache-hit != 'true'
         shell: cmd
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       - name: Build the NSIS installer
         run: ./dev preset release-msvc-arm64-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
