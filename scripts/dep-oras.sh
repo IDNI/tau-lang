@@ -28,6 +28,12 @@ case "$(uname -m)" in
 	*) echo "dep-oras: unsupported arch $(uname -m)" >&2; exit 2 ;;
 esac
 
+# oras has no Windows arm64 build, and Windows 11 on arm64 runs the x64 one
+# under emulation.
+if [ "$ORAS_OS" = windows ] && [ "$ORAS_ARCH" = arm64 ]; then
+	ORAS_ARCH=amd64
+fi
+
 if [ "$ORAS_OS" = windows ]; then
 	ORAS_ASSET="oras_${ORAS_VERSION}_${ORAS_OS}_${ORAS_ARCH}.zip"
 else

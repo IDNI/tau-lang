@@ -178,3 +178,43 @@ jobs:
           ./dev store-publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The windows-arm64-msvc packages build on an arm64 host, so they cannot come
+  # from the x86_64 job.
+  publish-windows-arm64:
+    # The x86_64 job publishes the Spot package this job reuses.
+    needs: publish-windows
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+
+      # cl.exe and clang-cl use the MSVC headers and libraries. The action
+      # passes arch to vcvarsall.bat, which selects the native arm64 tools.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      # No MSYS2 toolchain: the target reuses the x86_64 Spot package.
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve and publish the MSVC store packages
+        run: |
+          ./dev preset release-msvc-cl-arm64-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev preset release-msvc-arm64-tau -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+          ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
